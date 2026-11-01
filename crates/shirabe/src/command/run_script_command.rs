@@ -326,14 +326,9 @@ impl Command for RunScriptCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        dispatcher.borrow_mut().dispatch_script(
-            &script,
-            dev_mode,
-            args.iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<String>>(),
-            IndexMap::new(),
-        )
+        dispatcher
+            .borrow_mut()
+            .dispatch_script(&script, dev_mode, args, IndexMap::new())
     }
 
     fn initialize(

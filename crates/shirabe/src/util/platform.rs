@@ -5,9 +5,9 @@ use bstr::ByteSlice;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, defined,
     file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
-    legacy_lossy, mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid,
-    preg_is_match, preg_replace_callback, putenv, putenv_clear, realpath, stream_isatty, stripos,
-    strlen, strtoupper, substr, usleep,
+    legacy_lossy, mb_strlen, os_str_from_bytes, php_os_family, php_regex, posix_geteuid,
+    posix_getpwuid, posix_getuid, preg_is_match, preg_replace_callback, putenv, putenv_clear,
+    realpath, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 use std::sync::Mutex;
 
@@ -69,14 +69,17 @@ impl Platform {
     }
 
     /// putenv() equivalent but updates the runtime global variables too
-    pub fn put_env(name: &str, value: &str) {
+    pub fn put_env(name: impl AsRef<[u8]>, value: impl AsRef<[u8]>) {
+        let name = os_str_from_bytes(&name);
+        let value = os_str_from_bytes(&value);
         unsafe { putenv(name, value) };
         PHP_SERVER.lock().unwrap().put(name.into(), value.into());
         PHP_ENV.lock().unwrap().put(name.into(), value.into());
     }
 
     /// putenv('X') equivalent but updates the runtime global variables too
-    pub fn clear_env(name: &str) {
+    pub fn clear_env(name: impl AsRef<[u8]>) {
+        let name = os_str_from_bytes(&name);
         unsafe { putenv_clear(name) };
         PHP_SERVER.lock().unwrap().clear(name);
         PHP_ENV.lock().unwrap().clear(name);

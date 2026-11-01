@@ -44,7 +44,7 @@ pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
     // somewhere else that communicates with the real PHP runtime.
     Platform::put_env(
         "COMPOSER_BINARY",
-        &realpath(path_from_bytes(
+        realpath(path_from_bytes(
             argv.first().cloned().unwrap_or_default().as_slice(),
         ))
         .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())

@@ -594,12 +594,12 @@ impl Command for InitCommand {
         }
 
         let require_value = if options.contains_key(B("require")) {
-            let req_list: Vec<String> = options
+            let req_list: Vec<BString> = options
                 .get(B("require"))
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                        .filter_map(|v| v.as_string().map(BString::from))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -611,7 +611,7 @@ impl Command for InitCommand {
                 PhpMixed::Array(
                     formatted
                         .into_iter()
-                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect(),
                 )
             }
@@ -622,12 +622,12 @@ impl Command for InitCommand {
         options.insert("require".into(), require_value);
 
         if options.contains_key(B("require-dev")) {
-            let req_list: Vec<String> = options
+            let req_list: Vec<BString> = options
                 .get(B("require-dev"))
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                        .filter_map(|v| v.as_string().map(BString::from))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -638,7 +638,7 @@ impl Command for InitCommand {
                 PhpMixed::Array(
                     formatted
                         .into_iter()
-                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect(),
                 )
             };
@@ -1197,12 +1197,9 @@ impl Command for InitCommand {
                     self.determine_requirements(
                         input.clone(),
                         output.clone(),
-                        require
-                            .iter()
-                            .map(|s| legacy_lossy(s).into_owned())
-                            .collect::<Vec<String>>(),
+                        require,
                         platform_repo.as_ref(),
-                        &preferred_stability,
+                        bstr::BStr::new(&preferred_stability),
                         false,
                         false,
                     )?
@@ -1225,12 +1222,9 @@ impl Command for InitCommand {
                     self.determine_requirements(
                         input.clone(),
                         output.clone(),
-                        require_dev
-                            .iter()
-                            .map(|s| legacy_lossy(s).into_owned())
-                            .collect::<Vec<String>>(),
+                        require_dev,
                         platform_repo.as_ref(),
-                        &preferred_stability,
+                        bstr::BStr::new(&preferred_stability),
                         false,
                         false,
                     )?

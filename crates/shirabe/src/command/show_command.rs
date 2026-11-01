@@ -1305,9 +1305,9 @@ impl ShowCommand {
             ))
         };
         let mut candidate = version_selector.find_best_candidate(
-            &name,
+            bstr::BStr::new(&name),
             target_version.as_deref(),
-            &best_stability,
+            bstr::BStr::new(&best_stability),
             Some(platform_req_filter),
             0,
             Some(self.get_io().clone()),
@@ -1331,7 +1331,7 @@ impl ShowCommand {
         let composer = crate::composer::composer_full(composer);
         if self.repository_set.borrow().is_none() {
             let mut rs = RepositorySet::new(
-                &legacy_lossy(&composer.get_package().get_minimum_stability()),
+                composer.get_package().get_minimum_stability(),
                 composer.get_package().get_stability_flags(),
                 Vec::new(),
                 IndexMap::new(),

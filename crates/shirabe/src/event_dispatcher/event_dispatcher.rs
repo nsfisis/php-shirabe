@@ -18,7 +18,7 @@ use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
@@ -26,10 +26,10 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
-    array_search_in_vec, array_splice, bconcat, file_exists, get_class, hash, implode, ini_get,
-    is_array, is_callable, is_dir, is_object, is_string, krsort, legacy_lossy, path_from_bytes,
-    path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
-    preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
+    array_search_in_vec, array_splice, bconcat, explode, explode_with_limit, file_exists,
+    get_class, hash, implode, ini_get, is_array, is_callable, is_dir, is_object, is_string, krsort,
+    legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote,
+    preg_replace, preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
     spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos, strtoupper, substr,
     trim2,
 };
@@ -40,7 +40,7 @@ use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
 /// "Class::method"), a `[object|string, method]` pair, or a `\Closure`.
 #[derive(Clone)]
 pub enum Callable {
-    String(String),
+    String(BString),
     /// `[$className_or_object, $methodName]` array callable. The first element is represented
     /// here as `PhpMixed` to keep parity with PHP's loose typing.
     ///
@@ -93,8 +93,8 @@ pub struct EventDispatcher {
     run_scripts: bool,
     event_stack: Vec<String>,
     skip_scripts: Vec<String>,
-    previous_hash: Option<String>,
-    previous_listeners: IndexMap<String, bool>,
+    previous_hash: Option<BString>,
+    previous_listeners: IndexMap<BString, bool>,
     /// For testing only. Mirrors PHPUnit's `getMockBuilder(EventDispatcher)->onlyMethods(['getListeners'])`:
     /// when set, `get_listeners` returns this closure's result verbatim instead of resolving
     /// registered listeners and package scripts.
@@ -116,7 +116,7 @@ impl std::fmt::Debug for GetListenersOverride {
 
 /// For testing only. Holds a closure standing in for an overridden `dispatchScript` method.
 pub struct DispatchScriptOverride(
-    pub Box<dyn Fn(&str, bool, &[String], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>>,
+    pub Box<dyn Fn(&str, bool, &[BString], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>>,
 );
 
 impl std::fmt::Debug for DispatchScriptOverride {
@@ -174,7 +174,7 @@ impl EventDispatcher {
     pub fn __set_dispatch_script_override(
         &mut self,
         callback: Box<
-            dyn Fn(&str, bool, &[String], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>,
+            dyn Fn(&str, bool, &[BString], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>,
         >,
     ) {
         self.dispatch_script_override = Some(DispatchScriptOverride(callback));
@@ -182,7 +182,7 @@ impl EventDispatcher {
 
     /// For testing only. Exposes the protected `getPhpExecCommand`, mirroring the PHP tests'
     /// `new \ReflectionMethod($dispatcher, 'getPhpExecCommand')`.
-    pub fn __get_php_exec_command(&self) -> anyhow::Result<String> {
+    pub fn __get_php_exec_command(&self) -> anyhow::Result<BString> {
         self.get_php_exec_command()
     }
 
@@ -215,7 +215,7 @@ impl EventDispatcher {
         &mut self,
         event_name: &str,
         dev_mode: bool,
-        additional_args: Vec<String>,
+        additional_args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64> {
         if let Some(over) = &self.dispatch_script_override {
@@ -368,11 +368,9 @@ impl EventDispatcher {
             let mut additional_args = event.get_arguments().clone();
             let mut callable = callable;
             if let Callable::String(ref s) = callable
-                && s.contains("@no_additional_args")
+                && s.contains_str("@no_additional_args")
             {
-                let replaced =
-                    legacy_lossy(&preg_replace(php_regex!("{ ?@no_additional_args}"), "", s))
-                        .into_owned();
+                let replaced = preg_replace(php_regex!("{ ?@no_additional_args}"), "", s);
                 callable = Callable::String(replaced);
                 additional_args = Vec::new();
             }
@@ -380,7 +378,7 @@ impl EventDispatcher {
                 "{}{}",
                 event.get_name(),
                 if !additional_args.is_empty() {
-                    format!(" ({})", additional_args.join(", "))
+                    format!(" ({})", implode(", ", &additional_args).display_lossy())
                 } else {
                     "".to_string()
                 }
@@ -509,27 +507,26 @@ impl EventDispatcher {
                 r#return = 0;
             } else {
                 match callable {
-                    Callable::String(ref callable_str) if self.is_composer_script(callable_str) => {
+                    Callable::String(ref callable_str)
+                        if self.is_composer_script(callable_str.as_ref()) =>
+                    {
                         self.io.write_error3(
                             format!(
                                 "> {}: {}",
                                 formatted_event_name_with_args.clone(),
-                                callable_str.clone(),
+                                callable_str.display_lossy(),
                             ),
                             true,
                             crate::io::VERBOSE,
                         );
 
-                        let mut script: Vec<String> = legacy_lossy(&substr(callable_str, 1, None))
-                            .split(' ')
-                            .map(|s| s.to_string())
-                            .collect();
-                        let script_name = script[0].clone();
-                        script.remove(0);
+                        let mut script: Vec<BString> = explode(" ", substr(callable_str, 1, None));
+                        // TODO(bytes): event names are Strings, so non-UTF-8 bytes are replaced.
+                        let script_name = legacy_lossy(&script.remove(0)).into_owned();
 
-                        let args: Vec<String>;
+                        let args: Vec<BString>;
                         if let Some(index) = array_search_in_vec("@additional_args", &script) {
-                            let _ = array_splice::<String>(
+                            let _ = array_splice::<BString>(
                                 &mut script,
                                 index as i64,
                                 Some(0),
@@ -543,38 +540,39 @@ impl EventDispatcher {
                         }
                         let mut flags = event.get_flags().clone();
                         if flags.contains_key(B("script-alias-input")) {
-                            let args_string = script
-                                .iter()
-                                .map(|arg| legacy_lossy(&ProcessExecutor::escape(arg)).into_owned())
-                                .collect::<Vec<_>>()
-                                .join(" ");
-                            let existing = legacy_lossy(
+                            let args_string = implode(
+                                " ",
+                                &script
+                                    .iter()
+                                    .map(ProcessExecutor::escape)
+                                    .collect::<Vec<_>>(),
+                            );
+                            let existing = BString::from(
                                 flags
                                     .get(B("script-alias-input"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default(),
-                            )
-                            .into_owned();
+                            );
                             flags.insert(
                                 "script-alias-input".into(),
-                                PhpMixed::string(format!("{} {}", args_string, existing)),
+                                PhpMixed::string(bconcat!(args_string, " ", existing)),
                             );
                         }
                         if strpos(callable_str, "@composer ") == Some(0) {
                             // COMPOSER_BINARY is a native executable, so it is run directly instead
                             // of being passed to a PHP interpreter.
-                            let exec = format!(
-                                "{} {}",
-                                legacy_lossy(&ProcessExecutor::escape(
+                            let exec = bconcat!(
+                                ProcessExecutor::escape(
                                     Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
-                                )),
-                                args.join(" ")
+                                ),
+                                " ",
+                                implode(" ", &args)
                             );
                             let exit_code = self.execute_tty(&exec)?;
                             if exit_code != 0 {
                                 self.io.write_error3(format!(
                                     "<error>Script {} handling the {} event returned with error code {}</error>",
-                                    callable_str.clone(),
+                                    callable_str.display_lossy(),
                                     event.get_name(),
                                     exit_code
                                 ), true, crate::io::QUIET);
@@ -599,7 +597,7 @@ impl EventDispatcher {
                             {
                                 self.io.write_error3(format!(
                                     "<warning>You made a reference to a non-existent script {}</warning>",
-                                    callable_str.clone(),
+                                    callable_str.display_lossy(),
                                 ), true, crate::io::QUIET);
                             }
 
@@ -626,7 +624,7 @@ impl EventDispatcher {
                                         self.io.write_error3(
                                             format!(
                                                 "<error>Script {} was called via {}</error>",
-                                                callable_str.clone(),
+                                                callable_str.display_lossy(),
                                                 event.get_name(),
                                             ),
                                             true,
@@ -638,12 +636,12 @@ impl EventDispatcher {
                             }
                         }
                     }
-                    Callable::String(ref callable_str) if self.is_php_script(callable_str) => {
+                    Callable::String(ref callable_str)
+                        if self.is_php_script(callable_str.as_ref()) =>
+                    {
                         let pos = strpos(callable_str, "::").unwrap_or(0) as i64;
-                        let class_name =
-                            legacy_lossy(&substr(callable_str, 0, Some(pos))).into_owned();
-                        let method_name =
-                            legacy_lossy(&substr(callable_str, pos + 2, None)).into_owned();
+                        let class_name = substr(callable_str, 0, Some(pos));
+                        let method_name = substr(callable_str, pos + 2, None);
 
                         self.make_autoloader(event, &Callable::String(callable_str.clone()))?;
                         if !self.php_runtime_bool(
@@ -652,7 +650,7 @@ impl EventDispatcher {
                         )? {
                             self.io.write_error3(format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
-                                class_name,
+                                class_name.display_lossy(),
                                 event.get_name()
                             ), true, crate::io::QUIET);
                             continue;
@@ -663,13 +661,17 @@ impl EventDispatcher {
                         )? {
                             self.io.write_error3(format!(
                                 "<warning>Method {} is not callable, can not call {} script</warning>",
-                                callable_str,
+                                callable_str.display_lossy(),
                                 event.get_name()
                             ), true, crate::io::QUIET);
                             continue;
                         }
 
-                        match self.execute_event_php_script(&class_name, &method_name, event) {
+                        match self.execute_event_php_script(
+                            class_name.as_ref(),
+                            method_name.as_ref(),
+                            event,
+                        ) {
                             Ok(v) => {
                                 r#return = if let PhpMixed::Bool(false) = v { 1 } else { 0 };
                             }
@@ -677,7 +679,7 @@ impl EventDispatcher {
                                 self.io.write_error3(
                                     format!(
                                         "<error>Script {} handling the {} event terminated with an exception</error>",
-                                        callable_str.clone(),
+                                        callable_str.display_lossy(),
                                         event.get_name(),
                                     ),
                                     true,
@@ -687,7 +689,9 @@ impl EventDispatcher {
                             }
                         }
                     }
-                    Callable::String(ref callable_str) if self.is_command_class(callable_str) => {
+                    Callable::String(ref callable_str)
+                        if self.is_command_class(callable_str.as_ref()) =>
+                    {
                         let class_name = callable_str.clone();
 
                         self.make_autoloader(
@@ -713,7 +717,7 @@ impl EventDispatcher {
                         )? {
                             self.io.write_error3(format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
-                                class_name,
+                                class_name.display_lossy(),
                                 event.get_name()
                             ), true, crate::io::QUIET);
                             continue;
@@ -730,7 +734,7 @@ impl EventDispatcher {
                         )? {
                             self.io.write_error3(format!(
                                 "<warning>Class {} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>",
-                                class_name,
+                                class_name.display_lossy(),
                                 event.get_name()
                             ), true, crate::io::QUIET);
                             continue;
@@ -757,15 +761,17 @@ impl EventDispatcher {
                         // against the real output stream, the way upstream hands the live output
                         // object of `$this->io` to `$app->run()`; collecting the output and
                         // writing the buffer back once the run has returned is not a substitute.
-                        let args = additional_args
-                            .iter()
-                            .map(|arg| legacy_lossy(&ProcessExecutor::escape(arg)).into_owned())
-                            .collect::<Vec<_>>()
-                            .join(" ");
+                        let args = implode(
+                            " ",
+                            &additional_args
+                                .iter()
+                                .map(ProcessExecutor::escape)
+                                .collect::<Vec<_>>(),
+                        );
                         let string_input = event
                             .get_flags()
                             .get(B("script-alias-input"))
-                            .and_then(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                            .and_then(|v| v.as_string().map(BString::from))
                             .unwrap_or(args);
                         let verbosity = if self.io.is_debug() {
                             output_interface::VERBOSITY_DEBUG
@@ -776,39 +782,43 @@ impl EventDispatcher {
                         } else {
                             output_interface::VERBOSITY_NORMAL
                         };
-                        let snippet = format!(
-                            r#"
-$className = {class_name_lit};
+                        let snippet = bconcat!(
+                            "\n$className = ",
+                            php_single_quote(class_name.as_ref()),
+                            r#";
 $app = new \Symfony\Component\Console\Application();
 $app->setCatchExceptions(false);
-if (method_exists($app, 'setCatchErrors')) {{
+if (method_exists($app, 'setCatchErrors')) {
     $app->setCatchErrors(false);
-}}
+}
 $app->setAutoExit(false);
-$cmd = new $className({event_name_lit});
-if (method_exists($app, 'addCommand')) {{
+$cmd = new $className("#,
+                            php_single_quote(bstr::BStr::new(event.get_name())),
+                            r#");
+if (method_exists($app, 'addCommand')) {
     $app->addCommand($cmd);
-}} else {{
+} else {
     $app->add($cmd);
-}}
+}
 $app->setDefaultCommand((string) $cmd->getName(), true);
-$output = new \Symfony\Component\Console\Output\BufferedOutput({verbosity}, {decorated});
-try {{
-    $status = $app->run(new \Symfony\Component\Console\Input\StringInput({input_lit}), $output);
-    return ['status' => $status, 'output' => $output->fetch()];
-}} catch (\Throwable $e) {{
-    return ['throw' => \Shirabe\MaterializedThrowable::describe($e), 'caught' => $e instanceof \Exception, 'output' => $output->fetch()];
-}}
-"#,
-                            class_name_lit = php_single_quote(&class_name),
-                            event_name_lit = php_single_quote(event.get_name()),
-                            input_lit = php_single_quote(&string_input),
-                            verbosity = verbosity,
-                            decorated = if self.io.is_decorated() {
+$output = new \Symfony\Component\Console\Output\BufferedOutput("#,
+                            verbosity,
+                            ", ",
+                            if self.io.is_decorated() {
                                 "true"
                             } else {
                                 "false"
                             },
+                            r#");
+try {
+    $status = $app->run(new \Symfony\Component\Console\Input\StringInput("#,
+                            php_single_quote(string_input.as_ref()),
+                            r#"), $output);
+    return ['status' => $status, 'output' => $output->fetch()];
+} catch (\Throwable $e) {
+    return ['throw' => \Shirabe\MaterializedThrowable::describe($e), 'caught' => $e instanceof \Exception, 'output' => $output->fetch()];
+}
+"#,
                         );
                         Self::ensure_script_autoloader()?;
                         let mut dispatcher = ScriptRpcDispatcher {
@@ -824,14 +834,13 @@ try {{
                             Ok(value) => value.to_php_mixed()?,
                             Err(throw) => return Err(throw_into_error(throw)),
                         };
-                        let command_output = legacy_lossy(
+                        let command_output = BString::from(
                             result
                                 .as_array()
                                 .and_then(|map| map.get(B("output")))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default(),
-                        )
-                        .into_owned();
+                        );
                         if !command_output.is_empty() {
                             self.io.write3(&command_output, false, crate::io::NORMAL);
                         }
@@ -849,7 +858,7 @@ try {{
                                 self.io.write_error3(
                                     format!(
                                         "<error>Script {} handling the {} event terminated with an exception</error>",
-                                        callable_str.clone(),
+                                        callable_str.display_lossy(),
                                         event.get_name(),
                                     ),
                                     true,
@@ -866,42 +875,39 @@ try {{
                         };
                     }
                     Callable::String(callable_str) => {
-                        let args = additional_args
-                            .iter()
-                            .map(|arg| legacy_lossy(&ProcessExecutor::escape(arg)).into_owned())
-                            .collect::<Vec<_>>()
-                            .join(" ");
+                        let args = implode(
+                            " ",
+                            &additional_args
+                                .iter()
+                                .map(ProcessExecutor::escape)
+                                .collect::<Vec<_>>(),
+                        );
 
                         // @putenv does not receive arguments
                         let mut exec = if strpos(&callable_str, "@putenv ") == Some(0) {
                             callable_str.clone()
-                        } else if callable_str.contains("@additional_args") {
-                            legacy_lossy(&str_replace("@additional_args", &args, &callable_str))
-                                .into_owned()
+                        } else if callable_str.contains_str("@additional_args") {
+                            str_replace("@additional_args", &args, &callable_str)
                         } else {
-                            format!(
-                                "{}{}",
+                            bconcat!(
                                 callable_str,
                                 if args.is_empty() {
-                                    "".to_string()
+                                    BString::default()
                                 } else {
-                                    format!(" {}", args)
+                                    bconcat!(" ", args)
                                 }
                             )
                         };
 
                         if self.io.is_verbose() {
                             self.io.write_error3(
-                                format!("> {}: {}", event.get_name(), exec.clone()),
+                                bconcat!("> ", event.get_name(), ": ", exec),
                                 true,
                                 crate::io::NORMAL,
                             );
                         } else if self.event_needs_to_output(event) {
-                            self.io.write_error3(
-                                format!("> {}", exec.clone()),
-                                true,
-                                crate::io::NORMAL,
-                            );
+                            self.io
+                                .write_error3(bconcat!("> ", exec), true, crate::io::NORMAL);
                         }
 
                         let possible_local_binaries = self
@@ -920,12 +926,11 @@ try {{
                                     let caller = BinaryInstaller::determine_binary_caller(
                                         path_from_bytes(local_exec),
                                     );
-                                    exec = legacy_lossy(&preg_replace(
+                                    exec = preg_replace(
                                         format!("{{^{}}}", preg_quote(&callable_str, None)),
                                         bconcat!(caller, " ", local_exec),
                                         &exec,
-                                    ))
-                                    .into_owned();
+                                    );
                                     break;
                                 }
                             }
@@ -933,73 +938,56 @@ try {{
 
                         if strpos(&exec, "@putenv ") == Some(0) {
                             if strpos(&exec, "=").is_none() {
-                                Platform::clear_env(&legacy_lossy(&substr(&exec, 8, None)));
+                                Platform::clear_env(substr(&exec, 8, None));
                             } else {
-                                let after = legacy_lossy(&substr(&exec, 8, None)).into_owned();
-                                let parts: Vec<&str> = after.splitn(2, '=').collect();
-                                let var = parts[0].to_string();
-                                let value = parts[1].to_string();
-                                Platform::put_env(&var, &value);
+                                let parts = explode_with_limit("=", substr(&exec, 8, None), 2);
+                                Platform::put_env(&parts[0], &parts[1]);
                             }
 
                             continue;
                         }
                         if strpos(&exec, "@php ") == Some(0) {
-                            let mut path_and_args =
-                                legacy_lossy(&substr(&exec, 5, None)).into_owned();
+                            let mut path_and_args = substr(&exec, 5, None);
                             if Platform::is_windows() {
-                                path_and_args = legacy_lossy(
-                                    &preg_replace_callback(
-                                        php_regex!("{^\\S+}"),
-                                        |m| {
-                                            Ok(legacy_lossy(&str_replace(
-                                                "/",
-                                                "\\",
-                                                m.get(0).unwrap(),
-                                            ))
-                                            .into_owned())
-                                        },
-                                        &path_and_args,
-                                    )
-                                    .expect("the replacement callback cannot fail"),
+                                path_and_args = preg_replace_callback(
+                                    php_regex!("{^\\S+}"),
+                                    |m| Ok(str_replace("/", "\\", m.get(0).unwrap())),
+                                    &path_and_args,
                                 )
-                                .into_owned();
+                                .expect("the replacement callback cannot fail");
                             }
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
                             if let Some(m) =
                                 preg_match(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args)
                             {
-                                let m0 = legacy_lossy(m.get(0).unwrap_or_default()).into_owned();
-                                if !file_exists(&m0) {
+                                let m0 = m.get(0).unwrap_or_default();
+                                if !file_exists(path_from_bytes(m0)) {
                                     let finder = ExecutableFinder::new();
-                                    if let Some(path_to_exec) = finder.find(&m0, None, &[]) {
-                                        let mut path_to_exec = path_to_exec;
+                                    // TODO(bytes): ExecutableFinder looks the name up as a &str.
+                                    if let Some(path_to_exec) =
+                                        finder.find(&legacy_lossy(m0), None, &[])
+                                    {
+                                        let mut path_to_exec = BString::from(path_to_exec);
                                         if Platform::is_windows() {
-                                            let exec_without_ext = legacy_lossy(&preg_replace(
+                                            let exec_without_ext = preg_replace(
                                                 php_regex!("{\\.(exe|bat|cmd|com)$}i"),
                                                 "",
                                                 &path_to_exec,
-                                            ))
-                                            .into_owned();
+                                            );
                                             // prefer non-extension file if it exists when executing with PHP
-                                            if file_exists(&exec_without_ext) {
+                                            if file_exists(path_from_bytes(&exec_without_ext)) {
                                                 path_to_exec = exec_without_ext;
                                             }
                                         }
-                                        path_and_args = format!(
-                                            "{}{}",
+                                        path_and_args = bconcat!(
                                             path_to_exec,
-                                            legacy_lossy(&substr(
-                                                &path_and_args,
-                                                strlen(m.get(0).unwrap()),
-                                                None
-                                            ))
+                                            substr(&path_and_args, strlen(m0), None)
                                         );
                                     }
                                 }
                             }
-                            exec = format!("{} {}", self.get_php_exec_command()?, path_and_args);
+                            exec = bconcat!(self.get_php_exec_command()?, " ", path_and_args);
                         } else {
                             let finder = PhpExecutableFinder::new();
                             let php_path = finder.find(false);
@@ -1008,22 +996,12 @@ try {{
                             }
 
                             if Platform::is_windows() {
-                                exec = legacy_lossy(
-                                    &preg_replace_callback(
-                                        php_regex!("{^\\S+}"),
-                                        |m| {
-                                            Ok(legacy_lossy(&str_replace(
-                                                "/",
-                                                "\\",
-                                                m.get(0).unwrap(),
-                                            ))
-                                            .into_owned())
-                                        },
-                                        &exec,
-                                    )
-                                    .expect("the replacement callback cannot fail"),
+                                exec = preg_replace_callback(
+                                    php_regex!("{^\\S+}"),
+                                    |m| Ok(str_replace("/", "\\", m.get(0).unwrap())),
+                                    &exec,
                                 )
-                                .into_owned();
+                                .expect("the replacement callback cannot fail");
                             }
                         }
 
@@ -1033,12 +1011,11 @@ try {{
                         if strpos(&exec, "composer ") == Some(0) {
                             // COMPOSER_BINARY is a native executable, so it is run directly instead
                             // of being passed to a PHP interpreter.
-                            exec = format!(
-                                "{}{}",
-                                legacy_lossy(&ProcessExecutor::escape(
+                            exec = bconcat!(
+                                ProcessExecutor::escape(
                                     Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
-                                )),
-                                legacy_lossy(&substr(&exec, 8, None))
+                                ),
+                                substr(&exec, 8, None)
                             );
                         }
 
@@ -1046,7 +1023,7 @@ try {{
                         if exit_code != 0 {
                             self.io.write_error3(format!(
                                 "<error>Script {} handling the {} event returned with error code {}</error>",
-                                callable_str,
+                                callable_str.display_lossy(),
                                 event.get_name(),
                                 exit_code
                             ), true, crate::io::QUIET);
@@ -1088,7 +1065,7 @@ try {{
         self.do_dispatch(&mut event)
     }
 
-    fn execute_tty(&self, exec: &str) -> anyhow::Result<i64> {
+    fn execute_tty(&self, exec: &BString) -> anyhow::Result<i64> {
         if self.io.is_interactive() {
             return self.process.borrow_mut().execute_tty(exec, None);
         }
@@ -1098,7 +1075,7 @@ try {{
             .execute(exec, ProcessExecutor::FORWARD_OUTPUT, None)
     }
 
-    fn get_php_exec_command(&self) -> anyhow::Result<String> {
+    fn get_php_exec_command(&self) -> anyhow::Result<BString> {
         let finder = PhpExecutableFinder::new();
         let php_path = finder.find(false);
         let php_path = match php_path {
@@ -1112,32 +1089,25 @@ try {{
         };
         let php_args = finder.find_arguments();
         let php_args = if !php_args.is_empty() {
-            format!(" {}", legacy_lossy(&implode(" ", &php_args)))
+            bconcat!(" ", implode(" ", &php_args))
         } else {
-            "".to_string()
+            BString::default()
         };
-        let allow_url_fopen_flag = format!(
-            " -d allow_url_fopen={}",
-            legacy_lossy(&ProcessExecutor::escape(
-                ini_get("allow_url_fopen").unwrap_or_default()
-            ))
+        let allow_url_fopen_flag = bconcat!(
+            " -d allow_url_fopen=",
+            ProcessExecutor::escape(ini_get("allow_url_fopen").unwrap_or_default())
         );
-        let disable_functions_flag = format!(
-            " -d disable_functions={}",
-            legacy_lossy(&ProcessExecutor::escape(
-                ini_get("disable_functions").unwrap_or_default()
-            ))
+        let disable_functions_flag = bconcat!(
+            " -d disable_functions=",
+            ProcessExecutor::escape(ini_get("disable_functions").unwrap_or_default())
         );
-        let memory_limit_flag = format!(
-            " -d memory_limit={}",
-            legacy_lossy(&ProcessExecutor::escape(
-                ini_get("memory_limit").unwrap_or_default()
-            ))
+        let memory_limit_flag = bconcat!(
+            " -d memory_limit=",
+            ProcessExecutor::escape(ini_get("memory_limit").unwrap_or_default())
         );
 
-        Ok(format!(
-            "{}{}{}{}{}",
-            legacy_lossy(&ProcessExecutor::escape(&php_path)),
+        Ok(bconcat!(
+            ProcessExecutor::escape(&php_path),
             php_args,
             allow_url_fopen_flag,
             disable_functions_flag,
@@ -1147,19 +1117,28 @@ try {{
 
     fn execute_event_php_script(
         &self,
-        class_name: &str,
-        method_name: &str,
+        class_name: &BStr,
+        method_name: &BStr,
         event: &mut dyn EventInterface,
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
             self.io.write_error3(
-                format!("> {}: {}::{}", event.get_name(), class_name, method_name),
+                format!(
+                    "> {}: {}::{}",
+                    event.get_name(),
+                    class_name.display_lossy(),
+                    method_name.display_lossy()
+                ),
                 true,
                 crate::io::NORMAL,
             );
         } else if self.event_needs_to_output(event) {
             self.io.write_error3(
-                format!("> {}::{}", class_name, method_name),
+                format!(
+                    "> {}::{}",
+                    class_name.display_lossy(),
+                    method_name.display_lossy()
+                ),
                 true,
                 crate::io::NORMAL,
             );
@@ -1170,8 +1149,8 @@ try {{
             RuntimeException::new(format!(
                 "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
                 event.get_name(),
-                class_name,
-                method_name,
+                class_name.display_lossy(),
+                method_name.display_lossy(),
             ))
             .into()
         })?;
@@ -1192,9 +1171,10 @@ try {{
             loader: self.loader.clone(),
             event: Some((rhandle, event)),
         };
+        // TODO(bytes): the RPC layer carries class and method names as Strings.
         let outcome = call_static_method(
-            class_name,
-            method_name,
+            &legacy_lossy(class_name),
+            &legacy_lossy(method_name),
             vec![PluginValue::RustHandle(RustObjHandle {
                 rhandle,
                 class: stub_class.to_string(),
@@ -1394,12 +1374,8 @@ try {{
         let package = composer.get_package();
         let scripts = package.get_scripts();
 
-        let event_scripts: Vec<String> = match scripts.get(bstr::B(event.get_name())) {
-            Some(v) if !v.is_empty() => v
-                .clone()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
+        let event_scripts: Vec<BString> = match scripts.get(bstr::B(event.get_name())) {
+            Some(v) if !v.is_empty() => v.clone(),
             _ => return Vec::new(),
         };
 
@@ -1421,20 +1397,22 @@ try {{
     }
 
     /// Checks if string given references a class path and method
-    fn is_php_script(&self, callable: &str) -> bool {
+    fn is_php_script(&self, callable: &BStr) -> bool {
         strpos(callable, " ").is_none() && strpos(callable, "::").is_some()
     }
 
     /// Checks if string given references a command class
-    fn is_command_class(&self, callable: &str) -> bool {
-        callable.contains("\\") && !callable.contains(" ") && callable.ends_with("Command")
+    fn is_command_class(&self, callable: &BStr) -> bool {
+        callable.contains_str("\\")
+            && !callable.contains_str(" ")
+            && callable.ends_with_str("Command")
     }
 
     /// Checks if string given references a composer run-script
-    fn is_composer_script(&self, callable: &str) -> bool {
-        callable.starts_with("@")
-            && !callable.starts_with("@php ")
-            && !callable.starts_with("@putenv ")
+    fn is_composer_script(&self, callable: &BStr) -> bool {
+        callable.starts_with_str("@")
+            && !callable.starts_with_str("@php ")
+            && !callable.starts_with_str("@putenv ")
     }
 
     /// Push an event to the stack of active event
@@ -1549,14 +1527,14 @@ try {{
         let callable_key = match callable {
             Callable::String(callable_str) => callable_str.clone(),
             Callable::ArrayCallable(first, method) => match first.as_ref() {
-                PhpMixed::String(class) => format!("{}::{}", legacy_lossy(&class), method),
-                other => format!("{}::{}", legacy_lossy(&get_class(other)), method),
+                PhpMixed::String(class) => bconcat!(class, "::", method),
+                other => bconcat!(get_class(other), "::", method),
             },
             // PHP: get_class($callable[0]).'::'.$callable[1] — the object half's runtime class.
             Callable::PhpMethod(handle, method) => {
-                format!("{}::{}", handle.class, legacy_lossy(&method))
+                bconcat!(handle.class, "::", method)
             }
-            Callable::Closure(_) => "closure".to_string(),
+            Callable::Closure(_) => BString::from("closure"),
         };
         if self.previous_listeners.contains_key(&callable_key) {
             return Ok(());
@@ -1568,17 +1546,13 @@ try {{
         let local_repository = repository_manager.borrow().get_local_repository();
         let packages = local_repository.get_canonical_packages()?;
         let generator = composer.borrow().get_autoload_generator();
-        let mut hash_input = packages
-            .iter()
-            .map(|p| {
-                format!(
-                    "{}/{}",
-                    legacy_lossy(&p.get_name()),
-                    legacy_lossy(&p.get_version())
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(",");
+        let mut hash_input = implode(
+            ",",
+            &packages
+                .iter()
+                .map(|p| bconcat!(p.get_name(), "/", p.get_version()))
+                .collect::<Vec<_>>(),
+        );
         let dev_mode = event
             .as_any()
             .downcast_ref::<ScriptEvent>()
@@ -1598,12 +1572,12 @@ try {{
         if let Some(dev_mode) = dev_mode {
             generator.borrow().set_dev_mode(dev_mode);
             if dev_mode {
-                hash_input.push_str("/dev");
+                hash_input.extend_from_slice(b"/dev");
             }
         }
-        let hash = legacy_lossy(&hash("sha256", &hash_input)).into_owned();
+        let hash = hash("sha256", &hash_input);
 
-        if self.previous_hash.as_deref() == Some(hash.as_str()) {
+        if self.previous_hash.as_ref() == Some(&hash) {
             return Ok(());
         }
 
@@ -2004,8 +1978,8 @@ pub(crate) fn unwrap_php_result(
 }
 
 /// Quotes a string as a PHP single-quoted literal for a generated snippet.
-fn php_single_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\'"))
+fn php_single_quote(value: &BStr) -> BString {
+    bconcat!("'", value.replace("\\", "\\\\").replace("'", "\\'"), "'")
 }
 
 // Composer's PartialComposer::setEventDispatcher() accepts any EventDispatcher subclass, so plugins
@@ -2021,7 +1995,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
         &mut self,
         event_name: &str,
         dev_mode: bool,
-        additional_args: Vec<String>,
+        additional_args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64>;
     fn dispatch_installer_event(
@@ -2050,7 +2024,7 @@ impl EventDispatcherInterface for EventDispatcher {
         &mut self,
         event_name: &str,
         dev_mode: bool,
-        additional_args: Vec<String>,
+        additional_args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64> {
         self.dispatch_script(event_name, dev_mode, additional_args, flags)

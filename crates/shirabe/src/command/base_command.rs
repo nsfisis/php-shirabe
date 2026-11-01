@@ -14,7 +14,7 @@ use crate::io::{IOInterface, IOInterfaceWrite, NullIO};
 use crate::package::version::VersionParser;
 use crate::plugin::{PluginEvents, PreCommandRunEvent};
 use crate::util::Platform;
-use bstr::{BString, ByteSlice};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
@@ -205,13 +205,13 @@ pub trait BaseCommand: Command {
 
     fn format_requirements(
         &self,
-        requirements: Vec<String>,
-    ) -> anyhow::Result<IndexMap<String, String>>;
+        requirements: Vec<BString>,
+    ) -> anyhow::Result<IndexMap<BString, BString>>;
 
     fn normalize_requirements(
         &self,
-        requirements: Vec<String>,
-    ) -> anyhow::Result<Vec<IndexMap<String, String>>>;
+        requirements: Vec<BString>,
+    ) -> anyhow::Result<Vec<IndexMap<BString, BString>>>;
 
     fn render_table(
         &self,
@@ -251,8 +251,8 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
         shirabe_symfony_console::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_preferred_install_options(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, keep_vcs_requires_prefer_source: bool) -> anyhow::Result<(bool, bool)>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<String>) -> anyhow::Result<indexmap::IndexMap<String, String>>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<String>) -> anyhow::Result<Vec<indexmap::IndexMap<String, String>>>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<bstr::BString>) -> anyhow::Result<indexmap::IndexMap<bstr::BString, bstr::BString>>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<bstr::BString>) -> anyhow::Result<Vec<indexmap::IndexMap<bstr::BString, bstr::BString>>>);
         shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>));
         shirabe_symfony_console::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &str) -> anyhow::Result<String>);
@@ -570,28 +570,30 @@ impl BaseCommand for BaseCommandData {
 
     fn format_requirements(
         &self,
-        requirements: Vec<String>,
-    ) -> anyhow::Result<IndexMap<String, String>> {
-        let mut requires: IndexMap<String, String> = IndexMap::new();
+        requirements: Vec<BString>,
+    ) -> anyhow::Result<IndexMap<BString, BString>> {
+        let mut requires: IndexMap<BString, BString> = IndexMap::new();
         let requirements = self.normalize_requirements(requirements)?;
         for requirement in requirements {
-            if !requirement.contains_key("version") {
+            if !requirement.contains_key(B("version")) {
                 return Err(UnexpectedValueException::new(format!(
                     "Option {} is missing a version constraint, use e.g. {}:^1.0",
                     requirement
-                        .get("name")
-                        .map(|s| s.as_str())
-                        .unwrap_or_default(),
+                        .get(B("name"))
+                        .cloned()
+                        .unwrap_or_default()
+                        .display_lossy(),
                     requirement
-                        .get("name")
-                        .map(|s| s.as_str())
-                        .unwrap_or_default(),
+                        .get(B("name"))
+                        .cloned()
+                        .unwrap_or_default()
+                        .display_lossy(),
                 ))
                 .into());
             }
             requires.insert(
-                requirement.get("name").cloned().unwrap_or_default(),
-                requirement.get("version").cloned().unwrap_or_default(),
+                requirement.get(B("name")).cloned().unwrap_or_default(),
+                requirement.get(B("version")).cloned().unwrap_or_default(),
             );
         }
 
@@ -600,25 +602,11 @@ impl BaseCommand for BaseCommandData {
 
     fn normalize_requirements(
         &self,
-        requirements: Vec<String>,
-    ) -> anyhow::Result<Vec<IndexMap<String, String>>> {
+        requirements: Vec<BString>,
+    ) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
         let parser: VersionParser = VersionParser::new();
 
-        // TODO(bytes): requirements from the command line are Strings.
-        Ok(parser
-            .parse_name_version_pairs(
-                requirements
-                    .into_iter()
-                    .map(bstr::BString::from)
-                    .collect::<Vec<_>>(),
-            )?
-            .into_iter()
-            .map(|pair| {
-                pair.into_iter()
-                    .map(|(k, v)| (legacy_lossy(&k).into_owned(), legacy_lossy(&v).into_owned()))
-                    .collect()
-            })
-            .collect())
+        parser.parse_name_version_pairs(requirements)
     }
 
     fn render_table(

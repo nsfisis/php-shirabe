@@ -182,7 +182,7 @@ fn dispatcher_stub_for_listeners_test(
 }
 
 fn listeners_const(listeners: Vec<&str>) -> Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> {
-    let listeners: Vec<String> = listeners.into_iter().map(|s| s.to_string()).collect();
+    let listeners: Vec<bstr::BString> = listeners.into_iter().map(|s| s.into()).collect();
     Box::new(move |_event| listeners.iter().cloned().map(Callable::String).collect())
 }
 
@@ -237,13 +237,13 @@ fn test_dispatcher_can_execute_composer_script_groups() {
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
         Box::new(|event| match event.get_name() {
-            "root" => vec![Callable::String("@group".to_string())],
+            "root" => vec![Callable::String("@group".into())],
             "group" => vec![
-                Callable::String("echo -n foo".to_string()),
-                Callable::String("@subgroup".to_string()),
-                Callable::String("echo -n bar".to_string()),
+                Callable::String("echo -n foo".into()),
+                Callable::String("@subgroup".into()),
+                Callable::String("echo -n bar".into()),
             ],
-            "subgroup" => vec![Callable::String("echo -n baz".to_string())],
+            "subgroup" => vec![Callable::String("echo -n baz".into())],
             _ => vec![],
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
@@ -288,8 +288,8 @@ fn test_recursion_in_scripts_names() {
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
         Box::new(|event| match event.get_name() {
-            "hello" => vec![Callable::String("echo Hello".to_string())],
-            "helloWorld" => vec![Callable::String("@hello World".to_string())],
+            "hello" => vec![Callable::String("echo Hello".into())],
+            "helloWorld" => vec![Callable::String("@hello World".into())],
             _ => vec![],
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
@@ -326,8 +326,8 @@ fn test_dispatcher_detect_infinite_recursion() {
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
         Box::new(|event| match event.get_name() {
-            "root" => vec![Callable::String("@recurse".to_string())],
-            "recurse" => vec![Callable::String("@root".to_string())],
+            "root" => vec![Callable::String("@recurse".into())],
+            "recurse" => vec![Callable::String("@root".into())],
             _ => vec![],
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io.clone(), process, callback);
@@ -678,9 +678,9 @@ fn test_dispatcher_remove_listener() {
         };
     let listener = Callable::PhpMethod(this.clone(), "someMethod".into());
     let listener2 = Callable::PhpMethod(this.clone(), "someMethod2".into());
-    let listener3 = Callable::String(
+    let listener3 = Callable::String(bstr::BString::from(
         "Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod".to_string(),
-    );
+    ));
 
     dispatcher.add_listener("ev1", listener.clone(), 0);
     dispatcher.add_listener("ev1", listener.clone(), 1);
@@ -886,7 +886,11 @@ fn test_dispatcher_support_for_additional_args() {
     let (process, _process_guard) = get_process_executor_mock(
         vec![
             cmd("echo -n foo"),
-            cmd(format!("{} foo.php {} then the rest", php_cmd, args)),
+            cmd(format!(
+                "{} foo.php {} then the rest",
+                php_cmd.display_lossy(),
+                args
+            )),
             cmd(format!("echo -n bar {}", args)),
         ],
         true,
@@ -908,7 +912,7 @@ fn test_dispatcher_support_for_additional_args() {
         .dispatch_script(
             ScriptEvents::POST_INSTALL_CMD,
             false,
-            vec!["ARG".to_string(), "ARG2".to_string(), "--arg".to_string()],
+            vec!["ARG".into(), "ARG2".into(), "--arg".into()],
             IndexMap::new(),
         )
         .unwrap();

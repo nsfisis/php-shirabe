@@ -74,7 +74,7 @@ mockall::mock! {
             &mut self,
             event_name: &str,
             dev_mode: bool,
-            additional_args: Vec<String>,
+            additional_args: Vec<bstr::BString>,
             flags: IndexMap<BString, PhpMixed>,
         ) -> anyhow::Result<i64>;
         fn dispatch_installer_event(

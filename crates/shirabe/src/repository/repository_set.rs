@@ -70,7 +70,7 @@ impl RepositorySet {
     /// passing minimumStability is all you need to worry about. The rest is for advanced pool creation including
     /// aliases, pinned references and other special cases.
     pub fn new(
-        minimum_stability: &str,
+        minimum_stability: impl AsRef<[u8]>,
         stability_flags: IndexMap<BString, i64>,
         root_aliases: Vec<RootAliasInput>,
         root_references: IndexMap<BString, BString>,
@@ -82,7 +82,8 @@ impl RepositorySet {
         let mut acceptable_stabilities: IndexMap<BString, i64> = IndexMap::new();
         // PHP: foreach (BasePackage::STABILITIES as $stability => $value)
         let stabilities = crate::package::STABILITIES.clone();
-        let min_value = *stabilities.get(minimum_stability).unwrap_or(&0);
+        let min_value =
+            crate::package::base_package::stability_priority(minimum_stability).unwrap_or(0);
         for (stability, value) in stabilities.iter() {
             if *value <= min_value {
                 acceptable_stabilities.insert(bstr::BString::from(stability.to_string()), *value);

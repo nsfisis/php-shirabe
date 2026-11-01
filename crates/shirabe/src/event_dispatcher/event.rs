@@ -7,13 +7,13 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug)]
 pub struct Event {
     name: String,
-    args: Vec<String>,
+    args: Vec<BString>,
     flags: IndexMap<BString, PhpMixed>,
     propagation_stopped: bool,
 }
 
 impl Event {
-    pub fn new(name: String, args: Vec<String>, flags: IndexMap<BString, PhpMixed>) -> Self {
+    pub fn new(name: String, args: Vec<BString>, flags: IndexMap<BString, PhpMixed>) -> Self {
         Self {
             name,
             args,
@@ -30,7 +30,7 @@ impl Event {
         &self.name
     }
 
-    pub fn get_arguments(&self) -> &Vec<String> {
+    pub fn get_arguments(&self) -> &Vec<BString> {
         &self.args
     }
 
@@ -53,7 +53,7 @@ pub trait EventInterface: std::fmt::Debug {
     fn as_any(&self) -> &dyn std::any::Any;
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
     fn get_name(&self) -> &str;
-    fn get_arguments(&self) -> &Vec<String>;
+    fn get_arguments(&self) -> &Vec<BString>;
     fn get_flags(&self) -> &IndexMap<BString, PhpMixed>;
     fn is_propagation_stopped(&self) -> bool;
     fn stop_propagation(&mut self);
@@ -72,7 +72,7 @@ impl EventInterface for Event {
         &self.name
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<BString> {
         &self.args
     }
 

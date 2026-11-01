@@ -171,7 +171,7 @@ impl EventDispatcherInterface for StubEventDispatcher {
         &mut self,
         _event_name: &str,
         _dev_mode: bool,
-        _additional_args: Vec<String>,
+        _additional_args: Vec<bstr::BString>,
         _flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64> {
         Ok(0)
@@ -1113,17 +1113,14 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         let composer_cl = composer.clone();
         let run_result_cl = run_result.clone();
         update_ref.set_code(Box::new(move |input, _output| {
-            let packages: Vec<String> =
+            let packages: Vec<bstr::BString> =
                 match input.get_argument("packages").unwrap_or(InputValue::Null) {
-                    InputValue::Array(items) => items
-                        .iter()
-                        .map(|s| legacy_lossy(s).into_owned())
-                        .collect::<Vec<String>>(),
+                    InputValue::Array(items) => items,
                     _ => vec![],
                 };
-            let filtered: Vec<String> = packages
+            let filtered: Vec<bstr::BString> = packages
                 .iter()
-                .filter(|p: &&String| !["lock", "nothing", "mirrors"].contains(&p.as_str()))
+                .filter(|p| *p != "lock" && *p != "nothing" && *p != "mirrors")
                 .cloned()
                 .collect();
             let update_mirrors = opt_bool(input, "lock") || filtered.len() != packages.len();

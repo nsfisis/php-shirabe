@@ -72,7 +72,7 @@ impl EventInterface for InstallerEvent {
         self.inner.get_name()
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<bstr::BString> {
         self.inner.get_arguments()
     }
 

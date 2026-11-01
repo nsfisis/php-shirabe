@@ -14,13 +14,13 @@ use crate::repository::{
     RepositoryInterface, RepositorySet, SearchResult,
 };
 use crate::util::Filesystem;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
     array_slice, asort, bconcat, explode, file_get_contents, implode, in_array_strict, is_array,
-    is_file, is_numeric, json_decode_assoc, legacy_lossy, levenshtein, php_regex, preg_is_match,
-    preg_match, strlen, strpos, trim,
+    is_file, is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match, preg_match,
+    strlen, strpos, trim,
 };
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -65,7 +65,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
         if !self.get_repository_sets_mut().contains_key(&key) {
             let stability = minimum_stability
-                .map(|s| s.to_string())
+                .map(BString::from)
                 .unwrap_or_else(|| self.get_minimum_stability(input));
             let mut repository_set = RepositorySet::new(
                 &stability,
@@ -89,18 +89,18 @@ pub trait PackageDiscoveryTrait: BaseCommand {
     fn get_minimum_stability(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> String {
+    ) -> BString {
         if input.borrow().has_option("stability") {
-            return legacy_lossy(&VersionParser::normalize_stability(
+            return VersionParser::normalize_stability(
                 input
                     .borrow()
                     .get_option("stability")
-                    .expect("get_minimum_stability returns String, not anyhow::Result; stability option is guaranteed present by the has_option guard above")
+                    .expect("get_minimum_stability returns BString, not anyhow::Result; stability option is guaranteed present by the has_option guard above")
                     .as_string()
-                    .map(|s| legacy_lossy(s).into_owned())
-                    .unwrap_or_else(|| "stable".to_string()),
+                    .map(BString::from)
+                    .unwrap_or_else(|| BString::from("stable")),
             )
-            .unwrap_or_default()).into_owned();
+            .unwrap_or_default();
         }
 
         let file = Factory::get_composer_file().unwrap_or_default();
@@ -112,12 +112,11 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 && let Some(ms) = arr.get(B("minimum-stability"))
                 && let Some(s) = ms.as_string()
             {
-                return legacy_lossy(&VersionParser::normalize_stability(s).unwrap_or_default())
-                    .into_owned();
+                return VersionParser::normalize_stability(s).unwrap_or_default();
             }
         }
 
-        "stable".to_string()
+        BString::from("stable")
     }
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
@@ -125,82 +124,73 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        mut requires: Vec<String>,
+        mut requires: Vec<BString>,
         platform_repo: Option<&PlatformRepositoryHandle>,
-        preferred_stability: &str,
+        preferred_stability: &BStr,
         use_best_version_constraint: bool,
         fixed: bool,
-    ) -> anyhow::Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<BString>> {
         if !requires.is_empty() {
             let requires_norm = self.normalize_requirements(requires.clone())?;
-            let mut result: Vec<String> = vec![];
+            let mut result: Vec<BString> = vec![];
             let io = self.get_io();
 
             for mut requirement in requires_norm {
-                if requirement.contains_key("version")
+                let requirement_field = |requirement: &IndexMap<BString, BString>, key: &str| {
+                    requirement.get(B(key)).cloned().unwrap_or_default()
+                };
+                if requirement.contains_key(B("version"))
                     && preg_is_match(
                         php_regex!(r"{^\d+(\.\d+)?$}"),
-                        requirement
-                            .get("version")
-                            .map(|s| s.as_str())
-                            .unwrap_or_default(),
+                        requirement_field(&requirement, "version"),
                     )
                 {
                     io.write_error3(
                         format!(
                             "<warning>The \"{}\" constraint for \"{}\" appears too strict and will likely not match what you want. See https://getcomposer.org/constraints</warning>",
-                            requirement.get("version").map(|s| s.as_str()).unwrap_or_default(),
-                            requirement.get("name").map(|s| s.as_str()).unwrap_or_default(),
+                            requirement_field(&requirement, "version").display_lossy(),
+                            requirement_field(&requirement, "name").display_lossy(),
                         ),
                         true,
                         io_interface::NORMAL,
                     );
                 }
 
-                if !requirement.contains_key("version") {
+                if !requirement.contains_key(B("version")) {
                     // determine the best version automatically
-                    let (name, version): (String, String) = self
+                    let (name, version): (BString, BString) = self
                         .find_best_version_and_name_for_package(
                             io.clone(),
                             input.clone(),
-                            requirement
-                                .get("name")
-                                .map(|s| s.as_str())
-                                .unwrap_or_default(),
+                            requirement_field(&requirement, "name").as_ref(),
                             platform_repo,
                             preferred_stability,
                             fixed,
                         )?;
 
                     // replace package name from packagist.org
-                    requirement.insert("name".to_string(), name);
+                    requirement.insert("name".into(), name);
 
                     if use_best_version_constraint {
-                        requirement.insert("version".to_string(), version.clone());
+                        requirement.insert("version".into(), version.clone());
                         io.write_error3(
                             format!(
                                 "Using version <info>{}</info> for <info>{}</info>",
-                                version,
-                                requirement.get("name").cloned().unwrap_or_default(),
+                                version.display_lossy(),
+                                requirement_field(&requirement, "name").display_lossy(),
                             ),
                             true,
                             io_interface::NORMAL,
                         );
                     } else {
-                        requirement.insert("version".to_string(), "guess".to_string());
+                        requirement.insert("version".into(), "guess".into());
                     }
                 }
 
-                result.push(format!(
-                    "{} {}",
-                    requirement
-                        .get("name")
-                        .map(|s| s.as_str())
-                        .unwrap_or_default(),
-                    requirement
-                        .get("version")
-                        .map(|s| s.as_str())
-                        .unwrap_or_default(),
+                result.push(bconcat!(
+                    requirement_field(&requirement, "name"),
+                    " ",
+                    requirement_field(&requirement, "version"),
                 ));
             }
 
@@ -217,10 +207,10 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         let installed_repo = repository_manager_ref
             .as_ref()
             .map(|rm| rm.get_local_repository());
-        let mut existing_packages: Vec<String> = vec![];
+        let mut existing_packages: Vec<BString> = vec![];
         if let Some(repo) = &installed_repo {
             for package in repo.get_packages()? {
-                existing_packages.push(legacy_lossy(&package.get_name()).into_owned());
+                existing_packages.push(package.get_name());
             }
         }
         // PHP: unset($composer, $installedRepo);
@@ -234,11 +224,11 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         loop {
             let package_input = io.ask("Search for a package: ".into(), PhpMixed::Null)?;
             let mut package = match package_input.as_string() {
-                Some(s) => legacy_lossy(s).into_owned(),
+                Some(s) => BString::from(s),
                 None => break,
             };
             let mut matches: Vec<SearchResult> = self.get_repos().search(
-                bstr::BString::from(package.clone()),
+                package.clone(),
                 crate::repository::repository_interface::SEARCH_FULLTEXT,
                 None,
             )?;
@@ -265,16 +255,15 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                 // no match, prompt which to pick
                 if !exact_match {
-                    let providers: IndexMap<BString, crate::repository::ProviderInfo> = self
-                        .get_repos()
-                        .get_providers(bstr::BString::from(package.clone()))?;
+                    let providers: IndexMap<BString, crate::repository::ProviderInfo> =
+                        self.get_repos().get_providers(package.clone())?;
                     if !providers.is_empty() {
                         // PHP: array_unshift($matches, ['name' => $package, 'description' => '']);
                         matches.insert(
                             0,
                             SearchResult {
-                                name: bstr::BString::from(package.clone()),
-                                description: Some(bstr::BString::from(String::new())),
+                                name: package.clone(),
+                                description: Some(BString::default()),
                                 abandoned: None,
                                 url: None,
                             },
@@ -287,7 +276,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         if let Some(ai) = &found_package.abandoned {
                             let replacement = match ai {
                                 crate::repository::AbandonedInfo::Replacement(r) => {
-                                    format!("Use {} instead", legacy_lossy(&r.clone()))
+                                    format!("Use {} instead", r.display_lossy())
                                 }
                                 crate::repository::AbandonedInfo::Abandoned => {
                                     "No replacement was suggested".to_string()
@@ -299,7 +288,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         choices.push(format!(
                             " <info>{:>5}</info> {} {}",
                             format!("[{}]", position),
-                            legacy_lossy(&found_package.name.clone()),
+                            found_package.name.display_lossy(),
                             abandoned,
                         ));
                     }
@@ -309,7 +298,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         format!(
                             "Found <info>{}</info> packages matching <info>{}</info>",
                             matches.len() as i64,
-                            package.clone(),
+                            package.display_lossy(),
                         ),
                         true,
                         io_interface::NORMAL,
@@ -326,14 +315,15 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(
                         move |selection_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
                             let selection =
-                                legacy_lossy(selection_mixed.as_string().unwrap_or_default())
-                                    .into_owned();
+                                BString::from(selection_mixed.as_string().unwrap_or_default());
                             if selection.is_empty() {
                                 return Ok(PhpMixed::Bool(false));
                             }
 
                             if is_numeric(&PhpMixed::string(selection.clone())) {
-                                let idx: usize = selection.parse().unwrap_or(0);
+                                let idx =
+                                    shirabe_php_shim::intval(&PhpMixed::string(selection.clone()))
+                                        as usize;
                                 if let Some(p) = matches_clone.get(idx) {
                                     return Ok(PhpMixed::string(p.name.clone()));
                                 }
@@ -343,9 +333,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 php_regex!(r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}"),
                                 &selection,
                             ) {
-                                if let Some(v) =
-                                    m.name("version").map(|s| legacy_lossy(s).into_owned())
-                                {
+                                if let Some(v) = m.name("version").map(BString::from) {
                                     // parsing `acme/example ~2.3`
                                     // validate version constraint
                                     version_parser_clone.parse_constraints(&v)?;
@@ -358,9 +346,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 }
 
                                 // parsing `acme/example`
-                                return Ok(PhpMixed::string(
-                                    legacy_lossy(m.name("name").unwrap_or_default()).into_owned(),
-                                ));
+                                return Ok(PhpMixed::string(m.name("name").unwrap_or_default()));
                             }
 
                             Err(Exception::new("Not a valid selection".to_string()).into())
@@ -375,7 +361,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             PhpMixed::string(String::new()),
                         )?
                         .as_string()
-                        .map(|s| legacy_lossy(s).into_owned())
+                        .map(BString::from)
                         .unwrap_or_default();
                 }
 
@@ -398,13 +384,13 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         PhpMixed::string(String::new()),
                     )?;
 
-                    let constraint: String = match &constraint_mixed {
+                    let constraint: BString = match &constraint_mixed {
                         PhpMixed::Bool(false) => {
-                            let (_name, c): (String, String) = self
+                            let (_name, c): (BString, BString) = self
                                 .find_best_version_and_name_for_package(
                                     io.clone(),
                                     input.clone(),
-                                    &package,
+                                    package.as_ref(),
                                     platform_repo,
                                     preferred_stability,
                                     fixed,
@@ -413,8 +399,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             io.write_error3(
                                 format!(
                                     "Using version <info>{}</info> for <info>{}</info>",
-                                    c.clone(),
-                                    package.clone(),
+                                    c.display_lossy(),
+                                    package.display_lossy(),
                                 ),
                                 true,
                                 io_interface::NORMAL,
@@ -422,17 +408,16 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                             c
                         }
-                        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-                        _ => String::new(),
+                        PhpMixed::String(s) => s.clone(),
+                        _ => BString::default(),
                     };
 
-                    package = format!("{} {}", package, constraint);
+                    package = bconcat!(package, " ", constraint);
                 }
 
                 if !package.is_empty() {
                     requires.push(package.clone());
-                    existing_packages
-                        .push(legacy_lossy(&explode(" ", &package)[0].clone()).into_owned());
+                    existing_packages.push(explode(" ", &package)[0].clone());
                 }
             }
         }
@@ -447,11 +432,11 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        name: &str,
+        name: &BStr,
         platform_repo: Option<&PlatformRepositoryHandle>,
-        preferred_stability: &str,
+        preferred_stability: &BStr,
         fixed: bool,
-    ) -> anyhow::Result<(String, String)> {
+    ) -> anyhow::Result<(BString, BString)> {
         // handle ignore-platform-reqs flag if present
         let platform_requirement_filter = if input.borrow().has_option("ignore-platform-reqs")
             && input.borrow().has_option("ignore-platform-req")
@@ -484,21 +469,20 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         if package.is_none() {
             // platform packages can not be found in the pool in versions other than the local platform's has
             // so if platform reqs are ignored we just take the user's word for it
-            if platform_requirement_filter.is_ignored(name.as_bytes().as_bstr()) {
-                return Ok((name.to_string(), "*".to_string()));
+            if platform_requirement_filter.is_ignored(name) {
+                return Ok((BString::from(name), BString::from("*")));
             }
 
             // Check if it is a virtual package provided by others
-            let providers = repo_set.borrow().get_providers(bstr::BStr::new(name))?;
+            let providers = repo_set.borrow().get_providers(name)?;
             if !providers.is_empty() {
-                let mut constraint = "*".to_string();
+                let mut constraint = BString::from("*");
                 if input.borrow().is_interactive() {
                     let providers_count = providers.len();
-                    let name_owned = name.to_string();
+
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
                         Box::new(move |value_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
-                            let value = legacy_lossy(value_mixed.as_string().unwrap_or_default())
-                                .into_owned();
+                            let value = BString::from(value_mixed.as_string().unwrap_or_default());
                             let parser = VersionParser::new();
                             parser.parse_constraints(&value)?;
 
@@ -509,18 +493,18 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         .ask_and_validate(
                             format!(
                                 "Package \"<info>{}</info>\" does not exist but is provided by {} packages. Which version constraint would you like to use? [<info>*</info>] ",
-                                name_owned, providers_count,
+                                name.display_lossy(), providers_count,
                             ),
                             validator,
                             Some(3),
                             PhpMixed::string("*".to_string()),
                         )?
                         .as_string()
-                        .map(|s| legacy_lossy(s).into_owned())
+                        .map(BString::from)
                         .unwrap_or_default();
                 }
 
-                return Ok((name.to_string(), constraint));
+                return Ok((BString::from(name), constraint));
             }
 
             // Check whether the package requirements were the problem
@@ -542,7 +526,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 if let Some(candidate) = candidate {
                     return Err(InvalidArgumentException::new(format!(
                         "Package {} has requirements incompatible with your PHP version, PHP extensions and Composer version{}",
-                        name,
+                        name.display_lossy(),
                         self.get_platform_exception_details(
                             candidate,
                             platform_repo,
@@ -575,7 +559,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 if let Some(all_repos_package) = all_repos_package {
                     return Err(InvalidArgumentException::new(format!(
                         "Package {} exists in {} and {} which has a higher repository priority. The packages from the higher priority repository do not match your minimum-stability and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.",
-                        name,
+                        name.display_lossy(),
                         all_repos_package
                             .get_repository()
                             .map(|r| r.get_repo_name())
@@ -592,8 +576,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                 return Err(InvalidArgumentException::new(format!(
                     "Could not find a version of package {} matching your minimum-stability ({}). Require it with an explicit version constraint allowing its desired stability.",
-                    name,
-                    effective_minimum_stability,
+                    name.display_lossy(),
+                    effective_minimum_stability.display_lossy(),
                 ))
                 .into());
             }
@@ -624,14 +608,14 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             "{}{}Additionally, the package was only found with a stability of \"{}\" while your minimum stability is \"{}\".",
                             PHP_EOL,
                             PHP_EOL,
-                            legacy_lossy(&candidate.get_stability()),
-                            effective_minimum_stability,
+                            candidate.get_stability().display_lossy(),
+                            effective_minimum_stability.display_lossy(),
                         );
                     }
 
                     return Err(InvalidArgumentException::new(format!(
                         "Could not find package {} in any version matching your PHP version, PHP extensions and Composer version{}{}",
-                        name,
+                        name.display_lossy(),
                         self.get_platform_exception_details(
                             candidate,
                             platform_repo,
@@ -646,7 +630,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             let similar = self.find_similar(name)?;
             if !similar.is_empty() {
                 if in_array_strict(
-                    name.to_string(),
+                    BString::from(name),
                     &similar
                         .iter()
                         .map(|s| PhpMixed::string(s.clone()))
@@ -654,7 +638,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 ) {
                     return Err(InvalidArgumentException::new(format!(
                         "Could not find package {}. It was however found via repository search, which indicates a consistency issue with the repository.",
-                        name,
+                        name.display_lossy(),
                     ))
                     .into());
                 }
@@ -663,7 +647,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     let result_mixed = io.select(
                         format!(
                             "<error>Could not find package {}.</error>\nPick one of these or leave empty to abort:",
-                            name,
+                            name.display_lossy(),
                         ),
                         PhpMixed::List(
                             similar.iter().map(|s| PhpMixed::string(s.clone())).collect(),
@@ -680,7 +664,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         return self.find_best_version_and_name_for_package(
                             io.clone(),
                             input,
-                            selected,
+                            selected.as_ref(),
                             platform_repo,
                             preferred_stability,
                             fixed,
@@ -690,7 +674,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                 return Err(InvalidArgumentException::new(format!(
                     "Could not find package {}.\n\nDid you mean {}?\n    {}",
-                    name,
+                    name.display_lossy(),
                     if similar.len() > 1 {
                         "one of these"
                     } else {
@@ -703,25 +687,24 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
             return Err(InvalidArgumentException::new(format!(
                 "Could not find a matching version of package {}. Check the package spelling, your version constraint and that the package is available in a stability which matches your minimum-stability ({}).",
-                name,
-                effective_minimum_stability,
+                name.display_lossy(),
+                effective_minimum_stability.display_lossy(),
             ))
             .into());
         }
 
         let package = package.unwrap();
         Ok((
-            legacy_lossy(&package.get_pretty_name()).into_owned(),
+            package.get_pretty_name(),
             if fixed {
-                legacy_lossy(&package.get_pretty_version()).into_owned()
+                package.get_pretty_version()
             } else {
-                legacy_lossy(&version_selector.find_recommended_require_version(package)?)
-                    .into_owned()
+                version_selector.find_recommended_require_version(package)?
             },
         ))
     }
 
-    fn find_similar(&self, package: &str) -> anyhow::Result<Vec<String>> {
+    fn find_similar(&self, package: &BStr) -> anyhow::Result<Vec<BString>> {
         let results: Vec<SearchResult> = match (|| -> anyhow::Result<Vec<SearchResult>> {
             if self.get_repos_mut().is_none() {
                 return Err(LogicException::new(
@@ -729,11 +712,10 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 )
                 .into());
             }
-            self.get_repos_mut().as_ref().unwrap().search(
-                bstr::BString::from(package.to_string()),
-                0,
-                None,
-            )
+            self.get_repos_mut()
+                .as_ref()
+                .unwrap()
+                .search(BString::from(package), 0, None)
         })() {
             Ok(r) => r,
             Err(e) => {
@@ -746,7 +728,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 return Ok(vec![]);
             }
         };
-        let mut similar_packages: IndexMap<String, i64> = IndexMap::new();
+        let mut similar_packages: IndexMap<BString, i64> = IndexMap::new();
 
         let composer_for_installed = self.require_composer(None, None)?;
         let composer_for_installed = composer_for_installed.borrow_partial();
@@ -767,10 +749,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 // Ignore installed package
                 continue;
             }
-            similar_packages.insert(
-                legacy_lossy(&result.name.clone()).into_owned(),
-                levenshtein(package, &result.name),
-            );
+            similar_packages.insert(result.name.clone(), levenshtein(package, &result.name));
         }
         asort(&mut similar_packages);
 
@@ -794,31 +773,29 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 continue;
             }
             let platform_pkg = platform_repo.find_package(
-                bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                link.get_target().as_bstr(),
                 crate::repository::FindPackageConstraint::String(bstr::BString::from(
                     "*".to_string(),
                 )),
             )?;
             let platform_pkg = match platform_pkg {
                 None => {
-                    if platform_repo.is_platform_package_disabled(bstr::BStr::new(&*legacy_lossy(
-                        link.get_target(),
-                    ))) {
+                    if platform_repo.is_platform_package_disabled(link.get_target().as_bstr()) {
                         details.push(format!(
                             "{} {} requires {} {} but it is disabled by your platform config. Enable it again with \"shirabe config platform.{} --unset\".",
-                            legacy_lossy(&candidate.get_pretty_name()),
-                            legacy_lossy(&candidate.get_pretty_version()),
-                            legacy_lossy(&link.get_target()),
-                            legacy_lossy(&link.get_pretty_constraint()),
-                            legacy_lossy(&link.get_target()),
+                            candidate.get_pretty_name().display_lossy(),
+                            candidate.get_pretty_version().display_lossy(),
+                            link.get_target().display_lossy(),
+                            link.get_pretty_constraint().display_lossy(),
+                            link.get_target().display_lossy(),
                         ));
                     } else {
                         details.push(format!(
                             "{} {} requires {} {} but it is not present.",
-                            legacy_lossy(&candidate.get_pretty_name()),
-                            legacy_lossy(&candidate.get_pretty_version()),
-                            legacy_lossy(&link.get_target()),
-                            legacy_lossy(&link.get_pretty_constraint()),
+                            candidate.get_pretty_name().display_lossy(),
+                            candidate.get_pretty_version().display_lossy(),
+                            link.get_target().display_lossy(),
+                            link.get_pretty_constraint().display_lossy(),
                         ));
                     }
                     continue;
@@ -830,13 +807,15 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 .matches(&shirabe_semver::constraint::AnyConstraint::Simple(
                     shirabe_semver::constraint::SimpleConstraint::new(
                         "==",
-                        legacy_lossy(&platform_pkg.get_version()).into_owned(),
+                        platform_pkg.get_version(),
                         None,
                     ),
                 ))
             {
-                let mut platform_pkg_version =
-                    legacy_lossy(&platform_pkg.get_pretty_version()).into_owned();
+                let mut platform_pkg_version = platform_pkg
+                    .get_pretty_version()
+                    .display_lossy()
+                    .to_string();
                 let platform_extra = platform_pkg.get_extra();
                 let has_config_platform = platform_extra.contains_key(B("config.platform"));
                 let is_complete = platform_pkg.as_complete().is_some();
@@ -844,21 +823,20 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     platform_pkg_version = format!(
                         "{} ({})",
                         platform_pkg_version,
-                        legacy_lossy(
-                            &platform_pkg
-                                .as_complete()
-                                .unwrap()
-                                .get_description()
-                                .unwrap_or_default()
-                        )
+                        platform_pkg
+                            .as_complete()
+                            .unwrap()
+                            .get_description()
+                            .unwrap_or_default()
+                            .display_lossy()
                     );
                 }
                 details.push(format!(
                     "{} {} requires {} {} which does not match your installed version {}.",
-                    legacy_lossy(&candidate.get_pretty_name()),
-                    legacy_lossy(&candidate.get_pretty_version()),
-                    legacy_lossy(&link.get_target()),
-                    legacy_lossy(&link.get_pretty_constraint()),
+                    candidate.get_pretty_name().display_lossy(),
+                    candidate.get_pretty_version().display_lossy(),
+                    link.get_target().display_lossy(),
+                    link.get_pretty_constraint().display_lossy(),
                     platform_pkg_version,
                 ));
             }
@@ -871,7 +849,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         Ok(format!(
             ":{}  - {}",
             PHP_EOL,
-            legacy_lossy(&implode(format!("{}  - ", PHP_EOL), &details))
+            details.join(&format!("{}  - ", PHP_EOL))
         ))
     }
 }

@@ -10,7 +10,7 @@ use crate::package::base_package;
 use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
-use bstr::B;
+use bstr::{B, BString};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, file_get_contents, file_put_contents, impl_php_class, is_writable,
     legacy_lossy, php_regex, preg_is_match, preg_replace, strtolower,
@@ -52,7 +52,7 @@ impl BumpCommand {
         dev_only: bool,
         no_dev_only: bool,
         dry_run: bool,
-        packages_filter: Vec<String>,
+        packages_filter: Vec<BString>,
         dev_only_flag_hint: String,
     ) -> anyhow::Result<i64> {
         let composer_json_path = Factory::get_composer_file()?;
@@ -185,6 +185,9 @@ impl BumpCommand {
             packages_filter
         } else {
             packages_filter
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<String>>()
         };
 
         let mut updates: indexmap::IndexMap<&str, indexmap::IndexMap<String, String>> =
@@ -419,10 +422,7 @@ impl Command for BumpCommand {
             dev_only,
             no_dev_only,
             dry_run,
-            packages_filter
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<String>>(),
+            packages_filter,
             "--dev-only".to_string(),
         )
     }

@@ -587,7 +587,7 @@ impl CreateProjectCommand {
         let rm = composer.get_repository_manager();
 
         let mut repository_set = RepositorySet::new(
-            &legacy_lossy(&stability),
+            &stability,
             indexmap::IndexMap::new(),
             vec![],
             indexmap::IndexMap::new(),
@@ -679,9 +679,9 @@ impl CreateProjectCommand {
             Some(&mut platform_repo),
         )?;
         let package = version_selector.find_best_candidate(
-            &name,
+            bstr::BStr::new(&name),
             package_version.as_deref(),
-            &legacy_lossy(&stability),
+            bstr::BStr::new(&stability),
             Some(platform_requirement_filter.clone()),
             0,
             Some(io.clone()),
@@ -705,9 +705,9 @@ impl CreateProjectCommand {
             if !is_ignore_all
                 && version_selector
                     .find_best_candidate(
-                        &name,
+                        bstr::BStr::new(&name),
                         package_version.as_deref(),
-                        &legacy_lossy(&stability),
+                        bstr::BStr::new(&stability),
                         Some(PlatformRequirementFilterFactory::ignore_all()),
                         0,
                         None,
@@ -831,10 +831,7 @@ impl CreateProjectCommand {
             Platform::clear_env("COMPOSER");
         }
 
-        Platform::put_env(
-            "COMPOSER_ROOT_VERSION",
-            &legacy_lossy(&package.get_pretty_version()),
-        );
+        Platform::put_env("COMPOSER_ROOT_VERSION", package.get_pretty_version());
 
         if let Some(signals) = &signals
             && signals.is_triggered()

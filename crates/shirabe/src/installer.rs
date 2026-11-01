@@ -112,7 +112,7 @@ pub struct Installer {
     ignored_types: Vec<BString>,
     allowed_types: Option<Vec<BString>>,
     update_mirrors: bool,
-    update_allow_list: Option<Vec<String>>,
+    update_allow_list: Option<Vec<BString>>,
     update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     suggested_packages_reporter: std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
     platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
@@ -615,11 +615,7 @@ impl Installer {
         // pass the allow list into the request, so the pool builder can apply it
         if let Some(ref allow_list) = self.update_allow_list {
             request.set_update_allow_list(
-                allow_list
-                    .clone()
-                    .into_iter()
-                    .map(bstr::BString::from)
-                    .collect::<Vec<_>>(),
+                allow_list.clone(),
                 self.update_allow_transitive_dependencies,
             );
         }
@@ -1914,15 +1910,12 @@ impl Installer {
 
     /// restrict the update operation to a few packages, all other packages
     /// that are already installed will be kept at their current version
-    pub fn set_update_allow_list(&mut self, packages: Vec<String>) -> &mut Self {
+    pub fn set_update_allow_list(&mut self, packages: Vec<BString>) -> &mut Self {
         if packages.is_empty() {
             self.update_allow_list = None;
         } else {
-            let lowered: Vec<String> = array_map(|s: &String| strtolower(s), &packages)
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>();
-            let unique: Vec<String> = array_unique(&lowered);
+            let lowered: Vec<BString> = array_map(|s: &BString| strtolower(s), &packages);
+            let unique: Vec<BString> = array_unique(&lowered);
             self.update_allow_list = Some(unique);
         }
 

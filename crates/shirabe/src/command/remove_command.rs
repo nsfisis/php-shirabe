@@ -198,15 +198,11 @@ impl Command for RemoveCommand {
             .into());
         }
 
-        let mut packages: Vec<String> = input
+        let mut packages: Vec<BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(|l| {
-                l.iter()
-                    .map(|v| legacy_lossy(&strtolower(v)).into_owned())
-                    .collect()
-            })
+            .map(|l| l.iter().map(strtolower).collect())
             .unwrap_or_default();
 
         if input
@@ -269,11 +265,7 @@ impl Command for RemoveCommand {
                 }
             }
 
-            let unused: Vec<String> = locked_packages
-                .iter()
-                .map(|p| p.get_name())
-                .map(|s| legacy_lossy(&s).into_owned())
-                .collect();
+            let unused: Vec<BString> = locked_packages.iter().map(|p| p.get_name()).collect();
             packages.extend(unused);
 
             if packages.is_empty() {
@@ -345,7 +337,7 @@ impl Command for RemoveCommand {
             .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false);
-        let mut to_remove: IndexMap<String, Vec<String>> = IndexMap::new();
+        let mut to_remove: IndexMap<String, Vec<BString>> = IndexMap::new();
         for package in &packages {
             let in_type = composer_data
                 .as_array()
@@ -368,7 +360,7 @@ impl Command for RemoveCommand {
                     to_remove
                         .entry(r#type.to_string())
                         .or_default()
-                        .push(canonical_name.clone());
+                        .push(bstr::BString::from(canonical_name.clone()));
                 } else {
                     json.remove_link(bstr::BStr::new(r#type), bstr::BStr::new(&canonical_name));
                 }
@@ -390,7 +382,7 @@ impl Command for RemoveCommand {
                         to_remove
                             .entry(alt_type.to_string())
                             .or_default()
-                            .push(canonical_name.clone());
+                            .push(bstr::BString::from(canonical_name.clone()));
                     } else {
                         json.remove_link(
                             bstr::BStr::new(alt_type),
@@ -433,7 +425,7 @@ impl Command for RemoveCommand {
                             to_remove
                                 .entry(r#type.to_string())
                                 .or_default()
-                                .push(matched_package.clone());
+                                .push(bstr::BString::from(matched_package.clone()));
                         } else {
                             json.remove_link(
                                 bstr::BStr::new(r#type),
@@ -460,7 +452,7 @@ impl Command for RemoveCommand {
                                 to_remove
                                     .entry(alt_type.to_string())
                                     .or_default()
-                                    .push(matched_package.clone());
+                                    .push(bstr::BString::from(matched_package.clone()));
                             } else {
                                 json.remove_link(
                                     bstr::BStr::new(alt_type),
@@ -472,7 +464,7 @@ impl Command for RemoveCommand {
                 } else {
                     io.write_error(format!(
                         "<warning>{} is not required in your composer.json and has not been removed</warning>",
-                        package
+                        package.display_lossy()
                     ));
                 }
             }
@@ -537,7 +529,7 @@ impl Command for RemoveCommand {
             .dispatch(Some(&command_event_name), Some(&mut command_event))?;
 
         let allow_plugins = composer.get_config().borrow_mut().get("allow-plugins");
-        let removed_plugins: Vec<String> =
+        let removed_plugins: Vec<BString> =
             if let Some(allow_map) = allow_plugins.as_opt().and_then(|v| v.as_array()) {
                 packages
                     .iter()
@@ -563,7 +555,7 @@ impl Command for RemoveCommand {
                 for plugin in &removed_plugins {
                     json.remove_config_setting(bstr::BStr::new(&format!(
                         "allow-plugins.{}",
-                        plugin
+                        plugin.display_lossy()
                     )));
                 }
             }
@@ -667,7 +659,7 @@ impl Command for RemoveCommand {
 
         io.write_error(format!(
             "<info>Running shirabe update {}{}</info>",
-            packages.join(" "),
+            shirabe_php_shim::implode(" ", &packages).display_lossy(),
             flags
         ));
 
@@ -725,7 +717,7 @@ impl Command for RemoveCommand {
                 {
                     io.write_error(format!(
                         "<error>Removal failed, {} is still present, it may be required by another package. See `shirabe why {}`.</error>",
-                        package, package
+                        package.display_lossy(), package.display_lossy()
                     ));
                     return Ok(2);
                 }

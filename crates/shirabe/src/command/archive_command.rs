@@ -238,7 +238,7 @@ impl ArchiveCommand {
         }
 
         let mut repo_set = RepositorySet::new(
-            &legacy_lossy(&min_stability),
+            &min_stability,
             IndexMap::new(),
             Vec::new(),
             IndexMap::new(),
@@ -252,16 +252,19 @@ impl ArchiveCommand {
             Some(v) => Some(parser.parse_constraints(v)?),
             None => None,
         };
-        let packages =
-            repo_set.find_packages(bstr::BStr::new(&package_name.to_lowercase()), constraint, 0)?;
+        let packages = repo_set.find_packages(
+            shirabe_php_shim::strtolower(package_name).as_ref(),
+            constraint,
+            0,
+        )?;
 
         let package = if packages.len() > 1 {
             let mut version_selector =
                 VersionSelector::new(std::rc::Rc::new(std::cell::RefCell::new(repo_set)), None)?;
             let best = version_selector.find_best_candidate(
-                &package_name.to_lowercase(),
+                shirabe_php_shim::strtolower(package_name).as_ref(),
                 version.as_deref(),
-                &legacy_lossy(&min_stability),
+                bstr::BStr::new(&min_stability),
                 None,
                 0,
                 None,

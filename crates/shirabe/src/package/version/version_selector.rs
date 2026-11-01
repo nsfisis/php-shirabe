@@ -57,21 +57,21 @@ impl VersionSelector {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn find_best_candidate(
         &mut self,
-        package_name: &str,
+        package_name: &BStr,
         target_package_version: Option<&str>,
-        preferred_stability: &str,
+        preferred_stability: &BStr,
         platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
         repo_set_flags: i64,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         show_warnings: ShowWarnings,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
-        if !base_package::STABILITIES.contains_key(preferred_stability) {
+        let Some(min_priority) = base_package::stability_priority(preferred_stability) else {
             return Err(UnexpectedValueException::new(format!(
                 "Expected a valid stability name as 3rd argument, got {}",
-                preferred_stability
+                preferred_stability.display_lossy()
             ))
             .into());
-        }
+        };
 
         let platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface> =
             match platform_requirement_filter {
@@ -89,7 +89,6 @@ impl VersionSelector {
             repo_set_flags,
         )?;
 
-        let min_priority = *base_package::STABILITIES.get(preferred_stability).unwrap();
         candidates.sort_by(|a, b| {
             // BasePackage::get_stability_priority() is not forwarded by the handle; compute it
             // directly from the stability name.

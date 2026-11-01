@@ -30,7 +30,7 @@ impl CommandEvent {
         command_name: &str,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        args: Vec<String>,
+        args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
     ) -> Self {
         let inner = Event::new(name.to_string(), args, flags);
@@ -72,7 +72,7 @@ impl EventInterface for CommandEvent {
         self.inner.get_name()
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<bstr::BString> {
         self.inner.get_arguments()
     }
 

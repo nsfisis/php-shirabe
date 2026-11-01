@@ -78,9 +78,9 @@ fn find_best(
 ) -> Option<PackageInterfaceHandle> {
     version_selector
         .find_best_candidate(
-            package_name,
+            bstr::BStr::new(package_name),
             None,
-            preferred_stability,
+            bstr::BStr::new(preferred_stability),
             platform_requirement_filter,
             0,
             io,

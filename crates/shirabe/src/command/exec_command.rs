@@ -217,7 +217,7 @@ impl Command for ExecCommand {
             .clone();
         dispatcher.borrow_mut().add_listener(
             "__exec_command",
-            crate::event_dispatcher::Callable::String(binary),
+            crate::event_dispatcher::Callable::String(binary.into()),
             0,
         );
 
@@ -255,9 +255,7 @@ impl Command for ExecCommand {
         dispatcher.borrow_mut().dispatch_script(
             "__exec_command",
             true,
-            args.iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<String>>(),
+            args,
             indexmap::IndexMap::new(),
         )
     }

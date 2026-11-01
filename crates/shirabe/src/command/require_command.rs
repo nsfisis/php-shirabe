@@ -79,16 +79,16 @@ impl RequireCommand {
 
     fn get_inconsistent_require_keys(
         &self,
-        new_requirements: &IndexMap<String, String>,
+        new_requirements: &IndexMap<BString, BString>,
         require_key: &str,
-    ) -> Vec<String> {
+    ) -> Vec<BString> {
         let require_keys = self.get_packages_by_require_key();
-        let mut inconsistent_requirements: Vec<String> = vec![];
+        let mut inconsistent_requirements: Vec<BString> = vec![];
         for (package, package_require_key) in &require_keys {
             if !new_requirements.contains_key(package) {
                 continue;
             }
-            if require_key != package_require_key {
+            if package_require_key != require_key {
                 inconsistent_requirements.push(package.clone());
             }
         }
@@ -96,7 +96,7 @@ impl RequireCommand {
         inconsistent_requirements
     }
 
-    fn get_packages_by_require_key(&self) -> IndexMap<String, String> {
+    fn get_packages_by_require_key(&self) -> IndexMap<BString, BString> {
         let json = self.json.borrow().as_ref().unwrap().clone();
         let composer_definition = json.borrow_mut().read().unwrap_or_default();
         let mut require: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -143,11 +143,7 @@ impl RequireCommand {
         .as_array()
         .map(|m| {
             m.iter()
-                // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-                .filter_map(|(k, v)| {
-                    v.as_string()
-                        .map(|s| (k.to_str_lossy().into_owned(), legacy_lossy(s).into_owned()))
-                })
+                .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), BString::from(s))))
                 .collect()
         })
         .unwrap_or_default()
@@ -158,7 +154,7 @@ impl RequireCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        requirements: &IndexMap<String, String>,
+        requirements: &IndexMap<BString, BString>,
         require_key: &str,
         _remove_key: &str,
     ) -> anyhow::Result<i64> {
@@ -200,7 +196,7 @@ impl RequireCommand {
             let loader = ArrayLoader::new(None, false);
             let requirements_mixed: IndexMap<BString, PhpMixed> = requirements
                 .iter()
-                .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
+                .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                 .collect();
             let new_links = loader.parse_links(
                 bstr::BStr::new(&*legacy_lossy(&root_package.get_name())),
@@ -225,13 +221,11 @@ impl RequireCommand {
             root_package.set_dev_requires(links["require-dev"].clone());
 
             // extract stability flags & references as they weren't present when loading the unmodified composer.json
-            let references = RootPackageLoader::extract_references(
-                &bytes_map(requirements),
-                root_package.get_references(),
-            );
+            let references =
+                RootPackageLoader::extract_references(requirements, root_package.get_references());
             root_package.set_references(references);
             let stability_flags = RootPackageLoader::extract_stability_flags(
-                &bytes_map(requirements),
+                requirements,
                 bstr::BStr::new(&*legacy_lossy(&root_package.get_minimum_stability())),
                 root_package.get_stability_flags(),
             );
@@ -329,13 +323,7 @@ impl RequireCommand {
         io.write_error3(
             format!(
                 "<info>Running shirabe update {}{}</info>",
-                implode(
-                    " ",
-                    &array_keys(requirements)
-                        .into_iter()
-                        .collect::<Vec<String>>()
-                )
-                .display_lossy(),
+                implode(" ", &array_keys(requirements)).display_lossy(),
                 flags,
             ),
             true,
@@ -425,11 +413,7 @@ impl RequireCommand {
         // if no lock is present, or the file is brand new, we do not do a
         // partial update as this is not supported by the Installer
         if !self.first_require.get() && composer.get_locker().borrow_mut().is_locked() {
-            install.set_update_allow_list(
-                array_keys(requirements)
-                    .into_iter()
-                    .collect::<Vec<String>>(),
-            );
+            install.set_update_allow_list(array_keys(requirements));
         }
 
         let status = install.run().await?;
@@ -442,16 +426,13 @@ impl RequireCommand {
                         .get_argument("packages")?
                         .as_array()
                         .map(<[bstr::BString]>::to_vec)
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|s| legacy_lossy(s).into_owned())
-                        .collect::<Vec<String>>(),
+                        .unwrap_or_default(),
                 )? {
-                    if !req.contains_key("version") {
+                    if !req.contains_key(B("version")) {
                         io.write_error3(format!(
                             "You can also try re-running shirabe require with an explicit version constraint, e.g. \"shirabe require {}:*\" to figure out if any version is installable, or \"shirabe require {}:^2.1\" if you know which you need.",
-                            req.get("name").cloned().unwrap_or_default(),
-                            req.get("name").cloned().unwrap_or_default(),
+                            req.get(B("name")).cloned().unwrap_or_default().display_lossy(),
+                            req.get(B("name")).cloned().unwrap_or_default().display_lossy(),
                         ), true, io_interface::NORMAL);
                         break;
                     }
@@ -465,7 +446,7 @@ impl RequireCommand {
 
     fn update_requirements_after_resolution(
         &self,
-        requirements_to_update: &[String],
+        requirements_to_update: &[BString],
         require_key: &str,
         remove_key: &str,
         sort_packages: bool,
@@ -475,7 +456,7 @@ impl RequireCommand {
         let composer = self.require_composer(None, None)?;
         let composer = crate::composer::composer_full(&composer);
         let locker_is_locked = composer.get_locker().borrow_mut().is_locked();
-        let mut requirements: IndexMap<String, String> = IndexMap::new();
+        let mut requirements: IndexMap<BString, BString> = IndexMap::new();
         let mut version_selector = VersionSelector::new(
             std::rc::Rc::new(std::cell::RefCell::new(RepositorySet::new(
                 "stable",
@@ -516,24 +497,22 @@ impl RequireCommand {
             };
 
             if fixed {
-                requirements.insert(
-                    package_name.clone(),
-                    legacy_lossy(&package.get_pretty_version()).into_owned(),
-                );
+                requirements.insert(package_name.clone(), package.get_pretty_version());
             } else {
                 requirements.insert(
                     package_name.clone(),
-                    legacy_lossy(
-                        &version_selector.find_recommended_require_version(package.clone())?,
-                    )
-                    .into_owned(),
+                    version_selector.find_recommended_require_version(package.clone())?,
                 );
             }
             self.get_io().write_error3(
                 format!(
                     "Using version <info>{}</info> for <info>{}</info>",
-                    requirements.get(package_name).cloned().unwrap_or_default(),
-                    package_name.clone(),
+                    requirements
+                        .get(package_name)
+                        .cloned()
+                        .unwrap_or_default()
+                        .display_lossy(),
+                    package_name.display_lossy(),
                 ),
                 true,
                 io_interface::NORMAL,
@@ -542,20 +521,17 @@ impl RequireCommand {
             // Regex pattern compatibility:
             // PCRE `{^dev-(?!main$|master$|trunk$|latest$)}` uses a negative lookahead,
             // which the `regex` crate does not support. Decomposed into hand-written logic.
-            let requirement_str = requirements
-                .get(package_name)
-                .map(|s| s.as_str())
-                .unwrap_or_default();
-            if requirement_str.starts_with("dev-")
+            let requirement_str = requirements.get(package_name).cloned().unwrap_or_default();
+            if requirement_str.starts_with(b"dev-")
                 && !matches!(
                     &requirement_str[4..],
-                    "main" | "master" | "trunk" | "latest"
+                    b"main" | b"master" | b"trunk" | b"latest"
                 )
             {
                 self.get_io().warning(
                     &format!(
                         "Version {} looks like it may be a feature branch which is unlikely to keep working in the long run and may be in an unstable state",
-                        requirements.get(package_name).cloned().unwrap_or_default(),
+                        requirement_str.display_lossy(),
                     ),
                     &[],
                 );
@@ -585,7 +561,7 @@ impl RequireCommand {
                     .unwrap_or(false)
             {
                 let stability_flags = RootPackageLoader::extract_stability_flags(
-                    &bytes_map(&requirements),
+                    &(requirements),
                     bstr::BStr::new(&*legacy_lossy(
                         &composer.get_package().get_minimum_stability(),
                     )),
@@ -614,7 +590,7 @@ impl RequireCommand {
     fn update_file(
         &self,
         json: &std::rc::Rc<std::cell::RefCell<JsonFile>>,
-        new: &IndexMap<String, String>,
+        new: &IndexMap<BString, BString>,
         require_key: &str,
         remove_key: &str,
         sort_packages: bool,
@@ -633,7 +609,7 @@ impl RequireCommand {
                 .entry(require_key.to_string().into())
                 .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
             if let Some(section) = section.as_array_mut() {
-                section.insert(package.as_str().into(), PhpMixed::string(version.clone()));
+                section.insert(package.clone(), PhpMixed::string(version.clone()));
             }
             if let Some(section) = composer_definition
                 .get_mut(B(remove_key))
@@ -656,7 +632,7 @@ impl RequireCommand {
     fn update_file_cleanly(
         &self,
         json: &std::rc::Rc<std::cell::RefCell<JsonFile>>,
-        new: &IndexMap<String, String>,
+        new: &IndexMap<BString, BString>,
         require_key: &str,
         remove_key: &str,
         sort_packages: bool,
@@ -948,12 +924,9 @@ impl Command for RequireCommand {
         let requirements_result = self.determine_requirements(
             input.clone(),
             output.clone(),
-            packages
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<String>>(),
+            packages,
             Some(&platform_repo),
-            &preferred_stability,
+            bstr::BStr::new(&preferred_stability),
             no_update,
             fixed,
         );
@@ -1077,10 +1050,10 @@ impl Command for RequireCommand {
         };
 
         // check which requirements need the version guessed
-        let mut requirements_to_guess: Vec<String> = vec![];
+        let mut requirements_to_guess: Vec<BString> = vec![];
         for (package, constraint) in requirements.clone().iter() {
             if constraint == "guess" {
-                requirements.insert(package.clone(), "*".to_string());
+                requirements.insert(package.clone(), "*".into());
                 requirements_to_guess.push(package.clone());
             }
         }
@@ -1091,7 +1064,7 @@ impl Command for RequireCommand {
             if strtolower(package) == composer.get_package().get_name() {
                 let msg = format!(
                     "<error>Root package '{}' cannot require itself in its composer.json</error>",
-                    package.clone(),
+                    package.display_lossy(),
                 );
                 self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
@@ -1109,7 +1082,7 @@ impl Command for RequireCommand {
             for package in &inconsistent_require_keys {
                 let warn_msg = format!(
                     "{} is currently present in the {} key and you ran the command {} the --dev flag, which will move it to the {} key.",
-                    package.clone(),
+                    package.display_lossy(),
                     remove_key,
                     if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
                         "with"
@@ -1314,11 +1287,4 @@ impl BaseCommand for RequireCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-// TODO(bytes): requirements from the command line are Strings.
-fn bytes_map(map: &IndexMap<String, String>) -> IndexMap<BString, BString> {
-    map.iter()
-        .map(|(k, v)| (BString::from(k.as_str()), BString::from(v.as_str())))
-        .collect()
 }

@@ -16,7 +16,7 @@ use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
     CanonicalPackagesTrait, CompositeRepository, PlatformRepository, RepositorySet,
 };
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
@@ -60,8 +60,8 @@ impl UpdateCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         composer: &PartialComposerHandle,
-        packages: Vec<String>,
-    ) -> anyhow::Result<Vec<String>> {
+        packages: Vec<BString>,
+    ) -> anyhow::Result<Vec<BString>> {
         if !input.borrow().is_interactive() {
             return Err(InvalidArgumentException::new(
                 "--interactive cannot be used in non-interactive terminals.".to_string(),
@@ -125,9 +125,9 @@ impl UpdateCommand {
                 }
             };
             let latest_version = version_selector.find_best_candidate(
-                &legacy_lossy(&package.get_name()),
+                bstr::BStr::new(&package.get_name()),
                 constraint.map(legacy_lossy).as_deref(),
-                &stability,
+                bstr::BStr::new(&stability),
                 None,
                 0,
                 None,
@@ -176,10 +176,10 @@ impl UpdateCommand {
             "No package named \"%s\" is installed.".to_string(),
             true,
         )?;
-        let packages: Vec<String> = match select_result {
+        let packages: Vec<BString> = match select_result {
             PhpMixed::List(l) => l
                 .into_iter()
-                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                .filter_map(|v| v.as_string().map(BString::from))
                 .collect(),
             _ => Vec::new(),
         };
@@ -237,7 +237,7 @@ impl UpdateCommand {
             })
             .collect();
         let mut repository_set = RepositorySet::new(
-            &legacy_lossy(&composer.get_package().get_minimum_stability()),
+            composer.get_package().get_minimum_stability(),
             composer.get_package().get_stability_flags(),
             root_aliases,
             composer.get_package().get_references(),
@@ -356,31 +356,25 @@ impl Command for UpdateCommand {
         // Composer warns here that it runs slower without the curl extension. Shirabe does not use
         // curl for its own downloads, so there is nothing to warn about.
 
-        let mut packages: Vec<String> = input
+        let mut packages: Vec<BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[bstr::BString]>::to_vec)
-            .unwrap_or_default()
-            .iter()
-            .map(|s| legacy_lossy(s).into_owned())
-            .collect();
-        let mut reqs: IndexMap<String, String> = self.format_requirements(
+            .map(<[BString]>::to_vec)
+            .unwrap_or_default();
+        let mut reqs: IndexMap<BString, BString> = self.format_requirements(
             input
                 .borrow()
                 .get_option("with")?
                 .as_array()
-                .map(<[bstr::BString]>::to_vec)
-                .unwrap_or_default()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<String>>(),
+                .map(<[BString]>::to_vec)
+                .unwrap_or_default(),
         )?;
 
         // extract --with shorthands from the allowlist
         if !packages.is_empty() {
-            let allowlist_packages_with_requirements: Vec<String> =
-                array_filter(&packages, |pkg: &String| -> bool {
+            let allowlist_packages_with_requirements: Vec<BString> =
+                array_filter(&packages, |pkg: &BString| -> bool {
                     preg_is_match(php_regex!(r"{\S+[ =:]\S+}"), pkg)
                 });
             for (package, constraint) in
@@ -391,12 +385,7 @@ impl Command for UpdateCommand {
 
             // replace the foo/bar:req by foo/bar in the allowlist
             for package in &allowlist_packages_with_requirements {
-                let package_name = legacy_lossy(&preg_replace(
-                    php_regex!(r"{^([^ =:]+)[ =:].*$}"),
-                    "$1",
-                    package,
-                ))
-                .into_owned();
+                let package_name = preg_replace(php_regex!(r"{^([^ =:]+)[ =:].*$}"), "$1", package);
                 if let Some(idx) = array_search_in_vec(package, &packages) {
                     packages[idx] = package_name;
                 }
@@ -405,12 +394,12 @@ impl Command for UpdateCommand {
 
         let root_package = composer.get_package();
         root_package.set_references(RootPackageLoader::extract_references(
-            &bytes_map(&reqs),
+            &reqs,
             root_package.get_references(),
         ));
         root_package.set_stability_flags(RootPackageLoader::extract_stability_flags(
-            &bytes_map(&reqs),
-            bstr::BStr::new(&*legacy_lossy(&root_package.get_minimum_stability())),
+            &reqs,
+            root_package.get_minimum_stability().as_bstr(),
             root_package.get_stability_flags(),
         ));
 
@@ -421,18 +410,17 @@ impl Command for UpdateCommand {
             (*root_package.get_dev_requires()).clone(),
         );
         for (package, constraint) in reqs.iter() {
-            let package = legacy_lossy(&strtolower(package)).into_owned();
+            let package = strtolower(package);
             let parsed_constraint = parser.parse_constraints(constraint)?;
-            temporary_constraints
-                .insert(BString::from(package.as_str()), parsed_constraint.clone());
-            if let Some(root_req) = root_requirements.get(bstr::B(&package))
+            temporary_constraints.insert(package.clone(), parsed_constraint.clone());
+            if let Some(root_req) = root_requirements.get(&package)
                 && !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())?
             {
                 io.write_error3(
                         format!(
                             "<error>The temporary constraint \"{}\" for \"{}\" must be a subset of the constraint in your composer.json ({})</error>",
-                            constraint,
-                            package,
+                            constraint.display_lossy(),
+                            package.display_lossy(),
                             root_req.get_pretty_constraint().display_lossy(),
                         ),
                         true,
@@ -440,7 +428,7 @@ impl Command for UpdateCommand {
                     );
                 io.write(format!(
                         "<info>Run `shirabe require {}` or `shirabe require {}:{}` instead to replace the constraint</info>",
-                        package, package, constraint,
+                        package.display_lossy(), package.display_lossy(), constraint.display_lossy(),
                     ));
 
                 return Ok(crate::command::FAILURE);
@@ -510,23 +498,14 @@ impl Command for UpdateCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let mut requires: Vec<String> = root_package
-                .get_requires()
-                .keys()
-                .map(|k| legacy_lossy(k).into_owned())
-                .collect();
+            let mut requires: Vec<BString> = root_package.get_requires().keys().cloned().collect();
             if !input
                 .borrow()
                 .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false)
             {
-                requires.extend(
-                    root_package
-                        .get_dev_requires()
-                        .keys()
-                        .map(|k| legacy_lossy(k).into_owned()),
-                );
+                requires.extend(root_package.get_dev_requires().keys().cloned());
             }
 
             if !packages.is_empty() {
@@ -538,9 +517,10 @@ impl Command for UpdateCommand {
 
         // the arguments lock/nothing/mirrors are not package names but trigger a mirror update instead
         // they are further mutually exclusive with listing actual package names
-        let filtered_packages: Vec<String> = array_filter(&packages, |package: &String| -> bool {
-            !matches!(package.as_str(), "lock" | "nothing" | "mirrors")
-        });
+        let filtered_packages: Vec<BString> =
+            array_filter(&packages, |package: &BString| -> bool {
+                package != "lock" && package != "nothing" && package != "mirrors"
+            });
         let update_mirrors = input
             .borrow()
             .get_option("lock")?
@@ -759,10 +739,7 @@ impl Command for UpdateCommand {
                         .get_argument("packages")?
                         .as_array()
                         .map(<[bstr::BString]>::to_vec)
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|s| legacy_lossy(s).into_owned())
-                        .collect::<Vec<String>>(),
+                        .unwrap_or_default(),
                     "--bump-after-update=dev".to_string(),
                 )?;
             }
@@ -796,11 +773,4 @@ impl BaseCommand for UpdateCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
-}
-
-// TODO(bytes): requirements from the command line are Strings.
-fn bytes_map(map: &IndexMap<String, String>) -> IndexMap<BString, BString> {
-    map.iter()
-        .map(|(k, v)| (BString::from(k.as_str()), BString::from(v.as_str())))
-        .collect()
 }
