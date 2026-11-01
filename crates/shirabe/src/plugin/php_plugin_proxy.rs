@@ -4595,10 +4595,9 @@ impl PhpCommandProxy {
             };
             let (name, description) =
                 match (field(&mut row, "name"), field(&mut row, "description")) {
-                    (PluginValue::String(name), PluginValue::String(description)) => (
-                        Self::text(handle, "getDefinition", name)?,
-                        description.display_lossy().to_string(),
-                    ),
+                    (PluginValue::String(name), PluginValue::String(description)) => {
+                        (name, description.display_lossy().to_string())
+                    }
                     (other, _) => {
                         return Err(Self::unsupported_shape(handle, "getDefinition", &other));
                     }
@@ -4628,10 +4627,9 @@ impl PhpCommandProxy {
             };
             let (name, description) =
                 match (field(&mut row, "name"), field(&mut row, "description")) {
-                    (PluginValue::String(name), PluginValue::String(description)) => (
-                        Self::text(handle, "getDefinition", name)?,
-                        description.display_lossy().to_string(),
-                    ),
+                    (PluginValue::String(name), PluginValue::String(description)) => {
+                        (name, description.display_lossy().to_string())
+                    }
                     (other, _) => {
                         return Err(Self::unsupported_shape(handle, "getDefinition", &other));
                     }
@@ -4653,7 +4651,7 @@ impl PhpCommandProxy {
                 mode |= InputOption::VALUE_NEGATABLE;
             }
             let shortcut = match field(&mut row, "shortcut").to_php_mixed()? {
-                PhpMixed::String(shortcut) => Some(Self::text(handle, "getDefinition", shortcut)?),
+                PhpMixed::String(shortcut) => Some(shortcut),
                 _ => None,
             };
             // `getDefault()` exposes the stored representation (`false` for VALUE_NONE), while
@@ -4665,7 +4663,7 @@ impl PhpCommandProxy {
             };
             items.push(DefinitionItem::InputOption(InputOption::new(
                 &name,
-                shortcut.as_deref(),
+                shortcut.as_ref().map(|shortcut| shortcut.as_bstr()),
                 Some(mode),
                 description,
                 default,
@@ -4694,8 +4692,7 @@ impl PhpCommandProxy {
         Ok(())
     }
 
-    /// A value the command definition holds as text: a name or a shortcut. Other metadata is read
-    /// by people only.
+    /// A value the command holds as text: its name or an alias.
     fn text(handle: &PhpObjHandle, method: &str, bytes: BString) -> anyhow::Result<String> {
         match utf8_text(&bytes) {
             Some(text) => Ok(text.to_owned()),

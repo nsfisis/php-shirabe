@@ -66,8 +66,8 @@ impl XmlDescriptor {
             command.merge_application_definition(false);
 
             let mut usages = vec![command.get_synopsis(false)];
-            usages.extend(command.get_aliases());
-            usages.extend(command.get_usages());
+            usages.extend(command.get_aliases().into_iter().map(BString::from));
+            usages.extend(command.get_usages().into_iter().map(BString::from));
             for usage in usages {
                 usages_xml.append_child(dom.create_element_with_value("usage", &usage));
             }
@@ -256,7 +256,7 @@ impl XmlDescriptor {
         let dom = DOMDocument::new("1.0", "UTF-8");
 
         let object_xml = dom.append_child(dom.create_element("option"));
-        object_xml.set_attribute("name", format!("--{}", option.get_name()));
+        object_xml.set_attribute("name", bconcat!("--", option.get_name()));
         let pos = strpos(option.get_shortcut().unwrap_or_default(), "|");
         if let Some(pos) = pos {
             object_xml.set_attribute(
@@ -274,8 +274,8 @@ impl XmlDescriptor {
             object_xml.set_attribute(
                 "shortcut",
                 &match option.get_shortcut() {
-                    Some(s) => format!("-{}", s),
-                    None => String::new(),
+                    Some(s) => bconcat!("-", s),
+                    None => BString::default(),
                 },
             );
         }
@@ -317,15 +317,17 @@ impl XmlDescriptor {
 
         if option.is_negatable() {
             let object_xml = dom.append_child(dom.create_element("option"));
-            object_xml.set_attribute("name", format!("--no-{}", option.get_name()));
+            object_xml.set_attribute("name", bconcat!("--no-", option.get_name()));
             object_xml.set_attribute("shortcut", "");
             object_xml.set_attribute("accept_value", "0");
             object_xml.set_attribute("is_value_required", "0");
             object_xml.set_attribute("is_multiple", "0");
             let description_xml = object_xml.append_child(dom.create_element("description"));
-            description_xml.append_child(
-                dom.create_text_node(format!("Negate the \"--{}\" option", option.get_name())),
-            );
+            description_xml.append_child(dom.create_text_node(bconcat!(
+                "Negate the \"--",
+                option.get_name(),
+                "\" option"
+            )));
         }
 
         dom

@@ -2,10 +2,11 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
+use bstr::{BStr, BString, ByteSlice};
 
 #[derive(Debug, Clone)]
 pub struct InputArgument {
-    name: String,
+    name: BString,
     mode: i64,
     default: InputValue,
     description: String,
@@ -17,7 +18,7 @@ impl InputArgument {
     pub const IS_ARRAY: i64 = 4;
 
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         mode: Option<i64>,
         description: String,
         default: InputValue,
@@ -35,7 +36,7 @@ impl InputArgument {
         };
 
         let mut argument = InputArgument {
-            name,
+            name: name.into(),
             mode,
             description,
             default: InputValue::Null,
@@ -46,8 +47,8 @@ impl InputArgument {
         Ok(argument)
     }
 
-    pub fn get_name(&self) -> &str {
-        &self.name
+    pub fn get_name(&self) -> &BStr {
+        self.name.as_bstr()
     }
 
     pub fn is_required(&self) -> bool {

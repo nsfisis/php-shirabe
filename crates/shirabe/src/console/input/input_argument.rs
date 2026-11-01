@@ -16,7 +16,7 @@ impl InputArgument {
     pub const IS_ARRAY: i64 = 4;
 
     pub fn new(
-        name: &str,
+        name: impl AsRef<[u8]>,
         mode: Option<i64>,
         description: &str,
         default: Option<InputValue>,
@@ -32,14 +32,14 @@ impl InputArgument {
 
     /// PHP's constructor with the fifth parameter, `$suggestedValues`.
     pub fn new5(
-        name: &str,
+        name: impl AsRef<[u8]>,
         mode: Option<i64>,
         description: &str,
         default: Option<InputValue>,
         suggested_values: SuggestedValues,
     ) -> anyhow::Result<Self> {
         let inner = BaseInputArgument::new(
-            name.to_string(),
+            name.as_ref(),
             mode,
             description.to_string(),
             default.unwrap_or(InputValue::Null),
@@ -63,8 +63,8 @@ impl InputArgument {
         self.suggested_values.complete(this, input, suggestions)
     }
 
-    pub(crate) fn get_name(&self) -> String {
-        self.inner.get_name().to_string()
+    pub(crate) fn get_name(&self) -> bstr::BString {
+        self.inner.get_name().to_owned()
     }
 
     /// Unwraps to the underlying Symfony `InputArgument` (used when forwarding a Composer-typed

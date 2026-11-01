@@ -13,7 +13,7 @@ use shirabe_php_shim::{PhpMixed, bconcat, impl_php_class, implode, php_regex, pr
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -88,7 +88,7 @@ impl Command for FundCommand {
         self.set_description("Discover how to help fund the maintenance of your dependencies");
         self.set_definition(&[InputOption::new6(
             "format",
-            Some("f"),
+            Some("f".into()),
             Some(InputOption::VALUE_REQUIRED),
             "Format of the output: text or json",
             Some(InputValue::from("text")),

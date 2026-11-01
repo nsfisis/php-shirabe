@@ -12,7 +12,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class, in_array_loose};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -66,7 +66,7 @@ impl Command for SuggestsCommand {
             .into(),
             InputOption::new(
                 "all",
-                Some("a"),
+                Some("a".into()),
                 Some(InputOption::VALUE_NONE),
                 "Show suggestions from all dependencies, including transitive ones",
                 None,

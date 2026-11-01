@@ -20,6 +20,7 @@ use shirabe_php_shim::{
     var_export,
 };
 use shirabe_semver::VersionParser;
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
@@ -452,15 +453,15 @@ impl Command for ConfigCommand {
         self.set_name("config")?;
         self.set_description("Sets config options");
         self.set_definition(&[
-                InputOption::new("global", Some("g"), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None).unwrap().into(),
-        InputOption::new("editor", Some("e"), Some(InputOption::VALUE_NONE), "Open editor", None).unwrap().into(),
-        InputOption::new("auth", Some("a"), Some(InputOption::VALUE_NONE), "Affect auth config file (only used for --editor)", None).unwrap().into(),
+                InputOption::new("global", Some("g".into()), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None).unwrap().into(),
+        InputOption::new("editor", Some("e".into()), Some(InputOption::VALUE_NONE), "Open editor", None).unwrap().into(),
+        InputOption::new("auth", Some("a".into()), Some(InputOption::VALUE_NONE), "Affect auth config file (only used for --editor)", None).unwrap().into(),
         InputOption::new("unset", None, Some(InputOption::VALUE_NONE), "Unset the given setting-key", None).unwrap().into(),
-        InputOption::new("list", Some("l"), Some(InputOption::VALUE_NONE), "List configuration settings", None).unwrap().into(),
-        InputOption::new("file", Some("f"), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None).unwrap().into(),
+        InputOption::new("list", Some("l".into()), Some(InputOption::VALUE_NONE), "List configuration settings", None).unwrap().into(),
+        InputOption::new("file", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None).unwrap().into(),
         InputOption::new("absolute", None, Some(InputOption::VALUE_NONE), "Returns absolute paths when fetching *-dir config values instead of relative", None).unwrap().into(),
-        InputOption::new("json", Some("j"), Some(InputOption::VALUE_NONE), "JSON decode the setting value, to be used with extra.* keys", None).unwrap().into(),
-        InputOption::new("merge", Some("m"), Some(InputOption::VALUE_NONE), "Merge the setting value with the current value, to be used with extra.* or audit.ignore[-abandoned] keys in combination with --json", None).unwrap().into(),
+        InputOption::new("json", Some("j".into()), Some(InputOption::VALUE_NONE), "JSON decode the setting value, to be used with extra.* keys", None).unwrap().into(),
+        InputOption::new("merge", Some("m".into()), Some(InputOption::VALUE_NONE), "Merge the setting value with the current value, to be used with extra.* or audit.ignore[-abandoned] keys in combination with --json", None).unwrap().into(),
         InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lowest priority) to the existing ones instead of prepending it (highest priority)", None).unwrap().into(),
         InputOption::new("source", None, Some(InputOption::VALUE_NONE), "Display where the config value is loaded from", None).unwrap().into(),
         InputArgument::new5("setting-key", None, "Setting key", None, self.suggest_setting_keys()).unwrap().into(),

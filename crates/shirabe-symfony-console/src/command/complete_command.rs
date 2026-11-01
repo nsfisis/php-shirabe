@@ -5,7 +5,7 @@ use crate::completion::{
     BashCompletionOutput, CompletionInput, CompletionOutputInterface, CompletionSuggestions,
     StringOrSuggestion,
 };
-use crate::input::{InputInterface, InputOption, InputValue};
+use crate::input::{InputInterface, InputInterfaceByName, InputOption, InputValue};
 use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -183,28 +183,28 @@ impl Command for CompleteCommand {
         self.inner
             .add_option(
                 "shell",
-                Some("s"),
+                Some("s".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 &format!("The shell type (\"{}\")", shells),
                 InputValue::Null,
             )?
             .add_option(
                 "input",
-                Some("i"),
+                Some("i".into()),
                 Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
                 "An array of input tokens (e.g. COMP_WORDS or argv)",
                 InputValue::Null,
             )?
             .add_option(
                 "current",
-                Some("c"),
+                Some("c".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "The index of the \"input\" array that the cursor is in (e.g. COMP_CWORD)",
                 InputValue::Null,
             )?
             .add_option(
                 "symfony",
-                Some("S"),
+                Some("S".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "The version of the completion script",
                 InputValue::Null,
@@ -345,7 +345,10 @@ impl Command for CompleteCommand {
                             format!(
                                 "  Completing <comment>{}</> for <comment>{}</>",
                                 completion_input.get_completion_type(),
-                                completion_input.get_completion_name().unwrap_or_default()
+                                completion_input
+                                    .get_completion_name()
+                                    .unwrap_or_default()
+                                    .display_lossy()
                             ),
                         ]);
                         let compval = completion_input.get_completion_value();
@@ -374,7 +377,7 @@ impl Command for CompleteCommand {
                     "  --{}",
                     option_suggestions
                         .iter()
-                        .map(|o| o.get_name())
+                        .map(|o| o.get_name().display_lossy().to_string())
                         .collect::<Vec<_>>()
                         .join(" --")
                 ));

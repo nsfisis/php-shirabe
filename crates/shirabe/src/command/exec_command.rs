@@ -10,7 +10,7 @@ use shirabe_php_shim::{
     PhpMixed, RuntimeException, basename, bconcat, chdir, getcwd, glob, impl_php_class,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -81,7 +81,7 @@ impl Command for ExecCommand {
         self.set_name("exec")?;
         self.set_description("Executes a vendored binary/script");
         self.set_definition(&[
-            InputOption::new("list", Some("l"), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
+            InputOption::new("list", Some("l".into()), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
             // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
             // extra ones the caller passes).
             InputArgument::new5("binary",

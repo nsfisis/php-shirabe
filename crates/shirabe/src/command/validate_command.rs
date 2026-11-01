@@ -9,6 +9,7 @@ use crate::package::loader::ValidatingArrayLoader;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::util::{ConfigValidator, Filesystem};
 use shirabe_php_shim::{impl_php_class, path_from_bytes};
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
@@ -183,7 +184,7 @@ impl Command for ValidateCommand {
             .into(),
             InputOption::new(
                 "with-dependencies",
-                Some("A"),
+                Some("A".into()),
                 Some(InputOption::VALUE_NONE),
                 "Also validate the composer.json of all installed dependencies",
                 None,

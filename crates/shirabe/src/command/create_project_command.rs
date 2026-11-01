@@ -34,7 +34,7 @@ use shirabe_php_shim::{
     strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
@@ -837,7 +837,7 @@ impl Command for CreateProjectCommand {
                 InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
                 InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
                 InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None).unwrap().into(),
-                InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
+                InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
                 InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
                 InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
                 InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),

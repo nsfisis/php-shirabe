@@ -9,7 +9,7 @@ use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
 use shirabe_php_shim::{impl_php_class, path_from_bytes, realpath};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 use std::path::PathBuf;
 

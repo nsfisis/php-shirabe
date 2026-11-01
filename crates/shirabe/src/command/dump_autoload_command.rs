@@ -7,6 +7,7 @@ use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use bstr::BStr;
 use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class};
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
@@ -41,8 +42,8 @@ impl Command for DumpAutoloadCommand {
         self.set_aliases(vec!["dumpautoload".to_string()])?;
         self.set_description("Dumps the autoloader");
         self.set_definition(&[
-            InputOption::new("optimize", Some("o"), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None).unwrap().into(),
-        InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize`.", None).unwrap().into(),
+            InputOption::new("optimize", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None).unwrap().into(),
+        InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize`.", None).unwrap().into(),
         InputOption::new("apcu", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
         InputOption::new("apcu-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu", None).unwrap().into(),
         InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything.", None).unwrap().into(),

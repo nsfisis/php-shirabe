@@ -10,7 +10,7 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, preg_replace, str_replace, var_export};
+use shirabe_php_shim::{PhpMixed, bconcat, preg_replace, str_replace, var_export};
 
 /// Markdown descriptor.
 #[derive(Debug, Default)]
@@ -40,7 +40,7 @@ impl MarkdownDescriptor {
         _options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let name = if !argument.get_name().is_empty() {
-            argument.get_name().to_string()
+            argument.get_name().display_lossy().to_string()
         } else {
             "<none>".to_string()
         };
@@ -76,18 +76,18 @@ impl MarkdownDescriptor {
         option: &InputOption,
         _options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let mut name = format!("--{}", option.get_name());
+        let mut name = bconcat!("--", option.get_name());
         if option.is_negatable() {
-            name += &format!("|--no-{}", option.get_name());
+            name = bconcat!(name, "|--no-", option.get_name());
         }
         if let Some(shortcut) = option.get_shortcut() {
-            name += &format!("|-{}", shortcut.replace('|', "|-"));
+            name = bconcat!(name, "|-", str_replace("|", "|-", shortcut));
         }
 
         self.write(
             format!(
                 "#### `{}`\n\n{}* Accept value: {}\n* Is value required: {}\n* Is multiple: {}\n* Is negatable: {}\n* Default: `{}`",
-                name,
+                name.display_lossy(),
                 if !option.get_description().is_empty() {
                     format!(
                         "{}\n\n",
@@ -176,8 +176,8 @@ impl MarkdownDescriptor {
         command.merge_application_definition(false);
 
         let mut usages = vec![command.get_synopsis(false)];
-        usages.extend(command.get_aliases());
-        usages.extend(command.get_usages());
+        usages.extend(command.get_aliases().into_iter().map(BString::from));
+        usages.extend(command.get_usages().into_iter().map(BString::from));
         self.write(
             format!(
                 "`{}`\n{}\n\n{}### Usage\n\n{}",
@@ -191,7 +191,7 @@ impl MarkdownDescriptor {
                     String::new()
                 },
                 usages.iter().fold(String::new(), |carry, usage| {
-                    format!("{}* `{}`\n", carry, usage)
+                    format!("{}* `{}`\n", carry, usage.display_lossy())
                 }),
             ),
             true,

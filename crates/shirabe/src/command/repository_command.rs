@@ -11,6 +11,7 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class, parse_url,
     path_to_bytes, php_regex, php_to_string, preg_is_match, strtolower,
 };
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{
     command::Command,
     input::{InputInterface, InputValue},
@@ -201,7 +202,7 @@ impl Command for RepositoryCommand {
         self.set_definition(&[
             InputOption::new(
                 "global",
-                Some("g"),
+                Some("g".into()),
                 Some(InputOption::VALUE_NONE),
                 "Apply command to the global config file",
                 None,
@@ -210,7 +211,7 @@ impl Command for RepositoryCommand {
             .into(),
             InputOption::new(
                 "file",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "If you want to choose a different composer.json or config.json",
                 None,

@@ -18,7 +18,7 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::{AnyConstraint, Bound};
 use shirabe_symfony_console::formatter::{OutputFormatter, OutputFormatterStyle};
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 pub const ARGUMENT_PACKAGE: &str = "package";

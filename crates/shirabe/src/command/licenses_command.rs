@@ -16,7 +16,7 @@ use shirabe_php_shim::{
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::helper::{Row, Table};
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_console::style::{StyleInterface, SymfonyStyle};
 
@@ -53,7 +53,7 @@ impl Command for LicensesCommand {
         self.set_definition(&[
             InputOption::new6(
                 "format",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text, json or summary",
                 Some(InputValue::from("text")),

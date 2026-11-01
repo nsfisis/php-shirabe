@@ -72,7 +72,7 @@ impl Command for ProhibitsCommand {
             .into(),
             InputOption::new(
                 <Self as BaseDependencyCommand>::OPTION_RECURSIVE,
-                Some("r"),
+                Some("r".into()),
                 Some(InputOption::VALUE_NONE),
                 "Recursively resolves up to the root package",
                 None,
@@ -81,7 +81,7 @@ impl Command for ProhibitsCommand {
             .into(),
             InputOption::new(
                 <Self as BaseDependencyCommand>::OPTION_TREE,
-                Some("t"),
+                Some("t".into()),
                 Some(InputOption::VALUE_NONE),
                 "Prints the results as a nested tree",
                 None,

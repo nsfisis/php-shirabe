@@ -2,7 +2,7 @@
 
 use crate::command::{Command, CommandData};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
-use crate::input::{InputArgument, InputInterface, InputOption, InputValue};
+use crate::input::{InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue};
 use crate::output::{OutputInterface, output_interface};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{

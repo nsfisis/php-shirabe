@@ -16,7 +16,7 @@ use shirabe_php_shim::{
     trim, utf8_text,
 };
 use shirabe_symfony_console::input::{
-    InputArgument, InputInterface, InputOption, InputValue, StringInput,
+    InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue, StringInput,
 };
 use test_case::{get_package, get_version_constraint};
 

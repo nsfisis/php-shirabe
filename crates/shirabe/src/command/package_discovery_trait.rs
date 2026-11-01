@@ -22,6 +22,7 @@ use shirabe_php_shim::{
     is_array, is_file, is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match,
     preg_match, strlen, strpos, trim,
 };
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
 
 pub trait PackageDiscoveryTrait: BaseCommand {

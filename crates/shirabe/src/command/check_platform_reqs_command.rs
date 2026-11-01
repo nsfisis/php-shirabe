@@ -16,7 +16,7 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 struct CheckResult {
@@ -173,7 +173,7 @@ impl Command for CheckPlatformReqsCommand {
             .into(),
             InputOption::new6(
                 "format",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
                 Some(InputValue::from("text")),

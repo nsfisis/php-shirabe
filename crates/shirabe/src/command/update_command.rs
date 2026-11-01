@@ -24,6 +24,7 @@ use shirabe_php_shim::{
     preg_match, preg_replace, strtolower,
 };
 use shirabe_semver::{Intervals, constraint::MultiConstraint};
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{
     command::Command,
     helper::Table,
@@ -274,20 +275,20 @@ impl Command for UpdateCommand {
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-            InputOption::new("with-dependencies", Some("w"), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, except those which are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
-            InputOption::new("with-all-dependencies", Some("W"), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, including those which are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).", None).unwrap().into(),
-            InputOption::new("verbose", Some("v|vv|vvv"), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
-            InputOption::new("optimize-autoloader", Some("o"), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump.", None).unwrap().into(),
-            InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("with-dependencies", Some("w".into()), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, except those which are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
+            InputOption::new("with-all-dependencies", Some("W".into()), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, including those which are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).", None).unwrap().into(),
+            InputOption::new("verbose", Some("v|vv|vvv".into()), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump.", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
             InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
             InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
             InputOption::new("prefer-stable", None, Some(InputOption::VALUE_NONE), "Prefer stable versions of dependencies (can also be set via the COMPOSER_PREFER_STABLE=1 env var).", None).unwrap().into(),
             InputOption::new("prefer-lowest", None, Some(InputOption::VALUE_NONE), "Prefer lowest versions of dependencies (can also be set via the COMPOSER_PREFER_LOWEST=1 env var).", None).unwrap().into(),
-            InputOption::new("minimal-changes", Some("m"), Some(InputOption::VALUE_NONE), "Only perform absolutely necessary changes to dependencies. If packages cannot be kept at their currently locked version they are updated. For partial updates the allow-listed packages are always updated fully. (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).", None).unwrap().into(),
+            InputOption::new("minimal-changes", Some("m".into()), Some(InputOption::VALUE_NONE), "Only perform absolutely necessary changes to dependencies. If packages cannot be kept at their currently locked version they are updated. For partial updates the allow-listed packages are always updated fully. (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).", None).unwrap().into(),
             InputOption::new("patch-only", None, Some(InputOption::VALUE_NONE), "Only allow patch version updates for currently installed dependencies.", None).unwrap().into(),
-            InputOption::new("interactive", Some("i"), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
+            InputOption::new("interactive", Some("i".into()), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
             InputOption::new("root-reqs", None, Some(InputOption::VALUE_NONE), "Restricts the update to your first degree dependencies.", None).unwrap().into(),
             InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), crate::console::input::SuggestedValues::List(vec!["dev".to_string(), "no-dev".to_string(), "all".to_string()])).unwrap().into(),
         ]);

@@ -2,7 +2,8 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::input::{
-    ArgvInput, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
+    ArgvInput, InputDefinition, InputInterface, InputInterfaceByName, InputValue,
+    StreamableInputInterface,
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -124,17 +125,17 @@ impl InputInterface for StringInput {
         self.inner.get_first_argument()
     }
 
-    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
-        InputInterface::has_parameter_option(&self.inner, values, only_params)
+    fn has_parameter_option_bytes(&self, values: &[&BStr], only_params: bool) -> bool {
+        InputInterface::has_parameter_option_bytes(&self.inner, values, only_params)
     }
 
-    fn get_parameter_option(
+    fn get_parameter_option_bytes(
         &self,
-        values: &[&str],
+        values: &[&BStr],
         default: InputValue,
         only_params: bool,
     ) -> InputValue {
-        InputInterface::get_parameter_option(&self.inner, values, default, only_params)
+        InputInterface::get_parameter_option_bytes(&self.inner, values, default, only_params)
     }
 
     fn bind(&mut self, definition: &InputDefinition) -> anyhow::Result<()> {
@@ -145,35 +146,35 @@ impl InputInterface for StringInput {
         self.inner.validate()
     }
 
-    fn get_arguments(&self) -> IndexMap<String, InputValue> {
+    fn get_arguments(&self) -> IndexMap<BString, InputValue> {
         InputInterface::get_arguments(&self.inner)
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
+    fn get_argument_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
         self.inner.get_argument(name)
     }
 
-    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    fn set_argument_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_argument(name, value)
     }
 
-    fn has_argument(&self, name: &str) -> bool {
+    fn has_argument_bytes(&self, name: &BStr) -> bool {
         self.inner.has_argument(name)
     }
 
-    fn get_options(&self) -> IndexMap<String, InputValue> {
+    fn get_options(&self) -> IndexMap<BString, InputValue> {
         InputInterface::get_options(&self.inner)
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
+    fn get_option_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
         self.inner.get_option(name)
     }
 
-    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    fn set_option_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_option(name, value)
     }
 
-    fn has_option(&self, name: &str) -> bool {
+    fn has_option_bytes(&self, name: &BStr) -> bool {
         self.inner.has_option(name)
     }
 

@@ -22,6 +22,7 @@ use shirabe_php_shim::{
     preg_replace, realpath, str_replace, strpos, strtolower, trim, ucwords, unlink,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{
     command::Command,
     helper::FormatBlockMessages,
@@ -449,10 +450,10 @@ impl Command for InitCommand {
         InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
         InputOption::new6("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
         InputOption::new6("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
-        InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()).display_lossy()), None).unwrap().into(),
-        InputOption::new("license", Some("l"), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
+        InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()).display_lossy()), None).unwrap().into(),
+        InputOption::new("license", Some("l".into()), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
-        InputOption::new("autoload", Some("a"), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
+        InputOption::new("autoload", Some("a".into()), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
             ]);
         self.set_help(
             "The <info>init</info> command creates a basic composer.json file\n\
@@ -488,7 +489,7 @@ impl Command for InitCommand {
             .borrow()
             .get_options()
             .into_iter()
-            .map(|(key, value)| (key.into(), value.to_php_mixed()))
+            .map(|(key, value)| (key, value.to_php_mixed()))
             .collect();
         let filtered_input: IndexMap<BString, PhpMixed> =
             array_intersect_key(&options, &array_flip_strings(&allowlist))

@@ -4,13 +4,15 @@ use crate::application::Application;
 use crate::completion::{CompletionInput, CompletionSuggestions};
 use crate::exception::InvalidArgumentException;
 use crate::helper::HelperSet;
-use crate::input::{InputArgument, InputDefinition, InputInterface, InputOption, InputValue};
+use crate::input::{
+    InputArgument, InputDefinition, InputInterface, InputInterfaceByName, InputOption, InputValue,
+};
 use crate::output::OutputInterface;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AsAny, PHP_SERVER, PhpClass, PhpMixed, bconcat, is_numeric_to_int, path_to_bytes, php_regex,
-    preg_is_match, str_replace_array,
+    preg_is_match, str_replace_array, trim,
 };
 use std::cell::{Cell, Ref};
 
@@ -35,7 +37,7 @@ pub struct CommandData {
     code: std::cell::RefCell<
         Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>,
     >,
-    synopsis: std::cell::RefCell<IndexMap<String, String>>,
+    synopsis: std::cell::RefCell<IndexMap<String, bstr::BString>>,
     usages: std::cell::RefCell<Vec<String>>,
     helper_set: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>>,
 }
@@ -140,24 +142,25 @@ impl CommandData {
     /// Throws InvalidArgumentException when argument mode is not valid.
     pub fn add_argument(
         &self,
-        name: &str,
+        name: impl AsRef<[u8]>,
         mode: Option<i64>,
         description: &str,
         default: InputValue,
     ) -> anyhow::Result<&Self> {
+        let name = name.as_ref();
         self.definition
             .borrow_mut()
             .as_mut()
             .unwrap()
             .add_argument(InputArgument::new(
-                name.to_string(),
+                name,
                 mode,
                 description.to_string(),
                 default.clone(),
             )?)?;
         if let Some(full_definition) = self.full_definition.borrow_mut().as_mut() {
             full_definition.add_argument(InputArgument::new(
-                name.to_string(),
+                name,
                 mode,
                 description.to_string(),
                 default,
@@ -172,12 +175,13 @@ impl CommandData {
     /// Throws InvalidArgumentException if option mode is invalid or incompatible.
     pub fn add_option(
         &self,
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
         description: &str,
         default: InputValue,
     ) -> anyhow::Result<&Self> {
+        let name = name.as_ref();
         self.definition
             .borrow_mut()
             .as_mut()
@@ -277,7 +281,7 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn get_processed_help(&self) -> bstr::BString);
         $crate::delegate_to_inner!($field, fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()>);
         $crate::delegate_to_inner!($field, fn get_aliases(&self) -> Vec<String>);
-        $crate::delegate_to_inner!($field, fn get_synopsis(&self, short: bool) -> String);
+        $crate::delegate_to_inner!($field, fn get_synopsis(&self, short: bool) -> bstr::BString);
         $crate::delegate_to_inner!($field, fn add_usage(&self, usage: &str));
         $crate::delegate_to_inner!($field, fn get_usages(&self) -> Vec<String>);
         $crate::delegate_to_inner!($field, fn get_helper(&self, name: &str) -> anyhow::Result<Result<shirabe_php_shim::PhpMixed, $crate::exception::LogicException>>);
@@ -464,7 +468,7 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
 
     fn get_aliases(&self) -> Vec<String>;
 
-    fn get_synopsis(&self, short: bool) -> String;
+    fn get_synopsis(&self, short: bool) -> bstr::BString;
 
     fn add_usage(&self, usage: &str);
 
@@ -716,21 +720,19 @@ impl Command for CommandData {
         self.aliases.borrow().clone()
     }
 
-    fn get_synopsis(&self, short: bool) -> String {
+    fn get_synopsis(&self, short: bool) -> bstr::BString {
         let key = if short { "short" } else { "long" }.to_string();
 
         if !self.synopsis.borrow().contains_key(&key) {
-            let value = format!(
-                "{} {}",
+            let value = trim(bconcat!(
                 self.name.borrow().clone().unwrap_or_default(),
+                " ",
                 self.definition
                     .borrow()
                     .as_ref()
                     .unwrap()
                     .get_synopsis(short)
-            )
-            .trim()
-            .to_string();
+            ));
             self.synopsis.borrow_mut().insert(key.clone(), value);
         }
 

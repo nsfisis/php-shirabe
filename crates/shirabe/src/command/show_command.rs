@@ -33,7 +33,7 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_spdx_licenses::SpdxLicenses;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::{OutputFormatter, OutputFormatterStyle};
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -1369,7 +1369,7 @@ impl Command for ShowCommand {
         let opt_none = |name: &str, shortcut: Option<&str>, description: &str| {
             InputOption::new(
                 name,
-                shortcut,
+                shortcut.map(bstr::BStr::new),
                 Some(InputOption::VALUE_NONE),
                 description,
                 None,
@@ -1456,7 +1456,7 @@ impl Command for ShowCommand {
             ),
             InputOption::new6(
                 "format",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
                 Some(InputValue::from("text")),
@@ -1927,7 +1927,9 @@ impl Command for ShowCommand {
                 if input.borrow().get_option("locked")?.as_bool() == Some(true) {
                     hint.push_str(" in lock file");
                 }
-                if let Some(working_dir) = options.get("working-dir").filter(|v| !v.is_null()) {
+                if let Some(working_dir) =
+                    options.get(bstr::B("working-dir")).filter(|v| !v.is_null())
+                {
                     hint.push_str(&format!(
                         " in {}/composer.json",
                         working_dir.as_string().unwrap_or_default().display_lossy()

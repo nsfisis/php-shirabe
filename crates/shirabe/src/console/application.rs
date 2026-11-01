@@ -40,6 +40,7 @@ use shirabe_php_shim::{
     strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{
     application::Application as BaseApplication,
     command::{Command as SymfonyCommand, HelpCommand},
@@ -502,7 +503,7 @@ impl Application {
         )?)?;
         definition.add_option(InputOption::new(
             "--working-dir",
-            Some("-d"),
+            Some("-d".into()),
             Some(InputOption::VALUE_REQUIRED),
             "If specified, use the given directory as working directory.".to_string(),
             InputValue::Null,
@@ -711,7 +712,9 @@ impl Application {
         suggestions: &mut CompletionSuggestions,
     ) -> anyhow::Result<()> {
         if CompletionInput::TYPE_ARGUMENT_VALUE == input.get_completion_type()
-            && input.get_completion_name().as_deref() == Some("command")
+            && input
+                .get_completion_name()
+                .is_some_and(|name| name == "command")
         {
             let mut command_names: Vec<PhpMixed> = Vec::new();
             for (name, command) in self.all(None)? {
@@ -1498,7 +1501,7 @@ impl Application {
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--help",
-                    Some("-h"),
+                    Some("-h".into()),
                     Some(InputOption::VALUE_NONE),
                     format!(
                         "Display help for the given command. When no command is given display help for the <info>{}</info> command",
@@ -1511,7 +1514,7 @@ impl Application {
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--quiet",
-                    Some("-q"),
+                    Some("-q".into()),
                     Some(InputOption::VALUE_NONE),
                     "Do not output any message".to_string(),
                     InputValue::Null,
@@ -1521,7 +1524,7 @@ impl Application {
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--verbose",
-                    Some("-v|vv|vvv"),
+                    Some("-v|vv|vvv".into()),
                     Some(InputOption::VALUE_NONE),
                     "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug".to_string(),
                     InputValue::Null,
@@ -1531,7 +1534,7 @@ impl Application {
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--version",
-                    Some("-V"),
+                    Some("-V".into()),
                     Some(InputOption::VALUE_NONE),
                     "Display this application version".to_string(),
                     InputValue::Null,
@@ -1541,7 +1544,7 @@ impl Application {
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--ansi",
-                    Some(""),
+                    Some("".into()),
                     Some(InputOption::VALUE_NEGATABLE),
                     "Force (or disable --no-ansi) ANSI output".to_string(),
                     InputValue::Null,
@@ -1551,7 +1554,7 @@ impl Application {
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--no-interaction",
-                    Some("-n"),
+                    Some("-n".into()),
                     Some(InputOption::VALUE_NONE),
                     "Do not ask any interactive question".to_string(),
                     InputValue::Null,
@@ -2711,7 +2714,7 @@ impl ApplicationHandle {
                 let definition = application.borrow_mut().get_definition();
                 let command_description = definition
                     .borrow()
-                    .get_argument(&ArgumentName::Name("command".to_string()))?
+                    .get_argument(&ArgumentName::of("command"))?
                     .get_description()
                     .to_string();
                 let new_command_argument = InputArgument::new(

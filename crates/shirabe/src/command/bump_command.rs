@@ -16,7 +16,7 @@ use shirabe_php_shim::{
     is_writable, php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -360,7 +360,7 @@ impl Command for BumpCommand {
             .into(),
             InputOption::new(
                 "dev-only",
-                Some("D"),
+                Some("D".into()),
                 Some(InputOption::VALUE_NONE),
                 "Only bump requirements in \"require-dev\".",
                 None,
@@ -369,7 +369,7 @@ impl Command for BumpCommand {
             .into(),
             InputOption::new(
                 "no-dev-only",
-                Some("R"),
+                Some("R".into()),
                 Some(InputOption::VALUE_NONE),
                 "Only bump requirements in \"require\".",
                 None,

@@ -58,7 +58,7 @@ impl TextDescriptor {
         self.write_text(
             format!(
                 "  <info>{}</info>  {}{}{}",
-                argument.get_name(),
+                argument.get_name().display_lossy(),
                 " ".repeat(spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 (preg_replace(
@@ -93,12 +93,12 @@ impl TextDescriptor {
             String::new()
         };
 
-        let mut value = String::new();
+        let mut value = BString::default();
         if option.accept_value() {
-            value = format!("={}", option.get_name().to_ascii_uppercase());
+            value = bconcat!("=", option.get_name().to_ascii_uppercase());
 
             if option.is_value_optional() {
-                value = format!("[{}]", value);
+                value = bconcat!("[", value, "]");
             }
         }
 
@@ -106,18 +106,16 @@ impl TextDescriptor {
             Some(PhpMixed::Int(w)) => *w,
             _ => self.calculate_total_width_for_options(&[option]),
         };
-        let synopsis = format!(
-            "{}{}",
-            if option.get_shortcut().is_some() {
-                format!("-{}, ", option.get_shortcut().unwrap())
-            } else {
-                "    ".to_string()
+        let synopsis = bconcat!(
+            match option.get_shortcut() {
+                Some(shortcut) => bconcat!("-", shortcut, ", "),
+                None => BString::from("    "),
             },
             if option.is_negatable() {
-                format!("--{0}|--no-{0}", option.get_name().to_string())
+                bconcat!("--", option.get_name(), "|--no-", option.get_name())
             } else {
-                format!("--{0}{1}", option.get_name(), value)
-            }
+                bconcat!("--", option.get_name(), value)
+            },
         );
 
         let spacing_width = total_width - Helper::width(&synopsis);
@@ -125,7 +123,7 @@ impl TextDescriptor {
         self.write_text(
             format!(
                 "  <info>{}</info>  {}{}{}{}",
-                synopsis,
+                synopsis.display_lossy(),
                 " ".repeat(spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 (preg_replace(
@@ -218,8 +216,8 @@ impl TextDescriptor {
 
         self.write_text("<comment>Usage:</comment>", &options);
         let mut usages = vec![command.get_synopsis(true)];
-        usages.extend(command.get_aliases());
-        usages.extend(command.get_usages());
+        usages.extend(command.get_aliases().into_iter().map(BString::from));
+        usages.extend(command.get_usages().into_iter().map(BString::from));
         for usage in usages {
             self.write_text("\n", &IndexMap::new());
             self.write_text(

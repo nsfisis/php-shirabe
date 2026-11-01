@@ -13,7 +13,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{bconcat, explode, impl_php_class, implode, ltrim, path_to_bytes};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -300,7 +300,7 @@ impl Command for StatusCommand {
         self.set_description("Shows a list of locally modified packages");
         self.set_definition(&[InputOption::new(
             "verbose",
-            Some("v|vv|vvv"),
+            Some("v|vv|vvv".into()),
             Some(InputOption::VALUE_NONE),
             "Show modified files for each directory that contains changes.",
             None,

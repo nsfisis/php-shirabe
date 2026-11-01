@@ -21,6 +21,7 @@ use shirabe_php_shim::{
     LogicException, PhpMixed, bconcat, get_debug_type, impl_php_class, implode, path_from_bytes,
     path_to_bytes, php_regex, preg_match, strtolower,
 };
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
@@ -310,7 +311,7 @@ impl Command for ArchiveCommand {
         self.set_definition(&[
             InputArgument::new5("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, self.suggest_available_package(99)).unwrap().into(),
             InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
-            InputOption::new6("format", Some("f"), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("format", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
             InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
             InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
             InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),

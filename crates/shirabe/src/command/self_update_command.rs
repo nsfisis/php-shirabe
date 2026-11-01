@@ -41,7 +41,7 @@ impl Command for SelfUpdateCommand {
         self.set_aliases(vec!["selfupdate".to_string()])?;
         self.set_description("Updates composer.phar to the latest version");
         self.set_definition(&[
-            InputOption::new("rollback", Some("r"), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None).unwrap().into(),
+            InputOption::new("rollback", Some("r".into()), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None).unwrap().into(),
             InputOption::new("clean-backups", None, Some(InputOption::VALUE_NONE), "Delete old backups during an update. This makes the current version of composer the only backup available after the update", None).unwrap().into(),
             InputArgument::new("version", Some(InputArgument::OPTIONAL), "The version to update to", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),

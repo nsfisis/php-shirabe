@@ -13,7 +13,7 @@ use shirabe_php_shim::{
     in_array_strict,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -109,7 +109,7 @@ impl Command for AuditCommand {
             .into(),
             InputOption::new6(
                 "format",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
                 Some(InputValue::from(Auditor::FORMAT_TABLE)),

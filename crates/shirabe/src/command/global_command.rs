@@ -15,7 +15,9 @@ use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::{
     CompletionInput, CompletionSuggestions, StringOrSuggestion,
 };
-use shirabe_symfony_console::input::{ArgvInput, ArrayInput, InputInterface, StringInput};
+use shirabe_symfony_console::input::{
+    ArgvInput, ArrayInput, InputInterface, InputInterfaceByName, StringInput,
+};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

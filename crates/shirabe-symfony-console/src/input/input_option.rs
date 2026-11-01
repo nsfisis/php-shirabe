@@ -2,11 +2,13 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{implode, ltrim2, php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
-    name: String,
-    shortcut: Option<String>,
+    name: BString,
+    shortcut: Option<BString>,
     mode: i64,
     default: InputValue,
     description: String,
@@ -20,17 +22,14 @@ impl InputOption {
     pub const VALUE_NEGATABLE: i64 = 16;
 
     pub fn new(
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&BStr>,
         mode: Option<i64>,
         description: String,
         default: InputValue,
     ) -> anyhow::Result<Self> {
-        let name = if let Some(stripped) = name.strip_prefix("--") {
-            stripped.to_string()
-        } else {
-            name.to_string()
-        };
+        let name = name.as_ref();
+        let name = BString::from(name.strip_prefix(b"--").unwrap_or(name));
 
         if name.is_empty() {
             return Err(InvalidArgumentException::new(
@@ -40,7 +39,8 @@ impl InputOption {
         }
 
         let shortcut = match shortcut {
-            None | Some("") => None,
+            None => None,
+            Some(shortcut) if shortcut.is_empty() => None,
             Some(shortcut) => Self::normalize_shortcut(shortcut)?,
         };
 
@@ -78,15 +78,12 @@ impl InputOption {
         Ok(option)
     }
 
-    fn normalize_shortcut(s: &str) -> anyhow::Result<Option<String>> {
-        let stripped = s.trim_start_matches('-');
-        // The shortcut is declared in code: `{(\|)-?}` is split without a regex to keep it a `String`.
-        let filtered: Vec<&str> = stripped
-            .split('|')
-            .map(|part| part.strip_prefix('-').unwrap_or(part))
+    fn normalize_shortcut(s: &BStr) -> anyhow::Result<Option<BString>> {
+        let shortcuts: Vec<BString> = preg_split(php_regex!(r"{(\|)-?}"), ltrim2(s, "-"))
+            .into_iter()
             .filter(|part| !part.is_empty())
             .collect();
-        let result = filtered.join("|");
+        let result = implode("|", &shortcuts);
         if result.is_empty() {
             return Err(InvalidArgumentException::new(
                 "An option shortcut cannot be empty.".to_string(),
@@ -96,12 +93,12 @@ impl InputOption {
         Ok(Some(result))
     }
 
-    pub fn get_shortcut(&self) -> Option<&str> {
-        self.shortcut.as_deref()
+    pub fn get_shortcut(&self) -> Option<&BStr> {
+        self.shortcut.as_ref().map(|shortcut| shortcut.as_bstr())
     }
 
-    pub fn get_name(&self) -> &str {
-        &self.name
+    pub fn get_name(&self) -> &BStr {
+        self.name.as_bstr()
     }
 
     pub fn accept_value(&self) -> bool {

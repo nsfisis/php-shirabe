@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
 
 use crate::input::{ArgvInput, InputDefinition, InputOption, InputValue};
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    explode_with_limit, ltrim2, php_regex, preg_match_all, rtrim, substr, trim2, utf8_text,
+    explode_with_limit, ltrim2, php_regex, preg_match_all, rtrim, substr, trim2,
 };
 
 /// An input specialized for shell completion.
@@ -16,7 +16,7 @@ pub struct CompletionInput {
     tokens: Vec<BString>,
     current_index: i64,
     completion_type: String,
-    completion_name: Option<String>,
+    completion_name: Option<BString>,
     completion_value: BString,
 }
 
@@ -93,7 +93,7 @@ impl CompletionInput {
                 && option.accept_value()
             {
                 self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
-                self.completion_name = Some(option.get_name().to_string());
+                self.completion_name = Some(option.get_name().to_owned());
                 self.completion_value = if !option_value.is_empty() {
                     option_value
                 } else if !option_token.starts_with("--".as_bytes()) {
@@ -114,7 +114,7 @@ impl CompletionInput {
                 && previous_option.accept_value()
             {
                 self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
-                self.completion_name = Some(previous_option.get_name().to_string());
+                self.completion_name = Some(previous_option.get_name().to_owned());
                 self.completion_value = relevant_token;
 
                 return Ok(());
@@ -124,8 +124,8 @@ impl CompletionInput {
         // complete argument value
         self.completion_type = Self::TYPE_ARGUMENT_VALUE.to_string();
 
-        let mut argument_name: Option<String> = None;
-        let argument_names: Vec<String> = self
+        let mut argument_name: Option<BString> = None;
+        let argument_names: Vec<BString> = self
             .inner
             .inner
             .definition
@@ -141,12 +141,13 @@ impl CompletionInput {
                 .inner
                 .inner
                 .arguments
-                .contains_key(&current_argument_name)
+                .contains_key(current_argument_name.as_bstr())
             {
                 break;
             }
 
-            let argument_value = self.inner.inner.arguments[&current_argument_name].clone();
+            let argument_value =
+                self.inner.inner.arguments[current_argument_name.as_bstr()].clone();
             self.completion_name = Some(current_argument_name.clone());
             if let InputValue::Array(argument_value) = &argument_value {
                 self.completion_value = argument_value.last().cloned().unwrap_or_default();
@@ -157,7 +158,11 @@ impl CompletionInput {
 
         if self.current_index >= self.tokens.len() as i64 {
             let argument_name = argument_name.unwrap_or_default();
-            if !self.inner.inner.arguments.contains_key(&argument_name)
+            if !self
+                .inner
+                .inner
+                .arguments
+                .contains_key(argument_name.as_bstr())
                 || self
                     .inner
                     .inner
@@ -192,7 +197,7 @@ impl CompletionInput {
     /// The name of the input option or argument when completing a value.
     ///
     /// Returns null when completing an option name.
-    pub fn get_completion_name(&self) -> Option<String> {
+    pub fn get_completion_name(&self) -> Option<BString> {
         self.completion_name.clone()
     }
 
@@ -201,14 +206,14 @@ impl CompletionInput {
         self.completion_value.clone()
     }
 
-    pub fn must_suggest_option_values_for(&self, option_name: &str) -> bool {
+    pub fn must_suggest_option_values_for(&self, option_name: impl AsRef<[u8]>) -> bool {
         Self::TYPE_OPTION_VALUE == self.get_completion_type()
-            && Some(option_name.to_string()) == self.get_completion_name()
+            && Some(BString::from(option_name.as_ref())) == self.get_completion_name()
     }
 
-    pub fn must_suggest_argument_values_for(&self, argument_name: &str) -> bool {
+    pub fn must_suggest_argument_values_for(&self, argument_name: impl AsRef<[u8]>) -> bool {
         Self::TYPE_ARGUMENT_VALUE == self.get_completion_type()
-            && Some(argument_name.to_string()) == self.get_completion_name()
+            && Some(BString::from(argument_name.as_ref())) == self.get_completion_name()
     }
 
     pub fn get_first_argument(&self) -> Option<BString> {
@@ -233,19 +238,17 @@ impl CompletionInput {
             return None;
         }
 
-        // Option names are declared in code, so a name that is not UTF-8 cannot be defined.
         if option_token.get(1).copied().unwrap_or(b' ') == b'-' {
             // long option name
-            let option_name = utf8_text(&option_name)?;
-            return if self.inner.inner.definition.has_option(option_name) {
-                self.inner.inner.definition.get_option(option_name).ok()
+            return if self.inner.inner.definition.has_option(&option_name) {
+                self.inner.inner.definition.get_option(&option_name).ok()
             } else {
                 None
             };
         }
 
         // short option name
-        let first = utf8_text(&option_name[0..1])?;
+        let first = &option_name[0..1];
         if self.inner.inner.definition.has_shortcut(first) {
             self.inner
                 .inner
@@ -317,17 +320,17 @@ impl crate::input::InputInterface for CompletionInput {
         CompletionInput::__to_string(self)
     }
 
-    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
-        crate::input::InputInterface::has_parameter_option(&self.inner, values, only_params)
+    fn has_parameter_option_bytes(&self, values: &[&BStr], only_params: bool) -> bool {
+        crate::input::InputInterface::has_parameter_option_bytes(&self.inner, values, only_params)
     }
 
-    fn get_parameter_option(
+    fn get_parameter_option_bytes(
         &self,
-        values: &[&str],
+        values: &[&BStr],
         default: InputValue,
         only_params: bool,
     ) -> InputValue {
-        crate::input::InputInterface::get_parameter_option(
+        crate::input::InputInterface::get_parameter_option_bytes(
             &self.inner,
             values,
             default,
@@ -343,36 +346,36 @@ impl crate::input::InputInterface for CompletionInput {
         crate::input::InputInterface::validate(&mut self.inner)
     }
 
-    fn get_arguments(&self) -> indexmap::IndexMap<String, InputValue> {
+    fn get_arguments(&self) -> indexmap::IndexMap<BString, InputValue> {
         crate::input::InputInterface::get_arguments(&self.inner)
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
-        crate::input::InputInterface::get_argument(&self.inner, name)
+    fn get_argument_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
+        crate::input::InputInterface::get_argument_bytes(&self.inner, name)
     }
 
-    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
-        crate::input::InputInterface::set_argument(&mut self.inner, name, value)
+    fn set_argument_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
+        crate::input::InputInterface::set_argument_bytes(&mut self.inner, name, value)
     }
 
-    fn has_argument(&self, name: &str) -> bool {
-        crate::input::InputInterface::has_argument(&self.inner, name)
+    fn has_argument_bytes(&self, name: &BStr) -> bool {
+        crate::input::InputInterface::has_argument_bytes(&self.inner, name)
     }
 
-    fn get_options(&self) -> indexmap::IndexMap<String, InputValue> {
+    fn get_options(&self) -> indexmap::IndexMap<BString, InputValue> {
         crate::input::InputInterface::get_options(&self.inner)
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
-        crate::input::InputInterface::get_option(&self.inner, name)
+    fn get_option_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
+        crate::input::InputInterface::get_option_bytes(&self.inner, name)
     }
 
-    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
-        crate::input::InputInterface::set_option(&mut self.inner, name, value)
+    fn set_option_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
+        crate::input::InputInterface::set_option_bytes(&mut self.inner, name, value)
     }
 
-    fn has_option(&self, name: &str) -> bool {
-        crate::input::InputInterface::has_option(&self.inner, name)
+    fn has_option_bytes(&self, name: &BStr) -> bool {
+        crate::input::InputInterface::has_option_bytes(&self.inner, name)
     }
 
     fn is_interactive(&self) -> bool {

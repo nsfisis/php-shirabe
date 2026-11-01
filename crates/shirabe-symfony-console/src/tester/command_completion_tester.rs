@@ -42,7 +42,7 @@ impl CommandCompletionTester {
         let mut result: Vec<String> = suggestions
             .get_option_suggestions()
             .iter()
-            .map(|option| format!("--{}", option.get_name()))
+            .map(|option| format!("--{}", option.get_name().display_lossy()))
             .collect();
         // array_map('strval', ... $suggestions->getValueSuggestions())
         result.extend(

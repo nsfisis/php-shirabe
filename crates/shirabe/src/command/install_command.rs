@@ -9,6 +9,7 @@ use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use bstr::BStr;
 use shirabe_php_shim::{impl_php_class, implode};
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{
     command::Command,
     input::{InputInterface, InputValue},
@@ -61,9 +62,9 @@ impl Command for InstallCommand {
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Do not use, only defined here to catch misuse of the install command.", None).unwrap().into(),
             InputOption::new("audit", None, Some(InputOption::VALUE_NONE), "Run an audit after installation is complete.", None).unwrap().into(),
             InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
-            InputOption::new("verbose", Some("v|vv|vvv"), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
-            InputOption::new("optimize-autoloader", Some("o"), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
-            InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("verbose", Some("v|vv|vvv".into()), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
             InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),

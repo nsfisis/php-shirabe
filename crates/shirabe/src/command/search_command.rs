@@ -16,7 +16,7 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -52,7 +52,7 @@ impl Command for SearchCommand {
         self.set_definition(&[
             InputOption::new(
                 "only-name",
-                Some("N"),
+                Some("N".into()),
                 Some(InputOption::VALUE_NONE),
                 "Search only in package names",
                 None,
@@ -61,7 +61,7 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new(
                 "only-vendor",
-                Some("O"),
+                Some("O".into()),
                 Some(InputOption::VALUE_NONE),
                 "Search only for vendor / organization names, returns only \"vendor\" as result",
                 None,
@@ -70,7 +70,7 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new(
                 "type",
-                Some("t"),
+                Some("t".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Search for a specific package type",
                 None,
@@ -79,7 +79,7 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new6(
                 "format",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
                 Some(InputValue::from("text")),

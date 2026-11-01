@@ -5,7 +5,7 @@ use crate::input::{ArgumentName, InputDefinition, InputValue};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, php_regex,
+    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, implode, php_regex,
     preg_is_match,
 };
 
@@ -20,8 +20,8 @@ use shirabe_php_shim::{
 pub struct Input {
     pub(crate) definition: InputDefinition,
     stream: Option<PhpResource>,
-    pub(crate) options: IndexMap<String, InputValue>,
-    pub(crate) arguments: IndexMap<String, InputValue>,
+    pub(crate) options: IndexMap<BString, InputValue>,
+    pub(crate) arguments: IndexMap<BString, InputValue>,
     interactive: bool,
 }
 
@@ -71,9 +71,9 @@ impl Input {
         let definition = &self.definition;
         let given_arguments = &self.arguments;
 
-        let missing_arguments: Vec<String> = array_filter(
+        let missing_arguments: Vec<BString> = array_filter(
             &array_keys(definition.get_arguments()),
-            |argument: &String| {
+            |argument: &BString| {
                 !given_arguments.contains_key(argument)
                     && definition
                         .get_argument(&ArgumentName::of(argument))
@@ -85,7 +85,7 @@ impl Input {
         if !missing_arguments.is_empty() {
             return Err(RuntimeException::new(format!(
                 "Not enough arguments (missing: \"{}\").",
-                missing_arguments.join(", "),
+                implode(", ", &missing_arguments).display_lossy(),
             ))
             .into());
         }
@@ -101,18 +101,19 @@ impl Input {
         self.interactive = interactive;
     }
 
-    pub fn get_arguments(&self) -> IndexMap<String, InputValue> {
+    pub fn get_arguments(&self) -> IndexMap<BString, InputValue> {
         array_merge_map(
             self.definition.get_argument_defaults(),
             self.arguments.clone(),
         )
     }
 
-    pub fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
+    pub fn get_argument(&self, name: impl AsRef<[u8]>) -> anyhow::Result<InputValue> {
+        let name = BStr::new(name.as_ref());
         if !self.definition.has_argument(&ArgumentName::of(name)) {
             return Err(InvalidArgumentException::new(format!(
                 "The \"{}\" argument does not exist.",
-                name
+                name.display_lossy()
             ))
             .into());
         }
@@ -127,31 +128,37 @@ impl Input {
         })
     }
 
-    pub fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    pub fn set_argument(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        value: InputValue,
+    ) -> anyhow::Result<()> {
+        let name = BStr::new(name.as_ref());
         if !self.definition.has_argument(&ArgumentName::of(name)) {
             return Err(InvalidArgumentException::new(format!(
                 "The \"{}\" argument does not exist.",
-                name
+                name.display_lossy()
             ))
             .into());
         }
 
-        self.arguments.insert(name.to_string(), value);
+        self.arguments.insert(name.to_owned(), value);
 
         Ok(())
     }
 
-    pub fn has_argument(&self, name: &str) -> bool {
+    pub fn has_argument(&self, name: impl AsRef<[u8]>) -> bool {
         self.definition.has_argument(&ArgumentName::of(name))
     }
 
-    pub fn get_options(&self) -> IndexMap<String, InputValue> {
+    pub fn get_options(&self) -> IndexMap<BString, InputValue> {
         array_merge_map(self.definition.get_option_defaults(), self.options.clone())
     }
 
-    pub fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
+    pub fn get_option(&self, name: impl AsRef<[u8]>) -> anyhow::Result<InputValue> {
+        let name = BStr::new(name.as_ref());
         if self.definition.has_negation(name) {
-            let value = self.get_option(&self.definition.negation_to_name(name)?)?;
+            let value = self.get_option(self.definition.negation_to_name(name)?)?;
             if value.is_null() {
                 return Ok(value);
             }
@@ -162,7 +169,7 @@ impl Input {
         if !self.definition.has_option(name) {
             return Err(InvalidArgumentException::new(format!(
                 "The \"{}\" option does not exist.",
-                name
+                name.display_lossy()
             ))
             .into());
         }
@@ -174,7 +181,8 @@ impl Input {
         })
     }
 
-    pub fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    pub fn set_option(&mut self, name: impl AsRef<[u8]>, value: InputValue) -> anyhow::Result<()> {
+        let name = BStr::new(name.as_ref());
         if self.definition.has_negation(name) {
             let negated = self.definition.negation_to_name(name)?;
             self.options
@@ -184,17 +192,18 @@ impl Input {
         } else if !self.definition.has_option(name) {
             return Err(InvalidArgumentException::new(format!(
                 "The \"{}\" option does not exist.",
-                name
+                name.display_lossy()
             ))
             .into());
         }
 
-        self.options.insert(name.to_string(), value);
+        self.options.insert(name.to_owned(), value);
 
         Ok(())
     }
 
-    pub fn has_option(&self, name: &str) -> bool {
+    pub fn has_option(&self, name: impl AsRef<[u8]>) -> bool {
+        let name = name.as_ref();
         self.definition.has_option(name) || self.definition.has_negation(name)
     }
 

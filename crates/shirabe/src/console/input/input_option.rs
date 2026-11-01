@@ -18,8 +18,8 @@ impl InputOption {
     pub const VALUE_NEGATABLE: i64 = 16;
 
     pub fn new(
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
         description: &str,
         default: Option<InputValue>,
@@ -36,8 +36,8 @@ impl InputOption {
 
     /// PHP's constructor with the sixth parameter, `$suggestedValues`.
     pub fn new6(
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
         description: &str,
         default: Option<InputValue>,
@@ -70,8 +70,8 @@ impl InputOption {
         self.suggested_values.complete(this, input, suggestions)
     }
 
-    pub(crate) fn get_name(&self) -> String {
-        self.inner.get_name().to_string()
+    pub(crate) fn get_name(&self) -> bstr::BString {
+        self.inner.get_name().to_owned()
     }
 
     /// Unwraps to the underlying Symfony `InputOption` (used when forwarding a Composer-typed

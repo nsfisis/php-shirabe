@@ -9,6 +9,7 @@ use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, bconcat, impl_php_class, is_string,
     php_regex, preg_replace2,
 };
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
@@ -150,7 +151,7 @@ impl Command for ScriptAliasCommand {
         );
 
         let args_value: Vec<bstr::BString> = args
-            .get("args")
+            .get(bstr::B("args"))
             .and_then(|v| v.as_array())
             .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();

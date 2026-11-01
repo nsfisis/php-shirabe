@@ -8,6 +8,7 @@ use crate::json::JsonFile;
 use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, bconcat, chmod, path_from_bytes, php_to_string, touch};
+use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
 use std::path::PathBuf;
 

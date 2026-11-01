@@ -13,7 +13,7 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::{CommandNotFoundException, NamespaceNotFoundException};
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -179,7 +179,7 @@ impl Command for RunScriptCommand {
             .into(),
             InputOption::new(
                 "list",
-                Some("l"),
+                Some("l".into()),
                 Some(InputOption::VALUE_NONE),
                 "List scripts.",
                 None,

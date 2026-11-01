@@ -8,7 +8,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpResource, bconcat, implode, mb_detect_encoding, mb_substr, path_to_bytes, php_regex,
-    preg_match, strlen, strpos, substr, utf8_text,
+    preg_match, strlen, strpos, substr,
 };
 
 /// ArgvInput represents an input coming from the CLI arguments.
@@ -142,11 +142,11 @@ impl ArgvInput {
 
         if strlen(&name) > 1 {
             let first = substr(&name, 0, Some(1));
-            if self.has_shortcut(first.as_ref())
+            if self.inner.definition.has_shortcut(&first)
                 && self
                     .inner
                     .definition
-                    .get_option_for_shortcut(defined_name(first.as_ref()))?
+                    .get_option_for_shortcut(&first)?
                     .accept_value()
             {
                 // an option with a value (with no space)
@@ -167,7 +167,7 @@ impl ArgvInput {
         let mut i = 0;
         while i < len {
             let name_i = substr(name, i, Some(1));
-            if !self.has_shortcut(name_i.as_ref()) {
+            if !self.inner.definition.has_shortcut(&name_i) {
                 let encoding = mb_detect_encoding(name, None, true);
                 let bad = match encoding {
                     None => name_i,
@@ -180,21 +180,18 @@ impl ArgvInput {
                 .into());
             }
 
-            let option = self
-                .inner
-                .definition
-                .get_option_for_shortcut(defined_name(name_i.as_ref()))?;
+            let option = self.inner.definition.get_option_for_shortcut(&name_i)?;
             if option.accept_value() {
                 let value = if i == len - 1 {
                     InputValue::Null
                 } else {
                     InputValue::String(substr(name, i + 1, None))
                 };
-                self.add_long_option(BStr::new(option.get_name()), value)?;
+                self.add_long_option(option.get_name(), value)?;
 
                 break;
             } else {
-                self.add_long_option(BStr::new(option.get_name()), InputValue::Null)?;
+                self.add_long_option(option.get_name(), InputValue::Null)?;
             }
             i += 1;
         }
@@ -247,7 +244,7 @@ impl ArgvInput {
             };
             self.inner
                 .arguments
-                .insert(arg.get_name().to_string(), value);
+                .insert(arg.get_name().to_owned(), value);
 
         // if last argument isArray(), append token to last argument
         } else if self
@@ -276,24 +273,24 @@ impl ArgvInput {
             if let Some(key) = &first_key {
                 let input_argument = &all[key];
                 if input_argument.get_name() == "command" {
-                    symfony_command_name = self.inner.arguments.get("command").cloned();
+                    symfony_command_name = self.inner.arguments.get(BStr::new("command")).cloned();
                     all.shift_remove(key);
                 }
             }
 
             let message = if !all.is_empty() {
-                let names: Vec<String> = all.keys().cloned().collect();
+                let names: Vec<BString> = all.keys().cloned().collect();
                 match &symfony_command_name {
                     Some(symfony_command_name) if !symfony_command_name.is_null() => {
                         format!(
                             "Too many arguments to \"{}\" command, expected arguments \"{}\".",
                             symfony_command_name.to_php_string().display_lossy(),
-                            names.join("\" \""),
+                            implode("\" \"", &names).display_lossy(),
                         )
                     }
                     _ => format!(
                         "Too many arguments, expected arguments \"{}\".",
-                        names.join("\" \""),
+                        implode("\" \"", &names).display_lossy(),
                     ),
                 }
             } else if symfony_command_name
@@ -321,7 +318,7 @@ impl ArgvInput {
 
     /// Adds a short option value.
     fn add_short_option(&mut self, shortcut: &BStr, value: InputValue) -> anyhow::Result<()> {
-        if !self.has_shortcut(shortcut) {
+        if !self.inner.definition.has_shortcut(shortcut) {
             return Err(RuntimeException::new(format!(
                 "The \"-{}\" option does not exist.",
                 shortcut.display_lossy()
@@ -330,37 +327,21 @@ impl ArgvInput {
         }
 
         self.add_long_option(
-            BStr::new(
-                self.inner
-                    .definition
-                    .get_option_for_shortcut(defined_name(shortcut))?
-                    .get_name(),
-            ),
+            self.inner
+                .definition
+                .get_option_for_shortcut(shortcut)?
+                .get_name(),
             value,
         )
     }
 
-    /// `InputDefinition::hasShortcut()` for a name taken from the command line.
-    fn has_shortcut(&self, name: &BStr) -> bool {
-        utf8_text(name).is_some_and(|name| self.inner.definition.has_shortcut(name))
-    }
-
     /// Adds a long option value.
     fn add_long_option(&mut self, name: &BStr, mut value: InputValue) -> anyhow::Result<()> {
-        // Option names are declared in code, so a name that is not UTF-8 cannot be defined.
-        let Some(name) = utf8_text(name) else {
-            return Err(RuntimeException::new(format!(
-                "The \"--{}\" option does not exist.",
-                name.display_lossy()
-            ))
-            .into());
-        };
-
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
                 return Err(RuntimeException::new(format!(
                     "The \"--{}\" option does not exist.",
-                    name
+                    name.display_lossy()
                 ))
                 .into());
             }
@@ -369,7 +350,7 @@ impl ArgvInput {
             if !value.is_null() {
                 return Err(RuntimeException::new(format!(
                     "The \"--{}\" option does not accept a value.",
-                    name
+                    name.display_lossy()
                 ))
                 .into());
             }
@@ -385,7 +366,7 @@ impl ArgvInput {
         if !value.is_null() && !option.accept_value() {
             return Err(RuntimeException::new(format!(
                 "The \"--{}\" option does not accept a value.",
-                name
+                name.display_lossy()
             ))
             .into());
         }
@@ -410,7 +391,7 @@ impl ArgvInput {
             if option.is_value_required() {
                 return Err(RuntimeException::new(format!(
                     "The \"--{}\" option requires a value.",
-                    name
+                    name.display_lossy()
                 ))
                 .into());
             }
@@ -434,11 +415,11 @@ impl ArgvInput {
                 _ => {
                     self.inner
                         .options
-                        .insert(name.to_string(), InputValue::Array(vec![value]));
+                        .insert(name.to_owned(), InputValue::Array(vec![value]));
                 }
             }
         } else {
-            self.inner.options.insert(name.to_string(), value);
+            self.inner.options.insert(name.to_owned(), value);
         }
 
         Ok(())
@@ -459,21 +440,16 @@ impl ArgvInput {
                 } else {
                     substr(token, -1, None)
                 };
-                let has_value = |name: &BStr| {
-                    utf8_text(name).is_some_and(|name| self.inner.options.contains_key(name))
-                };
-                if !has_value(name.as_ref()) && !self.has_shortcut(name.as_ref()) {
+                let has_value = |name: &BStr| self.inner.options.contains_key(name);
+                if !has_value(name.as_ref()) && !self.inner.definition.has_shortcut(&name) {
                     // noop
                 } else {
                     if !has_value(name.as_ref())
-                        && let Ok(resolved) = self
-                            .inner
-                            .definition
-                            .shortcut_to_name(defined_name(name.as_ref()))
+                        && let Ok(resolved) = self.inner.definition.shortcut_to_name(&name)
                     {
-                        name = BString::from(resolved);
+                        name = resolved;
                     }
-                    if let Some(option_value) = self.inner.options.get(defined_name(name.as_ref()))
+                    if let Some(option_value) = self.inner.options.get(name.as_bstr())
                         && self.tokens.get(i + 1).map(|t| t.as_bstr()) == option_value.as_string()
                     {
                         is_option = true;
@@ -494,7 +470,7 @@ impl ArgvInput {
         None
     }
 
-    pub fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
+    pub fn has_parameter_option(&self, values: &[impl AsRef<[u8]>], only_params: bool) -> bool {
         for token in &self.tokens {
             if only_params && token == "--" {
                 return false;
@@ -503,12 +479,14 @@ impl ArgvInput {
                 // Options with values:
                 //   For long options, test for '--option=' at beginning
                 //   For short options, test for '-o' at beginning
-                let leading = if value.starts_with("--") {
-                    format!("{}=", value)
+                let value = value.as_ref();
+                let leading = if value.starts_with(b"--") {
+                    bconcat!(value, "=")
                 } else {
-                    value.to_string()
+                    BString::from(value)
                 };
-                if token == value || (!leading.is_empty() && token.starts_with(leading.as_bytes()))
+                if token.as_slice() == value
+                    || (!leading.is_empty() && token.starts_with(leading.as_slice()))
                 {
                     return true;
                 }
@@ -520,7 +498,7 @@ impl ArgvInput {
 
     pub fn get_parameter_option(
         &self,
-        values: &[&str],
+        values: &[impl AsRef<[u8]>],
         default: InputValue,
         only_params: bool,
     ) -> InputValue {
@@ -533,7 +511,8 @@ impl ArgvInput {
             }
 
             for value in values {
-                if token == *value {
+                let value = value.as_ref();
+                if token.as_slice() == value {
                     return match tokens.first() {
                         Some(_) => InputValue::String(tokens.remove(0)),
                         None => InputValue::Null,
@@ -542,12 +521,12 @@ impl ArgvInput {
                 // Options with values:
                 //   For long options, test for '--option=' at beginning
                 //   For short options, test for '-o' at beginning
-                let leading = if value.starts_with("--") {
-                    format!("{}=", value)
+                let leading = if value.starts_with(b"--") {
+                    bconcat!(value, "=")
                 } else {
-                    value.to_string()
+                    BString::from(value)
                 };
-                if !leading.is_empty() && token.starts_with(leading.as_bytes()) {
+                if !leading.is_empty() && token.starts_with(leading.as_slice()) {
                     return InputValue::String(substr(&token, strlen(&leading), None));
                 }
             }
@@ -582,11 +561,6 @@ impl ArgvInput {
     }
 }
 
-/// The name as a key of an `InputDefinition`, for a name the definition already reported as known.
-fn defined_name(name: &BStr) -> &str {
-    utf8_text(name).expect("defined option names are UTF-8")
-}
-
 impl InputInterface for ArgvInput {
     fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
         std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
@@ -596,13 +570,13 @@ impl InputInterface for ArgvInput {
         ArgvInput::get_first_argument(self)
     }
 
-    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
+    fn has_parameter_option_bytes(&self, values: &[&BStr], only_params: bool) -> bool {
         ArgvInput::has_parameter_option(self, values, only_params)
     }
 
-    fn get_parameter_option(
+    fn get_parameter_option_bytes(
         &self,
-        values: &[&str],
+        values: &[&BStr],
         default: InputValue,
         only_params: bool,
     ) -> InputValue {
@@ -617,35 +591,35 @@ impl InputInterface for ArgvInput {
         self.inner.validate()
     }
 
-    fn get_arguments(&self) -> IndexMap<String, InputValue> {
+    fn get_arguments(&self) -> IndexMap<BString, InputValue> {
         self.inner.get_arguments()
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
+    fn get_argument_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
         self.inner.get_argument(name)
     }
 
-    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    fn set_argument_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_argument(name, value)
     }
 
-    fn has_argument(&self, name: &str) -> bool {
+    fn has_argument_bytes(&self, name: &BStr) -> bool {
         self.inner.has_argument(name)
     }
 
-    fn get_options(&self) -> IndexMap<String, InputValue> {
+    fn get_options(&self) -> IndexMap<BString, InputValue> {
         self.inner.get_options()
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
+    fn get_option_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
         self.inner.get_option(name)
     }
 
-    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    fn set_option_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_option(name, value)
     }
 
-    fn has_option(&self, name: &str) -> bool {
+    fn has_option_bytes(&self, name: &BStr) -> bool {
         self.inner.has_option(name)
     }
 
@@ -699,7 +673,7 @@ mod tests {
             DefinitionItem::InputOption(
                 InputOption::new(
                     "foo",
-                    Some("f"),
+                    Some("f".into()),
                     Some(InputOption::VALUE_REQUIRED),
                     String::new(),
                     InputValue::Null,
@@ -732,10 +706,51 @@ mod tests {
     }
 
     #[test]
-    fn option_names_that_are_not_utf8_do_not_exist() {
+    fn undefined_option_names_that_are_not_utf8_do_not_exist() {
         for token in [b"--\xff".as_slice(), b"-\xff".as_slice()] {
             let error = ArgvInput::new(Some(argv(&[token])), Some(definition())).unwrap_err();
             assert!(error.to_string().contains("option does not exist"));
         }
+    }
+
+    #[test]
+    fn names_that_are_not_utf8_can_be_defined_and_read() {
+        let definition = InputDefinition::new(vec![
+            DefinitionItem::InputArgument(
+                InputArgument::new(
+                    b"\xfename".as_slice(),
+                    None,
+                    String::new(),
+                    InputValue::Null,
+                )
+                .unwrap(),
+            ),
+            DefinitionItem::InputOption(
+                InputOption::new(
+                    b"caf\xe9",
+                    Some(BStr::new(b"\xff")),
+                    Some(InputOption::VALUE_REQUIRED),
+                    String::new(),
+                    InputValue::Null,
+                )
+                .unwrap(),
+            ),
+        ])
+        .unwrap();
+        let value = |value: &[u8]| InputValue::String(BString::from(value));
+
+        let input = ArgvInput::new(
+            Some(argv(&[b"--caf\xe9=long", b"token"])),
+            Some(definition.clone()),
+        )
+        .unwrap();
+        assert_eq!(input.inner.get_option(b"caf\xe9").unwrap(), value(b"long"));
+        assert_eq!(
+            input.inner.get_argument(b"\xfename").unwrap(),
+            value(b"token")
+        );
+
+        let input = ArgvInput::new(Some(argv(&[b"-\xffshort"])), Some(definition)).unwrap();
+        assert_eq!(input.inner.get_option(b"caf\xe9").unwrap(), value(b"short"));
     }
 }

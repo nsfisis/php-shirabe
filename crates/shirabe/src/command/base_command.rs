@@ -23,7 +23,9 @@ use shirabe_php_shim::{
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
 use shirabe_symfony_console::helper::{Table, TableSeparator};
-use shirabe_symfony_console::input::{ArgumentName, InputInterface, InputValue};
+use shirabe_symfony_console::input::{
+    ArgumentName, InputInterface, InputInterfaceByName, InputValue,
+};
 use shirabe_symfony_console::output::OutputInterface;
 
 pub const SUCCESS: i64 = 0;
@@ -42,10 +44,12 @@ pub struct BaseCommandData {
     /// `$definition->getArgument($name) instanceof Composer\Console\Input\InputArgument`; in
     /// this port `set_definition` converts the entries to the Symfony types for storage, so
     /// the Composer-typedness is tracked by name in these side maps instead.
-    composer_arguments:
-        std::cell::RefCell<IndexMap<String, std::rc::Rc<crate::console::input::InputArgument>>>,
-    composer_options:
-        std::cell::RefCell<IndexMap<String, std::rc::Rc<crate::console::input::InputOption>>>,
+    composer_arguments: std::cell::RefCell<
+        IndexMap<bstr::BString, std::rc::Rc<crate::console::input::InputArgument>>,
+    >,
+    composer_options: std::cell::RefCell<
+        IndexMap<bstr::BString, std::rc::Rc<crate::console::input::InputOption>>,
+    >,
 }
 
 impl BaseCommandData {
@@ -116,7 +120,7 @@ pub trait BaseCommand: Command {
 
     fn add_argument(
         &self,
-        name: &str,
+        name: impl AsRef<[u8]>,
         mode: Option<i64>,
         description: &str,
         default: InputValue,
@@ -132,8 +136,8 @@ pub trait BaseCommand: Command {
 
     fn add_option(
         &self,
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
         description: &str,
         default: InputValue,
@@ -773,7 +777,7 @@ pub fn base_command_complete(
             .base_command_data()
             .composer_options
             .borrow()
-            .get(&name)
+            .get(name.as_bstr())
             .cloned();
         if let Some(option) = option {
             return option.complete(cmd, input, suggestions);
@@ -787,7 +791,7 @@ pub fn base_command_complete(
             .base_command_data()
             .composer_arguments
             .borrow()
-            .get(&name)
+            .get(name.as_bstr())
             .cloned();
         if let Some(argument) = argument {
             return argument.complete(cmd, input, suggestions);

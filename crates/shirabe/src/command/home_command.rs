@@ -10,7 +10,7 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{bconcat, filter_var_url, impl_php_class};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -150,7 +150,7 @@ impl Command for HomeCommand {
             .into(),
             InputOption::new(
                 "homepage",
-                Some("H"),
+                Some("H".into()),
                 Some(InputOption::VALUE_NONE),
                 "Open the homepage instead of the repository URL.",
                 None,
@@ -159,7 +159,7 @@ impl Command for HomeCommand {
             .into(),
             InputOption::new(
                 "show",
-                Some("s"),
+                Some("s".into()),
                 Some(InputOption::VALUE_NONE),
                 "Only show the homepage or repository URL.",
                 None,
