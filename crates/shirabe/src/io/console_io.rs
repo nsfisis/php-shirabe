@@ -6,7 +6,7 @@ use crate::question::StrictConfirmationQuestion;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
-    PhpMixed, array_search, bconcat, in_array_strict, is_array, is_string, legacy_lossy,
+    PhpMixed, array_search, bconcat, canonical_int_key, in_array_strict, is_array, is_string,
     mb_check_encoding, mb_convert_encoding, memory_get_usage, microtime, preg_replace, str_repeat,
     strip_tags, strlen,
 };
@@ -327,8 +327,8 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.do_overwrite(message, newline, size, true, verbosity);
     }
 
-    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(&question, true);
+    fn ask_bytes(&self, question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        let sanitized_question = Self::sanitize(question, true);
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
                 default.as_string().unwrap_or_default(),
@@ -337,18 +337,15 @@ impl IOInterfaceImmutable for ConsoleIO {
         } else {
             Some(default)
         };
-        let question = Question::new(
-            legacy_lossy(&sanitized_question).into_owned(),
-            sanitized_default,
-        );
+        let question = Question::new(sanitized_question, sanitized_default);
 
         self.ask_question(&question)
     }
 
-    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
-        let sanitized = Self::sanitize(&question, true);
+    fn ask_confirmation_bytes(&self, question: &bstr::BStr, default: bool) -> anyhow::Result<bool> {
+        let sanitized = Self::sanitize(question, true);
         let question = StrictConfirmationQuestion::new(
-            legacy_lossy(&sanitized).into_owned(),
+            sanitized,
             default,
             "/^y(?:es)?$/i".to_string(),
             "/^no?$/i".to_string(),
@@ -358,14 +355,14 @@ impl IOInterfaceImmutable for ConsoleIO {
         Ok(result.as_bool().unwrap_or(false))
     }
 
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(&question, true);
+        let sanitized_question = Self::sanitize(question, true);
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
                 default.as_string().unwrap_or_default(),
@@ -374,10 +371,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         } else {
             Some(default)
         };
-        let mut question = Question::new(
-            legacy_lossy(&sanitized_question).into_owned(),
-            sanitized_default,
-        );
+        let mut question = Question::new(sanitized_question, sanitized_default);
         // Question::set_validator takes Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>;
         // adapt the None answer to PHP's null and translate the validator's anyhow error into the
         // InvalidArgumentException the Question validator type expects (QuestionHelper retries on it).
@@ -401,31 +395,31 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.ask_question(&question)
     }
 
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
-        let sanitized_question = Self::sanitize(&question, true);
-        let mut question = Question::new(
-            legacy_lossy(&sanitized_question).into_owned(),
-            Some(PhpMixed::Null),
-        );
+    fn ask_and_hide_answer_bytes(
+        &self,
+        question: &bstr::BStr,
+    ) -> anyhow::Result<Option<bstr::BString>> {
+        let sanitized_question = Self::sanitize(question, true);
+        let mut question = Question::new(sanitized_question, Some(PhpMixed::Null));
         // setHidden only throws when an autocompleter is set, which is not the case here.
         question
             .set_hidden(true)
             .expect("a freshly constructed question has no autocompleter");
 
         let result = self.ask_question(&question)?;
-        Ok(result.as_string().map(|s| legacy_lossy(s).into_owned()))
+        Ok(result.as_string().map(BString::from))
     }
 
-    fn select(
+    fn select_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
-        error_message: String,
+        error_message: &bstr::BStr,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(&question, true);
+        let sanitized_question = Self::sanitize(question, true);
         // ChoiceQuestion::new expects an IndexMap<BString, PhpMixed>; project the
         // sanitized choice list/map into the keyed form, preserving keys.
         let sanitize_choice = |choice: &PhpMixed| {
@@ -452,12 +446,9 @@ impl IOInterfaceImmutable for ConsoleIO {
             Some(default)
         };
         // Empty choices raise a LogicException (programmer error in PHP).
-        let mut question = ChoiceQuestion::new(
-            legacy_lossy(&sanitized_question).into_owned(),
-            sanitized_choices,
-            sanitized_default,
-        )
-        .expect("select() always provides at least one choice");
+        let mut question =
+            ChoiceQuestion::new(sanitized_question, sanitized_choices, sanitized_default)
+                .expect("select() always provides at least one choice");
         // PHP: IOInterface requires false, and Question requires null or int
         let max_attempts = match attempts {
             PhpMixed::Bool(false) => None,
@@ -478,37 +469,30 @@ impl IOInterfaceImmutable for ConsoleIO {
             PhpMixed::List(_) => vec![],
             _ => vec![],
         };
-        let is_assoc = !choice_keys.is_empty()
-            && choice_keys
-                .iter()
-                .any(|k| !k.to_str().is_ok_and(|k| k.parse::<i64>().is_ok()));
+        let is_assoc =
+            !choice_keys.is_empty() && choice_keys.iter().any(|k| canonical_int_key(k).is_none());
         if is_assoc {
             return Ok(result);
         }
 
         if !is_array(&result) {
-            let result_str = legacy_lossy(result.as_string().unwrap_or_default()).into_owned();
-            let haystack: IndexMap<String, String> = match &choices {
+            let haystack: IndexMap<BString, BString> = match &choices {
                 PhpMixed::List(l) => l
                     .iter()
                     .enumerate()
                     .filter_map(|(i, v)| {
                         v.as_string()
-                            .map(|s| (i.to_string(), legacy_lossy(s).into_owned()))
+                            .map(|s| (BString::from(i.to_string()), BString::from(s)))
                     })
                     .collect(),
                 PhpMixed::Array(a) => a
                     .iter()
-                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-                    .filter_map(|(k, v)| {
-                        v.as_string()
-                            .map(|s| (k.to_str_lossy().into_owned(), legacy_lossy(s).into_owned()))
-                    })
+                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), BString::from(s))))
                     .collect(),
                 _ => IndexMap::new(),
             };
             return Ok(PhpMixed::string(
-                array_search(&result_str, &haystack).unwrap_or_default(),
+                array_search(result.as_string().unwrap_or_default(), &haystack).unwrap_or_default(),
             ));
         }
 
@@ -551,15 +535,15 @@ impl IOInterfaceImmutable for ConsoleIO {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
+    fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::error(self, message, context);
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+    fn warning_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::warning(self, message, context);
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+    fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
 }

@@ -5,7 +5,7 @@ use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -221,7 +221,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
         let io = self.get_io();
         loop {
-            let package_input = io.ask("Search for a package: ".into(), PhpMixed::Null)?;
+            let package_input = io.ask("Search for a package: ", PhpMixed::Null)?;
             let mut package = match package_input.as_string() {
                 Some(s) => BString::from(s),
                 None => break,
@@ -352,7 +352,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                     package = io
                         .ask_and_validate(
-                            "Enter package # to add, or the complete package name if it is not listed: ".to_string(),
+                            "Enter package # to add, or the complete package name if it is not listed: ",
                             validator,
                             Some(3),
                             PhpMixed::string(String::new()),
@@ -375,7 +375,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         });
 
                     let constraint_mixed = io.ask_and_validate(
-                        "Enter the version constraint to require (or leave blank to use the latest version): ".to_string(),
+                        "Enter the version constraint to require (or leave blank to use the latest version): ",
                         validator,
                         Some(3),
                         PhpMixed::string(String::new()),
@@ -651,11 +651,11 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         ),
                         PhpMixed::Bool(false),
                         PhpMixed::Int(1),
-                        "No package named \"%s\" is installed.".to_string(),
+                        "No package named \"%s\" is installed.",
                         false,
                     )?;
                     if let Some(idx_str) = result_mixed.as_string()
-                        && let Ok(idx) = idx_str.to_str_lossy().parse::<usize>()
+                        && let Ok(idx) = idx_str.display_lossy().to_string().parse::<usize>()
                         && let Some(selected) = similar.get(idx)
                     {
                         return self.find_best_version_and_name_for_package(

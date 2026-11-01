@@ -15,11 +15,9 @@ use crate::repository::{
     CompositeRepository, FindPackageConstraint, InstalledRepository, LockArrayRepositoryHandle,
     PlatformRepository, RepositoryInterfaceHandle,
 };
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    Catch as _, LogicException, RuntimeException, ksort, legacy_lossy, strtolower,
-};
+use shirabe_php_shim::{Catch as _, LogicException, RuntimeException, ksort, strtolower};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -222,7 +220,7 @@ impl RepositorySet {
         for candidate in candidates {
             if self.is_package_acceptable(
                 &candidate.get_names(true),
-                &legacy_lossy(&candidate.get_stability()),
+                candidate.get_stability().as_bstr(),
             ) {
                 result.push(candidate);
             }
@@ -388,12 +386,12 @@ impl RepositorySet {
     }
 
     /// Check for each given package name whether it would be accepted by this RepositorySet in the given $stability
-    pub fn is_package_acceptable(&self, names: &[BString], stability: &str) -> bool {
+    pub fn is_package_acceptable(&self, names: &[BString], stability: &BStr) -> bool {
         StabilityFilter::is_package_acceptable(
             &self.acceptable_stabilities,
             &self.stability_flags,
             names,
-            bstr::BStr::new(stability),
+            stability,
         )
     }
 
@@ -439,16 +437,7 @@ impl RepositorySet {
             self.temporary_constraints.clone(),
             security_advisory_pool_filter,
         );
-        pool_builder.set_ignored_types(
-            ignored_types
-                .to_vec()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>()
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        );
+        pool_builder.set_ignored_types(ignored_types);
         pool_builder.set_allowed_types(allowed_types);
 
         for repo in &self.repositories {
@@ -563,16 +552,7 @@ impl RepositorySet {
         }
 
         if !allowed_packages.is_empty() {
-            request.restrict_packages(
-                allowed_packages
-                    .to_vec()
-                    .iter()
-                    .map(|s| legacy_lossy(s).into_owned())
-                    .collect::<Vec<_>>()
-                    .into_iter()
-                    .map(bstr::BString::from)
-                    .collect::<Vec<_>>(),
-            );
+            request.restrict_packages(allowed_packages);
         }
 
         self.create_pool(

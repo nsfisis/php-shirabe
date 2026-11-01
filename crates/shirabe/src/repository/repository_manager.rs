@@ -6,11 +6,9 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{FilterRepository, RepositoryInterfaceHandle};
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BStr, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, json_encode, legacy_lossy,
-};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException, json_encode};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -115,7 +113,7 @@ impl RepositoryManager {
             self.io.write_error(format!("<warning>Repository \"{}\" ({}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or_default(), config_json));
         }
 
-        let class = legacy_lossy(&self.repository_classes[r#type].clone()).into_owned();
+        let class = self.repository_classes[r#type].clone();
 
         let has_filter = config.contains_key(B("only"))
             || config.contains_key(B("exclude"))
@@ -133,7 +131,7 @@ impl RepositoryManager {
 
         // PHP instantiates `new $class(...)` dynamically; the port matches on the known
         // repository class names instead.
-        let repository = self.create_repository_by_class(&class, cleaned_config)?;
+        let repository = self.create_repository_by_class(class.as_bstr(), cleaned_config)?;
 
         if let Some(filter_config) = filter_config {
             return Ok(RepositoryInterfaceHandle::new(FilterRepository::new(
@@ -147,14 +145,14 @@ impl RepositoryManager {
 
     fn create_repository_by_class(
         &self,
-        class: &str,
+        class: &BStr,
         config: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         // PHP: `new $class($config, $this->io, $this->config, $this->httpDownloader,
         // $this->eventDispatcher, $this->process)`. Rust cannot instantiate by string class name, so
         // dispatch over the classes registered in `createDefaultRepositoryManager`.
-        match class {
-            "Composer\\Repository\\ComposerRepository" => Ok(RepositoryInterfaceHandle::new(
+        match class.as_bytes() {
+            b"Composer\\Repository\\ComposerRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::ComposerRepository::new(
                     config,
                     self.io.clone(),
@@ -163,10 +161,10 @@ impl RepositoryManager {
                     self.event_dispatcher.clone(),
                 )?,
             )),
-            "Composer\\Repository\\PackageRepository" => Ok(RepositoryInterfaceHandle::new(
+            b"Composer\\Repository\\PackageRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::PackageRepository::new(config),
             )),
-            "Composer\\Repository\\VcsRepository" => Ok(RepositoryInterfaceHandle::new(
+            b"Composer\\Repository\\VcsRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::VcsRepository::new(
                     config,
                     self.io.clone(),
@@ -178,10 +176,10 @@ impl RepositoryManager {
                     None,
                 )?,
             )),
-            "Composer\\Repository\\ArtifactRepository" => Ok(RepositoryInterfaceHandle::new(
+            b"Composer\\Repository\\ArtifactRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::ArtifactRepository::new(config, self.io.clone())?,
             )),
-            "Composer\\Repository\\PathRepository" => Ok(RepositoryInterfaceHandle::new(
+            b"Composer\\Repository\\PathRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::PathRepository::new(
                     config,
                     self.io.clone(),
@@ -193,8 +191,9 @@ impl RepositoryManager {
             )),
             // TODO(plugin): `setRepositoryClass` lets a plugin register a repository class of
             // its own, which needs a Rust-side counterpart before it can be built here.
-            other => Err(RuntimeException::new(format!(
-                "Repository class has no Rust implementation: {other}"
+            _ => Err(RuntimeException::new(format!(
+                "Repository class has no Rust implementation: {}",
+                class.display_lossy()
             ))
             .into()),
         }

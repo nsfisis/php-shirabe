@@ -10,13 +10,12 @@ use crate::json::JsonValidationException;
 use crate::package::loader::InvalidPackageException;
 use crate::plugin::PluginBlockedException;
 use crate::repository::{InvalidRepositoryException, RepositorySecurityException};
-use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{
     AnyThrowable, BadFunctionCallException, BadMethodCallException, Catch as _, Error, Exception,
     InvalidArgumentException, LogicException, OutOfBoundsException, PhpClass as _, PhpMixed,
-    RuntimeException, TypeError, UnexpectedValueException, UnportedThrowable, legacy_lossy,
+    RuntimeException, TypeError, UnexpectedValueException, UnportedThrowable,
 };
 
 /// The error a `Throw` from the PHP worker stands for: the ported exception of its class, or,
@@ -42,7 +41,8 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
     };
     exception.set_code(throw.code);
     if !throw.file.is_empty() {
-        exception.set_location(legacy_lossy(&throw.file).into_owned(), throw.line);
+        // The location only ever appears in messages read by people.
+        exception.set_location(throw.file.display_lossy().to_string(), throw.line);
     }
     anyhow::Error::new(exception)
 }
@@ -51,13 +51,12 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
 /// as a plain value rather than as a frame.
 pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
     let string = |position: usize| {
-        legacy_lossy(
-            fields
-                .get(position)
-                .and_then(PhpMixed::as_string)
-                .unwrap_or_default(),
-        )
-        .into_owned()
+        fields
+            .get(position)
+            .and_then(PhpMixed::as_string)
+            .unwrap_or_default()
+            .display_lossy()
+            .to_string()
     };
     let int = |position: usize| fields.get(position).and_then(PhpMixed::as_int).unwrap_or(0);
     let mut throw = PhpThrow::new(string(0), string(1), int(2));
@@ -76,7 +75,7 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
     if let Some(PhpMixed::List(parents)) = fields.get(6) {
         throw.parents = parents
             .iter()
-            .filter_map(|parent| parent.as_string().map(|s| s.to_str_lossy().into_owned()))
+            .filter_map(|parent| parent.as_string().map(|s| s.display_lossy().to_string()))
             .collect();
     }
     throw
@@ -98,15 +97,15 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
             })
             .unwrap_or(PhpMixed::Null)
     };
+    let string_item = |item: &PhpMixed| {
+        item.as_string()
+            .unwrap_or_default()
+            .display_lossy()
+            .to_string()
+    };
     let strings = |name: &str| match property(name) {
-        PhpMixed::List(items) => items
-            .iter()
-            .map(|item| legacy_lossy(item.as_string().unwrap_or_default()).into_owned())
-            .collect(),
-        PhpMixed::Array(items) => items
-            .values()
-            .map(|item| legacy_lossy(item.as_string().unwrap_or_default()).into_owned())
-            .collect(),
+        PhpMixed::List(items) => items.iter().map(string_item).collect(),
+        PhpMixed::Array(items) => items.values().map(string_item).collect(),
         _ => Vec::new(),
     };
     Some(match class {
@@ -176,10 +175,10 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
         .into(),
         r"Composer\Plugin\PluginBlockedException" => PluginBlockedException::new(message).into(),
         r"Composer\Repository\InvalidRepositoryException" => {
-            InvalidRepositoryException::new(legacy_lossy(&message).into_owned()).into()
+            InvalidRepositoryException::new(message).into()
         }
         r"Composer\Repository\RepositorySecurityException" => {
-            RepositorySecurityException::new(legacy_lossy(&message).into_owned()).into()
+            RepositorySecurityException::new(message).into()
         }
         r"Symfony\Component\Console\Exception\CommandNotFoundException" => {
             shirabe_symfony_console::exception::CommandNotFoundException::new(

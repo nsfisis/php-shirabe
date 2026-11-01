@@ -32,13 +32,12 @@ use shirabe_php_shim::{
     disk_free_space, exec, explode, explode_limit, extension_loaded, file_exists,
     file_get_contents, file_put_contents, function_exists, get_debug_type_obj, getcwd, getenv,
     getmypid, glob, ini_set, intval, is_array, is_dir, is_file, is_numeric_string, is_string,
-    json_decode_assoc, legacy_lossy, levenshtein, mb_convert_encoding, mb_convert_variables,
-    mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage, microtime,
-    path_from_bytes, path_to_bytes, php_regex, php_to_string, php_truthy, php_uname, posix_getuid,
-    preg_grep, preg_match, preg_quote, preg_split, putenv, random_bytes, realpath,
-    restore_error_handler, round, sort_natural_flag_case, str_pad, str_repeat, str_replace,
-    str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time,
-    trim, unlink,
+    json_decode_assoc, levenshtein, mb_convert_encoding, mb_convert_variables, mb_detect_encoding,
+    mb_strwidth, memory_get_peak_usage, memory_get_usage, microtime, path_from_bytes,
+    path_to_bytes, php_regex, php_to_string, php_truthy, php_uname, posix_getuid, preg_grep,
+    preg_match, preg_quote, preg_split, putenv, random_bytes, realpath, restore_error_handler,
+    round, sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen, strpos,
+    strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::{
@@ -735,7 +734,7 @@ impl Application {
                     .filter(php_truthy)
                     .map(|n| {
                         shirabe_symfony_console::completion::StringOrSuggestion::String(
-                            php_to_string(&n).display_lossy().to_string(),
+                            php_to_string(&n),
                         )
                     })
                     .collect();
@@ -1103,7 +1102,7 @@ impl Application {
 
                     let abbrev = format!(
                         "{} {}",
-                        legacy_lossy(&str_pad(&cmd, max_len as usize, " ", STR_PAD_RIGHT)),
+                        str_pad(&cmd, max_len as usize, " ", STR_PAD_RIGHT).display_lossy(),
                         command_list[&cmd].borrow().get_description()
                     );
 
@@ -1122,7 +1121,7 @@ impl Application {
                         .iter()
                         .filter(|a| php_truthy(a))
                         .map(php_to_string)
-                        .map(|s| legacy_lossy(&s).into_owned())
+                        .map(|s| s.display_lossy().to_string())
                         .collect();
                     let suggestions = self.get_abbreviation_suggestions(&filtered);
 
@@ -1208,12 +1207,12 @@ impl Application {
     }
 
     /// Returns an array of possible abbreviations given a set of names.
-    pub fn get_abbreviations(names: Vec<String>) -> IndexMap<String, Vec<String>> {
-        let mut abbrevs: IndexMap<String, Vec<String>> = IndexMap::new();
+    pub fn get_abbreviations(names: Vec<String>) -> IndexMap<BString, Vec<String>> {
+        let mut abbrevs: IndexMap<BString, Vec<String>> = IndexMap::new();
         for name in names {
             let mut len = strlen(&name);
             while len > 0 {
-                let abbrev = legacy_lossy(&substr(&name, 0, Some(len))).into_owned();
+                let abbrev = substr(&name, 0, Some(len));
                 abbrevs.entry(abbrev).or_default().push(name.clone());
                 len -= 1;
             }
@@ -1383,11 +1382,11 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        let shell_verbosity_int: i64 = getenv("SHELL_VERBOSITY")
-            .unwrap_or_default()
-            .to_str()
-            .and_then(|verbosity| verbosity.parse().ok())
-            .unwrap_or(0);
+        let shell_verbosity_int = intval(&PhpMixed::string(
+            getenv("SHELL_VERBOSITY")
+                .unwrap_or_default()
+                .as_encoded_bytes(),
+        ));
         let mut shell_verbosity: i64 = shell_verbosity_int;
         match shell_verbosity_int {
             -1 => {
@@ -1753,9 +1752,9 @@ impl Application {
         for part in parts {
             if !namespaces.is_empty() {
                 let last = namespaces.last().unwrap().clone();
-                namespaces.push(format!("{}:{}", last, legacy_lossy(&part)));
+                namespaces.push(format!("{}:{}", last, part.display_lossy()));
             } else {
-                namespaces.push(legacy_lossy(&part).into_owned());
+                namespaces.push(part.display_lossy().to_string());
             }
         }
 
@@ -1977,11 +1976,11 @@ impl ApplicationHandle {
 
             // abort when we reach the home dir or top of the filesystem
             while dirname(&dir) != dir && dir != home {
-                if file_exists(format!(
-                    "{}/{}",
-                    legacy_lossy(&dir),
-                    Factory::get_composer_file().unwrap_or_default().display()
-                )) {
+                if file_exists(path_from_bytes(&bconcat!(
+                    dir,
+                    "/",
+                    Factory::get_composer_file().unwrap_or_default()
+                ))) {
                     if use_parent_dir_if_no_json_available.as_bool() != Some(true)
                         && !io.is_interactive()
                     {
@@ -2068,8 +2067,7 @@ impl ApplicationHandle {
 
                 if io.is_interactive()
                     && io.ask_confirmation(
-                        "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
-                            .to_string(),
+                        "<info>Continue as root/super user</info> [<comment>yes</comment>]? ",
                         true,
                     )?
                 {
@@ -2209,8 +2207,7 @@ impl ApplicationHandle {
 
                 if io.is_interactive()
                     && !io.ask_confirmation(
-                        "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
-                            .to_string(),
+                        "<info>Continue as root/super user</info> [<comment>yes</comment>]? ",
                         true,
                     )?
                 {
@@ -2972,7 +2969,7 @@ fn register_worker_reverse_application(
 /// (the reverse half of the two-world command split): the stringified input the plugin passed
 /// is re-parsed here and the command runs against this side's application state — helper set
 /// included — writing to the same stdio the worker inherited.
-pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow::Result<i64> {
+pub(crate) fn run_worker_reverse_command(name: &str, input_line: &BStr) -> anyhow::Result<i64> {
     let application = WORKER_REVERSE_APPLICATION
         .with(|slot| slot.borrow().as_ref().and_then(std::rc::Weak::upgrade))
         .ok_or_else(|| -> anyhow::Error {
@@ -2987,21 +2984,21 @@ pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow
     // the `command` argument, so the name is prepended when the first token is not this
     // command.
     let trimmed = input_line.trim();
-    let first_token = trimmed.split_whitespace().next().unwrap_or_default();
+    let first_token = trimmed.fields().next().unwrap_or_default();
     let is_named = {
         let command = command.borrow();
-        command.get_name().as_deref() == Some(first_token)
+        command.get_name().as_deref().map(str::as_bytes) == Some(first_token)
             || command
                 .get_aliases()
                 .iter()
-                .any(|alias| alias == first_token)
+                .any(|alias| alias.as_bytes() == first_token)
     };
     let line = if is_named {
-        trimmed.to_string()
+        BString::from(trimmed)
     } else if trimmed.is_empty() {
-        name.to_string()
+        BString::from(name)
     } else {
-        format!("{name} {trimmed}")
+        bconcat!(name, " ", trimmed)
     };
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(shirabe_symfony_console::input::StringInput::new(&line)?),

@@ -1,11 +1,12 @@
 //! ref: composer/tests/Composer/Test/Mock/IOMock.php
 
+use bstr::ByteSlice;
 use shirabe::config::Config;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, legacy_lossy, php_regex, preg_is_match, preg_quote, preg_split,
+    PHP_EOL, PhpMixed, bconcat, legacy_lossy, php_regex, preg_is_match, preg_quote, preg_split,
 };
 use shirabe_symfony_console::output::output_interface;
 use std::collections::VecDeque;
@@ -117,7 +118,10 @@ impl IOMock {
         let output = self.inner.get_output();
 
         if Platform::get_env("DEBUG_OUTPUT").is_some_and(|v| v == "1") {
-            println!("{PHP_EOL}Collected output: {output}{PHP_EOL}");
+            println!(
+                "{PHP_EOL}Collected output: {}{PHP_EOL}",
+                output.display_lossy()
+            );
         }
 
         // Not configured to expect anything, so there is nothing to verify.
@@ -186,11 +190,15 @@ impl IOMock {
                 }
 
                 panic!(
-                    "Expected \"{label}\" to be output still but there is no output left to consume. Complete output:{PHP_EOL}{output}"
+                    "Expected \"{label}\" to be output still but there is no output left to consume. Complete output:{PHP_EOL}{}",
+                    output.display_lossy()
                 );
             }
         } else if !output.is_empty() && self.strict {
-            panic!("There was strictly no output expected but some output occurred: {output}");
+            panic!(
+                "There was strictly no output expected but some output occurred: {}",
+                output.display_lossy()
+            );
         }
     }
 }
@@ -245,48 +253,45 @@ impl IOInterfaceImmutable for IOMock {
             .overwrite_error_bytes(message, newline, size, verbosity)
     }
 
-    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        self.inner
-            .ask(format!("{}{}", trim_eol(&question), PHP_EOL), default)
+    fn ask_bytes(&self, question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        self.inner.ask_bytes(with_eol(question).as_ref(), default)
     }
-    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
+    fn ask_confirmation_bytes(&self, question: &bstr::BStr, default: bool) -> anyhow::Result<bool> {
         self.inner
-            .ask_confirmation(format!("{}{}", trim_eol(&question), PHP_EOL), default)
+            .ask_confirmation_bytes(with_eol(question).as_ref(), default)
     }
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
-        self.inner.ask_and_validate(
-            format!("{}{}", trim_eol(&question), PHP_EOL),
-            validator,
-            attempts,
-            default,
-        )
+        self.inner
+            .ask_and_validate_bytes(with_eol(question).as_ref(), validator, attempts, default)
     }
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
+    fn ask_and_hide_answer_bytes(
+        &self,
+        question: &bstr::BStr,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         // Do not hide the answer in tests because that blocks on Windows with
         // hiddeninput.exe, so PHP delegates to `ask` rather than the hidden variant.
-        let result = self.inner.ask(
-            format!("{}{}", trim_eol(&question), PHP_EOL),
-            PhpMixed::Null,
-        )?;
-        Ok(result.as_string().map(|s| legacy_lossy(s).into_owned()))
+        let result = self
+            .inner
+            .ask_bytes(with_eol(question).as_ref(), PhpMixed::Null)?;
+        Ok(result.as_string().map(bstr::BString::from))
     }
-    fn select(
+    fn select_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
-        error_message: String,
+        error_message: &bstr::BStr,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
-        self.inner.select(
-            format!("{}{}", trim_eol(&question), PHP_EOL),
+        self.inner.select_bytes(
+            with_eol(question).as_ref(),
             choices,
             default,
             attempts,
@@ -309,14 +314,14 @@ impl IOInterfaceImmutable for IOMock {
     ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
         self.inner.get_authentication(repository_name)
     }
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.error(message, context)
+    fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
+        self.inner.error_bytes(message, context)
     }
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.warning(message, context)
+    fn warning_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
+        self.inner.warning_bytes(message, context)
     }
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.debug(message, context)
+    fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
+        self.inner.debug_bytes(message, context)
     }
 }
 
@@ -360,8 +365,8 @@ impl shirabe::io::BaseIO for IOMock {
     }
 }
 
-fn trim_eol(question: &str) -> &str {
-    question.trim_end_matches(['\r', '\n'])
+fn with_eol(question: &bstr::BStr) -> bstr::BString {
+    bconcat!(question.trim_end_with(|c| c == '\r' || c == '\n'), PHP_EOL)
 }
 
 pub struct IOMockGuard(std::rc::Rc<std::cell::RefCell<IOMock>>);

@@ -152,8 +152,7 @@ impl AuthHelper {
                     .into());
                 }
                 self.io.ask(
-                    "After authorizing your token, confirm that you would like to retry the request"
-                        .to_string(),
+                    "After authorizing your token, confirm that you would like to retry the request",
                     PhpMixed::Null,
                 )?;
 
@@ -427,14 +426,12 @@ impl AuthHelper {
                 true,
                 io_interface::NORMAL,
             );
-            let username = self.io.ask("      Username: ".into(), PhpMixed::Null)?;
-            let password = self
-                .io
-                .ask_and_hide_answer("      Password: ".to_string())?;
+            let username = self.io.ask("      Username: ", PhpMixed::Null)?;
+            let password = self.io.ask_and_hide_answer("      Password: ")?;
             self.io.borrow_mut().set_authentication(
                 origin.into(),
                 BString::from(username.as_string().unwrap_or_default()),
-                password.map(BString::from),
+                password,
             );
             // PHP: $this->config->get('store-auths') returns 'prompt'|bool
             store_auth = match self.config.borrow_mut().get("store-auths") {

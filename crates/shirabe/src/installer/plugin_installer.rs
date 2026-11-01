@@ -8,7 +8,7 @@ use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use bstr::B;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
 
 #[derive(Debug)]
 pub struct PluginInstaller {
@@ -100,7 +100,7 @@ impl InstallerInterface for PluginInstaller {
                 .map(|v| matches!(v, PhpMixed::Bool(true)))
                 .unwrap_or(false);
             self.get_plugin_manager().borrow_mut().is_plugin_allowed(
-                &legacy_lossy(&package.get_name()),
+                package.get_name(),
                 false,
                 plugin_optional,
                 true,

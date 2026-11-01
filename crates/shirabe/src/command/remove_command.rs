@@ -12,11 +12,10 @@ use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, UnexpectedValueException, impl_php_class, implode, legacy_lossy, preg_grep,
-    strtolower,
+    PhpMixed, UnexpectedValueException, impl_php_class, implode, preg_grep, strtolower,
 };
 use shirabe_symfony_console::{
     command::Command,
@@ -319,18 +318,12 @@ impl Command for RemoveCommand {
                 .and_then(|m| m.get_mut(B(link_type)))
                 .and_then(|v| v.as_array_mut())
             {
-                let entries: Vec<(String, String)> = section
+                let entries: Vec<BString> = section
                     .iter()
-                    // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
-                    .filter_map(|(k, v)| {
-                        v.as_string().map(|_| {
-                            let k = k.to_str_lossy().into_owned();
-                            (k.clone(), k)
-                        })
-                    })
+                    .filter_map(|(k, v)| v.as_string().map(|_| k.clone()))
                     .collect();
-                for (name, canonical) in entries {
-                    section.insert(strtolower(&name), PhpMixed::string(canonical));
+                for name in entries {
+                    section.insert(strtolower(&name), PhpMixed::string(name));
                 }
             }
         }
@@ -348,7 +341,7 @@ impl Command for RemoveCommand {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B(package)))
                 .and_then(|v| v.as_string())
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
 
             let in_alt_type = composer_data
                 .as_array()
@@ -356,21 +349,23 @@ impl Command for RemoveCommand {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B(package)))
                 .and_then(|v| v.as_string())
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
 
             if let Some(canonical_name) = in_type {
                 if dry_run {
                     to_remove
                         .entry(r#type.to_string())
                         .or_default()
-                        .push(bstr::BString::from(canonical_name.clone()));
+                        .push(canonical_name.clone());
                 } else {
                     json.remove_link(bstr::BStr::new(r#type), bstr::BStr::new(&canonical_name));
                 }
             } else if let Some(canonical_name) = in_alt_type {
                 io.write_error(format!(
                     "<warning>{} could not be found in {} but it is present in {}</warning>",
-                    canonical_name, r#type, alt_type
+                    canonical_name.display_lossy(),
+                    r#type,
+                    alt_type
                 ));
                 if io.is_interactive()
                     && io.ask_confirmation(
@@ -385,7 +380,7 @@ impl Command for RemoveCommand {
                         to_remove
                             .entry(alt_type.to_string())
                             .or_default()
-                            .push(bstr::BString::from(canonical_name.clone()));
+                            .push(canonical_name.clone());
                     } else {
                         json.remove_link(
                             bstr::BStr::new(alt_type),
@@ -394,29 +389,25 @@ impl Command for RemoveCommand {
                     }
                 }
             } else {
-                // TODO(bytes): package names are matched as UTF-8 text, so non-UTF-8 bytes are
-                // replaced.
-                let type_keys: Vec<String> = composer_data
+                let type_keys: Vec<BString> = composer_data
                     .as_array()
                     .and_then(|m| m.get(B(r#type)))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.keys().map(|k| k.to_str_lossy().into_owned()).collect())
+                    .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let matches_in_type: Vec<&String> = preg_grep(
+                let matches_in_type: Vec<&BString> = preg_grep(
                     base_package::package_name_to_regexp(package),
                     type_keys.iter(),
                 )
                 .collect();
 
-                // TODO(bytes): package names are matched as UTF-8 text, so non-UTF-8 bytes are
-                // replaced.
-                let alt_type_keys: Vec<String> = composer_data
+                let alt_type_keys: Vec<BString> = composer_data
                     .as_array()
                     .and_then(|m| m.get(B(alt_type)))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.keys().map(|k| k.to_str_lossy().into_owned()).collect())
+                    .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let matches_in_alt_type: Vec<&String> = preg_grep(
+                let matches_in_alt_type: Vec<&BString> = preg_grep(
                     base_package::package_name_to_regexp(package),
                     alt_type_keys.iter(),
                 )
@@ -428,7 +419,7 @@ impl Command for RemoveCommand {
                             to_remove
                                 .entry(r#type.to_string())
                                 .or_default()
-                                .push(bstr::BString::from(matched_package.clone()));
+                                .push(matched_package.clone());
                         } else {
                             json.remove_link(
                                 bstr::BStr::new(r#type),
@@ -440,7 +431,9 @@ impl Command for RemoveCommand {
                     for matched_package in matches_in_alt_type {
                         io.write_error(format!(
                             "<warning>{} could not be found in {} but it is present in {}</warning>",
-                            matched_package, r#type, alt_type
+                            matched_package.display_lossy(),
+                            r#type,
+                            alt_type
                         ));
                         if io.is_interactive()
                             && io.ask_confirmation(
@@ -455,7 +448,7 @@ impl Command for RemoveCommand {
                                 to_remove
                                     .entry(alt_type.to_string())
                                     .or_default()
-                                    .push(bstr::BString::from(matched_package.clone()));
+                                    .push(matched_package.clone());
                             } else {
                                 json.remove_link(
                                     bstr::BStr::new(alt_type),
@@ -608,7 +601,7 @@ impl Command for RemoveCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()

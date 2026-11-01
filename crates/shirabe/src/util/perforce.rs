@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/Perforce.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{CommandLine, Filesystem, Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -248,7 +248,7 @@ impl Perforce {
         }
         self.p4_user = self
             .io
-            .ask("Enter P4 User:".into(), PhpMixed::Null)?
+            .ask("Enter P4 User:", PhpMixed::Null)?
             .as_string()
             .map(BStr::to_owned);
         let command = if self.windows_flag {
@@ -308,13 +308,10 @@ impl Perforce {
         }
         let mut password = self.get_p4_variable("P4PASSWD");
         if strlen(password.clone().unwrap_or_default()) <= 0 {
-            password = self
-                .io
-                .ask_and_hide_answer(format!(
-                    "Enter password for Perforce user {}: ",
-                    self.get_user().unwrap_or_default().display_lossy()
-                ))?
-                .map(BString::from);
+            password = self.io.ask_and_hide_answer(format!(
+                "Enter password for Perforce user {}: ",
+                self.get_user().unwrap_or_default().display_lossy()
+            ))?;
         }
         self.p4_password = password.clone();
 

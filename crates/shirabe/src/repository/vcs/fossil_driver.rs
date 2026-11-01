@@ -11,8 +11,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bconcat, date_create, dirname, explode_with_limit,
-    is_dir, is_file, is_writable, legacy_lossy, path_from_bytes, path_to_bytes, php_regex,
-    preg_is_match, preg_replace, trim,
+    is_dir, is_file, is_writable, path_from_bytes, php_regex, preg_is_match, preg_replace, trim,
 };
 
 #[derive(Debug)]
@@ -134,7 +133,7 @@ impl FossilDriver {
             .into());
         }
 
-        let repo_file = legacy_lossy(&self.repo_file.as_ref().unwrap().clone()).into_owned();
+        let repo_file = self.repo_file.as_ref().unwrap().clone();
 
         // update the repo if it is a valid fossil repository
         if is_file(path_from_bytes(&repo_file))
@@ -165,15 +164,13 @@ impl FossilDriver {
 
             let mut output = BString::default();
             if self.inner.process.borrow_mut().execute(
-                [
-                    "fossil",
-                    "clone",
-                    "--",
-                    &*legacy_lossy(&self.inner.url),
-                    &repo_file,
-                ]
-                .map(|s| s.to_string())
-                .as_ref(),
+                &[
+                    BString::from("fossil"),
+                    "clone".into(),
+                    "--".into(),
+                    self.inner.url.clone(),
+                    repo_file.clone(),
+                ],
                 &mut output,
                 None,
             )? != 0
@@ -182,16 +179,20 @@ impl FossilDriver {
                 return Err(RuntimeException::new(format!(
                     "Failed to clone {} to repository {}\n\n{}",
                     self.inner.url.display_lossy(),
-                    repo_file,
+                    repo_file.display_lossy(),
                     output.display_lossy()
                 ))
                 .into());
             }
 
             if self.inner.process.borrow_mut().execute(
-                ["fossil", "open", "--nested", "--", &repo_file]
-                    .map(|s| s.to_string())
-                    .as_ref(),
+                &[
+                    BString::from("fossil"),
+                    "open".into(),
+                    "--nested".into(),
+                    "--".into(),
+                    repo_file.clone(),
+                ],
                 &mut output,
                 Some(path_from_bytes(&self.checkout_dir)),
             )? != 0
@@ -199,7 +200,7 @@ impl FossilDriver {
                 let output = BString::from(&self.inner.process.borrow().get_error_output()[..]);
                 return Err(RuntimeException::new(format!(
                     "Failed to open repository {} in {}\n\n{}",
-                    repo_file,
+                    repo_file.display_lossy(),
                     self.checkout_dir.display_lossy(),
                     output.display_lossy()
                 ))
@@ -229,7 +230,7 @@ impl FossilDriver {
         map
     }
 
-    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<BString, BString>> {
+    pub fn get_dist(&self, _identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         None
     }
 
@@ -248,16 +249,14 @@ impl FossilDriver {
 
         let mut content = BString::default();
         self.inner.process.borrow_mut().execute(
-            [
-                "fossil",
-                "cat",
-                "-r",
-                &*legacy_lossy(identifier),
-                "--",
-                &*legacy_lossy(file),
-            ]
-            .map(|s| s.to_string())
-            .as_ref(),
+            &[
+                BString::from("fossil"),
+                "cat".into(),
+                "-r".into(),
+                identifier.into(),
+                "--".into(),
+                file.into(),
+            ],
             &mut content,
             Some(path_from_bytes(&self.checkout_dir)),
         )?;
@@ -271,7 +270,7 @@ impl FossilDriver {
 
     pub fn get_change_date(
         &self,
-        _identifier: &str,
+        _identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
@@ -353,7 +352,7 @@ impl FossilDriver {
             if process.execute(
                 ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(std::path::Path::new(&*legacy_lossy(path_to_bytes(&url)))),
+                Some(&url),
             )? == 0
             {
                 return Ok(true);
@@ -374,7 +373,7 @@ impl FossilDriver {
         let file_content = self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
         let composer =
             VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
-                self.get_change_date(&legacy_lossy(identifier))
+                self.get_change_date(identifier)
             })?;
 
         self.inner.write_cached_composer(identifier, composer)
@@ -405,7 +404,7 @@ impl crate::repository::vcs::VcsDriverInterface for FossilDriver {
         &mut self,
         identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
-        FossilDriver::get_change_date(self, &legacy_lossy(identifier))
+        FossilDriver::get_change_date(self, identifier)
     }
 
     fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
@@ -421,7 +420,7 @@ impl crate::repository::vcs::VcsDriverInterface for FossilDriver {
     }
 
     fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
-        FossilDriver::get_dist(self, &legacy_lossy(identifier))
+        FossilDriver::get_dist(self, identifier)
     }
 
     fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {

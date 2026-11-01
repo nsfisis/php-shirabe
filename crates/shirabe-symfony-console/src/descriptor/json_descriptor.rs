@@ -7,7 +7,7 @@ use crate::descriptor::{
 };
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, bconcat, json_encode_ex, php_regex, preg_replace, str_replace};
 
@@ -64,7 +64,7 @@ impl JsonDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
+            Some(PhpMixed::String(s)) => Some(s.display_lossy().to_string()),
             _ => None,
         };
         let mut description =

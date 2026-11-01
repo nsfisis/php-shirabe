@@ -42,7 +42,7 @@ fn test_is_secure() {
     ];
 
     for (url, expected) in cases {
-        let proxy = RequestProxy::new(url.map(String::from), None, None, None);
+        let proxy = RequestProxy::new(url.map(BString::from), None, None, None);
         assert_eq!(expected, proxy.is_secure());
     }
 }
@@ -50,10 +50,10 @@ fn test_is_secure() {
 #[test]
 fn test_get_status_throws_on_bad_format_specifier() {
     let proxy = RequestProxy::new(
-        Some("http://proxy.com:80".to_string()),
+        Some("http://proxy.com:80".into()),
         None,
         None,
-        Some("http://proxy.com:80".to_string()),
+        Some("http://proxy.com:80".into()),
     );
     assert!(proxy.get_status(Some("using proxy")).is_err());
 }
@@ -73,7 +73,7 @@ fn test_get_status() {
     ];
 
     for (url, format, expected) in cases {
-        let proxy = RequestProxy::new(url.map(String::from), None, None, url.map(String::from));
+        let proxy = RequestProxy::new(url.map(BString::from), None, None, url.map(BString::from));
 
         if format.is_none() {
             // try with and without optional param
@@ -123,7 +123,7 @@ fn test_get_curl_options() {
     ];
 
     for (url, auth, expected) in cases {
-        let proxy = RequestProxy::new(url.map(String::from), auth.map(String::from), None, None);
+        let proxy = RequestProxy::new(url.map(BString::from), auth.map(BString::from), None, None);
         assert_eq!(expected, proxy.get_curl_options(&IndexMap::new()).unwrap());
     }
 }
@@ -182,7 +182,7 @@ fn test_get_curl_options_with_ssl() {
     ];
 
     for (url, auth, ssl_options, expected) in cases {
-        let proxy = RequestProxy::new(Some(url.to_string()), auth.map(String::from), None, None);
+        let proxy = RequestProxy::new(Some(url.into()), auth.map(BString::from), None, None);
         assert_eq!(expected, proxy.get_curl_options(&ssl_options).unwrap());
     }
 }

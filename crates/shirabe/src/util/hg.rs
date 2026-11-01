@@ -4,11 +4,11 @@ use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{ProcessExecutor, Url};
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, legacy_lossy, php_regex, preg_match, rawurlencode};
+use shirabe_php_shim::{bconcat, php_regex, preg_match, rawurlencode};
 use std::path::Path;
 use std::sync::Mutex;
 
-static VERSION: Mutex<Option<Option<String>>> = Mutex::new(None);
+static VERSION: Mutex<Option<Option<BString>>> = Mutex::new(None);
 
 #[derive(Debug)]
 pub struct Hg {
@@ -152,11 +152,11 @@ impl Hg {
 
     pub fn get_version(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<BString>> {
         let mut version = VERSION.lock().unwrap();
         if version.is_none() {
             *version = Some(None);
-            let mut output = String::new();
+            let mut output = BString::default();
             if process.borrow_mut().execute(
                 &["hg".to_string(), "--version".to_string()],
                 &mut output,
@@ -167,7 +167,7 @@ impl Hg {
                     &output,
                 )
             {
-                *version = Some(matches.get(1).map(|s| legacy_lossy(s).into_owned()));
+                *version = Some(matches.get(1).map(BString::from));
             }
         }
 

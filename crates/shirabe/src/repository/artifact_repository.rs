@@ -9,11 +9,12 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use crate::util::{Platform, Tar, Zip};
-use bstr::{B, BStr, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, extension_loaded, hash_file,
-    legacy_lossy,
+    PATHINFO_EXTENSION, PhpMixed, RuntimeException, UnexpectedValueException, basename, bconcat,
+    extension_loaded, hash_file, path_from_bytes, path_to_bytes, pathinfo, php_regex,
+    preg_is_match, realpath, strtr,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -47,11 +48,7 @@ impl ArtifactRepository {
             .into());
         }
 
-        let url = legacy_lossy(&BString::from(
-            repo_config[B("url")].as_string().unwrap_or_default(),
-        ))
-        .into_owned();
-        let lookup = Platform::expand_path(&url);
+        let lookup = Platform::expand_path(repo_config[B("url")].as_string().unwrap_or_default());
         Ok(Self {
             inner: ArrayRepository::new(Vec::new())?,
             loader: Box::new(ArrayLoader::new(None, true)),
@@ -76,8 +73,7 @@ impl ArtifactRepository {
 
     fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
-        let lookup = legacy_lossy(&BString::from(&self.lookup.clone()[..])).into_owned();
-        self.scan_directory(&lookup)
+        self.scan_directory(path_from_bytes(&self.lookup))
     }
 
     // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to scan
@@ -91,7 +87,7 @@ impl ArtifactRepository {
         Ok(())
     }
 
-    fn scan_directory(&self, path: &str) -> anyhow::Result<()> {
+    fn scan_directory(&self, path: &Path) -> anyhow::Result<()> {
         let entries = std::fs::read_dir(path)?;
         for entry in entries {
             let entry = entry?;
@@ -100,13 +96,13 @@ impl ArtifactRepository {
             if file_path.is_symlink() {
                 let resolved = std::fs::canonicalize(&file_path)?;
                 if resolved.is_dir() {
-                    self.scan_directory(resolved.to_str().unwrap_or_default())?;
+                    self.scan_directory(&resolved)?;
                     continue;
                 }
             }
 
             if file_path.is_dir() {
-                self.scan_directory(file_path.to_str().unwrap_or_default())?;
+                self.scan_directory(&file_path)?;
                 continue;
             }
 
@@ -114,26 +110,21 @@ impl ArtifactRepository {
                 continue;
             }
 
-            let ext = file_path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or_default()
-                .to_lowercase();
-            if !matches!(ext.as_str(), "zip" | "tar" | "gz" | "tgz") {
+            if !preg_is_match(
+                php_regex!(r"/^.+\.(zip|tar|gz|tgz)$/i"),
+                path_to_bytes(&file_path),
+            ) {
                 continue;
             }
 
             let package = self.get_composer_information(&file_path)?;
-            let basename = file_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default();
+            let basename = basename(path_to_bytes(&file_path));
             match package {
                 None => {
                     self.io.write_error3(
                         format!(
                             "File <comment>{}</comment> doesn't seem to hold a package",
-                            basename
+                            basename.display_lossy()
                         ),
                         true,
                         io_interface::VERBOSE,
@@ -144,7 +135,7 @@ impl ArtifactRepository {
                         "Found package <info>{}</info> (<comment>{}</comment>) in file <info>{}</info>",
                         package.get_name().display_lossy(),
                         package.get_pretty_version().display_lossy(),
-                        basename,
+                        basename.display_lossy(),
                     ), true, io_interface::VERBOSE);
                     self.inner.add_package(package);
                 }
@@ -158,36 +149,36 @@ impl ArtifactRepository {
         file: &Path,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         let mut json: Option<BString> = None;
-        let file_extension = file
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or_default()
-            .to_lowercase();
+        let pathname = path_to_bytes(file).as_bstr();
+        let file_extension = pathinfo(pathname, PATHINFO_EXTENSION);
 
         let file_type: &str;
-        if matches!(file_extension.as_str(), "gz" | "tar" | "tgz") {
+        if matches!(file_extension.as_slice(), b"gz" | b"tar" | b"tgz") {
             file_type = "tar";
         } else if file_extension == "zip" {
             file_type = "zip";
         } else {
             return Err(RuntimeException::new(format!(
                 "Files with \"{}\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported.",
-                file_extension
+                file_extension.display_lossy()
             ))
             .into());
         }
 
-        let pathname = file.to_str().unwrap_or_default();
         let get_result = if file_type == "tar" {
             Tar::get_composer_json(file)
         } else {
             Zip::get_composer_json(file)
         };
         match get_result {
-            Ok(j) => json = j.map(bstr::BString::from),
+            Ok(j) => json = j,
             Err(exception) => {
                 self.io.write3(
-                    format!("Failed loading package {}: {}", pathname, exception),
+                    format!(
+                        "Failed loading package {}: {}",
+                        pathname.display_lossy(),
+                        exception
+                    ),
                     false,
                     io_interface::VERBOSE,
                 );
@@ -199,15 +190,10 @@ impl ArtifactRepository {
         }
 
         let json_str = json.unwrap();
-        let pathname_label = format!("{}#composer.json", pathname);
-        let mut package =
-            JsonFile::parse_json(Some(&json_str), Some(bstr::BStr::new(&pathname_label)))?;
-        let url_normalized = pathname.replace('\\', "/");
-        let real_path = file
-            .canonicalize()
-            .ok()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .unwrap_or_default();
+        let pathname_label = bconcat!(pathname, "#composer.json");
+        let mut package = JsonFile::parse_json(Some(&json_str), Some(pathname_label.as_bstr()))?;
+        let url_normalized = strtr(pathname, "\\", "/");
+        let real_path = realpath(file).unwrap_or_default();
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
@@ -226,7 +212,11 @@ impl ArtifactRepository {
         match self.loader.load(cfg, None) {
             Ok(package) => Ok(Some(package)),
             Err(exception) => {
-                let message = format!("Failed loading package in {}: {}", pathname, exception);
+                let message = format!(
+                    "Failed loading package in {}: {}",
+                    pathname.display_lossy(),
+                    exception
+                );
                 Err(UnexpectedValueException::with_code_and_previous(
                     message,
                     0,

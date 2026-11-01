@@ -7,7 +7,7 @@ use crate::descriptor::{
 };
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DOMDocument, DOMNode, PhpMixed, bconcat, php_to_string, php_truthy, str_replace, strpos,
@@ -195,7 +195,7 @@ impl XmlDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
+            Some(PhpMixed::String(s)) => Some(s.display_lossy().to_string()),
             _ => None,
         };
         let short = matches!(options.get(B("short")), Some(PhpMixed::Bool(true)));

@@ -1,10 +1,10 @@
 //! ref: composer/tests/Composer/Test/Util/PackageSorterTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::Link;
 use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
 use shirabe::util::package_sorter::PackageSorter;
-use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::MatchAllConstraint;
 
 fn create_package(name: &str, requires: &[&str]) -> PackageInterfaceHandle {
@@ -37,12 +37,8 @@ fn create_package(name: &str, requires: &[&str]) -> PackageInterfaceHandle {
     package.into()
 }
 
-fn names(packages: &[PackageInterfaceHandle]) -> Vec<String> {
-    packages
-        .iter()
-        .map(|p| p.get_name())
-        .map(|s| legacy_lossy(&s).into_owned())
-        .collect()
+fn names(packages: &[PackageInterfaceHandle]) -> Vec<BString> {
+    packages.iter().map(|p| p.get_name()).collect()
 }
 
 #[test]
@@ -63,7 +59,7 @@ fn test_sorting_does_nothing_with_no_dependencies() {
 fn sorting_orders_dependencies_higher_than_package_cases() -> Vec<(
     Vec<PackageInterfaceHandle>,
     Vec<&'static str>,
-    IndexMap<String, i64>,
+    IndexMap<bstr::BString, i64>,
 )> {
     vec![
         // one package is dep
@@ -149,7 +145,7 @@ fn sorting_orders_dependencies_higher_than_package_cases() -> Vec<(
                 create_package("foo/dep2", &[]),
             ],
             vec!["foo/dep", "foo/bar", "foo/dep2", "foo/bar2"],
-            IndexMap::from([("foo/bar".to_string(), -1000)]),
+            IndexMap::from([(bstr::BString::from("foo/bar"), -1000)]),
         ),
     ]
 }

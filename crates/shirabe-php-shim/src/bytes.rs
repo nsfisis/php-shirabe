@@ -14,7 +14,8 @@ pub fn legacy_lossy(bytes: &(impl AsRef<[u8]> + ?Sized)) -> Cow<'_, str> {
 }
 
 /// `bytes` as UTF-8 text, or `None` if they are not valid UTF-8. Only for the shim of a PHP
-/// function that itself requires UTF-8, which reproduces how that function fails.
+/// function that itself requires UTF-8, which reproduces how that function fails, and for a lookup
+/// in data that is valid UTF-8, which other bytes cannot match.
 pub fn utf8_text(bytes: &(impl AsRef<[u8]> + ?Sized)) -> Option<&str> {
     std::str::from_utf8(bytes.as_ref()).ok()
 }

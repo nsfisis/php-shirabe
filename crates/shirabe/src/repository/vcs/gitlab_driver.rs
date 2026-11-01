@@ -13,9 +13,9 @@ use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
-    array_search_mixed, array_shift, bconcat, ctype_alnum, date_create, empty, explode,
-    extension_loaded, implode, in_array_loose, is_array, is_string, legacy_lossy, ord, php_regex,
-    preg_is_match, preg_match, preg_replace, strpos, strtolower,
+    array_search_mixed, array_shift, bconcat, date_create, empty, explode, extension_loaded,
+    implode, in_array_loose, is_array, is_string, path_from_bytes, php_regex, preg_is_match,
+    preg_match, preg_replace, sprintf, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -122,7 +122,7 @@ impl GitLabDriver {
             .filter(|_| is_string(&protocol_value))
         {
             // https treated as a synonym for http.
-            if !matches!(&*protocol.to_str_lossy(), "git" | "http" | "https") {
+            if !matches!(protocol.as_bytes(), b"git" | b"http" | b"https") {
                 return Err(RuntimeException::new(
                     "gitlab-protocol must be one of git, http.".to_string(),
                 )
@@ -152,21 +152,20 @@ impl GitLabDriver {
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            format!(
-                "{}/{}/{}/{}",
-                legacy_lossy(
-                    &self
-                        .inner
-                        .config
-                        .borrow_mut()
-                        .get("cache-repo-dir")
-                        .as_string()
-                        .unwrap_or_default()
-                ),
-                legacy_lossy(&self.inner.origin_url),
-                legacy_lossy(&self.namespace),
-                legacy_lossy(&self.repository),
-            ),
+            path_from_bytes(&bconcat!(
+                self.inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-repo-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+                "/",
+                self.inner.origin_url,
+                "/",
+                self.namespace,
+                "/",
+                self.repository,
+            )),
             None,
             None,
             false,
@@ -222,14 +221,14 @@ impl GitLabDriver {
                     .inner
                     .cache
                     .as_mut()
-                    .and_then(|c| c.read(&*legacy_lossy(identifier)))
+                    .and_then(|c| c.read(identifier))
                     .is_some()
             {
                 let res = self
                     .inner
                     .cache
                     .as_mut()
-                    .and_then(|c| c.read(&*legacy_lossy(identifier)))
+                    .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
                 JsonFile::parse_json(Some(&res), None)?.as_array().cloned()
             } else {
@@ -246,7 +245,7 @@ impl GitLabDriver {
                 {
                     self.inner.cache.as_mut().map(|c| {
                         c.write(
-                            &*legacy_lossy(identifier),
+                            identifier,
                             &JsonFile::encode_with_options(
                                 &PhpMixed::Array(composer_map.clone().into_iter().collect()),
                                 JsonEncodeOptions {
@@ -396,14 +395,15 @@ impl GitLabDriver {
             }
         }
 
-        let resource = format!(
-            "{}/repository/files/{}/raw?ref={}",
-            legacy_lossy(&self.get_api_url()),
-            legacy_lossy(&self.url_encode_all(&legacy_lossy(file))),
-            legacy_lossy(&identifier),
+        let resource = bconcat!(
+            self.get_api_url(),
+            "/repository/files/",
+            self.url_encode_all(file),
+            "/raw?ref=",
+            identifier,
         );
 
-        let content = match self.get_contents(bstr::BStr::new(&resource), false)? {
+        let content = match self.get_contents(resource.as_bstr(), false)? {
             Ok(response) => response.get_body().map(bstr::BString::from),
             Err(e) => {
                 if e.get_code() != 404 {
@@ -560,25 +560,24 @@ impl GitLabDriver {
             "://",
             self.inner.origin_url,
             "/api/v4/projects/",
-            self.url_encode_all(&legacy_lossy(&self.namespace)),
+            self.url_encode_all(self.namespace.as_bstr()),
             "%2F",
-            self.url_encode_all(&legacy_lossy(&self.repository))
+            self.url_encode_all(self.repository.as_bstr())
         )
     }
 
     /// Urlencode all non alphanumeric characters. rawurlencode() can not be used as it does not encode `.`
-    fn url_encode_all(&self, string: &str) -> BString {
+    fn url_encode_all(&self, string: &BStr) -> BString {
         let mut encoded = BString::default();
-        let bytes: Vec<char> = string.chars().collect();
-        for byte in &bytes {
-            let character = byte.to_string();
-            let final_character =
-                if !ctype_alnum(&character) && !matches!(character.as_str(), "-" | "_") {
-                    format!("%{:02X}", ord(&character))
-                } else {
-                    character
-                };
-            encoded.push_str(&final_character);
+        for &byte in string.iter() {
+            if byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' {
+                encoded.push(byte);
+            } else {
+                encoded.extend_from_slice(&bconcat!(
+                    "%",
+                    sprintf("%02X", &[PhpMixed::Int(byte as i64)])
+                ));
+            }
         }
 
         encoded
@@ -586,19 +585,17 @@ impl GitLabDriver {
 
     fn get_references(&mut self, r#type: &BStr) -> anyhow::Result<IndexMap<BString, BString>> {
         let per_page = 100;
-        let mut resource: Option<String> = Some(format!(
-            "{}/repository/{}?per_page={}",
-            legacy_lossy(&self.get_api_url()),
-            legacy_lossy(&r#type),
+        let mut resource: Option<BString> = Some(bconcat!(
+            self.get_api_url(),
+            "/repository/",
+            r#type,
+            "?per_page=",
             per_page
         ));
 
         let mut references: IndexMap<BString, BString> = IndexMap::new();
         loop {
-            let response = self.get_contents(
-                bstr::BStr::new(resource.as_deref().unwrap_or_default()),
-                false,
-            )??;
+            let response = self.get_contents(resource.as_ref().unwrap().as_bstr(), false)??;
             let data = response.decode_json()?;
 
             if let PhpMixed::List(ref list) = data {
@@ -638,10 +635,7 @@ impl GitLabDriver {
                 _ => 0,
             };
             if len >= per_page {
-                resource = self
-                    .get_next_page(&response)
-                    .map(|s| BString::from(&s[..]))
-                    .map(|s| legacy_lossy(&s).into_owned());
+                resource = self.get_next_page(&response);
             } else {
                 resource = None;
             }
@@ -916,7 +910,7 @@ impl GitLabDriver {
                 git_lab_util.authorize_oauth_interactively(
                     self.scheme.as_bstr(),
                     self.inner.origin_url.as_bstr(),
-                    Some(&*legacy_lossy(&bconcat!("Your credentials are required to fetch private repository metadata (<info>", self.inner.url, "</info>)"))),
+                    Some(&format!("Your credentials are required to fetch private repository metadata (<info>{}</info>)", self.inner.url.display_lossy())),
                 )?;
 
                 self.inner.get_contents(url)

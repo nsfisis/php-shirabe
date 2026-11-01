@@ -11,7 +11,7 @@ use crate::filter::platform_requirement_filter::{
 use crate::package::PackageInterfaceHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, legacy_lossy};
+use shirabe_php_shim::LogicException;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
@@ -284,7 +284,7 @@ impl RuleSetGenerator {
                 let rule = self.create_multi_conflict_rule(
                     &packages,
                     reason,
-                    rule::ReasonData::String(legacy_lossy(&name).into_owned()),
+                    rule::ReasonData::String(name),
                 );
                 self.add_rule(RuleSet::TYPE_PACKAGE, Some(rule));
             }
@@ -357,7 +357,7 @@ impl RuleSetGenerator {
                     literals,
                     rule::RULE_ROOT_REQUIRE,
                     rule::ReasonData::RootRequire {
-                        package_name: legacy_lossy(&package_name.clone()).into_owned(),
+                        package_name: package_name.clone(),
                         constraint: constraint.clone(),
                     },
                 );

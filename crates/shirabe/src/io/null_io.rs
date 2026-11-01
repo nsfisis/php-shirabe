@@ -70,17 +70,21 @@ impl IOInterfaceImmutable for NullIO {
     ) {
     }
 
-    fn ask(&self, _question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask_bytes(&self, _question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         Ok(default)
     }
 
-    fn ask_confirmation(&self, _question: String, default: bool) -> anyhow::Result<bool> {
-        Ok(default)
-    }
-
-    fn ask_and_validate(
+    fn ask_confirmation_bytes(
         &self,
-        _question: String,
+        _question: &bstr::BStr,
+        default: bool,
+    ) -> anyhow::Result<bool> {
+        Ok(default)
+    }
+
+    fn ask_and_validate_bytes(
+        &self,
+        _question: &bstr::BStr,
         _validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         _attempts: Option<i64>,
         default: PhpMixed,
@@ -88,17 +92,20 @@ impl IOInterfaceImmutable for NullIO {
         Ok(default)
     }
 
-    fn ask_and_hide_answer(&self, _question: String) -> anyhow::Result<Option<String>> {
+    fn ask_and_hide_answer_bytes(
+        &self,
+        _question: &bstr::BStr,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         Ok(None)
     }
 
-    fn select(
+    fn select_bytes(
         &self,
-        _question: String,
+        _question: &bstr::BStr,
         _choices: PhpMixed,
         default: PhpMixed,
         _attempts: PhpMixed,
-        _error_message: String,
+        _error_message: &bstr::BStr,
         _multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
         Ok(default)
@@ -121,15 +128,15 @@ impl IOInterfaceImmutable for NullIO {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
+    fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::error(self, message, context);
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+    fn warning_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::warning(self, message, context);
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+    fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
 }

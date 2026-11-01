@@ -6,12 +6,14 @@ use crate::package::CompletePackageInterfaceHandle;
 use crate::package::archiver::{ArchiverInterface, PharArchiver, ZipArchiver};
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, SyncHelper};
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, RuntimeException, bin2hex, file_exists, hash, legacy_lossy,
-    path_to_bytes, php_regex, preg_is_match, preg_replace, random_bytes, realpath,
+    InvalidArgumentException, RuntimeException, bconcat, bin2hex, file_exists, hash, implode,
+    path_from_bytes, php_regex, preg_is_match, preg_replace, random_bytes, realpath, str_replace,
     sys_get_temp_dir,
 };
+use std::path::PathBuf;
 
 pub struct ArchiveManager {
     download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
@@ -52,78 +54,52 @@ impl ArchiveManager {
     pub fn get_package_filename_parts(
         &self,
         package: CompletePackageInterfaceHandle,
-    ) -> anyhow::Result<IndexMap<String, String>> {
-        let base_name = legacy_lossy(&match package.get_archive_name() {
+    ) -> anyhow::Result<IndexMap<String, BString>> {
+        let base_name = match package.get_archive_name() {
             Some(name) => name,
-            None => bstr::BString::from(
-                legacy_lossy(&preg_replace(
-                    php_regex!("#[^a-z0-9-_]#i"),
-                    "-",
-                    package.get_name(),
-                ))
-                .into_owned(),
-            ),
-        })
-        .into_owned();
+            None => preg_replace(php_regex!("#[^a-z0-9-_]#i"), "-", package.get_name()),
+        };
 
-        let mut parts: IndexMap<String, String> = IndexMap::new();
+        let mut parts: IndexMap<String, BString> = IndexMap::new();
         parts.insert("base".to_string(), base_name);
 
         let dist_reference = package.get_dist_reference();
         if let Some(ref dist_ref) = dist_reference {
             if preg_is_match(php_regex!("{^[a-f0-9]{40}$}"), dist_ref) {
-                parts.insert(
-                    "dist_reference".to_string(),
-                    legacy_lossy(dist_ref).into_owned(),
-                );
+                parts.insert("dist_reference".to_string(), dist_ref.clone());
                 if let Some(dist_type) = package.get_dist_type() {
-                    parts.insert(
-                        "dist_type".to_string(),
-                        legacy_lossy(&dist_type).into_owned(),
-                    );
+                    parts.insert("dist_type".to_string(), dist_type);
                 }
             } else {
-                parts.insert(
-                    "version".to_string(),
-                    legacy_lossy(&package.get_pretty_version()).into_owned(),
-                );
-                parts.insert(
-                    "dist_reference".to_string(),
-                    legacy_lossy(dist_ref).into_owned(),
-                );
+                parts.insert("version".to_string(), package.get_pretty_version());
+                parts.insert("dist_reference".to_string(), dist_ref.clone());
             }
         } else {
-            parts.insert(
-                "version".to_string(),
-                legacy_lossy(&package.get_pretty_version()).into_owned(),
-            );
+            parts.insert("version".to_string(), package.get_pretty_version());
         }
 
         if let Some(source_reference) = package.get_source_reference() {
             let hash = hash("sha1", &source_reference);
-            parts.insert(
-                "source_reference".to_string(),
-                legacy_lossy(&hash[..6]).into_owned(),
-            );
+            parts.insert("source_reference".to_string(), BString::from(&hash[..6]));
         }
 
         // array_filter removed null values; replace '/' with '-' in each value
         for val in parts.values_mut() {
-            *val = val.replace('/', "-");
+            *val = str_replace("/", "-", &*val);
         }
 
         Ok(parts)
     }
 
-    pub fn get_package_filename_from_parts(&self, parts: &IndexMap<String, String>) -> String {
-        let values: Vec<&str> = parts.values().map(|s| s.as_str()).collect();
-        values.join("-")
+    pub fn get_package_filename_from_parts(&self, parts: &IndexMap<String, BString>) -> BString {
+        let values: Vec<&BString> = parts.values().collect();
+        implode("-", &values)
     }
 
     pub fn get_package_filename(
         &self,
         package: CompletePackageInterfaceHandle,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         let parts = self.get_package_filename_parts(package)?;
         Ok(self.get_package_filename_from_parts(&parts))
     }
@@ -131,11 +107,11 @@ impl ArchiveManager {
     pub async fn archive(
         &mut self,
         package: CompletePackageInterfaceHandle,
-        format: String,
-        target_dir: String,
-        file_name: Option<String>,
+        format: BString,
+        target_dir: PathBuf,
+        file_name: Option<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<PathBuf> {
         if format.is_empty() {
             return Err(
                 InvalidArgumentException::new("Format must be specified".to_string()).into(),
@@ -145,10 +121,8 @@ impl ArchiveManager {
         let mut usable_archiver_idx: Option<usize> = None;
         for (i, archiver) in self.archivers.iter().enumerate() {
             if archiver.supports(
-                format.clone(),
-                package
-                    .get_source_type()
-                    .map(|s| legacy_lossy(&s).into_owned()),
+                format.as_bstr(),
+                package.get_source_type().as_ref().map(|s| s.as_bstr()),
             ) {
                 usable_archiver_idx = Some(i);
                 break;
@@ -160,7 +134,7 @@ impl ArchiveManager {
             None => {
                 return Err(RuntimeException::new(format!(
                     "No archiver found to support {} format",
-                    format
+                    format.display_lossy()
                 ))
                 .into());
             }
@@ -169,24 +143,18 @@ impl ArchiveManager {
         let mut filesystem = Filesystem::new(None);
 
         let is_root = package.as_rc().borrow().is_root();
-        let source_path: String;
+        let source_path: PathBuf;
 
         if is_root {
-            source_path = realpath(".")
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .unwrap_or_else(|| ".".to_string());
+            source_path = realpath(".").unwrap_or_else(|| PathBuf::from("."));
         } else {
-            // TODO(bytes): the source path is kept as a String.
-            let tmp_dir = sys_get_temp_dir()
-                .into_os_string()
-                .into_string()
-                .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
             let random_suffix = bin2hex(random_bytes(5));
-            source_path = format!(
-                "{}/composer_archive{}",
-                tmp_dir,
-                legacy_lossy(&random_suffix)
-            );
+            source_path = path_from_bytes(&bconcat!(
+                sys_get_temp_dir(),
+                "/composer_archive",
+                random_suffix
+            ))
+            .to_path_buf();
             filesystem.ensure_directory_exists(&source_path)?;
 
             let download_result: anyhow::Result<()> = async {
@@ -195,11 +163,7 @@ impl ArchiveManager {
                     Some(Box::pin(async {
                         self.download_manager
                             .borrow()
-                            .download(
-                                package.clone().into(),
-                                std::path::Path::new(&source_path),
-                                None,
-                            )
+                            .download(package.clone().into(), &source_path, None)
                             .await
                             .map(|_| ())
                     })),
@@ -210,7 +174,7 @@ impl ArchiveManager {
                     Some(Box::pin(async {
                         self.download_manager
                             .borrow()
-                            .install(package.clone().into(), std::path::Path::new(&source_path))
+                            .install(package.clone().into(), &source_path)
                             .await
                             .map(|_| ())
                     })),
@@ -225,30 +189,26 @@ impl ArchiveManager {
                 return Err(e);
             }
 
-            let composer_json_path = format!("{}/composer.json", source_path);
-            if file_exists(&composer_json_path) {
+            let composer_json_path = bconcat!(&source_path, "/composer.json");
+            let composer_json_path = path_from_bytes(&composer_json_path);
+            if file_exists(composer_json_path) {
                 let json_file = JsonFile::new(composer_json_path, None, None)?;
                 let json_data = json_file.read()?;
                 if let Some(archive) = json_data.get("archive") {
                     if let Some(name) = archive.get("name").and_then(|v| v.as_string())
                         && !name.is_empty()
                     {
-                        package.set_archive_name(bstr::BString::from(name));
+                        package.set_archive_name(BString::from(name));
                     }
                     if let Some(exclude) = archive.get("exclude")
                         && let Some(excludes) = exclude.as_array()
                     {
-                        let excludes: Vec<String> = excludes
+                        let excludes: Vec<BString> = excludes
                             .values()
-                            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                            .filter_map(|v| v.as_string().map(BString::from))
                             .collect();
                         if !excludes.is_empty() {
-                            package.set_archive_excludes(
-                                excludes
-                                    .into_iter()
-                                    .map(bstr::BString::from)
-                                    .collect::<Vec<_>>(),
-                            );
+                            package.set_archive_excludes(excludes);
                         }
                     }
                 }
@@ -269,16 +229,16 @@ impl ArchiveManager {
         let exclude_patterns = self.build_exclude_patterns(&package_name_parts, &supported_formats);
 
         filesystem.ensure_directory_exists(&target_dir)?;
-        let target = format!(
-            "{}/{}.{}",
-            realpath(&target_dir)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .unwrap_or(target_dir.clone()),
+        let target = path_from_bytes(&bconcat!(
+            realpath(&target_dir).unwrap_or_else(|| target_dir.clone()),
+            "/",
             package_name,
-            format
-        );
-        if let Some(parent) = std::path::Path::new(&target).parent() {
-            filesystem.ensure_directory_exists(parent.to_str().unwrap_or_default())?;
+            ".",
+            &format
+        ))
+        .to_path_buf();
+        if let Some(parent) = target.parent() {
+            filesystem.ensure_directory_exists(parent)?;
         }
 
         if !self.overwrite_files && file_exists(&target) {
@@ -286,31 +246,24 @@ impl ArchiveManager {
         }
 
         let tmp_suffix = bin2hex(random_bytes(5));
-        // TODO(bytes): the target path is kept as a String.
-        let temp_target = format!(
-            "{}/composer_archive{}.{}",
-            sys_get_temp_dir()
-                .into_os_string()
-                .into_string()
-                .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}")),
-            legacy_lossy(&tmp_suffix),
-            format
-        );
-        if let Some(parent) = std::path::Path::new(&temp_target).parent() {
-            filesystem.ensure_directory_exists(parent.to_str().unwrap_or_default())?;
+        let temp_target = path_from_bytes(&bconcat!(
+            sys_get_temp_dir(),
+            "/composer_archive",
+            tmp_suffix,
+            ".",
+            &format
+        ))
+        .to_path_buf();
+        if let Some(parent) = temp_target.parent() {
+            filesystem.ensure_directory_exists(parent)?;
         }
 
         let mut all_excludes = exclude_patterns;
-        all_excludes.extend(
-            package
-                .get_archive_excludes()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned()),
-        );
+        all_excludes.extend(package.get_archive_excludes().iter().cloned());
         let archive_path = self.archivers[usable_archiver_idx].archive(
-            source_path.clone(),
-            temp_target.clone(),
-            format,
+            &source_path,
+            &temp_target,
+            format.as_bstr(),
             all_excludes,
             ignore_filters,
         )?;
@@ -326,17 +279,17 @@ impl ArchiveManager {
 
     fn build_exclude_patterns(
         &self,
-        parts: &IndexMap<String, String>,
+        parts: &IndexMap<String, BString>,
         formats: &[String],
-    ) -> Vec<String> {
+    ) -> Vec<BString> {
         let mut base = parts["base"].clone();
         if parts.len() > 1 {
-            base.push_str("-*");
+            base = bconcat!(&base, "-*");
         }
 
         let mut patterns = vec![];
         for format in formats {
-            patterns.push(format!("{}.{}", base, format));
+            patterns.push(bconcat!(&base, ".", format));
         }
 
         patterns
@@ -372,11 +325,11 @@ pub trait ArchiveManagerInterface: std::fmt::Debug {
     async fn archive(
         &mut self,
         package: CompletePackageInterfaceHandle,
-        format: String,
-        target_dir: String,
-        file_name: Option<String>,
+        format: BString,
+        target_dir: PathBuf,
+        file_name: Option<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<String>;
+    ) -> anyhow::Result<PathBuf>;
 }
 
 #[async_trait::async_trait(?Send)]
@@ -384,11 +337,11 @@ impl ArchiveManagerInterface for ArchiveManager {
     async fn archive(
         &mut self,
         package: CompletePackageInterfaceHandle,
-        format: String,
-        target_dir: String,
-        file_name: Option<String>,
+        format: BString,
+        target_dir: PathBuf,
+        file_name: Option<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<PathBuf> {
         self.archive(package, format, target_dir, file_name, ignore_filters)
             .await
     }

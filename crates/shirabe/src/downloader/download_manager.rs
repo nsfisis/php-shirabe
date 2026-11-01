@@ -310,7 +310,7 @@ impl DownloadManager {
                         io_interface::NORMAL,
                     );
                     if !self.io.ask_confirmation(
-                        "    Would you like to try reinstalling the package instead [<comment>yes</comment>]? ".to_string(),
+                        "    Would you like to try reinstalling the package instead [<comment>yes</comment>]? ",
                         true,
                     )? {
                         return Err(e);

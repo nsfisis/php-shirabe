@@ -52,7 +52,7 @@ pub struct IOStub {
     // Keyed `askAndHideAnswer` replies, mirroring tests whose willReturnCallback
     // switches on the question string. Unknown questions return `''` like PHP's
     // `switch` default.
-    ask_and_hide_answer_responses: Option<indexmap::IndexMap<String, String>>,
+    ask_and_hide_answer_responses: Option<indexmap::IndexMap<bstr::BString, bstr::BString>>,
 
     // Records `writeError` calls.
     write_error_calls: CallRecorder<(String, bool)>,
@@ -135,7 +135,12 @@ impl IOStub {
         mut self,
         value: indexmap::IndexMap<String, String>,
     ) -> Self {
-        self.ask_and_hide_answer_responses = Some(value);
+        self.ask_and_hide_answer_responses = Some(
+            value
+                .into_iter()
+                .map(|(question, answer)| (question.into(), answer.into()))
+                .collect(),
+        );
         self
     }
 
@@ -232,39 +237,53 @@ impl IOInterfaceImmutable for IOStub {
     ) {
     }
 
-    fn ask(&self, _question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask_bytes(&self, _question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         Ok(self.ask.clone().unwrap_or(default))
     }
-    fn ask_confirmation(&self, _question: String, default: bool) -> anyhow::Result<bool> {
+    fn ask_confirmation_bytes(
+        &self,
+        _question: &bstr::BStr,
+        default: bool,
+    ) -> anyhow::Result<bool> {
         Ok(self.ask_confirmation.unwrap_or(default))
     }
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
-        self.ask_and_validate_calls
-            .push((question, attempts, default.clone()));
+        self.ask_and_validate_calls.push((
+            legacy_lossy(question).into_owned(),
+            attempts,
+            default.clone(),
+        ));
         match &self.ask_and_validate_answer {
             Some(answer) => validator(answer.clone()),
             None => Ok(default),
         }
     }
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
-        if let Some(responses) = &self.ask_and_hide_answer_responses {
-            return Ok(Some(responses.get(&question).cloned().unwrap_or_default()));
-        }
-        Ok(self.ask_and_hide_answer.clone().unwrap_or(None))
-    }
-    fn select(
+    fn ask_and_hide_answer_bytes(
         &self,
-        _question: String,
+        question: &bstr::BStr,
+    ) -> anyhow::Result<Option<bstr::BString>> {
+        if let Some(responses) = &self.ask_and_hide_answer_responses {
+            return Ok(Some(responses.get(question).cloned().unwrap_or_default()));
+        }
+        Ok(self
+            .ask_and_hide_answer
+            .clone()
+            .unwrap_or(None)
+            .map(bstr::BString::from))
+    }
+    fn select_bytes(
+        &self,
+        _question: &bstr::BStr,
         _choices: PhpMixed,
         default: PhpMixed,
         _attempts: PhpMixed,
-        _error_message: String,
+        _error_message: &bstr::BStr,
         _multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
         Ok(default)
@@ -295,13 +314,13 @@ impl IOInterfaceImmutable for IOStub {
         }
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
+    fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::error(self, message, context);
     }
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+    fn warning_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::warning(self, message, context);
     }
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+    fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
 }

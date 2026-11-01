@@ -45,7 +45,7 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, legacy_lossy, path_from_bytes, path_to_bytes,
+    UnexpectedValueException, path_from_bytes, path_to_bytes, utf8_text,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -352,10 +352,10 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             }
             if method_name == "__shirabe_run_rust_command" {
                 let name = arg::<String>(method_name, &args, 0)?;
-                let input_line = arg::<String>(method_name, &args, 1)?;
+                let input_line = arg::<BString>(method_name, &args, 1)?;
                 return match crate::console::application::run_worker_reverse_command(
                     &name,
-                    &input_line,
+                    input_line.as_ref(),
                 ) {
                     Ok(code) => Ok(code.to_plugin_value()),
                     Err(e) => Err(runtime_throw(format!("{e:#}"))),
@@ -403,7 +403,9 @@ pub(crate) fn dispatch_job_service_method(
             let id = job_id()?;
             let mut throw = PhpThrow::new(
                 arg::<String>(method_name, args, 1)?,
-                arg::<String>(method_name, args, 2)?,
+                arg::<BString>(method_name, args, 2)?
+                    .display_lossy()
+                    .to_string(),
                 arg::<i64>(method_name, args, 3)?,
             );
             *throw.properties = match args.get(4) {
@@ -548,7 +550,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
         }
     };
-    let class_name = legacy_lossy(class).into_owned();
+    let class_name = class.display_lossy().to_string();
     let string_arg = |position: usize| arg::<BString>(&class_name, ctor_args, position);
     let package_arg =
         |position: usize| arg::<PackageInterfaceHandle>(&class_name, ctor_args, position);
@@ -775,7 +777,7 @@ fn dispatch_property_access(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let property = arg::<String>(method_name, args, 0)?;
+    let property = arg::<BString>(method_name, args, 0)?;
     // `BasePackage::$id` is the one instance property the entities expose so far.
     if let RustEntity::Package(package) = entity
         && property == "id"
@@ -801,7 +803,8 @@ fn dispatch_property_access(
     // driven by these explicit errors from real plugins. Each one has to decide how the state
     // the real class keeps in that property is served from the Rust-side entity.
     Err(runtime_throw(format!(
-        "the property `{property}` is not available over RPC yet"
+        "the property `{}` is not available over RPC yet",
+        property.display_lossy()
     )))
 }
 
@@ -930,7 +933,7 @@ fn dispatch_autoload_generator_method(
         }
         "setApcu" => generator.borrow().set_apcu(
             arg::<bool>(method_name, args, 0)?,
-            arg::<Option<String>>(method_name, args, 1)?,
+            arg::<Option<BString>>(method_name, args, 1)?,
         ),
         "setRunScripts" => generator.borrow().set_run_scripts(flag(0)?),
         "setDryRun" => generator.borrow().set_dry_run(flag(0)?),
@@ -1442,28 +1445,31 @@ fn dispatch_filesystem_method(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let string_arg = |position: usize| arg::<String>(method_name, args, position);
+    let path_arg = |position: usize| {
+        arg::<BString>(method_name, args, position)
+            .map(|path| std::path::PathBuf::from(path_from_bytes(&path)))
+    };
     let failed = |error: anyhow::Error| error_throw(&format!("{method_name} failed"), &error);
     match method_name {
         "remove" => Ok(fs
             .borrow_mut()
-            .remove(string_arg(0)?)
+            .remove(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "isDirEmpty" => Ok(fs.borrow().is_dir_empty(&string_arg(0)?).to_plugin_value()),
+        "isDirEmpty" => Ok(fs.borrow().is_dir_empty(&path_arg(0)?).to_plugin_value()),
         "emptyDirectory" => {
             fs.borrow_mut()
-                .empty_directory(&string_arg(0)?, arg::<bool>(method_name, args, 1)?)
+                .empty_directory(&path_arg(0)?, arg::<bool>(method_name, args, 1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
         "removeDirectory" => Ok(fs
             .borrow_mut()
-            .remove_directory(string_arg(0)?)
+            .remove_directory(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
         "removeDirectoryAsync" => {
-            let directory = string_arg(0)?;
+            let directory = path_arg(0)?;
             let executor = fs.borrow_mut().get_process_handle();
             let fs = fs.clone();
             let mut future: std::pin::Pin<
@@ -1493,45 +1499,45 @@ fn dispatch_filesystem_method(
         }
         "removeDirectoryPhp" => Ok(fs
             .borrow_mut()
-            .remove_directory_php(&string_arg(0)?)
+            .remove_directory_php(&path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
         "ensureDirectoryExists" => {
             fs.borrow_mut()
-                .ensure_directory_exists(&string_arg(0)?)
+                .ensure_directory_exists(&path_arg(0)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
         "unlink" => Ok(fs
             .borrow()
-            .unlink(string_arg(0)?)
+            .unlink(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
         "rmdir" => Ok(fs
             .borrow()
-            .rmdir(string_arg(0)?)
+            .rmdir(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
         "copyThenRemove" => {
             fs.borrow_mut()
-                .copy_then_remove(&string_arg(0)?, &string_arg(1)?)
+                .copy_then_remove(&path_arg(0)?, &path_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
         "copy" => Ok(fs
             .borrow_mut()
-            .copy(&string_arg(0)?, &string_arg(1)?)
+            .copy(&path_arg(0)?, &path_arg(1)?)
             .map_err(failed)?
             .to_plugin_value()),
         "rename" => {
             fs.borrow_mut()
-                .rename(string_arg(0)?, string_arg(1)?)
+                .rename(path_arg(0)?, path_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
         "findShortestPath" | "findShortestPathCode" => {
-            let from = string_arg(0)?;
-            let to = string_arg(1)?;
+            let from = path_arg(0)?;
+            let to = path_arg(1)?;
             let fs = fs.borrow();
             Ok(if method_name == "findShortestPath" {
                 fs.find_shortest_path(
@@ -1556,46 +1562,43 @@ fn dispatch_filesystem_method(
         }
         "isAbsolutePath" => Ok(fs
             .borrow()
-            .is_absolute_path(&string_arg(0)?)
+            .is_absolute_path(&path_arg(0)?)
             .to_plugin_value()),
         "size" => Ok(fs
             .borrow()
-            .size(string_arg(0)?)
+            .size(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "normalizePath" => Ok(fs
-            .borrow()
-            .normalize_path(&string_arg(0)?)
-            .to_plugin_value()),
+        "normalizePath" => Ok(fs.borrow().normalize_path(&path_arg(0)?).to_plugin_value()),
         "relativeSymlink" => Ok(fs
             .borrow()
-            .relative_symlink(&string_arg(0)?, &string_arg(1)?)
+            .relative_symlink(&path_arg(0)?, &path_arg(1)?)
             .map_err(failed)?
             .to_plugin_value()),
         "isSymlinkedDirectory" => Ok(fs
             .borrow()
-            .is_symlinked_directory(&string_arg(0)?)
+            .is_symlinked_directory(&path_arg(0)?)
             .to_plugin_value()),
         "junction" => {
             fs.borrow_mut()
-                .junction(&string_arg(0)?, &string_arg(1)?)
+                .junction(&path_arg(0)?, &path_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "isJunction" => Ok(fs.borrow().is_junction(&string_arg(0)?).to_plugin_value()),
+        "isJunction" => Ok(fs.borrow().is_junction(&path_arg(0)?).to_plugin_value()),
         "removeJunction" => Ok(fs
             .borrow_mut()
-            .remove_junction(&string_arg(0)?)
+            .remove_junction(&path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
         "filePutContentsIfModified" => Ok(fs
             .borrow()
-            .file_put_contents_if_modified(&string_arg(0)?, &string_arg(1)?)
+            .file_put_contents_if_modified(&path_arg(0)?, arg::<BString>(method_name, args, 1)?)
             .map_err(failed)?
             .to_plugin_value()),
         "safeCopy" => {
             fs.borrow()
-                .safe_copy(&string_arg(0)?, &string_arg(1)?)
+                .safe_copy(&path_arg(0)?, &path_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
@@ -1616,10 +1619,11 @@ fn dispatch_process_executor_method(
     out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
     let failed = |error: anyhow::Error| error_throw(&format!("{method_name} failed"), &error);
-    let cwd_arg = |position: usize| -> Result<Option<String>, PhpThrow> {
+    let cwd_arg = |position: usize| -> Result<Option<std::path::PathBuf>, PhpThrow> {
         match args.get(position) {
             None | Some(PluginValue::Null) => Ok(None),
-            _ => arg::<String>(method_name, args, position).map(Some),
+            _ => arg::<BString>(method_name, args, position)
+                .map(|cwd| Some(std::path::PathBuf::from(path_from_bytes(&cwd)))),
         }
     };
     match method_name {
@@ -1634,7 +1638,7 @@ fn dispatch_process_executor_method(
                     .execute(
                         command,
                         crate::util::ProcessExecutor::FORWARD_OUTPUT,
-                        cwd.as_deref().map(std::path::Path::new),
+                        cwd.as_deref(),
                     )
                     .map(|code| code.to_plugin_value())
                     .map_err(failed);
@@ -1651,18 +1655,14 @@ fn dispatch_process_executor_method(
                     });
                 return process
                     .borrow()
-                    .execute(command, callback, cwd.as_deref().map(std::path::Path::new))
+                    .execute(command, callback, cwd.as_deref())
                     .map(|code| code.to_plugin_value())
                     .map_err(failed);
             }
             let mut captured: Option<BString> = None;
             let code = process
                 .borrow()
-                .execute(
-                    command,
-                    &mut captured,
-                    cwd.as_deref().map(std::path::Path::new),
-                )
+                .execute(command, &mut captured, cwd.as_deref())
                 .map_err(failed)?;
             // PHP leaves `$output` alone when the child was signaled before the assignment, which
             // is what an absent out-param position reproduces.
@@ -1675,14 +1675,14 @@ fn dispatch_process_executor_method(
             .borrow()
             .execute_tty(
                 exec_command_arg(method_name, args, 0)?,
-                cwd_arg(1)?.as_deref().map(std::path::Path::new),
+                cwd_arg(1)?.as_deref(),
             )
             .map_err(failed)?
             .to_plugin_value()),
         "splitLines" => {
             let output = match args.first() {
-                None | Some(PluginValue::Null) => String::new(),
-                _ => arg::<String>(method_name, args, 0)?,
+                None | Some(PluginValue::Null) => BString::default(),
+                _ => arg::<BString>(method_name, args, 0)?,
             };
             Ok(PluginValue::List(
                 process
@@ -1716,11 +1716,10 @@ fn dispatch_process_executor_method(
             let command = exec_command_arg(method_name, args, 0)?;
             let cwd = cwd_arg(1)?;
             let started = std::rc::Rc::new(std::cell::Cell::new(false));
-            let mut future = process.borrow().execute_async_job(
-                command,
-                cwd.as_deref().map(std::path::Path::new),
-                Some(started.clone()),
-            );
+            let mut future =
+                process
+                    .borrow()
+                    .execute_async_job(command, cwd.as_deref(), Some(started.clone()));
             let resolve = |child: shirabe_symfony_process::Process| {
                 rust_handle_value(
                     register_entity(RustEntity::Process(std::rc::Rc::new(
@@ -1879,6 +1878,17 @@ fn dispatch_http_downloader_method(
     }
 }
 
+/// `name` as the RPC layer carries a class or method name, which is text. PHP accepts any bytes in
+/// such a name; one that is not valid UTF-8 cannot be sent.
+pub(crate) fn rpc_name(name: &bstr::BStr) -> anyhow::Result<&str> {
+    utf8_text(name).ok_or_else(|| {
+        RuntimeException::new(format!(
+            "the PHP name {name:?} is not valid UTF-8 and cannot be sent to the PHP worker"
+        ))
+        .into()
+    })
+}
+
 /// Decodes the `string|non-empty-list<string>` a process executor takes as its command.
 fn exec_command_arg(
     method: &str,
@@ -1886,16 +1896,15 @@ fn exec_command_arg(
     position: usize,
 ) -> Result<crate::util::process_executor::CommandLine, PhpThrow> {
     match args.get(position) {
-        // TODO(bytes): lossy UTF-8; every PHP string crossing the boundary is bytes.
         Some(PluginValue::String(bytes)) => Ok(crate::util::process_executor::CommandLine::Shell(
-            bstr::BString::from(String::from_utf8_lossy(bytes).into_owned()),
+            bytes.clone(),
         )),
         Some(PluginValue::List(items)) => {
             let mut parts = Vec::with_capacity(items.len());
             for (index, item) in items.iter().enumerate() {
                 match item {
                     PluginValue::String(bytes) => {
-                        parts.push(String::from_utf8_lossy(bytes).into_owned());
+                        parts.push(bytes.clone());
                     }
                     other => {
                         return Err(runtime_throw(format!(
@@ -1906,10 +1915,7 @@ fn exec_command_arg(
                 }
             }
             Ok(crate::util::process_executor::CommandLine::Args(
-                parts
-                    .into_iter()
-                    .map(bstr::BString::from)
-                    .collect::<Vec<_>>(),
+                parts.into_iter().collect::<Vec<_>>(),
             ))
         }
         other => Err(arg_throw(
@@ -1986,7 +1992,7 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
         }
     };
     let name = format!("{}::{}", class.display_lossy(), method.display_lossy());
-    let string_arg = |position: usize| arg::<String>(&name, &call_args, position);
+    let string_arg = |position: usize| arg::<BString>(&name, &call_args, position);
     match (class.as_slice(), method.as_slice()) {
         (b"Composer\\Util\\Filesystem", b"isLocalPath") => {
             Ok(crate::util::Filesystem::is_local_path(&string_arg(0)?).to_plugin_value())
@@ -2010,7 +2016,9 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
         // both of the non-string forms into the empty string.
         (b"Composer\\Util\\ProcessExecutor", b"escape") => {
             let argument = match call_args.first() {
-                None | Some(PluginValue::Null) | Some(PluginValue::Bool(false)) => String::new(),
+                None | Some(PluginValue::Null) | Some(PluginValue::Bool(false)) => {
+                    BString::default()
+                }
                 _ => string_arg(0)?,
             };
             Ok(PluginValue::string(crate::util::ProcessExecutor::escape(
@@ -2135,7 +2143,7 @@ fn dispatch_locker_method(
                     arg::<IndexMap<BString, BString>>(method_name, args, 2)?,
                     arg::<IndexMap<BString, BString>>(method_name, args, 3)?,
                     arg::<Vec<IndexMap<BString, PhpMixed>>>(method_name, args, 4)?,
-                    &arg::<String>(method_name, args, 5)?,
+                    arg::<BString>(method_name, args, 5)?.as_ref(),
                     arg::<IndexMap<BString, i64>>(method_name, args, 6)?,
                     arg::<bool>(method_name, args, 7)?,
                     arg::<bool>(method_name, args, 8)?,
@@ -2320,6 +2328,8 @@ impl FromPluginArg for i64 {
     }
 }
 
+/// For an argument that is text by contract, such as a class, event or setting name. Invalid
+/// UTF-8 is refused; data arguments decode as `BString`.
 impl FromPluginArg for String {
     fn from_arg(
         method: &str,
@@ -2327,8 +2337,9 @@ impl FromPluginArg for String {
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
         match value {
-            // TODO(bytes): lossy UTF-8; every PHP string crossing the boundary is bytes.
-            Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
+            Some(PluginValue::String(bytes)) => utf8_text(bytes)
+                .map(str::to_owned)
+                .ok_or_else(|| arg_throw(method, position, "valid UTF-8 text", value)),
             other => Err(arg_throw(method, position, "a string", other)),
         }
     }
@@ -2423,20 +2434,6 @@ impl<T: FromPluginArg> FromPluginArg for IndexMap<BString, T> {
     }
 }
 
-impl<T: FromPluginArg> FromPluginArg for IndexMap<String, T> {
-    fn from_arg(
-        method: &str,
-        position: usize,
-        value: Option<&PluginValue>,
-    ) -> Result<Self, PhpThrow> {
-        Ok(IndexMap::<BString, T>::from_arg(method, position, value)?
-            .into_iter()
-            // TODO(bytes): lossy UTF-8; PHP array keys are bytes.
-            .map(|(key, item)| (key.to_str_lossy().into_owned(), item))
-            .collect())
-    }
-}
-
 impl FromPluginArg for crate::package::Link {
     fn from_arg(
         method: &str,
@@ -2461,8 +2458,7 @@ impl FromPluginArg for crate::package::Mirror {
             other => return Err(arg_throw(method, position, "a mirror map", other)),
         };
         let url = match row.get(b"url".as_slice()) {
-            // TODO(bytes): lossy UTF-8; PHP strings are bytes.
-            Some(PluginValue::String(url)) => String::from_utf8_lossy(url).into_owned(),
+            Some(PluginValue::String(url)) => url.clone(),
             other => {
                 return Err(runtime_throw(format!(
                     "{method} expects a string `url` in every mirror, got {other:?}"
@@ -2473,10 +2469,7 @@ impl FromPluginArg for crate::package::Mirror {
             row.get(b"preferred".as_slice()),
             Some(PluginValue::Bool(true))
         );
-        Ok(crate::package::Mirror {
-            url: bstr::BString::from(url),
-            preferred,
-        })
+        Ok(crate::package::Mirror { url, preferred })
     }
 }
 
@@ -2912,27 +2905,19 @@ fn dispatch_package_method(
         | "setDistType"
         | "setDistReference"
         | "setSourceDistReferences" => {
-            let value = arg::<Option<String>>(method_name, args, 0)?;
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_interface_mut();
             match method_name {
-                "setInstallationSource" => {
-                    package.set_installation_source(value.map(bstr::BString::from))
-                }
-                "setSourceReference" => {
-                    package.set_source_reference(value.map(bstr::BString::from))
-                }
-                "setSourceUrl" => package.set_source_url(value.map(bstr::BString::from)),
-                "setDistUrl" => package.set_dist_url(value.map(bstr::BString::from)),
-                "setDistType" => package.set_dist_type(value.map(bstr::BString::from)),
-                "setDistReference" => package.set_dist_reference(value.map(bstr::BString::from)),
-                _ => package.set_source_dist_references(bstr::BString::from(value.ok_or_else(
-                    || {
-                        runtime_throw(
-                            "setSourceDistReferences expects a reference string".to_string(),
-                        )
-                    },
-                )?)),
+                "setInstallationSource" => package.set_installation_source(value),
+                "setSourceReference" => package.set_source_reference(value),
+                "setSourceUrl" => package.set_source_url(value),
+                "setDistUrl" => package.set_dist_url(value),
+                "setDistType" => package.set_dist_type(value),
+                "setDistReference" => package.set_dist_reference(value),
+                _ => package.set_source_dist_references(value.ok_or_else(|| {
+                    runtime_throw("setSourceDistReferences expects a reference string".to_string())
+                })?),
             }
             return Ok(PluginValue::Null);
         }
@@ -3059,12 +3044,7 @@ fn dispatch_package_method(
                 "setExtra" => {
                     package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setBinaries" => package.set_binaries(
-                    arg::<Vec<String>>(method_name, args, 0)?
-                        .into_iter()
-                        .map(bstr::BString::from)
-                        .collect::<Vec<_>>(),
-                ),
+                "setBinaries" => package.set_binaries(arg::<Vec<BString>>(method_name, args, 0)?),
                 "setSourceType" => {
                     package.set_source_type(arg::<Option<BString>>(method_name, args, 0)?)
                 }
@@ -3082,12 +3062,9 @@ fn dispatch_package_method(
                     args,
                     0,
                 )?),
-                "setIncludePaths" => package.set_include_paths(
-                    arg::<Vec<String>>(method_name, args, 0)?
-                        .into_iter()
-                        .map(bstr::BString::from)
-                        .collect::<Vec<_>>(),
-                ),
+                "setIncludePaths" => {
+                    package.set_include_paths(arg::<Vec<BString>>(method_name, args, 0)?)
+                }
                 "setPhpExt" => package.set_php_ext(arg::<Option<IndexMap<BString, PhpMixed>>>(
                     method_name,
                     args,
@@ -3161,18 +3138,8 @@ fn dispatch_package_method(
                     args,
                     0,
                 )?),
-                "setLicense" => package.set_license(
-                    arg::<Vec<String>>(method_name, args, 0)?
-                        .into_iter()
-                        .map(bstr::BString::from)
-                        .collect::<Vec<_>>(),
-                ),
-                "setKeywords" => package.set_keywords(
-                    arg::<Vec<String>>(method_name, args, 0)?
-                        .into_iter()
-                        .map(bstr::BString::from)
-                        .collect::<Vec<_>>(),
-                ),
+                "setLicense" => package.set_license(arg::<Vec<BString>>(method_name, args, 0)?),
+                "setKeywords" => package.set_keywords(arg::<Vec<BString>>(method_name, args, 0)?),
                 "setDescription" => package.set_description(arg::<BString>(method_name, args, 0)?),
                 "setHomepage" => package.set_homepage(arg::<BString>(method_name, args, 0)?),
                 "setAuthors" => package.set_authors(arg::<Vec<IndexMap<BString, BString>>>(
@@ -3190,12 +3157,7 @@ fn dispatch_package_method(
                 )?),
                 "setAbandoned" => package.set_abandoned(arg::<PhpMixed>(method_name, args, 0)?),
                 "setArchiveName" => package.set_archive_name(arg::<BString>(method_name, args, 0)?),
-                _ => package.set_archive_excludes(
-                    arg::<Vec<String>>(method_name, args, 0)?
-                        .into_iter()
-                        .map(bstr::BString::from)
-                        .collect::<Vec<_>>(),
-                ),
+                _ => package.set_archive_excludes(arg::<Vec<BString>>(method_name, args, 0)?),
             }
             return Ok(PluginValue::Null);
         }
@@ -3279,12 +3241,8 @@ fn dispatch_package_method(
     let borrowed = package.borrow();
     let package = borrowed.as_package_interface();
     match method_name {
-        "getName" => Ok(legacy_lossy(package.get_name())
-            .into_owned()
-            .to_plugin_value()),
-        "getPrettyName" => Ok(legacy_lossy(package.get_pretty_name())
-            .into_owned()
-            .to_plugin_value()),
+        "getName" => Ok(package.get_name().to_plugin_value()),
+        "getPrettyName" => Ok(package.get_pretty_name().to_plugin_value()),
         "getNames" => {
             let provides = arg_or::<bool>(method_name, args, 0, true)?;
             Ok(package.get_names(provides).to_plugin_value())
@@ -3306,12 +3264,8 @@ fn dispatch_package_method(
         "getDistReference" => Ok(package.get_dist_reference().to_plugin_value()),
         "getDistSha1Checksum" => Ok(package.get_dist_sha1_checksum().to_plugin_value()),
         "getDistMirrors" => Ok(package.get_dist_mirrors().to_plugin_value()),
-        "getVersion" => Ok(legacy_lossy(package.get_version())
-            .into_owned()
-            .to_plugin_value()),
-        "getPrettyVersion" => Ok(legacy_lossy(package.get_pretty_version())
-            .into_owned()
-            .to_plugin_value()),
+        "getVersion" => Ok(package.get_version().to_plugin_value()),
+        "getPrettyVersion" => Ok(package.get_pretty_version().to_plugin_value()),
         "getFullPrettyVersion" => {
             let truncate = arg_or::<bool>(method_name, args, 0, true)?;
             let display_mode =
@@ -3320,9 +3274,7 @@ fn dispatch_package_method(
                 .get_full_pretty_version(truncate, display_mode)
                 .to_plugin_value())
         }
-        "getStability" => Ok(legacy_lossy(package.get_stability())
-            .into_owned()
-            .to_plugin_value()),
+        "getStability" => Ok(package.get_stability().to_plugin_value()),
         "getRequires" => Ok((*package.get_requires()).clone().to_plugin_value()),
         "getConflicts" => Ok((*package.get_conflicts()).clone().to_plugin_value()),
         "getProvides" => Ok((*package.get_provides()).clone().to_plugin_value()),
@@ -3836,8 +3788,13 @@ fn decode_subscribed_events(
     };
     let mut events: IndexMap<String, SubscribedEventEntry> = IndexMap::new();
     for (event_name, params) in entries {
-        // TODO(bytes): lossy UTF-8; the dispatcher keys its listeners by String event names.
-        let event_name = String::from_utf8_lossy(&event_name).into_owned();
+        // The dispatcher keys its listeners by event names, which are text.
+        let Some(event_name) = utf8_text(&event_name).map(str::to_owned) else {
+            return Err(subscribed_events_shape_error(
+                class,
+                &PluginValue::String(event_name),
+            ));
+        };
         let entry = match &params {
             PluginValue::String(method) => SubscribedEventEntry::Method(method.clone()),
             PluginValue::List(items) => match items.first() {
@@ -4556,14 +4513,14 @@ impl PhpCommandProxy {
         match name {
             PluginValue::Null => {}
             PluginValue::String(bytes) => {
-                Command::set_name(&data, &String::from_utf8_lossy(&bytes))?;
+                Command::set_name(&data, &Self::text(&handle, "getName", bytes)?)?;
             }
             other => return Err(Self::unsupported_shape(&handle, "getName", &other)),
         }
         let description = Self::call_metadata_getter(&handle, "getDescription")?;
         match description {
             PluginValue::String(bytes) => {
-                Command::set_description(&data, &String::from_utf8_lossy(&bytes));
+                Command::set_description(&data, &bytes.display_lossy().to_string());
             }
             other => return Err(Self::unsupported_shape(&handle, "getDescription", &other)),
         }
@@ -4577,7 +4534,7 @@ impl PhpCommandProxy {
         for alias in alias_items {
             match alias {
                 PluginValue::String(bytes) => {
-                    alias_names.push(String::from_utf8_lossy(&bytes).into_owned());
+                    alias_names.push(Self::text(&handle, "getAliases", bytes)?);
                 }
                 other => return Err(Self::unsupported_shape(&handle, "getAliases", &other)),
             }
@@ -4639,8 +4596,8 @@ impl PhpCommandProxy {
             let (name, description) =
                 match (field(&mut row, "name"), field(&mut row, "description")) {
                     (PluginValue::String(name), PluginValue::String(description)) => (
-                        String::from_utf8_lossy(&name).into_owned(),
-                        String::from_utf8_lossy(&description).into_owned(),
+                        Self::text(handle, "getDefinition", name)?,
+                        description.display_lossy().to_string(),
                     ),
                     (other, _) => {
                         return Err(Self::unsupported_shape(handle, "getDefinition", &other));
@@ -4672,8 +4629,8 @@ impl PhpCommandProxy {
             let (name, description) =
                 match (field(&mut row, "name"), field(&mut row, "description")) {
                     (PluginValue::String(name), PluginValue::String(description)) => (
-                        String::from_utf8_lossy(&name).into_owned(),
-                        String::from_utf8_lossy(&description).into_owned(),
+                        Self::text(handle, "getDefinition", name)?,
+                        description.display_lossy().to_string(),
                     ),
                     (other, _) => {
                         return Err(Self::unsupported_shape(handle, "getDefinition", &other));
@@ -4696,7 +4653,7 @@ impl PhpCommandProxy {
                 mode |= InputOption::VALUE_NEGATABLE;
             }
             let shortcut = match field(&mut row, "shortcut").to_php_mixed()? {
-                PhpMixed::String(shortcut) => Some(shortcut.to_str_lossy().into_owned()),
+                PhpMixed::String(shortcut) => Some(Self::text(handle, "getDefinition", shortcut)?),
                 _ => None,
             };
             // `getDefault()` exposes the stored representation (`false` for VALUE_NONE), while
@@ -4722,19 +4679,32 @@ impl PhpCommandProxy {
 
         match field(&mut map, "help") {
             PluginValue::String(help) => {
-                Command::set_help(data, &String::from_utf8_lossy(&help));
+                Command::set_help(data, &help.display_lossy().to_string());
             }
             other => return Err(Self::unsupported_shape(handle, "getHelp", &other)),
         }
         for usage in as_rows(field(&mut map, "usages")) {
             match usage {
                 PluginValue::String(usage) => {
-                    Command::add_usage(data, &String::from_utf8_lossy(&usage));
+                    Command::add_usage(data, &usage.display_lossy().to_string());
                 }
                 other => return Err(Self::unsupported_shape(handle, "getUsages", &other)),
             }
         }
         Ok(())
+    }
+
+    /// A value the command definition holds as text: a name or a shortcut. Other metadata is read
+    /// by people only.
+    fn text(handle: &PhpObjHandle, method: &str, bytes: BString) -> anyhow::Result<String> {
+        match utf8_text(&bytes) {
+            Some(text) => Ok(text.to_owned()),
+            None => Err(Self::unsupported_shape(
+                handle,
+                method,
+                &PluginValue::String(bytes),
+            )),
+        }
     }
 
     fn call_metadata_getter(handle: &PhpObjHandle, method: &str) -> anyhow::Result<PluginValue> {
@@ -4837,6 +4807,27 @@ impl Drop for PhpCommandProxy {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_data_argument_keeps_its_bytes_and_a_text_argument_refuses_invalid_utf8() {
+        let bytes = BString::from(b"vendor/\xffname".as_slice());
+        let args = [PluginValue::String(bytes.clone())];
+
+        assert_eq!(bytes, arg::<BString>("method", &args, 0).unwrap());
+        assert!(arg::<String>("method", &args, 0).is_err());
+    }
+
+    #[test]
+    fn a_process_command_keeps_its_bytes() {
+        let bytes = BString::from(b"echo \xff".as_slice());
+
+        match exec_command_arg("execute", &[PluginValue::String(bytes.clone())], 0).unwrap() {
+            crate::util::process_executor::CommandLine::Shell(command) => {
+                assert_eq!(bytes, command)
+            }
+            other => panic!("expected a shell command, got {other:?}"),
+        }
+    }
 
     #[test]
     fn a_listener_method_name_that_is_not_utf8_keeps_its_bytes() {

@@ -93,16 +93,34 @@ impl Glob {
     /// boundary woven in as the consuming `(?:$|/)` (equivalent under boolean
     /// matching, since nothing follows it).
     pub fn to_regex_dir_boundary(
-        glob: &str,
+        glob: impl AsRef<[u8]>,
         strict_leading_dot: bool,
         strict_wildcard_slash: bool,
     ) -> String {
-        expand(
-            glob,
+        // PHP scans the glob byte by byte: each byte stands for one char here, and a byte outside
+        // ASCII comes back as an `\xNN` escape, which a pattern without `/u` matches as that byte.
+        let glob: String = glob.as_ref().iter().map(|byte| *byte as char).collect();
+        let regex = expand(
+            &glob,
             strict_leading_dot,
             strict_wildcard_slash,
             Terminal::EndOrSlash,
-        )
+        );
+        let mut escaped = String::with_capacity(regex.len());
+        let mut after_backslash = false;
+        for c in regex.chars() {
+            if c.is_ascii() {
+                escaped.push(c);
+                after_backslash = c == '\\' && !after_backslash;
+            } else {
+                if after_backslash {
+                    escaped.pop();
+                }
+                escaped.push_str(&format!("\\x{:02x}", c as u32));
+                after_backslash = false;
+            }
+        }
+        escaped
     }
 }
 

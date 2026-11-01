@@ -11,8 +11,7 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Platform, ProcessExecutor};
 use shirabe_php_shim::{
-    PhpMixed, file_get_contents, hash, legacy_lossy, path_from_bytes, path_to_bytes, realpath,
-    serialize,
+    PhpMixed, file_get_contents, hash, path_from_bytes, path_to_bytes, realpath, serialize,
 };
 use std::path::Path;
 
@@ -118,15 +117,15 @@ fn test_load_package_from_file_system_with_wildcard() {
     let mut repository =
         create_path_repo(coordinates(vec![("url", PhpMixed::string(repository_url))]));
     let packages = repository.__get_packages().unwrap();
-    let mut names: Vec<String> = Vec::new();
+    let mut names: Vec<BString> = Vec::new();
 
     assert!(repository.__count().unwrap() >= 2);
 
     let package = &packages[0];
-    names.push(legacy_lossy(&package.get_name()).into_owned());
+    names.push(BString::from(&package.get_name()[..]));
 
     let package = &packages[1];
-    names.push(legacy_lossy(&package.get_name()).into_owned());
+    names.push(BString::from(&package.get_name()[..]));
 
     names.sort();
     assert_eq!(
@@ -163,26 +162,26 @@ fn test_load_package_with_explicit_versions() {
     ]));
     let packages = repository.__get_packages().unwrap();
 
-    let mut versions: IndexMap<String, String> = IndexMap::new();
+    let mut versions: IndexMap<BString, BString> = IndexMap::new();
 
     assert_eq!(2, repository.__count().unwrap());
 
     let package = &packages[0];
     versions.insert(
-        legacy_lossy(&package.get_name()).into_owned(),
-        legacy_lossy(&package.get_version()).into_owned(),
+        BString::from(&package.get_name()[..]),
+        BString::from(&package.get_version()[..]),
     );
 
     let package = &packages[1];
     versions.insert(
-        legacy_lossy(&package.get_name()).into_owned(),
-        legacy_lossy(&package.get_version()).into_owned(),
+        BString::from(&package.get_name()[..]),
+        BString::from(&package.get_version()[..]),
     );
 
     versions.sort_keys();
-    let expected: IndexMap<String, String> = [
-        ("test/path-unversioned".to_string(), "4.3.2.1".to_string()),
-        ("test/path-versioned".to_string(), "3.2.1.0".to_string()),
+    let expected: IndexMap<BString, BString> = [
+        ("test/path-unversioned".into(), "4.3.2.1".into()),
+        ("test/path-versioned".into(), "3.2.1.0".into()),
     ]
     .into_iter()
     .collect();
@@ -222,21 +221,19 @@ fn test_url_remains_relative() {
 
     // realpath() does not fully expand the paths
     // PHP Bug https://bugs.php.net/bug.php?id=72642
-    let repository_url = Path::new(
-        &realpath(realpath(fixtures_dir().replace("/Fixtures", "")).unwrap_or_default())
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .unwrap_or_default(),
-    )
-    .join("Fixtures")
-    .join("path")
-    .join("with-version")
-    .into_os_string()
-    .into_string()
-    .unwrap();
+    let repository_url =
+        realpath(realpath(fixtures_dir().replace("/Fixtures", "")).unwrap_or_default())
+            .unwrap_or_default()
+            .join("Fixtures")
+            .join("path")
+            .join("with-version")
+            .into_os_string()
+            .into_string()
+            .unwrap();
     // getcwd() not necessarily match __DIR__
     // PHP Bug https://bugs.php.net/bug.php?id=73797
     let cwd = realpath(realpath(Platform::get_cwd(false).unwrap()).unwrap_or_default())
-        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+        .map(|p| BString::from(path_to_bytes(&p)))
         .unwrap_or_default();
     let relative_url = repository_url[cwd.len().min(repository_url.len())..]
         .trim_start_matches(std::path::MAIN_SEPARATOR)
@@ -255,12 +252,7 @@ fn test_url_remains_relative() {
 
     // Convert platform specific separators back to generic URL slashes
     let relative_url = relative_url.replace(std::path::MAIN_SEPARATOR, "/");
-    assert_eq!(
-        Some(relative_url),
-        package
-            .get_dist_url()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some(BString::from(relative_url)), package.get_dist_url());
 }
 
 #[test]

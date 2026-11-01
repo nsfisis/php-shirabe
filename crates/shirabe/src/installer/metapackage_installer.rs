@@ -66,7 +66,10 @@ impl InstallerInterface for MetapackageInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.write_error3(
-            format!("  - {}", InstallOperation::format(package.clone(), false)),
+            format!(
+                "  - {}",
+                InstallOperation::format(package.clone(), false).display_lossy()
+            ),
             true,
             io_interface::NORMAL,
         );
@@ -94,7 +97,7 @@ impl InstallerInterface for MetapackageInstaller {
         self.io.write_error3(
             format!(
                 "  - {}",
-                UpdateOperation::format(initial.clone(), target.clone(), false)
+                UpdateOperation::format(initial.clone(), target.clone(), false).display_lossy()
             ),
             true,
             io_interface::NORMAL,
@@ -121,7 +124,10 @@ impl InstallerInterface for MetapackageInstaller {
         }
 
         self.io.write_error3(
-            format!("  - {}", UninstallOperation::format(package.clone(), false)),
+            format!(
+                "  - {}",
+                UninstallOperation::format(package.clone(), false).display_lossy()
+            ),
             true,
             io_interface::NORMAL,
         );

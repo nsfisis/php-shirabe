@@ -2,11 +2,12 @@
 
 use crate::completion::Suggestion;
 use crate::input::InputOption;
+use bstr::BString;
 
 /// PHP union type `string|Suggestion` used by `suggestValue`/`suggestValues`.
 #[derive(Debug)]
 pub enum StringOrSuggestion {
-    String(String),
+    String(BString),
     Suggestion(Suggestion),
 }
 

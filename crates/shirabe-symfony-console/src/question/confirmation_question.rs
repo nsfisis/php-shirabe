@@ -2,7 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::question::{Question, QuestionInterface};
-use bstr::BStr;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{PhpMixed, empty, preg_is_match, strval};
 
 /// Represents a yes/no question.
@@ -16,7 +16,7 @@ impl ConfirmationQuestion {
     /// `$question` The question to ask to the user.
     /// `$default` The default answer to return, true or false.
     /// `$trueAnswerRegex` A regex to match the "yes" answer.
-    pub fn new(question: String, default: bool, true_answer_regex: String) -> Self {
+    pub fn new(question: impl Into<BString>, default: bool, true_answer_regex: String) -> Self {
         let mut this = Self {
             inner: Question::new(question, Some(PhpMixed::Bool(default))),
             true_answer_regex,
@@ -54,7 +54,7 @@ impl ConfirmationQuestion {
 }
 
 impl QuestionInterface for ConfirmationQuestion {
-    fn get_question(&self) -> &str {
+    fn get_question(&self) -> &BStr {
         self.inner.get_question()
     }
 

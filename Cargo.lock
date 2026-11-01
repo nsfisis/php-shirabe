@@ -2459,6 +2459,7 @@ version = "0.2.0-dev"
 dependencies = [
  "indexmap",
  "serde_json",
+ "shirabe-php-shim",
 ]
 
 [[package]]

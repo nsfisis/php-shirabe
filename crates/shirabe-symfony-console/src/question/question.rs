@@ -3,8 +3,8 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::question::choice_question::ChoiceQuestion;
 use crate::question::confirmation_question::ConfirmationQuestion;
-use bstr::{BStr, ByteSlice};
-use shirabe_php_shim::PhpMixed;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{PhpMixed, canonical_int_key};
 
 /// Polymorphic boundary for the Symfony Console Question hierarchy.
 ///
@@ -14,7 +14,7 @@ use shirabe_php_shim::PhpMixed;
 /// a `Question` and run `instanceof` checks are expressed here as a trait whose
 /// `as_choice`/`as_confirmation` downcasts stand in for `instanceof`.
 pub trait QuestionInterface: std::fmt::Debug {
-    fn get_question(&self) -> &str;
+    fn get_question(&self) -> &BStr;
 
     fn get_default(&self) -> PhpMixed;
 
@@ -51,7 +51,7 @@ pub trait QuestionInterface: std::fmt::Debug {
 
 /// Represents a Question.
 pub struct Question {
-    question: String,
+    question: BString,
     attempts: Option<i64>,
     hidden: bool,
     hidden_fallback: bool,
@@ -80,9 +80,9 @@ impl std::fmt::Debug for Question {
 impl Question {
     /// `$question` The question to ask to the user.
     /// `$default` The default answer to return if the user enters nothing.
-    pub fn new(question: String, default: Option<PhpMixed>) -> Self {
+    pub fn new(question: impl Into<BString>, default: Option<PhpMixed>) -> Self {
         Self {
-            question,
+            question: question.into(),
             attempts: None,
             hidden: false,
             hidden_fallback: true,
@@ -96,8 +96,8 @@ impl Question {
     }
 
     /// Returns the question.
-    pub fn get_question(&self) -> &str {
-        &self.question
+    pub fn get_question(&self) -> &BStr {
+        self.question.as_bstr()
     }
 
     /// Returns the default answer.
@@ -302,13 +302,9 @@ impl Question {
     // A `List` has only sequential int keys, so it is never associative. An `Array` is
     // associative only when at least one key is a genuine string key; PHP normalizes
     // canonical-integer string keys (e.g. "0", "12") back to int keys, so those do not count.
-    // The same heuristic (a key is "string" iff it does not parse as an i64) is used by
-    // ConsoleIO::select when computing `$isAssoc` over the choice map.
     pub(crate) fn is_assoc(array: &PhpMixed) -> bool {
         match array {
-            PhpMixed::Array(map) => map
-                .keys()
-                .any(|key| !key.to_str().is_ok_and(|key| key.parse::<i64>().is_ok())),
+            PhpMixed::Array(map) => map.keys().any(|key| canonical_int_key(key).is_none()),
             _ => false,
         }
     }
@@ -325,7 +321,7 @@ impl Question {
 }
 
 impl QuestionInterface for Question {
-    fn get_question(&self) -> &str {
+    fn get_question(&self) -> &BStr {
         self.get_question()
     }
 

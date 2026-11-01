@@ -18,16 +18,18 @@ use crate::repository::{
 };
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, PackageSorter};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_merge,
     array_unique, empty, file_exists, file_get_contents, file_put_contents, filesize,
-    impl_php_class, implode, is_writable, legacy_lossy, strtolower, unlink,
+    impl_php_class, implode, is_writable, strtolower, unlink,
 };
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::{
+    command::Command,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -264,7 +266,7 @@ impl RequireCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
@@ -530,7 +532,7 @@ impl RequireCommand {
                 )
             {
                 self.get_io().warning(
-                    &format!(
+                    format!(
                         "Version {} looks like it may be a feature branch which is unlikely to keep working in the long run and may be in an unstable state",
                         requirement_str.display_lossy(),
                     ),
@@ -538,8 +540,7 @@ impl RequireCommand {
                 );
                 if self.get_io().is_interactive()
                     && !self.get_io().ask_confirmation(
-                        "Are you sure you want to use this constraint (<comment>y</comment>) or would you rather abort (<comment>n</comment>) the whole operation [<comment>y,n</comment>]? "
-                            .to_string(),
+                        "Are you sure you want to use this constraint (<comment>y</comment>) or would you rather abort (<comment>n</comment>) the whole operation [<comment>y,n</comment>]? ",
                         true,
                     )?
                 {
@@ -845,15 +846,14 @@ impl Command for RequireCommand {
             let config = json.borrow_mut().read()?;
 
             let package_type = if empty(&config.get("type").cloned().unwrap_or(PhpMixed::Null)) {
-                "library".to_string()
+                BString::from("library")
             } else {
-                legacy_lossy(
+                BString::from(
                     config
                         .get("type")
                         .and_then(|v| v.as_string())
                         .unwrap_or_default(),
                 )
-                .into_owned()
             };
 
             // @see https://github.com/composer/composer/pull/8313#issuecomment-532637955
@@ -898,9 +898,9 @@ impl Command for RequireCommand {
         ));
 
         let preferred_stability = if composer.get_package().get_prefer_stable() {
-            "stable".to_string()
+            BString::from("stable")
         } else {
-            legacy_lossy(&composer.get_package().get_minimum_stability()).into_owned()
+            composer.get_package().get_minimum_stability()
         };
 
         let packages: Vec<bstr::BString> = input
@@ -961,12 +961,9 @@ impl Command for RequireCommand {
             && self.get_io().is_interactive()
             && !composer.is_global()
         {
-            let mut dev_packages: Vec<Vec<String>> = vec![];
-            let dev_tags: Vec<String> = vec![
-                "dev".to_string(),
-                "testing".to_string(),
-                "static analysis".to_string(),
-            ];
+            let mut dev_packages: Vec<Vec<BString>> = vec![];
+            let dev_tags: Vec<BString> =
+                vec!["dev".into(), "testing".into(), "static analysis".into()];
             let current_requires_by_key = self.get_packages_by_require_key();
             for (name, _version) in &requirements {
                 // skip packages which are already in the composer.json as those have already been decided
@@ -984,12 +981,12 @@ impl Command for RequireCommand {
                 let pkg_as_complete: Option<crate::package::CompletePackageInterfaceHandle> =
                     pkg.as_ref().and_then(|p| p.as_complete());
                 if let Some(pkg_complete) = pkg_as_complete {
-                    let lowered: Vec<String> = pkg_complete
+                    let lowered: Vec<BString> = pkg_complete
                         .get_keywords()
                         .iter()
-                        .map(|s| legacy_lossy(&strtolower(s)).into_owned())
+                        .map(strtolower)
                         .collect::<Vec<_>>();
-                    let pkg_dev_tags: Vec<String> = array_intersect(&dev_tags, &lowered);
+                    let pkg_dev_tags: Vec<BString> = array_intersect(&dev_tags, &lowered);
                     if (pkg_dev_tags.len() as i64) > 0 {
                         dev_packages.push(pkg_dev_tags);
                     }
@@ -1013,8 +1010,8 @@ impl Command for RequireCommand {
                 } else {
                     "it is"
                 };
-                let merged: Vec<String> = dev_packages.iter().flatten().cloned().collect();
-                let pkg_dev_tags: Vec<String> = array_unique(&merged);
+                let merged: Vec<BString> = dev_packages.iter().flatten().cloned().collect();
+                let pkg_dev_tags: Vec<BString> = array_unique(&merged);
                 let warn_msg = format!(
                     "The package{} you required {} recommended to be placed in require-dev (because {} tagged as \"{}\") but you did not use --dev.",
                     plural,
@@ -1024,8 +1021,7 @@ impl Command for RequireCommand {
                 );
                 self.get_io().warning(&warn_msg, &[]);
                 if self.get_io().ask_confirmation(
-                    "<info>Do you want to re-run the command with --dev?</> [<comment>yes</>]? "
-                        .to_string(),
+                    "<info>Do you want to re-run the command with --dev?</> [<comment>yes</>]? ",
                     true,
                 )? {
                     input

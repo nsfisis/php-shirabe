@@ -9,8 +9,8 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, array_replace_recursive, bconcat, extension_loaded, implode, is_dir, legacy_lossy,
-    php_uname, stream_context_create, stripos, uasort,
+    PhpMixed, array_replace_recursive, bconcat, extension_loaded, implode, is_dir, path_from_bytes,
+    path_to_bytes, php_uname, stream_context_create, stripos, uasort,
 };
 
 pub struct StreamContextFactory;
@@ -306,11 +306,7 @@ impl StreamContextFactory {
         if !has_cafile && !has_capath {
             let result = CaBundle::get_system_ca_root_bundle_path(logger);
             let is_dir = is_dir(&result);
-            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-            let result = result
-                .into_os_string()
-                .into_string()
-                .unwrap_or_else(|path| panic!("CA bundle path is not valid UTF-8: {path:?}"));
+            let result = BString::from(path_to_bytes(&result));
             if is_dir {
                 if let Some(PhpMixed::Array(ssl)) = defaults.get_mut(B("ssl")) {
                     ssl.insert("capath".into(), PhpMixed::string(result));
@@ -327,8 +323,8 @@ impl StreamContextFactory {
             .and_then(|v| v.as_array())
             .and_then(|a| a.get(B("cafile")))
             .and_then(|v| v.as_string())
-            .map(|s| legacy_lossy(s).into_owned());
-        if let Some(ref cafile) = cafile
+            .map(path_from_bytes);
+        if let Some(cafile) = cafile
             && (!Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger))
         {
             return Err(Box::new(TransportException::new(
@@ -342,8 +338,8 @@ impl StreamContextFactory {
             .and_then(|v| v.as_array())
             .and_then(|a| a.get(B("capath")))
             .and_then(|v| v.as_string())
-            .map(|s| legacy_lossy(s).into_owned());
-        if let Some(ref capath) = capath
+            .map(path_from_bytes);
+        if let Some(capath) = capath
             && (!is_dir(capath) || !Filesystem::is_readable(capath))
         {
             return Err(Box::new(TransportException::new(

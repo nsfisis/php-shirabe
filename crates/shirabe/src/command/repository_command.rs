@@ -8,7 +8,7 @@ use crate::json::JsonFile;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, legacy_lossy, parse_url,
+    InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class, parse_url,
     path_to_bytes, php_regex, php_to_string, preg_is_match, strtolower,
 };
 use shirabe_symfony_console::{
@@ -100,10 +100,7 @@ impl RepositoryCommand {
                     && matches!(*first_val, PhpMixed::Bool(false))
                 {
                     let first_key = repo_map.keys().next().unwrap();
-                    io.write(format!(
-                        "[{}] <info>disabled</info>",
-                        first_key.display_lossy()
-                    ));
+                    io.write(bconcat!("[", first_key, "] <info>disabled</info>"));
                     continue;
                 }
 
@@ -115,20 +112,11 @@ impl RepositoryCommand {
                     .get(B("type"))
                     .and_then(|v| v.as_string())
                     .unwrap_or("unknown".into());
-                let url = match repo_map
-                    .get(B("url"))
-                    .and_then(|v| v.as_string())
-                    .map(|s| legacy_lossy(s).into_owned())
-                {
-                    Some(url) => url,
-                    None => JsonFile::encode(repo)?,
+                let url = match repo_map.get(B("url")).and_then(|v| v.as_string()) {
+                    Some(url) => BString::from(url),
+                    None => BString::from(JsonFile::encode(repo)?),
                 };
-                io.write(format!(
-                    "[{}] <info>{}</info> {}",
-                    name.display_lossy(),
-                    r#type.display_lossy(),
-                    url
-                ));
+                io.write(bconcat!("[", name, "] <info>", r#type, "</info> ", url));
             }
         }
 
@@ -140,10 +128,10 @@ impl RepositoryCommand {
         crate::console::input::SuggestedValues::Closure(Box::new(|_this, input, _suggestions| {
             if input.get_argument("action")?.to_php_string() == "add" {
                 return Ok(vec![
-                    "composer".to_string(),
-                    "vcs".to_string(),
-                    "artifact".to_string(),
-                    "path".to_string(),
+                    "composer".into(),
+                    "vcs".into(),
+                    "artifact".into(),
+                    "path".into(),
                 ]);
             }
 
@@ -155,7 +143,7 @@ impl RepositoryCommand {
         crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             let action = input.get_argument("action")?.to_php_string();
             if action == "enable" || action == "disable" {
-                return Ok(vec!["packagist.org".to_string()]);
+                return Ok(vec!["packagist.org".into()]);
             }
 
             if action != "remove" && action != "set-url" && action != "get-url" {
@@ -179,19 +167,19 @@ impl RepositoryCommand {
             )?;
 
             let data = config_file.read()?;
-            let mut repos: Vec<String> = vec![];
+            let mut repos: Vec<BString> = vec![];
 
             if let Some(repositories) = data.as_array().and_then(|d| d.get(B("repositories"))) {
                 if let Some(list) = repositories.as_list() {
                     for repo in list {
                         if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
-                            repos.push(legacy_lossy(&php_to_string(name)).into_owned());
+                            repos.push(php_to_string(name));
                         }
                     }
                 } else if let Some(map) = repositories.as_array() {
                     for repo in map.values() {
                         if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
-                            repos.push(legacy_lossy(&php_to_string(name)).into_owned());
+                            repos.push(php_to_string(name));
                         }
                     }
                 }
@@ -338,17 +326,17 @@ impl Command for RepositoryCommand {
             .borrow()
             .get_argument("name")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BString::from);
         let arg1 = input
             .borrow()
             .get_argument("arg1")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BString::from);
         let arg2 = input
             .borrow()
             .get_argument("arg2")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BString::from);
 
         let config_file = self.config_file.borrow().as_ref().unwrap().clone();
         let config_data = config_file.borrow_mut().read()?;
@@ -378,7 +366,7 @@ impl Command for RepositoryCommand {
                     )
                     .into());
                 }
-                let arg1_str = arg1.as_deref().unwrap();
+                let arg1_str = arg1.as_ref().unwrap();
                 let repo_config: PhpMixed = if preg_is_match(php_regex!(r"{^\s*\{}"), arg1_str) {
                     JsonFile::parse_json(Some(arg1_str), None)?
                 } else {
@@ -386,7 +374,7 @@ impl Command for RepositoryCommand {
                         return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
                     }
                     let mut m = IndexMap::new();
-                    m.insert("type".into(), PhpMixed::string(arg1_str.to_string()));
+                    m.insert("type".into(), PhpMixed::string(arg1_str.clone()));
                     m.insert("url".into(), PhpMixed::string(arg2.unwrap()));
                     PhpMixed::Array(m)
                 };
@@ -395,12 +383,12 @@ impl Command for RepositoryCommand {
                     .borrow()
                     .get_option("before")?
                     .as_string()
-                    .map(|s| legacy_lossy(s).into_owned());
+                    .map(BString::from);
                 let after = input
                     .borrow()
                     .get_option("after")?
                     .as_string()
-                    .map(|s| legacy_lossy(s).into_owned());
+                    .map(BString::from);
                 if before.is_some() && after.is_some() {
                     return Err(RuntimeException::new(
                         "You can not combine --before and --after".to_string(),
@@ -416,14 +404,14 @@ impl Command for RepositoryCommand {
                         )
                         .into());
                     }
-                    let reference_name = before.as_deref().or(after.as_deref()).unwrap();
+                    let reference_name = before.as_ref().or(after.as_ref()).unwrap();
                     let offset: i64 = if after.is_some() { 1 } else { 0 };
                     self.config_source
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
                         .insert_repository(
-                            bstr::BStr::new(name.as_deref().unwrap()),
+                            bstr::BStr::new(name.as_ref().unwrap()),
                             repo_config,
                             bstr::BStr::new(reference_name),
                             offset,
@@ -440,11 +428,7 @@ impl Command for RepositoryCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_repository(
-                        bstr::BStr::new(name.as_deref().unwrap()),
-                        repo_config,
-                        append,
-                    )?;
+                    .add_repository(bstr::BStr::new(name.as_ref().unwrap()), repo_config, append)?;
                 Ok(0)
             }
             b"remove" | b"rm" | b"delete" => {
@@ -454,13 +438,13 @@ impl Command for RepositoryCommand {
                     )
                     .into());
                 }
-                let name_str = name.as_deref().unwrap();
+                let name_str = name.as_ref().unwrap();
                 self.config_source
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
                     .remove_repository(bstr::BStr::new(name_str))?;
-                if ["packagist", "packagist.org"].contains(&name_str) {
+                if matches!(name_str.as_slice(), b"packagist" | b"packagist.org") {
                     self.config_source
                         .borrow_mut()
                         .as_mut()
@@ -481,8 +465,8 @@ impl Command for RepositoryCommand {
                     .as_mut()
                     .unwrap()
                     .set_repository_url(
-                        bstr::BStr::new(name.as_deref().unwrap()),
-                        bstr::BStr::new(arg1.as_deref().unwrap()),
+                        bstr::BStr::new(name.as_ref().unwrap()),
+                        bstr::BStr::new(arg1.as_ref().unwrap()),
                     );
                 Ok(0)
             }
@@ -493,7 +477,7 @@ impl Command for RepositoryCommand {
                     )
                     .into());
                 }
-                let name_str = name.as_deref().unwrap();
+                let name_str = name.as_ref().unwrap();
                 if let Some(repo) = repos.get(B(name_str))
                     && let PhpMixed::Array(ref repo_map) = *repo
                 {
@@ -504,14 +488,14 @@ impl Command for RepositoryCommand {
                     }
                     return Err(InvalidArgumentException::new(format!(
                         "The {} repository does not have a URL",
-                        name_str
+                        name_str.display_lossy()
                     ))
                     .into());
                 }
                 for (_key, val) in &repos {
                     if let PhpMixed::Array(ref repo_map) = *val
                         && let Some(n) = repo_map.get(B("name")).and_then(|v| v.as_string())
-                        && n == name_str
+                        && n == name_str.as_bstr()
                     {
                         let url = repo_map.get(B("url")).and_then(|v| v.as_string());
                         if let Some(url) = url {
@@ -520,14 +504,14 @@ impl Command for RepositoryCommand {
                         }
                         return Err(InvalidArgumentException::new(format!(
                             "The {} repository does not have a URL",
-                            name_str
+                            name_str.display_lossy()
                         ))
                         .into());
                     }
                 }
                 Err(InvalidArgumentException::new(format!(
                     "There is no {} repository defined",
-                    name_str
+                    name_str.display_lossy()
                 ))
                 .into())
             }
@@ -538,8 +522,8 @@ impl Command for RepositoryCommand {
                     )
                     .into());
                 }
-                let name_str = name.as_deref().unwrap();
-                if ["packagist", "packagist.org"].contains(&name_str) {
+                let name_str = name.as_ref().unwrap();
+                if matches!(name_str.as_slice(), b"packagist" | b"packagist.org") {
                     let append = input
                         .borrow()
                         .get_option("append")?
@@ -565,8 +549,8 @@ impl Command for RepositoryCommand {
                     )
                     .into());
                 }
-                let name_str = name.as_deref().unwrap();
-                if ["packagist", "packagist.org"].contains(&name_str) {
+                let name_str = name.as_ref().unwrap();
+                if matches!(name_str.as_slice(), b"packagist" | b"packagist.org") {
                     self.config_source
                         .borrow_mut()
                         .as_mut()

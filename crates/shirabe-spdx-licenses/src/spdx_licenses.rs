@@ -1,6 +1,7 @@
 //! ref: composer/vendor/composer/spdx-licenses/src/SpdxLicenses.php
 
 use indexmap::IndexMap;
+use shirabe_php_shim::utf8_text;
 
 // PHP reads the resource files from `dirname(__DIR__) . '/res'` at runtime via
 // file_get_contents. Composer's res directory ships with the vendored package; embed it at compile
@@ -60,8 +61,12 @@ impl SpdxLicenses {
     }
 
     /// Returns license metadata by license identifier.
-    pub fn get_license_by_identifier(&self, identifier: &str) -> Option<LicenseMetadata> {
-        let key = identifier.to_lowercase();
+    pub fn get_license_by_identifier(
+        &self,
+        identifier: impl AsRef<[u8]>,
+    ) -> Option<LicenseMetadata> {
+        // The identifiers are valid UTF-8, so other bytes name no license.
+        let key = utf8_text(&identifier)?.to_lowercase();
 
         let (identifier, name, is_osi_approved, is_deprecated_license_id) =
             self.licenses.get(&key)?;
@@ -74,10 +79,11 @@ impl SpdxLicenses {
         })
     }
 
-    pub fn validate(&self, license: &str) -> bool {
+    pub fn validate(&self, license: impl AsRef<[u8]>) -> bool {
         // PHP also accepts string[] and joins it with ' OR '. The Rust signature here takes a single
-        // &str, matching the string-input path of the PHP code; the array path lives in callers.
-        self.is_valid_license_string(license)
+        // string, matching the string-input path of the PHP code; the array path lives in callers.
+        // The identifiers are valid UTF-8, so other bytes form no valid expression.
+        utf8_text(&license).is_some_and(|license| self.is_valid_license_string(license))
     }
 
     fn load_licenses(&mut self) {

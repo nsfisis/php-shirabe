@@ -47,8 +47,8 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, legacy_lossy, php_fopen_resource, php_regex, preg_is_match, preg_match,
-    preg_replace, preg_split_delim_capture, rewind, stream_get_contents,
+    PHP_EOL, PhpMixed, implode, legacy_lossy, php_fopen_resource, php_regex, preg_is_match,
+    preg_match, preg_replace, preg_split_delim_capture, rewind, stream_get_contents,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
@@ -206,7 +206,7 @@ struct StubAutoloadGenerator;
 impl AutoloadGeneratorInterface for StubAutoloadGenerator {
     fn set_dev_mode(&self, _dev_mode: bool) {}
     fn set_class_map_authoritative(&self, _class_map_authoritative: bool) {}
-    fn set_apcu(&self, _apcu: bool, _apcu_prefix: Option<String>) {}
+    fn set_apcu(&self, _apcu: bool, _apcu_prefix: Option<bstr::BString>) {}
     fn set_run_scripts(&self, _run_scripts: bool) {}
     fn set_dry_run(&self, _dry_run: bool) {}
     fn set_platform_requirement_filter(
@@ -482,7 +482,12 @@ fn test_installer() {
         );
         let result = shirabe::util::sync_executor::block_on(installer.run()).unwrap();
 
-        let output = io_buffer.borrow().get_output().replace('\r', "");
+        let output = io_buffer
+            .borrow()
+            .get_output()
+            .display_lossy()
+            .to_string()
+            .replace('\r', "");
         assert_eq!(0, result, "{}", output);
 
         let installed = installation_manager.borrow().__get_installed_packages();
@@ -1189,7 +1194,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let app_run =
         shirabe::util::sync_executor::block_on(application.run(Some(input), Some(output)));
 
-    let output_string = io_buffer.borrow().get_output().replace('\r', "");
+    let output_string = io_buffer
+        .borrow()
+        .get_output()
+        .display_lossy()
+        .to_string()
+        .replace('\r', "");
 
     // Shouldn't check output and results if an exception was expected by this point.
     if is_exception {
@@ -1306,7 +1316,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         .downcast_ref::<InstallationManager>()
         .expect("composer installation manager is the recording mock")
         .__get_trace();
-    assert_eq!(case.expect.trim_end(), trace.join("\n"));
+    assert_eq!(case.expect.trim_end(), implode("\n", &trace));
 
     if let Some(expect_output) = expect_output
         && !expect_output.is_empty()

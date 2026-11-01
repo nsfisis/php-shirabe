@@ -48,19 +48,19 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     /// PHP: `@throws \RuntimeException If there is no data to read in the input stream`.
     /// `QuestionHelper::ask` exceptions (validator errors, `MissingInputException`) propagate
     /// to the caller, hence the `anyhow::Result` return type.
-    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed>;
+    fn ask_bytes(&self, question: &BStr, default: PhpMixed) -> anyhow::Result<PhpMixed>;
 
-    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool>;
+    fn ask_confirmation_bytes(&self, question: &BStr, default: bool) -> anyhow::Result<bool>;
 
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed>;
 
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>>;
+    fn ask_and_hide_answer_bytes(&self, question: &BStr) -> anyhow::Result<Option<BString>>;
 
     /// PHP `array $choices` may be a list (`PhpMixed::List`) or an associative
     /// array (`PhpMixed::Array`); list choices resolve to their index, while
@@ -69,13 +69,13 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     /// PHP: `@throws \InvalidArgumentException` — the `ChoiceQuestion` validator error
     /// propagates to the caller once `$attempts` is exhausted, hence the `anyhow::Result`
     /// return type.
-    fn select(
+    fn select_bytes(
         &self,
-        question: String,
+        question: &BStr,
         choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
-        error_message: String,
+        error_message: &BStr,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed>;
 
@@ -87,16 +87,16 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
 
     // From PHP `LoggerInterface` (which `IOInterface` extends). Only the
     // variants Composer actually calls through an IO are kept.
-    fn error(&self, message: &str, context: &[(&str, &str)]);
+    fn error_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]);
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]);
+    fn warning_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]);
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]);
+    fn debug_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]);
 }
 
-// The overloads of PHP's `write()`, `writeError()`, `writeRaw()`, `writeErrorRaw()`, `overwrite()`
-// and `overwriteError()`, which take any byte string. They are generic, so they live outside the
-// `dyn IOInterface` vtable.
+// The overloads of the PHP methods taking a string (`write()`, `writeError()`, `ask()`,
+// `select()`, `error()`, ...), which accept any byte string. They are generic, so they live outside
+// the `dyn IOInterface` vtable.
 pub trait IOInterfaceWrite: IOInterfaceImmutable {
     fn write(&self, message: impl AsRef<[u8]>) {
         self.write_bytes(BStr::new(message.as_ref()), true, NORMAL)
@@ -175,6 +175,51 @@ pub trait IOInterfaceWrite: IOInterfaceImmutable {
         verbosity: i64,
     ) {
         self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, size, verbosity)
+    }
+    fn ask(&self, question: impl AsRef<[u8]>, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        self.ask_bytes(BStr::new(question.as_ref()), default)
+    }
+    fn ask_confirmation(&self, question: impl AsRef<[u8]>, default: bool) -> anyhow::Result<bool> {
+        self.ask_confirmation_bytes(BStr::new(question.as_ref()), default)
+    }
+    fn ask_and_validate(
+        &self,
+        question: impl AsRef<[u8]>,
+        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        attempts: Option<i64>,
+        default: PhpMixed,
+    ) -> anyhow::Result<PhpMixed> {
+        self.ask_and_validate_bytes(BStr::new(question.as_ref()), validator, attempts, default)
+    }
+    fn ask_and_hide_answer(&self, question: impl AsRef<[u8]>) -> anyhow::Result<Option<BString>> {
+        self.ask_and_hide_answer_bytes(BStr::new(question.as_ref()))
+    }
+    fn select(
+        &self,
+        question: impl AsRef<[u8]>,
+        choices: PhpMixed,
+        default: PhpMixed,
+        attempts: PhpMixed,
+        error_message: impl AsRef<[u8]>,
+        multiselect: bool,
+    ) -> anyhow::Result<PhpMixed> {
+        self.select_bytes(
+            BStr::new(question.as_ref()),
+            choices,
+            default,
+            attempts,
+            BStr::new(error_message.as_ref()),
+            multiselect,
+        )
+    }
+    fn error(&self, message: impl AsRef<[u8]>, context: &[(&BStr, &BStr)]) {
+        self.error_bytes(BStr::new(message.as_ref()), context)
+    }
+    fn warning(&self, message: impl AsRef<[u8]>, context: &[(&BStr, &BStr)]) {
+        self.warning_bytes(BStr::new(message.as_ref()), context)
+    }
+    fn debug(&self, message: impl AsRef<[u8]>, context: &[(&BStr, &BStr)]) {
+        self.debug_bytes(BStr::new(message.as_ref()), context)
     }
 }
 
@@ -261,39 +306,39 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
             .overwrite_error_bytes(message, newline, size, verbosity)
     }
 
-    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        self.borrow().ask(question, default)
+    fn ask_bytes(&self, question: &BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        self.borrow().ask_bytes(question, default)
     }
 
-    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
-        self.borrow().ask_confirmation(question, default)
+    fn ask_confirmation_bytes(&self, question: &BStr, default: bool) -> anyhow::Result<bool> {
+        self.borrow().ask_confirmation_bytes(question, default)
     }
 
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
         self.borrow()
-            .ask_and_validate(question, validator, attempts, default)
+            .ask_and_validate_bytes(question, validator, attempts, default)
     }
 
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
-        self.borrow().ask_and_hide_answer(question)
+    fn ask_and_hide_answer_bytes(&self, question: &BStr) -> anyhow::Result<Option<BString>> {
+        self.borrow().ask_and_hide_answer_bytes(question)
     }
 
-    fn select(
+    fn select_bytes(
         &self,
-        question: String,
+        question: &BStr,
         choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
-        error_message: String,
+        error_message: &BStr,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
-        self.borrow().select(
+        self.borrow().select_bytes(
             question,
             choices,
             default,
@@ -315,15 +360,15 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         self.borrow().get_authentication(repository_name)
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
-        self.borrow().error(message, context)
+    fn error_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
+        self.borrow().error_bytes(message, context)
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
-        self.borrow().warning(message, context)
+    fn warning_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
+        self.borrow().warning_bytes(message, context)
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
-        self.borrow().debug(message, context)
+    fn debug_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
+        self.borrow().debug_bytes(message, context)
     }
 }

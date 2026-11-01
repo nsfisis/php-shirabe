@@ -1,9 +1,10 @@
 //! ref: composer/src/Composer/IO/BufferIO.php
 
 use crate::io::ConsoleIO;
+use bstr::BString;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, PhpResource, PregMatches, RuntimeException, SEEK_SET, fopen, fseek, fwrite,
-    legacy_lossy, php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
+    PHP_EOL, PhpMixed, PhpResource, PregMatches, RuntimeException, SEEK_SET, bconcat, fopen, fseek,
+    fwrite, php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
 };
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
 use shirabe_symfony_console::helper::QuestionHelper;
@@ -17,11 +18,11 @@ pub struct BufferIO {
 
 impl BufferIO {
     pub fn new(
-        input: String,
+        input: impl AsRef<[u8]>,
         verbosity: i64,
         formatter: Option<std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>>,
     ) -> anyhow::Result<Self> {
-        let mut input_obj = StringInput::new(&input)?;
+        let mut input_obj = StringInput::new(input)?;
         input_obj.set_interactive(false);
 
         let stream = match fopen("php://memory", "rw") {
@@ -51,7 +52,7 @@ impl BufferIO {
         Ok(Self { inner })
     }
 
-    pub fn get_output(&self) -> String {
+    pub fn get_output(&self) -> BString {
         let output = self.inner.output.borrow();
         let stream_output = (*output)
             .as_any()
@@ -60,10 +61,7 @@ impl BufferIO {
         let stream = stream_output.get_stream();
         fseek(stream, 0, SEEK_SET);
 
-        // TODO(bytes): preg_replace_callback matches over a &str, and the output is returned as a
-        // String.
-        let output =
-            String::from_utf8_lossy(&stream_get_contents(stream).unwrap_or_default()).into_owned();
+        let output = BString::from(stream_get_contents(stream).unwrap_or_default());
 
         // Regex pattern compatibility:
         // PHP uses `{(?<=^|\n|\x08)(.+?)(\x08+)}` to collapse backspace-overwritten spans (e.g.
@@ -76,22 +74,18 @@ impl BufferIO {
         loop {
             let next = preg_replace_callback(
                 php_regex!(r"{(^|\n|\x08)(.+?)(\x08+)}"),
-                |matches: &PregMatches| -> anyhow::Result<String> {
+                |matches: &PregMatches| -> anyhow::Result<BString> {
                     let g1 = matches.get(1).unwrap_or_default();
                     let g2 = matches.get(2).unwrap_or_default();
                     let g3 = matches.get(3).unwrap_or_default();
                     let pre = strip_tags(g2);
 
                     if pre.len() == g3.len() {
-                        return Ok(legacy_lossy(g1).into_owned());
+                        return Ok(BString::from(g1));
                     }
 
                     // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs
-                    Ok(format!(
-                        "{}{}\n",
-                        legacy_lossy(&g1),
-                        legacy_lossy(&rtrim(g2))
-                    ))
+                    Ok(bconcat!(g1, rtrim(g2), "\n"))
                 },
                 &output,
             )
@@ -99,12 +93,12 @@ impl BufferIO {
             if next == output {
                 break;
             }
-            output = legacy_lossy(&next).into_owned();
+            output = next;
         }
         output
     }
 
-    pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> anyhow::Result<()> {
+    pub fn set_user_inputs(&mut self, inputs: Vec<impl AsRef<[u8]>>) -> anyhow::Result<()> {
         let stream = self.create_stream(inputs)?;
 
         let mut input = self.inner.input.borrow_mut();
@@ -119,7 +113,7 @@ impl BufferIO {
         Ok(())
     }
 
-    fn create_stream(&self, inputs: Vec<String>) -> anyhow::Result<PhpResource> {
+    fn create_stream(&self, inputs: Vec<impl AsRef<[u8]>>) -> anyhow::Result<PhpResource> {
         let stream = match fopen("php://memory", "r+") {
             Ok(stream) => stream,
             Err(_) => {
@@ -131,7 +125,7 @@ impl BufferIO {
         };
 
         for input in inputs {
-            fwrite(&stream, format!("{}{}", input, PHP_EOL), None);
+            fwrite(&stream, bconcat!(input.as_ref(), PHP_EOL), None);
         }
 
         rewind(&stream);
@@ -189,35 +183,38 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
         self.inner
             .overwrite_error_bytes(message, newline, size, verbosity)
     }
-    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        self.inner.ask(question, default)
+    fn ask_bytes(&self, question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        self.inner.ask_bytes(question, default)
     }
-    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
-        self.inner.ask_confirmation(question, default)
+    fn ask_confirmation_bytes(&self, question: &bstr::BStr, default: bool) -> anyhow::Result<bool> {
+        self.inner.ask_confirmation_bytes(question, default)
     }
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
         self.inner
-            .ask_and_validate(question, validator, attempts, default)
+            .ask_and_validate_bytes(question, validator, attempts, default)
     }
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
-        self.inner.ask_and_hide_answer(question)
-    }
-    fn select(
+    fn ask_and_hide_answer_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
+    ) -> anyhow::Result<Option<bstr::BString>> {
+        self.inner.ask_and_hide_answer_bytes(question)
+    }
+    fn select_bytes(
+        &self,
+        question: &bstr::BStr,
         choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
-        error_message: String,
+        error_message: &bstr::BStr,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
-        self.inner.select(
+        self.inner.select_bytes(
             question,
             choices,
             default,
@@ -240,16 +237,16 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
         self.inner.get_authentication(repository_name)
     }
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.error(message, context)
+    fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
+        self.inner.error_bytes(message, context)
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.warning(message, context)
+    fn warning_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
+        self.inner.warning_bytes(message, context)
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.debug(message, context)
+    fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
+        self.inner.debug_bytes(message, context)
     }
 }
 

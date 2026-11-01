@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/TableCellStyle.php
 
 use crate::exception::InvalidArgumentException;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, STR_PAD_BOTH, STR_PAD_LEFT, STR_PAD_RIGHT};
 
@@ -40,7 +40,7 @@ impl TableCellStyle {
         let diff: Vec<String> = options
             .keys()
             .filter(|key| !this_options.contains_key(*key))
-            .map(|key| key.to_str_lossy().into_owned())
+            .map(|key| key.display_lossy().to_string())
             .collect();
         if !diff.is_empty() {
             return Err(InvalidArgumentException::new(format!(
@@ -51,7 +51,7 @@ impl TableCellStyle {
 
         if let Some(align) = options.get(B("align")) {
             let align = match align {
-                PhpMixed::String(align) => align.to_str_lossy().into_owned(),
+                PhpMixed::String(align) => align.display_lossy().to_string(),
                 _ => String::new(),
             };
             if align_map(&align).is_none() {
@@ -90,7 +90,7 @@ impl TableCellStyle {
 
     pub fn get_pad_by_align(&self) -> i64 {
         let align = match &self.get_options()[B("align")] {
-            PhpMixed::String(align) => align.to_str_lossy().into_owned(),
+            PhpMixed::String(align) => align.display_lossy().to_string(),
             _ => String::new(),
         };
         align_map(&align).unwrap()
@@ -98,7 +98,7 @@ impl TableCellStyle {
 
     pub fn get_cell_format(&self) -> Option<String> {
         match &self.get_options()[B("cellFormat")] {
-            PhpMixed::String(format) => Some(format.to_str_lossy().into_owned()),
+            PhpMixed::String(format) => Some(format.display_lossy().to_string()),
             _ => None,
         }
     }

@@ -11,7 +11,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bconcat, date_create, legacy_lossy, path_from_bytes,
+    Catch as _, PhpMixed, RuntimeException, bconcat, date_create, intval, path_from_bytes,
     php_regex, preg_is_match, preg_match, preg_replace, rtrim2, stripos, strrpos, strtr, substr,
     trim, trim2,
 };
@@ -90,23 +90,16 @@ impl SvnDriver {
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            format!(
-                "{}/{}",
-                legacy_lossy(
-                    &self
-                        .inner
-                        .config
-                        .borrow_mut()
-                        .get("cache-repo-dir")
-                        .as_string()
-                        .unwrap_or_default()
-                ),
-                legacy_lossy(&preg_replace(
-                    r"{[^a-z0-9.]}i",
-                    "-",
-                    Url::sanitize(BString::from(&self.base_url.clone()[..]))
-                )),
-            ),
+            path_from_bytes(&bconcat!(
+                self.inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-repo-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+                "/",
+                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&self.base_url)),
+            )),
             None,
             None,
             false,
@@ -143,7 +136,7 @@ impl SvnDriver {
         m
     }
 
-    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<BString, BString>> {
+    pub fn get_dist(&self, _identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         None
     }
 
@@ -345,10 +338,7 @@ impl SvnDriver {
                             && let Some(m) =
                                 preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                         {
-                            let rev: i64 = m
-                                .get(1)
-                                .and_then(|s| legacy_lossy(s).parse().ok())
-                                .unwrap_or(0);
+                            let rev = intval(&PhpMixed::string(m.get(1).unwrap_or_default()));
                             let path = BString::from(m.get(2).unwrap_or_default());
                             if path == "./" {
                                 last_rev = rev;
@@ -394,10 +384,7 @@ impl SvnDriver {
                     if !line.is_empty()
                         && let Some(m) = preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                     {
-                        let rev: i64 = m
-                            .get(1)
-                            .and_then(|s| legacy_lossy(s).parse().ok())
-                            .unwrap_or(0);
+                        let rev = intval(&PhpMixed::string(m.get(1).unwrap_or_default()));
                         let path = BString::from(m.get(2).unwrap_or_default());
                         if path == "./" {
                             let identifier = self.build_identifier(
@@ -435,10 +422,7 @@ impl SvnDriver {
                             && let Some(m) =
                                 preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                         {
-                            let rev: i64 = m
-                                .get(1)
-                                .and_then(|s| legacy_lossy(s).parse().ok())
-                                .unwrap_or(0);
+                            let rev = intval(&PhpMixed::string(m.get(1).unwrap_or_default()));
                             let path = BString::from(m.get(2).unwrap_or_default());
                             if path == "./" {
                                 last_rev = rev;
@@ -466,7 +450,7 @@ impl SvnDriver {
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        let url = legacy_lossy(&Self::normalize_url(url)).into_owned();
+        let url = Self::normalize_url(url);
         if preg_is_match(php_regex!(r"#(^svn://|^svn\+ssh://|svn\.)#i"), &url) {
             return Ok(true);
         }
@@ -480,10 +464,10 @@ impl SvnDriver {
         let mut ignored_output = BString::default();
         let exit = process.execute(
             &[
-                "svn".to_string(),
-                "info".to_string(),
-                "--non-interactive".to_string(),
-                "--".to_string(),
+                BString::from("svn"),
+                "info".into(),
+                "--non-interactive".into(),
+                "--".into(),
                 url,
             ],
             &mut ignored_output,
@@ -611,7 +595,7 @@ impl crate::repository::vcs::VcsDriverInterface for SvnDriver {
     }
 
     fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
-        SvnDriver::get_dist(self, &legacy_lossy(identifier))
+        SvnDriver::get_dist(self, identifier)
     }
 
     fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {

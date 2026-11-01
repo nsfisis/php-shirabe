@@ -246,7 +246,10 @@ pub trait VcsDownloader:
         }
 
         self.io().write_error3(
-            format!("  - {}: ", InstallOperation::format(package.clone(), false)),
+            format!(
+                "  - {}: ",
+                InstallOperation::format(package.clone(), false).display_lossy()
+            ),
             false,
             io_interface::NORMAL,
         );
@@ -311,7 +314,7 @@ pub trait VcsDownloader:
         self.io().write_error3(
             format!(
                 "  - {}: ",
-                UpdateOperation::format(initial.clone(), target.clone(), false),
+                UpdateOperation::format(initial.clone(), target.clone(), false).display_lossy(),
             ),
             false,
             io_interface::NORMAL,
@@ -410,7 +413,10 @@ pub trait VcsDownloader:
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io().write_error3(
-            format!("  - {}", UninstallOperation::format(package, false)),
+            format!(
+                "  - {}",
+                UninstallOperation::format(package, false).display_lossy()
+            ),
             true,
             io_interface::NORMAL,
         );

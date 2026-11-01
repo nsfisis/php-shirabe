@@ -18,7 +18,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, count, explode, in_array_strict, legacy_lossy,
+    UnexpectedValueException, count, explode, in_array_strict,
 };
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
@@ -421,16 +421,16 @@ impl BaseCommand for BaseCommandData {
         let mut prefer_source = false;
         let mut prefer_dist = false;
 
-        match &*config
+        match config
             .get("preferred-install")
             .as_string()
             .unwrap_or_default()
-            .to_str_lossy()
+            .as_bytes()
         {
-            "source" => {
+            b"source" => {
                 prefer_source = true;
             }
-            "dist" => {
+            b"dist" => {
                 prefer_dist = true;
             }
             _ => {
@@ -665,7 +665,11 @@ impl BaseCommand for BaseCommandData {
             .into());
         }
 
-        Ok(legacy_lossy(val.as_string().unwrap_or_default()).into_owned())
+        Ok(val
+            .as_string()
+            .unwrap_or_default()
+            .display_lossy()
+            .to_string())
     }
 
     fn create_audit_config(

@@ -10,7 +10,8 @@ use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use shirabe_php_shim::{InvalidArgumentException, impl_php_class, legacy_lossy, preg_is_match};
+use bstr::BStr;
+use shirabe_php_shim::{InvalidArgumentException, impl_php_class, preg_is_match};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -84,7 +85,7 @@ impl Command for ReinstallCommand {
         let repository_manager = repository_manager.borrow();
         let local_repo = repository_manager.get_local_repository();
         let mut packages_to_reinstall: Vec<crate::package::PackageInterfaceHandle> = vec![];
-        let mut package_names_to_reinstall: Vec<String> = vec![];
+        let mut package_names_to_reinstall: Vec<bstr::BString> = vec![];
 
         let type_option = input.borrow().get_option("type")?;
         let type_count = type_option.as_array().map_or(0, <[bstr::BString]>::len);
@@ -105,7 +106,7 @@ impl Command for ReinstallCommand {
                 .unwrap_or_default();
             for package in local_repo.get_canonical_packages()? {
                 if filter_types.iter().any(|t| *t == package.get_type()) {
-                    package_names_to_reinstall.push(legacy_lossy(&package.get_name()).into_owned());
+                    package_names_to_reinstall.push(package.get_name());
                     packages_to_reinstall.push(package);
                 }
             }
@@ -126,8 +127,7 @@ impl Command for ReinstallCommand {
                 for package in local_repo.get_canonical_packages()? {
                     if preg_is_match(&pattern_regexp, package.get_name()) {
                         matched = true;
-                        package_names_to_reinstall
-                            .push(legacy_lossy(&package.get_name()).into_owned());
+                        package_names_to_reinstall.push(package.get_name());
                         packages_to_reinstall.push(package);
                     }
                 }
@@ -154,7 +154,8 @@ impl Command for ReinstallCommand {
             .into_iter()
             .filter(|package| {
                 !package_names_to_reinstall
-                    .contains(&legacy_lossy(&package.get_name()).into_owned())
+                    .iter()
+                    .any(|name| *name == package.get_name())
             })
             .collect();
 
@@ -273,7 +274,7 @@ impl Command for ReinstallCommand {
                 .borrow()
                 .get_option("apcu-autoloader-prefix")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BStr::to_owned);
             let apcu = apcu_prefix.is_some()
                 || input
                     .borrow()

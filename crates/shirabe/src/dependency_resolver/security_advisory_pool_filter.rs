@@ -6,7 +6,6 @@ use crate::package::BasePackageHandle;
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle, RepositorySet};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
@@ -153,12 +152,8 @@ impl SecurityAdvisoryPoolFilter {
                 continue;
             }
 
-            let package_constraint = SimpleConstraint::new(
-                "==",
-                legacy_lossy(&package.get_version()).into_owned(),
-                None,
-            )
-            .into();
+            let package_constraint =
+                SimpleConstraint::new("==", package.get_version(), None).into();
             for advisory in &advisory_map[&package_name] {
                 if advisory.affected_versions().matches(&package_constraint) {
                     matching_advisories.push(advisory.clone());

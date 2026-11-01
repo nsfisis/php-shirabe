@@ -30,8 +30,8 @@ pub use package_events::*;
 pub use plugin_installer::*;
 pub use project_installer::*;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, array_map, array_unique, implode, intval, is_dir,
-    is_numeric, legacy_lossy, strcmp, strpos, strtolower, touch, usort,
+    Catch as _, PhpMixed, RuntimeException, array_map, array_unique, bconcat, implode, intval,
+    is_dir, is_numeric, path_from_bytes, strcmp, strpos, strtolower, touch, usort,
 };
 pub use suggested_packages_reporter::*;
 
@@ -91,7 +91,7 @@ pub struct Installer {
     optimize_autoloader: bool,
     class_map_authoritative: bool,
     apcu_autoloader: bool,
-    apcu_autoloader_prefix: Option<String>,
+    apcu_autoloader_prefix: Option<BString>,
     dev_mode: bool,
     dry_run: bool,
     download_only: bool,
@@ -348,7 +348,7 @@ impl Installer {
             };
 
             let replacement = if let Some(repl) = complete.get_replacement_package() {
-                format!("Use {} instead", legacy_lossy(&repl))
+                format!("Use {} instead", repl.display_lossy())
             } else {
                 "No replacement was suggested".to_string()
             };
@@ -511,10 +511,10 @@ impl Installer {
                     Err(e) => {
                         if let Some(te) = e.catch::<TransportException>() {
                             self.io
-                                .error(&format!("Failed to audit {} packages.", target), &[]);
+                                .error(format!("Failed to audit {} packages.", target), &[]);
                             if self.io.is_verbose() {
                                 self.io.error(
-                                    &format!("[{}] {}", "TransportException", te.get_message()),
+                                    format!("[{}] {}", "TransportException", te.get_message()),
                                     &[],
                                 );
                             }
@@ -670,7 +670,11 @@ impl Installer {
                 }
 
                 let mut ghe = GithubActionError::new(self.io.clone());
-                ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+                ghe.emit(
+                    &format!("{}\n{}", err, pretty_problem.display_lossy()),
+                    None,
+                    None,
+                );
 
                 return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
             }
@@ -725,19 +729,19 @@ impl Installer {
         let mut installs_updates: Vec<std::rc::Rc<AnyOperation>> = vec![];
         let mut uninstalls: Vec<std::rc::Rc<AnyOperation>> = vec![];
         if !lock_transaction.get_operations().is_empty() {
-            let mut install_names: Vec<String> = vec![];
-            let mut update_names: Vec<String> = vec![];
-            let mut uninstall_names: Vec<String> = vec![];
+            let mut install_names: Vec<BString> = vec![];
+            let mut update_names: Vec<BString> = vec![];
+            let mut uninstall_names: Vec<BString> = vec![];
             for operation in lock_transaction.get_operations() {
                 if let AnyOperation::Install(io) = &**operation {
                     installs_updates.push(operation.clone());
-                    install_names.push(format!(
-                        "{}:{}",
-                        legacy_lossy(&io.get_package().get_pretty_name()),
-                        legacy_lossy(&io.get_package().get_full_pretty_version(
+                    install_names.push(bconcat!(
+                        io.get_package().get_pretty_name(),
+                        ":",
+                        io.get_package().get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev
-                        ))
+                        )
                     ));
                 } else if let AnyOperation::Update(uo) = &**operation {
                     // when mirrors/metadata from a package gets updated we do not want to list it as an
@@ -751,18 +755,17 @@ impl Installer {
                     }
 
                     installs_updates.push(operation.clone());
-                    update_names.push(format!(
-                        "{}:{}",
-                        legacy_lossy(&uo.get_target_package().get_pretty_name()),
-                        legacy_lossy(&uo.get_target_package().get_full_pretty_version(
+                    update_names.push(bconcat!(
+                        uo.get_target_package().get_pretty_name(),
+                        ":",
+                        uo.get_target_package().get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev
-                        ))
+                        )
                     ));
                 } else if let AnyOperation::Uninstall(uo) = &**operation {
                     uninstalls.push(operation.clone());
-                    uninstall_names
-                        .push(legacy_lossy(&uo.get_package().get_pretty_name()).into_owned());
+                    uninstall_names.push(uo.get_package().get_pretty_name());
                 }
             }
 
@@ -840,17 +843,17 @@ impl Installer {
                 .unwrap_or(false)
                 && (strpos(operation.get_operation_type(), "Alias").is_none() || self.io.is_debug())
             {
-                let mut source_repo = String::new();
+                let mut source_repo = BString::default();
                 if self.io.is_very_verbose()
                     && strpos(operation.get_operation_type(), "Alias").is_none()
                 {
                     let operation_pkg = operation.get_target_package();
                     if let Some(repo) = operation_pkg.get_repository() {
-                        source_repo = format!(" from {}", legacy_lossy(&repo.get_repo_name()?));
+                        source_repo = bconcat!(" from ", repo.get_repo_name()?);
                     }
                 }
                 self.io
-                    .write_error(format!("  - {}{}", operation.show(true), source_repo));
+                    .write_error(bconcat!("  - ", operation.show(true), source_repo));
             }
         }
 
@@ -879,7 +882,7 @@ impl Installer {
             platform_reqs,
             platform_dev_reqs,
             aliases_php_mixed,
-            &legacy_lossy(&self.package.get_minimum_stability()),
+            self.package.get_minimum_stability().as_ref(),
             self.package.get_stability_flags(),
             self.prefer_stable || self.package.get_prefer_stable(),
             self.prefer_lowest,
@@ -968,7 +971,11 @@ impl Installer {
                 self.io.write_error(&pretty_problem);
 
                 let mut ghe = GithubActionError::new(self.io.clone());
-                ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+                ghe.emit(
+                    &format!("{}\n{}", err, pretty_problem.display_lossy()),
+                    None,
+                    None,
+                );
 
                 return Ok(e.get_code());
             }
@@ -1146,7 +1153,11 @@ impl Installer {
                     self.io.write_error(&pretty_problem);
 
                     let mut ghe = GithubActionError::new(self.io.clone());
-                    ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+                    ghe.emit(
+                        &format!("{}\n{}", err, pretty_problem.display_lossy()),
+                        None,
+                        None,
+                    );
 
                     return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
                 }
@@ -1176,30 +1187,26 @@ impl Installer {
                 local_repo_transaction.clone(),
             )?;
 
-        let mut installs: Vec<String> = vec![];
-        let mut updates: Vec<String> = vec![];
-        let mut uninstalls: Vec<String> = vec![];
+        let mut installs: Vec<BString> = vec![];
+        let mut updates: Vec<BString> = vec![];
+        let mut uninstalls: Vec<BString> = vec![];
         for operation in local_repo_transaction.get_operations() {
             if let AnyOperation::Install(io) = &**operation {
-                installs.push(format!(
-                    "{}:{}",
-                    legacy_lossy(&io.get_package().get_pretty_name()),
-                    legacy_lossy(&io.get_package().get_full_pretty_version(
-                        true,
-                        crate::package::DisplayMode::SourceRefIfDev
-                    ))
+                installs.push(bconcat!(
+                    io.get_package().get_pretty_name(),
+                    ":",
+                    io.get_package()
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 ));
             } else if let AnyOperation::Update(uo) = &**operation {
-                updates.push(format!(
-                    "{}:{}",
-                    legacy_lossy(&uo.get_target_package().get_pretty_name()),
-                    legacy_lossy(&uo.get_target_package().get_full_pretty_version(
-                        true,
-                        crate::package::DisplayMode::SourceRefIfDev
-                    ))
+                updates.push(bconcat!(
+                    uo.get_target_package().get_pretty_name(),
+                    ":",
+                    uo.get_target_package()
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 ));
             } else if let AnyOperation::Uninstall(uo) = &**operation {
-                uninstalls.push(legacy_lossy(&uo.get_package().get_pretty_name()).into_owned());
+                uninstalls.push(uo.get_package().get_pretty_name());
             }
         }
 
@@ -1255,26 +1262,25 @@ impl Installer {
 
             // see https://github.com/composer/composer/issues/2764
             if !local_repo_transaction.get_operations().is_empty() {
-                let vendor_dir = legacy_lossy(
+                let vendor_dir = BString::from(
                     self.config
                         .borrow_mut()
                         .get("vendor-dir")
                         .as_string()
                         .unwrap_or_default(),
-                )
-                .into_owned();
-                if is_dir(&vendor_dir) {
+                );
+                let vendor_dir = path_from_bytes(&vendor_dir);
+                if is_dir(vendor_dir) {
                     // suppress errors as this fails sometimes on OSX for no apparent reason
                     // see https://github.com/composer/composer/issues/4070#issuecomment-129792748
-                    let _ = touch(&vendor_dir);
+                    let _ = touch(vendor_dir);
                 }
             }
         } else {
             for operation in local_repo_transaction.get_operations() {
                 // output op, but alias op only in debug verbosity
                 if strpos(operation.get_operation_type(), "Alias").is_none() || self.io.is_debug() {
-                    self.io
-                        .write_error(format!("  - {}", operation.show(false)));
+                    self.io.write_error(bconcat!("  - ", operation.show(false)));
                 }
             }
         }
@@ -1320,12 +1326,12 @@ impl Installer {
         root_aliases: &[IndexMap<BString, BString>],
         locked_repository: Option<&mut dyn RepositoryInterface>,
     ) -> anyhow::Result<RepositorySet> {
-        let minimum_stability: String;
+        let minimum_stability: BString;
         let mut stability_flags: IndexMap<BString, i64>;
 
         let requires: IndexMap<BString, AnyConstraint>;
         if for_update {
-            minimum_stability = legacy_lossy(&self.package.get_minimum_stability()).into_owned();
+            minimum_stability = self.package.get_minimum_stability();
             stability_flags = self.package.get_stability_flags();
 
             // Convert Link map merge into ConstraintInterface map for use later
@@ -1343,14 +1349,11 @@ impl Installer {
             }
             requires = tmp;
         } else {
-            minimum_stability = legacy_lossy(
-                &self
-                    .locker
-                    .borrow_mut()
-                    .get_minimum_stability()
-                    .unwrap_or_else(|_| bstr::BString::from(String::new())),
-            )
-            .into_owned();
+            minimum_stability = self
+                .locker
+                .borrow_mut()
+                .get_minimum_stability()
+                .unwrap_or_default();
             stability_flags = self
                 .locker
                 .borrow_mut()
@@ -1361,10 +1364,8 @@ impl Installer {
             for package in locked_repository.unwrap().get_packages()? {
                 let constraint = SimpleConstraint::new(
                     "=",
-                    legacy_lossy(&package.get_version()).into_owned(),
-                    Some(bstr::BString::from(
-                        legacy_lossy(&package.get_pretty_version()).into_owned(),
-                    )),
+                    package.get_version(),
+                    Some(package.get_pretty_version()),
                 );
                 tmp.insert(
                     bstr::BString::from(&package.get_name()[..]),
@@ -1537,14 +1538,11 @@ impl Installer {
             let name = package.get_name();
             if !pkg_repo_is_platform
                 || !provided.contains_key(&name)
-                || !provided.get(&name).unwrap().get_constraint().matches(
-                    &SimpleConstraint::new(
-                        "=",
-                        legacy_lossy(&package.get_version()).into_owned(),
-                        None,
-                    )
-                    .into(),
-                )
+                || !provided
+                    .get(&name)
+                    .unwrap()
+                    .get_constraint()
+                    .matches(&SimpleConstraint::new("=", package.get_version(), None).into())
             {
                 request.fix_package(package);
             }
@@ -1834,7 +1832,7 @@ impl Installer {
     pub fn set_apcu_autoloader(
         &mut self,
         apcu_autoloader: bool,
-        apcu_autoloader_prefix: Option<String>,
+        apcu_autoloader_prefix: Option<BString>,
     ) -> &mut Self {
         self.apcu_autoloader = apcu_autoloader;
         self.apcu_autoloader_prefix = apcu_autoloader_prefix;

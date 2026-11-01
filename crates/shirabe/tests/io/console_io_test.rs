@@ -192,7 +192,7 @@ fn test_ask() {
     // stream yields the answer makes ConsoleIO::ask return that answer.
     let (console_io, _output) = make_console_io_with_answer("answer\n");
     let result = console_io
-        .ask("Why?".into(), PhpMixed::string("default".to_string()))
+        .ask("Why?", PhpMixed::string("default".to_string()))
         .unwrap();
     assert_eq!(PhpMixed::string("answer".to_string()), result);
 }
@@ -202,18 +202,10 @@ fn test_ask_confirmation() {
     // PHP asserts the helper receives a StrictConfirmationQuestion. Behaviorally, a "yes" answer
     // confirms and a "no" answer denies via the StrictConfirmationQuestion ConsoleIO builds.
     let (console_io, _output) = make_console_io_with_answer("yes\n");
-    assert!(
-        console_io
-            .ask_confirmation("Why?".to_string(), false)
-            .unwrap()
-    );
+    assert!(console_io.ask_confirmation("Why?", false).unwrap());
 
     let (console_io, _output) = make_console_io_with_answer("no\n");
-    assert!(
-        !console_io
-            .ask_confirmation("Why?".to_string(), false)
-            .unwrap()
-    );
+    assert!(!console_io.ask_confirmation("Why?", false).unwrap());
 }
 
 #[test]
@@ -224,7 +216,7 @@ fn test_ask_and_validate() {
     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(Ok);
     let result = console_io
         .ask_and_validate(
-            "Why?".to_string(),
+            "Why?",
             validator,
             Some(10),
             PhpMixed::string("default".to_string()),
@@ -240,14 +232,14 @@ fn test_select() {
     // ["item1","item2"] resolves to that choice, which select maps back to its index '1'.
     let (console_io, _output) = make_console_io_with_answer("item2\n");
     let result = console_io.select(
-        "Select item".into(),
+        "Select item",
         PhpMixed::List(vec![
             PhpMixed::string("item1".to_string()),
             PhpMixed::string("item2".to_string()),
         ]),
         PhpMixed::string("item1".to_string()),
         PhpMixed::Bool(false),
-        "Error message".to_string(),
+        "Error message",
         true,
     );
     assert_eq!(

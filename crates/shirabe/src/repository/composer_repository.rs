@@ -5,7 +5,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::package::loader::{ArrayLoader, VersionFields};
 use crate::package::version::{StabilityFilter, VersionParser};
@@ -1470,7 +1470,7 @@ impl ComposerRepository {
                                     Some(bconcat!("not-found file (", Url::sanitize(&url), ")"));
                                 if status_code == Some(499) {
                                     self.io.error(
-                                        &format!("<warning>{}</warning>", te.get_message()),
+                                        format!("<warning>{}</warning>", te.get_message()),
                                         &[],
                                     );
                                 }

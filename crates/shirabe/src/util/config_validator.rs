@@ -9,7 +9,8 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, file_get_contents, php_regex, preg_is_match, preg_replace, strtolower,
+    Catch as _, PhpMixed, file_get_contents, php_regex, preg_is_match, preg_replace, str_replace,
+    strtolower,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use std::path::Path;
@@ -73,9 +74,7 @@ impl ConfigValidator {
         }
 
         if manifest.is_some() {
-            // TODO(bytes): detect_duplicate_keys scans the JSON as a &str.
-            let contents =
-                String::from_utf8_lossy(&file_get_contents(file).unwrap_or_default()).into_owned();
+            let contents = file_get_contents(file).unwrap_or_default();
             if let Some((key, line)) = detect_duplicate_keys(&contents) {
                 warnings.push(format!(
                     "Key {key} is a duplicate in {} at line {line}",
@@ -98,13 +97,13 @@ impl ConfigValidator {
             warnings.push("No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.".to_string());
         } else {
             let license_val = manifest.get(B("license")).unwrap();
-            let licenses: Vec<String> = match license_val {
-                PhpMixed::String(s) => vec![s.to_str_lossy().into_owned()],
+            let licenses: Vec<BString> = match license_val {
+                PhpMixed::String(s) => vec![s.clone()],
                 PhpMixed::List(list) => list
                     .iter()
                     .filter_map(|v| {
                         if let PhpMixed::String(s) = v {
-                            Some(s.to_str_lossy().into_owned())
+                            Some(s.clone())
                         } else {
                             None
                         }
@@ -114,7 +113,7 @@ impl ConfigValidator {
             };
 
             // strip proprietary since it's not a valid SPDX identifier, but is accepted by composer
-            let licenses: Vec<String> = licenses
+            let licenses: Vec<BString> = licenses
                 .into_iter()
                 .filter(|l| l != "proprietary")
                 .collect();
@@ -126,18 +125,20 @@ impl ConfigValidator {
                     if preg_is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license) {
                         warnings.push(format!(
                             "License \"{}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead",
-                            license,
-                            license.replace('+', "")
+                            license.display_lossy(),
+                            str_replace("+", "", license).display_lossy()
                         ));
                     } else if preg_is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"), license) {
                         warnings.push(format!(
                             "License \"{}\" is a deprecated SPDX license identifier, use \"{}-only\" or \"{}-or-later\" instead",
-                            license, license, license
+                            license.display_lossy(),
+                            license.display_lossy(),
+                            license.display_lossy()
                         ));
                     } else {
                         warnings.push(format!(
                             "License \"{}\" is a deprecated SPDX license identifier, see https://spdx.org/licenses/",
-                            license
+                            license.display_lossy()
                         ));
                     }
                 }
@@ -316,10 +317,10 @@ impl ConfigValidator {
 /// Detects the first duplicate object key in a JSON text, returning its key name and line number.
 /// Replaces `Seld\JsonLint\JsonParser` with `DETECT_KEY_CONFLICTS`.
 /// Returns `None` on no collision, even if any other error occurs.
-fn detect_duplicate_keys(json: &str) -> Option<(String, usize)> {
+fn detect_duplicate_keys(json: &[u8]) -> Option<(String, usize)> {
     let duplicate_key: std::cell::Cell<Option<String>> = std::cell::Cell::new(None);
 
-    let mut deserializer = serde_json::Deserializer::from_str(json);
+    let mut deserializer = serde_json::Deserializer::from_slice(json);
     let seed = DuplicateKeyScanSeed {
         duplicate_key: &duplicate_key,
     };
@@ -423,24 +424,33 @@ mod tests {
 
     #[test]
     fn no_duplicates() {
-        assert_eq!(detect_duplicate_keys("{\"a\": 1, \"b\": {\"c\": 2}}"), None);
+        assert_eq!(
+            detect_duplicate_keys(b"{\"a\": 1, \"b\": {\"c\": 2}}"),
+            None
+        );
     }
 
     #[test]
     fn top_level_duplicate_reports_key_and_line() {
         let json = "{\n    \"name\": \"a\",\n    \"name\": \"b\"\n}";
-        assert_eq!(detect_duplicate_keys(json), Some(("name".to_string(), 3)));
+        assert_eq!(
+            detect_duplicate_keys(json.as_bytes()),
+            Some(("name".to_string(), 3))
+        );
     }
 
     #[test]
     fn nested_duplicate_is_detected() {
         let json =
             "{\n    \"require\": {\n        \"x/y\": \"1\",\n        \"x/y\": \"2\"\n    }\n}";
-        assert_eq!(detect_duplicate_keys(json), Some(("x/y".to_string(), 4)));
+        assert_eq!(
+            detect_duplicate_keys(json.as_bytes()),
+            Some(("x/y".to_string(), 4))
+        );
     }
 
     #[test]
     fn syntax_error_is_not_reported_as_duplicate() {
-        assert_eq!(detect_duplicate_keys("{ not json"), None);
+        assert_eq!(detect_duplicate_keys(b"{ not json"), None);
     }
 }

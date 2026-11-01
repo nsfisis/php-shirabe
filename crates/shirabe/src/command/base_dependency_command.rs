@@ -11,10 +11,10 @@ use crate::repository::{
     RootPackageRepository,
 };
 use crate::util::PackageInfo;
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, legacy_lossy,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, bconcat, rtrim,
 };
 use shirabe_semver::constraint::{AnyConstraint, Bound};
 use shirabe_symfony_console::formatter::{OutputFormatter, OutputFormatterStyle};
@@ -124,40 +124,38 @@ pub trait BaseDependencyCommand: BaseCommand {
 
         let mut installed_repo = InstalledRepository::new(repos);
 
-        let needle = legacy_lossy(
+        let needle = BString::from(
             input
                 .borrow()
                 .get_argument(Self::ARGUMENT_PACKAGE)?
                 .as_string()
                 .unwrap_or_default(),
-        )
-        .into_owned();
-        let text_constraint: String = if input.borrow().has_argument(Self::ARGUMENT_CONSTRAINT) {
-            legacy_lossy(
+        );
+        let text_constraint: BString = if input.borrow().has_argument(Self::ARGUMENT_CONSTRAINT) {
+            BString::from(
                 input
                     .borrow()
                     .get_argument(Self::ARGUMENT_CONSTRAINT)?
                     .as_string()
-                    .unwrap_or(bstr::BStr::new("*")),
+                    .unwrap_or(BStr::new("*")),
             )
-            .into_owned()
         } else {
-            "*".to_string()
+            BString::from("*")
         };
 
-        let packages = installed_repo
-            .find_packages_with_replacers_and_providers(bstr::BStr::new(&needle), None)?;
+        let packages =
+            installed_repo.find_packages_with_replacers_and_providers(BStr::new(&needle), None)?;
         if packages.is_empty() {
             return Err(InvalidArgumentException::new(format!(
                 "Could not find package \"{}\" in your project",
-                needle
+                needle.display_lossy()
             ))
             .into());
         }
 
         let matched_package = installed_repo.find_package(
-            bstr::BStr::new(&needle),
-            FindPackageConstraint::String(bstr::BString::from(text_constraint.clone())),
+            BStr::new(&needle),
+            FindPackageConstraint::String(text_constraint.clone()),
         )?;
         match &matched_package {
             None => {
@@ -172,8 +170,8 @@ pub trait BaseDependencyCommand: BaseCommand {
                     .collect(),
                 );
                 if let Some(r#match) = default_repos.find_package(
-                    bstr::BStr::new(&needle),
-                    FindPackageConstraint::String(bstr::BString::from(text_constraint.clone())),
+                    BStr::new(&needle),
+                    FindPackageConstraint::String(text_constraint.clone()),
                 )? {
                     installed_repo.add_repository(
                         crate::repository::RepositoryInterfaceHandle::new(
@@ -186,14 +184,10 @@ pub trait BaseDependencyCommand: BaseCommand {
                     let parser = VersionParser::new();
                     let platform_constraint = parser.parse_constraints(&text_constraint)?;
                     if platform_constraint.get_lower_bound() != Bound::zero() {
-                        let version =
-                            legacy_lossy(platform_constraint.get_lower_bound().get_version())
-                                .into_owned();
-                        let temp_platform_pkg = Package::new(
-                            bstr::BString::from(needle.clone()),
-                            bstr::BString::from(version.clone()),
-                            bstr::BString::from(version),
-                        );
+                        let lower_bound = platform_constraint.get_lower_bound();
+                        let version = BString::from(lower_bound.get_version());
+                        let temp_platform_pkg =
+                            Package::new(needle.clone(), version.clone(), version);
                         installed_repo.add_repository(
                             crate::repository::RepositoryInterfaceHandle::new(
                                 InstalledArrayRepository::new_with_packages(vec![
@@ -206,7 +200,8 @@ pub trait BaseDependencyCommand: BaseCommand {
                 } else {
                     self.get_io().write_error(format!(
                         "<error>Package \"{}\" could not be found with constraint \"{}\", results below will most likely be incomplete.</error>",
-                        needle, text_constraint
+                        needle.display_lossy(),
+                        text_constraint.display_lossy()
                     ));
                 }
             }
@@ -223,8 +218,8 @@ pub trait BaseDependencyCommand: BaseCommand {
                 };
                 self.get_io().write_error(format!(
                     "<info>Package \"{} {}\" found in version \"{}\"{}.</info>",
-                    needle,
-                    text_constraint,
+                    needle.display_lossy(),
+                    text_constraint.display_lossy(),
                     matched.get_pretty_version().display_lossy(),
                     extra_notice
                 ));
@@ -232,9 +227,9 @@ pub trait BaseDependencyCommand: BaseCommand {
             Some(matched) if inverted => {
                 self.get_io().write(format!(
                     "<comment>Package \"{}\" {} is already installed! To find out why, run `shirabe why {}`</comment>",
-                    needle,
+                    needle.display_lossy(),
                     matched.get_pretty_version().display_lossy(),
-                    needle
+                    needle.display_lossy()
                 ));
 
                 return Ok(0);
@@ -245,12 +240,12 @@ pub trait BaseDependencyCommand: BaseCommand {
         let mut needles = vec![needle.clone()];
         if inverted {
             for package in &packages {
-                let replaces: Vec<String> = package
-                    .get_replaces()
-                    .values()
-                    .map(|link| legacy_lossy(link.get_target()).into_owned())
-                    .collect();
-                needles.extend(replaces);
+                needles.extend(
+                    package
+                        .get_replaces()
+                        .values()
+                        .map(|link| BString::from(link.get_target())),
+                );
             }
         }
 
@@ -277,12 +272,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         let mut r#return: i64 = if inverted { 1 } else { 0 };
 
         let results = installed_repo.get_dependents(
-            NeedleInput::Multiple(
-                needles
-                    .into_iter()
-                    .map(bstr::BString::from)
-                    .collect::<Vec<_>>(),
-            ),
+            NeedleInput::Multiple(needles),
             constraint,
             inverted,
             recursive,
@@ -293,14 +283,15 @@ pub trait BaseDependencyCommand: BaseCommand {
                 format!(
                     " in versions {}matching {}",
                     if inverted { "not " } else { "" },
-                    text_constraint
+                    text_constraint.display_lossy()
                 )
             } else {
                 String::new()
             };
             self.get_io().write_error(format!(
                 "<info>There is no installed package depending on \"{}\"{}",
-                needle, extra
+                needle.display_lossy(),
+                extra
             ));
             r#return = if inverted { 0 } else { 1 };
         } else if render_tree {
@@ -328,14 +319,14 @@ pub trait BaseDependencyCommand: BaseCommand {
             let mut composer_command = "update";
 
             for root_requirement in composer.get_package().get_requires().values() {
-                if root_requirement.get_target() == needle.as_str() {
+                if root_requirement.get_target() == needle {
                     composer_command = "require";
                     break;
                 }
             }
 
             for root_requirement in composer.get_package().get_dev_requires().values() {
-                if root_requirement.get_target() == needle.as_str() {
+                if root_requirement.get_target() == needle {
                     composer_command = "require --dev";
                     break;
                 }
@@ -343,7 +334,9 @@ pub trait BaseDependencyCommand: BaseCommand {
 
             self.get_io().write_error(format!(
                 "Not finding what you were looking for? Try calling `shirabe {} \"{}:{}\" --dry-run` to get another view on the problem.",
-                composer_command, needle, text_constraint
+                composer_command,
+                needle.display_lossy(),
+                text_constraint.display_lossy()
             ));
         }
 
@@ -355,48 +348,43 @@ pub trait BaseDependencyCommand: BaseCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         results: Vec<DependentsEntry>,
     ) {
-        let mut table: Vec<Vec<String>> = vec![];
-        let mut doubles: IndexMap<String, bool> = IndexMap::new();
+        let mut table: Vec<Vec<BString>> = vec![];
+        let mut doubles: IndexMap<BString, bool> = IndexMap::new();
         let mut results = results;
         loop {
             if results.is_empty() {
                 break;
             }
             let mut queue: Vec<DependentsEntry> = vec![];
-            let mut rows: Vec<Vec<String>> = vec![];
+            let mut rows: Vec<Vec<BString>> = vec![];
             for DependentsEntry(package, link, children) in results {
-                let unique = legacy_lossy(&link.to_php_string()).into_owned();
+                let unique = link.to_php_string();
                 if doubles.contains_key(&unique) {
                     continue;
                 }
                 doubles.insert(unique.clone(), true);
                 let version = if package.get_pretty_version() == RootPackage::DEFAULT_PRETTY_VERSION
                 {
-                    "-".to_string()
+                    BString::from("-")
                 } else {
-                    legacy_lossy(&package.get_pretty_version()).into_owned()
+                    package.get_pretty_version()
                 };
                 let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
                 let name_with_link = match &package_url {
-                    Some(url) => format!(
-                        "<href={}>{}</>",
-                        legacy_lossy(
-                            &OutputFormatter::escape(url)
-                                .expect("OutputFormatter::escape never fails")
-                        ),
-                        legacy_lossy(&package.get_pretty_name())
+                    Some(url) => bconcat!(
+                        "<href=",
+                        OutputFormatter::escape(url).expect("OutputFormatter::escape never fails"),
+                        ">",
+                        package.get_pretty_name(),
+                        "</>"
                     ),
-                    None => legacy_lossy(&package.get_pretty_name()).into_owned(),
+                    None => package.get_pretty_name(),
                 };
                 rows.push(vec![
                     name_with_link,
                     version,
-                    legacy_lossy(link.get_description()).into_owned(),
-                    format!(
-                        "{} ({})",
-                        legacy_lossy(&link.get_target()),
-                        legacy_lossy(&link.get_pretty_constraint())
-                    ),
+                    BString::from(link.get_description()),
+                    bconcat!(link.get_target(), " (", link.get_pretty_constraint(), ")"),
                 ]);
                 if let Some(children_vec) = children {
                     queue.extend(children_vec);
@@ -445,49 +433,56 @@ pub trait BaseDependencyCommand: BaseCommand {
             let is_last = idx == count;
             let version_text =
                 if package.get_pretty_version() == RootPackage::DEFAULT_PRETTY_VERSION {
-                    String::new()
+                    BString::default()
                 } else {
-                    legacy_lossy(&package.get_pretty_version()).into_owned()
+                    package.get_pretty_version()
                 };
             let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
             let name_with_link = match &package_url {
-                Some(url) => format!(
-                    "<href={}>{}</>",
-                    legacy_lossy(
-                        &OutputFormatter::escape(url).expect("OutputFormatter::escape never fails")
-                    ),
-                    legacy_lossy(&package.get_pretty_name())
+                Some(url) => bconcat!(
+                    "<href=",
+                    OutputFormatter::escape(url).expect("OutputFormatter::escape never fails"),
+                    ">",
+                    package.get_pretty_name(),
+                    "</>"
                 ),
-                None => legacy_lossy(&package.get_pretty_name()).into_owned(),
+                None => package.get_pretty_name(),
             };
-            let package_text =
-                format!("<{}>{}</{}> {}", color, name_with_link, color, version_text)
-                    .trim_end()
-                    .to_string();
-            let link_text = format!(
-                "{} <{}>{}</{}> {}",
-                legacy_lossy(&link.get_description()),
+            let package_text = rtrim(bconcat!(
+                "<",
+                color,
+                ">",
+                name_with_link,
+                "</",
+                color,
+                "> ",
+                version_text
+            ));
+            let link_text = bconcat!(
+                link.get_description(),
+                " <",
                 prev_color,
-                legacy_lossy(&link.get_target()),
+                ">",
+                link.get_target(),
+                "</",
                 prev_color,
-                legacy_lossy(&link.get_pretty_constraint()),
+                "> ",
+                link.get_pretty_constraint()
             );
             let circular_warn = if children.is_none() {
                 "(circular dependency aborted here)"
             } else {
                 ""
             };
-            self.write_tree_line(
-                format!(
-                    "{}{}{} ({}) {}",
-                    prefix,
-                    if is_last { "└──" } else { "├──" },
-                    package_text,
-                    link_text,
-                    circular_warn
-                )
-                .trim_end(),
-            );
+            self.write_tree_line(BStr::new(&rtrim(bconcat!(
+                prefix,
+                if is_last { "└──" } else { "├──" },
+                package_text,
+                " (",
+                link_text,
+                ") ",
+                circular_warn
+            ))));
             if let Some(children_vec) = children {
                 self.print_tree(
                     children_vec,
@@ -498,16 +493,17 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
     }
 
-    fn write_tree_line(&self, line: &str) {
+    fn write_tree_line(&self, line: &BStr) {
         let io = self.get_io();
-        let line = if !io.is_decorated() {
-            line.replace('└', "`-")
-                .replace('├', "|-")
-                .replace("──", "-")
-                .replace('│', "|")
+        if !io.is_decorated() {
+            io.write(
+                line.replace("└", "`-")
+                    .replace("├", "|-")
+                    .replace("──", "-")
+                    .replace("│", "|"),
+            );
         } else {
-            line.to_string()
-        };
-        io.write(&line);
+            io.write(line);
+        }
     }
 }

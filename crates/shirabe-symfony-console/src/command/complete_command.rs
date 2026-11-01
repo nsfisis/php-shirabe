@@ -121,7 +121,6 @@ impl CompleteCommand {
             return;
         }
 
-        // TODO(bytes): basename takes the path as a &str.
         let command_name = basename(
             PHP_SERVER
                 .lock()
@@ -129,14 +128,9 @@ impl CompleteCommand {
                 .argv()
                 .next()
                 .unwrap_or_default()
-                .into_string()
-                .unwrap_or_else(|arg| panic!("argv[0] is not valid UTF-8: {arg:?}")),
+                .as_encoded_bytes(),
         );
-        // TODO(bytes): file_put_contents3 takes the path as a &str.
-        let tmp_dir = sys_get_temp_dir()
-            .into_os_string()
-            .into_string()
-            .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
+        let tmp_dir = sys_get_temp_dir();
         file_put_contents3(
             path_from_bytes(&bconcat!(tmp_dir, "/sf_", command_name, ".log")),
             &(messages.join(PHP_EOL) + PHP_EOL),
@@ -183,7 +177,7 @@ impl Command for CompleteCommand {
         let shells = self
             .completion_outputs
             .keys()
-            .map(|shell| shell.to_str_lossy())
+            .map(|shell| shell.display_lossy().to_string())
             .collect::<Vec<_>>()
             .join("\", \"");
         self.inner
@@ -225,14 +219,10 @@ impl Command for CompleteCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         let _ = (input, output);
-        // TODO(bytes): filter_var_boolean takes the value as a &str.
         self.is_debug.set(filter_var_boolean(
             getenv("SYMFONY_COMPLETION_DEBUG")
                 .unwrap_or_default()
-                .into_string()
-                .unwrap_or_else(|value| {
-                    panic!("SYMFONY_COMPLETION_DEBUG is not valid UTF-8: {value:?}")
-                }),
+                .as_encoded_bytes(),
         ));
 
         Ok(())
@@ -272,7 +262,7 @@ impl Command for CompleteCommand {
                     shell.as_string().unwrap_or_default().display_lossy(),
                     self.completion_outputs
                         .keys()
-                        .map(|shell| shell.to_str_lossy())
+                        .map(|shell| shell.display_lossy().to_string())
                         .collect::<Vec<_>>()
                         .join("\", \"")
                 )));
@@ -293,10 +283,7 @@ impl Command for CompleteCommand {
                         .lock()
                         .unwrap()
                         .argv()
-                        // TODO(bytes): the log messages are built as Strings.
-                        .map(|a| a
-                            .into_string()
-                            .unwrap_or_else(|a| panic!("argv is not valid UTF-8: {a:?}")))
+                        .map(|a| a.as_encoded_bytes().as_bstr().display_lossy().to_string())
                         .collect::<Vec<_>>()
                         .join(" ")
                 ),
@@ -333,7 +320,7 @@ impl Command for CompleteCommand {
                             .into_iter()
                             .flatten()
                             .filter(|v| !v.is_empty())
-                            .map(StringOrSuggestion::String)
+                            .map(|value| StringOrSuggestion::String(value.into()))
                             .collect(),
                     );
                 }
@@ -395,7 +382,7 @@ impl Command for CompleteCommand {
                 let value_suggestions: Vec<String> = suggestions
                     .get_value_suggestions()
                     .iter()
-                    .map(|s| s.get_value())
+                    .map(|s| s.get_value().display_lossy().to_string())
                     .collect();
                 if !value_suggestions.is_empty() {
                     self.log(&format!("  {}", value_suggestions.join(" ")));

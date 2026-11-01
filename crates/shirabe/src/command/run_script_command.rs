@@ -3,12 +3,13 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::script::{Event as ScriptEvent, ScriptEvents};
 use crate::util::{Platform, ProcessExecutor};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, legacy_lossy,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::{CommandNotFoundException, NamespaceNotFoundException};
@@ -70,7 +71,7 @@ impl RunScriptCommand {
             .iter()
             .map(|(name, desc)| {
                 PhpMixed::List(vec![
-                    PhpMixed::string(format!("  {}", name)),
+                    PhpMixed::string(bconcat!("  ", name)),
                     PhpMixed::string(desc.clone()),
                 ])
             })
@@ -81,7 +82,7 @@ impl RunScriptCommand {
         Ok(0)
     }
 
-    fn get_scripts(&self) -> anyhow::Result<Vec<(String, String)>> {
+    fn get_scripts(&self) -> anyhow::Result<Vec<(BString, String)>> {
         let composer = self.require_composer(None, None)?;
         let scripts = crate::composer::composer_full(&composer)
             .get_package()
@@ -91,7 +92,7 @@ impl RunScriptCommand {
             return Ok(vec![]);
         }
 
-        let mut result: Vec<(String, String)> = vec![];
+        let mut result: Vec<(BString, String)> = vec![];
         for (name, _script) in scripts {
             let mut description = String::new();
             if let Some(application) = self.get_application() {
@@ -103,7 +104,7 @@ impl RunScriptCommand {
                     Err(e) => return Err(e),
                 }
             }
-            result.push((legacy_lossy(&name).into_owned(), description));
+            result.push((name, description));
         }
 
         Ok(result)
@@ -217,16 +218,16 @@ impl Command for RunScriptCommand {
 
             let mut options = indexmap::IndexMap::new();
             for script in &scripts {
-                options.insert(script.0.as_str().into(), PhpMixed::string(script.1.clone()));
+                options.insert(script.0.clone(), PhpMixed::string(script.1.clone()));
             }
 
             let io = self.get_io();
             let script = io.select(
-                "Script to run: ".into(),
+                "Script to run: ",
                 PhpMixed::Array(options),
                 PhpMixed::string(String::new()),
                 PhpMixed::Int(1),
-                "Invalid script name \"%s\"".to_string(),
+                "Invalid script name \"%s\"",
                 false,
             )?;
 
@@ -259,7 +260,9 @@ impl Command for RunScriptCommand {
                 )
                 .into());
             }
-            Some(s) => legacy_lossy(s).into_owned(),
+            // Scripts are keys of composer.json, which is UTF-8, so a name that is not UTF-8 stays
+            // undefined after this conversion.
+            Some(s) => s.display_lossy().to_string(),
         };
 
         if !self.script_events.contains(&script.as_str()) {
@@ -312,15 +315,14 @@ impl Command for RunScriptCommand {
             .unwrap_or_default();
 
         if let Some(timeout_val) = input.borrow().get_option("timeout")?.as_string() {
-            let timeout_str: String = legacy_lossy(timeout_val).into_owned();
-            if !timeout_str.chars().all(|c| c.is_ascii_digit()) {
+            if !timeout_val.iter().all(u8::is_ascii_digit) {
                 return Err(RuntimeException::new(
                     "Timeout value must be numeric and positive if defined, or 0 for forever"
                         .to_string(),
                 )
                 .into());
             }
-            let timeout: i64 = timeout_str.parse().unwrap_or(0);
+            let timeout: i64 = timeout_val.display_lossy().to_string().parse().unwrap_or(0);
             ProcessExecutor::set_timeout(timeout);
         }
 

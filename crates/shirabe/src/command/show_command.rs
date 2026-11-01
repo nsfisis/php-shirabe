@@ -19,14 +19,14 @@ use crate::repository::{
     RootPackageRepository,
 };
 use crate::util::PackageInfo;
-use bstr::{BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_search, bconcat, date_format_to_strftime, date_local, extension_loaded, get_class,
-    impl_php_class, implode, in_array_loose, in_array_strict, legacy_lossy, path_to_bytes,
-    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, realpath, strtolower,
-    version_compare,
+    CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, STR_PAD_RIGHT,
+    UnexpectedValueException, array_search, bconcat, date_format_to_strftime, date_local,
+    extension_loaded, get_class, impl_php_class, implode, in_array_loose, in_array_strict, intval,
+    json_bytes, ltrim2, path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote,
+    preg_replace, realpath, rtrim, str_pad, strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -123,24 +123,30 @@ impl ShowCommand {
                 } else {
                     0
                 };
-                io.write_no_newline(format!(
-                    "{}<href={}>{}</>{}",
+                io.write_no_newline(bconcat!(
                     indent,
-                    OutputFormatter::escape(&link)
-                        .expect("OutputFormatter::escape failed")
-                        .display_lossy(),
+                    "<href=",
+                    OutputFormatter::escape(&link).expect("OutputFormatter::escape failed"),
+                    ">",
                     name,
+                    "</>",
                     " ".repeat(pad)
                 ));
             } else {
                 let width_pad = if pad_name { name_length } else { 0 };
-                io.write_no_newline(format!("{}{:<width$}", indent, name, width = width_pad));
+                io.write_no_newline(bconcat!(
+                    indent,
+                    str_pad(name, width_pad, " ", STR_PAD_RIGHT)
+                ));
             }
             if let Some(version) = &package.version
                 && write_version
             {
                 let width_pad = if pad_version { version_length } else { 0 };
-                io.write_no_newline(format!(" {:<width$}", version, width = width_pad));
+                io.write_no_newline(bconcat!(
+                    " ",
+                    str_pad(version, width_pad, " ", STR_PAD_RIGHT)
+                ));
             }
             if let (Some(latest_version), Some(update_status)) =
                 (&package.latest, &package.latest_status)
@@ -153,15 +159,17 @@ impl ShowCommand {
                         .replace("up-to-date", "=")
                         .replace("semver-safe-update", "!")
                         .replace("update-possible", "~");
-                    latest_version = format!("{} {}", marker, latest_version);
+                    latest_version = bconcat!(marker, " ", latest_version);
                 }
                 let width_pad = if pad_latest { latest_length } else { 0 };
-                io.write_no_newline(format!(
-                    " <{}>{:<width$}</{}>",
+                io.write_no_newline(bconcat!(
+                    " <",
                     style,
-                    latest_version,
+                    ">",
+                    str_pad(&latest_version, width_pad, " ", STR_PAD_RIGHT),
+                    "</",
                     style,
-                    width = width_pad
+                    ">"
                 ));
                 if write_release_date && let Some(age) = &package.release_age {
                     let width_pad = if pad_release_date {
@@ -175,11 +183,7 @@ impl ShowCommand {
             if let Some(Some(description)) = &package.description
                 && write_description
             {
-                let mut description = description
-                    .split(['\r', '\n'])
-                    .next()
-                    .unwrap_or_default()
-                    .to_string();
+                let mut description = BString::from(first_token(description));
 
                 // Compute remaining width available for the description.
                 let mut remaining = (width as i64)
@@ -193,46 +197,45 @@ impl ShowCommand {
 
                 // If nothing fits, clear the description.
                 if remaining <= 0 {
-                    description = String::new();
+                    description = BString::default();
                 } else if extension_loaded("mbstring") {
                     // Use mb_strwidth/mb_strimwidth to measure and trim by display width
                     // (CJK characters count as width 2). mb_strimwidth counts the trim
                     // marker ('...') in the width parameter, so pass $remaining directly.
+                    // TODO(unicode): this counts code points, not display width.
                     if description.chars().count() > remaining as usize {
-                        description = format!(
-                            "{}...",
-                            description
-                                .chars()
-                                .take((remaining as usize).saturating_sub(3))
-                                .collect::<String>()
-                        );
+                        let end = description
+                            .char_indices()
+                            .nth((remaining as usize).saturating_sub(3))
+                            .map_or(description.len(), |(start, _, _)| start);
+                        description = bconcat!(&description[..end], "...");
                     }
                 } else {
                     // Fallback when mbstring is not available: do a conservative byte-based cut.
                     // Ensure cut length is non-negative and leave room for the ellipsis.
                     let cut = (remaining - 3).max(0) as usize;
                     if description.len() > cut {
-                        description = format!("{}...", &description[..cut]);
+                        description = bconcat!(&description[..cut], "...");
                     }
                 }
 
-                io.write_no_newline(format!(" {}", description));
+                io.write_no_newline(bconcat!(" ", description));
             }
             if let Some(path) = &package.path {
                 let path_str = match path {
                     Some(s) => s.clone(),
-                    None => "null".to_string(),
+                    None => BString::from("null"),
                 };
-                io.write_no_newline(format!(" {}", path_str));
+                io.write_no_newline(bconcat!(" ", path_str));
             }
             io.write("");
             if let Some(warning) = &package.warning {
-                io.write(format!("<warning>{}</warning>", warning));
+                io.write(bconcat!("<warning>", warning, "</warning>"));
             }
         }
     }
 
-    fn get_root_requires(&self) -> Vec<String> {
+    fn get_root_requires(&self) -> Vec<BString> {
         let composer_rc = self.try_composer(None, None);
         let composer_rc = match composer_rc {
             None => return vec![],
@@ -242,17 +245,14 @@ impl ShowCommand {
 
         let root_package = composer.get_package();
 
-        let mut combined: IndexMap<String, Link> = IndexMap::new();
+        let mut combined: IndexMap<BString, Link> = IndexMap::new();
         for (k, v) in root_package.get_requires().iter() {
-            combined.insert(legacy_lossy(&k.clone()).into_owned(), v.clone());
+            combined.insert(k.clone(), v.clone());
         }
         for (k, v) in root_package.get_dev_requires().iter() {
-            combined.insert(legacy_lossy(&k.clone()).into_owned(), v.clone());
+            combined.insert(k.clone(), v.clone());
         }
-        combined
-            .keys()
-            .map(|k| legacy_lossy(&strtolower(k)).into_owned())
-            .collect()
+        combined.keys().map(strtolower).collect()
     }
 
     fn get_version_style(
@@ -274,13 +274,13 @@ impl ShowCommand {
         &self,
         installed_repo: &RepositoryInterfaceHandle,
         repos: &RepositoryInterfaceHandle,
-        name: &str,
+        name: &BStr,
         version: PhpMixed,
     ) -> anyhow::Result<(
         Option<crate::package::CompletePackageInterfaceHandle>,
-        IndexMap<String, String>,
+        IndexMap<BString, BString>,
     )> {
-        let name = legacy_lossy(&strtolower(name)).into_owned();
+        let name = strtolower(name);
         let constraint: Option<AnyConstraint> = match &version {
             PhpMixed::String(s) => Some(self.version_parser.borrow().parse_constraints(s)?),
             PhpMixed::Null => None,
@@ -300,7 +300,7 @@ impl ShowCommand {
         repository_set.add_repository(repos.clone())?;
 
         let mut matched_package: Option<crate::package::PackageInterfaceHandle> = None;
-        let mut versions: IndexMap<String, String> = IndexMap::new();
+        let mut versions: IndexMap<BString, BString> = IndexMap::new();
         let mut pool = if PlatformRepository::is_platform_package(&name) {
             repository_set.create_pool_with_all_packages()?
         } else {
@@ -322,10 +322,7 @@ impl ShowCommand {
                 matched_package = Some(p.clone());
             }
 
-            versions.insert(
-                legacy_lossy(&p.get_pretty_version()).into_owned(),
-                legacy_lossy(&p.get_version()).into_owned(),
-            );
+            versions.insert(p.get_pretty_version(), p.get_version());
             literals.push(p.get_id());
         }
 
@@ -353,7 +350,7 @@ impl ShowCommand {
     fn print_package_info(
         &self,
         package: CompletePackageInterfaceHandle,
-        versions: &IndexMap<String, String>,
+        versions: &IndexMap<BString, BString>,
         installed_repo: &mut dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
@@ -386,7 +383,7 @@ impl ShowCommand {
     fn print_meta(
         &self,
         package: CompletePackageInterfaceHandle,
-        versions: &IndexMap<String, String>,
+        versions: &IndexMap<BString, BString>,
         installed_repo: &mut dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
@@ -473,31 +470,25 @@ impl ShowCommand {
                 .display_lossy()
         ));
         if is_installed_package {
-            let path: Option<String> = self
-                .require_composer(None, None)
-                .ok()
-                .and_then(|c| {
-                    let installation_manager = c.borrow_partial().get_installation_manager();
+            let path = self.require_composer(None, None).ok().and_then(|c| {
+                let installation_manager = c.borrow_partial().get_installation_manager();
 
-                    installation_manager
-                        .borrow_mut()
-                        .get_install_path(package.clone().into())
-                })
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+                installation_manager
+                    .borrow_mut()
+                    .get_install_path(package.clone().into())
+            });
             if let Some(p) = path {
-                self.get_io().write(format!(
-                    "<info>path</info>     : {}",
-                    realpath(&p)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default()
+                self.get_io().write(bconcat!(
+                    "<info>path</info>     : ",
+                    realpath(&p).unwrap_or_default()
                 ));
             } else {
                 self.get_io().write("<info>path</info>     : null");
             }
         }
-        self.get_io().write(format!(
-            "<info>names</info>    : {}",
-            legacy_lossy(&implode(", ", &package.get_names(true))).into_owned()
+        self.get_io().write(bconcat!(
+            "<info>names</info>    : ",
+            implode(", ", &package.get_names(true))
         ));
 
         if let Some(c) = latest.as_complete()
@@ -506,7 +497,7 @@ impl ShowCommand {
             let replacement = match c.get_replacement_package() {
                 Some(rp) => format!(
                     " The author suggests using the {} package instead.",
-                    legacy_lossy(&rp)
+                    rp.display_lossy()
                 ),
                 None => String::new(),
             };
@@ -540,38 +531,26 @@ impl ShowCommand {
                     if let PhpMixed::Array(map) = autoloads {
                         for (name, path) in map.iter() {
                             let path_str = match path {
-                                PhpMixed::List(l) => l
-                                    .iter()
-                                    .filter_map(|p| {
-                                        p.as_string().map(|s| legacy_lossy(s).into_owned())
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(", "),
-                                PhpMixed::String(s) if !s.is_empty() => {
-                                    s.to_str_lossy().into_owned()
-                                }
-                                _ => ".".to_string(),
+                                PhpMixed::List(l) => implode(
+                                    ", ",
+                                    &l.iter().filter_map(|p| p.as_string()).collect::<Vec<_>>(),
+                                ),
+                                PhpMixed::String(s) if !s.is_empty() => s.clone(),
+                                _ => BString::from("."),
                             };
                             let name_disp = if name.is_empty() {
                                 "*".into()
                             } else {
                                 name.as_bstr()
                             };
-                            self.get_io().write(format!(
-                                "{} => {}",
-                                name_disp.display_lossy(),
-                                path_str
-                            ));
+                            self.get_io().write(bconcat!(name_disp, " => ", path_str));
                         }
                     }
                 } else if r#type == "classmap"
                     && let PhpMixed::List(l) = autoloads
                 {
-                    let joined: Vec<String> = l
-                        .iter()
-                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
-                        .collect();
-                    self.get_io().write(joined.join(", "));
+                    let joined: Vec<&BStr> = l.iter().filter_map(|v| v.as_string()).collect();
+                    self.get_io().write(implode(", ", &joined));
                 }
             }
             let include_paths = package.get_include_paths();
@@ -588,10 +567,10 @@ impl ShowCommand {
     fn print_versions(
         &self,
         package: CompletePackageInterfaceHandle,
-        versions: &IndexMap<String, String>,
+        versions: &IndexMap<BString, BString>,
         installed_repo: &mut dyn RepositoryInterface,
     ) -> anyhow::Result<()> {
-        let mut versions_keys: Vec<String> = versions.keys().cloned().collect();
+        let mut versions_keys: Vec<BString> = versions.keys().cloned().collect();
         versions_keys = Semver::rsort(versions_keys)?;
 
         // highlight installed version
@@ -600,23 +579,22 @@ impl ShowCommand {
         if !installed_packages.is_empty() {
             for installed_package in installed_packages.iter() {
                 let installed_version = installed_package.get_pretty_version();
-                let key_map: IndexMap<String, String> = versions_keys
+                let key_map: IndexMap<BString, BString> = versions_keys
                     .iter()
                     .map(|v| (v.clone(), v.clone()))
                     .collect();
                 if let Some(found) = array_search(&installed_version, &key_map)
                     && let Some(idx) = versions_keys.iter().position(|v| v == &found)
                 {
-                    versions_keys[idx] =
-                        format!("<info>* {}</info>", legacy_lossy(&installed_version));
+                    versions_keys[idx] = bconcat!("<info>* ", installed_version, "</info>");
                 }
             }
         }
 
-        let versions_str = versions_keys.join(", ");
-
-        self.get_io()
-            .write(format!("<info>versions</info> : {}", versions_str));
+        self.get_io().write(bconcat!(
+            "<info>versions</info> : ",
+            implode(", ", &versions_keys)
+        ));
 
         Ok(())
     }
@@ -652,28 +630,26 @@ impl ShowCommand {
         let io = self.get_io();
 
         for license_id in licenses.iter() {
-            let license = spdx_licenses.get_license_by_identifier(&legacy_lossy(license_id));
+            let license = spdx_licenses.get_license_by_identifier(license_id);
 
             let out = match license {
                 None => license_id.clone(),
-                Some(license) => bstr::BString::from(if license.is_osi_approved {
-                    format!(
-                        "{} ({}) (OSI approved) {}",
-                        license.name,
-                        legacy_lossy(&license_id),
-                        license.url
-                    )
-                } else {
-                    format!(
-                        "{} ({}) {}",
-                        license.name,
-                        legacy_lossy(&license_id),
-                        license.url
-                    )
-                }),
+                Some(license) => {
+                    if license.is_osi_approved {
+                        bconcat!(
+                            license.name,
+                            " (",
+                            license_id,
+                            ") (OSI approved) ",
+                            license.url
+                        )
+                    } else {
+                        bconcat!(license.name, " (", license_id, ") ", license.url)
+                    }
+                }
             };
 
-            io.write(format!("<info>license</info>  : {}", out.display_lossy()));
+            io.write(bconcat!("<info>license</info>  : ", out));
         }
     }
 
@@ -681,29 +657,17 @@ impl ShowCommand {
     fn print_package_info_as_json(
         &self,
         package: CompletePackageInterfaceHandle,
-        versions: &IndexMap<String, String>,
+        versions: &IndexMap<BString, BString>,
         installed_repo: &mut dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         let mut json = PackageInfoJson {
-            name: legacy_lossy(&package.get_pretty_name()).into_owned(),
-            description: package
-                .get_description()
-                .map(|s| legacy_lossy(&s).into_owned()),
-            keywords: package
-                .get_keywords()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
-            r#type: legacy_lossy(&package.get_type()).into_owned(),
-            homepage: package
-                .get_homepage()
-                .map(|s| legacy_lossy(&s).into_owned()),
-            names: package
-                .get_names(true)
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
+            name: package.get_pretty_name(),
+            description: package.get_description(),
+            keywords: package.get_keywords(),
+            r#type: package.get_type(),
+            homepage: package.get_homepage(),
+            names: package.get_names(true),
             versions: Vec::new(),
             licenses: None,
             latest: None,
@@ -727,7 +691,7 @@ impl ShowCommand {
         Self::append_licenses(&mut json, package.clone());
 
         let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
-            json.latest = Some(legacy_lossy(&latest.get_pretty_version()).into_owned());
+            json.latest = Some(latest.get_pretty_version());
             latest
         } else {
             package.clone().into()
@@ -735,25 +699,17 @@ impl ShowCommand {
 
         if let Some(source_type) = package.get_source_type() {
             json.source = Some(PackageReferenceJson {
-                r#type: legacy_lossy(&source_type).into_owned(),
-                url: package
-                    .get_source_url()
-                    .map(|s| legacy_lossy(&s).into_owned()),
-                reference: package
-                    .get_source_reference()
-                    .map(|s| legacy_lossy(&s).into_owned()),
+                r#type: source_type,
+                url: package.get_source_url(),
+                reference: package.get_source_reference(),
             });
         }
 
         if let Some(dist_type) = package.get_dist_type() {
             json.dist = Some(PackageReferenceJson {
-                r#type: legacy_lossy(&dist_type).into_owned(),
-                url: package
-                    .get_dist_url()
-                    .map(|s| legacy_lossy(&s).into_owned()),
-                reference: package
-                    .get_dist_reference()
-                    .map(|s| legacy_lossy(&s).into_owned()),
+                r#type: dist_type,
+                url: package.get_dist_url(),
+                reference: package.get_dist_reference(),
             });
         }
 
@@ -762,16 +718,13 @@ impl ShowCommand {
         {
             let composer = self.require_composer(None, None)?;
             let installation_manager = composer.borrow_partial().get_installation_manager();
-            let path: Option<String> = installation_manager
+            let path = installation_manager
                 .borrow_mut()
-                .get_install_path(package.clone().into())
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+                .get_install_path(package.clone().into());
             match path {
                 Some(p) => {
-                    if let Some(r) =
-                        realpath(&p).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    {
-                        json.path = Some(Some(r));
+                    if let Some(r) = realpath(&p) {
+                        json.path = Some(Some(BString::from(path_to_bytes(&r))));
                     }
                 }
                 None => {
@@ -787,30 +740,21 @@ impl ShowCommand {
         if let Some(c) = latest.as_complete()
             && c.is_abandoned()
         {
-            json.replacement = Some(
-                c.get_replacement_package()
-                    .map(|s| legacy_lossy(&s).into_owned()),
-            );
+            json.replacement = Some(c.get_replacement_package());
         }
 
         if !package.get_suggests().is_empty() {
-            json.suggests = Some(lossy_map(package.get_suggests()));
+            json.suggests = Some(package.get_suggests());
         }
 
         if !package.get_support().is_empty() {
-            json.support = Some(lossy_map(package.get_support()));
+            json.support = Some(package.get_support());
         }
 
         Self::append_autoload(&mut json, package.clone());
 
         if !package.get_include_paths().is_empty() {
-            json.include_path = Some(
-                package
-                    .get_include_paths()
-                    .iter()
-                    .map(|s| legacy_lossy(s).into_owned())
-                    .collect::<Vec<_>>(),
-            );
+            json.include_path = Some(package.get_include_paths());
         }
 
         Self::append_links(&mut json, package);
@@ -819,8 +763,8 @@ impl ShowCommand {
         Ok(())
     }
 
-    fn append_versions(json: &mut PackageInfoJson, versions: &IndexMap<String, String>) {
-        let mut versions_pairs: Vec<(String, String)> = versions
+    fn append_versions(json: &mut PackageInfoJson, versions: &IndexMap<BString, BString>) {
+        let mut versions_pairs: Vec<(BString, BString)> = versions
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
@@ -847,14 +791,13 @@ impl ShowCommand {
                 licenses
                     .into_iter()
                     .map(|license_id| {
-                        let license =
-                            spdx_licenses.get_license_by_identifier(&legacy_lossy(&license_id));
+                        let license = spdx_licenses.get_license_by_identifier(&license_id);
                         match license {
-                            None => LicenseJson::Id(legacy_lossy(&license_id).into_owned()),
+                            None => LicenseJson::Id(license_id),
                             // The 'osi' key holds the license id string, not the OSI-approved flag.
                             Some(l) => LicenseJson::Detail {
                                 name: l.name,
-                                osi: legacy_lossy(&license_id).into_owned(),
+                                osi: license_id,
                                 url: l.url,
                             },
                         }
@@ -918,11 +861,11 @@ impl ShowCommand {
         let links = package.get_links_for_type(link_type);
 
         if !links.is_empty() {
-            let mut m: IndexMap<String, String> = IndexMap::new();
+            let mut m: IndexMap<BString, BString> = IndexMap::new();
             for link in links.iter() {
                 m.insert(
-                    legacy_lossy(link.1.get_target()).into_owned(),
-                    legacy_lossy(link.1.get_pretty_constraint()).into_owned(),
+                    BString::from(link.1.get_target()),
+                    BString::from(link.1.get_pretty_constraint()),
                 );
             }
             let slot = match link_type {
@@ -962,12 +905,11 @@ impl ShowCommand {
     fn display_package_tree(&self, array_tree: Vec<PackageTree>) {
         for package in array_tree.iter() {
             self.get_io()
-                .write_no_newline(format!("<info>{}</info>", package.name));
+                .write_no_newline(bconcat!("<info>", package.name, "</info>"));
             self.get_io()
-                .write_no_newline(format!(" {}", package.version));
+                .write_no_newline(bconcat!(" ", package.version));
             if let Some(description) = &package.description {
-                let trimmed = description.split(['\r', '\n']).next().unwrap_or_default();
-                self.get_io().write(format!(" {}", trimmed));
+                self.get_io().write(bconcat!(" ", first_token(description)));
             } else {
                 // output newline
                 self.get_io().write("");
@@ -984,14 +926,21 @@ impl ShowCommand {
                     }
                     let level: usize = 1;
                     let color = self.colors.borrow().get(level).cloned().unwrap_or_default();
-                    let info = format!(
-                        "{}──<{}>{}</{}> {}",
-                        tree_bar, color, require.name, color, require.version
+                    let info = bconcat!(
+                        tree_bar,
+                        "──<",
+                        color,
+                        ">",
+                        require.name,
+                        "</",
+                        color,
+                        "> ",
+                        require.version
                     );
-                    self.write_tree_line(&info);
+                    self.write_tree_line(BStr::new(&info));
 
                     tree_bar = tree_bar.replace('└', " ");
-                    let packages_in_tree: Vec<String> =
+                    let packages_in_tree: Vec<BString> =
                         vec![package.name.clone(), require.name.clone()];
 
                     self.display_tree(require, &packages_in_tree, &tree_bar, level + 1);
@@ -1008,30 +957,23 @@ impl ShowCommand {
         remote_repos: &RepositoryInterfaceHandle,
     ) -> PackageTree {
         let requires = {
-            let mut r: IndexMap<String, Link> = package
-                .get_requires()
-                .iter()
-                .map(|(k, v)| (legacy_lossy(k).into_owned(), v.clone()))
-                .collect();
+            let mut r = (*package.get_requires()).clone();
             r.sort_keys();
             r
         };
         let mut children: Vec<PackageTreeChild> = Vec::new();
         for (require_name, require) in requires.iter() {
-            let packages_in_tree: Vec<String> = vec![
-                legacy_lossy(&package.get_name()).into_owned(),
-                require_name.clone(),
-            ];
+            let packages_in_tree: Vec<BString> = vec![package.get_name(), require_name.clone()];
 
             let mut tree_child_desc = PackageTreeChild {
                 name: require_name.clone(),
-                version: legacy_lossy(require.get_pretty_constraint()).into_owned(),
+                version: BString::from(require.get_pretty_constraint()),
                 requires: None,
             };
 
             let deep_children = self
                 .add_tree(
-                    require_name,
+                    BStr::new(require_name),
                     require,
                     installed_repo,
                     remote_repos,
@@ -1046,11 +988,11 @@ impl ShowCommand {
             children.push(tree_child_desc);
         }
         let mut tree = PackageTree {
-            name: legacy_lossy(&package.get_pretty_name()).into_owned(),
-            version: legacy_lossy(&package.get_pretty_version()).into_owned(),
+            name: package.get_pretty_name(),
+            version: package.get_pretty_version(),
             description: match package.as_complete() {
-                Some(c) => c.get_description().map(|s| legacy_lossy(&s).into_owned()),
-                None => Some(String::new()),
+                Some(c) => c.get_description(),
+                None => Some(BString::default()),
             },
             requires: None,
         };
@@ -1066,7 +1008,7 @@ impl ShowCommand {
     fn display_tree(
         &self,
         package: &PackageTreeChild,
-        packages_in_tree: &[String],
+        packages_in_tree: &[BString],
         previous_tree_bar: &str,
         level: usize,
     ) {
@@ -1097,13 +1039,20 @@ impl ShowCommand {
             } else {
                 ""
             };
-            let info = format!(
-                "{}──<{}>{}</{}> {} {}",
-                tree_bar, color, require.name, color, require.version, circular_warn
-            )
-            .trim_end()
-            .to_string();
-            self.write_tree_line(&info);
+            let info = rtrim(bconcat!(
+                tree_bar,
+                "──<",
+                color,
+                ">",
+                require.name,
+                "</",
+                color,
+                "> ",
+                require.version,
+                " ",
+                circular_warn
+            ));
+            self.write_tree_line(BStr::new(&info));
 
             tree_bar = tree_bar.replace('└', " ");
 
@@ -1115,18 +1064,18 @@ impl ShowCommand {
     /// Display a package tree
     fn add_tree(
         &self,
-        name: &str,
+        name: &BStr,
         link: &Link,
         installed_repo: &RepositoryInterfaceHandle,
         remote_repos: &RepositoryInterfaceHandle,
-        packages_in_tree: &[String],
+        packages_in_tree: &[BString],
     ) -> anyhow::Result<Vec<PackageTreeChild>> {
         let mut children: Vec<PackageTreeChild> = Vec::new();
         let version_arg: PhpMixed = if link.get_pretty_constraint() == "self.version" {
             // pass the ConstraintInterface object — signal via Null in this scalar shape
             PhpMixed::Null
         } else {
-            PhpMixed::string(legacy_lossy(link.get_pretty_constraint()).into_owned())
+            PhpMixed::string(link.get_pretty_constraint())
         };
         let (package, _) = self.get_package(installed_repo, remote_repos, name, version_arg)?;
         if let Some(package) = package {
@@ -1136,15 +1085,15 @@ impl ShowCommand {
                 let mut current_tree = packages_in_tree.to_vec();
 
                 let mut tree_child_desc = PackageTreeChild {
-                    name: legacy_lossy(&require_name.clone()).into_owned(),
-                    version: legacy_lossy(require.get_pretty_constraint()).into_owned(),
+                    name: require_name.clone(),
+                    version: BString::from(require.get_pretty_constraint()),
                     requires: None,
                 };
 
-                if !current_tree.contains(&legacy_lossy(require_name).into_owned()) {
-                    current_tree.push(legacy_lossy(&require_name.clone()).into_owned());
+                if !current_tree.contains(require_name) {
+                    current_tree.push(require_name.clone());
                     let deep_children = self.add_tree(
-                        &legacy_lossy(require_name),
+                        BStr::new(require_name),
                         require,
                         installed_repo,
                         remote_repos,
@@ -1199,18 +1148,18 @@ impl ShowCommand {
         Ok("update-possible".to_string())
     }
 
-    fn write_tree_line(&self, line: &str) {
+    fn write_tree_line(&self, line: &BStr) {
         let io = self.get_io();
-        let mut line = line.to_string();
         if !io.is_decorated() {
-            line = line
-                .replace('└', "`-")
-                .replace('├', "|-")
-                .replace("──", "-")
-                .replace('│', "|");
+            io.write(
+                line.replace("└", "`-")
+                    .replace("├", "|-")
+                    .replace("──", "-")
+                    .replace("│", "|"),
+            );
+        } else {
+            io.write(line);
         }
-
-        io.write(&line);
     }
 
     /// Given a package, this finds the latest package matching it
@@ -1226,7 +1175,7 @@ impl ShowCommand {
         platform_req_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         // find the latest version allowed in this repo set
-        let name = legacy_lossy(&package.get_name()).into_owned();
+        let name = package.get_name();
         let repo_set = self.get_repository_set(composer)?;
         let composer_ref = crate::composer::composer_full(composer);
         let mut version_selector =
@@ -1244,14 +1193,14 @@ impl ShowCommand {
             }
         }
 
-        let mut best_stability = legacy_lossy(&stability).into_owned();
+        let mut best_stability = stability;
         if composer_ref.get_package().get_prefer_stable() {
-            best_stability = legacy_lossy(&package.get_stability()).into_owned();
+            best_stability = package.get_stability();
         }
 
-        let mut target_version: Option<String> = None;
+        let mut target_version: Option<BString> = None;
         if package.get_version().starts_with(b"dev-") {
-            target_version = Some(legacy_lossy(&package.get_version()).into_owned());
+            target_version = Some(package.get_version());
 
             // dev-x branches are considered to be on the latest major version always, do not look up for a new commit as that is deemed a minor upgrade (albeit risky)
             if major_only {
@@ -1266,22 +1215,20 @@ impl ShowCommand {
                     &package.get_version(),
                 )
             {
-                let zero_major =
-                    legacy_lossy(groups.name("zero_major").unwrap_or_default()).into_owned();
-                let first_meaningful =
-                    legacy_lossy(groups.name("first_meaningful").unwrap_or_default())
-                        .into_owned()
-                        .parse::<i64>()
-                        .unwrap_or(0);
-                target_version = Some(format!(
-                    ">={}{},<9999999-dev",
+                let zero_major = groups.name("zero_major").unwrap_or_default();
+                let first_meaningful = intval(&PhpMixed::string(
+                    groups.name("first_meaningful").unwrap_or_default(),
+                ));
+                target_version = Some(bconcat!(
+                    ">=",
                     zero_major,
-                    first_meaningful + 1
+                    first_meaningful + 1,
+                    ",<9999999-dev"
                 ));
             }
 
             if minor_only {
-                target_version = Some(format!("^{}", legacy_lossy(&package.get_version())));
+                target_version = Some(bconcat!("^", package.get_version()));
             }
 
             if patch_only {
@@ -1296,7 +1243,7 @@ impl ShowCommand {
                 while trimmed_version.iter().filter(|&&c| c == b'.').count() + 1 < parts_needed {
                     trimmed_version.push_str(".0");
                 }
-                target_version = Some(format!("~{}", legacy_lossy(&trimmed_version)));
+                target_version = Some(bconcat!("~", trimmed_version));
             }
         }
 
@@ -1318,7 +1265,7 @@ impl ShowCommand {
         };
         let mut candidate = version_selector.find_best_candidate(
             bstr::BStr::new(&name),
-            target_version.as_deref(),
+            target_version.as_ref().map(|version| version.as_ref()),
             bstr::BStr::new(&best_stability),
             Some(platform_req_filter),
             0,
@@ -1628,14 +1575,13 @@ impl Command for ShowCommand {
             return Ok(1);
         }
 
-        let format = legacy_lossy(
+        let format = BString::from(
             input
                 .borrow()
                 .get_option("format")?
                 .as_string()
-                .unwrap_or(bstr::BStr::new("text")),
-        )
-        .into_owned();
+                .unwrap_or(BStr::new("text")),
+        );
         if !in_array_loose(
             format.clone(),
             &[
@@ -1645,7 +1591,7 @@ impl Command for ShowCommand {
         ) {
             self.get_io().write_error(format!(
                 "Unsupported format \"{}\". See help for supported formats.",
-                format
+                format.display_lossy()
             ));
 
             return Ok(1);
@@ -1677,7 +1623,7 @@ impl Command for ShowCommand {
 
         // The single-package $package binding from PHP gets surfaced here.
         let mut single_package: Option<crate::package::CompletePackageInterfaceHandle> = None;
-        let mut versions_map: IndexMap<String, String> = IndexMap::new();
+        let mut versions_map: IndexMap<BString, BString> = IndexMap::new();
         let installed_repo: RepositoryInterfaceHandle;
         let repos: RepositoryInterfaceHandle;
 
@@ -1740,16 +1686,13 @@ impl Command for ShowCommand {
             } else {
                 let default_repos =
                     RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
-                let names: Vec<String> = default_repos
-                    .keys()
-                    .map(|s| legacy_lossy(s).into_owned())
-                    .collect();
+                let names: Vec<BString> = default_repos.keys().cloned().collect();
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     default_repos.into_values().collect(),
                 ));
                 self.get_io().write_error(format!(
                     "No composer.json found in the current directory, showing available packages from {}",
-                    names.join(", ")
+                    implode(", ", &names).display_lossy()
                 ));
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             }
@@ -1796,13 +1739,10 @@ impl Command for ShowCommand {
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) {
             let default_repos =
                 RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
-            let names: Vec<String> = default_repos
-                .keys()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect();
+            let names: Vec<BString> = default_repos.keys().cloned().collect();
             self.get_io().write_error(format!(
                 "No composer.json found in the current directory, showing available packages from {}",
-                names.join(", ")
+                implode(", ", &names).display_lossy()
             ));
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 platform_repo.clone().into(),
@@ -1944,25 +1884,22 @@ impl Command for ShowCommand {
                 .set_option("latest", InputValue::Bool(false));
         }
 
-        let package_filter: Option<String> = input
+        let package_filter: Option<BString> = input
             .borrow()
             .get_argument("package")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BString::from);
 
         // show single package or single version
         if let Some(ref pkg) = single_package {
-            versions_map.insert(
-                legacy_lossy(&pkg.get_pretty_version()).into_owned(),
-                legacy_lossy(&pkg.get_version()).into_owned(),
-            );
+            versions_map.insert(pkg.get_pretty_version(), pkg.get_version());
         } else if let Some(ref pf) = package_filter
-            && !pf.contains('*')
+            && !pf.contains(&b'*')
         {
             let (matched_package, vers) = self.get_package(
                 &installed_repo,
                 &repos,
-                pf,
+                BStr::new(pf),
                 input.borrow().get_argument("version")?.to_php_mixed(),
             )?;
 
@@ -2009,7 +1946,8 @@ impl Command for ShowCommand {
 
                 return Err(InvalidArgumentException::new(format!(
                     "Package \"{}\" not found{}.",
-                    pf, hint
+                    pf.display_lossy(),
+                    hint
                 ))
                 .into());
             }
@@ -2088,11 +2026,9 @@ impl Command for ShowCommand {
                         .get_install_path(package.clone().into())
                 };
                 if let Some(path) = path {
-                    let real = realpath(&path)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default();
-                    let trimmed = real.split(['\r', '\n']).next().unwrap_or_default();
-                    self.get_io().write(format!(" {}", trimmed));
+                    let real = realpath(&path).unwrap_or_default();
+                    self.get_io()
+                        .write(bconcat!(" ", first_token(path_to_bytes(&real))));
                 } else {
                     self.get_io().write(" null");
                 }
@@ -2157,14 +2093,14 @@ impl Command for ShowCommand {
         }
 
         // list packages
-        let mut packages: IndexMap<String, IndexMap<String, PackageOrName>> = IndexMap::new();
+        let mut packages: IndexMap<String, IndexMap<BString, PackageOrName>> = IndexMap::new();
         let mut package_filter_regex: Option<String> = None;
         if let Some(ref pf) = package_filter {
             let escaped = preg_quote(pf, None);
             package_filter_regex = Some(format!("{{^{}$}}i", escaped.replace("\\*", ".*?")));
         }
 
-        let mut package_list_filter: Option<Vec<String>> = None;
+        let mut package_list_filter: Option<Vec<BString>> = None;
         if input.borrow().get_option("direct")?.as_bool() == Some(true) {
             package_list_filter = Some(self.get_root_requires());
         }
@@ -2201,18 +2137,18 @@ impl Command for ShowCommand {
             if let Some(cr_rc) = repo.downcast_rc::<ComposerRepository>() {
                 let names = cr_rc
                     .borrow_mut()
-                    .get_package_names(package_filter.as_deref().map(bstr::BStr::new))?;
+                    .get_package_names(package_filter.as_ref().map(BStr::new))?;
                 for name in names {
-                    packages.entry(type_owned.clone()).or_default().insert(
-                        legacy_lossy(&name).into_owned(),
-                        PackageOrName::Name(legacy_lossy(&name).into_owned()),
-                    );
+                    packages
+                        .entry(type_owned.clone())
+                        .or_default()
+                        .insert(name.clone(), PackageOrName::Name(name));
                 }
             } else {
                 for package in repo.get_packages()? {
                     let existing = packages
                         .get(&type_owned)
-                        .and_then(|m| m.get(&*legacy_lossy(&package.get_name())));
+                        .and_then(|m| m.get(&package.get_name()));
                     let need_replace = match existing {
                         None => true,
                         Some(PackageOrName::Name(_)) => true,
@@ -2243,20 +2179,20 @@ impl Command for ShowCommand {
                                 ),
                             };
                             if matches_list {
-                                packages.entry(type_owned.clone()).or_default().insert(
-                                    legacy_lossy(&p.get_name()).into_owned(),
-                                    PackageOrName::Pkg(p),
-                                );
+                                packages
+                                    .entry(type_owned.clone())
+                                    .or_default()
+                                    .insert(p.get_name(), PackageOrName::Pkg(p));
                             }
                         }
                     }
                 }
                 if Self::same_repository(&repo, &platform_repo) {
                     for (name, p) in platform_repo.borrow().get_disabled_packages() {
-                        packages.entry(type_owned.clone()).or_default().insert(
-                            legacy_lossy(&name.clone()).into_owned(),
-                            PackageOrName::Pkg(p.clone().into()),
-                        );
+                        packages
+                            .entry(type_owned.clone())
+                            .or_default()
+                            .insert(name.clone(), PackageOrName::Pkg(p.clone().into()));
                     }
                 }
             }
@@ -2273,14 +2209,11 @@ impl Command for ShowCommand {
                 .get_option("ignore")?
                 .as_array()
                 .map(|l| l.iter().map(strtolower).collect::<Vec<_>>())
-                .unwrap_or_default()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
+                .unwrap_or_default(),
             "{^(?:%s)$}iD",
         );
         let indent = if show_all_types { "  " } else { "" };
-        let mut latest_packages: IndexMap<String, crate::package::PackageInterfaceHandle> =
+        let mut latest_packages: IndexMap<BString, crate::package::PackageInterfaceHandle> =
             IndexMap::new();
         let mut exit_code: i64 = 0;
         let mut view_data: IndexMap<String, Vec<PackageViewData>> = IndexMap::new();
@@ -2322,10 +2255,7 @@ impl Command for ShowCommand {
                                 continue;
                             }
 
-                            latest_packages.insert(
-                                legacy_lossy(&package.get_pretty_name()).into_owned(),
-                                latest.unwrap(),
-                            );
+                            latest_packages.insert(package.get_pretty_name(), latest.unwrap());
                         }
                     }
                 }
@@ -2358,10 +2288,9 @@ impl Command for ShowCommand {
                     let mut package_view_data = PackageViewData::default();
                     if let PackageOrName::Pkg(package) = package_or_name {
                         let latest_package = if show_latest
-                            && latest_packages
-                                .contains_key(&*legacy_lossy(&package.get_pretty_name()))
+                            && latest_packages.contains_key(&package.get_pretty_name())
                         {
-                            latest_packages.get(&*legacy_lossy(&package.get_pretty_name()))
+                            latest_packages.get(&package.get_pretty_name())
                         } else {
                             None
                         };
@@ -2395,8 +2324,7 @@ impl Command for ShowCommand {
                             has_outdated_packages = true;
                         }
 
-                        package_view_data.name =
-                            legacy_lossy(&package.get_pretty_name()).into_owned();
+                        package_view_data.name = package.get_pretty_name();
                         package_view_data.direct_dependency = Some(in_array_strict(
                             package.get_name(),
                             &self
@@ -2408,24 +2336,19 @@ impl Command for ShowCommand {
                         if format != "json"
                             || input.borrow().get_option("name-only")?.as_bool() != Some(true)
                         {
-                            package_view_data.homepage = Some(
-                                package
-                                    .as_complete()
-                                    .and_then(|c| c.get_homepage())
-                                    .map(|s| legacy_lossy(&s).into_owned()),
-                            );
+                            package_view_data.homepage =
+                                Some(package.as_complete().and_then(|c| c.get_homepage()));
                             package_view_data.source =
                                 Some(PackageInfo::get_view_source_url(package.clone()));
                         }
                         name_length = name_length.max(package_view_data.name.len());
                         if write_version {
-                            let mut version_str = legacy_lossy(&package.get_full_pretty_version(
+                            let mut version_str = package.get_full_pretty_version(
                                 true,
                                 crate::package::DisplayMode::SourceRefIfDev,
-                            ))
-                            .into_owned();
+                            );
                             if format == "text" {
-                                version_str = version_str.trim_start_matches('v').to_string();
+                                version_str = ltrim2(&version_str, "v");
                             }
                             version_length = version_length.max(version_str.len());
                             package_view_data.version = Some(version_str);
@@ -2448,15 +2371,12 @@ impl Command for ShowCommand {
                             }
                         }
                         if write_latest && let Some(latest) = latest_package {
-                            let mut latest_version_str =
-                                legacy_lossy(&latest.get_full_pretty_version(
-                                    true,
-                                    crate::package::DisplayMode::SourceRefIfDev,
-                                ))
-                                .into_owned();
+                            let mut latest_version_str = latest.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            );
                             if format == "text" {
-                                latest_version_str =
-                                    latest_version_str.trim_start_matches('v').to_string();
+                                latest_version_str = ltrim2(&latest_version_str, "v");
                             }
                             let update_status =
                                 Self::get_update_status(latest.clone(), package.clone())?;
@@ -2471,13 +2391,12 @@ impl Command for ShowCommand {
                                 package_view_data.latest_release_date = Some(String::new());
                             }
                         } else if write_latest {
-                            package_view_data.latest = Some("[none matched]".to_string());
+                            package_view_data.latest = Some(BString::from("[none matched]"));
                             package_view_data.latest_status = Some("up-to-date".to_string());
                             latest_length = latest_length.max("[none matched]".len());
                         }
                         if write_description && let Some(c) = package.as_complete() {
-                            package_view_data.description =
-                                Some(c.get_description().map(|s| legacy_lossy(&s).into_owned()));
+                            package_view_data.description = Some(c.get_description());
                         }
                         if write_path {
                             let installation_manager = composer
@@ -2485,16 +2404,13 @@ impl Command for ShowCommand {
                                 .unwrap()
                                 .borrow_partial()
                                 .get_installation_manager();
-                            let path: Option<String> = installation_manager
+                            let path = installation_manager
                                 .borrow_mut()
-                                .get_install_path(package.clone())
-                                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+                                .get_install_path(package.clone());
                             if let Some(p) = path {
-                                let r = realpath(&p)
-                                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                                    .unwrap_or_default();
-                                let trimmed = r.split(['\r', '\n']).next().unwrap_or_default();
-                                package_view_data.path = Some(Some(trimmed.to_string()));
+                                let r = realpath(&p).unwrap_or_default();
+                                package_view_data.path =
+                                    Some(Some(BString::from(first_token(path_to_bytes(&r)))));
                             } else {
                                 package_view_data.path = Some(None);
                             }
@@ -2507,20 +2423,20 @@ impl Command for ShowCommand {
                         {
                             let replacement_package_name = c.get_replacement_package();
                             let replacement = if let Some(ref rp) = replacement_package_name {
-                                format!("Use {} instead", legacy_lossy(&rp))
+                                bconcat!("Use ", rp, " instead")
                             } else {
-                                "No replacement was suggested".to_string()
+                                BString::from("No replacement was suggested")
                             };
-                            let package_warning = format!(
-                                "Package {} is abandoned, you should avoid using it. {}.",
-                                legacy_lossy(&package.get_pretty_name()),
-                                replacement
+                            let package_warning = bconcat!(
+                                "Package ",
+                                package.get_pretty_name(),
+                                " is abandoned, you should avoid using it. ",
+                                replacement,
+                                "."
                             );
                             package_view_data.warning = Some(package_warning);
                             package_is_abandoned = match replacement_package_name {
-                                Some(rp) => {
-                                    AbandonedState::Replacement(legacy_lossy(&rp).into_owned())
-                                }
+                                Some(rp) => AbandonedState::Replacement(rp),
                                 None => AbandonedState::Flag(true),
                             };
                         }
@@ -2730,67 +2646,112 @@ impl BaseCommand for ShowCommand {
 #[derive(Debug)]
 pub enum PackageOrName {
     Pkg(crate::package::PackageInterfaceHandle),
-    Name(String),
+    Name(BString),
 }
 
 /// Shape of `show <package> --format=json` output.
 #[derive(Debug, serde::Serialize)]
 struct PackageInfoJson {
-    name: String,
-    description: Option<String>,
-    keywords: Vec<String>,
-    r#type: String,
-    homepage: Option<String>,
-    names: Vec<String>,
-    versions: Vec<String>,
+    #[serde(serialize_with = "json_bytes::str")]
+    name: BString,
+    #[serde(serialize_with = "json_bytes::option_str")]
+    description: Option<BString>,
+    #[serde(serialize_with = "json_bytes::str_vec")]
+    keywords: Vec<BString>,
+    #[serde(serialize_with = "json_bytes::str")]
+    r#type: BString,
+    #[serde(serialize_with = "json_bytes::option_str")]
+    homepage: Option<BString>,
+    #[serde(serialize_with = "json_bytes::str_vec")]
+    names: Vec<BString>,
+    #[serde(serialize_with = "json_bytes::str_vec")]
+    versions: Vec<BString>,
     #[serde(skip_serializing_if = "Option::is_none")]
     licenses: Option<Vec<LicenseJson>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    latest: Option<String>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    latest: Option<BString>,
     #[serde(skip_serializing_if = "Option::is_none")]
     source: Option<PackageReferenceJson>,
     #[serde(skip_serializing_if = "Option::is_none")]
     dist: Option<PackageReferenceJson>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<Option<String>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "nested_option_str"
+    )]
+    path: Option<Option<BString>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     released: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    replacement: Option<Option<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    suggests: Option<IndexMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    support: Option<IndexMap<String, String>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "nested_option_str"
+    )]
+    replacement: Option<Option<BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "option_str_map"
+    )]
+    suggests: Option<IndexMap<BString, BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "option_str_map"
+    )]
+    support: Option<IndexMap<BString, BString>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     autoload: Option<PhpMixed>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    include_path: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    requires: Option<IndexMap<String, String>>,
-    #[serde(rename = "devRequires", skip_serializing_if = "Option::is_none")]
-    dev_requires: Option<IndexMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    provides: Option<IndexMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    conflicts: Option<IndexMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    replaces: Option<IndexMap<String, String>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "option_str_vec"
+    )]
+    include_path: Option<Vec<BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "option_str_map"
+    )]
+    requires: Option<IndexMap<BString, BString>>,
+    #[serde(
+        rename = "devRequires",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "option_str_map"
+    )]
+    dev_requires: Option<IndexMap<BString, BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "option_str_map"
+    )]
+    provides: Option<IndexMap<BString, BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "option_str_map"
+    )]
+    conflicts: Option<IndexMap<BString, BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "option_str_map"
+    )]
+    replaces: Option<IndexMap<BString, BString>>,
 }
 
 #[derive(Debug, serde::Serialize)]
 struct PackageReferenceJson {
-    r#type: String,
-    url: Option<String>,
-    reference: Option<String>,
+    #[serde(serialize_with = "json_bytes::str")]
+    r#type: BString,
+    #[serde(serialize_with = "json_bytes::option_str")]
+    url: Option<BString>,
+    #[serde(serialize_with = "json_bytes::option_str")]
+    reference: Option<BString>,
 }
 
 #[derive(Debug, serde::Serialize)]
 #[serde(untagged)]
 enum LicenseJson {
-    Id(String),
+    Id(#[serde(serialize_with = "json_bytes::str")] BString),
     Detail {
         name: String,
-        osi: String,
+        #[serde(serialize_with = "json_bytes::str")]
+        osi: BString,
         url: String,
     },
 }
@@ -2803,17 +2764,22 @@ struct PackageTreeJson {
 
 #[derive(Debug, serde::Serialize)]
 struct PackageTree {
-    name: String,
-    version: String,
-    description: Option<String>,
+    #[serde(serialize_with = "json_bytes::str")]
+    name: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    version: BString,
+    #[serde(serialize_with = "json_bytes::option_str")]
+    description: Option<BString>,
     #[serde(skip_serializing_if = "Option::is_none")]
     requires: Option<Vec<PackageTreeChild>>,
 }
 
 #[derive(Debug, serde::Serialize)]
 struct PackageTreeChild {
-    name: String,
-    version: String,
+    #[serde(serialize_with = "json_bytes::str")]
+    name: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    version: BString,
     #[serde(skip_serializing_if = "Option::is_none")]
     requires: Option<Vec<PackageTreeChild>>,
 }
@@ -2841,21 +2807,34 @@ impl serde::Serialize for ViewDataJson<'_> {
 /// which PHP `isset()` and `array_key_exists()` tell apart.
 #[derive(Debug, Clone, Default, serde::Serialize)]
 struct PackageViewData {
-    name: String,
+    #[serde(serialize_with = "json_bytes::str")]
+    name: BString,
     #[serde(rename = "direct-dependency", skip_serializing_if = "Option::is_none")]
     direct_dependency: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    homepage: Option<Option<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    source: Option<Option<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    version: Option<String>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "nested_option_str"
+    )]
+    homepage: Option<Option<BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "nested_option_str"
+    )]
+    source: Option<Option<BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    version: Option<BString>,
     #[serde(rename = "release-age", skip_serializing_if = "Option::is_none")]
     release_age: Option<String>,
     #[serde(rename = "release-date", skip_serializing_if = "Option::is_none")]
     release_date: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    latest: Option<String>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    latest: Option<BString>,
     #[serde(rename = "latest-status", skip_serializing_if = "Option::is_none")]
     latest_status: Option<String>,
     #[serde(
@@ -2863,12 +2842,21 @@ struct PackageViewData {
         skip_serializing_if = "Option::is_none"
     )]
     latest_release_date: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<Option<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<Option<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    warning: Option<String>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "nested_option_str"
+    )]
+    description: Option<Option<BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "nested_option_str"
+    )]
+    path: Option<Option<BString>>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    warning: Option<BString>,
     #[serde(skip_serializing_if = "Option::is_none")]
     abandoned: Option<AbandonedState>,
 }
@@ -2877,7 +2865,7 @@ struct PackageViewData {
 #[serde(untagged)]
 enum AbandonedState {
     Flag(bool),
-    Replacement(String),
+    Replacement(#[serde(serialize_with = "json_bytes::str")] BString),
 }
 
 #[derive(Debug, Clone)]
@@ -2890,9 +2878,41 @@ struct ViewMetaData {
     write_release_date: bool,
 }
 
-// TODO(bytes): the `--format=json` output is built from Strings.
-fn lossy_map(map: IndexMap<BString, BString>) -> IndexMap<String, String> {
-    map.iter()
-        .map(|(k, v)| (legacy_lossy(k).into_owned(), legacy_lossy(v).into_owned()))
-        .collect()
+fn nested_option_str<S: serde::Serializer>(
+    value: &Option<Option<BString>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    json_bytes::option_str(value.as_ref().unwrap_or(&None), serializer)
+}
+
+fn option_str_vec<S: serde::Serializer>(
+    value: &Option<Vec<BString>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    match value {
+        Some(value) => json_bytes::str_vec(value, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
+fn option_str_map<S: serde::Serializer>(
+    value: &Option<IndexMap<BString, BString>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    match value {
+        Some(value) => json_bytes::str_map(value, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
+/// PHP's `strtok($string, "\r\n")`: the first token, skipping leading line breaks.
+fn first_token(string: &[u8]) -> &BStr {
+    let is_delimiter = |byte: &u8| matches!(byte, b'\r' | b'\n');
+    let start = string
+        .iter()
+        .position(|byte| !is_delimiter(byte))
+        .unwrap_or(string.len());
+    let token = &string[start..];
+    let end = token.iter().position(is_delimiter).unwrap_or(token.len());
+    token[..end].as_bstr()
 }

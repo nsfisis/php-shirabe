@@ -9,9 +9,10 @@ use crate::package::Link;
 use crate::repository::{
     InstalledRepository, PlatformRepository, RepositoryInterface, RootPackageRepository,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_merge_map, bconcat, impl_php_class, legacy_lossy, strip_tags,
+    PhpMixed, array_merge_map, bconcat, impl_php_class, json_bytes, rtrim, strip_tags,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;
@@ -19,29 +20,37 @@ use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 struct CheckResult {
-    platform_package: String,
-    version: String,
+    platform_package: BString,
+    version: BString,
     link: Option<Link>,
-    status: String,
-    provider: String,
+    status: BString,
+    provider: BString,
 }
 
 /// Shape of one entry of the `check-platform-reqs --format=json` output.
 #[derive(Debug, serde::Serialize)]
 struct PlatformRequirementJson {
-    name: String,
-    version: String,
-    status: String,
+    #[serde(serialize_with = "json_bytes::str")]
+    name: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    version: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    status: BString,
     failed_requirement: Option<FailedRequirementJson>,
-    provider: Option<String>,
+    #[serde(serialize_with = "json_bytes::option_str")]
+    provider: Option<BString>,
 }
 
 #[derive(Debug, serde::Serialize)]
 struct FailedRequirementJson {
-    source: String,
-    r#type: String,
-    target: String,
-    constraint: String,
+    #[serde(serialize_with = "json_bytes::str")]
+    source: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    r#type: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    target: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    constraint: BString,
 }
 
 #[derive(Debug)]
@@ -75,7 +84,7 @@ impl CheckPlatformReqsCommand {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         results: &[CheckResult],
-        format: &str,
+        format: &BStr,
     ) -> anyhow::Result<()> {
         let io = self.get_io();
 
@@ -85,17 +94,17 @@ impl CheckPlatformReqsCommand {
                 .map(|result| PlatformRequirementJson {
                     name: result.platform_package.clone(),
                     version: result.version.clone(),
-                    status: legacy_lossy(&strip_tags(&result.status)).into_owned(),
+                    status: strip_tags(&result.status),
                     failed_requirement: result.link.as_ref().map(|link| FailedRequirementJson {
-                        source: legacy_lossy(link.get_source()).into_owned(),
-                        r#type: legacy_lossy(link.get_description()).into_owned(),
-                        target: legacy_lossy(link.get_target()).into_owned(),
-                        constraint: legacy_lossy(link.get_pretty_constraint()).into_owned(),
+                        source: BString::from(link.get_source()),
+                        r#type: BString::from(link.get_description()),
+                        target: BString::from(link.get_target()),
+                        constraint: BString::from(link.get_pretty_constraint()),
                     }),
                     provider: if result.provider.is_empty() {
                         None
                     } else {
-                        Some(legacy_lossy(&strip_tags(&result.provider)).into_owned())
+                        Some(strip_tags(&result.provider))
                     },
                 })
                 .collect();
@@ -126,11 +135,7 @@ impl CheckPlatformReqsCommand {
                         } else {
                             PhpMixed::string(String::new())
                         },
-                        PhpMixed::string(
-                            format!("{} {}", result.status, result.provider)
-                                .trim_end()
-                                .to_string(),
-                        ),
+                        PhpMixed::string(rtrim(bconcat!(result.status, " ", result.provider))),
                     ])
                 })
                 .collect();
@@ -200,8 +205,8 @@ impl Command for CheckPlatformReqsCommand {
             .as_bool()
             .unwrap_or(false);
 
-        let mut requires: IndexMap<String, Vec<Link>> = IndexMap::new();
-        let mut remove_packages: Vec<String> = vec![];
+        let mut requires: IndexMap<BString, Vec<Link>> = IndexMap::new();
+        let mut remove_packages: Vec<BString> = vec![];
 
         let installed_repo_base: crate::repository::RepositoryInterfaceHandle = if input
             .borrow()
@@ -234,11 +239,7 @@ impl Command for CheckPlatformReqsCommand {
                     .into()
             } else {
                 if no_dev {
-                    remove_packages = local_repo
-                        .get_dev_package_names()
-                        .iter()
-                        .map(|s| legacy_lossy(s).into_owned())
-                        .collect::<Vec<_>>();
+                    remove_packages = local_repo.get_dev_package_names();
                 }
                 io.write_error(format!(
                     "<info>Checking {}platform requirements for packages in the vendor dir</info>",
@@ -251,7 +252,7 @@ impl Command for CheckPlatformReqsCommand {
         if !no_dev {
             for (require, link) in composer.get_package().get_dev_requires().iter() {
                 requires
-                    .entry(legacy_lossy(require).into_owned())
+                    .entry(require.clone())
                     .or_default()
                     .push(link.clone());
             }
@@ -266,18 +267,18 @@ impl Command for CheckPlatformReqsCommand {
         ]);
 
         for package in installed_repo.get_packages()? {
-            if remove_packages.contains(&legacy_lossy(&package.get_name()).into_owned()) {
+            if remove_packages.contains(&package.get_name()) {
                 continue;
             }
             for (require, link) in package.get_requires().iter() {
                 requires
-                    .entry(legacy_lossy(require).into_owned())
+                    .entry(require.clone())
                     .or_default()
                     .push(link.clone());
             }
         }
 
-        let mut requires_sorted: Vec<(String, Vec<Link>)> = requires.into_iter().collect();
+        let mut requires_sorted: Vec<(BString, Vec<Link>)> = requires.into_iter().collect();
         requires_sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
         installed_repo.add_repository(crate::repository::RepositoryInterfaceHandle::new(
@@ -299,10 +300,8 @@ impl Command for CheckPlatformReqsCommand {
                             if candidate.get_name() == *require {
                                 let c = SimpleConstraint::new(
                                     "=",
-                                    legacy_lossy(&candidate.get_version()).into_owned(),
-                                    Some(bstr::BString::from(
-                                        legacy_lossy(&candidate.get_pretty_version()).into_owned(),
-                                    )),
+                                    candidate.get_version(),
+                                    Some(candidate.get_pretty_version()),
                                 );
                                 Some(c.into())
                             } else {
@@ -329,22 +328,20 @@ impl Command for CheckPlatformReqsCommand {
                             if !link.get_constraint().matches(&candidate_constraint) {
                                 req_results.push(CheckResult {
                                     platform_package: if candidate.get_name() == *require {
-                                        legacy_lossy(&candidate.get_pretty_name()).into_owned()
+                                        candidate.get_pretty_name()
                                     } else {
                                         require.clone()
                                     },
-                                    version: legacy_lossy(
-                                        &candidate_constraint.get_pretty_string(),
-                                    )
-                                    .into_owned(),
+                                    version: candidate_constraint.get_pretty_string(),
                                     link: Some(link.clone()),
-                                    status: "<error>failed</error>".to_string(),
+                                    status: BString::from("<error>failed</error>"),
                                     provider: if candidate.get_name() == *require {
-                                        String::new()
+                                        BString::default()
                                     } else {
-                                        format!(
-                                            "<comment>provided by {}</comment>",
-                                            legacy_lossy(&candidate.get_pretty_name())
+                                        bconcat!(
+                                            "<comment>provided by ",
+                                            candidate.get_pretty_name(),
+                                            "</comment>"
                                         )
                                     },
                                 });
@@ -354,20 +351,20 @@ impl Command for CheckPlatformReqsCommand {
 
                         results.push(CheckResult {
                             platform_package: if candidate.get_name() == *require {
-                                legacy_lossy(&candidate.get_pretty_name()).into_owned()
+                                candidate.get_pretty_name()
                             } else {
                                 require.clone()
                             },
-                            version: legacy_lossy(&candidate_constraint.get_pretty_string())
-                                .into_owned(),
+                            version: candidate_constraint.get_pretty_string(),
                             link: None,
-                            status: "<info>success</info>".to_string(),
+                            status: BString::from("<info>success</info>"),
                             provider: if candidate.get_name() == *require {
-                                String::new()
+                                BString::default()
                             } else {
-                                format!(
-                                    "<comment>provided by {}</comment>",
-                                    legacy_lossy(&candidate.get_pretty_name())
+                                bconcat!(
+                                    "<comment>provided by ",
+                                    candidate.get_pretty_name(),
+                                    "</comment>"
                                 )
                             },
                         });
@@ -381,24 +378,23 @@ impl Command for CheckPlatformReqsCommand {
 
                 results.push(CheckResult {
                     platform_package: require.clone(),
-                    version: "n/a".to_string(),
+                    version: BString::from("n/a"),
                     link: links.first().cloned(),
-                    status: "<error>missing</error>".to_string(),
-                    provider: String::new(),
+                    status: BString::from("<error>missing</error>"),
+                    provider: BString::default(),
                 });
                 exit_code = exit_code.max(2);
             }
         }
 
-        let format = legacy_lossy(
+        let format = BString::from(
             input
                 .borrow()
                 .get_option("format")?
                 .as_string()
-                .unwrap_or(bstr::BStr::new("text")),
-        )
-        .into_owned();
-        self.print_table(_output, &results, &format)?;
+                .unwrap_or(BStr::new("text")),
+        );
+        self.print_table(_output, &results, BStr::new(&format))?;
 
         Ok(exit_code)
     }

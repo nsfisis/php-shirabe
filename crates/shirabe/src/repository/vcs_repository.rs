@@ -19,8 +19,8 @@ use crate::util::{HttpDownloader, Platform, ProcessExecutor, Url};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, bconcat, legacy_lossy, php_regex,
-    preg_is_match, preg_replace, str_replace, strpos,
+    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, bconcat, php_regex, preg_is_match,
+    preg_replace, str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -384,7 +384,6 @@ impl VcsRepository {
 
         let tags = self.driver.borrow_mut().as_mut().unwrap().get_tags()?;
         for (tag, identifier) in tags {
-            let mut tag = legacy_lossy(&tag).into_owned();
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
                 self.package_name
@@ -392,14 +391,14 @@ impl VcsRepository {
                     .clone()
                     .unwrap_or_else(|| self.url.clone())
                     .display_lossy(),
-                tag
+                tag.display_lossy()
             );
 
             // strip the release- prefix from tags if present
-            tag = legacy_lossy(&BString::from(&str_replace("release-", "", &tag)[..])).into_owned();
+            let tag = str_replace("release-", "", &tag);
 
             let cached_package = self.get_cached_package_version(
-                &tag,
+                tag.as_bstr(),
                 identifier.as_bstr(),
                 is_verbose,
                 is_very_verbose,
@@ -417,12 +416,12 @@ impl VcsRepository {
                 CachedPackageResult::None => {}
             }
 
-            let parsed_tag = self.validate_tag(&tag);
+            let parsed_tag = self.validate_tag(tag.as_bstr());
             if parsed_tag.is_none() {
                 if is_very_verbose {
                     self.io.write_error(format!(
                         "<warning>Skipped tag {}, invalid tag name</warning>",
-                        tag
+                        tag.display_lossy()
                     ));
                 }
                 continue;
@@ -447,7 +446,7 @@ impl VcsRepository {
                     if is_very_verbose {
                         self.io.write_error(format!(
                             "<warning>Skipped tag {}, no composer file</warning>",
-                            tag
+                            tag.display_lossy()
                         ));
                     }
                     self.empty_references.borrow_mut().push(identifier.clone());
@@ -510,12 +509,12 @@ impl VcsRepository {
                         if preg_is_match(php_regex!(r"{(^dev-|[.-]?dev$)}i"), &parsed_tag) {
                             self.io.write_error(format!(
                                 "<warning>Skipped tag {}, invalid tag name, tags can not use dev prefixes or suffixes</warning>",
-                                tag
+                                tag.display_lossy()
                             ));
                         } else {
                             self.io.write_error(format!(
                                 "<warning>Skipped tag {}, tag ({}) does not match version ({}) in composer.json</warning>",
-                                tag, parsed_tag.display_lossy(), version_normalized.display_lossy()
+                                tag.display_lossy(), parsed_tag.display_lossy(), version_normalized.display_lossy()
                             ));
                         }
                     }
@@ -544,7 +543,7 @@ impl VcsRepository {
                     if is_very_verbose {
                         self.io.write_error(format!(
                             "<warning>Skipped tag {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
-                            tag, existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
+                            tag.display_lossy(), existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
                         ));
                     }
                     return Ok(());
@@ -553,7 +552,7 @@ impl VcsRepository {
                 if is_very_verbose {
                     self.io.write_error(format!(
                         "Importing tag {} ({})",
-                        tag,
+                        tag.display_lossy(),
                         version_normalized.display_lossy()
                     ));
                 }
@@ -578,7 +577,7 @@ impl VcsRepository {
                         .borrow_mut()
                         .entry(bstr::BString::from("tags".to_string()))
                         .or_default()
-                        .insert(bstr::BString::from(tag.clone()), te.clone());
+                        .insert(tag.clone(), te.clone());
                     if te.get_code() == 404 {
                         self.empty_references.borrow_mut().push(identifier.clone());
                     }
@@ -597,7 +596,8 @@ impl VcsRepository {
                     };
                     self.io.write_error(format!(
                         "<warning>Skipped tag {}, {}</warning>",
-                        tag, detail
+                        tag.display_lossy(),
+                        detail
                     ));
                 }
                 continue;
@@ -684,7 +684,7 @@ impl VcsRepository {
                 .get_root_identifier()?
                 == branch;
             let cached_package = self.get_cached_package_version(
-                &legacy_lossy(&version),
+                version.as_bstr(),
                 identifier.as_bstr(),
                 is_verbose,
                 is_very_verbose,
@@ -931,7 +931,7 @@ impl VcsRepository {
         None
     }
 
-    fn validate_tag(&self, version: &str) -> Option<BString> {
+    fn validate_tag(&self, version: &BStr) -> Option<BString> {
         self.version_parser
             .borrow()
             .as_ref()
@@ -942,7 +942,7 @@ impl VcsRepository {
 
     fn get_cached_package_version(
         &self,
-        version: &str,
+        version: &BStr,
         identifier: &BStr,
         is_verbose: bool,
         is_very_verbose: bool,
@@ -961,7 +961,7 @@ impl VcsRepository {
             if is_very_verbose {
                 self.io.write_error(format!(
                     "<warning>Skipped {}, no composer file (cached from ref {})</warning>",
-                    version,
+                    version.display_lossy(),
                     identifier.display_lossy()
                 ));
             }
@@ -977,7 +977,7 @@ impl VcsRepository {
                     .clone()
                     .unwrap_or_else(|| self.url.clone())
                     .display_lossy(),
-                version
+                version.display_lossy()
             );
             if is_very_verbose {
                 self.io.write_error(&msg);
@@ -1010,7 +1010,7 @@ impl VcsRepository {
                 if is_very_verbose {
                     self.io.write_error(format!(
                         "<warning>Skipped cached version {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
-                        version, existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
+                        version.display_lossy(), existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
                     ));
                 }
                 cached_package = VersionCacheResult::None;

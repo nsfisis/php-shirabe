@@ -13,9 +13,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, bconcat, dirname, impl_php_class,
-    implode, in_array_strict, is_dir, legacy_lossy, path_from_bytes, path_to_bytes, php_regex,
-    preg_is_match, preg_match, preg_match_all, preg_quote, preg_replace, preg_split, realpath,
-    rtrim2, strlen, strpos, substr, trim, version_compare,
+    implode, in_array_strict, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen,
+    strpos, substr, trim, version_compare,
 };
 use std::path::{Path, PathBuf};
 
@@ -1268,14 +1268,14 @@ impl VcsDownloader for GitDownloader {
                     PhpMixed::string("?".to_string()),
                 )?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(|answer| answer.to_vec());
             let mut do_help = false;
             match answer.as_deref() {
-                Some("y") => {
+                Some(b"y") => {
                     self.discard_changes(&path).await?;
                     break 'outer;
                 }
-                Some("s") => {
+                Some(b"s") => {
                     if !update {
                         // goto help;
                         do_help = true;
@@ -1284,17 +1284,17 @@ impl VcsDownloader for GitDownloader {
                         break 'outer;
                     }
                 }
-                Some("n") => {
+                Some(b"n") => {
                     return Err(RuntimeException::new("Update aborted".to_string()).into());
                 }
-                Some("v") => {
+                Some(b"v") => {
                     self.inner.io.write_error3(
                         implode("\n", &changes).display_lossy().to_string(),
                         true,
                         io_interface::NORMAL,
                     );
                 }
-                Some("d") => {
+                Some(b"d") => {
                     self.view_diff(&path)?;
                 }
                 _ => {

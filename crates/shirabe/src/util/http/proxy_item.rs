@@ -4,8 +4,8 @@ use crate::util::http::RequestProxy;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_encode, bconcat, legacy_lossy, parse_url, rawurldecode,
-    str_replace, strpbrk, strtolower,
+    PhpMixed, RuntimeException, base64_encode, bconcat, parse_url, rawurldecode, str_replace,
+    strpbrk, strtolower,
 };
 
 #[derive(Debug)]
@@ -133,12 +133,10 @@ impl ProxyItem {
         options.insert("http".to_string(), http_options);
 
         RequestProxy::new(
-            Some(legacy_lossy(&self.url).into_owned()),
-            self.curl_auth
-                .as_ref()
-                .map(|curl_auth| legacy_lossy(curl_auth).into_owned()),
+            Some(self.url.clone()),
+            self.curl_auth.clone(),
             Some(options),
-            Some(legacy_lossy(&self.safe_url).into_owned()),
+            Some(self.safe_url.clone()),
         )
     }
 }

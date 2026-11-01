@@ -16,8 +16,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
     array_replace_recursive, bconcat, empty, extension_loaded, file_get_contents, implode, intval,
-    is_numeric, legacy_lossy, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
-    rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
+    is_numeric, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, rawurldecode,
+    stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -518,8 +518,7 @@ impl HttpDownloader {
                     .parse_constraints(versions_value.as_string().unwrap_or_default())?;
                 let composer_constraint = SimpleConstraint::new(
                     "==",
-                    legacy_lossy(&version_parser.normalize(composer::get_version(), None)?)
-                        .into_owned(),
+                    version_parser.normalize(composer::get_version(), None)?,
                     None,
                 );
                 if !constraint.matches(&composer_constraint.into()) {
@@ -557,8 +556,7 @@ impl HttpDownloader {
                         )?;
                         let composer_constraint = SimpleConstraint::new(
                             "==",
-                            legacy_lossy(&version_parser.normalize(composer::get_version(), None)?)
-                                .into_owned(),
+                            version_parser.normalize(composer::get_version(), None)?,
                             None,
                         );
                         if !constraint.matches(&composer_constraint.into()) {

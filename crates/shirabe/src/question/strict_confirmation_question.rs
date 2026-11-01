@@ -13,7 +13,7 @@ pub struct StrictConfirmationQuestion {
 
 impl StrictConfirmationQuestion {
     pub fn new(
-        question: String,
+        question: impl Into<bstr::BString>,
         default: bool,
         true_answer_regex: String,
         false_answer_regex: String,
@@ -82,7 +82,7 @@ impl StrictConfirmationQuestion {
 // so it is not an instanceof ChoiceQuestion/ConfirmationQuestion and keeps the default
 // downcasts returning None.
 impl QuestionInterface for StrictConfirmationQuestion {
-    fn get_question(&self) -> &str {
+    fn get_question(&self) -> &bstr::BStr {
         self.inner.get_question()
     }
 

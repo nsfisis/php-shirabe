@@ -8,7 +8,7 @@ use shirabe::package::loader::array_loader::ArrayLoader;
 use shirabe::repository::{
     AbandonedInfo, ArrayRepository, RepositoryInterface, SEARCH_FULLTEXT, SearchResult,
 };
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 
 /// PHP `setType`/`setAbandoned` operate on non-root packages; the public handle API only allows
 /// such setters on root packages, so packages carrying extra config are built via ArrayLoader.
@@ -30,25 +30,19 @@ fn loaded(name: &str, version: &str, extra: Vec<(&str, PhpMixed)>) -> PackageInt
 enum Abandoned {
     No,
     Yes,
-    Replacement(String),
+    Replacement(BString),
 }
 
-fn reprs(results: &[SearchResult]) -> Vec<(String, Option<String>, Abandoned)> {
+fn reprs(results: &[SearchResult]) -> Vec<(BString, Option<BString>, Abandoned)> {
     results
         .iter()
         .map(|r| {
             let abandoned = match &r.abandoned {
                 None => Abandoned::No,
                 Some(AbandonedInfo::Abandoned) => Abandoned::Yes,
-                Some(AbandonedInfo::Replacement(s)) => {
-                    Abandoned::Replacement(legacy_lossy(&s.clone()).into_owned())
-                }
+                Some(AbandonedInfo::Replacement(s)) => Abandoned::Replacement(s.clone()),
             };
-            (
-                legacy_lossy(&r.name).into_owned(),
-                r.description.as_ref().map(|d| legacy_lossy(d).into_owned()),
-                abandoned,
-            )
+            (r.name.clone(), r.description.clone(), abandoned)
         })
         .collect()
 }
@@ -131,7 +125,7 @@ fn test_search() {
     repo.add_package(get_package("bar", "1")).unwrap();
 
     assert_eq!(
-        vec![("foo".to_string(), None, Abandoned::No)],
+        vec![(BString::from("foo"), None, Abandoned::No)],
         reprs(
             &repo
                 .search(
@@ -144,7 +138,7 @@ fn test_search() {
     );
 
     assert_eq!(
-        vec![("bar".to_string(), None, Abandoned::No)],
+        vec![(BString::from("bar"), None, Abandoned::No)],
         reprs(
             &repo
                 .search(
@@ -182,7 +176,7 @@ fn test_search_with_package_type() {
     repo.add_package(package).unwrap();
 
     assert_eq!(
-        vec![("foo".to_string(), None, Abandoned::No)],
+        vec![(BString::from("foo"), None, Abandoned::No)],
         reprs(
             &repo
                 .search(
@@ -205,7 +199,7 @@ fn test_search_with_package_type() {
     );
 
     assert_eq!(
-        vec![("foobar".to_string(), None, Abandoned::No)],
+        vec![(BString::from("foobar"), None, Abandoned::No)],
         reprs(
             &repo
                 .search(
@@ -233,11 +227,11 @@ fn test_search_with_abandoned_packages() {
 
     assert_eq!(
         vec![
-            ("foo1".to_string(), None, Abandoned::Yes),
+            (BString::from("foo1"), None, Abandoned::Yes),
             (
-                "foo2".to_string(),
+                BString::from("foo2"),
                 None,
-                Abandoned::Replacement("bar".to_string())
+                Abandoned::Replacement(BString::from("bar"))
             ),
         ],
         reprs(

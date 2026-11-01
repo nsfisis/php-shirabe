@@ -102,13 +102,7 @@ impl ConsoleOutput {
     fn is_running_os400() -> bool {
         let checks = [
             php_uname("s"),
-            // TODO(bytes): the checks are matched as Strings.
-            bstr::BString::from(
-                getenv("OSTYPE")
-                    .unwrap_or_default()
-                    .into_string()
-                    .unwrap_or_else(|ostype| panic!("OSTYPE is not valid UTF-8: {ostype:?}")),
-            ),
+            bstr::BString::from(getenv("OSTYPE").unwrap_or_default().as_encoded_bytes()),
             bstr::BString::from(PHP_OS.to_string()),
         ];
 

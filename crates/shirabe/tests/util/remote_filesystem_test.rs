@@ -7,8 +7,8 @@ use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};
 use shirabe_php_shim::{
-    PhpMixed, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
-    legacy_lossy, parse_url, strpos,
+    PhpMixed, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, parse_url,
+    strpos,
 };
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
@@ -36,14 +36,14 @@ fn call_get_options_for_url(
         .unwrap()
 }
 
-fn http_header_list(res: &IndexMap<BString, PhpMixed>) -> Option<Vec<String>> {
+fn http_header_list(res: &IndexMap<BString, PhpMixed>) -> Option<Vec<BString>> {
     res.get(B("http"))
         .and_then(|v| v.as_array())
         .and_then(|http| http.get(B("header")))
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
-                .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
+                .map(|v| BString::from(v.as_string().unwrap_or_default()))
                 .collect()
         })
 }

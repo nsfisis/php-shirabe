@@ -2,6 +2,7 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug, Clone)]
 pub struct InstallOperation {
@@ -17,18 +18,18 @@ impl InstallOperation {
         self.package.clone()
     }
 
-    pub fn show(&self, lock: bool) -> String {
+    pub fn show(&self, lock: bool) -> bstr::BString {
         Self::format(self.package.clone(), lock)
     }
 
-    pub fn format(package: PackageInterfaceHandle, lock: bool) -> String {
-        format!(
-            "{}<info>{}</info> (<comment>{}</comment>)",
+    pub fn format(package: PackageInterfaceHandle, lock: bool) -> bstr::BString {
+        bconcat!(
             if lock { "Locking " } else { "Installing " },
-            package.get_pretty_name().display_lossy(),
-            package
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-                .display_lossy(),
+            "<info>",
+            package.get_pretty_name(),
+            "</info> (<comment>",
+            package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+            "</comment>)"
         )
     }
 }
@@ -39,6 +40,6 @@ impl SolverOperation for InstallOperation {
 
 impl std::fmt::Display for InstallOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false))
+        write!(f, "{}", self.show(false).display_lossy())
     }
 }

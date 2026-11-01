@@ -12,8 +12,7 @@ use bstr::{B, BStr, BString};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, DATE_RFC3339, PhpMixed, bconcat, extension_loaded, legacy_lossy, php_regex,
-    preg_is_match,
+    Catch as _, DATE_RFC3339, PhpMixed, bconcat, extension_loaded, php_regex, preg_is_match,
 };
 
 #[derive(Debug)]
@@ -149,10 +148,7 @@ impl VcsDriverBase {
             ));
         }
         if self.should_cache(identifier)
-            && let Some(res) = self
-                .cache
-                .as_mut()
-                .and_then(|c| c.read(&*legacy_lossy(identifier)))
+            && let Some(res) = self.cache.as_mut().and_then(|c| c.read(identifier))
         {
             let parsed = JsonFile::parse_json(Some(&res), None)?;
             let composer: Option<IndexMap<BString, PhpMixed>> = parsed.as_array().cloned();
@@ -179,9 +175,7 @@ impl VcsDriverBase {
                     ..Default::default()
                 },
             )?;
-            self.cache
-                .as_mut()
-                .map(|c| c.write(&*legacy_lossy(identifier), &encoded));
+            self.cache.as_mut().map(|c| c.write(identifier, &encoded));
         }
         self.info_cache
             .insert(bstr::BString::from(identifier), composer);
@@ -218,9 +212,7 @@ pub trait VcsDriver: VcsDriverInterface {
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if !self.info_cache().contains_key(identifier) {
             if self.should_cache(identifier)
-                && let Some(res) = self
-                    .cache_mut()
-                    .and_then(|c| c.read(&*legacy_lossy(identifier)))
+                && let Some(res) = self.cache_mut().and_then(|c| c.read(identifier))
             {
                 let parsed = JsonFile::parse_json(Some(&res), None)?;
                 let parsed_map: Option<IndexMap<BString, PhpMixed>> = match parsed {
@@ -250,8 +242,7 @@ pub trait VcsDriver: VcsDriverInterface {
                         ..Default::default()
                     },
                 )?;
-                self.cache_mut()
-                    .map(|c| c.write(&*legacy_lossy(identifier), &encoded));
+                self.cache_mut().map(|c| c.write(identifier, &encoded));
             }
 
             self.info_cache_mut()

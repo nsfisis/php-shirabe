@@ -10,7 +10,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, bconcat, get_class, json_bytes, legacy_lossy, preg_is_match,
+    array_keys, array_reduce, bconcat, get_class, json_bytes, preg_is_match,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::helper::Cell;
@@ -493,11 +493,7 @@ impl Auditor {
                     .set_headers(headers.into_iter().map(|h| h.into()).collect());
                 table.add_row(
                     row.iter()
-                        .map(|cell| {
-                            legacy_lossy(&ConsoleIO::sanitize(cell, true))
-                                .into_owned()
-                                .into()
-                        })
+                        .map(|cell| ConsoleIO::sanitize(cell, true).into())
                         .collect::<Vec<Cell>>()
                         .into(),
                 );
@@ -576,11 +572,7 @@ impl Auditor {
         io.write_error(format!(
             "<error>Found {} abandoned package{}:</error>",
             packages.len() as i64,
-            if packages.len() > 1 {
-                "s".to_string()
-            } else {
-                legacy_lossy(&BString::default()).into_owned()
-            },
+            if packages.len() > 1 { "s" } else { "" },
         ));
 
         if format == Self::FORMAT_PLAIN {
@@ -628,22 +620,13 @@ impl Auditor {
             .set_column_max_width(1, 80);
 
         for pkg in packages {
-            let replacement = legacy_lossy(&if pkg.get_replacement_package().is_some() {
-                BString::from(&pkg.get_replacement_package().unwrap()[..])
-            } else {
-                bstr::BString::from("none".to_string())
-            })
-            .into_owned();
+            let replacement = pkg
+                .get_replacement_package()
+                .unwrap_or_else(|| BString::from("none"));
             let row: Vec<Cell> = vec![
-                legacy_lossy(&ConsoleIO::sanitize(
-                    self.get_package_name_with_link(pkg.clone().into()),
-                    true,
-                ))
-                .into_owned()
-                .into(),
-                legacy_lossy(&ConsoleIO::sanitize(&replacement, true))
-                    .into_owned()
+                ConsoleIO::sanitize(self.get_package_name_with_link(pkg.clone().into()), true)
                     .into(),
+                ConsoleIO::sanitize(&replacement, true).into(),
             ];
             table.add_row(row.into());
         }

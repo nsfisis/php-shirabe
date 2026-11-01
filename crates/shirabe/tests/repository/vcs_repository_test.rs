@@ -11,7 +11,7 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, implode};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -171,7 +171,7 @@ fn test_load_versions() {
     let composer_home = set_up.composer_home.path().to_path_buf();
     let git_repo = set_up.git_repo.path().to_path_buf();
 
-    let mut expected: IndexSet<String> = [
+    let mut expected: IndexSet<BString> = [
         "0.6.0",
         "1.0.0",
         "1.0.x-dev",
@@ -183,7 +183,7 @@ fn test_load_versions() {
         "9999999-dev", // alias of dev-master
     ]
     .iter()
-    .map(|s| s.to_string())
+    .map(|s| BString::from(*s))
     .collect();
 
     let mut config = Config::new(true, None);
@@ -236,17 +236,17 @@ fn test_load_versions() {
     let packages = repo.__get_packages().unwrap();
 
     for package in &packages {
-        let pretty = legacy_lossy(&package.get_pretty_version()).into_owned();
+        let pretty = BString::from(&package.get_pretty_version()[..]);
         assert!(
             expected.shift_remove(&pretty),
             "Unexpected version {}",
-            pretty
+            pretty.display_lossy()
         );
     }
 
     assert!(
         expected.is_empty(),
         "Missing versions: {}",
-        expected.into_iter().collect::<Vec<_>>().join(", ")
+        implode(", ", &expected.into_iter().collect::<Vec<_>>()).display_lossy()
     );
 }

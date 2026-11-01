@@ -2,10 +2,10 @@
 
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::HttpDownloader;
 use bstr::{BStr, BString};
-use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, legacy_lossy, trim};
+use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, trim};
 
 #[derive(Debug)]
 pub struct Forgejo {
@@ -76,21 +76,20 @@ impl Forgejo {
         let mut store_in_local_auth_config = false;
         if has_local_auth {
             store_in_local_auth_config = self.io.ask_confirmation(
-                "A local auth config source was found, do you want to store the token there?"
-                    .to_string(),
+                "A local auth config source was found, do you want to store the token there?",
                 true,
             )?;
         }
 
         let username = self
             .io
-            .ask("Username: ".into(), PhpMixed::Null)?
+            .ask("Username: ", PhpMixed::Null)?
             .as_string()
             .map(trim)
             .unwrap_or_default();
         let token = self
             .io
-            .ask_and_hide_answer("Token (hidden): ".to_string())?
+            .ask_and_hide_answer("Token (hidden): ")?
             .map(trim)
             .unwrap_or_default();
 
@@ -145,7 +144,7 @@ impl Forgejo {
         }
 
         // store value in local/user config
-        let setting_key = legacy_lossy(&bconcat!("forgejo-token.", origin_url)).into_owned();
+        let setting_key = bconcat!("forgejo-token.", origin_url);
         {
             let mut cfg = self.config.borrow_mut();
             cfg.get_config_source_mut()

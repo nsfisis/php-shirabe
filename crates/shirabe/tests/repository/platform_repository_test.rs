@@ -8,14 +8,14 @@ use shirabe::repository::{
     FindPackageConstraint, PlatformRepository, RepositoryInterface, SEARCH_NAME,
 };
 use shirabe_php_rpc::PlatformInfo;
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::SimpleConstraint;
 
 mockall::mock! {
     pub HhvmDetector {}
     impl HhvmDetectorInterface for HhvmDetector {
         fn reset(&self);
-        fn get_version(&mut self) -> Option<String>;
+        fn get_version(&mut self) -> Option<bstr::BString>;
     }
 }
 
@@ -92,7 +92,7 @@ fn test_hhvm_package() {
     hhvm_detector
         .expect_get_version()
         .times(..)
-        .returning(|| Some("2.1.0".to_string()));
+        .returning(|| Some("2.1.0".into()));
 
     let mut platform_repository =
         PlatformRepository::new(vec![], IndexMap::new(), None, Some(Box::new(hhvm_detector)))
@@ -1647,13 +1647,12 @@ fn test_library_information() {
         let mut platform_repository =
             PlatformRepository::new(vec![], IndexMap::new(), Some(platform_info), None).unwrap();
 
-        let libraries: Vec<String> = platform_repository
+        let libraries: Vec<bstr::BString> = platform_repository
             .search(bstr::BString::from("lib".to_string()), SEARCH_NAME, None)
             .unwrap()
             .into_iter()
             .map(|package| package.name)
             .filter(|name| name.starts_with(b"lib-"))
-            .map(|s| legacy_lossy(&s).into_owned())
             .collect();
         let expected_libraries: Vec<&str> = case
             .expectations

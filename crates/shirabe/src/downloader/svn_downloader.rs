@@ -314,21 +314,20 @@ impl VcsDownloader for SvnDownloader {
                 .inner
                 .io
                 .ask(
-                    "    <info>Discard changes [y,n,v,?]?</info> ".into(),
+                    "    <info>Discard changes [y,n,v,?]?</info> ",
                     PhpMixed::string("?".to_string()),
                 )?
                 .as_string()
-                .map(|s| s.to_str_lossy())
-                .as_deref()
+                .map(|s| &**s)
             {
-                Some("y") => {
+                Some(b"y") => {
                     self.discard_changes(path).await?;
                     break;
                 }
-                Some("n") => {
+                Some(b"n") => {
                     return Err(RuntimeException::new("Update aborted".to_string()).into());
                 }
-                Some("v") => {
+                Some(b"v") => {
                     for line in &changes {
                         self.inner.io.write_error3(line, true, io_interface::NORMAL);
                     }

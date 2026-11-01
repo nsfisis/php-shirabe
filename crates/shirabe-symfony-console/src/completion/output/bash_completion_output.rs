@@ -2,23 +2,25 @@
 
 use crate::completion::{CompletionOutputInterface, CompletionSuggestions};
 use crate::output::OutputInterface;
+use bstr::BString;
+use shirabe_php_shim::{bconcat, implode};
 
 #[derive(Debug)]
 pub struct BashCompletionOutput;
 
 impl CompletionOutputInterface for BashCompletionOutput {
     fn write(&self, suggestions: &CompletionSuggestions, output: &dyn OutputInterface) {
-        let mut values: Vec<String> = suggestions
+        let mut values: Vec<BString> = suggestions
             .get_value_suggestions()
             .iter()
             .map(|suggestion| suggestion.get_value())
             .collect();
         for option in suggestions.get_option_suggestions() {
-            values.push(format!("--{}", option.get_name()));
+            values.push(bconcat!("--", option.get_name()));
             if option.is_negatable() {
-                values.push(format!("--no-{}", option.get_name()));
+                values.push(bconcat!("--no-", option.get_name()));
             }
         }
-        output.writeln(&[bstr::BString::from(values.join("\n"))], 0);
+        output.writeln(&[implode("\n", &values)], 0);
     }
 }

@@ -1,7 +1,8 @@
 //! The native phar binary layout implemented here follows the php.net manual
 //! (`https://www.php.net/manual/en/phar.fileformat.php`); no PHP C sources were referenced.
 
-use crate::UnexpectedValueException;
+use crate::{UnexpectedValueException, path_from_bytes, path_to_bytes, rtrim2, trim2, utf8_text};
+use bstr::{BString, ByteSlice};
 use std::io::{Read as _, Write as _};
 
 #[derive(Debug, Clone)]
@@ -15,7 +16,7 @@ enum PharEntryData {
 
 #[derive(Debug, Clone)]
 struct PharEntry {
-    localname: String,
+    localname: BString,
     data: PharEntryData,
     mode: Option<u32>,
     mtime: Option<u64>,
@@ -59,7 +60,7 @@ fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry
             let mut file = zip
                 .by_index(i)
                 .map_err(|e| corruption_error(path, &format!("invalid zip entry: {}", e)))?;
-            let localname = file.name().trim_end_matches('/').to_string();
+            let localname = rtrim2(file.name_raw(), "/");
             if file.is_dir() {
                 entries.push(PharEntry {
                     localname,
@@ -95,12 +96,7 @@ fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry
         if entry_type.is_pax_global_extensions() || entry_type.is_pax_local_extensions() {
             continue;
         }
-        // TODO(bytes): PharEntry keeps the local name as a String, so an entry name that is not
-        // valid UTF-8 is rejected instead of being read as bytes.
-        let localname = String::from_utf8(entry.path_bytes().into_owned())
-            .map_err(|e| corruption_error(path, &format!("invalid tar entry name: {}", e)))?
-            .trim_end_matches('/')
-            .to_string();
+        let localname = rtrim2(entry.path_bytes(), "/");
         let mode = entry.header().mode().ok().map(|m| m & 0o7777);
         let mtime = entry.header().mtime().ok();
         if entry_type.is_dir() {
@@ -159,9 +155,11 @@ fn extract_entries(
     };
 
     if let Some(files) = files
-        && let Some(missing) = files
-            .iter()
-            .find(|file| !entries.iter().any(|entry| entry.localname == **file))
+        && let Some(missing) = files.iter().find(|file| {
+            !entries
+                .iter()
+                .any(|entry| entry.localname == *file.as_bytes())
+        })
     {
         return Err(extract_error(format!("\"{}\" is not in the phar", missing)));
     }
@@ -169,11 +167,13 @@ fn extract_entries(
     std::fs::create_dir_all(directory).map_err(|e| extract_error(e.to_string()))?;
     for entry in entries {
         if let Some(files) = files
-            && !files.contains(&entry.localname.as_str())
+            && !files
+                .iter()
+                .any(|file| file.as_bytes() == entry.localname.as_slice())
         {
             continue;
         }
-        let rel = std::path::Path::new(&entry.localname);
+        let rel = path_from_bytes(&entry.localname);
         if rel.is_absolute()
             || rel
                 .components()
@@ -181,7 +181,7 @@ fn extract_entries(
         {
             return Err(extract_error(format!(
                 "path \"{}\" is invalid",
-                entry.localname
+                entry.localname.display_lossy()
             )));
         }
         let dest = directory.join(rel);
@@ -332,7 +332,7 @@ fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
     let halt_pos = find_halt_compiler_token(&bytes, &halt).ok_or_else(|| {
         corruption_error(
             path,
-            &format!("{} not found in stub", String::from_utf8_lossy(&halt)),
+            &format!("{} not found in stub", halt.as_bstr().display_lossy()),
         )
     })?;
     let mut offset = halt_pos + halt.len();
@@ -364,7 +364,7 @@ fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
     reader.take(metadata_len).ok_or_else(truncated)?;
 
     struct RawEntry {
-        name: String,
+        name: BString,
         size: u32,
         timestamp: u32,
         compressed_size: u32,
@@ -374,8 +374,7 @@ fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
     let mut raw_entries = Vec::new();
     for _ in 0..file_count {
         let name_len = reader.u32().ok_or_else(truncated)? as usize;
-        let name =
-            String::from_utf8_lossy(reader.take(name_len).ok_or_else(truncated)?).into_owned();
+        let name = BString::from(reader.take(name_len).ok_or_else(truncated)?);
         let size = reader.u32().ok_or_else(truncated)?;
         let timestamp = reader.u32().ok_or_else(truncated)?;
         let compressed_size = reader.u32().ok_or_else(truncated)?;
@@ -407,9 +406,9 @@ fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
         offset = end;
         let mode = Some(raw.flags & 0o777);
         let mtime = Some(raw.timestamp as u64);
-        if raw.name.ends_with('/') {
+        if raw.name.ends_with(b"/") {
             entries.push(PharEntry {
-                localname: raw.name.trim_end_matches('/').to_string(),
+                localname: rtrim2(&raw.name, "/"),
                 data: PharEntryData::Dir,
                 mode,
                 mtime,
@@ -499,7 +498,7 @@ crate::impl_php_exception!(PharException, inner, r"PharException");
 
 #[derive(Debug)]
 pub struct PharFileInfo {
-    file_name: String,
+    file_name: BString,
     is_dir: bool,
     content: Vec<u8>,
 }
@@ -509,12 +508,11 @@ impl PharFileInfo {
         self.content.clone()
     }
 
-    pub fn get_basename(&self) -> String {
-        self.file_name
-            .rsplit('/')
-            .next()
-            .unwrap_or(&self.file_name)
-            .to_string()
+    pub fn get_basename(&self) -> BString {
+        match self.file_name.rfind_byte(b'/') {
+            Some(slash) => BString::from(&self.file_name[slash + 1..]),
+            None => self.file_name.clone(),
+        }
     }
 
     pub fn is_dir(&self) -> bool {
@@ -583,9 +581,9 @@ impl PharData {
         !self.entries.borrow().is_empty()
     }
 
-    pub fn get(&self, key: &str) -> Option<PharFileInfo> {
+    pub fn get(&self, key: impl AsRef<[u8]>) -> Option<PharFileInfo> {
         let entries = self.entries.borrow();
-        let key = key.trim_end_matches('/');
+        let key = rtrim2(key, "/");
         for entry in entries.iter() {
             if entry.localname == key {
                 return Some(PharFileInfo {
@@ -598,10 +596,13 @@ impl PharData {
                 });
             }
         }
-        let prefix = format!("{}/", key);
-        if entries.iter().any(|e| e.localname.starts_with(&prefix)) {
+        let prefix = crate::bconcat!(&key, "/");
+        if entries
+            .iter()
+            .any(|e| e.localname.starts_with(prefix.as_slice()))
+        {
             return Some(PharFileInfo {
-                file_name: key.to_string(),
+                file_name: key,
                 is_dir: true,
                 content: Vec::new(),
             });
@@ -613,12 +614,12 @@ impl PharData {
     /// directories) in sorted order, like a `DirectoryIterator` over the phar root.
     pub fn iter(&self) -> impl Iterator<Item = PharFileInfo> {
         let entries = self.entries.borrow();
-        let mut top_level: indexmap::IndexMap<String, (bool, Vec<u8>)> = indexmap::IndexMap::new();
+        let mut top_level: indexmap::IndexMap<BString, (bool, Vec<u8>)> = indexmap::IndexMap::new();
         for entry in entries.iter() {
-            match entry.localname.split_once('/') {
-                Some((first_segment, _)) => {
+            match entry.localname.find_byte(b'/') {
+                Some(slash) => {
                     top_level
-                        .entry(first_segment.to_string())
+                        .entry(BString::from(&entry.localname[..slash]))
                         .or_insert((true, Vec::new()));
                 }
                 None => {
@@ -662,8 +663,8 @@ impl PharData {
         )
     }
 
-    pub fn add_empty_dir(&self, dirname: &str) -> anyhow::Result<()> {
-        let localname = dirname.trim_matches('/').to_string();
+    pub fn add_empty_dir(&self, dirname: impl AsRef<[u8]>) -> anyhow::Result<()> {
+        let localname = trim2(dirname, "/");
         {
             let mut entries = self.entries.borrow_mut();
             if !entries.iter().any(|e| e.localname == localname) {
@@ -687,20 +688,17 @@ impl PharData {
         {
             let mut entries = self.entries.borrow_mut();
             for file in iter {
-                let localname = file
-                    .strip_prefix(base_directory)
-                    .map_err(|_| -> anyhow::Error {
-                        UnexpectedValueException::new(format!(
-                            "Iterator returned a path \"{}\" that is not in the base directory \"{}\"",
-                            file.display(),
-                            base_directory.display()
-                        ))
-                        .into()
-                    })?
-                    .to_str()
-                    // TODO(bytes): PharEntry keeps the local name as a String.
-                    .unwrap_or_else(|| panic!("path is not valid UTF-8: {}", file.display()))
-                    .to_string();
+                let localname = BString::from(path_to_bytes(
+                    file.strip_prefix(base_directory)
+                        .map_err(|_| -> anyhow::Error {
+                            UnexpectedValueException::new(format!(
+                                "Iterator returned a path \"{}\" that is not in the base directory \"{}\"",
+                                file.display(),
+                                base_directory.display()
+                            ))
+                            .into()
+                        })?,
+                ));
                 entries.push(PharEntry {
                     localname,
                     data: PharEntryData::Disk(file),
@@ -803,7 +801,7 @@ impl PharData {
                     );
                     let file = std::fs::File::open(source).map_err(write_error)?;
                     builder
-                        .append_data(&mut header, &entry.localname, file)
+                        .append_data(&mut header, path_from_bytes(&entry.localname), file)
                         .map_err(write_error)?;
                 }
                 PharEntryData::Memory(content) => {
@@ -816,7 +814,7 @@ impl PharData {
                             .unwrap_or_else(|| unix_mtime(std::time::SystemTime::now())),
                     );
                     builder
-                        .append_data(&mut header, &entry.localname, &content[..])
+                        .append_data(&mut header, path_from_bytes(&entry.localname), &content[..])
                         .map_err(write_error)?;
                 }
                 PharEntryData::Dir => {
@@ -829,7 +827,11 @@ impl PharData {
                             .unwrap_or_else(|| unix_mtime(std::time::SystemTime::now())),
                     );
                     builder
-                        .append_data(&mut header, &entry.localname, std::io::empty())
+                        .append_data(
+                            &mut header,
+                            path_from_bytes(&entry.localname),
+                            std::io::empty(),
+                        )
                         .map_err(write_error)?;
                 }
             }
@@ -851,6 +853,14 @@ impl PharData {
         for entry in self.entries.borrow().iter() {
             let options = zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated);
+            // TODO(bytes): the zip crate only writes entry names that are valid UTF-8, where phar
+            // stores any bytes.
+            let localname = utf8_text(&entry.localname).ok_or_else(|| {
+                write_error(format!(
+                    "the entry name {:?} is not valid UTF-8",
+                    entry.localname
+                ))
+            })?;
             match &entry.data {
                 PharEntryData::Disk(source) => {
                     use std::os::unix::fs::PermissionsExt;
@@ -858,7 +868,7 @@ impl PharData {
                         std::fs::metadata(source).map_err(|e| write_error(e.to_string()))?;
                     writer
                         .start_file(
-                            entry.localname.as_str(),
+                            localname,
                             options.unix_permissions(metadata.permissions().mode() & 0o7777),
                         )
                         .map_err(|e| write_error(e.to_string()))?;
@@ -873,7 +883,7 @@ impl PharData {
                         None => options,
                     };
                     writer
-                        .start_file(entry.localname.as_str(), options)
+                        .start_file(localname, options)
                         .map_err(|e| write_error(e.to_string()))?;
                     writer
                         .write_all(content)
@@ -881,7 +891,7 @@ impl PharData {
                 }
                 PharEntryData::Dir => {
                     writer
-                        .add_directory(entry.localname.as_str(), options)
+                        .add_directory(localname, options)
                         .map_err(|e| write_error(e.to_string()))?;
                 }
             }
@@ -895,6 +905,26 @@ impl PharData {
 mod tests {
     use super::*;
     use crate::Catch as _;
+
+    #[test]
+    fn tar_entry_name_keeps_bytes_that_are_not_valid_utf8() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        let file = src.join(path_from_bytes(b"caf\xE9.txt"));
+        std::fs::write(&file, b"hello").unwrap();
+        let tar_path = dir.path().join("out.tar");
+
+        let phar = PharData::new(&tar_path).unwrap();
+        phar.build_from_iterator(&mut vec![file].into_iter(), &src)
+            .unwrap();
+
+        let read_back = PharData::new(&tar_path).unwrap();
+        assert_eq!(
+            read_back.get(b"caf\xE9.txt").unwrap().get_content(),
+            b"hello"
+        );
+    }
 
     #[test]
     fn halt_compiler_token_decodes() {
@@ -935,16 +965,16 @@ mod tests {
         assert_eq!(read_back.get("sub/b.txt").unwrap().get_content(), b"world");
         assert!(read_back.get("sub").unwrap().is_dir());
         assert!(read_back.get("missing").is_none());
-        let top: Vec<(String, bool)> = read_back
+        let top: Vec<(BString, bool)> = read_back
             .iter()
             .map(|info| (info.get_basename(), info.is_dir()))
             .collect();
         assert_eq!(
             top,
             vec![
-                ("a.txt".to_string(), false),
-                ("emptydir".to_string(), true),
-                ("sub".to_string(), true),
+                ("a.txt".into(), false),
+                ("emptydir".into(), true),
+                ("sub".into(), true),
             ]
         );
 

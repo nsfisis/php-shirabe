@@ -304,7 +304,7 @@ pub fn create_composer_lock(
             IndexMap::new(),
             IndexMap::new(),
             vec![],
-            "dev",
+            bstr::BStr::new("dev"),
             IndexMap::new(),
             false,
             false,

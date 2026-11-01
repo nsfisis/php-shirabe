@@ -11,7 +11,6 @@ use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{Link, PackageInterfaceHandle};
-use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -95,7 +94,7 @@ fn describe(constraint: &AnyConstraint) -> String {
             format!(
                 "Constraint({} {})",
                 c.get_operator(),
-                legacy_lossy(&c.get_version())
+                c.get_version().display_lossy()
             )
         }
         AnyConstraint::Multi(c) => format!(
@@ -112,7 +111,7 @@ fn describe(constraint: &AnyConstraint) -> String {
     };
     format!(
         "{shape} pretty={}",
-        legacy_lossy(&constraint.get_pretty_string())
+        constraint.get_pretty_string().display_lossy()
     )
 }
 
@@ -122,11 +121,11 @@ fn describe_links(links: &IndexMap<BString, Link>) -> Vec<String> {
         .map(|(name, link)| {
             format!(
                 "{} | {} | {} | {} | {} | {}",
-                legacy_lossy(name),
-                legacy_lossy(&link.get_source()),
-                legacy_lossy(&link.get_target()),
-                legacy_lossy(&link.get_description()),
-                legacy_lossy(&link.get_pretty_constraint()),
+                name.display_lossy(),
+                link.get_source().display_lossy(),
+                link.get_target().display_lossy(),
+                link.get_description().display_lossy(),
+                link.get_pretty_constraint().display_lossy(),
                 describe(link.get_constraint())
             )
         })

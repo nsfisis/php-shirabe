@@ -5,7 +5,7 @@ use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, bconcat, legacy_lossy, str_pad};
+use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, bconcat, str_pad};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::fmt;
@@ -63,9 +63,7 @@ impl Pool {
 
         let mut result: IndexMap<BString, BString> = IndexMap::new();
         for (version, pretty_version) in versions {
-            if constraint.matches(
-                &SimpleConstraint::new("==", legacy_lossy(version).into_owned(), None).into(),
-            ) {
+            if constraint.matches(&SimpleConstraint::new("==", version.clone(), None).into()) {
                 result.insert(version.clone(), pretty_version.clone());
             }
         }
@@ -103,9 +101,7 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, _package_with_security_advisories) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==", legacy_lossy(version).into_owned(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.clone(), None).into())
             {
                 return true;
             }
@@ -126,9 +122,7 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, package_with_security_advisories) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==", legacy_lossy(version).into_owned(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.clone(), None).into())
             {
                 return package_with_security_advisories
                     .iter()
@@ -152,9 +146,7 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, _pretty_version) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==", legacy_lossy(version).into_owned(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.clone(), None).into())
             {
                 return true;
             }
@@ -354,8 +346,8 @@ impl fmt::Display for Pool {
         for package in &self.packages {
             str.push_str(&format!(
                 "- {}: {}\n",
-                legacy_lossy(&str_pad(package.id().to_string(), 6, " ", STR_PAD_LEFT)),
-                legacy_lossy(&package.get_name())
+                str_pad(package.id().to_string(), 6, " ", STR_PAD_LEFT).display_lossy(),
+                package.get_name().display_lossy()
             ));
         }
 

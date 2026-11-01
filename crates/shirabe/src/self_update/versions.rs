@@ -6,8 +6,8 @@ use crate::util::HttpDownloader;
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, legacy_lossy, php_regex,
-    preg_is_match,
+    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, bconcat,
+    path_from_bytes, php_regex, preg_is_match, trim,
 };
 
 pub struct Versions {
@@ -46,22 +46,23 @@ impl Versions {
             return Ok(ch.clone());
         }
 
-        let channel_file = format!(
-            "{}/update-channel",
-            legacy_lossy(
-                &self
-                    .config
-                    .borrow_mut()
-                    .get("home")
-                    .as_string()
-                    .unwrap_or_default()
-            )
+        let channel_file = bconcat!(
+            self.config
+                .borrow_mut()
+                .get("home")
+                .as_string()
+                .unwrap_or_default(),
+            "/update-channel"
         );
-        if std::path::Path::new(&channel_file).exists() {
-            let channel = std::fs::read_to_string(&channel_file)?.trim().to_string();
-            if ["stable", "preview", "snapshot", "2.2"].contains(&channel.as_str()) {
-                self.channel = Some(channel.clone());
-                return Ok(channel);
+        let channel_file = path_from_bytes(&channel_file);
+        if channel_file.exists() {
+            let channel = trim(std::fs::read(channel_file)?);
+            if let Some(channel) = ["stable", "preview", "snapshot", "2.2"]
+                .into_iter()
+                .find(|known| channel == *known)
+            {
+                self.channel = Some(channel.to_string());
+                return Ok(channel.to_string());
             }
         }
 
@@ -82,17 +83,15 @@ impl Versions {
             ))));
         }
 
-        let channel_file = format!(
-            "{}/update-channel",
-            legacy_lossy(
-                &self
-                    .config
-                    .borrow_mut()
-                    .get("home")
-                    .as_string()
-                    .unwrap_or_default()
-            )
+        let channel_file = bconcat!(
+            self.config
+                .borrow_mut()
+                .get("home")
+                .as_string()
+                .unwrap_or_default(),
+            "/update-channel"
         );
+        let channel_file = path_from_bytes(&channel_file);
         self.channel = Some(channel.clone());
 
         // rewrite '2' and '1' channels to stable for future self-updates, but LTS ones like '2.2' remain pinned
@@ -102,15 +101,17 @@ impl Versions {
             channel
         };
 
-        let previously_stored: Option<String> = if std::path::Path::new(&channel_file).exists() {
-            Some(std::fs::read_to_string(&channel_file)?.trim().to_string())
+        let previously_stored: Option<BString> = if channel_file.exists() {
+            Some(trim(std::fs::read(channel_file)?))
         } else {
             None
         };
-        std::fs::write(&channel_file, format!("{}{}", stored_channel, PHP_EOL))?;
+        std::fs::write(channel_file, format!("{}{}", stored_channel, PHP_EOL))?;
 
         if let Some(io) = io
-            && previously_stored.as_deref() != Some(&stored_channel)
+            && previously_stored
+                .as_ref()
+                .is_none_or(|stored| *stored != stored_channel)
         {
             io.write_error(format!(
                     "Storing \"<info>{}</info>\" as default update channel for the next self-update run.",

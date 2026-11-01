@@ -12,8 +12,8 @@ use crate::repository::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    bconcat, explode_with_limit, implode, legacy_lossy, php_regex, preg_is_match, preg_quote,
-    preg_split, strtolower,
+    bconcat, explode_with_limit, implode, php_regex, preg_is_match, preg_quote, preg_split,
+    strtolower,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::rc::Weak;
@@ -332,11 +332,11 @@ impl RepositoryInterface for ArrayRepository {
     ) -> anyhow::Result<Vec<SearchResult>> {
         let regex = if mode == crate::repository::SEARCH_FULLTEXT {
             let parts = preg_split(php_regex!("{\\s+}"), preg_quote(&query, None));
-            format!("{{(?:{})}}i", legacy_lossy(&implode("|", &parts)))
+            bconcat!("{(?:", implode("|", &parts), ")}i")
         } else {
             // vendor/name searches expect the caller to have preg_quoted the query
             let parts = preg_split(php_regex!("{\\s+}"), &query);
-            format!("{{(?:{})}}i", legacy_lossy(&implode("|", &parts)))
+            bconcat!("{(?:", implode("|", &parts), ")}i")
         };
 
         let mut matches: IndexMap<BString, SearchResult> = IndexMap::new();
@@ -361,16 +361,14 @@ impl RepositoryInterface for ArrayRepository {
                 && complete.is_some()
                 && preg_is_match(
                     &regex,
-                    format!(
-                        "{} {}",
-                        legacy_lossy(&implode(" ", &complete.as_ref().unwrap().get_keywords())),
-                        legacy_lossy(
-                            &complete
-                                .as_ref()
-                                .unwrap()
-                                .get_description()
-                                .unwrap_or_default()
-                        )
+                    bconcat!(
+                        implode(" ", &complete.as_ref().unwrap().get_keywords()),
+                        " ",
+                        complete
+                            .as_ref()
+                            .unwrap()
+                            .get_description()
+                            .unwrap_or_default()
                     ),
                 );
 

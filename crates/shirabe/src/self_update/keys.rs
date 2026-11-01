@@ -1,16 +1,17 @@
 //! ref: composer/src/Composer/SelfUpdate/Keys.php
 
-use regex::Regex;
-use shirabe_php_shim::{hash, legacy_lossy, strtoupper};
+use shirabe_php_shim::{file_get_contents, hash, php_regex, preg_replace, strtoupper};
+use std::path::Path;
 
 pub struct Keys;
 
 impl Keys {
-    pub fn fingerprint(path: &str) -> anyhow::Result<String> {
-        let content = std::fs::read_to_string(path)?;
-        let re = Regex::new(r"\s").unwrap();
-        let cleaned = re.replace_all(&content, "");
-        let hash = legacy_lossy(&strtoupper(hash("sha256", cleaned.as_bytes()))).into_owned();
+    pub fn fingerprint(path: impl AsRef<Path>) -> anyhow::Result<String> {
+        let content = file_get_contents(path)?;
+        let cleaned = preg_replace(php_regex!(r"{\s}"), "", content);
+        let hash = strtoupper(hash("sha256", cleaned))
+            .display_lossy()
+            .to_string();
 
         Ok([
             &hash[0..8],

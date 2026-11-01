@@ -3,7 +3,7 @@
 use crate::package::{Mirror, PackageInterfaceHandle, SUPPORTED_LINK_TYPES};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed, legacy_lossy};
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed};
 
 /// Serializes a Mirror back into the PHP array shape `{url, preferred}`.
 fn mirror_to_php(mirror: Mirror) -> PhpMixed {
@@ -96,8 +96,8 @@ impl ArrayDumper {
             let mut link_map: IndexMap<BString, PhpMixed> = IndexMap::new();
             for link in links.values() {
                 link_map.insert(
-                    legacy_lossy(link.get_target()).into_owned().into(),
-                    PhpMixed::string(legacy_lossy(link.get_pretty_constraint()).into_owned()),
+                    BString::from(link.get_target()),
+                    PhpMixed::string(link.get_pretty_constraint()),
                 );
             }
             link_map.sort_keys();

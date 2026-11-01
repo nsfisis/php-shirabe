@@ -102,11 +102,11 @@ fn test_parse_valid_author_string() {
         let command = InitCommand::new();
         let author = command.__parse_author_string(input).unwrap();
         assert_eq!(
-            Some(name.to_string()),
+            Some(BString::from(name)),
             author.get("name").cloned().flatten()
         );
         assert_eq!(
-            email.map(|e| e.to_string()),
+            email.map(BString::from),
             author.get("email").cloned().flatten()
         );
     }
@@ -137,7 +137,7 @@ fn test_namespace_from_valid_package_name() {
     let command = InitCommand::new();
     let namespace = command.namespace_from_package_name("new_projects.acme-extra/package-name");
     assert_eq!(
-        Some("NewProjectsAcmeExtra\\PackageName".to_string()),
+        Some(BString::from("NewProjectsAcmeExtra\\PackageName")),
         namespace
     );
 }
@@ -614,8 +614,8 @@ fn test_get_git_config() {
 
     let command = InitCommand::new();
     let git_config = command.__get_git_config().unwrap();
-    assert!(git_config.contains_key("user.name"));
-    assert!(git_config.contains_key("user.email"));
+    assert!(git_config.contains_key(bstr::B("user.name")));
+    assert!(git_config.contains_key(bstr::B("user.email")));
 }
 
 #[test]

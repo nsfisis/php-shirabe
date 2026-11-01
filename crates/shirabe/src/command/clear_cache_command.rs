@@ -7,10 +7,11 @@ use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
-use shirabe_php_shim::{impl_php_class, legacy_lossy, path_to_bytes, realpath};
+use shirabe_php_shim::{impl_php_class, path_from_bytes, realpath};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {
@@ -83,32 +84,18 @@ impl Command for ClearCacheCommand {
 
         let gc = input.borrow().get_option("gc")?.as_bool().unwrap_or(false);
 
-        let cache_paths: [(&str, String); 4] = [
+        let cache_paths: [(&str, PathBuf); 4] = [
+            "cache-vcs-dir",
+            "cache-repo-dir",
+            "cache-files-dir",
+            "cache-dir",
+        ]
+        .map(|key| {
             (
-                "cache-vcs-dir",
-                legacy_lossy(config.get("cache-vcs-dir").as_string().unwrap_or_default())
-                    .into_owned(),
-            ),
-            (
-                "cache-repo-dir",
-                legacy_lossy(config.get("cache-repo-dir").as_string().unwrap_or_default())
-                    .into_owned(),
-            ),
-            (
-                "cache-files-dir",
-                legacy_lossy(
-                    config
-                        .get("cache-files-dir")
-                        .as_string()
-                        .unwrap_or_default(),
-                )
-                .into_owned(),
-            ),
-            (
-                "cache-dir",
-                legacy_lossy(config.get("cache-dir").as_string().unwrap_or_default()).into_owned(),
-            ),
-        ];
+                key,
+                path_from_bytes(config.get(key).as_string().unwrap_or_default()).to_path_buf(),
+            )
+        });
 
         for (key, cache_path) in cache_paths {
             // only individual dirs get garbage collected
@@ -116,28 +103,30 @@ impl Command for ClearCacheCommand {
                 continue;
             }
 
-            let cache_path =
-                match realpath(&cache_path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned()) {
-                    Some(path) => path,
-                    None => {
-                        io.write_error(format!(
-                            "<info>Cache directory does not exist ({key}): {cache_path}</info>"
-                        ));
-                        continue;
-                    }
-                };
+            let cache_path = match realpath(&cache_path) {
+                Some(path) => path,
+                None => {
+                    io.write_error(format!(
+                        "<info>Cache directory does not exist ({key}): {}</info>",
+                        cache_path.display()
+                    ));
+                    continue;
+                }
+            };
             let mut cache = Cache::new(io.clone(), &cache_path, None, None, false);
             cache.set_read_only(config.get("cache-read-only").as_bool().unwrap_or(false));
             if !cache.is_enabled() {
                 io.write_error(format!(
-                    "<info>Cache is not enabled ({key}): {cache_path}</info>"
+                    "<info>Cache is not enabled ({key}): {}</info>",
+                    cache_path.display()
                 ));
                 continue;
             }
 
             if gc {
                 io.write_error(format!(
-                    "<info>Garbage-collecting cache ({key}): {cache_path}</info>"
+                    "<info>Garbage-collecting cache ({key}): {}</info>",
+                    cache_path.display()
                 ));
                 if key == "cache-files-dir" {
                     cache.gc(
@@ -153,7 +142,10 @@ impl Command for ClearCacheCommand {
                     cache.gc_vcs_cache(config.get("cache-ttl").as_int().unwrap_or(0));
                 }
             } else {
-                io.write_error(format!("<info>Clearing cache ({key}): {cache_path}</info>"));
+                io.write_error(format!(
+                    "<info>Clearing cache ({key}): {}</info>",
+                    cache_path.display()
+                ));
                 cache.clear();
             }
         }

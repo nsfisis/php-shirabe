@@ -1,8 +1,8 @@
 //! ref: composer/tests/Composer/Test/IO/NullIOTest.php
 
 use indexmap::IndexMap;
-use shirabe::io::IOInterfaceImmutable;
 use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use shirabe_php_shim::PhpMixed;
 
 #[test]
@@ -23,7 +23,7 @@ fn test_has_authentication() {
 fn test_ask_and_hide_answer() {
     let io = NullIO::new();
 
-    assert_eq!(None, io.ask_and_hide_answer("foo".to_string()).unwrap());
+    assert_eq!(None, io.ask_and_hide_answer("foo").unwrap());
 }
 
 #[test]
@@ -44,8 +44,7 @@ fn test_ask() {
 
     assert_eq!(
         PhpMixed::string("foo".to_string()),
-        io.ask("bar".into(), PhpMixed::string("foo".to_string()))
-            .unwrap()
+        io.ask("bar", PhpMixed::string("foo".to_string())).unwrap()
     );
 }
 
@@ -53,7 +52,7 @@ fn test_ask() {
 fn test_ask_confirmation() {
     let io = NullIO::new();
 
-    assert!(!io.ask_confirmation("bar".to_string(), false).unwrap());
+    assert!(!io.ask_confirmation("bar", false).unwrap());
 }
 
 #[test]
@@ -63,7 +62,7 @@ fn test_ask_and_validate() {
     assert_eq!(
         PhpMixed::string("foo".to_string()),
         io.ask_and_validate(
-            "question".to_string(),
+            "question",
             Box::new(|_x| Ok(PhpMixed::Bool(true))),
             None,
             PhpMixed::string("foo".to_string())
@@ -79,14 +78,14 @@ fn test_select() {
     assert_eq!(
         PhpMixed::string("1".to_string()),
         io.select(
-            "question".into(),
+            "question",
             PhpMixed::List(vec![
                 PhpMixed::string("item1".to_string()),
                 PhpMixed::string("item2".to_string()),
             ]),
             PhpMixed::string("1".to_string()),
             PhpMixed::Int(2),
-            "foo".to_string(),
+            "foo",
             true
         )
         .unwrap()

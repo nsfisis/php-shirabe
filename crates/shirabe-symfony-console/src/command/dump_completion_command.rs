@@ -78,7 +78,7 @@ impl DumpCompletionCommand {
             suggestions.suggest_values(
                 self.get_supported_shells()?
                     .into_iter()
-                    .map(StringOrSuggestion::String)
+                    .map(|value| StringOrSuggestion::String(value.into()))
                     .collect(),
             );
         }

@@ -7,7 +7,7 @@ use crate::descriptor::{
 use crate::exception::InvalidArgumentException;
 use crate::helper::{Helper, HelperInterface, HelperSet};
 use crate::output::OutputInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -62,7 +62,7 @@ impl DescriptorHelper {
         let options = merged;
 
         let format = match &options[B("format")] {
-            PhpMixed::String(format) => format.to_str_lossy().into_owned(),
+            PhpMixed::String(format) => format.display_lossy().to_string(),
             _ => String::new(),
         };
 

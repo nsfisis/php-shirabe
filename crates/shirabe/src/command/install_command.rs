@@ -7,7 +7,8 @@ use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::installer::Installer;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
-use shirabe_php_shim::{impl_php_class, implode, legacy_lossy};
+use bstr::BStr;
+use shirabe_php_shim::{impl_php_class, implode};
 use shirabe_symfony_console::{
     command::Command,
     input::{InputInterface, InputValue},
@@ -167,7 +168,7 @@ impl Command for InstallCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()

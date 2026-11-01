@@ -17,7 +17,7 @@ const CMD_BUILTINS: &[&str] = &[
 
 #[derive(Debug)]
 pub struct ExecutableFinder {
-    suffixes: Vec<String>,
+    suffixes: Vec<BString>,
 }
 
 impl Default for ExecutableFinder {
@@ -49,29 +49,24 @@ impl ExecutableFinder {
         let mut dirs: Vec<PathBuf> = std::env::split_paths(&path).collect();
         dirs.extend(extra_dirs.iter().map(PathBuf::from));
 
-        let mut suffixes: Vec<String> = vec![];
+        let mut suffixes: Vec<BString> = vec![];
         if cfg!(windows) {
             let path_ext = getenv("PATHEXT");
             suffixes = self.suffixes.clone();
             let exts = match path_ext {
                 Some(ref ext) if !ext.is_empty() => std::env::split_paths(ext)
-                    .map(|e| e.into_os_string().into_string().unwrap())
+                    .map(|e| BString::from(path_to_bytes(&e)))
                     .collect(),
-                _ => vec![
-                    ".exe".to_string(),
-                    ".bat".to_string(),
-                    ".cmd".to_string(),
-                    ".com".to_string(),
-                ],
+                _ => vec![".exe".into(), ".bat".into(), ".cmd".into(), ".com".into()],
             };
             suffixes.extend(exts);
         }
         suffixes = if !pathinfo(name, PATHINFO_EXTENSION).is_empty() {
-            let mut s = vec![String::new()];
+            let mut s = vec![BString::default()];
             s.extend(suffixes);
             s
         } else {
-            suffixes.push(String::new());
+            suffixes.push(BString::default());
             suffixes
         };
         for suffix in &suffixes {

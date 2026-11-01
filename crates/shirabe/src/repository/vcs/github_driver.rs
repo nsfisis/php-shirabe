@@ -14,7 +14,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
     array_search_mixed, base64_decode, basename, bconcat, date_create, empty, explode,
-    extension_loaded, in_array_loose, legacy_lossy, parse_url, php_regex, php_to_string,
+    extension_loaded, in_array_loose, parse_url, path_from_bytes, php_regex, php_to_string,
     preg_is_match, preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim, trim2,
     urlencode,
 };
@@ -92,21 +92,20 @@ impl GitHubDriver {
         }
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            format!(
-                "{}/{}/{}/{}",
-                legacy_lossy(
-                    &self
-                        .inner
-                        .config
-                        .borrow_mut()
-                        .get("cache-repo-dir")
-                        .as_string()
-                        .unwrap_or_default()
-                ),
-                legacy_lossy(&self.inner.origin_url),
-                legacy_lossy(&self.owner),
-                legacy_lossy(&self.repository)
-            ),
+            path_from_bytes(&bconcat!(
+                self.inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-repo-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+                "/",
+                self.inner.origin_url,
+                "/",
+                self.owner,
+                "/",
+                self.repository
+            )),
             None,
             None,
             false,
@@ -260,14 +259,14 @@ impl GitHubDriver {
                     .inner
                     .cache
                     .as_mut()
-                    .and_then(|c| c.read(&*legacy_lossy(identifier)))
+                    .and_then(|c| c.read(identifier))
                     .is_some()
             {
                 let res = self
                     .inner
                     .cache
                     .as_mut()
-                    .and_then(|c| c.read(&*legacy_lossy(identifier)))
+                    .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
                 let parsed = JsonFile::parse_json(Some(&res), None)?;
                 parsed.as_array().cloned()
@@ -291,7 +290,7 @@ impl GitHubDriver {
                     );
                     self.inner.cache.as_mut().map(|c| {
                         c.write(
-                            &*legacy_lossy(identifier),
+                            identifier,
                             &JsonFile::encode_with_options(
                                 &php_value,
                                 JsonEncodeOptions {
@@ -491,7 +490,7 @@ impl GitHubDriver {
         }
 
         let funding = match funding {
-            Some(f) => String::from_utf8_lossy(&f).to_string(),
+            Some(f) => f,
             None => {
                 self.funding_info = Some(PhpMixed::Bool(false));
                 return PhpMixed::Bool(false);
@@ -559,12 +558,11 @@ impl GitHubDriver {
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
             );
-            let item_url = legacy_lossy(&BString::from(
+            let item_url = BString::from(
                 item.get(B("url"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
-            ))
-            .into_owned();
+            );
             match item_type.as_slice() {
                 b"community_bridge" => {
                     result[key_idx].insert(
@@ -584,7 +582,7 @@ impl GitHubDriver {
                 b"issuehunt" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!("https://issuehunt.io/r/{}", item_url)),
+                        PhpMixed::string(bconcat!("https://issuehunt.io/r/", item_url)),
                     );
                 }
                 b"ko_fi" => {
@@ -617,8 +615,8 @@ impl GitHubDriver {
                 b"tidelift" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!(
-                            "https://tidelift.com/funding/github/{}",
+                        PhpMixed::string(bconcat!(
+                            "https://tidelift.com/funding/github/",
                             item_url
                         )),
                     );
@@ -641,7 +639,7 @@ impl GitHubDriver {
                 b"thanks_dev" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!("https://thanks.dev/{}", item_url)),
+                        PhpMixed::string(bconcat!("https://thanks.dev/", item_url)),
                     );
                 }
                 b"otechie" => {
@@ -660,7 +658,7 @@ impl GitHubDriver {
                         if preg_is_match(php_regex!(r"{^[a-z0-9-]++\.[a-z]{2,3}$}"), &item_url) {
                             result[key_idx].insert(
                                 "url".into(),
-                                PhpMixed::string(format!("https://{}", item_url)),
+                                PhpMixed::string(bconcat!("https://", item_url)),
                             );
                             continue;
                         }
@@ -668,7 +666,7 @@ impl GitHubDriver {
                         self.inner.io.write_error3(
                             format!(
                                 "<warning>Funding URL {} not in a supported format.</warning>",
-                                item_url
+                                item_url.display_lossy()
                             ),
                             true,
                             io_interface::NORMAL,
@@ -765,7 +763,7 @@ impl GitHubDriver {
             None
         };
         let content = match content {
-            Some(c) => String::from_utf8_lossy(&c).to_string(),
+            Some(c) => c,
             None => {
                 return Err(RuntimeException::new(format!(
                     "Could not retrieve {} for {}",
@@ -1065,7 +1063,7 @@ impl GitHubDriver {
                         {
                             git_hub_util.authorize_oauth_interactively(
                                 self.inner.origin_url.as_bstr(),
-                                Some(&*legacy_lossy(&bconcat!("Your GitHub credentials are required to fetch private repository metadata (<info>", self.inner.url, "</info>)"))),
+                                Some(&format!("Your GitHub credentials are required to fetch private repository metadata (<info>{}</info>)", self.inner.url.display_lossy())),
                             )?;
                         }
 
@@ -1114,7 +1112,7 @@ impl GitHubDriver {
 
                             git_hub_util.authorize_oauth_interactively(
                                 self.inner.origin_url.as_bstr(),
-                                Some(&*legacy_lossy(&bconcat!("API limit exhausted. Enter your GitHub credentials to get a larger API limit (<info>", self.inner.url, "</info>)"))),
+                                Some(&format!("API limit exhausted. Enter your GitHub credentials to get a larger API limit (<info>{}</info>)", self.inner.url.display_lossy())),
                             )?;
 
                             return self.inner.get_contents(url);

@@ -15,7 +15,7 @@ use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{Catch as _, PhpMixed, legacy_lossy};
+use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, path_from_bytes};
 use shirabe_semver::VersionParser;
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is
@@ -331,10 +331,7 @@ fn test_repository_writes_installed_php() {
             return Some(std::path::PathBuf::from(cwd.clone()));
         }
         // check for relative paths
-        Some(std::path::PathBuf::from(format!(
-            "vendor/{}",
-            legacy_lossy(&package.get_name())
-        )))
+        Some(path_from_bytes(&bconcat!("vendor/", package.get_name())).to_path_buf())
     });
 
     repository.write(true, &im).unwrap();

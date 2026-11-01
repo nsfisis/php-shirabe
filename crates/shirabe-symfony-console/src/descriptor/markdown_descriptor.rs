@@ -8,7 +8,7 @@ use crate::descriptor::{
 use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, preg_replace, str_replace, var_export};
 
@@ -217,7 +217,7 @@ impl MarkdownDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
+            Some(PhpMixed::String(s)) => Some(s.display_lossy().to_string()),
             _ => None,
         };
         let mut description =
@@ -231,7 +231,7 @@ impl MarkdownDescriptor {
 
         for namespace in description.get_namespaces().values() {
             let namespace_id = match namespace.get(B("id")) {
-                Some(PhpMixed::String(s)) => s.to_str_lossy().into_owned(),
+                Some(PhpMixed::String(s)) => s.display_lossy().to_string(),
                 _ => String::new(),
             };
             if ApplicationDescription::GLOBAL_NAMESPACE != namespace_id {

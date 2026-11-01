@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{Pool, PoolOptimizer, Request, SecurityAdvisoryPoolFilter};
 use crate::event_dispatcher::EventDispatcherInterface;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::version::StabilityFilter;
 use crate::package::{
     AliasPackageHandle, BasePackageHandle, CompleteAliasPackageHandle, PackageInterfaceHandle,
@@ -15,8 +15,8 @@ use crate::repository::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, bconcat, in_array_strict,
-    legacy_lossy, microtime, number_format, preg_is_match, round, strpos,
+    CmpOp, LogicException, PhpMixed, array_map, bconcat, in_array_strict, microtime, number_format,
+    preg_is_match, round, strpos,
 };
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
@@ -124,17 +124,13 @@ impl PoolBuilder {
     ) -> anyhow::Result<Pool> {
         self.restricted_packages_list = if request.get_restricted_packages().is_some() {
             Some(
-                array_flip_strings(
-                    &request
-                        .get_restricted_packages()
-                        .unwrap()
-                        .iter()
-                        .map(|s| legacy_lossy(s).into_owned())
-                        .collect::<Vec<_>>(),
-                )
-                .into_iter()
-                .map(|(k, v)| (k.clone(), v.as_int().unwrap_or(0)))
-                .collect(),
+                request
+                    .get_restricted_packages()
+                    .unwrap()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, name)| (name.clone(), index as i64))
+                    .collect(),
             )
         } else {
             None

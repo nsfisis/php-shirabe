@@ -7,7 +7,8 @@ use crate::io::IOInterfaceWrite;
 use crate::package::CompletePackageInterfaceHandle;
 use crate::repository::{RepositoryFactory, RootPackageRepository};
 use crate::util::{Platform, ProcessExecutor};
-use shirabe_php_shim::{filter_var_url, impl_php_class, legacy_lossy};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{bconcat, filter_var_url, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -43,15 +44,12 @@ impl HomeCommand {
         show_only: bool,
     ) -> bool {
         let support = package.get_support();
-        let mut url: Option<String> = support
+        let mut url: Option<BString> = support
             .get(bstr::B("source"))
             .cloned()
-            .or_else(|| package.get_source_url())
-            .map(|s| legacy_lossy(&s).into_owned());
-        if url.as_deref().is_none_or(|s| s.is_empty()) || show_homepage {
-            url = package
-                .get_homepage()
-                .map(|s| legacy_lossy(&s).into_owned());
+            .or_else(|| package.get_source_url());
+        if url.as_ref().is_none_or(|s| s.is_empty()) || show_homepage {
+            url = package.get_homepage();
         }
 
         let url = match url {
@@ -65,18 +63,28 @@ impl HomeCommand {
         }
 
         if show_only {
-            self.get_io().write(format!("<info>{}</info>", url));
+            self.get_io().write(bconcat!("<info>", url, "</info>"));
         } else {
-            self.open_browser(&url);
+            self.open_browser(BStr::new(&url));
         }
 
         true
     }
 
-    fn open_browser(&self, url: &str) {
+    fn open_browser(&self, url: &BStr) {
         let process = ProcessExecutor::new(Some(self.get_io().clone()));
+        let url_arg = BString::from(url);
         if Platform::is_windows() {
-            let _ = process.execute(&["start", "\"web\"", "explorer", url], (), None);
+            let _ = process.execute(
+                &[
+                    BString::from("start"),
+                    BString::from("\"web\""),
+                    BString::from("explorer"),
+                    url_arg,
+                ],
+                (),
+                None,
+            );
             return;
         }
 
@@ -86,13 +94,13 @@ impl HomeCommand {
         let osx = process.execute(&["which", "open"], (), None).unwrap_or(1);
 
         if linux == 0 {
-            let _ = process.execute(&["xdg-open", url], (), None);
+            let _ = process.execute(&[BString::from("xdg-open"), url_arg], (), None);
         } else if osx == 0 {
-            let _ = process.execute(&["open", url], (), None);
+            let _ = process.execute(&[BString::from("open"), url_arg], (), None);
         } else {
             self.get_io().write_error(format!(
                 "No suitable browser opening command found, open yourself: {}",
-                url
+                url.display_lossy()
             ));
         }
     }

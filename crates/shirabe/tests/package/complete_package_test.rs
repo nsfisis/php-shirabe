@@ -2,7 +2,6 @@
 
 use shirabe::package::package::Package;
 use shirabe::package::package_interface::PackageInterface;
-use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::VersionParser;
 
 /// Memory package naming, versioning, and marshalling semantics provider
@@ -21,11 +20,10 @@ fn provider_versioning_schemes() -> Vec<(&'static str, &'static str)> {
 fn test_package_has_expected_naming_semantics() {
     for (name, version) in provider_versioning_schemes() {
         let version_parser = VersionParser;
-        let norm_version =
-            legacy_lossy(&version_parser.normalize(version, None).unwrap()).into_owned();
+        let norm_version = version_parser.normalize(version, None).unwrap();
         let package = Package::new(
             bstr::BString::from(name.to_string()),
-            bstr::BString::from(norm_version),
+            norm_version,
             bstr::BString::from(version.to_string()),
         );
         assert_eq!(name.to_ascii_lowercase(), package.get_name());
@@ -36,11 +34,10 @@ fn test_package_has_expected_naming_semantics() {
 fn test_package_has_expected_versioning_semantics() {
     for (name, version) in provider_versioning_schemes() {
         let version_parser = VersionParser;
-        let norm_version =
-            legacy_lossy(&version_parser.normalize(version, None).unwrap()).into_owned();
+        let norm_version = version_parser.normalize(version, None).unwrap();
         let package = Package::new(
             bstr::BString::from(name.to_string()),
-            bstr::BString::from(norm_version.clone()),
+            norm_version.clone(),
             bstr::BString::from(version.to_string()),
         );
         assert_eq!(version, package.get_pretty_version());
@@ -52,15 +49,18 @@ fn test_package_has_expected_versioning_semantics() {
 fn test_package_has_expected_marshalling_semantics() {
     for (name, version) in provider_versioning_schemes() {
         let version_parser = VersionParser;
-        let norm_version =
-            legacy_lossy(&version_parser.normalize(version, None).unwrap()).into_owned();
+        let norm_version = version_parser.normalize(version, None).unwrap();
         let package = Package::new(
             bstr::BString::from(name.to_string()),
-            bstr::BString::from(norm_version.clone()),
+            norm_version.clone(),
             bstr::BString::from(version.to_string()),
         );
         assert_eq!(
-            format!("{}-{}", name.to_ascii_lowercase(), norm_version),
+            format!(
+                "{}-{}",
+                name.to_ascii_lowercase(),
+                norm_version.display_lossy()
+            ),
             package.to_php_string()
         );
     }
@@ -77,58 +77,23 @@ fn test_get_target_dir() {
     assert_eq!(None, package.get_target_dir());
 
     package.set_target_dir(Some(bstr::BString::from("./../foo/".to_string())));
-    assert_eq!(
-        Some("foo/".to_string()),
-        package
-            .get_target_dir()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("foo/".into()), package.get_target_dir());
 
     package.set_target_dir(Some(bstr::BString::from("foo/../../../bar/".to_string())));
-    assert_eq!(
-        Some("foo/bar/".to_string()),
-        package
-            .get_target_dir()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("foo/bar/".into()), package.get_target_dir());
 
     package.set_target_dir(Some(bstr::BString::from("../..".to_string())));
-    assert_eq!(
-        Some(String::new()),
-        package
-            .get_target_dir()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("".into()), package.get_target_dir());
 
     package.set_target_dir(Some(bstr::BString::from("..".to_string())));
-    assert_eq!(
-        Some(String::new()),
-        package
-            .get_target_dir()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("".into()), package.get_target_dir());
 
     package.set_target_dir(Some(bstr::BString::from("/..".to_string())));
-    assert_eq!(
-        Some(String::new()),
-        package
-            .get_target_dir()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("".into()), package.get_target_dir());
 
     package.set_target_dir(Some(bstr::BString::from("/foo/..".to_string())));
-    assert_eq!(
-        Some("foo/".to_string()),
-        package
-            .get_target_dir()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("foo/".into()), package.get_target_dir());
 
     package.set_target_dir(Some(bstr::BString::from("/foo/..//bar".to_string())));
-    assert_eq!(
-        Some("foo/bar".to_string()),
-        package
-            .get_target_dir()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("foo/bar".into()), package.get_target_dir());
 }

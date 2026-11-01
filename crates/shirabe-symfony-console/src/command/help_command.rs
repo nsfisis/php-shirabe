@@ -66,7 +66,7 @@ impl HelpCommand {
                     .get_commands()
                     .keys()
                     .cloned()
-                    .map(StringOrSuggestion::String)
+                    .map(|value| StringOrSuggestion::String(value.into()))
                     .collect(),
             );
 
@@ -79,7 +79,7 @@ impl HelpCommand {
                 helper
                     .get_formats()
                     .into_iter()
-                    .map(StringOrSuggestion::String)
+                    .map(|value| StringOrSuggestion::String(value.into()))
                     .collect(),
             );
         }

@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Autoload/AutoloadGeneratorTest.php
 
 use crate::config_stub::ConfigStubBuilder;
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::autoload::AutoloadGenerator;
@@ -1543,8 +1543,7 @@ fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
     );
 
     s.generator.set_class_map_authoritative(true);
-    s.generator
-        .set_apcu(true, Some("custom'Prefix".to_string()));
+    s.generator.set_apcu(true, Some("custom'Prefix".into()));
     let vendor = s.vendor_dir.clone();
     let composer_out = vendor.join("composer");
     let class_map = dump(&mut s, package.into(), false, "_7").unwrap();
@@ -2809,7 +2808,7 @@ fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
     let output = s.io.borrow().get_output();
 
     // Should not contain PSR-4 violation warnings
-    assert!(!output.contains("does not comply with psr-4 autoloading standard"));
+    assert!(!output.contains_str("does not comply with psr-4 autoloading standard"));
 }
 
 #[test]

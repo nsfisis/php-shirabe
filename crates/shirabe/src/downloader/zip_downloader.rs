@@ -9,8 +9,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bconcat, bin2hex, class_exists, file_exists, file_get_contents, filesize,
-    hash_file, impl_php_class, implode, is_file, json_encode, legacy_lossy, path_to_bytes,
-    php_regex, preg_match, random_int, str_replace, strlen, substr, version_compare,
+    hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex, preg_match,
+    random_int, str_replace, strlen, substr, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -106,7 +106,7 @@ impl ZipDownloader {
             && ["7z", "7zz", "7za"].iter().any(|e| executable == *e)
         {
             *WARNED_7ZIP_LINUX.lock().unwrap() = true;
-            let mut output = String::new();
+            let mut output = BString::default();
             if self
                 .inner
                 .process
@@ -121,12 +121,12 @@ impl ZipDownloader {
                 && let Some(m) =
                     preg_match(php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"), &output)
             {
-                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                if version_compare(&m1, "21.01", CmpOp::Lt) {
+                let m1 = m.get(1).unwrap_or_default();
+                if version_compare(m1, "21.01", CmpOp::Lt) {
                     self.inner.io.borrow().write_error(format!(
                         "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
                         executable.display_lossy(),
-                        m1,
+                        m1.display_lossy(),
                         executable.display_lossy(),
                     ));
                 }

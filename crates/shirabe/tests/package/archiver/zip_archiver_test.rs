@@ -1,13 +1,14 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ZipArchiverTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::archiver::{ArchiverInterface, ZipArchiver};
 use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::Platform;
 use shirabe_php_shim::{
-    ZipArchive, class_exists, dirname, file_exists, file_put_contents, legacy_lossy, mkdir,
-    path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
+    ZipArchive, class_exists, dirname, file_exists, file_put_contents, mkdir, path_from_bytes,
+    path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use tempfile::TempDir;
 
@@ -39,17 +40,18 @@ impl ArchiverTestCase {
 
     fn setup_package(&self) -> CompletePackageHandle {
         let package = CompletePackageHandle::new(
-            bstr::BString::from("archivertest/archivertest".to_string()),
-            bstr::BString::from("master".to_string()),
-            bstr::BString::from("master".to_string()),
+            BString::from("archivertest/archivertest".to_string()),
+            BString::from("master".to_string()),
+            BString::from("master".to_string()),
         );
-        package.set_source_url(Some(bstr::BString::from(
+        package.set_source_url(Some(BString::from(
             realpath(&self.test_dir)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .as_deref()
+                .map(path_to_bytes)
                 .unwrap_or_default(),
         )));
-        package.set_source_reference(Some(bstr::BString::from("master".to_string())));
-        package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+        package.set_source_reference(Some(BString::from("master".to_string())));
+        package.__set_source_type(Some(BString::from("git".to_string())));
 
         package
     }
@@ -68,9 +70,9 @@ impl ArchiverTestCase {
         let archiver = ZipArchiver::new();
         archiver
             .archive(
-                legacy_lossy(&package.get_source_url().unwrap()).into_owned(),
-                target.to_str().unwrap().to_string(),
-                "zip".to_string(),
+                path_from_bytes(&package.get_source_url().unwrap()),
+                &target,
+                "zip".into(),
                 vec![],
                 false,
             )
@@ -80,18 +82,18 @@ impl ArchiverTestCase {
         let res = zip.open(&target, 0);
         assert!(res.is_ok(), "Failed asserting that Zip file can be opened");
 
-        let mut zip_contents: IndexMap<String, Option<String>> = IndexMap::new();
+        let mut zip_contents: IndexMap<BString, Option<BString>> = IndexMap::new();
         for i in 0..zip.num_files {
             let path = zip.get_name_index(i);
-            zip_contents.insert(
-                legacy_lossy(&path).into_owned(),
-                zip.get_from_name(&path)
-                    .map(|contents| legacy_lossy(&contents).into_owned()),
-            );
+            let contents = zip.get_from_name(&path).map(BString::from);
+            zip_contents.insert(path, contents);
         }
         zip.close();
 
-        let files: IndexMap<String, Option<String>> = files;
+        let files: IndexMap<BString, Option<BString>> = files
+            .into_iter()
+            .map(|(path, contents)| (path.into(), contents.map(Into::into)))
+            .collect();
         assert_eq!(
             files, zip_contents,
             "Failed asserting that Zip created with the ZipArchiver contains all files from the repository."
@@ -106,17 +108,13 @@ impl ArchiverTestCase {
             if files[&path].is_none() {
                 files.insert(path.clone(), Some("content".to_string()));
             }
-            self.write_file(
-                &path,
-                files[&path].clone().unwrap(),
-                &legacy_lossy(path_to_bytes(&current_work_dir)),
-            );
+            self.write_file(&path, files[&path].clone().unwrap(), &current_work_dir);
         }
 
         std::env::set_current_dir(&current_work_dir).unwrap();
     }
 
-    fn write_file(&self, path: &str, content: String, current_work_dir: &str) {
+    fn write_file(&self, path: &str, content: String, current_work_dir: &std::path::Path) {
         if !file_exists(path_from_bytes(&dirname(path))) {
             mkdir(path_from_bytes(&dirname(path)), 0o777, true);
         }

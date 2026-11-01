@@ -60,7 +60,7 @@ impl ListCommand {
                     .get_namespaces()
                     .keys()
                     .cloned()
-                    .map(StringOrSuggestion::String)
+                    .map(|value| StringOrSuggestion::String(value.into()))
                     .collect(),
             );
 
@@ -73,7 +73,7 @@ impl ListCommand {
                 helper
                     .get_formats()
                     .into_iter()
-                    .map(StringOrSuggestion::String)
+                    .map(|value| StringOrSuggestion::String(value.into()))
                     .collect(),
             );
         }

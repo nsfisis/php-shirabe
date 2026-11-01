@@ -16,8 +16,8 @@ use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bconcat, defined, dirname,
-    file_exists, file_get_contents, glob_with_flags, hash, is_dir, legacy_lossy, path_from_bytes,
-    path_to_bytes, php_regex, preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
+    file_exists, file_get_contents, glob_with_flags, hash, is_dir, path_from_bytes, path_to_bytes,
+    php_regex, preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
 };
 
 #[derive(Debug)]
@@ -53,14 +53,12 @@ impl PathRepository {
             .into());
         }
 
-        let url_str = legacy_lossy(&BString::from(
+        let url = Platform::expand_path(
             repo_config
                 .get(B("url"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default(),
-        ))
-        .into_owned();
-        let url = Platform::expand_path(&url_str);
+        );
         let process = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
                 io.clone(),
@@ -171,15 +169,9 @@ impl PathRepository {
         }
 
         for url in url_matches {
-            let path = format!(
-                "{}/",
-                legacy_lossy(
-                    &realpath(path_from_bytes(&url))
-                        .map(|p| BString::from(path_to_bytes(&p)))
-                        .unwrap_or_default()
-                )
-            );
-            let composer_file_path = format!("{}composer.json", path);
+            let path = bconcat!(realpath(path_from_bytes(&url)).unwrap_or_default(), "/");
+            let composer_file_path =
+                path_from_bytes(&bconcat!(path, "composer.json")).to_path_buf();
 
             if !file_exists(&composer_file_path) {
                 continue;
@@ -267,7 +259,7 @@ impl PathRepository {
                 let code1 = self
                     .process
                     .borrow_mut()
-                    .execute(&cmd, &mut ref1, Some(std::path::Path::new(path.as_str())))
+                    .execute(&cmd, &mut ref1, Some(path_from_bytes(&path)))
                     .unwrap_or(1);
                 let code2 = self
                     .process
@@ -292,15 +284,11 @@ impl PathRepository {
                 args
             })?;
             if reference == "auto"
-                && is_dir(format!("{}/.git", path.trim_end_matches('/')))
+                && is_dir(path_from_bytes(&bconcat!(rtrim2(&path, "/"), "/.git")))
                 && self
                     .process
                     .borrow_mut()
-                    .execute(
-                        command,
-                        &mut output,
-                        Some(std::path::Path::new(path.as_str())),
-                    )
+                    .execute(command, &mut output, Some(path_from_bytes(&path)))
                     .unwrap_or(1)
                     == 0
             {
@@ -317,7 +305,7 @@ impl PathRepository {
                 let version_data = self
                     .version_guesser
                     .borrow_mut()
-                    .guess_version(&package, std::path::Path::new(path.as_str()))?;
+                    .guess_version(&package, path_from_bytes(&path))?;
                 if let Some(version_data) = version_data {
                     if let Some(pretty_version) = version_data
                         .pretty_version
@@ -350,7 +338,10 @@ impl PathRepository {
             self.inner
                 .add_package(self.loader.load(package.clone(), None).map_err(|e| {
                     RuntimeException::with_code_and_previous(
-                        format!("Failed loading the package in {}", composer_file_path),
+                        format!(
+                            "Failed loading the package in {}",
+                            composer_file_path.display()
+                        ),
                         0,
                         Some(std::sync::Arc::new(e)),
                     )

@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
     array_key_exists, array_search_mixed, bconcat, date_create, empty, extension_loaded,
-    http_build_query, implode, is_array, legacy_lossy, path_from_bytes, php_regex, preg_is_match,
-    preg_match, preg_replace, strpos,
+    http_build_query, implode, is_array, path_from_bytes, php_regex, preg_is_match, preg_match,
+    preg_replace, strpos,
 };
 
 #[derive(Debug)]
@@ -124,15 +124,17 @@ impl GitBitbucketDriver {
     /// Attempts to fetch the repository data via the BitBucket API and
     /// sets some parameters which are used in other methods
     fn get_repo_data(&mut self) -> anyhow::Result<bool> {
-        let resource = format!(
-            "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
-            legacy_lossy(&self.owner.clone()),
-            legacy_lossy(&self.repository.clone()),
-            legacy_lossy(&http_build_query(&[("fields", "-project,-owner")])),
+        let resource = bconcat!(
+            "https://api.bitbucket.org/2.0/repositories/",
+            self.owner,
+            "/",
+            self.repository,
+            "?",
+            http_build_query(&[("fields", "-project,-owner")]),
         );
 
         let repo_data = self
-            .fetch_with_oauth_credentials(bstr::BStr::new(&resource), true)?
+            .fetch_with_oauth_credentials(resource.as_bstr(), true)?
             .decode_json()?;
         if self.fallback_driver.is_some() {
             return Ok(false);
@@ -222,11 +224,7 @@ impl GitBitbucketDriver {
         if !self.inner.info_cache.contains_key(identifier) {
             let mut composer: Option<IndexMap<BString, PhpMixed>> = None;
             if self.inner.should_cache(identifier) && {
-                let res = self
-                    .inner
-                    .cache
-                    .as_mut()
-                    .and_then(|c| c.read(&*legacy_lossy(identifier)));
+                let res = self.inner.cache.as_mut().and_then(|c| c.read(identifier));
                 if let Some(res) = res {
                     composer = JsonFile::parse_json(Some(&res), None)?.as_array().cloned();
                     true
@@ -246,7 +244,7 @@ impl GitBitbucketDriver {
 
                 if self.inner.should_cache(identifier) {
                     self.inner.cache.as_mut().unwrap().write(
-                        &*legacy_lossy(identifier),
+                        identifier,
                         &JsonFile::encode_with_options(
                             &PhpMixed::Array(
                                 composer.clone().unwrap_or_default().into_iter().collect(),
@@ -427,7 +425,7 @@ impl GitBitbucketDriver {
         );
 
         Ok(self
-            .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
+            .fetch_with_oauth_credentials(resource.as_bstr(), false)?
             .get_body()
             .map(bstr::BString::from))
     }
@@ -458,7 +456,7 @@ impl GitBitbucketDriver {
             "?fields=date"
         );
         let commit = self
-            .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
+            .fetch_with_oauth_credentials(resource.as_bstr(), false)?
             .decode_json()?;
 
         let date_str = commit
@@ -526,19 +524,19 @@ impl GitBitbucketDriver {
 
         if self.tags.is_none() {
             let mut tags: IndexMap<BString, BString> = IndexMap::new();
-            let mut resource = format!(
-                "{}?{}",
-                legacy_lossy(&self.tags_url.clone()),
-                legacy_lossy(&http_build_query(&[
+            let mut resource = bconcat!(
+                self.tags_url,
+                "?",
+                http_build_query(&[
                     ("pagelen", "100"),
                     ("fields", "values.name,values.target.hash,next"),
                     ("sort", "-target.date"),
-                ])),
+                ]),
             );
             let mut has_next = true;
             while has_next {
                 let tags_data = self
-                    .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
+                    .fetch_with_oauth_credentials(resource.as_bstr(), false)?
                     .decode_json()?;
                 let values = tags_data.get("values").cloned();
                 if let Some(PhpMixed::List(list)) = values {
@@ -571,13 +569,12 @@ impl GitBitbucketDriver {
                 ) {
                     has_next = false;
                 } else {
-                    resource = legacy_lossy(&BString::from(
+                    resource = BString::from(
                         tags_data
                             .get("next")
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    ))
-                    .into_owned();
+                    );
                 }
             }
 
@@ -594,19 +591,19 @@ impl GitBitbucketDriver {
 
         if self.branches.is_none() {
             let mut branches: IndexMap<BString, BString> = IndexMap::new();
-            let mut resource = format!(
-                "{}?{}",
-                legacy_lossy(&self.branches_url.clone()),
-                legacy_lossy(&http_build_query(&[
+            let mut resource = bconcat!(
+                self.branches_url,
+                "?",
+                http_build_query(&[
                     ("pagelen", "100"),
                     ("fields", "values.name,values.target.hash,values.heads,next"),
                     ("sort", "-target.date"),
-                ])),
+                ]),
             );
             let mut has_next = true;
             while has_next {
                 let branch_data = self
-                    .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
+                    .fetch_with_oauth_credentials(resource.as_bstr(), false)?
                     .decode_json()?;
                 let values = branch_data.get("values").cloned();
                 if let Some(PhpMixed::List(list)) = values {
@@ -639,13 +636,12 @@ impl GitBitbucketDriver {
                 ) {
                     has_next = false;
                 } else {
-                    resource = legacy_lossy(&BString::from(
+                    resource = BString::from(
                         branch_data
                             .get("next")
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    ))
-                    .into_owned();
+                    );
                 }
             }
 

@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Terminal.php
 
 use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, php_fopen_resource,
-    php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get, sapi_windows_cp_set,
-    sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
+    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, path_to_bytes,
+    php_fopen_resource, php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get,
+    sapi_windows_cp_set, sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
 };
 use std::cell::Cell;
 
@@ -31,11 +31,7 @@ impl Terminal {
     pub fn get_width(&self) -> i64 {
         let width = getenv("COLUMNS");
         if let Some(width) = width {
-            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-            let width = width
-                .into_string()
-                .unwrap_or_else(|width| panic!("COLUMNS is not valid UTF-8: {width:?}"));
-            return intval(&PhpMixed::string(trim(&width)));
+            return intval(&PhpMixed::string(trim(path_to_bytes(&width))));
         }
 
         if WIDTH.with(|w| w.get()).is_none() {
@@ -49,11 +45,7 @@ impl Terminal {
     pub fn get_height(&self) -> i64 {
         let height = getenv("LINES");
         if let Some(height) = height {
-            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-            let height = height
-                .into_string()
-                .unwrap_or_else(|height| panic!("LINES is not valid UTF-8: {height:?}"));
-            return intval(&PhpMixed::string(trim(&height)));
+            return intval(&PhpMixed::string(trim(path_to_bytes(&height))));
         }
 
         if HEIGHT.with(|h| h.get()).is_none() {
@@ -79,16 +71,11 @@ impl Terminal {
 
     fn init_dimensions() {
         if cfg!(windows) {
-            // TODO(bytes): preg_match matches over a &str.
-            let ansicon = getenv("ANSICON").map(|ansicon| {
-                ansicon
-                    .into_string()
-                    .unwrap_or_else(|ansicon| panic!("ANSICON is not valid UTF-8: {ansicon:?}"))
-            });
+            let ansicon = getenv("ANSICON").map(|ansicon| trim(path_to_bytes(&ansicon)));
             if let Some(ansicon) = &ansicon
                 && let Some(matches) = preg_match(
                     php_regex!("/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/"),
-                    &trim(ansicon),
+                    ansicon,
                 )
             {
                 // extract [w, H] from "wxh (WxH)"
@@ -188,11 +175,11 @@ impl Terminal {
     }
 
     /// Runs and parses stty -a if it's available, suppressing any error output.
-    fn get_stty_columns() -> Option<String> {
+    fn get_stty_columns() -> Option<Vec<u8>> {
         Self::read_from_process("stty -a | grep columns")
     }
 
-    fn read_from_process(command: &str) -> Option<String> {
+    fn read_from_process(command: &str) -> Option<Vec<u8>> {
         // Sparse PHP descriptorspec `[1 => ['pipe', 'w'], 2 => ['pipe', 'w']]`: fd 0 is inherited.
         let descriptorspec = [
             Descriptor::Inherit,
@@ -212,11 +199,7 @@ impl Terminal {
             Err(_) => return None,
         };
 
-        // TODO(bytes): the stty/mode output is returned as a String.
-        let info = pipes
-            .get(&1)
-            .and_then(stream_get_contents)
-            .map(|info| String::from_utf8_lossy(&info).into_owned());
+        let info = pipes.get(&1).and_then(stream_get_contents);
         if let Some(pipe) = pipes.get(&1) {
             fclose(pipe);
         }

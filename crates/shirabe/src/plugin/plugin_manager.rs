@@ -13,19 +13,19 @@ use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
 use crate::plugin::php_plugin_proxy::{
     PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, PluginRpcDispatcher, php_is_a,
-    plugin_handle_value,
+    plugin_handle_value, rpc_name,
 };
 use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
 };
 use crate::util::PackageSorter;
-use bstr::{B, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
-    CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,
-    file_get_contents, implode, ksort, legacy_lossy, path_from_bytes, php_regex, preg_is_match,
+    CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bconcat,
+    dirname, empty, file_get_contents, implode, ksort, path_from_bytes, php_regex, preg_is_match,
     preg_quote, preg_replace2, strrpos, strtr_array, substr, trigger_error, trim2, var_export,
     var_export_str, version_compare,
 };
@@ -39,7 +39,7 @@ pub struct PluginManager {
     version_parser: VersionParser,
     disable_plugins: DisablePlugins,
     plugins: Vec<std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>>,
-    registered_plugins: IndexMap<String, Vec<PluginOrInstaller>>,
+    registered_plugins: IndexMap<BString, Vec<PluginOrInstaller>>,
     allow_plugin_rules: Option<IndexMap<String, bool>>,
     allow_global_plugin_rules: Option<IndexMap<String, bool>>,
     running_in_global_dir: bool,
@@ -188,7 +188,7 @@ impl PluginManager {
     /// Gets all currently active plugin instances
     ///
     /// internal — Plugin package names which are currently active
-    pub fn get_registered_plugins(&self) -> Vec<String> {
+    pub fn get_registered_plugins(&self) -> Vec<BString> {
         self.registered_plugins.keys().cloned().collect()
     }
 
@@ -268,12 +268,7 @@ impl PluginManager {
             .get(B("plugin-optional"))
             .map(|v| v.as_bool() == Some(true))
             .unwrap_or(false);
-        if !self.is_plugin_allowed(
-            &legacy_lossy(&package.get_name()),
-            is_global_plugin,
-            plugin_optional,
-            true,
-        )? {
+        if !self.is_plugin_allowed(package.get_name(), is_global_plugin, plugin_optional, true)? {
             self.io.write_error3(
                 format!(
                     "Skipped loading \"{}\" {}as it is not in config.allow-plugins",
@@ -292,10 +287,7 @@ impl PluginManager {
 
         let old_installer_plugin = package.get_type() == "composer-installer";
 
-        if self
-            .registered_plugins
-            .contains_key(&*legacy_lossy(&package.get_name()))
-        {
+        if self.registered_plugins.contains_key(&package.get_name()) {
             return Ok(());
         }
 
@@ -319,13 +311,12 @@ impl PluginManager {
         // PHP: is_array($extra['class']) ? $extra['class'] : [$extra['class']] — an associative
         // array iterates its values too, and a non-string entry reaches class_exists() where it
         // raises a TypeError (an Error, not caught by the plugin installer's rollback).
-        let expect_class_name =
-            |value: &PhpMixed| -> String {
-                value.as_string().map(|s| legacy_lossy(s).into_owned()).unwrap_or_else(|| {
+        let expect_class_name = |value: &PhpMixed| -> BString {
+            value.as_string().map(BString::from).unwrap_or_else(|| {
                 panic!("extra.class entries must be strings (PHP raises a TypeError): {value:?}")
             })
-            };
-        let classes: Vec<String> = match class_value {
+        };
+        let classes: Vec<BString> = match class_value {
             Some(PhpMixed::List(items)) => items.iter().map(expect_class_name).collect(),
             Some(PhpMixed::Array(map)) => map.values().map(expect_class_name).collect(),
             Some(other) => vec![expect_class_name(other)],
@@ -364,11 +355,8 @@ impl PluginManager {
             installed_repo.add_repository(global_repo.clone());
         }
 
-        let mut autoload_packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        autoload_packages.insert(
-            legacy_lossy(&package.get_name()).into_owned(),
-            package.clone(),
-        );
+        let mut autoload_packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
+        autoload_packages.insert(package.get_name(), package.clone());
         let autoload_packages =
             self.collect_dependencies(&installed_repo, autoload_packages, package.clone())?;
 
@@ -430,32 +418,26 @@ impl PluginManager {
                 let file = file.as_string().unwrap_or_else(|| {
                     panic!("autoload files entry {file_identifier:?} is not a string path")
                 });
-                // TODO(bytes): file identifiers are Strings, so non-UTF-8 bytes are replaced.
-                self.php_runtime_composer_require(
-                    &legacy_lossy(file_identifier),
-                    &legacy_lossy(file),
-                )?;
+                self.php_runtime_composer_require(file_identifier.as_bstr(), file)?;
             }
         }
 
         for class in classes {
             let mut class = class;
-            if self.php_runtime_class_exists(&class, false)? {
-                class = legacy_lossy(&trim2(&class, "\\")).into_owned();
+            if self.php_runtime_class_exists(class.as_bstr(), false)? {
+                class = trim2(&class, "\\");
                 let path = class_loader.find_file(&class).unwrap_or_else(|| {
-                    panic!("plugin class `{class}` is already defined but has no autoloadable file")
+                    panic!(
+                        "plugin class `{}` is already defined but has no autoloadable file",
+                        class.display_lossy()
+                    )
                 });
-                // TODO(bytes): the eval'd plugin source is carried as a String, so
-                // from_utf8_lossy corrupts a source file that is not valid UTF-8.
-                let code = String::from_utf8_lossy(
-                    &file_get_contents(path_from_bytes(&path)).unwrap_or_else(|_| {
-                        panic!(
-                            "unable to read the plugin class file `{}`",
-                            path.display_lossy()
-                        )
-                    }),
-                )
-                .into_owned();
+                let code = file_get_contents(path_from_bytes(&path)).unwrap_or_else(|_| {
+                    panic!(
+                        "unable to read the plugin class file `{}`",
+                        path.display_lossy()
+                    )
+                });
                 let class_counter = CLASS_COUNTER.load(std::sync::atomic::Ordering::Relaxed);
                 let separator_pos = strrpos(&class, "\\");
                 let mut class_name = class.clone();
@@ -463,8 +445,7 @@ impl PluginManager {
                 if let Some(separator_pos) = separator_pos
                     && separator_pos != 0
                 {
-                    class_name = legacy_lossy(&substr(&class, (separator_pos + 1) as i64, None))
-                        .into_owned();
+                    class_name = substr(&class, (separator_pos + 1) as i64, None);
                 }
                 let code = preg_replace2(
                     format!(
@@ -476,33 +457,25 @@ impl PluginManager {
                     1,
                     None,
                 );
-                let mut replacements: IndexMap<String, String> = IndexMap::new();
-                replacements.insert(
-                    "__FILE__".to_string(),
-                    legacy_lossy(&var_export_str(&path, true)).into_owned(),
-                );
-                replacements.insert(
-                    "__DIR__".to_string(),
-                    legacy_lossy(&var_export_str(dirname(&path), true)).into_owned(),
-                );
-                replacements.insert(
-                    "__CLASS__".to_string(),
-                    legacy_lossy(&var_export_str(&class, true)).into_owned(),
-                );
+                let mut replacements: IndexMap<String, BString> = IndexMap::new();
+                replacements.insert("__FILE__".to_string(), var_export_str(&path, true));
+                replacements.insert("__DIR__".to_string(), var_export_str(dirname(&path), true));
+                replacements.insert("__CLASS__".to_string(), var_export_str(&class, true));
                 let code = strtr_array(&code, &replacements);
-                let code = legacy_lossy(&preg_replace2(r"/^\s*<\?(php)?/i", "", &code, 1, None))
-                    .into_owned();
-                self.php_runtime_eval(&code)?;
-                class = format!("{}_composer_tmp{}", class, class_counter);
+                let code = preg_replace2(r"/^\s*<\?(php)?/i", "", &code, 1, None);
+                self.php_runtime_eval(code)?;
+                class = bconcat!(class, "_composer_tmp", class_counter);
                 CLASS_COUNTER.store(class_counter + 1, std::sync::atomic::Ordering::Relaxed);
             }
 
             if old_installer_plugin {
-                if !self.php_runtime_is_a(&class, "Composer\\Installer\\InstallerInterface")? {
+                if !self
+                    .php_runtime_is_a(class.as_bstr(), "Composer\\Installer\\InstallerInterface")?
+                {
                     return Err(RuntimeException::new(format!(
                         "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Installer\\InstallerInterface",
                         package.get_name().display_lossy(),
-                        class
+                        class.display_lossy()
                     ))
                     .into());
                 }
@@ -517,7 +490,7 @@ impl PluginManager {
                 ));
                 let composer = self.composer_full();
                 let handle = self.php_runtime_new_object_with_args(
-                    &class,
+                    class.as_bstr(),
                     vec![
                         crate::plugin::io_handle_value(&self.io)?,
                         crate::plugin::composer_handle_value(&composer),
@@ -530,19 +503,19 @@ impl PluginManager {
                     .borrow()
                     .add_installer(installer.clone());
                 self.registered_plugins
-                    .entry(legacy_lossy(&package.get_name()).into_owned())
+                    .entry(package.get_name())
                     .or_default()
                     .push(PluginOrInstaller::Installer(installer));
-            } else if self.php_runtime_class_exists(&class, true)? {
-                if !self.php_runtime_is_a(&class, "Composer\\Plugin\\PluginInterface")? {
+            } else if self.php_runtime_class_exists(class.as_bstr(), true)? {
+                if !self.php_runtime_is_a(class.as_bstr(), "Composer\\Plugin\\PluginInterface")? {
                     return Err(RuntimeException::new(format!(
                         "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Plugin\\PluginInterface",
                         package.get_name().display_lossy(),
-                        class
+                        class.display_lossy()
                     ))
                     .into());
                 }
-                let handle = self.php_runtime_new_object(&class)?;
+                let handle = self.php_runtime_new_object(class.as_bstr())?;
                 let plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> =
                     std::rc::Rc::new(std::cell::RefCell::new(PhpPluginProxy::new(
                         handle.phandle,
@@ -551,14 +524,14 @@ impl PluginManager {
                     )));
                 self.add_plugin(plugin.clone(), is_global_plugin, Some(package.clone()))?;
                 self.registered_plugins
-                    .entry(legacy_lossy(&package.get_name()).into_owned())
+                    .entry(package.get_name())
                     .or_default()
                     .push(PluginOrInstaller::Plugin(plugin));
             } else if fail_on_missing_classes {
                 return Err(UnexpectedValueException::new(format!(
                     "Plugin {} could not be initialized, class not found: {}",
                     package.get_name().display_lossy(),
-                    class
+                    class.display_lossy()
                 ))
                 .into());
             }
@@ -581,14 +554,14 @@ impl PluginManager {
         }
     }
 
-    fn php_runtime_class_exists(&self, class: &str, autoload: bool) -> anyhow::Result<bool> {
+    fn php_runtime_class_exists(&self, class: &BStr, autoload: bool) -> anyhow::Result<bool> {
         self.php_runtime_bool(
             "class_exists",
             vec![PluginValue::string(class), PluginValue::Bool(autoload)],
         )
     }
 
-    fn php_runtime_is_a(&self, class: &str, interface: &str) -> anyhow::Result<bool> {
+    fn php_runtime_is_a(&self, class: &BStr, interface: &str) -> anyhow::Result<bool> {
         self.php_runtime_bool(
             "is_a",
             vec![
@@ -599,7 +572,7 @@ impl PluginManager {
         )
     }
 
-    fn php_runtime_eval(&self, code: &str) -> anyhow::Result<()> {
+    fn php_runtime_eval(&self, code: BString) -> anyhow::Result<()> {
         unwrap_php_result(call_function_with_dispatcher(
             "__shirabe_eval",
             vec![PluginValue::string(code)],
@@ -610,8 +583,8 @@ impl PluginManager {
 
     fn php_runtime_composer_require(
         &self,
-        file_identifier: &str,
-        file: &str,
+        file_identifier: &BStr,
+        file: &BStr,
     ) -> anyhow::Result<()> {
         unwrap_php_result(call_function_with_dispatcher(
             "__shirabe_composer_require",
@@ -625,40 +598,41 @@ impl PluginManager {
     }
 
     /// PHP `new $class()` in the worker, returning the P-table handle of the new entity.
-    fn php_runtime_new_object(&self, class: &str) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
+    fn php_runtime_new_object(
+        &self,
+        class: &BStr,
+    ) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
         self.php_runtime_new_object_with_args(class, vec![])
     }
 
     fn php_runtime_new_object_with_args(
         &self,
-        class: &str,
+        class: &BStr,
         args: Vec<PluginValue>,
     ) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
         let value = unwrap_php_result(shirabe_php_rpc::new_object(
-            class,
+            rpc_name(class)?,
             args,
             Some(&mut PluginRpcDispatcher::default()),
         ))?;
         match value {
             PluginValue::PhpHandle(handle) => Ok(handle),
             other => Err(anyhow::anyhow!(
-                "instantiating `{class}` did not return a PHP handle: {other:?}"
+                "instantiating `{}` did not return a PHP handle: {other:?}",
+                class.display_lossy()
             )),
         }
     }
 
     /// Deactivates a plugin package
     pub fn deactivate_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
-        if !self
-            .registered_plugins
-            .contains_key(&*legacy_lossy(&package.get_name()))
-        {
+        if !self.registered_plugins.contains_key(&package.get_name()) {
             return Ok(());
         }
 
         // PHP unsets registeredPlugins only after the loop; a deactivate() throw must leave the
         // entry observable, so removal happens last here too.
-        let name = legacy_lossy(&package.get_name()).into_owned();
+        let name = package.get_name();
         let count = self
             .registered_plugins
             .get(&name)
@@ -688,15 +662,12 @@ impl PluginManager {
 
     /// Uninstall a plugin package
     pub fn uninstall_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
-        if !self
-            .registered_plugins
-            .contains_key(&*legacy_lossy(&package.get_name()))
-        {
+        if !self.registered_plugins.contains_key(&package.get_name()) {
             return Ok(());
         }
 
         // PHP unsets registeredPlugins only after the loop, as in deactivate_package.
-        let name = legacy_lossy(&package.get_name()).into_owned();
+        let name = package.get_name();
         let count = self
             .registered_plugins
             .get(&name)
@@ -760,7 +731,7 @@ impl PluginManager {
                     .map(|v| v.as_bool() == Some(true))
                     .unwrap_or(false);
                 if !self.is_plugin_allowed(
-                    &legacy_lossy(&sp.get_name()),
+                    sp.get_name(),
                     is_global_plugin,
                     plugin_optional,
                     true,
@@ -784,21 +755,21 @@ impl PluginManager {
             }
         }
 
-        let mut details: Vec<String> = vec![];
+        let mut details: Vec<BString> = vec![];
         if let Some(sp) = source_package.as_ref() {
-            details.push(format!("from {}", legacy_lossy(&sp.get_name())));
+            details.push(bconcat!("from ", sp.get_name()));
         }
         if is_global_plugin || self.running_in_global_dir {
-            details.push("installed globally".to_string());
+            details.push("installed globally".into());
         }
         self.io.write_error3(
-            format!(
-                "Loading plugin {}{}",
+            bconcat!(
+                "Loading plugin ",
                 plugin.borrow().get_class_name(),
                 if !details.is_empty() {
-                    format!(" ({})", legacy_lossy(&implode(", ", &details)))
+                    bconcat!(" (", implode(", ", &details), ")")
                 } else {
-                    String::new()
+                    BString::default()
                 }
             ),
             true,
@@ -883,7 +854,7 @@ impl PluginManager {
     ) -> anyhow::Result<()> {
         let packages = repo.get_packages()?;
 
-        let mut weights: IndexMap<String, i64> = IndexMap::new();
+        let mut weights: IndexMap<BString, i64> = IndexMap::new();
         for package in &packages {
             if package.get_type() == "composer-plugin" {
                 let extra = package.get_extra();
@@ -893,7 +864,7 @@ impl PluginManager {
                         .map(|v| v.as_bool() == Some(true))
                         .unwrap_or(false)
                 {
-                    weights.insert(legacy_lossy(&package.get_name()).into_owned(), -10000);
+                    weights.insert(package.get_name(), -10000);
                 }
             }
         }
@@ -932,12 +903,7 @@ impl PluginManager {
                 .any(|rp| rp.ptr_id() == package_addr);
             if !is_global_repo
                 && !in_required
-                && !self.is_plugin_allowed(
-                    &legacy_lossy(&package.get_name()),
-                    false,
-                    true,
-                    false,
-                )?
+                && !self.is_plugin_allowed(package.get_name(), false, true, false)?
             {
                 self.io.write_error(format!("<warning>The \"{}\" plugin was not loaded as it is not listed in allow-plugins and is not required by the root package anymore.</warning>", package.get_name().display_lossy()));
                 continue;
@@ -982,20 +948,17 @@ impl PluginManager {
     fn collect_dependencies(
         &self,
         installed_repo: &InstalledRepository,
-        mut collected: IndexMap<String, PackageInterfaceHandle>,
+        mut collected: IndexMap<BString, PackageInterfaceHandle>,
         package: PackageInterfaceHandle,
-    ) -> anyhow::Result<IndexMap<String, PackageInterfaceHandle>> {
+    ) -> anyhow::Result<IndexMap<BString, PackageInterfaceHandle>> {
         // TODO(plugin): used by registerPackage to assemble plugin dependency autoload map
         for (_k, require_link) in package.get_requires().iter() {
             for required_package in installed_repo.find_packages_with_replacers_and_providers(
                 bstr::BStr::new(require_link.get_target()),
                 None,
             )? {
-                if !collected.contains_key(&*legacy_lossy(&required_package.get_name())) {
-                    collected.insert(
-                        legacy_lossy(&required_package.get_name()).into_owned(),
-                        required_package.clone(),
-                    );
+                if !collected.contains_key(&required_package.get_name()) {
+                    collected.insert(required_package.get_name(), required_package.clone());
                     collected = self.collect_dependencies(
                         installed_repo,
                         collected,
@@ -1037,7 +1000,7 @@ impl PluginManager {
         &self,
         plugin: &dyn PluginInterface,
         capability: &str,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<BString>> {
         let capable = match plugin.as_capable() {
             Some(c) => c,
             None => return Ok(None),
@@ -1050,7 +1013,7 @@ impl PluginManager {
             && !empty(value)
             && let PhpMixed::String(s) = value
         {
-            let trimmed = legacy_lossy(&trim2(s, " \t\n\r\0\u{0B}")).into_owned();
+            let trimmed = trim2(s, " \t\n\r\0\u{0B}");
             // PHP evaluates trim(...) in boolean context: "" and "0" are falsy.
             if !trimmed.is_empty() && trimmed != "0" {
                 return Ok(Some(trimmed));
@@ -1094,7 +1057,7 @@ impl PluginManager {
         if !matches!(exists, PluginValue::Bool(true)) {
             return Err(RuntimeException::new(format!(
                 "Cannot instantiate Capability, as class {} from plugin {} does not exist.",
-                capability_class,
+                capability_class.display_lossy(),
                 plugin.borrow().get_class_name()
             ))
             .into());
@@ -1118,14 +1081,15 @@ impl PluginManager {
 
         // PHP: $capabilityObj = new $capabilityClass($ctorArgs);
         let capability_obj = unwrap_php_result(shirabe_php_rpc::new_object(
-            &capability_class,
+            rpc_name(capability_class.as_bstr())?,
             vec![args_value],
             Some(&mut PluginRpcDispatcher::default()),
         ))?;
         let handle = match capability_obj {
             PluginValue::PhpHandle(handle) => handle,
             other => anyhow::bail!(
-                "worker returned a non-object for new {capability_class}(...): {other:?}"
+                "worker returned a non-object for new {}(...): {other:?}",
+                capability_class.display_lossy()
             ),
         };
 
@@ -1134,7 +1098,8 @@ impl PluginManager {
             || !php_is_a(&handle, capability_class_name)?
         {
             return Err(RuntimeException::new(format!(
-                "Class {capability_class} must implement both Composer\\Plugin\\Capability\\Capability and {capability_class_name}."
+                "Class {} must implement both Composer\\Plugin\\Capability\\Capability and {capability_class_name}.",
+                capability_class.display_lossy()
             ))
             .into());
         }
@@ -1213,8 +1178,6 @@ impl PluginManager {
         if let Some(arr) = allow_plugins_config.as_array() {
             for (pattern, allow) in arr {
                 rules.insert(
-                    // TODO(bytes): patterns are compiled from UTF-8 text, so non-UTF-8 bytes are
-                    // replaced.
                     base_package::package_name_to_regexp(pattern),
                     allow.as_bool().unwrap_or(false),
                 );
@@ -1239,11 +1202,12 @@ impl PluginManager {
 
     pub fn is_plugin_allowed(
         &mut self,
-        package: &str,
+        package: impl AsRef<[u8]>,
         is_global_plugin: bool,
         optional: bool,
         prompt: bool,
     ) -> anyhow::Result<bool> {
+        let package = BStr::new(package.as_ref());
         // TODO(plugin): allow-plugins authorization flow with interactive prompt
         let rules: &mut Option<IndexMap<String, bool>> = if is_global_plugin {
             &mut self.allow_global_plugin_rules
@@ -1298,7 +1262,7 @@ impl PluginManager {
                 .get_config();
 
             self.io.write_error(format!("<warning>{}{} contains a Composer plugin which is currently not in your allow-plugins config. See https://getcomposer.org/allow-plugins</warning>",
-                package,
+                package.display_lossy(),
                 if is_global_plugin || self.running_in_global_dir { " (installed globally)" } else { "" }
             ));
             let mut attempts = 0;
@@ -1312,13 +1276,13 @@ impl PluginManager {
                 }
 
                 let answer = self.io.ask(
-                    format!("Do you trust \"<fg=green;options=bold>{}</>\" to execute code and wish to enable it now? (writes \"allow-plugins\" to composer.json) [<comment>y,n,d,?</comment>] ", package),
+                    bconcat!("Do you trust \"<fg=green;options=bold>", package, "</>\" to execute code and wish to enable it now? (writes \"allow-plugins\" to composer.json) [<comment>y,n,d,?</comment>] "),
                     PhpMixed::string(default.to_string()),
                 )?;
-                let answer_str = answer.as_string().unwrap_or_default().to_str_lossy();
-                match &*answer_str {
-                    "y" | "n" | "d" => {
-                        let allow = answer_str == "y";
+                let answer_str: &[u8] = answer.as_string().unwrap_or_default();
+                match answer_str {
+                    b"y" | b"n" | b"d" => {
+                        let allow = answer_str == b"y";
 
                         // persist answer in current rules to avoid prompting again if the package gets reloaded
                         rules
@@ -1327,12 +1291,11 @@ impl PluginManager {
                             .insert(base_package::package_name_to_regexp(package), allow);
 
                         // persist answer in composer.json if it wasn't simply discarded
-                        if answer_str == "y" || answer_str == "n" {
+                        if answer_str == b"y" || answer_str == b"n" {
                             let allow_plugins_value = config.borrow_mut().get("allow-plugins");
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
-                                allow_plugins
-                                    .insert(package.to_string().into(), PhpMixed::Bool(allow));
+                                allow_plugins.insert(BString::from(package), PhpMixed::Bool(allow));
                                 if config
                                     .borrow_mut()
                                     .get("sort-packages")
@@ -1381,10 +1344,10 @@ impl PluginManager {
 
         Err(PluginBlockedException::new(format!(
             "{}{} contains a Composer plugin which is blocked by your allow-plugins config. You may add it to the list if you consider it safe.\nYou can run \"shirabe {}config --no-plugins allow-plugins.{} [true|false]\" to enable it (true) or disable it explicitly and suppress this exception (false)\nSee https://getcomposer.org/allow-plugins",
-            package,
+            package.display_lossy(),
             if is_global_plugin || self.running_in_global_dir { " (installed globally)" } else { "" },
             if is_global_plugin || self.running_in_global_dir { "global " } else { "" },
-            package
+            package.display_lossy()
         )).into())
     }
 }

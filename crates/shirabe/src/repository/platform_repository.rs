@@ -14,9 +14,9 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_slice_mixed,
-    array_slice_strs, bconcat, explode, get_class, get_debug_type, implode, is_string,
-    legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace, str_replace, strpos,
-    strtolower, var_export,
+    array_slice_strs, bconcat, explode, get_class, get_debug_type, implode, intval, is_string,
+    php_regex, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower,
+    var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use std::sync::{LazyLock, Mutex};
@@ -59,8 +59,6 @@ impl PlatformRepository {
             hhvm_detector.unwrap_or_else(|| Box::new(HhvmDetector::new(None, None)));
         let mut overrides_map: IndexMap<BString, PlatformOverride> = IndexMap::new();
         for (name, version) in overrides {
-            // TODO(bytes): platform package names are Strings, so non-UTF-8 bytes are replaced.
-            let name = BString::from(&name.clone()[..]);
             if !is_string(&version) && !matches!(version, PhpMixed::Bool(false)) {
                 return Err(UnexpectedValueException::new(format!(
                     "config.platform.{} should be a string or false, but got {} {}",
@@ -158,7 +156,7 @@ impl PlatformRepository {
             }
         }
 
-        let mut pretty_version = composer::get_version();
+        let mut pretty_version = BString::from(composer::get_version());
         let mut version = BString::from(
             &self
                 .version_parser
@@ -169,12 +167,12 @@ impl PlatformRepository {
         let mut composer = CompletePackage::new(
             bstr::BString::from("composer".to_string()),
             version.clone(),
-            bstr::BString::from(pretty_version.clone()),
+            pretty_version.clone(),
         );
         composer.set_description(bstr::BString::from("Composer package".to_string()));
         self.add_package(CompletePackageHandle::from_complete_package(composer).into())?;
 
-        pretty_version = plugin_interface::PLUGIN_API_VERSION.to_string();
+        pretty_version = plugin_interface::PLUGIN_API_VERSION.into();
         version = BString::from(
             &self
                 .version_parser
@@ -185,13 +183,13 @@ impl PlatformRepository {
         let mut composer_plugin_api = CompletePackage::new(
             bstr::BString::from("composer-plugin-api".to_string()),
             version.clone(),
-            bstr::BString::from(pretty_version.clone()),
+            pretty_version.clone(),
         );
         composer_plugin_api
             .set_description(bstr::BString::from("The Composer Plugin API".to_string()));
         self.add_package(CompletePackageHandle::from_complete_package(composer_plugin_api).into())?;
 
-        pretty_version = composer::RUNTIME_API_VERSION.to_string();
+        pretty_version = composer::RUNTIME_API_VERSION.into();
         version = BString::from(
             &self
                 .version_parser
@@ -202,7 +200,7 @@ impl PlatformRepository {
         let mut composer_runtime_api = CompletePackage::new(
             bstr::BString::from("composer-runtime-api".to_string()),
             version.clone(),
-            bstr::BString::from(pretty_version.clone()),
+            pretty_version.clone(),
         );
         composer_runtime_api
             .set_description(bstr::BString::from("The Composer Runtime API".to_string()));
@@ -211,11 +209,10 @@ impl PlatformRepository {
         )?;
 
         let php_version_const = platform_info.get_constant("PHP_VERSION", None);
-        let php_version_str = legacy_lossy(&match &php_version_const {
+        let php_version_str = match &php_version_const {
             PhpMixed::String(s) => s.clone(),
-            _ => bstr::BString::from("".to_string()),
-        })
-        .into_owned();
+            _ => BString::default(),
+        };
         match self
             .version_parser
             .as_ref()
@@ -227,10 +224,8 @@ impl PlatformRepository {
                 version = BString::from(&v[..]);
             }
             Err(_) => {
-                pretty_version = legacy_lossy(&BString::from(
-                    &preg_replace(php_regex!("#^([^~+-]+).*$#"), "$1", &php_version_str)[..],
-                ))
-                .into_owned();
+                pretty_version =
+                    preg_replace(php_regex!("#^([^~+-]+).*$#"), "$1", &php_version_str);
                 version = BString::from(
                     &self
                         .version_parser
@@ -244,7 +239,7 @@ impl PlatformRepository {
         let mut php = CompletePackage::new(
             bstr::BString::from("php".to_string()),
             version.clone(),
-            bstr::BString::from(pretty_version.clone()),
+            pretty_version.clone(),
         );
         php.set_description(bstr::BString::from("The PHP interpreter".to_string()));
         self.add_package(CompletePackageHandle::from_complete_package(php).into())?;
@@ -257,7 +252,7 @@ impl PlatformRepository {
             let mut phpdebug = CompletePackage::new(
                 bstr::BString::from("php-debug".to_string()),
                 version.clone(),
-                bstr::BString::from(pretty_version.clone()),
+                pretty_version.clone(),
             );
             phpdebug.set_description(bstr::BString::from(
                 "The PHP interpreter, with debugging symbols".to_string(),
@@ -274,7 +269,7 @@ impl PlatformRepository {
             let mut phpzts = CompletePackage::new(
                 bstr::BString::from("php-zts".to_string()),
                 version.clone(),
-                bstr::BString::from(pretty_version.clone()),
+                pretty_version.clone(),
             );
             phpzts.set_description(bstr::BString::from(
                 "The PHP interpreter, with Zend Thread Safety".to_string(),
@@ -291,7 +286,7 @@ impl PlatformRepository {
             let mut php64 = CompletePackage::new(
                 bstr::BString::from("php-64bit".to_string()),
                 version.clone(),
-                bstr::BString::from(pretty_version.clone()),
+                pretty_version.clone(),
             );
             php64.set_description(bstr::BString::from(
                 "The PHP interpreter, 64bit".to_string(),
@@ -307,7 +302,7 @@ impl PlatformRepository {
             let mut php_ipv6 = CompletePackage::new(
                 bstr::BString::from("php-ipv6".to_string()),
                 version,
-                bstr::BString::from(pretty_version),
+                pretty_version,
             );
             php_ipv6.set_description(bstr::BString::from(
                 "The PHP interpreter, with IPv6 support".to_string(),
@@ -365,7 +360,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             bstr::BStr::new(&bconcat!(name, "-protocol")),
-                            Some(&*legacy_lossy(&str_replace("-", ".", &version_str))),
+                            Some(str_replace("-", ".", &version_str)),
                             Some("AMQP protocol version"),
                             &[],
                             &[],
@@ -424,9 +419,8 @@ impl PlatformRepository {
                             BString::from(&BString::from(&strtolower(&ssl_library_raw)[..])[..]);
                         if library == "openssl" {
                             let mut is_fips = false;
-                            let parsed_version =
-                                Version::parse_openssl(&legacy_lossy(&ssl_version), &mut is_fips)
-                                    .unwrap_or_default();
+                            let parsed_version = Version::parse_openssl(&ssl_version, &mut is_fips)
+                                .unwrap_or_default();
                             let fips_provides: Vec<BString> = if is_fips {
                                 vec![bstr::BString::from("curl-openssl".to_string())]
                             } else {
@@ -434,13 +428,10 @@ impl PlatformRepository {
                             };
                             self.add_library(
                                 &mut libraries,
-                                bstr::BStr::new(&format!(
-                                    "{}-openssl{}",
-                                    name.display_lossy(),
-                                    if is_fips { "-fips" } else { "" }
-                                )),
+                                bconcat!(name, "-openssl", if is_fips { "-fips" } else { "" })
+                                    .as_bstr(),
                                 Some(&parsed_version),
-                                Some(&format!("curl OpenSSL version ({})", parsed_version)),
+                                Some(&bconcat!("curl OpenSSL version (", parsed_version, ")")),
                                 &[],
                                 &fips_provides,
                             )?;
@@ -451,22 +442,22 @@ impl PlatformRepository {
                                     php_regex!("{^\\(securetransport\\) ([a-z0-9]+)}"),
                                     &library,
                                 ) {
-                                    shortlib = "securetransport".to_string();
+                                    shortlib = BString::from("securetransport");
                                     let m1 = BString::from(
                                         securetransport_matches.get(1).unwrap_or_default(),
                                     );
                                     ssl_lib = bconcat!("curl-", m1);
                                 } else {
-                                    shortlib = legacy_lossy(&library.clone()).into_owned();
+                                    shortlib = library.clone();
                                     ssl_lib = "curl-openssl".into();
                                 }
                             } else {
-                                shortlib = legacy_lossy(&library.clone()).into_owned();
+                                shortlib = library.clone();
                                 ssl_lib = "curl-openssl".into();
                             }
                             self.add_library(
                                 &mut libraries,
-                                bstr::BStr::new(&format!("{}-{}", name.display_lossy(), shortlib)),
+                                bconcat!(name, "-", shortlib).as_bstr(),
                                 Some(&ssl_version),
                                 Some(&bconcat!("curl ", library, " version (", ssl_version, ")")),
                                 &[ssl_lib],
@@ -612,8 +603,7 @@ impl PlatformRepository {
                     ) {
                         let libjpeg_version =
                             BString::from(libjpeg_matches.name("version").unwrap_or_default());
-                        let parsed = Version::parse_libjpeg(&legacy_lossy(&libjpeg_version))
-                            .unwrap_or_default();
+                        let parsed = Version::parse_libjpeg(&libjpeg_version).unwrap_or_default();
                         self.add_library(
                             &mut libraries,
                             bstr::BStr::new(&bconcat!(name, "-libjpeg")),
@@ -654,10 +644,9 @@ impl PlatformRepository {
                         php_regex!("/^libXpm Version => (?<versionId>\\d+)$/im"),
                         info,
                     ) {
-                        let version_id: i64 = libxpm_matches
-                            .name("versionId")
-                            .and_then(|s| legacy_lossy(s).parse().ok())
-                            .unwrap_or(0);
+                        let version_id = intval(&PhpMixed::string(
+                            libxpm_matches.name("versionId").unwrap_or_default(),
+                        ));
                         let converted = Version::convert_libxpm_version_id(version_id);
                         self.add_library(
                             &mut libraries,
@@ -743,9 +732,7 @@ impl PlatformRepository {
                     ) {
                         let zi_version =
                             BString::from(zoneinfo_matches.name("version").unwrap_or_default());
-                        if let Some(parsed) =
-                            Version::parse_zoneinfo_version(&legacy_lossy(&zi_version))
-                        {
+                        if let Some(parsed) = Version::parse_zoneinfo_version(&zi_version) {
                             self.add_library(
                                 &mut libraries,
                                 bstr::BStr::new("icu-zoneinfo"),
@@ -831,10 +818,9 @@ impl PlatformRepository {
                     ) && let Some(vendor_matches) =
                         preg_match(php_regex!("/^Vendor Name => (?<vendor>.+)$/im"), info)
                     {
-                        let version_id: i64 = matches
-                            .name("versionId")
-                            .and_then(|s| legacy_lossy(s).parse().ok())
-                            .unwrap_or(0);
+                        let version_id = intval(&PhpMixed::string(
+                            matches.name("versionId").unwrap_or_default(),
+                        ));
                         let converted = Version::convert_openldap_version_id(version_id);
                         let vendor =
                             BString::from(vendor_matches.name("vendor").unwrap_or_default());
@@ -950,11 +936,10 @@ impl PlatformRepository {
 
                 b"openssl" => {
                     let openssl_text = platform_info.get_constant("OPENSSL_VERSION_TEXT", None);
-                    let openssl_text_str = legacy_lossy(&match &openssl_text {
+                    let openssl_text_str = match &openssl_text {
                         PhpMixed::String(s) => s.clone(),
-                        _ => bstr::BString::from("".to_string()),
-                    })
-                    .into_owned();
+                        _ => BString::default(),
+                    };
                     // OpenSSL 1.1.1g  21 Apr 2020
                     if let Some(matches) = preg_match(
                         php_regex!("{^(?:OpenSSL|LibreSSL)?\\s*(?<version>\\S+)}i"),
@@ -963,19 +948,14 @@ impl PlatformRepository {
                         let version = BString::from(matches.name("version").unwrap_or_default());
                         let mut is_fips = false;
                         let parsed_version =
-                            Version::parse_openssl(&legacy_lossy(&version), &mut is_fips)
-                                .unwrap_or_default();
+                            Version::parse_openssl(&version, &mut is_fips).unwrap_or_default();
                         let mut provides_list: Vec<BString> = Vec::new();
                         if is_fips {
                             provides_list.push(name.clone());
                         }
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&format!(
-                                "{}{}",
-                                name.display_lossy(),
-                                if is_fips { "-fips" } else { "" }
-                            )),
+                            bconcat!(name, if is_fips { "-fips" } else { "" }).as_bstr(),
                             Some(&parsed_version),
                             Some(&openssl_text_str),
                             &[],
@@ -1158,10 +1138,11 @@ impl PlatformRepository {
                             .get_constant("RD_KAFKA_VERSION", None)
                             .as_int()
                             .unwrap_or(0);
-                        let version_built = format!(
-                            "{}.{}.{}",
+                        let version_built = bconcat!(
                             (lib_rd_kafka_version_int & 0x7F000000) >> 24,
+                            ".",
                             (lib_rd_kafka_version_int & 0x00FF0000) >> 16,
+                            ".",
                             (lib_rd_kafka_version_int & 0x0000FF00) >> 8,
                         );
                         self.add_library(
@@ -1357,10 +1338,8 @@ impl PlatformRepository {
                     version = v;
                 }
                 Err(_) => {
-                    pretty_version = legacy_lossy(&BString::from(
-                        &preg_replace(php_regex!("#^([^~+-]+).*$#"), "$1", &hhvm_version)[..],
-                    ))
-                    .into_owned();
+                    pretty_version =
+                        preg_replace(php_regex!("#^([^~+-]+).*$#"), "$1", &hhvm_version);
                     version = self
                         .version_parser
                         .as_ref()
@@ -1372,7 +1351,7 @@ impl PlatformRepository {
             let mut hhvm = CompletePackage::new(
                 bstr::BString::from("hhvm".to_string()),
                 version,
-                bstr::BString::from(pretty_version),
+                pretty_version,
             );
             hhvm.set_description("The HHVM Runtime (64bit)".into());
             self.add_package(CompletePackageHandle::from_complete_package(hhvm).into())?;

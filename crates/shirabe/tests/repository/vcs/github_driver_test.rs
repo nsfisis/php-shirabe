@@ -17,7 +17,7 @@ use shirabe::util::Git as GitUtil;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, base64_encode, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, base64_encode};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -118,7 +118,7 @@ fn http_status(
 }
 
 fn b64(s: &str) -> String {
-    legacy_lossy(&base64_encode(s)).into_owned()
+    base64_encode(s).display_lossy().to_string()
 }
 
 fn supports_provider() -> Vec<(bool, &'static str)> {
@@ -641,29 +641,27 @@ fn test_funding_format() {
                     Some(PhpMixed::Array(m)) => m.values().cloned().collect(),
                     other => panic!("unexpected funding value: {:?}", other),
                 };
-                let actual: Vec<(String, String)> = funding_list
+                let actual: Vec<(BString, BString)> = funding_list
                     .iter()
                     .map(|entry| {
                         let m = entry.as_array().unwrap();
                         (
-                            legacy_lossy(
+                            BString::from(
                                 m.get(B("type"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default(),
-                            )
-                            .into_owned(),
-                            legacy_lossy(
+                            ),
+                            BString::from(
                                 m.get(B("url"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default(),
-                            )
-                            .into_owned(),
+                            ),
                         )
                     })
                     .collect();
-                let expected_vec: Vec<(String, String)> = expected
+                let expected_vec: Vec<(BString, BString)> = expected
                     .iter()
-                    .map(|(t, u)| (t.to_string(), u.to_string()))
+                    .map(|(t, u)| (BString::from(*t), BString::from(*u)))
                     .collect();
                 assert_eq!(expected_vec, actual);
             }
@@ -795,14 +793,13 @@ fn test_private_repository_no_interaction() {
         top.insert("config".into(), PhpMixed::Array(config_section));
         config.borrow_mut().merge(&top, Config::SOURCE_UNKNOWN);
     }
-    let resolved_cache_vcs_dir = legacy_lossy(
+    let resolved_cache_vcs_dir = BString::from(
         config
             .borrow_mut()
             .get("cache-vcs-dir")
             .as_string()
             .unwrap_or_default(),
-    )
-    .into_owned();
+    );
 
     let (process, _process_guard): (_, ProcessExecutorMockGuard) = get_process_executor_mock(
         vec![
@@ -815,7 +812,7 @@ fn test_private_repository_no_interaction() {
                 repo_ssh_url,
                 &format!(
                     "{}/git-github.com-composer-packagist.git/",
-                    resolved_cache_vcs_dir
+                    resolved_cache_vcs_dir.display_lossy()
                 ),
             ]),
             cmd(["git", "remote", "-v"]),
@@ -961,10 +958,9 @@ fn test_get_empty_file_content() {
     git_hub_driver.initialize().unwrap();
 
     assert_eq!(
-        Some(String::new()),
+        Some(BString::default()),
         git_hub_driver
             .get_file_content(bstr::BStr::new("composer.json"), bstr::BStr::new("main"))
             .unwrap()
-            .map(|s| legacy_lossy(&s).into_owned())
     );
 }

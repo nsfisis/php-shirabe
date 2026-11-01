@@ -465,7 +465,7 @@ mockall::mock! {
     impl AutoloadGeneratorInterface for AutoloadGenerator {
         fn set_dev_mode(&self, dev_mode: bool);
         fn set_class_map_authoritative(&self, class_map_authoritative: bool);
-        fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>);
+        fn set_apcu(&self, apcu: bool, apcu_prefix: Option<bstr::BString>);
         fn set_run_scripts(&self, run_scripts: bool);
         fn set_dry_run(&self, dry_run: bool);
         fn set_platform_requirement_filter(

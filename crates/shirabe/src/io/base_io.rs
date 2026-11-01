@@ -7,7 +7,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
-    UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, php_regex,
+    UnexpectedValueException, array_merge, bconcat, in_array_strict, json_encode_ex, php_regex,
     preg_is_match,
 };
 
@@ -26,10 +26,10 @@ impl LogLevel {
     pub const DEBUG: &'static str = "debug";
 }
 
-fn log_context(context: &[(&str, &str)]) -> IndexMap<BString, PhpMixed> {
+fn log_context(context: &[(&BStr, &BStr)]) -> IndexMap<BString, PhpMixed> {
     context
         .iter()
-        .map(|(k, v)| (k.to_string().into(), PhpMixed::string(v.to_string())))
+        .map(|(k, v)| (BString::from(*k), PhpMixed::string(*v)))
         .collect()
 }
 
@@ -140,10 +140,10 @@ pub trait BaseIO: IOInterface {
                 {
                     <Self as BaseIO>::debug(
                         self,
-                        &format!(
+                        BStr::new(&format!(
                             "{} is not in the configured github-domains, adding it implicitly as authentication is configured for this domain",
                             domain.display_lossy()
-                        ),
+                        )),
                         &[],
                     );
                     let merged = array_merge(
@@ -187,10 +187,10 @@ pub trait BaseIO: IOInterface {
                 {
                     <Self as BaseIO>::debug(
                         self,
-                        &format!(
+                        BStr::new(&format!(
                             "{} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain",
                             domain.display_lossy()
-                        ),
+                        )),
                         &[],
                     );
                     let merged = array_merge(
@@ -231,10 +231,10 @@ pub trait BaseIO: IOInterface {
                 {
                     <Self as BaseIO>::debug(
                         self,
-                        &format!(
+                        BStr::new(&format!(
                             "{} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain",
                             domain.display_lossy()
-                        ),
+                        )),
                         &[],
                     );
                     let merged = array_merge(
@@ -283,10 +283,10 @@ pub trait BaseIO: IOInterface {
                 ) {
                     <Self as BaseIO>::debug(
                         self,
-                        &format!(
+                        BStr::new(&format!(
                             "{} is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain",
                             domain.display_lossy()
-                        ),
+                        )),
                         &[],
                     );
                     let merged = array_merge(
@@ -405,40 +405,40 @@ pub trait BaseIO: IOInterface {
         Ok(())
     }
 
-    fn emergency(&self, message: &str, context: &[(&str, &str)]) {
+    fn emergency(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
         self.log(LogLevel::EMERGENCY, message, context);
     }
 
-    fn alert(&self, message: &str, context: &[(&str, &str)]) {
+    fn alert(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
         self.log(LogLevel::ALERT, message, context);
     }
 
-    fn critical(&self, message: &str, context: &[(&str, &str)]) {
+    fn critical(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
         self.log(LogLevel::CRITICAL, message, context);
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
+    fn error(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
         self.log(LogLevel::ERROR, message, context);
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+    fn warning(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
         self.log(LogLevel::WARNING, message, context);
     }
 
-    fn notice(&self, message: &str, context: &[(&str, &str)]) {
+    fn notice(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
         self.log(LogLevel::NOTICE, message, context);
     }
 
-    fn info(&self, message: &str, context: &[(&str, &str)]) {
+    fn info(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
         self.log(LogLevel::INFO, message, context);
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+    fn debug(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
         self.log(LogLevel::DEBUG, message, context);
     }
 
-    fn log(&self, level: &str, message: &str, context: &[(&str, &str)]) {
-        let mut message_str = message.to_string();
+    fn log(&self, level: &str, message: &BStr, context: &[(&BStr, &BStr)]) {
+        let mut message_str = BString::from(message);
 
         if !context.is_empty() {
             let json = json_encode_ex(
@@ -446,8 +446,7 @@ pub trait BaseIO: IOInterface {
                 JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
             );
             if let Ok(json_str) = json {
-                message_str += " ";
-                message_str += &json_str;
+                message_str = bconcat!(message_str, " ", json_str);
             }
         }
 
@@ -456,25 +455,25 @@ pub trait BaseIO: IOInterface {
             LogLevel::EMERGENCY | LogLevel::ALERT | LogLevel::CRITICAL | LogLevel::ERROR
         ) {
             self.write_error3(
-                format!("<error>{}</error>", message_str),
+                bconcat!("<error>", message_str, "</error>"),
                 true,
                 io_interface::NORMAL,
             );
         } else if level == LogLevel::WARNING {
             self.write_error3(
-                format!("<warning>{}</warning>", message_str),
+                bconcat!("<warning>", message_str, "</warning>"),
                 true,
                 io_interface::NORMAL,
             );
         } else if level == LogLevel::NOTICE {
             self.write_error3(
-                format!("<info>{}</info>", message_str),
+                bconcat!("<info>", message_str, "</info>"),
                 true,
                 io_interface::VERBOSE,
             );
         } else if level == LogLevel::INFO {
             self.write_error3(
-                format!("<info>{}</info>", message_str),
+                bconcat!("<info>", message_str, "</info>"),
                 true,
                 io_interface::VERY_VERBOSE,
             );

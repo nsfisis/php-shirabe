@@ -9,7 +9,7 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::Perforce;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-use shirabe_php_shim::{PHP_EOL, PhpMixed, legacy_lossy, path_to_bytes};
+use shirabe_php_shim::{PHP_EOL, PhpMixed, path_to_bytes};
 
 const TEST_DEPOT: &str = "depot";
 const TEST_BRANCH: &str = "branch";
@@ -244,7 +244,7 @@ fn test_query_p4_user_queries_for_user() {
 fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
     let expected_command = format!(
         "p4 set P4USER={}",
-        legacy_lossy(&ProcessExecutor::escape("TEST_QUERY_USER"))
+        ProcessExecutor::escape("TEST_QUERY_USER").display_lossy()
     );
     let (process, _guard) = get_process_executor_mock(
         vec![cmd("p4 set"), cmd(expected_command.as_str())],
@@ -265,7 +265,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
 fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
     let expected_command = format!(
         "export P4USER={}",
-        legacy_lossy(&ProcessExecutor::escape("TEST_QUERY_USER"))
+        ProcessExecutor::escape("TEST_QUERY_USER").display_lossy()
     );
     let (process, _guard) = get_process_executor_mock(
         vec![cmd("echo $P4USER"), cmd(expected_command.as_str())],
@@ -286,7 +286,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
 fn test_query_p4_user_escapes_injection_on_windows() {
     let expected_command = format!(
         "p4 set P4USER={}",
-        legacy_lossy(&ProcessExecutor::escape("foo && calc.exe"))
+        ProcessExecutor::escape("foo && calc.exe").display_lossy()
     );
     let (process, _guard) = get_process_executor_mock(
         vec![cmd("p4 set"), cmd(expected_command.as_str())],
@@ -307,7 +307,7 @@ fn test_query_p4_user_escapes_injection_on_windows() {
 fn test_query_p4_user_escapes_injection_on_unix() {
     let expected_command = format!(
         "export P4USER={}",
-        legacy_lossy(&ProcessExecutor::escape("foo; id"))
+        ProcessExecutor::escape("foo; id").display_lossy()
     );
     let (process, _guard) = get_process_executor_mock(
         vec![cmd("echo $P4USER"), cmd(expected_command.as_str())],

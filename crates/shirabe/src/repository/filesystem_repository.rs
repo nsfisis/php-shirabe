@@ -16,10 +16,11 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
     UnexpectedValueException, array_flip, bconcat, dirname, get_debug_type, in_array_strict,
-    is_array, is_null, is_string, ksort, legacy_lossy, path_from_bytes, path_to_bytes, realpath,
-    str_repeat, strcmp, strnatcmp, usort, var_export,
+    is_array, is_null, is_string, ksort, path_from_bytes, path_to_bytes, realpath, str_repeat,
+    strcmp, strnatcmp, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
+use std::path::Path;
 
 /// Filesystem repository.
 #[derive(Debug)]
@@ -319,19 +320,17 @@ impl FilesystemRepository {
                 installation_manager,
                 &install_paths,
                 dev_mode,
-                &legacy_lossy(path_to_bytes(&repo_dir)),
+                &repo_dir,
             )?;
 
-            let installed_php = format!(
-                "<?php return {};\n",
-                legacy_lossy(&self.dump_to_php_code(&versions, 0))
-            );
+            let installed_php =
+                bconcat!("<?php return ", self.dump_to_php_code(&versions, 0), ";\n");
             self.filesystem.borrow_mut().file_put_contents_if_modified(
-                format!("{}/installed.php", repo_dir.display()),
+                path_from_bytes(&bconcat!(repo_dir, "/installed.php")),
                 &installed_php,
             );
             self.filesystem.borrow_mut().file_put_contents_if_modified(
-                format!("{}/InstalledVersions.php", repo_dir.display()),
+                path_from_bytes(&bconcat!(repo_dir, "/InstalledVersions.php")),
                 include_str!("../../../../composer/src/Composer/InstalledVersions.php"),
             );
 
@@ -446,7 +445,7 @@ impl FilesystemRepository {
         installation_manager: &dyn InstallationManagerInterface,
         install_paths: &IndexMap<BString, Option<BString>>,
         dev_mode: bool,
-        repo_dir: &str,
+        repo_dir: &Path,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let dev_packages = array_flip(&PhpMixed::List(
             self.inner
@@ -531,7 +530,7 @@ impl FilesystemRepository {
                 }
                 record_replace_or_provide(
                     &mut versions,
-                    &legacy_lossy(replace.get_target()),
+                    replace.get_target(),
                     "replaced",
                     replaced,
                     is_dev_package,
@@ -548,7 +547,7 @@ impl FilesystemRepository {
                 }
                 record_replace_or_provide(
                     &mut versions,
-                    &legacy_lossy(provide.get_target()),
+                    provide.get_target(),
                     "provided",
                     provided,
                     is_dev_package,
@@ -563,7 +562,7 @@ impl FilesystemRepository {
             }
             let pretty = BString::from(&package.get_pretty_version()[..]);
             push_to_list(
-                versions_entry(&mut versions, &legacy_lossy(&package.get_name())),
+                versions_entry(&mut versions, package.get_name().as_bstr()),
                 "aliases",
                 pretty.clone(),
             );
@@ -606,7 +605,7 @@ impl FilesystemRepository {
         &self,
         package: PackageInterfaceHandle,
         install_paths: &IndexMap<BString, Option<BString>>,
-        repo_dir: &str,
+        repo_dir: &Path,
         dev_packages: &PhpMixed,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let mut reference: Option<BString> = None;
@@ -688,7 +687,7 @@ impl FilesystemRepository {
         package: RootPackageInterfaceHandle,
         install_paths: &IndexMap<BString, Option<BString>>,
         dev_mode: bool,
-        repo_dir: &str,
+        repo_dir: &Path,
         dev_packages: &PhpMixed,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let data = self.dump_installed_package(
@@ -821,14 +820,14 @@ impl RepositoryInterface for FilesystemRepository {
 
 fn versions_entry<'a>(
     versions: &'a mut IndexMap<BString, PhpMixed>,
-    target: &str,
+    target: &BStr,
 ) -> &'a mut IndexMap<BString, PhpMixed> {
     let versions_map = match versions.get_mut(B("versions")) {
         Some(PhpMixed::Array(m)) => m,
         _ => unreachable!("versions['versions'] is always an array"),
     };
     match versions_map
-        .entry(target.to_string().into())
+        .entry(target.into())
         .or_insert_with(|| PhpMixed::Array(IndexMap::new()))
     {
         PhpMixed::Array(m) => m,
@@ -847,7 +846,7 @@ fn push_to_list(entry: &mut IndexMap<BString, PhpMixed>, key: &str, value: BStri
 
 fn record_replace_or_provide(
     versions: &mut IndexMap<BString, PhpMixed>,
-    target: &str,
+    target: &BStr,
     key: &str,
     value: BString,
     is_dev_package: bool,

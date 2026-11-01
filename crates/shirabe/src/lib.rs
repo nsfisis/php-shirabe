@@ -1,4 +1,4 @@
-use shirabe_php_shim::{legacy_lossy, path_from_bytes, path_to_bytes, realpath};
+use shirabe_php_shim::{path_from_bytes, path_to_bytes, realpath};
 pub mod advisory;
 pub mod autoload;
 pub mod cache;
@@ -47,7 +47,7 @@ pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
         realpath(path_from_bytes(
             argv.first().cloned().unwrap_or_default().as_slice(),
         ))
-        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+        .map(|p| bstr::BString::from(path_to_bytes(&p)))
         .unwrap_or_default(),
     );
 

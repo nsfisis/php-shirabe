@@ -11,7 +11,7 @@ use shirabe::repository::vcs::ForgejoDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 use tempfile::TempDir;
 
 struct SetUp {
@@ -298,11 +298,10 @@ fn test_get_empty_file_content() {
     );
 
     assert_eq!(
-        Some(String::new()),
+        Some(bstr::BString::default()),
         driver
             .get_file_content(bstr::BStr::new("composer.json"), bstr::BStr::new("main"))
             .unwrap()
-            .map(|s| legacy_lossy(&s).into_owned())
     );
 }
 

@@ -12,8 +12,8 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, ProcessExecutor};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, file_exists, file_put_contents, legacy_lossy,
-    path_to_bytes, realpath, sys_get_temp_dir, unlink,
+    Catch as _, PhpMixed, RuntimeException, bconcat, file_exists, file_put_contents,
+    path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use shirabe_symfony_process::Process;
 use tempfile::TempDir;
@@ -86,7 +86,8 @@ impl TestCase {
         );
         package.set_source_url(Some(bstr::BString::from(
             realpath(&self.test_dir)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .as_deref()
+                .map(path_to_bytes)
                 .unwrap_or_default(),
         )));
         package.set_source_reference(Some(bstr::BString::from("master".to_string())));
@@ -102,7 +103,8 @@ impl TestCase {
         format: &str,
     ) -> std::path::PathBuf {
         let package_name = self.manager.get_package_filename(package).unwrap();
-        self.target_dir.join(format!("{}.{}", package_name, format))
+        self.target_dir
+            .join(path_from_bytes(&bconcat!(package_name, ".", format)))
     }
 
     // ref: ArchiveManagerTest::setupGitRepo.
@@ -163,8 +165,8 @@ fn test_unknown_format() {
 
     let result = shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package,
-        "__unknown_format__".to_string(),
-        test_case.target_dir.to_str().unwrap().to_string(),
+        "__unknown_format__".into(),
+        test_case.target_dir.clone(),
         None,
         false,
     ));
@@ -188,8 +190,8 @@ fn test_archive_tar() {
 
     shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package.clone(),
-        "tar".to_string(),
-        test_case.target_dir.to_str().unwrap().to_string(),
+        "tar".into(),
+        test_case.target_dir.clone(),
         None,
         false,
     ))
@@ -200,7 +202,9 @@ fn test_archive_tar() {
 
     let tmppath = sys_get_temp_dir()
         .join("composer_archiver")
-        .join(test_case.manager.get_package_filename(package).unwrap());
+        .join(path_from_bytes(
+            &test_case.manager.get_package_filename(package).unwrap(),
+        ));
     assert!(!file_exists(&tmppath));
 
     unlink(&target);
@@ -222,9 +226,9 @@ fn test_archive_custom_file_name() {
 
     shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package.clone(),
-        "tar".to_string(),
-        test_case.target_dir.to_str().unwrap().to_string(),
-        Some(file_name.to_string()),
+        "tar".into(),
+        test_case.target_dir.clone(),
+        Some(file_name.into()),
         false,
     ))
     .unwrap();
@@ -235,7 +239,9 @@ fn test_archive_custom_file_name() {
 
     let tmppath = sys_get_temp_dir()
         .join("composer_archiver")
-        .join(test_case.manager.get_package_filename(package).unwrap());
+        .join(path_from_bytes(
+            &test_case.manager.get_package_filename(package).unwrap(),
+        ));
     assert!(!file_exists(&tmppath));
 
     unlink(&target);
@@ -246,10 +252,10 @@ fn test_get_package_filename_parts() {
     let test_case = TestCase::set_up();
     let package = test_case.setup_package();
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
-    expected.insert("base".to_string(), "archivertest-archivertest".to_string());
-    expected.insert("version".to_string(), "master".to_string());
-    expected.insert("source_reference".to_string(), "4f26ae".to_string());
+    let mut expected: IndexMap<String, bstr::BString> = IndexMap::new();
+    expected.insert("base".to_string(), "archivertest-archivertest".into());
+    expected.insert("version".to_string(), "master".into());
+    expected.insert("source_reference".to_string(), "4f26ae".into());
 
     assert_eq!(
         expected,

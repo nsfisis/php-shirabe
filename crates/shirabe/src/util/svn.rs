@@ -196,21 +196,19 @@ impl Svn {
         self.credentials = Some(SvnCredentials {
             username: self
                 .io
-                .ask("Username: ".into(), PhpMixed::string(""))?
+                .ask("Username: ", PhpMixed::string(""))?
                 .as_string()
                 .unwrap_or_default()
                 .to_owned(),
             password: self
                 .io
-                .ask_and_hide_answer("Password: ".to_string())?
-                .unwrap_or_default()
-                .into(),
+                .ask_and_hide_answer("Password: ")?
+                .unwrap_or_default(),
         });
 
-        self.cache_credentials = self.io.ask_confirmation(
-            "Should Subversion cache these credentials? (yes/no) ".to_string(),
-            true,
-        )?;
+        self.cache_credentials = self
+            .io
+            .ask_confirmation("Should Subversion cache these credentials? (yes/no) ", true)?;
 
         Ok(self)
     }

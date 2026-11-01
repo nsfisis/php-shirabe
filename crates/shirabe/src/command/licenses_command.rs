@@ -11,7 +11,7 @@ use crate::util::{PackageInfo, PackageSorter};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, impl_php_class, implode, legacy_lossy,
+    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, impl_php_class, implode,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -160,32 +160,32 @@ impl Command for LicensesCommand {
         let packages = PackageSorter::sort_packages_alphabetically(packages);
         let io = self.get_io();
 
-        let format = legacy_lossy(
+        let format = BString::from(
             input
                 .borrow()
                 .get_option("format")?
                 .as_string()
                 .unwrap_or(bstr::BStr::new("text")),
-        )
-        .into_owned();
-        match format.as_str() {
-            "text" => {
+        );
+        match format.as_slice() {
+            b"text" => {
                 let root_licenses = root.get_license();
                 let licenses_str = if root_licenses.is_empty() {
-                    "none".to_string()
+                    BString::from("none")
                 } else {
-                    legacy_lossy(&implode(", ", &root_licenses)).into_owned()
+                    implode(", ", &root_licenses)
                 };
-                io.write(format!(
-                    "Name: <comment>{}</comment>",
-                    root.get_pretty_name().display_lossy()
+                io.write(bconcat!(
+                    "Name: <comment>",
+                    root.get_pretty_name(),
+                    "</comment>"
                 ));
-                io.write(format!(
-                    "Version: <comment>{}</comment>",
-                    root.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-                        .display_lossy()
+                io.write(bconcat!(
+                    "Version: <comment>",
+                    root.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                    "</comment>"
                 ));
-                io.write(format!("Licenses: <comment>{}</comment>", licenses_str));
+                io.write(bconcat!("Licenses: <comment>", licenses_str, "</comment>"));
                 io.write("Dependencies:");
                 io.write("");
 
@@ -195,13 +195,15 @@ impl Command for LicensesCommand {
                 for package in &packages {
                     let link = PackageInfo::get_view_source_or_homepage_url(package.clone());
                     let name = if let Some(link) = link {
-                        format!(
-                            "<href={}>{}</>",
-                            legacy_lossy(&OutputFormatter::escape(&link)?),
-                            legacy_lossy(&package.get_pretty_name())
+                        bconcat!(
+                            "<href=",
+                            OutputFormatter::escape(&link)?,
+                            ">",
+                            package.get_pretty_name(),
+                            "</>"
                         )
                     } else {
-                        legacy_lossy(&package.get_pretty_name()).into_owned()
+                        package.get_pretty_name()
                     };
                     let pkg_licenses = if let Some(complete_pkg) = package.as_complete_package() {
                         complete_pkg.get_license()
@@ -209,9 +211,9 @@ impl Command for LicensesCommand {
                         vec![]
                     };
                     let licenses_str = if pkg_licenses.is_empty() {
-                        "none".to_string()
+                        BString::from("none")
                     } else {
-                        legacy_lossy(&implode(", ", &pkg_licenses)).into_owned()
+                        implode(", ", &pkg_licenses)
                     };
                     table.add_row(
                         PhpMixed::List(vec![
@@ -227,7 +229,7 @@ impl Command for LicensesCommand {
                 }
                 table.render();
             }
-            "json" => {
+            b"json" => {
                 let mut dependencies: IndexMap<BString, PhpMixed> = IndexMap::new();
                 for package in &packages {
                     let pkg_licenses = if let Some(complete_pkg) = package.as_complete_package() {
@@ -247,10 +249,7 @@ impl Command for LicensesCommand {
                         "license".into(),
                         PhpMixed::List(pkg_licenses.into_iter().map(PhpMixed::string).collect()),
                     );
-                    dependencies.insert(
-                        legacy_lossy(&package.get_pretty_name()).into_owned().into(),
-                        PhpMixed::Array(dep_info),
-                    );
+                    dependencies.insert(package.get_pretty_name(), PhpMixed::Array(dep_info));
                 }
 
                 let mut output_map: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -272,8 +271,8 @@ impl Command for LicensesCommand {
                     output_map.into_iter().collect(),
                 ))?);
             }
-            "summary" => {
-                let mut used_licenses: IndexMap<String, i64> = IndexMap::new();
+            b"summary" => {
+                let mut used_licenses: IndexMap<BString, i64> = IndexMap::new();
                 for package in &packages {
                     let mut licenses = if let Some(complete_pkg) = package.as_complete_package() {
                         complete_pkg.get_license()
@@ -281,16 +280,14 @@ impl Command for LicensesCommand {
                         vec![]
                     };
                     if licenses.is_empty() {
-                        licenses.push(bstr::BString::from("none".to_string()));
+                        licenses.push(BString::from("none"));
                     }
                     for license_name in licenses {
-                        *used_licenses
-                            .entry(legacy_lossy(&license_name).into_owned())
-                            .or_insert(0) += 1;
+                        *used_licenses.entry(license_name).or_insert(0) += 1;
                     }
                 }
 
-                let mut entries: Vec<(String, i64)> = used_licenses.into_iter().collect();
+                let mut entries: Vec<(BString, i64)> = used_licenses.into_iter().collect();
                 entries.sort_by(|a, b| b.1.cmp(&a.1));
 
                 let rows: Vec<Row> = entries
@@ -309,7 +306,7 @@ impl Command for LicensesCommand {
             _ => {
                 return Err(RuntimeException::new(format!(
                     "Unsupported format \"{}\".  See help for supported formats.",
-                    format
+                    format.display_lossy()
                 ))
                 .into());
             }

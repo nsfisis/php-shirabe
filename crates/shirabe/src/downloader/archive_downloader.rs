@@ -64,7 +64,7 @@ pub trait ArchiveDownloader {
         if output {
             self.inner().io.borrow().write_error(format!(
                 "  - {}{}",
-                InstallOperation::format(package.clone(), false),
+                InstallOperation::format(package.clone(), false).display_lossy(),
                 self.get_install_operation_appendix(package.clone(), path)
             ));
         }

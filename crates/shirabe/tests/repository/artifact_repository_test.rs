@@ -4,7 +4,7 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
-use shirabe_php_shim::{PhpMixed, extension_loaded, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, bconcat, extension_loaded};
 
 /// Returns true when the test should be skipped because the zip extension is
 /// unavailable, mirroring PHP's markTestSkipped in setUp.
@@ -54,17 +54,11 @@ fn test_extracts_configs_from_zip_archives() {
 
     let mut repo = create_repo(&artifacts_dir());
 
-    let mut found_packages: Vec<String> = repo
+    let mut found_packages: Vec<bstr::BString> = repo
         .__get_packages()
         .unwrap()
         .iter()
-        .map(|package| {
-            format!(
-                "{}-{}",
-                legacy_lossy(&package.get_pretty_name()),
-                legacy_lossy(&package.get_pretty_version())
-            )
-        })
+        .map(|package| bconcat!(package.get_pretty_name(), "-", package.get_pretty_version()))
         .collect();
 
     expected_packages.sort();
@@ -81,10 +75,8 @@ fn test_extracts_configs_from_zip_archives() {
     assert_eq!(1, tar_package.len());
     let tar_package = tar_package.into_iter().next_back().unwrap();
     assert_eq!(
-        Some("tar".to_string()),
-        tar_package
-            .get_dist_type()
-            .map(|s| legacy_lossy(&s).into_owned())
+        Some(bstr::BString::from("tar")),
+        tar_package.get_dist_type()
     );
 }
 

@@ -9,9 +9,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, date_create,
     explode, filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar,
-    is_string, json_encode, legacy_lossy, parse_url, php_regex, php_to_string, preg_is_match,
-    preg_replace, str_replace, strcasecmp, strtolower, strtotime, substr, trigger_error, trim2,
-    var_export,
+    is_string, json_encode, parse_url, php_regex, php_to_string, preg_is_match, preg_replace,
+    str_replace, strcasecmp, strtolower, strtotime, substr, trigger_error, trim2, var_export,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -137,16 +136,17 @@ impl ValidatingArrayLoader {
             return false;
         }
 
-        let value = legacy_lossy(
+        let value = BString::from(
             self.config.borrow()[B(property)]
                 .as_string()
                 .unwrap_or_default(),
-        )
-        .into_owned();
+        );
         if !preg_is_match(format!("{{^{}$}}u", regex), &value) {
             let message = format!(
                 "{} : invalid value ({}), must match {}",
-                property, value, regex
+                property,
+                value.display_lossy(),
+                regex
             );
             if mandatory {
                 self.errors.borrow_mut().push(message);
@@ -287,16 +287,16 @@ impl ValidatingArrayLoader {
             return false;
         }
 
-        let value = legacy_lossy(
+        let value = BString::from(
             self.config.borrow()[B(property)]
                 .as_string()
                 .unwrap_or_default(),
-        )
-        .into_owned();
+        );
         if !self.filter_url(&value, &["http", "https"]) {
             self.warnings.borrow_mut().push(format!(
                 "{} : invalid value ({}), must be an http/https URL",
-                property, value
+                property,
+                value.display_lossy()
             ));
             self.config.borrow_mut().shift_remove(B(property));
 
@@ -306,7 +306,8 @@ impl ValidatingArrayLoader {
         true
     }
 
-    fn filter_url(&self, value: &str, schemes: &[&str]) -> bool {
+    fn filter_url(&self, value: impl AsRef<[u8]>, schemes: &[&str]) -> bool {
+        let value = value.as_ref();
         if value.is_empty() {
             return true;
         }
@@ -376,20 +377,21 @@ impl LoaderInterface for ValidatingArrayLoader {
                         PhpMixed::string(php_to_string(&version_val)),
                     );
                 }
-                let version_str = legacy_lossy(
+                let version_str = BString::from(
                     self.config
                         .borrow()
                         .get(B("version"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default(),
-                )
-                .into_owned();
+                );
                 match self.version_parser.normalize(&version_str, None) {
                     Ok(_) => {}
                     Err(e) => {
-                        self.errors
-                            .borrow_mut()
-                            .push(format!("version : invalid value ({}): {}", version_str, e));
+                        self.errors.borrow_mut().push(format!(
+                            "version : invalid value ({}): {}",
+                            version_str.display_lossy(),
+                            e
+                        ));
                         self.config.borrow_mut().shift_remove(B("version"));
                     }
                 }
@@ -425,13 +427,12 @@ impl LoaderInterface for ValidatingArrayLoader {
                     ));
                     continue;
                 }
-                let platform_str =
-                    legacy_lossy(platform.as_string().unwrap_or_default()).into_owned();
+                let platform_str = BString::from(platform.as_string().unwrap_or_default());
                 if let Err(e) = self.version_parser.normalize(&platform_str, None) {
                     self.errors.borrow_mut().push(format!(
                         "config.platform.{} : invalid value ({}): {}",
                         key.display_lossy(),
-                        platform_str,
+                        platform_str.display_lossy(),
                         e
                     ));
                 }
@@ -458,20 +459,21 @@ impl LoaderInterface for ValidatingArrayLoader {
         let mut release_date: Option<chrono::DateTime<chrono::Utc>> = None;
         self.validate_string("time", false);
         if self.config.borrow().contains_key(B("time")) {
-            let time_str = legacy_lossy(
+            let time_str = BString::from(
                 self.config.borrow()[B("time")]
                     .as_string()
                     .unwrap_or_default(),
-            )
-            .into_owned();
+            );
             match date_create::<chrono::Utc>(&time_str) {
                 Ok(dt) => {
                     release_date = Some(dt);
                 }
                 Err(e) => {
-                    self.errors
-                        .borrow_mut()
-                        .push(format!("time : invalid value ({}): {}", time_str, e));
+                    self.errors.borrow_mut().push(format!(
+                        "time : invalid value ({}): {}",
+                        time_str.display_lossy(),
+                        e
+                    ));
                     self.config.borrow_mut().shift_remove(B("time"));
                 }
             }
@@ -514,20 +516,16 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if release_date.is_none() || release_date.unwrap().timestamp() >= cutoff {
                     let license_validator = SpdxLicenses::new();
                     for license in licenses.values() {
-                        let license_str =
-                            legacy_lossy(license.as_string().unwrap_or_default()).into_owned();
+                        let license_str = BString::from(license.as_string().unwrap_or_default());
                         // replace proprietary by MIT for validation purposes since it's not a valid SPDX identifier, but is accepted by composer
                         if license_str == "proprietary" {
                             continue;
                         }
-                        let license_to_validate =
-                            legacy_lossy(&str_replace("proprietary", "MIT", &license_str))
-                                .into_owned();
+                        let license_to_validate = str_replace("proprietary", "MIT", &license_str);
                         if !license_validator.validate(&license_to_validate) {
-                            if license_validator.validate(&legacy_lossy(&trim2(
-                                &license_to_validate,
-                                " \t\n\r\0\u{0B}",
-                            ))) {
+                            if license_validator
+                                .validate(trim2(&license_to_validate, " \t\n\r\0\u{0B}"))
+                            {
                                 self.warnings.borrow_mut().push(format!(
                                     "License {} must not contain extra spaces, make sure to trim it.",
                                         json_encode(&PhpMixed::string(license_str.clone()))
@@ -608,14 +606,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .as_array()
                     .and_then(|m| m.get(B("homepage")))
                     .and_then(|v| v.as_string())
-                    .map(|s| legacy_lossy(s).into_owned());
+                    .map(BString::from);
                 if let Some(homepage_str) = homepage
                     && !self.filter_url(&homepage_str, &["http", "https"])
                 {
                     self.warnings.borrow_mut().push(format!(
                         "authors.{}.homepage : invalid value ({}), must be an http/https URL",
                         key.display_lossy(),
-                        homepage_str
+                        homepage_str.display_lossy()
                     ));
                     if let Some(PhpMixed::Array(authors)) =
                         self.config.borrow_mut().get_mut(B("authors"))
@@ -629,14 +627,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .as_array()
                     .and_then(|m| m.get(B("email")))
                     .and_then(|v| v.as_string())
-                    .map(|s| legacy_lossy(s).into_owned());
+                    .map(BString::from);
                 if let Some(email_str) = email
                     && !filter_var_email(&email_str)
                 {
                     self.warnings.borrow_mut().push(format!(
                         "authors.{}.email : invalid value ({}), must be a valid email address",
                         key.display_lossy(),
-                        email_str
+                        email_str.display_lossy()
                     ));
                     if let Some(PhpMixed::Array(authors)) =
                         self.config.borrow_mut().get_mut(B("authors"))
@@ -709,13 +707,13 @@ impl LoaderInterface for ValidatingArrayLoader {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B("email")))
                 .and_then(|v| v.as_string())
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
             if let Some(email_str) = support_email
                 && !filter_var_email(&email_str)
             {
                 self.warnings.borrow_mut().push(format!(
                     "support.email : invalid value ({}), must be a valid email address",
-                    email_str
+                    email_str.display_lossy()
                 ));
                 if let Some(PhpMixed::Array(support)) =
                     self.config.borrow_mut().get_mut(B("support"))
@@ -731,13 +729,13 @@ impl LoaderInterface for ValidatingArrayLoader {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B("irc")))
                 .and_then(|v| v.as_string())
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
             if let Some(irc_str) = support_irc
                 && !self.filter_url(&irc_str, &["irc", "ircs"])
             {
                 self.warnings.borrow_mut().push(format!(
                         "support.irc : invalid value ({}), must be a irc://<server>/<channel> or ircs:// URL",
-                        irc_str
+                        irc_str.display_lossy()
                     ));
                 if let Some(PhpMixed::Array(support)) =
                     self.config.borrow_mut().get_mut(B("support"))
@@ -756,13 +754,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .and_then(|v| v.as_array())
                     .and_then(|m| m.get(B(key)))
                     .and_then(|v| v.as_string())
-                    .map(|s| legacy_lossy(s).into_owned());
+                    .map(BString::from);
                 if let Some(url_str) = url_opt
                     && !self.filter_url(&url_str, &["http", "https"])
                 {
                     self.warnings.borrow_mut().push(format!(
                         "support.{} : invalid value ({}), must be an http/https URL",
-                        key, url_str
+                        key,
+                        url_str.display_lossy()
                     ));
                     if let Some(PhpMixed::Array(support)) =
                         self.config.borrow_mut().get_mut(B("support"))
@@ -828,14 +827,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .as_array()
                     .and_then(|m| m.get(B("url")))
                     .and_then(|v| v.as_string())
-                    .map(|s| legacy_lossy(s).into_owned());
+                    .map(BString::from);
                 if let Some(url_str) = url
                     && !self.filter_url(&url_str, &["http", "https"])
                 {
                     self.warnings.borrow_mut().push(format!(
                         "funding.{}.url : invalid value ({}), must be an http/https URL",
                         key.display_lossy(),
-                        url_str
+                        url_str.display_lossy()
                     ));
                     if let Some(PhpMixed::Array(funding)) =
                         self.config.borrow_mut().get_mut(B("funding"))
@@ -868,15 +867,14 @@ impl LoaderInterface for ValidatingArrayLoader {
 
         if self.config.borrow().contains_key(B("php-ext")) && self.validate_array("php-ext", false)
         {
-            let pkg_type = legacy_lossy(
+            let pkg_type = BString::from(
                 self.config
                     .borrow()
                     .get(B("type"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
-            )
-            .into_owned();
-            if !["php-ext", "php-ext-zend"].contains(&pkg_type.as_str()) {
+            );
+            if pkg_type != "php-ext" && pkg_type != "php-ext-zend" {
                 self.errors.borrow_mut().push(
                     "php-ext can only be set by packages of type \"php-ext\" or \"php-ext-zend\" which must be C extensions".to_string()
                 );
@@ -979,12 +977,9 @@ impl LoaderInterface for ValidatingArrayLoader {
                                         get_debug_type(download_url_method).display_lossy()
                                     ));
                                     php_ext.shift_remove(B("download-url-method"));
-                                } else if !valid_download_url_methods.contains(
-                                    &&*download_url_method
-                                        .as_string()
-                                        .unwrap_or_default()
-                                        .to_str_lossy(),
-                                ) {
+                                } else if !valid_download_url_methods.iter().any(|method| {
+                                    download_url_method.as_string().unwrap_or_default() == *method
+                                }) {
                                     self.errors.borrow_mut().push(format!(
                                         "php-ext.download-url-method.{} : invalid value ({}), must be one of {}",
                                         key.display_lossy(),
@@ -1043,9 +1038,9 @@ impl LoaderInterface for ValidatingArrayLoader {
                                         {
                                             arr.shift_remove(B(key));
                                         }
-                                    } else if !valid_os_families.contains(
-                                        &&*os_family.as_string().unwrap_or_default().to_str_lossy(),
-                                    ) {
+                                    } else if !valid_os_families.iter().any(|family| {
+                                        os_family.as_string().unwrap_or_default() == *family
+                                    }) {
                                         self.errors.borrow_mut().push(format!(
                                             "php-ext.{}.{} : invalid value ({}), must be one of {}",
                                             field_name,
@@ -1204,17 +1199,18 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .cloned()
                     .unwrap_or_default();
                 for (package, constraint) in &link_section {
-                    let package = legacy_lossy(package).into_owned();
                     let conflicts_with_own_name = self
                         .config
                         .borrow()
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .is_some_and(|name_val| strcasecmp(&package, name_val) == 0);
+                        .is_some_and(|name_val| strcasecmp(package, name_val) == 0);
                     if conflicts_with_own_name {
                         self.errors.borrow_mut().push(format!(
                             "{}.{} : a package cannot set a {} on itself",
-                            link_type, package, link_type
+                            link_type,
+                            package.display_lossy(),
+                            link_type
                         ));
                         if let Some(PhpMixed::Array(arr)) =
                             self.config.borrow_mut().get_mut(B(link_type))
@@ -1229,16 +1225,18 @@ impl LoaderInterface for ValidatingArrayLoader {
                         self.warnings
                             .borrow_mut()
                             .push(format!("{}.{}", link_type, err));
-                    } else if !preg_is_match(php_regex!("{^[A-Za-z0-9_./-]+$}"), &package) {
+                    } else if !preg_is_match(php_regex!("{^[A-Za-z0-9_./-]+$}"), package) {
                         self.errors.borrow_mut().push(format!(
                             "{}.{} : invalid key, package names must be strings containing only [A-Za-z0-9_./-]",
-                            link_type, package
+                            link_type,
+                            package.display_lossy()
                         ));
                     }
                     if !is_string(constraint) {
                         self.errors.borrow_mut().push(format!(
                             "{}.{} : invalid value, must be a string containing a version constraint",
-                            link_type, package
+                            link_type,
+                            package.display_lossy()
                         ));
                         if let Some(PhpMixed::Array(arr)) =
                             self.config.borrow_mut().get_mut(B(link_type))
@@ -1247,14 +1245,16 @@ impl LoaderInterface for ValidatingArrayLoader {
                         }
                     } else if constraint.as_string().unwrap_or_default() != "self.version" {
                         let constraint_str =
-                            legacy_lossy(constraint.as_string().unwrap_or_default()).into_owned();
+                            BString::from(constraint.as_string().unwrap_or_default());
                         let link_constraint =
                             match self.version_parser.parse_constraints(&constraint_str) {
                                 Ok(c) => c,
                                 Err(e) => {
                                     self.errors.borrow_mut().push(format!(
                                         "{}.{} : invalid version constraint ({})",
-                                        link_type, package, e
+                                        link_type,
+                                        package.display_lossy(),
+                                        e
                                     ));
                                     if let Some(PhpMixed::Array(arr)) =
                                         self.config.borrow_mut().get_mut(B(link_type))
@@ -1269,11 +1269,13 @@ impl LoaderInterface for ValidatingArrayLoader {
                         if (self.flags & Self::CHECK_UNBOUND_CONSTRAINTS) != 0
                             && link_type == "require"
                             && link_constraint.matches(&unbound_constraint)
-                            && !PlatformRepository::is_platform_package(&package)
+                            && !PlatformRepository::is_platform_package(package)
                         {
                             self.warnings.borrow_mut().push(format!(
                                 "{}.{} : unbound version constraints ({}) should be avoided",
-                                link_type, package, constraint_str
+                                link_type,
+                                package.display_lossy(),
+                                constraint_str.display_lossy()
                             ));
                         } else if (self.flags & Self::CHECK_STRICT_CONSTRAINTS) != 0
                             && link_type == "require"
@@ -1289,7 +1291,9 @@ impl LoaderInterface for ValidatingArrayLoader {
                         {
                             self.warnings.borrow_mut().push(format!(
                                 "{}.{} : exact version constraints ({}) should be avoided if the package follows semantic versioning",
-                                link_type, package, constraint_str
+                                link_type,
+                                package.display_lossy(),
+                                constraint_str.display_lossy()
                             ));
                         }
 
@@ -1297,7 +1301,9 @@ impl LoaderInterface for ValidatingArrayLoader {
                         if compacted.is_match_none() {
                             self.warnings.borrow_mut().push(format!(
                                 "{}.{} : this version constraint cannot possibly match anything ({})",
-                                link_type, package, constraint_str
+                                link_type,
+                                package.display_lossy(),
+                                constraint_str.display_lossy()
                             ));
                         }
                     }
@@ -1323,7 +1329,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                         if !keys.is_empty() {
                             self.errors.borrow_mut().push(format!(
                                 "{}.{} : you cannot conflict with a package that is also replaced, as replace already creates an implicit conflict rule",
-                                link_type, package
+                                link_type,
+                            package.display_lossy()
                             ));
                             if let Some(PhpMixed::Array(arr)) =
                                 self.config.borrow_mut().get_mut(B(link_type))
@@ -1360,18 +1367,20 @@ impl LoaderInterface for ValidatingArrayLoader {
         if self.validate_string("minimum-stability", false)
             && self.config.borrow().contains_key(B("minimum-stability"))
         {
-            let min_stability = legacy_lossy(
+            let min_stability = BString::from(
                 self.config.borrow()[B("minimum-stability")]
                     .as_string()
                     .unwrap_or_default(),
-            )
-            .into_owned();
-            if !STABILITIES.contains_key(&*legacy_lossy(&strtolower(&min_stability)))
+            );
+            let lowered_stability = strtolower(&min_stability);
+            if !STABILITIES
+                .keys()
+                .any(|stability| lowered_stability == *stability)
                 && min_stability != "RC"
             {
                 self.errors.borrow_mut().push(format!(
                     "minimum-stability : invalid value ({}), must be one of {}",
-                    min_stability,
+                    min_stability.display_lossy(),
                     STABILITIES.keys().copied().collect::<Vec<_>>().join(", ")
                 ));
                 self.config
@@ -1413,13 +1422,11 @@ impl LoaderInterface for ValidatingArrayLoader {
                     && let Some(type_map) = type_config.as_array()
                 {
                     for (namespace, _dirs) in type_map {
-                        // TODO(bytes): namespaces are checked as UTF-8 text, so non-UTF-8 bytes are
-                        // replaced.
-                        let ns_str: &str = &namespace.to_str_lossy();
-                        if !ns_str.is_empty() && substr(ns_str, -1, None) != "\\" {
+                        if !namespace.is_empty() && substr(namespace, -1, None) != "\\" {
                             self.errors.borrow_mut().push(format!(
                                     "autoload.psr-4 : invalid value ({}), namespaces must end with a namespace separator, should be {}\\\\",
-                                    ns_str, ns_str
+                                    namespace.display_lossy(),
+                                    namespace.display_lossy()
                                 ));
                         }
                     }
@@ -1566,14 +1573,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     }
 
                     let target_branch_str =
-                        legacy_lossy(target_branch.as_string().unwrap_or_default()).into_owned();
+                        BString::from(target_branch.as_string().unwrap_or_default());
 
                     // ensure it is an alias to a -dev package
                     if substr(&target_branch_str, -4, None) != "-dev" {
                         self.warnings.borrow_mut().push(format!(
                             "extra.branch-alias.{} : the target branch ({}) must end in -dev",
                             source_branch.display_lossy(),
-                            target_branch_str
+                            target_branch_str.display_lossy()
                         ));
                         if let Some(PhpMixed::Array(extra)) =
                             self.config.borrow_mut().get_mut(B("extra"))
@@ -1586,17 +1593,16 @@ impl LoaderInterface for ValidatingArrayLoader {
                     }
 
                     // normalize without -dev and ensure it's a numeric branch that is parseable
-                    let trimmed = legacy_lossy(&substr(
+                    let trimmed = substr(
                         &target_branch_str,
                         0,
                         Some((target_branch_str.len() as i64) - 4),
-                    ))
-                    .into_owned();
+                    );
                     let validated_target_branch = self.version_parser.normalize_branch(&trimmed)?;
                     if substr(&validated_target_branch, -4, None) != "-dev" {
                         self.warnings.borrow_mut().push(format!(
                             "extra.branch-alias.{} : the target branch ({}) must be a parseable number like 2.0-dev",
-                            source_branch.display_lossy(), target_branch_str
+                            source_branch.display_lossy(), target_branch_str.display_lossy()
                         ));
                         if let Some(PhpMixed::Array(extra)) =
                             self.config.borrow_mut().get_mut(B("extra"))
@@ -1611,8 +1617,6 @@ impl LoaderInterface for ValidatingArrayLoader {
                     // If using numeric aliases ensure the alias is a valid subversion
                     let source_prefix = self
                         .version_parser
-                        // TODO(bytes): branch names are parsed as UTF-8 text, so non-UTF-8 bytes
-                        // are replaced.
                         .parse_numeric_alias_prefix(source_branch);
                     let target_prefix = self
                         .version_parser
@@ -1622,7 +1626,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     {
                         self.warnings.borrow_mut().push(format!(
                                 "extra.branch-alias.{} : the target branch ({}) is not a valid numeric alias for this version",
-                                source_branch.display_lossy(), target_branch_str
+                                source_branch.display_lossy(), target_branch_str.display_lossy()
                             ));
                         if let Some(PhpMixed::Array(extra)) =
                             self.config.borrow_mut().get_mut(B("extra"))

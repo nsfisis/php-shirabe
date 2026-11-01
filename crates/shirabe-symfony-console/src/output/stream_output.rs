@@ -111,12 +111,9 @@ impl StreamOutput {
             return true;
         }
 
-        // TODO(bytes): preg_match matches over a &str.
-        let term = getenv("TERM")
-            .unwrap_or_default()
-            .into_string()
-            .unwrap_or_else(|term| panic!("TERM is not valid UTF-8: {term:?}"));
-        if "dumb" == term {
+        let term = getenv("TERM").unwrap_or_default();
+        let term = term.as_encoded_bytes();
+        if b"dumb" == term {
             return false;
         }
 
@@ -125,7 +122,7 @@ impl StreamOutput {
             php_regex!(
                 "/^((screen|xterm|vt100|vt220|putty|rxvt|ansi|cygwin|linux).*)|(.*-256(color)?(-bce)?)$/"
             ),
-            &term,
+            term,
         )
     }
 }

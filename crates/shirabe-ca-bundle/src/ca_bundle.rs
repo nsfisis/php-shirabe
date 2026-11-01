@@ -78,8 +78,8 @@ impl CaBundle {
     // TODO(http): Dummy stand-in until reqwest validates certificates itself.
     // The original parses the file with OpenSSL and rejects malformed or expired
     // bundles; here we only require the file to exist and be non-empty.
-    pub fn validate_ca_file(ca_file: &str, _logger: ()) -> bool {
-        std::fs::read(ca_file)
+    pub fn validate_ca_file(ca_file: impl AsRef<std::path::Path>, _logger: ()) -> bool {
+        std::fs::read(ca_file.as_ref())
             .map(|c| !c.is_empty())
             .unwrap_or(false)
     }

@@ -9,7 +9,7 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::composer_repository::{ComposerRepository, ProviderListingEntry};
 use shirabe::repository::{RepositoryInterface, SEARCH_FULLTEXT};
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe_php_shim::{PhpMixed, hash, legacy_lossy, uniqid};
+use shirabe_php_shim::{PhpMixed, bconcat, hash, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use tempfile::TempDir;
 
@@ -173,11 +173,11 @@ fn test_load_data() {
         assert_eq!(expected.len(), packages.len());
         for (index, (name, version)) in expected.iter().enumerate() {
             assert_eq!(
-                format!("{} {}", name, version),
-                format!(
-                    "{} {}",
-                    legacy_lossy(&packages[index].get_name()),
-                    legacy_lossy(&packages[index].get_pretty_version())
+                bconcat!(name, " ", version),
+                bconcat!(
+                    packages[index].get_name(),
+                    " ",
+                    packages[index].get_pretty_version()
                 )
             );
         }
@@ -227,7 +227,7 @@ fn test_what_provides() {
         ]),
     )]));
 
-    let sha256 = legacy_lossy(&hash("sha256", &body)).into_owned();
+    let sha256 = hash("sha256", &body);
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![http_body("https://dummy.test.link/to/a/file", body)],
@@ -249,12 +249,7 @@ fn test_what_provides() {
     rc.borrow().set_self_handle(std::rc::Rc::downgrade(&rc_dyn));
 
     let mut provider_listing: IndexMap<BString, ProviderListingEntry> = IndexMap::new();
-    provider_listing.insert(
-        "a".into(),
-        ProviderListingEntry {
-            sha256: sha256.into(),
-        },
-    );
+    provider_listing.insert("a".into(), ProviderListingEntry { sha256 });
     rc.borrow_mut().__set_provider_listing(provider_listing);
     rc.borrow_mut()
         .__set_providers_url("https://dummy.test.link/to/%package%/file");
@@ -622,8 +617,8 @@ fn generate_security_advisory(
     package_name: &str,
     cve: Option<&str>,
     affected_versions: &str,
-) -> (String, PhpMixed) {
-    let advisory_id = legacy_lossy(&uniqid("PKSA-", false)).into_owned();
+) -> (bstr::BString, PhpMixed) {
+    let advisory_id = uniqid("PKSA-", false);
     let advisory = str_kv(&[
         ("advisoryId", PhpMixed::string(advisory_id.clone())),
         ("packageName", PhpMixed::string(package_name.to_string())),

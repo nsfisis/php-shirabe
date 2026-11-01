@@ -12,7 +12,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, base64_decode, bconcat, date_create, explode,
-    extension_loaded, legacy_lossy, path_from_bytes, php_regex, preg_match, strtolower, urlencode,
+    extension_loaded, path_from_bytes, php_regex, preg_match, strtolower, urlencode,
 };
 
 #[derive(Debug)]
@@ -140,15 +140,7 @@ impl ForgejoDriver {
 
         match content_b64 {
             Some(b64) => match base64_decode(b64) {
-                Some(bytes) => match String::from_utf8(bytes) {
-                    Ok(s) => Ok(Some(bstr::BString::from(s))),
-                    Err(_) => Err(RuntimeException::new(format!(
-                        "Could not retrieve {} for {}",
-                        file.display_lossy(),
-                        identifier.display_lossy()
-                    ))
-                    .into()),
-                },
+                Some(bytes) => Ok(Some(bstr::BString::from(bytes))),
                 None => Err(RuntimeException::new(format!(
                     "Could not retrieve {} for {}",
                     file.display_lossy(),
@@ -211,13 +203,12 @@ impl ForgejoDriver {
             return git_driver.get_root_identifier();
         }
 
-        Ok(bstr::BString::from(
-            self.repository_data
-                .as_ref()
-                .unwrap()
-                .default_branch
-                .clone(),
-        ))
+        Ok(self
+            .repository_data
+            .as_ref()
+            .unwrap()
+            .default_branch
+            .clone())
     }
 
     pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
@@ -327,12 +318,7 @@ impl ForgejoDriver {
 
         if !self.inner.info_cache.contains_key(identifier) {
             let composer = if self.inner.should_cache(identifier) {
-                if let Some(res) = self
-                    .inner
-                    .cache
-                    .as_mut()
-                    .and_then(|c| c.read(&*legacy_lossy(identifier)))
-                {
+                if let Some(res) = self.inner.cache.as_mut().and_then(|c| c.read(identifier)) {
                     let parsed = JsonFile::parse_json(Some(&res), None)?;
                     parsed.as_array().cloned()
                 } else {
@@ -361,7 +347,7 @@ impl ForgejoDriver {
                         self.inner
                             .cache
                             .as_mut()
-                            .map(|c| c.write(&*legacy_lossy(identifier), &encoded));
+                            .map(|c| c.write(identifier, &encoded));
                     }
                     c
                 }
@@ -404,15 +390,15 @@ impl ForgejoDriver {
                         .find(|(_, v)| v == identifier)
                         .map(|(k, _)| k)
                     {
-                        format!("{}/tag/{}", html_url, legacy_lossy(&label))
+                        bconcat!(html_url, "/tag/", label)
                     } else if let Some(label) = branches
                         .into_iter()
                         .find(|(_, v)| v == identifier)
                         .map(|(k, _)| k)
                     {
-                        format!("{}/branch/{}", html_url, legacy_lossy(&label))
+                        bconcat!(html_url, "/branch/", label)
                     } else {
-                        format!("{}/commit/{}", html_url, legacy_lossy(&identifier))
+                        bconcat!(html_url, "/commit/", identifier)
                     };
 
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut(B("support")) {
@@ -426,12 +412,12 @@ impl ForgejoDriver {
                     .is_some_and(|arr| arr.contains_key(B("issues")));
 
                 if !has_issues && self.repository_data.as_ref().is_some_and(|r| r.has_issues) {
-                    let issues_url = format!(
-                        "{}/issues",
+                    let issues_url = bconcat!(
                         self.repository_data
                             .as_ref()
                             .map(|r| r.html_url.clone())
-                            .unwrap_or_default()
+                            .unwrap_or_default(),
+                        "/issues"
                     );
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut(B("support")) {
                         support.insert("issues".into(), PhpMixed::string(issues_url));
@@ -476,9 +462,9 @@ impl ForgejoDriver {
 
         let repo = self.repository_data.as_ref().unwrap();
         if repo.is_private {
-            bstr::BString::from(repo.ssh_url.clone())
+            repo.ssh_url.clone()
         } else {
-            bstr::BString::from(repo.http_clone_url.clone())
+            repo.http_clone_url.clone()
         }
     }
 
@@ -622,10 +608,9 @@ impl ForgejoDriver {
                 {
                     let origin_url = self.forgejo_url.as_ref().unwrap().origin_url.clone();
                     let message = if e.get_code() == 429 {
-                        Some(bconcat!(
-                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>",
-                            self.inner.url,
-                            "</info>)"
+                        Some(format!(
+                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>{}</info>)",
+                            self.inner.url.display_lossy()
                         ))
                     } else {
                         None
@@ -636,10 +621,8 @@ impl ForgejoDriver {
                         self.inner.config.clone(),
                         self.inner.http_downloader.clone(),
                     );
-                    let auth_result = forgejo.authorize_o_auth_interactively(
-                        origin_url.as_bstr(),
-                        message.as_ref().map(|m| legacy_lossy(m)).as_deref(),
-                    )?;
+                    let auth_result = forgejo
+                        .authorize_o_auth_interactively(origin_url.as_bstr(), message.as_deref())?;
 
                     if let Ok(true) = auth_result {
                         return self.inner.get_contents(url);

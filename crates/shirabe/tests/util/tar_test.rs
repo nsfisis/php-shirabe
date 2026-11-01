@@ -35,19 +35,13 @@ fn test_throws_exception_if_the_composer_json_is_in_a_sub_subfolder() {
 #[test]
 fn test_returns_composer_json_in_tar_root() {
     let result = Tar::get_composer_json(&fixture("root.tar.gz")).unwrap();
-    assert_eq!(
-        Some("{\n    \"name\": \"foo/bar\"\n}\n".to_string()),
-        result
-    );
+    assert_eq!(Some("{\n    \"name\": \"foo/bar\"\n}\n".into()), result);
 }
 
 #[test]
 fn test_returns_composer_json_in_first_folder() {
     let result = Tar::get_composer_json(&fixture("folder.tar.gz")).unwrap();
-    assert_eq!(
-        Some("{\n    \"name\": \"foo/bar\"\n}\n".to_string()),
-        result
-    );
+    assert_eq!(Some("{\n    \"name\": \"foo/bar\"\n}\n".into()), result);
 }
 
 #[test]

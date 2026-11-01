@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
 use shirabe::package::{ArrayDumper, Link};
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 
 fn set_up() -> ArrayLoader {
     ArrayLoader::new(None, false)
@@ -351,12 +351,7 @@ fn test_abandoned() {
     let package = loader.load(config, None).unwrap();
     let package = package.as_complete().unwrap();
     assert!(package.is_abandoned());
-    assert_eq!(
-        Some("foo/bar".to_string()),
-        package
-            .get_replacement_package()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("foo/bar".into()), package.get_replacement_package());
 }
 
 #[test]
@@ -507,18 +502,8 @@ fn test_none_string_source_dist_reference() {
     ]);
 
     let package = loader.load(config, None).unwrap();
-    assert_eq!(
-        Some("2019".to_string()),
-        package
-            .get_source_reference()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
-    assert_eq!(
-        Some("2019".to_string()),
-        package
-            .get_dist_reference()
-            .map(|s| legacy_lossy(&s).into_owned())
-    );
+    assert_eq!(Some("2019".into()), package.get_source_reference());
+    assert_eq!(Some("2019".into()), package.get_dist_reference());
 }
 
 #[test]

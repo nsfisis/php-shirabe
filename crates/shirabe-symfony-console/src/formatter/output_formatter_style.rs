@@ -3,7 +3,7 @@
 use crate::color::Color;
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{PHP_SERVER, array_search_in_vec, bconcat, getenv};
+use shirabe_php_shim::{PHP_SERVER, PhpMixed, array_search_in_vec, bconcat, getenv, intval};
 
 /// Formatter style class for defining styles.
 #[derive(Debug, Clone)]
@@ -89,15 +89,7 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
                     != Some(std::ffi::OsStr::new("JetBrains-JediTerm"))
                     && (getenv("KONSOLE_VERSION").is_none_or(|v| v.is_empty())
                         || getenv("KONSOLE_VERSION")
-                            // TODO(bytes): the version is parsed as a &str.
-                            .map(|v| {
-                                v.into_string()
-                                    .unwrap_or_else(|v| {
-                                        panic!("KONSOLE_VERSION is not valid UTF-8: {v:?}")
-                                    })
-                                    .parse::<i64>()
-                                    .unwrap_or(0)
-                            })
+                            .map(|v| intval(&PhpMixed::string(v.as_encoded_bytes())))
                             .unwrap_or(0)
                             > 201100)
                     && PHP_SERVER

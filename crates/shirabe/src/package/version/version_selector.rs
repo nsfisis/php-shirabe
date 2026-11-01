@@ -58,7 +58,7 @@ impl VersionSelector {
     pub fn find_best_candidate(
         &mut self,
         package_name: &BStr,
-        target_package_version: Option<&str>,
+        target_package_version: Option<&BStr>,
         preferred_stability: &BStr,
         platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
         repo_set_flags: i64,

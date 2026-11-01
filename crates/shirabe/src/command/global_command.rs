@@ -8,7 +8,7 @@ use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
 use shirabe_php_shim::{
-    LogicException, RuntimeException, chdir, impl_php_class, legacy_lossy, php_regex,
+    LogicException, RuntimeException, chdir, impl_php_class, path_from_bytes, php_regex,
     preg_replace2, preg_split,
 };
 use shirabe_symfony_console::command::Command;
@@ -17,7 +17,6 @@ use shirabe_symfony_console::completion::{
 };
 use shirabe_symfony_console::input::{ArgvInput, ArrayInput, InputInterface, StringInput};
 use shirabe_symfony_console::output::OutputInterface;
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct GlobalCommand {
@@ -75,21 +74,22 @@ impl GlobalCommand {
         }
 
         let config = Factory::create_config(None, None)?;
-        let home = legacy_lossy(config.get("home").as_string().unwrap_or_default()).into_owned();
+        let home = config.get("home");
+        let home = path_from_bytes(home.as_string().unwrap_or_default());
 
-        if !Path::new(&home).is_dir() {
+        if !home.is_dir() {
             let mut fs = Filesystem::new(None);
-            fs.ensure_directory_exists(&home)?;
-            if !Path::new(&home).is_dir() {
+            fs.ensure_directory_exists(home)?;
+            if !home.is_dir() {
                 return Err(
                     RuntimeException::new("Could not create home directory".to_string()).into(),
                 );
             }
         }
 
-        chdir(&home).map_err(|e| {
+        chdir(home).map_err(|e| {
             RuntimeException::with_code_and_previous(
-                format!("Could not switch to home directory \"{}\"", home),
+                format!("Could not switch to home directory \"{}\"", home.display()),
                 0,
                 Some(std::sync::Arc::new(e)),
             )
@@ -98,18 +98,17 @@ impl GlobalCommand {
         if !quiet {
             self.get_io().borrow().write_error(format!(
                 "<info>Changed current directory to {}</info>",
-                home
+                home.display()
             ));
         }
 
-        let new_input_str = legacy_lossy(&preg_replace2(
+        let new_input_str = preg_replace2(
             php_regex!(r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}"),
             "",
             &Self::input_to_string(&*input.borrow())?,
             1,
             None,
-        ))
-        .into_owned();
+        );
         self.reset_composer()?;
 
         StringInput::new(&new_input_str)
@@ -175,7 +174,7 @@ impl Command for GlobalCommand {
                     // array_filter drops the nulls.
                     .filter(|command| !command.borrow().is_hidden())
                     .filter_map(|command| command.borrow().get_name())
-                    .map(StringOrSuggestion::String)
+                    .map(|name| StringOrSuggestion::String(name.into()))
                     .collect()
             };
             suggestions.suggest_values(values);
@@ -227,10 +226,10 @@ impl Command for GlobalCommand {
             php_regex!(r"{\s+}"),
             &Self::input_to_string(&*input.borrow())?,
         );
-        let mut args: Vec<String> = vec![];
+        let mut args: Vec<&bstr::BString> = vec![];
         for token in &tokens {
             if !token.is_empty() && !token.starts_with(b"-") {
-                args.push(legacy_lossy(&token.clone()).into_owned());
+                args.push(token);
                 if args.len() >= 2 {
                     break;
                 }

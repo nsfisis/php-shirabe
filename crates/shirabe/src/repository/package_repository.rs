@@ -12,7 +12,7 @@ use crate::repository::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, json_encode, legacy_lossy, php_regex, preg_replace, var_export,
+    PhpMixed, RuntimeException, json_encode, php_regex, preg_replace, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -69,9 +69,7 @@ impl PackageRepository {
                         e,
                         json_encode(package).unwrap_or_default()
                     );
-                    return Ok(Err(InvalidRepositoryException::new(
-                        legacy_lossy(&msg).into_owned(),
-                    )));
+                    return Ok(Err(InvalidRepositoryException::new(msg)));
                 }
             };
             self.inner.add_package(package_loaded)?;

@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/IO/BufferIOTest.php
 
-use shirabe::io::IOInterfaceImmutable;
+use shirabe::io::IOInterfaceWrite;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
@@ -17,21 +17,18 @@ fn test_set_user_inputs() {
 
     assert!(
         buffer_io
-            .ask_confirmation("Please say yes!".to_string(), false)
+            .ask_confirmation("Please say yes!", false)
             .unwrap()
     );
     assert!(
         !buffer_io
-            .ask_confirmation("Now please say no!".to_string(), true)
+            .ask_confirmation("Now please say no!", true)
             .unwrap()
     );
     assert_eq!(
         PhpMixed::string("default".to_string()),
         buffer_io
-            .ask(
-                "Empty string last".into(),
-                PhpMixed::string("default".to_string())
-            )
+            .ask("Empty string last", PhpMixed::string("default".to_string()))
             .unwrap()
     );
 }

@@ -14,8 +14,8 @@ use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, file_exists, impl_php_class, is_dir, legacy_lossy,
-    path_from_bytes, path_to_bytes, realpath,
+    PhpMixed, RuntimeException, bconcat, file_exists, impl_php_class, is_dir, path_from_bytes,
+    path_to_bytes, realpath,
 };
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
 use std::path::{Path, PathBuf};
@@ -299,7 +299,7 @@ impl DownloaderInterface for PathDownloader {
                 self.inner.io.borrow().write_error3(
                     format!(
                         "  - {}{}",
-                        InstallOperation::format(package, false),
+                        InstallOperation::format(package, false).display_lossy(),
                         appendix
                     ),
                     true,
@@ -324,7 +324,10 @@ impl DownloaderInterface for PathDownloader {
 
         if output {
             self.inner.io.borrow().write_error3(
-                format!("  - {}: ", InstallOperation::format(package, false)),
+                format!(
+                    "  - {}: ",
+                    InstallOperation::format(package, false).display_lossy()
+                ),
                 false,
                 io_interface::NORMAL,
             );
@@ -430,8 +433,7 @@ impl DownloaderInterface for PathDownloader {
                     io_interface::NORMAL,
                 );
             }
-            let iterator =
-                ArchivableFilesFinder::new(&legacy_lossy(path_to_bytes(&real_url)), vec![], false)?;
+            let iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
             symfony_filesystem.mirror(&real_url, &path, iterator.collect())?;
         }
 
@@ -477,7 +479,7 @@ impl DownloaderInterface for PathDownloader {
                 self.inner.io.borrow().write_error3(
                     format!(
                         "  - {}, source is still present in {}",
-                        UninstallOperation::format(package.clone(), false),
+                        UninstallOperation::format(package.clone(), false).display_lossy(),
                         path.display()
                     ),
                     true,
@@ -538,7 +540,7 @@ impl DownloaderInterface for PathDownloader {
                 self.inner.io.borrow().write_error3(
                     format!(
                         "  - {}, source is still present in {}",
-                        UninstallOperation::format(package.clone(), false),
+                        UninstallOperation::format(package.clone(), false).display_lossy(),
                         path.display()
                     ),
                     true,

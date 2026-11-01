@@ -17,8 +17,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, bconcat, http_build_query,
-    json_encode, legacy_lossy, path_from_bytes, str_replace, strip_tags, strpos, strtolower,
-    ucfirst,
+    json_encode, path_from_bytes, str_replace, strip_tags, strpos, strtolower, ucfirst,
 };
 use std::path::PathBuf;
 
@@ -45,7 +44,7 @@ struct InstallationManagerMockState {
     installed: Vec<PackageInterfaceHandle>,
     updated: Vec<(PackageInterfaceHandle, PackageInterfaceHandle)>,
     uninstalled: Vec<PackageInterfaceHandle>,
-    trace: Vec<String>,
+    trace: Vec<BString>,
 }
 
 impl InstallationManager {
@@ -82,7 +81,7 @@ impl InstallationManager {
     }
 
     /// For testing only: the trace of stringified operations recorded by the mock.
-    pub fn __get_trace(&self) -> Vec<String> {
+    pub fn __get_trace(&self) -> Vec<BString> {
         self.mock
             .as_ref()
             .map(|m| m.borrow().trace.clone())
@@ -240,7 +239,7 @@ impl InstallationManager {
             let _ = (dev_mode, run_scripts, download_only);
             let mut repo = repo.borrow_mut();
             for operation in operations {
-                let trace = legacy_lossy(&strip_tags(operation.to_string())).into_owned();
+                let trace = strip_tags(operation.show(false));
                 match &*operation {
                     AnyOperation::Install(op) => {
                         let package = op.get_package();
@@ -574,7 +573,7 @@ impl InstallationManager {
                 // output alias ops in debug verbosity as they have no output otherwise
                 if self.io.is_debug() {
                     self.io.write_error3(
-                        format!("  - {}", operation.show(false)),
+                        bconcat!("  - ", operation.show(false)),
                         true,
                         io_interface::NORMAL,
                     );
@@ -837,12 +836,7 @@ impl InstallationManager {
                 // non-batch API, deprecated
                 if repo_url.contains_str("%package%") {
                     for package in packages {
-                        let url = legacy_lossy(&str_replace(
-                            "%package%",
-                            package.get_pretty_name(),
-                            repo_url,
-                        ))
-                        .into_owned();
+                        let url = str_replace("%package%", package.get_pretty_name(), repo_url);
 
                         let mut params: IndexMap<BString, BString> = IndexMap::new();
                         params.insert(
@@ -923,7 +917,7 @@ impl InstallationManager {
                 opts.insert("http".into(), PhpMixed::Array(http.into_iter().collect()));
 
                 let http_downloader = &*http_downloader;
-                let repo_url = legacy_lossy(&repo_url.clone()).into_owned();
+                let repo_url = repo_url.clone();
                 promises.push(Box::pin(async move {
                     http_downloader.add(&repo_url, opts).await.map(|_| ())
                 }));

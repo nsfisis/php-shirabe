@@ -10,7 +10,7 @@ use crate::repository::{InstalledRepository, RepositoryInterface, RepositorySet,
 use bstr::BString;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, impl_php_class, implode,
-    in_array_strict, legacy_lossy,
+    in_array_strict,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -211,7 +211,7 @@ impl Command for AuditCommand {
             .borrow()
             .get_option("abandoned")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BString::from);
         if abandoned.is_some()
             && !in_array_strict(
                 abandoned.clone().unwrap(),
@@ -235,8 +235,7 @@ impl Command for AuditCommand {
             .into());
         }
 
-        let abandoned = abandoned
-            .unwrap_or_else(|| legacy_lossy(&audit_config.audit_abandoned.clone()).into_owned());
+        let abandoned = abandoned.unwrap_or_else(|| audit_config.audit_abandoned.clone());
 
         let mut ignore_severities: indexmap::IndexMap<BString, Option<BString>> =
             indexmap::IndexMap::new();

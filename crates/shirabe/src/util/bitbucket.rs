@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
@@ -221,15 +221,14 @@ impl Bitbucket {
         let mut store_in_local_auth_config = false;
         if has_local_auth_config {
             store_in_local_auth_config = self.io.ask_confirmation(
-                "A local auth config source was found, do you want to store the token there?"
-                    .to_string(),
+                "A local auth config source was found, do you want to store the token there?",
                 true,
             )?;
         }
 
         let consumer_key = self
             .io
-            .ask_and_hide_answer("Consumer Key (hidden): ".to_string())?
+            .ask_and_hide_answer("Consumer Key (hidden): ")?
             .unwrap_or_default();
         let consumer_key = trim(consumer_key);
 
@@ -249,7 +248,7 @@ impl Bitbucket {
 
         let consumer_secret = self
             .io
-            .ask_and_hide_answer("Consumer Secret (hidden): ".to_string())?
+            .ask_and_hide_answer("Consumer Secret (hidden): ")?
             .unwrap_or_default();
         let consumer_secret = trim(consumer_secret);
 

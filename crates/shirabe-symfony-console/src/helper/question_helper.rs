@@ -361,12 +361,7 @@ impl QuestionHelper {
         let mut messages: Vec<BString> = vec![];
 
         let choices = question.get_choices();
-        let max_width = choices
-            .keys()
-            // TODO(bytes): widths are measured on UTF-8 text, so non-UTF-8 bytes are replaced.
-            .map(Helper::width)
-            .max()
-            .unwrap_or(0);
+        let max_width = choices.keys().map(Helper::width).max().unwrap_or(0);
 
         for (key, value) in choices {
             let padding = str_repeat(" ", (max_width - Helper::width(key)) as usize);
@@ -652,23 +647,18 @@ impl QuestionHelper {
         trimmable: bool,
     ) -> anyhow::Result<Result<BString, RuntimeException>> {
         if cfg!(windows) {
-            let mut exe = format!("{}/../Resources/bin/hiddeninput.exe", dir());
+            let mut exe = bconcat!(dir(), "/../Resources/bin/hiddeninput.exe");
 
             // handle code running from a phar
-            let mut tmp_exe: Option<String> = None;
+            let mut tmp_exe: Option<BString> = None;
             if substr(magic_file(), 0, Some(5)) == "phar:" {
-                // TODO(bytes): the executable path is kept as a String.
-                let tmp_dir = sys_get_temp_dir()
-                    .into_os_string()
-                    .into_string()
-                    .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
-                let tmp = format!("{}/hiddeninput.exe", tmp_dir);
-                let _ = copy(&exe, &tmp);
+                let tmp = bconcat!(sys_get_temp_dir(), "/hiddeninput.exe");
+                let _ = copy(path_from_bytes(&exe), path_from_bytes(&tmp));
                 exe = tmp.clone();
                 tmp_exe = Some(tmp);
             }
 
-            let s_exec = shell_exec(format!("\"{}\"", exe)).unwrap_or_default();
+            let s_exec = shell_exec(bconcat!("\"", exe, "\"")).unwrap_or_default();
             let value = if trimmable { rtrim(&s_exec) } else { s_exec };
             output.borrow().writeln(
                 &[bstr::BString::from("".to_string())],
@@ -676,7 +666,7 @@ impl QuestionHelper {
             );
 
             if let Some(tmp) = tmp_exe {
-                unlink(&tmp);
+                unlink(path_from_bytes(&tmp));
             }
 
             return Ok(Ok(value));

@@ -8,7 +8,7 @@ use shirabe::repository::{
     AdvisoryProviderInterface, ArrayRepository, FilterRepository, RepositoryInterface,
     RepositoryInterfaceHandle,
 };
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 fn set_up() -> RepositoryInterfaceHandle {
@@ -84,10 +84,9 @@ fn test_repo_matching() {
     for (expected, cfg) in cases {
         let mut repo = FilterRepository::new(set_up(), cfg).unwrap();
         let packages = repo.get_packages().unwrap();
-        let names: Vec<String> = packages
+        let names: Vec<bstr::BString> = packages
             .iter()
-            .map(|p| p.get_name())
-            .map(|s| legacy_lossy(&s).into_owned())
+            .map(|p| bstr::BString::from(&p.get_name()[..]))
             .collect();
 
         let expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();

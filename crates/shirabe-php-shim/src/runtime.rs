@@ -109,20 +109,20 @@ pub fn php_os_family() -> &'static str {
 
 // Models the extensions loaded in a standard PHP CLI environment running Composer.
 // Opt-in extensions (apcu, xdebug, ionCube, uopz) are reported absent.
-pub fn extension_loaded(name: &str) -> bool {
+pub fn extension_loaded(name: impl AsRef<[u8]>) -> bool {
     matches!(
-        name,
-        "Phar"
-            | "curl"
-            | "filter"
-            | "hash"
-            | "iconv"
-            | "intl"
-            | "mbstring"
-            | "openssl"
-            | "pcre"
-            | "zip"
-            | "zlib"
+        name.as_ref(),
+        b"Phar"
+            | b"curl"
+            | b"filter"
+            | b"hash"
+            | b"iconv"
+            | b"intl"
+            | b"mbstring"
+            | b"openssl"
+            | b"pcre"
+            | b"zip"
+            | b"zlib"
     )
 }
 

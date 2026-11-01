@@ -9,7 +9,7 @@ use crate::package::base_package::{self};
 use crate::repository::{CompositeRepository, RepositoryInterface};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class, legacy_lossy, php_regex, preg_match};
+use shirabe_php_shim::{PhpMixed, bconcat, impl_php_class, implode, php_regex, preg_match};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -41,7 +41,7 @@ impl FundCommand {
     }
 
     fn insert_funding_data(
-        fundings: &mut IndexMap<String, IndexMap<String, Vec<String>>>,
+        fundings: &mut IndexMap<BString, IndexMap<BString, Vec<BString>>>,
         package: &crate::package::CompletePackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         let pretty_name = package.get_pretty_name();
@@ -58,7 +58,7 @@ impl FundCommand {
             if url_val.is_none_or(|s| s.is_empty()) {
                 continue;
             }
-            let mut url = legacy_lossy(url_val.unwrap()).into_owned();
+            let mut url = BString::from(url_val.unwrap());
             let r#type = funding_option
                 .get(B("type"))
                 .and_then(|v| v.as_string())
@@ -66,16 +66,16 @@ impl FundCommand {
             if r#type == "github"
                 && let Some(matches) =
                     preg_match(php_regex!(r"{^https://github.com/([^/]+)$}"), &url)
-                && let Some(sponsor) = matches.get(1).map(|s| legacy_lossy(s).into_owned())
+                && let Some(sponsor) = matches.get(1)
             {
-                url = format!("https://github.com/sponsors/{}", sponsor);
+                url = bconcat!("https://github.com/sponsors/", sponsor);
             }
             fundings
-                .entry(legacy_lossy(vendor).into_owned())
+                .entry(BString::from(vendor))
                 .or_default()
                 .entry(url)
                 .or_default()
-                .push(legacy_lossy(package_name).into_owned());
+                .push(BString::from(package_name));
         }
         Ok(())
     }
@@ -112,10 +112,10 @@ impl Command for FundCommand {
         let repo = repository_manager.get_local_repository();
         let mut remote_repos =
             CompositeRepository::new(repository_manager.get_repositories().to_vec());
-        let mut fundings: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();
+        let mut fundings: IndexMap<BString, IndexMap<BString, Vec<BString>>> = IndexMap::new();
 
         let mut packages_to_load: IndexMap<BString, Option<AnyConstraint>> = IndexMap::new();
-        let mut packages_to_load_names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
+        let mut packages_to_load_names: indexmap::IndexSet<BString> = indexmap::IndexSet::new();
         for package in repo.get_packages()? {
             if package.as_alias().is_some() {
                 continue;
@@ -124,7 +124,7 @@ impl Command for FundCommand {
                 package.get_name(),
                 Some(MatchAllConstraint::new(None).into()),
             );
-            packages_to_load_names.insert(legacy_lossy(&package.get_name()).into_owned());
+            packages_to_load_names.insert(package.get_name());
         }
 
         // load all packages dev versions in parallel
@@ -141,17 +141,16 @@ impl Command for FundCommand {
                 && let Some(complete_pkg) = package.as_complete()
                 && complete_pkg.is_default_branch()
                 && !complete_pkg.get_funding().is_empty()
-                && packages_to_load_names.contains(&*legacy_lossy(&complete_pkg.get_name()))
+                && packages_to_load_names.contains(&complete_pkg.get_name())
             {
                 Self::insert_funding_data(&mut fundings, &complete_pkg)?;
-                packages_to_load_names.shift_remove(&*legacy_lossy(&complete_pkg.get_name()));
+                packages_to_load_names.shift_remove(&complete_pkg.get_name());
             }
         }
 
         // collect funding from installed packages if none was found in the default branch above
         for package in repo.get_packages()? {
-            if package.as_alias().is_some()
-                || !packages_to_load_names.contains(&*legacy_lossy(&package.get_name()))
+            if package.as_alias().is_some() || !packages_to_load_names.contains(&package.get_name())
             {
                 continue;
             }
@@ -166,40 +165,41 @@ impl Command for FundCommand {
 
         let io = self.get_io();
 
-        let format = legacy_lossy(
+        let format = BString::from(
             input
                 .borrow()
                 .get_option("format")?
                 .as_string()
                 .unwrap_or(bstr::BStr::new("text")),
-        )
-        .into_owned();
-        if !matches!(format.as_str(), "text" | "json") {
+        );
+        if !matches!(format.as_slice(), b"text" | b"json") {
             io.write_error(format!(
                 "Unsupported format \"{}\". See help for supported formats.",
-                format
+                format.display_lossy()
             ));
             return Ok(1);
         }
 
         if !fundings.is_empty() && format == "text" {
-            let mut prev: Option<String> = None;
+            let mut prev: Option<BString> = None;
 
             io.write("The following packages were found in your dependencies which publish funding information:");
 
             for (vendor, links) in &fundings {
                 io.write("");
-                io.write(format!("<comment>{}</comment>", vendor));
+                io.write(bconcat!("<comment>", vendor, "</comment>"));
                 for (url, packages) in links {
-                    let line = format!("  <info>{}</info>", packages.join(", "));
-                    if prev.as_deref() != Some(&line) {
+                    let line = bconcat!("  <info>", implode(", ", packages), "</info>");
+                    if prev.as_ref() != Some(&line) {
                         io.write(&line);
                         prev = Some(line);
                     }
-                    io.write(format!(
-                        "    <href={}>{}</>",
-                        OutputFormatter::escape(url)?.display_lossy(),
-                        url
+                    io.write(bconcat!(
+                        "    <href=",
+                        OutputFormatter::escape(url)?,
+                        ">",
+                        url,
+                        "</>"
                     ));
                 }
             }

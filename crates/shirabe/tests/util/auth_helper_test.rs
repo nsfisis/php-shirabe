@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
-use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, json_encode, legacy_lossy, time};
+use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, json_encode, time};
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
 // shared with the AuthHelper under test. The IOMockGuard runs assert_complete on drop.
@@ -50,7 +50,7 @@ fn expects_authentication(
     );
 }
 
-fn header_strings(options: &IndexMap<BString, PhpMixed>) -> Vec<String> {
+fn header_strings(options: &IndexMap<BString, PhpMixed>) -> Vec<BString> {
     options
         .get(B("http"))
         .and_then(|v| v.as_array())
@@ -58,7 +58,7 @@ fn header_strings(options: &IndexMap<BString, PhpMixed>) -> Vec<String> {
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
-                .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
+                .map(|v| BString::from(v.as_string().unwrap_or_default()))
                 .collect()
         })
         .unwrap_or_default()
@@ -336,7 +336,7 @@ fn add_authentication_header_with_basic_http_authentication(
 
     let expected = format!(
         "Authorization: Basic {}",
-        legacy_lossy(&base64_encode(format!("{}:{}", username, password)))
+        base64_encode(format!("{}:{}", username, password)).display_lossy()
     );
 
     let options = f

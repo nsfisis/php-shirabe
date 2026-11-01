@@ -4,7 +4,9 @@ use crate::exception::{InvalidArgumentException, LogicException};
 use crate::question::{Question, QuestionInterface};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, explode, php_regex, preg_is_match, sprintf, strval, trim};
+use shirabe_php_shim::{
+    PhpMixed, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
+};
 
 /// Represents a choice question.
 #[derive(Debug)]
@@ -12,8 +14,8 @@ pub struct ChoiceQuestion {
     inner: Question,
     choices: IndexMap<BString, PhpMixed>,
     multiselect: bool,
-    prompt: String,
-    error_message: String,
+    prompt: BString,
+    error_message: BString,
 }
 
 impl ChoiceQuestion {
@@ -21,7 +23,7 @@ impl ChoiceQuestion {
     /// `$choices` The list of available choices.
     /// `$default` The default answer to return.
     pub fn new(
-        question: String,
+        question: impl Into<BString>,
         choices: IndexMap<BString, PhpMixed>,
         default: Option<PhpMixed>,
     ) -> Result<Self, LogicException> {
@@ -35,8 +37,8 @@ impl ChoiceQuestion {
             inner: Question::new(question, default),
             choices: choices.clone(),
             multiselect: false,
-            prompt: " > ".to_string(),
-            error_message: "Value \"%s\" is invalid".to_string(),
+            prompt: BString::from(" > "),
+            error_message: BString::from("Value \"%s\" is invalid"),
         };
 
         let validator = this.get_default_validator();
@@ -71,13 +73,13 @@ impl ChoiceQuestion {
     }
 
     /// Gets the prompt for choices.
-    pub fn get_prompt(&self) -> &str {
-        &self.prompt
+    pub fn get_prompt(&self) -> &BStr {
+        self.prompt.as_bstr()
     }
 
     /// Sets the prompt for choices.
-    pub fn set_prompt(&mut self, prompt: String) -> &mut Self {
-        self.prompt = prompt;
+    pub fn set_prompt(&mut self, prompt: impl Into<BString>) -> &mut Self {
+        self.prompt = prompt.into();
 
         self
     }
@@ -95,8 +97,8 @@ impl ChoiceQuestion {
     /// Sets the error message for invalid values.
     ///
     /// The error message has a string placeholder (%s) for the invalid value.
-    pub fn set_error_message(&mut self, error_message: String) -> &mut Self {
-        self.error_message = error_message;
+    pub fn set_error_message(&mut self, error_message: impl Into<BString>) -> &mut Self {
+        self.error_message = error_message.into();
         let validator = self.get_default_validator();
         self.inner.set_validator(Some(validator));
 
@@ -146,18 +148,17 @@ impl ChoiceQuestion {
 
             let mut multiselect_choices: Vec<PhpMixed> = Vec::new();
             for value in &selected_choices {
-                let mut results: Vec<String> = Vec::new();
+                let mut results: Vec<&BString> = Vec::new();
                 for (key, choice) in &choices {
                     if (*choice) == *value {
-                        // TODO(bytes): results are Strings, so non-UTF-8 bytes are replaced.
-                        results.push(key.to_str_lossy().into_owned());
+                        results.push(key);
                     }
                 }
 
                 if results.len() > 1 {
                     return Err(InvalidArgumentException::new(format!(
                         "The provided answer is ambiguous. Value should be one of \"{}\".",
-                        results.join("\" or \""),
+                        implode("\" or \"", &results).display_lossy(),
                     )));
                 }
 
@@ -220,7 +221,7 @@ impl ChoiceQuestion {
 }
 
 impl QuestionInterface for ChoiceQuestion {
-    fn get_question(&self) -> &str {
+    fn get_question(&self) -> &BStr {
         self.inner.get_question()
     }
 

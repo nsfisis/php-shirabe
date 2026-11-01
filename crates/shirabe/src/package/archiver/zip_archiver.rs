@@ -2,11 +2,13 @@
 
 use crate::package::archiver::{ArchivableFilesFinder, ArchiverInterface};
 use crate::util::{Filesystem, Platform};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, ZipArchive, class_exists, fileperms, legacy_lossy, path_to_bytes, realpath,
-    strtr,
+    RuntimeException, ZipArchive, class_exists, fileperms, path_to_bytes, realpath, strtr,
+    utf8_text,
 };
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct ZipArchiver;
@@ -22,9 +24,9 @@ impl ZipArchiver {
         Self
     }
 
-    fn formats() -> IndexMap<String, bool> {
-        let mut map = IndexMap::new();
-        map.insert("zip".to_string(), true);
+    fn formats() -> IndexMap<&'static [u8], bool> {
+        let mut map: IndexMap<&'static [u8], bool> = IndexMap::new();
+        map.insert(b"zip", true);
         map
     }
 
@@ -36,59 +38,54 @@ impl ZipArchiver {
 impl ArchiverInterface for ZipArchiver {
     fn archive(
         &self,
-        sources: String,
-        target: String,
-        format: String,
-        excludes: Vec<String>,
+        sources: &Path,
+        target: &Path,
+        _format: &BStr,
+        excludes: Vec<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<PathBuf> {
         let fs = Filesystem::new(None);
-        let sources_realpath =
-            realpath(&sources).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
-        let sources = if let Some(p) = sources_realpath {
-            p
-        } else {
-            sources
-        };
+        let sources = realpath(sources).unwrap_or_else(|| sources.to_path_buf());
         let sources = fs.normalize_path(&sources);
 
         let mut zip = ZipArchive::new();
-        if zip.open(&target, ZipArchive::CREATE).is_ok() {
-            let files = ArchivableFilesFinder::new(
-                &legacy_lossy(path_to_bytes(&sources)),
-                excludes,
-                ignore_filters,
-            )?;
+        if zip.open(target, ZipArchive::CREATE).is_ok() {
+            let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
             for file in files {
                 let filepath = file;
-                // TODO(bytes): ZipArchive takes the local name as a &str.
-                let mut relative_path = filepath
-                    .strip_prefix(&sources)
-                    .unwrap_or(filepath.as_path())
-                    .to_str()
-                    .unwrap_or_else(|| panic!("path is not valid UTF-8: {}", filepath.display()))
-                    .to_string();
+                let mut relative_path = BString::from(path_to_bytes(
+                    filepath
+                        .strip_prefix(&sources)
+                        .unwrap_or(filepath.as_path()),
+                ));
 
                 if Platform::is_windows() {
-                    relative_path = legacy_lossy(&strtr(&relative_path, "\\", "/")).into_owned();
+                    relative_path = strtr(&relative_path, "\\", "/");
                 }
+
+                // TODO(bytes): the zip crate only writes entry names that are valid UTF-8, where
+                // libzip stores any bytes.
+                let Some(local_name) = utf8_text(&relative_path) else {
+                    return Err(RuntimeException::new(format!(
+                        "Could not create archive '{}' from '{}': the entry name {:?} is not valid UTF-8",
+                        target.display(),
+                        sources.display(),
+                        relative_path.as_bstr()
+                    ))
+                    .into());
+                };
 
                 // Ensure to preserve the permission umasks for the filepath in the archive.
                 let perms = fileperms(&filepath)?;
 
                 if filepath.is_dir() {
-                    zip.add_empty_dir(&relative_path, ZipArchive::OPSYS_UNIX, perms << 16);
+                    zip.add_empty_dir(local_name, ZipArchive::OPSYS_UNIX, perms << 16);
                 } else {
-                    zip.add_file(
-                        &filepath,
-                        &relative_path,
-                        ZipArchive::OPSYS_UNIX,
-                        perms << 16,
-                    );
+                    zip.add_file(&filepath, local_name, ZipArchive::OPSYS_UNIX, perms << 16);
                 }
             }
             if zip.close() {
-                if !std::path::Path::new(&target).exists() {
+                if !target.exists() {
                     // create minimal valid ZIP file (Empty Central Directory + End of Central Directory record)
                     let mut eocd = Vec::with_capacity(22);
                     eocd.extend_from_slice(&0x06054b50u32.to_le_bytes()); // End of central directory signature
@@ -99,23 +96,23 @@ impl ArchiverInterface for ZipArchiver {
                     eocd.extend_from_slice(&0u32.to_le_bytes()); // Size of central directory (bytes)
                     eocd.extend_from_slice(&0u32.to_le_bytes()); // Offset of start of central directory
                     eocd.extend_from_slice(&0u16.to_le_bytes()); // Comment length
-                    std::fs::write(&target, &eocd)?;
+                    std::fs::write(target, &eocd)?;
                 }
 
-                return Ok(target);
+                return Ok(target.to_path_buf());
             }
         }
         let message = format!(
             "Could not create archive '{}' from '{}': {}",
-            target,
+            target.display(),
             sources.display(),
             zip.get_status_string()
         );
         Err(RuntimeException::new(message).into())
     }
 
-    fn supports(&self, format: String, _source_type: Option<String>) -> bool {
-        Self::formats().contains_key(&format) && self.compression_available()
+    fn supports(&self, format: &BStr, _source_type: Option<&BStr>) -> bool {
+        Self::formats().contains_key(format.as_bytes()) && self.compression_available()
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -7,7 +7,7 @@ use crate::composer::PartialComposerHandle;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::base_package;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::version_selector::ShowWarnings;
@@ -16,19 +16,20 @@ use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
     CanonicalPackagesTrait, CompositeRepository, PlatformRepository, RepositorySet,
 };
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_merge_map, array_search_in_vec, impl_php_class, legacy_lossy, php_regex, preg_is_match,
+    array_merge_map, array_search_in_vec, bconcat, impl_php_class, php_regex, preg_is_match,
     preg_match, preg_replace, strtolower,
 };
-use shirabe_semver::Intervals;
-use shirabe_semver::constraint::MultiConstraint;
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::helper::Table;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_semver::{Intervals, constraint::MultiConstraint};
+use shirabe_symfony_console::{
+    command::Command,
+    helper::Table,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct UpdateCommand {
@@ -88,7 +89,7 @@ impl UpdateCommand {
             true,
             io_interface::NORMAL,
         );
-        let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
+        let mut autocompleter_values: IndexMap<BString, BString> = IndexMap::new();
         let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
             if composer_ref.get_locker().borrow_mut().is_locked() {
                 let locked_repo = composer_ref
@@ -118,15 +119,13 @@ impl UpdateCommand {
                 Some(flag) => base_package::STABILITIES
                     .iter()
                     .find(|&(_, v)| v == flag)
-                    .map(|(k, _)| k.to_string())
+                    .map(|(k, _)| BString::from(*k))
                     .unwrap_or_default(),
-                None => {
-                    legacy_lossy(&composer_ref.get_package().get_minimum_stability()).into_owned()
-                }
+                None => composer_ref.get_package().get_minimum_stability(),
             };
             let latest_version = version_selector.find_best_candidate(
                 bstr::BStr::new(&package.get_name()),
-                constraint.map(legacy_lossy).as_deref(),
+                constraint,
                 bstr::BStr::new(&stability),
                 None,
                 0,
@@ -138,11 +137,13 @@ impl UpdateCommand {
                 && (package.get_version() != latest.get_version() || latest.is_dev())
             {
                 autocompleter_values.insert(
-                    legacy_lossy(&package.get_name()).into_owned(),
-                    format!(
-                        "<comment>{}</comment> => <comment>{}</comment>",
-                        legacy_lossy(&current_version),
-                        legacy_lossy(&latest.get_pretty_version()),
+                    package.get_name(),
+                    bconcat!(
+                        "<comment>",
+                        current_version,
+                        "</comment> => <comment>",
+                        latest.get_pretty_version(),
+                        "</comment>",
                     ),
                 );
             }
@@ -152,7 +153,7 @@ impl UpdateCommand {
                 if PlatformRepository::is_platform_package(req) {
                     continue;
                 }
-                autocompleter_values.insert(legacy_lossy(req).into_owned(), String::new());
+                autocompleter_values.insert(BString::from(req.as_bstr()), BString::default());
             }
         }
 
@@ -164,16 +165,16 @@ impl UpdateCommand {
         }
 
         let select_result = io.select(
-            "Select packages: (Select more than one value separated by comma) ".into(),
+            "Select packages: (Select more than one value separated by comma) ",
             PhpMixed::Array(
                 autocompleter_values
                     .iter()
-                    .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
+                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
             PhpMixed::Bool(false),
             PhpMixed::Int(1),
-            "No package named \"%s\" is installed.".to_string(),
+            "No package named \"%s\" is installed.",
             true,
         )?;
         let packages: Vec<BString> = match select_result {
@@ -214,26 +215,13 @@ impl UpdateCommand {
             .get_aliases()
             .into_iter()
             .map(|alias| crate::repository::RootAliasInput {
-                package: bstr::BString::from(
-                    legacy_lossy(&alias.get(bstr::B("package")).cloned().unwrap_or_default())
-                        .into_owned(),
-                ),
-                version: bstr::BString::from(
-                    legacy_lossy(&alias.get(bstr::B("version")).cloned().unwrap_or_default())
-                        .into_owned(),
-                ),
-                alias: bstr::BString::from(
-                    &alias.get(bstr::B("alias")).cloned().unwrap_or_default()[..],
-                ),
-                alias_normalized: bstr::BString::from(
-                    legacy_lossy(
-                        &alias
-                            .get(bstr::B("alias_normalized"))
-                            .cloned()
-                            .unwrap_or_default(),
-                    )
-                    .into_owned(),
-                ),
+                package: alias.get(bstr::B("package")).cloned().unwrap_or_default(),
+                version: alias.get(bstr::B("version")).cloned().unwrap_or_default(),
+                alias: alias.get(bstr::B("alias")).cloned().unwrap_or_default(),
+                alias_normalized: alias
+                    .get(bstr::B("alias_normalized"))
+                    .cloned()
+                    .unwrap_or_default(),
             })
             .collect();
         let mut repository_set = RepositorySet::new(
@@ -462,10 +450,8 @@ impl Command for UpdateCommand {
                 let Some(matches) = matches else {
                     continue;
                 };
-                let constraint = parser.parse_constraints(format!(
-                    "~{}",
-                    legacy_lossy(&matches.get(1).unwrap_or_default())
-                ))?;
+                let constraint =
+                    parser.parse_constraints(bconcat!("~", matches.get(1).unwrap_or_default()))?;
                 if let Some(existing) = temporary_constraints.get(&package.get_name()) {
                     temporary_constraints.insert(
                         package.get_name(),
@@ -580,11 +566,11 @@ impl Command for UpdateCommand {
                 .get("classmap-authoritative")
                 .as_bool()
                 .unwrap_or(false);
-        let apcu_prefix: Option<String> = input
+        let apcu_prefix: Option<BString> = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()

@@ -32,11 +32,11 @@ mockall::mock! {
         async fn archive(
             &mut self,
             package: CompletePackageInterfaceHandle,
-            format: String,
-            target_dir: String,
-            file_name: Option<String>,
+            format: bstr::BString,
+            target_dir: std::path::PathBuf,
+            file_name: Option<bstr::BString>,
             ignore_filters: bool,
-        ) -> anyhow::Result<String>;
+        ) -> anyhow::Result<std::path::PathBuf>;
     }
 }
 
@@ -145,11 +145,11 @@ fn test_uses_config_from_composer_object() {
         .withf(|package, format, target_dir, file_name, ignore_filters| {
             package.get_name() == "archive/test"
                 && format == "zip"
-                && target_dir == "."
+                && path_to_bytes(target_dir) == b"."
                 && file_name.is_none()
                 && !*ignore_filters
         })
-        .returning(move |_, _, _, _, _| Ok(legacy_lossy(path_to_bytes(&cwd.clone())).into_owned()));
+        .returning(move |_, _, _, _, _| Ok(cwd.clone()));
 
     let package = root_package("archive/test", "1.0.0");
 
@@ -232,11 +232,11 @@ fn test_uses_config_from_composer_object_with_package_name() {
         .withf(|package, format, target_dir, file_name, ignore_filters| {
             package.get_name() == "foo/bar"
                 && format == "zip"
-                && target_dir == "."
+                && path_to_bytes(target_dir) == b"."
                 && file_name.is_none()
                 && !*ignore_filters
         })
-        .returning(move |_, _, _, _, _| Ok(legacy_lossy(path_to_bytes(&cwd.clone())).into_owned()));
+        .returning(move |_, _, _, _, _| Ok(cwd.clone()));
 
     let package = root_package("foo/bar", "1.0.0");
 

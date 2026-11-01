@@ -4,9 +4,10 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
+use bstr::BString;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, basename, chdir, getcwd, glob, impl_php_class, legacy_lossy,
+    PhpMixed, RuntimeException, basename, bconcat, chdir, getcwd, glob, impl_php_class,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -36,47 +37,38 @@ impl ExecCommand {
         command
     }
 
-    fn get_binaries(&self, for_display: bool) -> anyhow::Result<Vec<String>> {
+    fn get_binaries(&self, for_display: bool) -> anyhow::Result<Vec<BString>> {
         let composer = self.require_composer(None, None)?;
         let composer_ref = crate::composer::composer_full(&composer);
-        let bin_dir = legacy_lossy(
+        let bin_dir = BString::from(
             composer_ref
                 .get_config()
                 .borrow_mut()
                 .get("bin-dir")
                 .as_string()
                 .unwrap_or_default(),
-        )
-        .into_owned();
-        let bins: Vec<String> = glob(format!("{}/*", bin_dir))
-            .iter()
-            .map(|bin| legacy_lossy(bin).into_owned())
-            .collect();
-        let local_bins_raw: Vec<String> = composer_ref
-            .get_package()
-            .get_binaries()
-            .iter()
-            .map(|s| legacy_lossy(s).into_owned())
-            .collect::<Vec<_>>();
-        let local_bins: Vec<String> = if for_display {
+        );
+        let bins = glob(bconcat!(bin_dir, "/*"));
+        let local_bins_raw = composer_ref.get_package().get_binaries();
+        let local_bins: Vec<BString> = if for_display {
             local_bins_raw
                 .into_iter()
-                .map(|e| format!("{} (local)", e))
+                .map(|e| bconcat!(e, " (local)"))
                 .collect()
         } else {
             local_bins_raw
         };
 
-        let mut binaries: Vec<String> = Vec::new();
-        let mut previous_bin: Option<String> = None;
+        let mut binaries: Vec<BString> = Vec::new();
+        let mut previous_bin: Option<&BString> = None;
         for bin in bins.iter().chain(local_bins.iter()) {
-            if let Some(prev) = &previous_bin
-                && bin == &format!("{}.bat", prev)
+            if let Some(prev) = previous_bin
+                && *bin == bconcat!(prev, ".bat")
             {
                 continue;
             }
-            previous_bin = Some(legacy_lossy(&bin.clone()).into_owned());
-            binaries.push(legacy_lossy(&basename(bin)).into_owned());
+            previous_bin = Some(bin);
+            binaries.push(basename(bin));
         }
 
         Ok(binaries)
@@ -138,7 +130,7 @@ impl Command for ExecCommand {
 
             let io = self.get_io();
             let binary = io.select(
-                "Binary to run: ".into(),
+                "Binary to run: ",
                 PhpMixed::List(
                     binaries
                         .iter()
@@ -147,15 +139,14 @@ impl Command for ExecCommand {
                 ),
                 PhpMixed::string(String::new()),
                 PhpMixed::Int(1),
-                "Invalid binary name \"%s\"".to_string(),
+                "Invalid binary name \"%s\"",
                 false,
             )?;
 
             if let Some(idx) = binary.as_int() {
-                input.borrow_mut().set_argument(
-                    "binary",
-                    InputValue::String(bstr::BString::from(binaries[idx as usize].clone())),
-                );
+                input
+                    .borrow_mut()
+                    .set_argument("binary", InputValue::String(binaries[idx as usize].clone()));
             }
 
             Ok(())
@@ -178,18 +169,17 @@ impl Command for ExecCommand {
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
-                let bin_dir = legacy_lossy(
+                let bin_dir = BString::from(
                     crate::composer::composer_full(&composer)
                         .get_config()
                         .borrow_mut()
                         .get("bin-dir")
                         .as_string()
                         .unwrap_or_default(),
-                )
-                .into_owned();
+                );
                 return Err(RuntimeException::new(format!(
                     "No binaries found in composer.json or in bin-dir ({})",
-                    bin_dir
+                    bin_dir.display_lossy()
                 ))
                 .into());
             }
@@ -197,27 +187,26 @@ impl Command for ExecCommand {
             self.get_io()
                 .write("<comment>Available binaries:</comment>");
             for bin in &bins {
-                self.get_io().write(format!("<info>- {}</info>", bin));
+                self.get_io().write(bconcat!("<info>- ", bin, "</info>"));
             }
 
             return Ok(0);
         }
 
-        let binary = legacy_lossy(
+        let binary = BString::from(
             input
                 .borrow()
                 .get_argument("binary")?
                 .as_string()
                 .unwrap_or_default(),
-        )
-        .into_owned();
+        );
 
         let dispatcher = crate::composer::composer_full(&composer)
             .get_event_dispatcher()
             .clone();
         dispatcher.borrow_mut().add_listener(
             "__exec_command",
-            crate::event_dispatcher::Callable::String(binary.into()),
+            crate::event_dispatcher::Callable::String(binary),
             0,
         );
 

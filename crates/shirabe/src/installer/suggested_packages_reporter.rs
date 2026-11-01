@@ -3,9 +3,9 @@
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepository, RepositoryInterface};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{legacy_lossy, php_regex, preg_replace};
+use shirabe_php_shim::{bconcat, php_regex, preg_replace, str_replace};
 use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
@@ -98,13 +98,14 @@ impl SuggestedPackagesReporter {
                 ));
 
                 for (suggestion, reason) in suggestions {
-                    self.io.write(format!(
-                        " - <info>{}</info>{}",
-                        suggestion.display_lossy(),
+                    self.io.write(bconcat!(
+                        " - <info>",
+                        suggestion,
+                        "</info>",
                         if !reason.is_empty() {
-                            format!(": {}", self.escape_output(&legacy_lossy(reason)))
+                            bconcat!(": ", self.escape_output(reason.as_ref()))
                         } else {
-                            String::new()
+                            BString::default()
                         }
                     ));
                 }
@@ -125,13 +126,14 @@ impl SuggestedPackagesReporter {
                 ));
 
                 for (suggester, reason) in suggesters {
-                    self.io.write(format!(
-                        " - <info>{}</info>{}",
-                        suggester.display_lossy(),
+                    self.io.write(bconcat!(
+                        " - <info>",
+                        suggester,
+                        "</info>",
                         if !reason.is_empty() {
-                            format!(": {}", self.escape_output(&legacy_lossy(reason)))
+                            bconcat!(": ", self.escape_output(reason.as_ref()))
                         } else {
-                            String::new()
+                            BString::default()
                         }
                     ));
                 }
@@ -209,20 +211,16 @@ impl SuggestedPackagesReporter {
         Ok(suggestions)
     }
 
-    fn escape_output(&self, string: &str) -> String {
-        legacy_lossy(
-            &OutputFormatter::escape(self.remove_control_characters(string))
-                .expect("OutputFormatter::escape does not fail"),
-        )
-        .into_owned()
+    fn escape_output(&self, string: &BStr) -> BString {
+        OutputFormatter::escape(self.remove_control_characters(string))
+            .expect("OutputFormatter::escape does not fail")
     }
 
-    fn remove_control_characters(&self, string: &str) -> String {
-        legacy_lossy(&preg_replace(
+    fn remove_control_characters(&self, string: &BStr) -> BString {
+        preg_replace(
             php_regex!("/[[:cntrl:]]/"),
             "",
-            string.replace('\n', " "),
-        ))
-        .into_owned()
+            str_replace("\n", " ", string),
+        )
     }
 }

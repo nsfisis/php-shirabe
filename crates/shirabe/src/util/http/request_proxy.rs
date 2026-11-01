@@ -14,17 +14,17 @@ type ContextOptions = IndexMap<String, IndexMap<BString, PhpMixed>>;
 #[derive(Debug)]
 pub struct RequestProxy {
     context_options: Option<ContextOptions>,
-    status: Option<String>,
-    url: Option<String>,
-    auth: Option<String>,
+    status: Option<BString>,
+    url: Option<BString>,
+    auth: Option<BString>,
 }
 
 impl RequestProxy {
     pub fn new(
-        url: Option<String>,
-        auth: Option<String>,
+        url: Option<BString>,
+        auth: Option<BString>,
         context_options: Option<ContextOptions>,
-        status: Option<String>,
+        status: Option<BString>,
     ) -> Self {
         Self {
             url,
@@ -39,7 +39,7 @@ impl RequestProxy {
     }
 
     pub fn no_proxy() -> Self {
-        Self::new(None, None, None, Some("excluded by no_proxy".to_string()))
+        Self::new(None, None, None, Some("excluded by no_proxy".into()))
     }
 
     pub fn get_context_options(&self) -> Option<&ContextOptions> {
@@ -57,7 +57,7 @@ impl RequestProxy {
         let mut options: IndexMap<i64, PhpMixed> = IndexMap::new();
         options.insert(
             CURLOPT_PROXY,
-            PhpMixed::string(self.url.as_deref().unwrap_or_default().to_string()),
+            PhpMixed::string(self.url.clone().unwrap_or_default()),
         );
 
         if self.url.is_some() {
@@ -88,7 +88,8 @@ impl RequestProxy {
 
         let format = format.unwrap_or("%s");
         if format.contains("%s") {
-            return Ok(format.replace("%s", self.status.as_deref().unwrap()));
+            let status = self.status.as_ref().unwrap().display_lossy().to_string();
+            return Ok(format.replace("%s", &status));
         }
 
         Err(InvalidArgumentException::new(
@@ -102,9 +103,8 @@ impl RequestProxy {
 
     pub fn is_secure(&self) -> bool {
         self.url
-            .as_deref()
-            .unwrap_or_default()
-            .starts_with("https://")
+            .as_ref()
+            .is_some_and(|url| url.starts_with(b"https://"))
     }
 
     /// Whether a TLS connection to the proxy itself (an `https://` proxy URL) is supported.

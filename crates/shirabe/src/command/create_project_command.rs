@@ -25,12 +25,12 @@ use crate::repository::{
 use crate::script::ScriptEvents;
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
-    array_pop, chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir,
-    is_file, legacy_lossy, mkdir, path_from_bytes, path_to_bytes, preg_match, realpath, rtrim2,
+    array_pop, bconcat, chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode,
+    is_dir, is_file, mkdir, path_from_bytes, path_to_bytes, preg_match, realpath, rtrim2,
     strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
@@ -77,10 +77,10 @@ impl CreateProjectCommand {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        package_name: Option<String>,
-        directory: Option<String>,
-        package_version: Option<String>,
-        stability: Option<String>,
+        package_name: Option<BString>,
+        directory: Option<PathBuf>,
+        package_version: Option<BString>,
+        stability: Option<BString>,
         mut prefer_source: bool,
         mut prefer_dist: bool,
         install_dev_packages: bool,
@@ -95,21 +95,19 @@ impl CreateProjectCommand {
     ) -> anyhow::Result<i64> {
         let old_cwd = Platform::get_cwd(false)?;
 
-        let repositories: Option<Vec<String>> = match repositories {
+        let repositories: Option<Vec<BString>> = match repositories {
             Some(PhpMixed::Null) | None => None,
             Some(PhpMixed::List(list)) => Some(
                 list.into_iter()
-                    .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                    .filter_map(|v| v.as_string().map(BString::from))
                     .collect(),
             ),
             Some(PhpMixed::Array(map)) => Some(
                 map.into_iter()
-                    .filter_map(|(_, v)| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                    .filter_map(|(_, v)| v.as_string().map(BString::from))
                     .collect(),
             ),
-            Some(other) => Some(vec![
-                legacy_lossy(other.as_string().unwrap_or_default()).into_owned(),
-            ]),
+            Some(other) => Some(vec![BString::from(other.as_string().unwrap_or_default())]),
         };
 
         let platform_requirement_filter = platform_requirement_filter
@@ -128,7 +126,7 @@ impl CreateProjectCommand {
                 input.clone(),
                 io.clone(),
                 &config,
-                package_name,
+                package_name.as_bstr(),
                 platform_requirement_filter.clone(),
                 directory,
                 package_version,
@@ -172,12 +170,11 @@ impl CreateProjectCommand {
                         .get_config()
                         .borrow()
                         .get_repositories();
-                let name = legacy_lossy(&RepositoryFactory::generate_repository_name(
+                let name = RepositoryFactory::generate_repository_name(
                     &PhpMixed::Int(index as i64),
                     &repo_config,
                     &composer_json_repositories_config,
-                ))
-                .into_owned();
+                );
                 let mut config_source = JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
                         "composer.json",
@@ -327,7 +324,7 @@ impl CreateProjectCommand {
             && (input.borrow().get_option("remove-vcs")?.as_bool().unwrap_or(false)
                 || !io.is_interactive()
                 || io.ask_confirmation(
-                    "<info>Do you want to remove the existing VCS (.git, .svn..) history?</info> [<comment>y,n</comment>]? ".to_string(),
+                    "<info>Do you want to remove the existing VCS (.git, .svn..) history?</info> [<comment>y,n</comment>]? ",
                     true,
                 )?);
         if remove_vcs {
@@ -424,62 +421,51 @@ impl CreateProjectCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        package_name: &str,
+        package_name: &BStr,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
-        directory: Option<String>,
-        mut package_version: Option<String>,
-        mut stability: Option<String>,
+        directory: Option<PathBuf>,
+        mut package_version: Option<BString>,
+        mut stability: Option<BString>,
         prefer_source: bool,
         prefer_dist: bool,
         _install_dev_packages: bool,
-        repositories: Option<&Vec<String>>,
+        repositories: Option<&Vec<BString>>,
         disable_plugins: bool,
         disable_scripts: bool,
         no_progress: bool,
         secure_http: bool,
     ) -> anyhow::Result<bool> {
         let parser: VersionParser = VersionParser::new();
-        let requirements =
-            parser.parse_name_version_pairs(vec![bstr::BString::from(package_name.to_string())])?;
-        let name = legacy_lossy(&strtolower(
+        let requirements = parser.parse_name_version_pairs(vec![BString::from(package_name)])?;
+        let name = strtolower(
             requirements[0]
                 .get(bstr::B("name"))
                 .map(|s| s.as_bstr())
                 .unwrap_or_default(),
-        ))
-        .into_owned();
+        );
         if package_version.is_none() && requirements[0].contains_key(bstr::B("version")) {
-            package_version = requirements[0]
-                .get(bstr::B("version"))
-                .map(|s| legacy_lossy(s).into_owned());
+            package_version = requirements[0].get(bstr::B("version")).cloned();
         }
 
         // if no directory was specified, use the 2nd part of the package name
         let mut directory = match directory {
             None => {
                 let mut parts = explode_with_limit("/", &name, 2);
-                std::path::Path::new(&Platform::get_cwd(false)?)
+                Platform::get_cwd(false)?
                     .join(path_from_bytes(&array_pop(&mut parts).unwrap_or_default()))
-                    .into_os_string()
-                    .into_string()
-                    .unwrap()
             }
             Some(directory) => directory,
         };
-        directory = legacy_lossy(&rtrim2(&directory, "/\\")).into_owned();
+        directory = path_from_bytes(&rtrim2(path_to_bytes(&directory), "/\\")).to_path_buf();
 
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(process))));
         if !fs.borrow().is_absolute_path(&directory) {
-            directory = std::path::Path::new(&Platform::get_cwd(false)?)
-                .join(&directory)
-                .into_os_string()
-                .into_string()
-                .unwrap();
+            directory = Platform::get_cwd(false)?.join(&directory);
         }
-        if directory.is_empty() {
+        if directory.as_os_str().is_empty() {
             return Err(UnexpectedValueException::new(
                 "Got an empty target directory, something went wrong".to_string(),
             )
@@ -489,7 +475,7 @@ impl CreateProjectCommand {
         // set the base dir to ensure $config->all() below resolves the correct absolute paths to vendor-dir etc
         config
             .borrow_mut()
-            .set_base_dir(Some(BString::from(directory.clone())));
+            .set_base_dir(Some(BString::from(path_to_bytes(&directory))));
         if !secure_http {
             let mut merge_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             let mut inner_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
@@ -502,7 +488,7 @@ impl CreateProjectCommand {
 
         io.write_error(format!(
             "<info>Creating a \"{}\" project at \"{}\"</info>",
-            package_name,
+            package_name.display_lossy(),
             fs.borrow()
                 .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?
                 .display()
@@ -512,14 +498,14 @@ impl CreateProjectCommand {
             if !is_dir(&directory) {
                 return Err(InvalidArgumentException::new(format!(
                     "Cannot create project directory at \"{}\", it exists as a file.",
-                    directory
+                    directory.display()
                 ))
                 .into());
             }
             if !fs.borrow().is_dir_empty(&directory) {
                 return Err(InvalidArgumentException::new(format!(
                     "Project directory \"{}\" is not empty.",
-                    directory
+                    directory.display()
                 ))
                 .into());
             }
@@ -527,37 +513,37 @@ impl CreateProjectCommand {
 
         if stability.is_none() {
             if package_version.is_none() {
-                stability = Some("stable".to_string());
+                stability = Some("stable".into());
             } else {
                 let matched = preg_match(
                     format!(
                         "{{^[^,\\s]*?@({})$}}i",
-                        legacy_lossy(&implode(
+                        implode(
                             "|",
                             &STABILITIES
                                 .keys()
                                 .map(|k| k.to_string())
                                 .collect::<Vec<_>>()
-                        ))
+                        )
+                        .display_lossy()
                     ),
-                    package_version.as_deref().unwrap_or_default(),
+                    package_version
+                        .as_ref()
+                        .map(|v| v.as_bstr())
+                        .unwrap_or_default(),
                 );
                 if let Some(matched) = matched {
-                    stability = Some(legacy_lossy(matched.get(1).unwrap_or_default()).into_owned());
+                    stability = Some(BString::from(matched.get(1).unwrap_or_default()));
                 } else {
-                    stability = Some(
-                        legacy_lossy(&VersionParser::parse_stability(
-                            package_version.as_deref().unwrap_or_default(),
-                        ))
-                        .into_owned(),
-                    );
+                    stability = Some(VersionParser::parse_stability(
+                        package_version.clone().unwrap_or_default(),
+                    ));
                 }
             }
         }
 
         let stability =
-            VersionParser::normalize_stability(stability.as_deref().unwrap_or_default())
-                .unwrap_or_default();
+            VersionParser::normalize_stability(stability.unwrap_or_default()).unwrap_or_default();
 
         if crate::package::stability_priority(&stability).is_none() {
             return Err(InvalidArgumentException::new(format!(
@@ -587,7 +573,7 @@ impl CreateProjectCommand {
         // set the base dir here again on the new config instance, as otherwise in case the vendor dir is defined in an env var for example it would still override the value set above by $config->all()
         config
             .borrow_mut()
-            .set_base_dir(Some(BString::from(directory.clone())));
+            .set_base_dir(Some(BString::from(path_to_bytes(&directory))));
         let rm = composer.get_repository_manager();
 
         let mut repository_set = RepositorySet::new(
@@ -660,17 +646,7 @@ impl CreateProjectCommand {
         let mut platform_repo = PlatformRepository::new(
             vec![],
             match platform_overrides {
-                PhpMixed::Array(m) => m
-                    .iter()
-                    .map(|(k, v)| {
-                        (
-                            k.clone(),
-                            PhpMixed::string(
-                                legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
-                            ),
-                        )
-                    })
-                    .collect(),
+                PhpMixed::Array(m) => m,
                 _ => indexmap::IndexMap::new(),
             },
             None,
@@ -684,7 +660,7 @@ impl CreateProjectCommand {
         )?;
         let package = version_selector.find_best_candidate(
             bstr::BStr::new(&name),
-            package_version.as_deref(),
+            package_version.as_ref().map(BString::as_ref),
             bstr::BStr::new(&stability),
             Some(platform_requirement_filter.clone()),
             0,
@@ -695,11 +671,11 @@ impl CreateProjectCommand {
         if package.is_none() {
             let error_message = format!(
                 "Could not find package {} with {}",
-                name,
+                name.display_lossy(),
                 if let Some(v) = package_version.as_ref() {
-                    format!("version {}", v)
+                    format!("version {}", v.display_lossy())
                 } else {
-                    format!("stability {}", legacy_lossy(&stability))
+                    format!("stability {}", stability.display_lossy())
                 }
             );
             let is_ignore_all = platform_requirement_filter
@@ -710,7 +686,7 @@ impl CreateProjectCommand {
                 && version_selector
                     .find_best_candidate(
                         bstr::BStr::new(&name),
-                        package_version.as_deref(),
+                        package_version.as_ref().map(BString::as_ref),
                         bstr::BStr::new(&stability),
                         Some(PlatformRequirementFilterFactory::ignore_all()),
                         0,
@@ -732,7 +708,7 @@ impl CreateProjectCommand {
 
         // handler Ctrl+C aborts gracefully
         let _ = mkdir(&directory, 0o777, true);
-        let real_dir = realpath(&directory).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+        let real_dir = realpath(&directory);
         let signals = real_dir.as_ref().map(|_| SignalSubscription::new());
         let abort_on_signal = |signals: &SignalSubscription| {
             io.write_error3(
@@ -777,8 +753,7 @@ impl CreateProjectCommand {
         dm.borrow_mut().set_prefer_source(prefer_source);
         dm.borrow_mut().set_prefer_dist(prefer_dist);
 
-        let project_installer =
-            ProjectInstaller::new(std::path::Path::new(&directory), dm.clone(), fs);
+        let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs);
         let installation_manager = composer.get_installation_manager().clone();
         {
             let mut im = installation_manager.borrow_mut();
@@ -823,13 +798,16 @@ impl CreateProjectCommand {
             .get_installation_source()
             .is_some_and(|s| s == "source");
 
-        io.write_error(format!("<info>Created project in {}</info>", directory));
+        io.write_error(format!(
+            "<info>Created project in {}</info>",
+            directory.display()
+        ));
         chdir(&directory);
 
         // ensure that the env var being set does not interfere with create-project
         // as it is probably not meant to be used here, so we do not use it if a composer.json can be found
         // in the project
-        if file_exists(format!("{}/composer.json", directory))
+        if file_exists(path_from_bytes(&bconcat!(directory, "/composer.json")))
             && Platform::get_env("COMPOSER").is_some()
         {
             Platform::clear_env("COMPOSER");
@@ -967,22 +945,22 @@ impl Command for CreateProjectCommand {
                 .borrow()
                 .get_argument("package")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned()),
+                .map(BString::from),
             input
                 .borrow()
                 .get_argument("directory")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned()),
+                .map(|s| path_from_bytes(s).to_path_buf()),
             input
                 .borrow()
                 .get_argument("version")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned()),
+                .map(BString::from),
             input
                 .borrow()
                 .get_option("stability")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned()),
+                .map(BString::from),
             prefer_source,
             prefer_dist,
             !input

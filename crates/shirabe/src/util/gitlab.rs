@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
@@ -247,8 +247,7 @@ impl GitLab {
         let mut store_in_local_auth_config = false;
         if has_local_auth_config {
             store_in_local_auth_config = self.io.ask_confirmation(
-                "A local auth config source was found, do you want to store the token there?"
-                    .to_string(),
+                "A local auth config source was found, do you want to store the token there?",
                 true,
             )?;
         }
@@ -428,13 +427,13 @@ impl GitLab {
     }
 
     fn create_token(&mut self, scheme: &BStr, origin_url: &BStr) -> anyhow::Result<PhpMixed> {
-        let username = match self.io.ask("Username: ".into(), PhpMixed::Null)? {
+        let username = match self.io.ask("Username: ", PhpMixed::Null)? {
             PhpMixed::String(s) => s,
             _ => BString::default(),
         };
         let password = self
             .io
-            .ask_and_hide_answer("Password: ".to_string())?
+            .ask_and_hide_answer("Password: ")?
             .unwrap_or_default();
 
         let headers = vec!["Content-Type: application/x-www-form-urlencoded".to_string()];
@@ -442,7 +441,7 @@ impl GitLab {
         let api_url = origin_url;
         let data = http_build_query(&[
             (B("username"), username.as_slice()),
-            (B("password"), password.as_bytes()),
+            (B("password"), password.as_slice()),
             (B("grant_type"), B("password")),
         ]);
         let mut http_inner: IndexMap<BString, PhpMixed> = IndexMap::new();

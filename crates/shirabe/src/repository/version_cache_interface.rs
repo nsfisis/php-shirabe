@@ -19,5 +19,5 @@ pub enum VersionCacheResult {
 }
 
 pub trait VersionCacheInterface: std::fmt::Debug {
-    fn get_version_package(&self, version: &str, identifier: &BStr) -> VersionCacheResult;
+    fn get_version_package(&self, version: &BStr, identifier: &BStr) -> VersionCacheResult;
 }

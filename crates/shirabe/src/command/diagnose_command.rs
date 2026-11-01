@@ -18,13 +18,13 @@ use crate::repository::{
 use crate::self_update::{Keys, Versions};
 use crate::util::http::{ProxyManager, RequestProxy};
 use crate::util::{ConfigValidator, Git, HttpDownloader, IniHelper, Platform, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,
-    PhpMixed, RuntimeException, bconcat, disk_free_space, file_exists, filter_var_boolean, hash,
-    impl_php_class, implode, legacy_lossy, php_regex, preg_match, rtrim2, str_replace, strpos,
-    strstr, strstr3, strtolower, trim2, version_compare,
+    PhpMixed, bconcat, disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class,
+    implode, path_from_bytes, php_regex, preg_match, rtrim2, str_replace, strpos, strstr, strstr3,
+    strtolower, trim2, version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -98,7 +98,9 @@ impl DiagnoseCommand {
             }
 
             return Ok(CheckResult::Message(
-                legacy_lossy(&rtrim2(&output, " \t\n\r\0\u{0B}")).into_owned(),
+                rtrim2(&output, " \t\n\r\0\u{0B}")
+                    .display_lossy()
+                    .to_string(),
             ));
         }
 
@@ -121,7 +123,9 @@ impl DiagnoseCommand {
                     }
 
                     return Ok(CheckResult::Message(
-                        legacy_lossy(&trim2(&output, " \t\n\r\0\u{0B}")).into_owned(),
+                        trim2(&output, " \t\n\r\0\u{0B}")
+                            .display_lossy()
+                            .to_string(),
                     ));
                 }
                 return Err(e);
@@ -138,7 +142,7 @@ impl DiagnoseCommand {
             );
         }
 
-        let mut output = String::new();
+        let mut output = BString::default();
         let _ = self
             .process
             .borrow()
@@ -240,7 +244,7 @@ impl DiagnoseCommand {
 
     fn check_composer_repo(
         &self,
-        url: &str,
+        url: &BStr,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
     ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
@@ -250,7 +254,8 @@ impl DiagnoseCommand {
 
         let mut result_list: Vec<String> = vec![];
         let mut tls_warning: Option<String> = None;
-        if url.starts_with("https://") && config.borrow().get("disable-tls").as_bool() == Some(true)
+        if url.starts_with(b"https://")
+            && config.borrow().get("disable-tls").as_bool() == Some(true)
         {
             tls_warning = Some("<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
@@ -383,7 +388,7 @@ impl DiagnoseCommand {
         }
     }
 
-    fn check_github_oauth(&self, domain: &str, token: &str) -> anyhow::Result<CheckResult> {
+    fn check_github_oauth(&self, domain: &BStr, token: &BStr) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
@@ -395,9 +400,9 @@ impl DiagnoseCommand {
             Some(BString::from("x-oauth-basic")),
         );
         let url = if domain == "github.com" {
-            format!("https://api.{}/", domain)
+            bconcat!("https://api.", domain, "/")
         } else {
-            format!("https://{}/api/v3/", domain)
+            bconcat!("https://", domain, "/api/v3/")
         };
 
         let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -431,7 +436,8 @@ impl DiagnoseCommand {
                 {
                     return Ok(CheckResult::Message(format!(
                         "<comment>The oauth token for {} seems invalid, run \"shirabe config --global --unset github-oauth.{}\" to remove it</comment>",
-                        domain, domain
+                        domain.display_lossy(),
+                        domain.display_lossy()
                     )));
                 }
                 Ok(CheckResult::Exception(e))
@@ -495,24 +501,22 @@ impl DiagnoseCommand {
         }
 
         let min_space_free: f64 = (1024 * 1024) as f64;
-        let home_dir =
-            legacy_lossy(config.get("home").as_string().unwrap_or_default()).into_owned();
-        let vendor_dir =
-            legacy_lossy(config.get("vendor-dir").as_string().unwrap_or_default()).into_owned();
-        let mut dir = home_dir.clone();
-        let df_home = disk_free_space(&home_dir);
+        let home_dir = config.get("home");
+        let dir = path_from_bytes(home_dir.as_string().unwrap_or_default());
+        let df_home = disk_free_space(dir);
         if df_home.map(|d| d < min_space_free).unwrap_or(false) {
             return CheckResult::Message(format!(
                 "<error>The disk hosting {} is full</error>",
-                dir
+                dir.display()
             ));
         }
-        dir = vendor_dir.clone();
-        let df_vendor = disk_free_space(&vendor_dir);
+        let vendor_dir = config.get("vendor-dir");
+        let dir = path_from_bytes(vendor_dir.as_string().unwrap_or_default());
+        let df_vendor = disk_free_space(dir);
         if df_vendor.map(|d| d < min_space_free).unwrap_or(false) {
             return CheckResult::Message(format!(
                 "<error>The disk hosting {} is full</error>",
-                dir
+                dir.display()
             ));
         }
 
@@ -520,29 +524,32 @@ impl DiagnoseCommand {
     }
 
     fn check_pub_keys(&self, config: &Config) -> anyhow::Result<CheckResult> {
-        let home = legacy_lossy(config.get("home").as_string().unwrap_or_default()).into_owned();
+        let home = config.get("home");
+        let home = home.as_string().unwrap_or_default();
+        let keys_tags = bconcat!(home, "/keys.tags.pub");
+        let keys_tags = path_from_bytes(&keys_tags);
+        let keys_dev = bconcat!(home, "/keys.dev.pub");
+        let keys_dev = path_from_bytes(&keys_dev);
         let mut errors: Vec<String> = vec![];
         let io = self.get_io();
 
-        if file_exists(format!("{}/keys.tags.pub", home))
-            && file_exists(format!("{}/keys.dev.pub", home))
-        {
+        if file_exists(keys_tags) && file_exists(keys_dev) {
             io.write("");
         }
 
-        if file_exists(format!("{}/keys.tags.pub", home)) {
+        if file_exists(keys_tags) {
             io.write(format!(
                 "Tags Public Key Fingerprint: {}",
-                Keys::fingerprint(&format!("{}/keys.tags.pub", home))?
+                Keys::fingerprint(keys_tags)?
             ));
         } else {
             errors.push("<error>Missing pubkey for tags verification</error>".to_string());
         }
 
-        if file_exists(format!("{}/keys.dev.pub", home)) {
+        if file_exists(keys_dev) {
             io.write(format!(
                 "Dev Public Key Fingerprint: {}",
-                Keys::fingerprint(&format!("{}/keys.dev.pub", home))?
+                Keys::fingerprint(keys_dev)?
             ));
         } else {
             errors.push("<error>Missing pubkey for dev verification</error>".to_string());
@@ -580,19 +587,16 @@ impl DiagnoseCommand {
             Err(e) => return Ok(CheckResult::Exception(e)),
         };
 
-        let latest_version = legacy_lossy(
-            latest
-                .get(B("version"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default(),
-        )
-        .into_owned();
+        let latest_version = latest
+            .get(B("version"))
+            .and_then(|v| v.as_string())
+            .unwrap_or_default();
         if composer::VERSION != latest_version && composer::VERSION != "@package_version@" {
             return Ok(CheckResult::Message(format!(
                 "<comment>You are not running the latest {} version, run `shirabe self-update` to update ({} => {})</comment>",
                 versions_util.get_channel()?,
                 composer::VERSION,
-                latest_version
+                latest_version.display_lossy()
             )));
         }
 
@@ -621,13 +625,7 @@ impl DiagnoseCommand {
         // Composer PHP runtime. The handle holds the file in place while the repository reads it.
         let installed =
             shirabe_php_rpc::composer_runtime::local_file("vendor/composer/installed.json")?;
-        // TODO(bytes): JsonFile holds its path as a string, since it takes http URLs too, so the
-        // path has to be representable as UTF-8.
-        let path = installed.path();
-        let path = path.to_str().ok_or_else(|| {
-            RuntimeException::new(format!("Path contains invalid UTF-8: {}", path.display()))
-        })?;
-        let installed_json = JsonFile::new(path, None, None)?;
+        let installed_json = JsonFile::new(installed.path(), None, None)?;
         if !installed_json.exists() {
             return Ok(CheckResult::Message(
                 "<warning>Could not find Composer's installed.json, this must be a non-standard Composer installation.</>".to_string(),
@@ -699,6 +697,7 @@ impl DiagnoseCommand {
                     .downcast_ref::<BufferIO>()
                     .unwrap()
                     .get_output()
+                    .display_lossy()
             )));
         }
 
@@ -749,11 +748,11 @@ impl DiagnoseCommand {
 
             return format!(
                 "<comment>{}</comment> libz <comment>{}</comment> brotli <comment>{}</comment> zstd <comment>{}</comment> ssl <comment>{}</comment> HTTP <comment>{}</comment>",
-                legacy_lossy(&version.version),
-                legacy_lossy(&libz_version),
-                legacy_lossy(&brotli_version),
+                version.version.display_lossy(),
+                libz_version.display_lossy(),
+                brotli_version.display_lossy(),
                 if has_zstd { "supported" } else { "missing" },
-                legacy_lossy(&ssl_version),
+                ssl_version.display_lossy(),
                 http_versions,
             );
         }
@@ -852,14 +851,19 @@ impl DiagnoseCommand {
         {
             errors.insert(
                 "ioncube".to_string(),
-                Some(legacy_lossy(&diagnostics.ioncube_loader_version.clone()).into_owned()),
+                Some(
+                    diagnostics
+                        .ioncube_loader_version
+                        .display_lossy()
+                        .to_string(),
+                ),
             );
         }
 
         if diagnostics.php_version_id < 70205 {
             errors.insert(
                 "php".to_string(),
-                Some(legacy_lossy(&diagnostics.php_version.clone()).into_owned()),
+                Some(diagnostics.php_version.display_lossy().to_string()),
             );
         }
 
@@ -888,14 +892,13 @@ impl DiagnoseCommand {
             php_regex!("{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"),
             &diagnostics.phpinfo_general,
         ) {
-            let configure = legacy_lossy(phpinfo_match.get(1).unwrap_or_default()).into_owned();
-            let configure = configure.as_str();
+            let configure = phpinfo_match.get(1).unwrap_or_default();
 
-            if configure.contains("--enable-sigchild") {
+            if configure.contains_str("--enable-sigchild") {
                 warnings.insert("sigchild".to_string(), None);
             }
 
-            if configure.contains("--with-curlwrappers") {
+            if configure.contains_str("--with-curlwrappers") {
                 warnings.insert("curlwrappers".to_string(), None);
             }
         }
@@ -917,7 +920,7 @@ impl DiagnoseCommand {
         {
             warnings.insert(
                 "onedrive".to_string(),
-                Some(legacy_lossy(&diagnostics.php_version.clone()).into_owned()),
+                Some(diagnostics.php_version.display_lossy().to_string()),
             );
         }
 
@@ -1040,7 +1043,7 @@ impl DiagnoseCommand {
 
                         format!(
                             "The OpenSSL library ({}) used by PHP does not support TLSv1.2 or TLSv1.1.{}If possible you should upgrade OpenSSL to version 1.0.1 or above.",
-                            legacy_lossy(&openssl_version),
+                            openssl_version.display_lossy(),
                             PHP_EOL
                         )
                     }
@@ -1288,7 +1291,7 @@ impl Command for DiagnoseCommand {
         io.write(format!(
             "OpenSSL version: {}",
             match &diagnostics.openssl_version_text {
-                Some(text) => format!("<comment>{}</comment>", legacy_lossy(&text)),
+                Some(text) => format!("<comment>{}</comment>", text.display_lossy()),
                 None => "<error>missing</error>".to_string(),
             }
         ));
@@ -1398,11 +1401,11 @@ impl Command for DiagnoseCommand {
                 // PHP: ReflectionMethod($composerRepo, 'getPackagesJsonUrl')
                 // We surface the same internal call by directly invoking the equivalent method.
                 // TODO(plugin): support reflection-based access if plugin code requires it.
-                let url = legacy_lossy(&composer_repo.get_packages_json_url()).into_owned();
-                if !url.starts_with("http") {
+                let url = composer_repo.get_packages_json_url();
+                if !url.starts_with(b"http") {
                     continue;
                 }
-                if url.starts_with("https://repo.packagist.org") {
+                if url.starts_with(b"https://repo.packagist.org") {
                     continue;
                 }
                 io.write_no_newline(format!(
@@ -1413,7 +1416,7 @@ impl Command for DiagnoseCommand {
                         .unwrap_or_default()
                         .display_lossy()
                 ));
-                let r = self.check_composer_repo(&url, &config)?;
+                let r = self.check_composer_repo(url.as_bstr(), &config)?;
                 self.output_result(r);
             }
         }
@@ -1465,11 +1468,8 @@ impl Command for DiagnoseCommand {
                     "Checking {} oauth access: ",
                     domain.display_lossy()
                 ));
-                let r = self.check_github_oauth(
-                    // TODO(bytes): domains are Strings, so non-UTF-8 bytes are replaced.
-                    &domain.to_str_lossy(),
-                    &token.as_string().unwrap_or_default().to_str_lossy(),
-                )?;
+                let r = self
+                    .check_github_oauth(domain.as_bstr(), token.as_string().unwrap_or_default())?;
                 self.output_result(r);
             }
         } else {

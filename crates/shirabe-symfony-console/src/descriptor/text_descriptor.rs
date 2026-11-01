@@ -9,7 +9,7 @@ use crate::formatter::OutputFormatter;
 use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, bconcat, count, json_encode_ex,
@@ -253,7 +253,7 @@ impl TextDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
+            Some(PhpMixed::String(s)) => Some(s.display_lossy().to_string()),
             _ => None,
         };
         let mut description =
@@ -333,7 +333,7 @@ impl TextDescriptor {
                                 && command_keys.iter().any(|key| name == key)
                             {
                                 merged.push(CommandOrString::String(
-                                    name.to_str_lossy().into_owned(),
+                                    name.display_lossy().to_string(),
                                 ));
                             }
                         }
@@ -360,9 +360,9 @@ impl TextDescriptor {
                         .iter()
                         .filter_map(|n| match n {
                             PhpMixed::String(name)
-                                if commands.contains_key(&*name.to_str_lossy()) =>
+                                if commands.contains_key(&*name.display_lossy().to_string()) =>
                             {
-                                Some(name.to_str_lossy().into_owned())
+                                Some(name.display_lossy().to_string())
                             }
                             _ => None,
                         })
@@ -375,7 +375,7 @@ impl TextDescriptor {
                 }
 
                 let namespace_id = match namespace.get(B("id")) {
-                    Some(PhpMixed::String(s)) => s.to_str_lossy().into_owned(),
+                    Some(PhpMixed::String(s)) => s.display_lossy().to_string(),
                     _ => String::new(),
                 };
 

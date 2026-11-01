@@ -8,10 +8,11 @@ use crate::json::JsonFile;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::repository_interface::{self, AbandonedInfo, RepositoryInterface};
 use crate::repository::{CompositeRepository, PlatformRepository, RepositoryInterfaceHandle};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, impl_php_class, implode, in_array_loose, legacy_lossy,
-    preg_quote, substr,
+    InvalidArgumentException, PhpMixed, STR_PAD_RIGHT, bconcat, impl_php_class, implode,
+    in_array_loose, preg_quote, str_pad, substr,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -115,8 +116,8 @@ impl Command for SearchCommand {
             .borrow()
             .get_option("format")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned())
-            .unwrap_or_else(|| "text".to_string());
+            .map(BString::from)
+            .unwrap_or_else(|| BString::from("text"));
         if !in_array_loose(
             format.clone(),
             &[
@@ -126,7 +127,7 @@ impl Command for SearchCommand {
         ) {
             io.write_error(format!(
                 "Unsupported format \"{}\". See help for supported formats.",
-                format
+                format.display_lossy()
             ));
             return Ok(1);
         }
@@ -197,23 +198,19 @@ impl Command for SearchCommand {
             .borrow()
             .get_option("type")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BString::from);
 
         let tokens_arg = input.borrow().get_argument("tokens")?;
         let token_strings: Vec<bstr::BString> = tokens_arg
             .as_array()
             .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
-        let mut query = legacy_lossy(&implode(" ", &token_strings)).into_owned();
+        let mut query = implode(" ", &token_strings);
         if mode != repository_interface::SEARCH_FULLTEXT {
-            query = legacy_lossy(&preg_quote(&query, None)).into_owned();
+            query = BString::from(preg_quote(&query, None));
         }
 
-        let results = repos.search(
-            bstr::BString::from(query),
-            mode,
-            r#type.map(bstr::BString::from),
-        )?;
+        let results = repos.search(query, mode, r#type)?;
 
         if !results.is_empty() && format == "text" {
             let width = self.get_terminal_width();
@@ -230,33 +227,29 @@ impl Command for SearchCommand {
                     ""
                 };
                 let remaining = width - name_length - warning.len() as i64 - 2;
-                let description = legacy_lossy(&if description.len() as i64 > remaining {
-                    format!(
-                        "{}...",
-                        legacy_lossy(&substr(&description, 0, Some(remaining - 3)))
-                    )
+                let description = if description.len() as i64 > remaining {
+                    bconcat!(substr(&description, 0, Some(remaining - 3)), "...")
                 } else {
-                    legacy_lossy(&description).into_owned()
-                })
-                .into_owned();
+                    description
+                };
 
                 let link = result.url.as_deref();
                 if let Some(link) = link {
-                    io.write(format!(
-                        "<href={}>{}</>{}{}{}",
-                        OutputFormatter::escape(link)?.display_lossy(),
-                        result.name.display_lossy(),
+                    io.write(bconcat!(
+                        "<href=",
+                        OutputFormatter::escape(link)?,
+                        ">",
+                        result.name,
+                        "</>",
                         " ".repeat(name_length as usize - result.name.len()),
                         warning,
                         description
                     ));
                 } else {
-                    io.write(format!(
-                        "{:<width$}{}{}",
-                        result.name.display_lossy(),
+                    io.write(bconcat!(
+                        str_pad(&result.name, name_length as usize, " ", STR_PAD_RIGHT),
                         warning,
-                        description,
-                        width = name_length as usize
+                        description
                     ));
                 }
             }

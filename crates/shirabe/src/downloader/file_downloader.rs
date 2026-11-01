@@ -210,7 +210,7 @@ impl FileDownloader {
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.borrow().write_error(format!(
             "  - {}{}",
-            UpdateOperation::format(initial.clone(), target.clone(), false),
+            UpdateOperation::format(initial.clone(), target.clone(), false).display_lossy(),
             install_operation_appendix
         ));
 
@@ -725,7 +725,7 @@ impl DownloaderInterface for FileDownloader {
         if output {
             self.io.borrow().write_error(format!(
                 "  - {}",
-                InstallOperation::format(package.clone(), false)
+                InstallOperation::format(package.clone(), false).display_lossy()
             ));
         }
 
@@ -802,7 +802,7 @@ impl DownloaderInterface for FileDownloader {
         if output {
             self.io.borrow().write_error(format!(
                 "  - {}",
-                UninstallOperation::format(package, false)
+                UninstallOperation::format(package, false).display_lossy()
             ));
         }
         let result = Filesystem::remove_directory_async_via(&self.filesystem, path).await?;

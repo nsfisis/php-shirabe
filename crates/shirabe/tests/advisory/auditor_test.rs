@@ -2,7 +2,7 @@
 
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::test_case::{get_complete_package, get_package};
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice};
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe::advisory::{AnySecurityAdvisory, Auditor, PartialSecurityAdvisory, SecurityAdvisory};
@@ -620,6 +620,8 @@ Found 2 abandoned packages:
                 .downcast_ref::<BufferIO>()
                 .unwrap()
                 .get_output()
+                .display_lossy()
+                .to_string()
                 .replace('\r', "")
                 .trim()
         );
@@ -982,12 +984,12 @@ fn test_audit_with_ignore_unreachable() {
             .downcast_ref::<BufferIO>()
             .unwrap()
             .get_output();
-        assert!(output.contains("The following repositories were unreachable:"));
-        assert!(output.contains("HTTP/1.1 404 Not Found"));
-        assert!(output.contains("First repo advisory"));
-        assert!(output.contains("Third repo advisory"));
-        assert!(output.contains("CVE-2023-12345"));
-        assert!(output.contains("CVE-2023-67890"));
+        assert!(output.contains_str("The following repositories were unreachable:"));
+        assert!(output.contains_str("HTTP/1.1 404 Not Found"));
+        assert!(output.contains_str("First repo advisory"));
+        assert!(output.contains_str("Third repo advisory"));
+        assert!(output.contains_str("CVE-2023-12345"));
+        assert!(output.contains_str("CVE-2023-67890"));
     }
 
     // With JSON format the unreachable repositories and advisories are both included.
@@ -1013,7 +1015,7 @@ fn test_audit_with_ignore_unreachable() {
             .unwrap();
         assert_eq!(Auditor::STATUS_VULNERABLE, result);
 
-        let json: serde_json::Value = serde_json::from_str(
+        let json: serde_json::Value = serde_json::from_slice(
             &io.borrow()
                 .as_any()
                 .downcast_ref::<BufferIO>()

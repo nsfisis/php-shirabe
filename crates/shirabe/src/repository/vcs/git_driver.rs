@@ -11,8 +11,8 @@ use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, dirname, is_dir,
-    is_writable, legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_replace, realpath, sys_get_temp_dir, trim, utf8_text,
+    is_writable, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
+    preg_replace, realpath, sys_get_temp_dir, trim, utf8_text,
 };
 
 #[derive(Debug)]
@@ -139,15 +139,11 @@ impl GitDriver {
         );
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            format!(
-                "{}/{}",
-                legacy_lossy(&cache_repo_dir),
-                legacy_lossy(&preg_replace(
-                    r"{[^a-z0-9.]}i",
-                    "-",
-                    Url::sanitize(BString::from(&cache_url[..]))
-                ))
-            ),
+            path_from_bytes(&bconcat!(
+                cache_repo_dir,
+                "/",
+                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&cache_url))
+            )),
             None,
             None,
             false,
@@ -227,7 +223,7 @@ impl GitDriver {
         map
     }
 
-    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<BString, BString>> {
+    pub fn get_dist(&self, _identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         None
     }
 
@@ -397,9 +393,7 @@ impl GitDriver {
             if process.borrow_mut().execute(
                 &["git".to_string(), "tag".to_string()],
                 &mut output,
-                Some(std::path::Path::new(&*legacy_lossy(path_to_bytes(
-                    path_from_bytes(&url),
-                )))),
+                Some(path_from_bytes(&url)),
             )? == 0
             {
                 return Ok(true);
@@ -514,7 +508,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitDriver {
     }
 
     fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
-        GitDriver::get_dist(self, &legacy_lossy(identifier))
+        GitDriver::get_dist(self, identifier)
     }
 
     fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {

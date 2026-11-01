@@ -151,21 +151,21 @@ impl NoProxyPattern {
         if net.is_empty() {
             return Err(RuntimeException::new(format!(
                 "Could not parse network IP {}",
-                String::from_utf8_lossy(net)
+                net.as_bstr().display_lossy()
             ))
             .into());
         }
         if mask.is_empty() {
             return Err(RuntimeException::new(format!(
                 "Could not parse netmask {}",
-                String::from_utf8_lossy(mask)
+                mask.as_bstr().display_lossy()
             ))
             .into());
         }
         if ip.is_empty() {
             return Err(RuntimeException::new(format!(
                 "Could not parse target IP {}",
-                String::from_utf8_lossy(ip)
+                ip.as_bstr().display_lossy()
             ))
             .into());
         }
@@ -308,14 +308,14 @@ impl NoProxyPattern {
         if netmask.is_empty() {
             return Err(RuntimeException::new(format!(
                 "Could not parse netmask {}",
-                String::from_utf8_lossy(&netmask)
+                netmask.as_bstr().display_lossy()
             ))
             .into());
         }
         if range_ip.is_empty() {
             return Err(RuntimeException::new(format!(
                 "Could not parse range IP {}",
-                String::from_utf8_lossy(range_ip)
+                range_ip.as_bstr().display_lossy()
             ))
             .into());
         }

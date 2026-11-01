@@ -15,7 +15,7 @@ fn root_require_rule() -> std::rc::Rc<std::cell::RefCell<Rule>> {
         vec![],
         RULE_ROOT_REQUIRE,
         ReasonData::RootRequire {
-            package_name: String::new(),
+            package_name: bstr::BString::default(),
             constraint: MatchAllConstraint::new(None).into(),
         },
     ))))

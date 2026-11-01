@@ -8,9 +8,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
     array_map, bconcat, escapeshellarg, explode, implode, in_array_strict, intval, is_dir,
-    is_numeric, legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim2, str_replace, strcspn,
-    strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
+    is_numeric, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
+    preg_replace_callback, preg_replace2, preg_split, rtrim2, str_replace, strcspn, strlen,
+    strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
 use shirabe_symfony_process::{
     ExecutableFinder, Process, ProcessMock,
@@ -55,7 +55,7 @@ pub struct ProcessExecutorMockState {
     pub expectations: Option<Vec<MockExpectation>>,
     pub strict: bool,
     pub default_handler: MockHandler,
-    pub log: Vec<String>,
+    pub log: Vec<BString>,
 }
 
 /// A single expected command (`array{cmd, return, stdout, stderr, callback}` in PHP).
@@ -169,7 +169,7 @@ impl ProcessExecutor {
         &self,
         command: CommandLine,
         cwd: Option<&Path>,
-        env: Option<IndexMap<String, String>>,
+        env: Option<IndexMap<BString, BString>>,
         tty: bool,
         output: O,
     ) -> anyhow::Result<Option<i64>>
@@ -196,7 +196,7 @@ impl ProcessExecutor {
                 Process::from_shell_commandline(
                     &command,
                     cwd,
-                    env,
+                    None,
                     PhpMixed::Null,
                     Some(Self::get_timeout() as f64),
                 )?
@@ -211,12 +211,19 @@ impl ProcessExecutor {
                 Process::new(
                     command,
                     cwd.map(Path::to_path_buf),
-                    env,
+                    None,
                     PhpMixed::Null,
                     Some(Self::get_timeout() as f64),
                 )?
             }
         };
+        if let Some(env) = env {
+            process.set_env(
+                env.into_iter()
+                    .map(|(name, value)| (name, PhpMixed::string(value)))
+                    .collect(),
+            );
+        }
 
         if !Platform::is_windows() && tty {
             // PHP: try { $process->setTty(true); } catch (RuntimeException $e) { /* ignore */ }
@@ -303,7 +310,7 @@ impl ProcessExecutor {
         self.capture_output.set(output.capture_output());
         *self.error_output.borrow_mut() = BString::default();
 
-        let mut env: Option<IndexMap<String, String>> = None;
+        let mut env: Option<IndexMap<BString, BString>> = None;
 
         let requires_git_dir_env = self.requires_git_dir_env(&command);
         if let Some(cwd) = cwd
@@ -315,12 +322,8 @@ impl ProcessExecutor {
             )));
             if is_bare_repository {
                 let mut config_value = BString::default();
-                let mut git_env: IndexMap<String, String> = IndexMap::new();
-                // TODO(bytes): Process takes the environment as Strings.
-                git_env.insert(
-                    "GIT_DIR".to_string(),
-                    legacy_lossy(path_to_bytes(cwd)).into_owned(),
-                );
+                let mut git_env: IndexMap<BString, BString> = IndexMap::new();
+                git_env.insert("GIT_DIR".into(), path_to_bytes(cwd).into());
                 self.run_process(
                     CommandLine::Args(vec![
                         "git".into(),
@@ -357,11 +360,10 @@ impl ProcessExecutor {
         command: &CommandLine,
         cwd: Option<&Path>,
     ) -> anyhow::Result<(String, String, i64)> {
-        let command_string = legacy_lossy(&match command {
+        let command_string = match command {
             CommandLine::Args(args) => implode(" ", args),
             CommandLine::Shell(command) => command.clone(),
-        })
-        .into_owned();
+        };
 
         let mut mock = self.mock.as_ref().unwrap().borrow_mut();
         mock.log.push(command_string);
@@ -391,7 +393,7 @@ impl ProcessExecutor {
                 .filter(|exps| !exps.is_empty())
                 .map(|exps| format!("Expected {:?} at this point.", exps[0].cmd))
                 .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
-            let received = mock.log[..mock.log.len().saturating_sub(1)].join(PHP_EOL);
+            let received = implode(PHP_EOL, &mock.log[..mock.log.len().saturating_sub(1)]);
             // PHPUnit's `AssertionFailedError` (thrown by `ProcessExecutorMock::doExecute` on a
             // strict-mode mismatch) extends `\RuntimeException`, so PHP call sites that
             // `catch (\RuntimeException $e)` around a mock-driven git/hg/svn call (e.g.
@@ -406,7 +408,7 @@ impl ProcessExecutor {
                 expected,
                 PHP_EOL,
                 PHP_EOL,
-                received
+                received.display_lossy()
             ))
             .into());
         }
@@ -520,7 +522,7 @@ impl ProcessExecutor {
                 PHP_EOL,
                 PHP_EOL,
                 PHP_EOL,
-                mock.log.join(PHP_EOL)
+                implode(PHP_EOL, &mock.log).display_lossy()
             );
         }
     }
@@ -1067,24 +1069,6 @@ impl<'a> IntoExecOutput<'a> for &'a mut PhpMixed {
 
     fn write_back(&mut self, value: BString) {
         **self = PhpMixed::string(value);
-    }
-}
-
-/// `execute($cmd, $out)` where `$out` is consumed as a string: output is captured and assigned back
-/// directly.
-impl<'a> IntoExecOutput<'a> for &'a mut String {
-    fn capture_output(&self) -> bool {
-        true
-    }
-
-    fn to_callback(
-        self,
-    ) -> anyhow::Result<Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>>, Self> {
-        Err(self)
-    }
-
-    fn write_back(&mut self, value: BString) {
-        **self = legacy_lossy(&value).into_owned();
     }
 }
 

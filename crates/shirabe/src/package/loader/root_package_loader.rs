@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Loader/RootPackageLoader.php
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::{ArrayLoader, LoaderInterface, ValidatingArrayLoader};
 use crate::package::version::{VersionGuesser, VersionGuesserInterface, VersionParser};
 use crate::package::{RootPackage, STABILITIES, SUPPORTED_LINK_TYPES, stability_priority};
@@ -108,7 +108,7 @@ impl RootPackageLoader {
                         .and_then(|v| v.as_string())
                         .unwrap_or_default();
                     if name != "__root__" && package_type != "project" {
-                        io.warning(&format!(
+                        io.warning(format!(
                             "Shirabe could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
                             name.display_lossy()
                         ), &[]);

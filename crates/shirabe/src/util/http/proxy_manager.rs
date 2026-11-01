@@ -111,38 +111,34 @@ impl ProxyManager {
         // PHP_SAPI is always 'cli' for this application
         let (env, name) = Self::get_proxy_env("http_proxy");
         if let Some(env) = env {
-            self.http_proxy = Some(ProxyItem::new(env, name)?);
+            self.http_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
         }
 
         if self.http_proxy.is_none() {
             let (env, name) = Self::get_proxy_env("cgi_http_proxy");
             if let Some(env) = env {
-                self.http_proxy = Some(ProxyItem::new(env, name)?);
+                self.http_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
             }
         }
 
         let (env, name) = Self::get_proxy_env("https_proxy");
         if let Some(env) = env {
-            self.https_proxy = Some(ProxyItem::new(env, name)?);
+            self.https_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
         }
 
         let (env, _name) = Self::get_proxy_env("no_proxy");
         if let Some(env) = env {
-            *self.no_proxy_handler.borrow_mut() = Some(NoProxyPattern::new(&env));
+            *self.no_proxy_handler.borrow_mut() = Some(NoProxyPattern::new(env.as_encoded_bytes()));
         }
 
         Ok(())
     }
 
-    fn get_proxy_env(env_name: &str) -> (Option<String>, String) {
+    fn get_proxy_env(env_name: &str) -> (Option<std::ffi::OsString>, String) {
         for name in [env_name.to_lowercase(), env_name.to_uppercase()] {
             if let Some(val) = PHP_SERVER.lock().unwrap().get(&name)
                 && !val.is_empty()
             {
-                // TODO(bytes): the proxy URL is returned as a String.
-                let val = val
-                    .into_string()
-                    .unwrap_or_else(|val| panic!("{name} is not valid UTF-8: {val:?}"));
                 return (Some(val), name);
             }
         }

@@ -5,12 +5,12 @@ use crate::dependency_resolver::{Pool, Request};
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
 use crate::repository::{LockArrayRepository, PlatformRepository, RepositorySet};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, bconcat, extension_loaded, implode, legacy_lossy,
-    loosely_compare, php_regex, preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf,
-    str_replace, stripos, strpos, strtolower, substr, substr_count, version_compare,
+    CmpOp, LogicException, PhpMixed, bconcat, extension_loaded, implode, loosely_compare,
+    php_regex, preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf, str_replace,
+    stripos, strpos, strtolower, substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -62,7 +62,7 @@ impl Problem {
         is_verbose: bool,
         installed_map: &IndexMap<BString, BasePackageHandle>,
         learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         // TODO doesn't this entirely defeat the purpose of the problem sections? what's the point of sections?
         let mut reasons: Vec<std::rc::Rc<std::cell::RefCell<Rule>>> = Vec::new();
         for section_rules in self.reasons.values().rev() {
@@ -83,28 +83,25 @@ impl Problem {
             }
 
             let reason_data = rule_ref.get_reason_data();
-            let (package_name, constraint): (String, Option<&AnyConstraint>) = match reason_data {
+            let (package_name, constraint): (BString, Option<&AnyConstraint>) = match reason_data {
                 rule::ReasonData::RootRequire {
                     package_name,
                     constraint,
                 } => (package_name.clone(), Some(constraint)),
-                _ => (String::new(), None),
+                _ => (BString::default(), None),
             };
 
-            let packages = pool.compute_what_provides(bstr::BStr::new(&package_name), constraint);
+            let packages = pool.compute_what_provides(package_name.as_ref(), constraint);
             if packages.is_empty() {
                 let missing = Self::get_missing_package_reason(
                     repository_set,
                     request,
                     pool,
                     is_verbose,
-                    &package_name,
+                    package_name.as_ref(),
                     constraint,
                 )?;
-                return Ok(format!(
-                    "\n    {}",
-                    implode("", &[missing.0, missing.1]).display_lossy()
-                ));
+                return Ok(bconcat!("\n    ", implode("", &[missing.0, missing.1])));
             }
         }
 
@@ -136,46 +133,39 @@ impl Problem {
         )
     }
 
-    fn get_sortable_string(&self, pool: &Pool, rule: &Rule) -> String {
+    fn get_sortable_string(&self, pool: &Pool, rule: &Rule) -> BString {
         match rule.get_reason() {
             rule::RULE_ROOT_REQUIRE => match rule.get_reason_data() {
                 rule::ReasonData::RootRequire { package_name, .. } => package_name.clone(),
-                _ => String::new(),
+                _ => BString::default(),
             },
             rule::RULE_FIXED => match rule.get_reason_data() {
-                rule::ReasonData::Fixed { package } => {
-                    legacy_lossy(&package.get_unique_name()).into_owned()
-                }
-                _ => String::new(),
+                rule::ReasonData::Fixed { package } => package.get_unique_name(),
+                _ => BString::default(),
             },
             rule::RULE_PACKAGE_CONFLICT | rule::RULE_PACKAGE_REQUIRES => {
                 let source = rule.get_source_package(pool).unwrap();
                 let link_pretty = match rule.get_reason_data() {
                     rule::ReasonData::Link(link) => link.get_pretty_string(source.clone()),
-                    _ => bstr::BString::from(String::new()),
+                    _ => BString::default(),
                 };
-                format!(
-                    "{}//{}",
-                    source.get_unique_name().display_lossy(),
-                    link_pretty.display_lossy()
-                )
+                bconcat!(source.get_unique_name(), "//", link_pretty)
             }
             rule::RULE_PACKAGE_SAME_NAME
             | rule::RULE_PACKAGE_ALIAS
             | rule::RULE_PACKAGE_INVERSE_ALIAS => match rule.get_reason_data() {
                 rule::ReasonData::String(s) => s.clone(),
-                rule::ReasonData::BasePackage(p) => p.to_php_string().display_lossy().to_string(),
+                rule::ReasonData::BasePackage(p) => p.to_php_string(),
                 _ => unreachable!(),
             },
-            rule::RULE_LEARNED => legacy_lossy(&implode(
+            rule::RULE_LEARNED => implode(
                 "-",
                 &rule
                     .get_literals()
                     .iter()
                     .map(|l| l.to_string())
                     .collect::<Vec<_>>(),
-            ))
-            .into_owned(),
+            ),
             _ => {
                 panic!("Unknown rule type: {}", rule.get_reason());
             }
@@ -207,14 +197,14 @@ impl Problem {
         is_verbose: bool,
         installed_map: &IndexMap<BString, BasePackageHandle>,
         learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
-    ) -> anyhow::Result<String> {
-        let mut messages: Vec<String> = Vec::new();
-        let mut templates: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
+    ) -> anyhow::Result<BString> {
+        let mut messages: Vec<BString> = Vec::new();
+        let mut templates: IndexMap<BString, IndexMap<BString, IndexMap<BString, BString>>> =
             IndexMap::new();
         let parser = VersionParser::new();
         for rule in rules {
             let rule_ref = rule.borrow();
-            let mut message = rule_ref.get_pretty_string(
+            let message = rule_ref.get_pretty_string(
                 repository_set,
                 request,
                 pool,
@@ -236,16 +226,12 @@ impl Problem {
                 None
             };
             if let Some(m) = matched {
-                let pkg_key = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
-                message = legacy_lossy(&str_replace("%", "%%", &message)).into_owned();
-                let template =
-                    legacy_lossy(&preg_replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message))
-                        .into_owned();
+                let pkg_key = BString::from(m.get(1).unwrap_or_default());
+                let m2 = BString::from(m.get(2).unwrap_or_default());
+                let escaped_message = str_replace("%", "%%", &message);
+                let template = preg_replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &escaped_message);
                 messages.push(template.clone());
-                let version_key =
-                    legacy_lossy(&parser.normalize(&m2, Some(b"")).unwrap_or_default())
-                        .into_owned();
+                let version_key = parser.normalize(&m2, Some(b"")).unwrap_or_default();
                 templates
                     .entry(template.clone())
                     .or_default()
@@ -261,21 +247,18 @@ impl Problem {
                         .unwrap()
                         .get_mut(&pkg_key)
                         .unwrap()
-                        .insert(
-                            legacy_lossy(&version).into_owned(),
-                            legacy_lossy(&pretty_version).into_owned(),
-                        );
+                        .insert(version, pretty_version);
                 }
             } else if !message.is_empty() {
                 messages.push(message);
             }
         }
 
-        let mut result: Vec<String> = Vec::new();
+        let mut result: Vec<BString> = Vec::new();
         // array_unique preserves first-seen order
-        let mut unique_messages: Vec<String> = Vec::new();
+        let mut unique_messages: Vec<BString> = Vec::new();
         {
-            let mut seen: IndexMap<String, bool> = IndexMap::new();
+            let mut seen: IndexMap<BString, bool> = IndexMap::new();
             for m in &messages {
                 if !seen.contains_key(m) {
                     seen.insert(m.clone(), true);
@@ -288,7 +271,7 @@ impl Problem {
                 let entry = templates.get(message).unwrap().clone();
                 for (package, mut versions) in entry {
                     // uksort($versions, 'version_compare')
-                    let mut keys: Vec<String> = versions.keys().cloned().collect();
+                    let mut keys: Vec<BString> = versions.keys().cloned().collect();
                     keys.sort_by(|a, b| {
                         if version_compare(a, b, CmpOp::Lt) {
                             std::cmp::Ordering::Less
@@ -298,13 +281,13 @@ impl Problem {
                             std::cmp::Ordering::Equal
                         }
                     });
-                    let mut sorted: IndexMap<String, String> = IndexMap::new();
+                    let mut sorted: IndexMap<BString, BString> = IndexMap::new();
                     for k in &keys {
                         sorted.insert(k.clone(), versions.shift_remove(k).unwrap());
                     }
                     versions = sorted;
 
-                    let versions_list: Vec<String> = if !is_verbose {
+                    let versions_list: Vec<BString> = if !is_verbose {
                         Self::condense_version_list(&versions, 1, 16)
                     } else {
                         versions.values().cloned().collect()
@@ -316,32 +299,22 @@ impl Problem {
                             "$1",
                             message,
                         );
-                        result.push(
-                            legacy_lossy(&sprintf(
-                                &message_var,
-                                &[
-                                    PhpMixed::string(package.clone()),
-                                    PhpMixed::string(bconcat!(
-                                        "[",
-                                        implode(", ", &versions_list),
-                                        "]"
-                                    )),
-                                ],
-                            ))
-                            .into_owned(),
-                        );
+                        result.push(sprintf(
+                            &message_var,
+                            &[
+                                PhpMixed::string(package.clone()),
+                                PhpMixed::string(bconcat!("[", implode(", ", &versions_list), "]")),
+                            ],
+                        ));
                     } else {
                         let first = versions_list.first().cloned().unwrap_or_default();
-                        result.push(
-                            legacy_lossy(&sprintf(
-                                message,
-                                &[
-                                    PhpMixed::string(package.clone()),
-                                    PhpMixed::string(format!(" {}", first)),
-                                ],
-                            ))
-                            .into_owned(),
-                        );
+                        result.push(sprintf(
+                            message,
+                            &[
+                                PhpMixed::string(package.clone()),
+                                PhpMixed::string(bconcat!(" ", first)),
+                            ],
+                        ));
                     }
                 }
             } else {
@@ -349,10 +322,11 @@ impl Problem {
             }
         }
 
-        Ok(format!(
-            "\n{}- {}",
+        Ok(bconcat!(
+            "\n",
             indent,
-            implode(format!("\n{}- ", indent), &result).display_lossy()
+            "- ",
+            implode(bconcat!("\n", indent, "- "), &result)
         ))
     }
 
@@ -396,59 +370,62 @@ impl Problem {
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
-        package_name: &str,
+        package_name: &BStr,
         constraint: Option<&AnyConstraint>,
-    ) -> anyhow::Result<(String, String)> {
+    ) -> anyhow::Result<(BString, BString)> {
         if PlatformRepository::is_platform_package(package_name) {
             // handle php/php-*/hhvm
             if stripos(package_name, "php") == Some(0) || package_name == "hhvm" {
                 let version = Self::get_platform_package_version(
                     pool,
                     package_name,
-                    &legacy_lossy(&shirabe_php_rpc::phpversion("").unwrap_or_default()),
+                    shirabe_php_rpc::phpversion("").unwrap_or_default().as_ref(),
                 );
 
-                let msg = format!(
-                    "- Root composer.json requires {}{} but ",
+                let msg = bconcat!(
+                    "- Root composer.json requires ",
                     package_name,
-                    Self::constraint_to_text(constraint)
+                    Self::constraint_to_text(constraint),
+                    " but "
                 );
 
-                if package_name == "hhvm"
-                    && !pool
-                        .what_provides(bstr::BStr::new(package_name), None)
-                        .is_empty()
-                {
+                if package_name == "hhvm" && !pool.what_provides(package_name, None).is_empty() {
                     return Ok((
                         msg,
-                        "your HHVM version does not satisfy that requirement.".to_string(),
+                        BString::from("your HHVM version does not satisfy that requirement."),
                     ));
                 }
 
                 if package_name == "hhvm" {
                     return Ok((
                         msg,
-                        "HHVM was not detected on this machine, make sure it is in your PATH."
-                            .to_string(),
+                        BString::from(
+                            "HHVM was not detected on this machine, make sure it is in your PATH.",
+                        ),
                     ));
                 }
 
                 if version.is_none() {
                     return Ok((
                         msg,
-                        format!(
-                            "the {} package is disabled by your platform config. Enable it again with \"shirabe config platform.{} --unset\".",
-                            package_name, package_name
+                        bconcat!(
+                            "the ",
+                            package_name,
+                            " package is disabled by your platform config. Enable it again with \"shirabe config platform.",
+                            package_name,
+                            " --unset\"."
                         ),
                     ));
                 }
 
                 return Ok((
                     msg,
-                    format!(
-                        "your {} version ({}) does not satisfy that requirement.",
+                    bconcat!(
+                        "your ",
                         package_name,
-                        version.unwrap()
+                        " version (",
+                        version.unwrap(),
+                        ") does not satisfy that requirement."
                     ),
                 ));
             }
@@ -457,62 +434,78 @@ impl Problem {
             if stripos(package_name, "ext-") == Some(0) {
                 if strpos(package_name, " ").is_some() {
                     return Ok((
-                        "- ".to_string(),
-                        format!(
-                            "PHP extension {} should be required as {}.",
+                        BString::from("- "),
+                        bconcat!(
+                            "PHP extension ",
                             package_name,
-                            str_replace(" ", "-", package_name).display_lossy()
+                            " should be required as ",
+                            str_replace(" ", "-", package_name),
+                            "."
                         ),
                     ));
                 }
 
-                let ext = legacy_lossy(&substr(package_name, 4, None)).into_owned();
-                let msg = format!(
-                    "- Root composer.json requires PHP extension {}{} but ",
+                let ext = substr(package_name, 4, None);
+                let msg = bconcat!(
+                    "- Root composer.json requires PHP extension ",
                     package_name,
-                    Self::constraint_to_text(constraint)
+                    Self::constraint_to_text(constraint),
+                    " but "
                 );
 
                 let runtime_version = shirabe_php_rpc::phpversion(&ext);
                 let effective_version = match runtime_version {
-                    None => "0".to_string(),
-                    Some(ref v) => legacy_lossy(&v.clone()).into_owned(),
+                    None => BString::from("0"),
+                    Some(v) => v,
                 };
-                let version =
-                    Self::get_platform_package_version(pool, package_name, &effective_version);
+                let version = Self::get_platform_package_version(
+                    pool,
+                    package_name,
+                    effective_version.as_ref(),
+                );
                 if version.is_none() {
                     let providers_str_opt =
                         Self::get_providers_list(repository_set, package_name, 5)?;
                     let providers_str = match providers_str_opt {
-                        Some(ps) => format!(
-                            "\n\n      Alternatively you can require one of these packages that provide the extension (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n{}",
+                        Some(ps) => bconcat!(
+                            "\n\n      Alternatively you can require one of these packages that provide the extension (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n",
                             ps
                         ),
-                        None => String::new(),
+                        None => BString::default(),
                     };
 
                     if extension_loaded(&ext) {
                         return Ok((
                             msg,
-                            format!(
-                                "the {} package is disabled by your platform config. Enable it again with \"shirabe config platform.{} --unset\".{}",
-                                package_name, package_name, providers_str
+                            bconcat!(
+                                "the ",
+                                package_name,
+                                " package is disabled by your platform config. Enable it again with \"shirabe config platform.",
+                                package_name,
+                                " --unset\".",
+                                providers_str
                             ),
                         ));
                     }
 
                     return Ok((
                         msg,
-                        format!(
-                            "it is missing from your system. Install or enable PHP's {} extension.{}",
-                            ext, providers_str
+                        bconcat!(
+                            "it is missing from your system. Install or enable PHP's ",
+                            ext,
+                            " extension.",
+                            providers_str
                         ),
                     ));
                 }
 
                 return Ok((
                     msg,
-                    format!("it has the wrong version installed ({}).", version.unwrap()),
+                    bconcat!(
+                        "it has the wrong version installed (",
+                        version.unwrap(),
+                        ")."
+                    ),
                 ));
             }
 
@@ -526,32 +519,34 @@ impl Problem {
                     };
 
                     return Ok((
-                        format!(
-                            "- Root composer.json requires linked library {}{} but ",
+                        bconcat!(
+                            "- Root composer.json requires linked library ",
                             package_name,
-                            Self::constraint_to_text(constraint)
+                            Self::constraint_to_text(constraint),
+                            " but "
                         ),
-                        error.to_string(),
+                        BString::from(error),
                     ));
                 }
 
                 let providers_str_opt = Self::get_providers_list(repository_set, package_name, 5)?;
                 let providers_str = match providers_str_opt {
-                    Some(ps) => format!(
-                        "\n\n      Alternatively you can require one of these packages that provide the library (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n{}",
+                    Some(ps) => bconcat!(
+                        "\n\n      Alternatively you can require one of these packages that provide the library (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n",
                         ps
                     ),
-                    None => String::new(),
+                    None => BString::default(),
                 };
 
                 return Ok((
-                    format!(
-                        "- Root composer.json requires linked library {}{} but ",
+                    bconcat!(
+                        "- Root composer.json requires linked library ",
                         package_name,
-                        Self::constraint_to_text(constraint)
+                        Self::constraint_to_text(constraint),
+                        " but "
                     ),
-                    format!(
-                        "it has the wrong version installed or is missing from your system, make sure to load the extension providing it.{}",
+                    bconcat!(
+                        "it has the wrong version installed or is missing from your system, make sure to load the extension providing it.",
                         providers_str
                     ),
                 ));
@@ -564,11 +559,12 @@ impl Problem {
                 locked_package = Some(package.clone());
                 if pool.is_unacceptable_fixed_or_locked_package(package.clone()) {
                     return Ok((
-                        "- ".to_string(),
-                        format!(
-                            "{} is fixed to {} (lock file version) by a partial update but that version is rejected by your minimum-stability. Make sure you list it as an argument for the update command.",
-                            package.get_pretty_name().display_lossy(),
-                            package.get_pretty_version().display_lossy()
+                        BString::from("- "),
+                        bconcat!(
+                            package.get_pretty_name(),
+                            " is fixed to ",
+                            package.get_pretty_version(),
+                            " (lock file version) by a partial update but that version is rejected by your minimum-stability. Make sure you list it as an argument for the update command."
                         ),
                     ));
                 }
@@ -581,14 +577,13 @@ impl Problem {
             && c.get_operator() == Some(CmpOp::Eq)
             && preg_is_match(php_regex!(r"{^dev-.*#.*}"), c.get_pretty_string())
         {
-            let new_constraint = legacy_lossy(&preg_replace(
+            let new_constraint = preg_replace(
                 php_regex!(r"{ +as +([^,\s|]+)$}"),
                 "",
                 c.get_pretty_string(),
-            ))
-            .into_owned();
+            );
             let packages = repository_set.find_packages(
-                bstr::BStr::new(package_name),
+                package_name,
                 Some(
                     MultiConstraint::new(
                         vec![
@@ -599,7 +594,7 @@ impl Problem {
                             )),
                             AnyConstraint::Simple(SimpleConstraint::new(
                                 "==",
-                                legacy_lossy(&str_replace("#", "+", &new_constraint)).into_owned(),
+                                str_replace("#", "+", &new_constraint),
                                 None,
                             )),
                         ],
@@ -612,13 +607,14 @@ impl Problem {
             )?;
             if !packages.is_empty() {
                 return Ok((
-                    format!(
-                        "- Root composer.json requires {}{}, ",
+                    bconcat!(
+                        "- Root composer.json requires ",
                         package_name,
-                        Self::constraint_to_text(constraint)
+                        Self::constraint_to_text(constraint),
+                        ", "
                     ),
-                    format!(
-                        "found {}. The # character in branch names is replaced by a + character. Make sure to require it as \"{}\".",
+                    bconcat!(
+                        "found ",
                         Self::get_package_list(
                             &packages,
                             is_verbose,
@@ -626,7 +622,9 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        str_replace("#", "+", c.get_pretty_string()).display_lossy()
+                        ". The # character in branch names is replaced by a + character. Make sure to require it as \"",
+                        str_replace("#", "+", c.get_pretty_string()),
+                        "\"."
                     ),
                 ));
             }
@@ -634,27 +632,27 @@ impl Problem {
 
         // first check if the actual requested package is found in normal conditions
         // if so it must mean it is rejected by another constraint than the one given here
-        let packages =
-            repository_set.find_packages(bstr::BStr::new(package_name), constraint.cloned(), 0)?;
+        let packages = repository_set.find_packages(package_name, constraint.cloned(), 0)?;
         if !packages.is_empty() {
             let root_reqs = repository_set.get_root_requires();
-            if root_reqs.contains_key(bstr::B(package_name)) {
+            if root_reqs.contains_key(package_name) {
                 let filtered: Vec<&BasePackageHandle> = packages
                     .iter()
                     .filter(|p| {
-                        root_reqs[bstr::B(package_name)]
+                        root_reqs[package_name]
                             .matches(&SimpleConstraint::new("==", p.get_version(), None).into())
                     })
                     .collect();
                 if filtered.is_empty() {
                     return Ok((
-                        format!(
-                            "- Root composer.json requires {}{}, ",
+                        bconcat!(
+                            "- Root composer.json requires ",
                             package_name,
-                            Self::constraint_to_text(constraint)
+                            Self::constraint_to_text(constraint),
+                            ", "
                         ),
-                        format!(
-                            "found {} but {} with your root composer.json require ({}).",
+                        bconcat!(
+                            "found ",
                             Self::get_package_list(
                                 &packages,
                                 is_verbose,
@@ -662,14 +660,15 @@ impl Problem {
                                 constraint,
                                 false
                             ),
+                            " but ",
                             if Self::has_multiple_names(&packages) {
                                 "these conflict"
                             } else {
                                 "it conflicts"
                             },
-                            root_reqs[bstr::B(package_name)]
-                                .get_pretty_string()
-                                .display_lossy()
+                            " with your root composer.json require (",
+                            root_reqs[package_name].get_pretty_string(),
+                            ")."
                         ),
                     ));
                 }
@@ -688,13 +687,14 @@ impl Problem {
                         .collect();
                     if filtered.is_empty() {
                         return Ok((
-                            format!(
-                                "- Root composer.json requires {}{}, ",
-                                name.display_lossy(),
-                                Self::constraint_to_text(constraint)
+                            bconcat!(
+                                "- Root composer.json requires ",
+                                name,
+                                Self::constraint_to_text(constraint),
+                                ", "
                             ),
-                            format!(
-                                "found {} but {} with your temporary update constraint ({}:{}).",
+                            bconcat!(
+                                "found ",
                                 Self::get_package_list(
                                     &packages,
                                     is_verbose,
@@ -702,13 +702,17 @@ impl Problem {
                                     constraint,
                                     false
                                 ),
+                                " but ",
                                 if Self::has_multiple_names(&packages) {
                                     "these conflict"
                                 } else {
                                     "it conflicts"
                                 },
-                                name.display_lossy(),
-                                temp_reqs[&name].get_pretty_string().display_lossy()
+                                " with your temporary update constraint (",
+                                name,
+                                ":",
+                                temp_reqs[&name].get_pretty_string(),
+                                ")."
                             ),
                         ));
                     }
@@ -727,13 +731,14 @@ impl Problem {
                     .collect();
                 if filtered.is_empty() {
                     return Ok((
-                        format!(
-                            "- Root composer.json requires {}{}, ",
+                        bconcat!(
+                            "- Root composer.json requires ",
                             package_name,
-                            Self::constraint_to_text(constraint)
+                            Self::constraint_to_text(constraint),
+                            ", "
                         ),
-                        format!(
-                            "found {} but the package is fixed to {} (lock file version) by a partial update and that version does not match. Make sure you list it as an argument for the update command.",
+                        bconcat!(
+                            "found ",
                             Self::get_package_list(
                                 &packages,
                                 is_verbose,
@@ -741,7 +746,9 @@ impl Problem {
                                 constraint,
                                 false
                             ),
-                            lp.get_pretty_version().display_lossy()
+                            " but the package is fixed to ",
+                            lp.get_pretty_version(),
+                            " (lock file version) by a partial update and that version does not match. Make sure you list it as an argument for the update command."
                         ),
                     ));
                 }
@@ -757,122 +764,14 @@ impl Problem {
 
             if non_locked_packages.is_empty() {
                 return Ok((
-                    format!(
-                        "- Root composer.json requires {}{}, ",
+                    bconcat!(
+                        "- Root composer.json requires ",
                         package_name,
-                        Self::constraint_to_text(constraint)
+                        Self::constraint_to_text(constraint),
+                        ", "
                     ),
-                    format!(
-                        "found {} in the lock file but not in remote repositories, make sure you avoid updating this package to keep the one from the lock file.",
-                        Self::get_package_list(
-                            &packages,
-                            is_verbose,
-                            Some(pool),
-                            constraint,
-                            false
-                        )
-                    ),
-                ));
-            }
-
-            if pool.is_abandoned_removed_package_version(bstr::BStr::new(package_name), constraint)
-            {
-                return Ok((
-                    format!(
-                        "- Root composer.json requires {}{}, ",
-                        package_name,
-                        Self::constraint_to_text(constraint)
-                    ),
-                    format!(
-                        "found {} but these were not loaded, because they are abandoned and you configured \"block-abandoned\" to true in your \"audit\" config.",
-                        Self::get_package_list(
-                            &packages,
-                            is_verbose,
-                            Some(pool),
-                            constraint,
-                            false
-                        )
-                    ),
-                ));
-            }
-
-            if pool.is_security_removed_package_version(bstr::BStr::new(package_name), constraint) {
-                let advisories = repository_set.get_matching_security_advisories(
-                    packages.clone(),
-                    false,
-                    true,
-                )?;
-                let advisories_list: Vec<String> =
-                    match advisories.advisories.get(bstr::B(package_name)) {
-                        Some(list) if !list.is_empty() => list
-                            .iter()
-                            .map(|advisory| {
-                                let advisory_id = advisory.advisory_id();
-                                let link = advisory
-                                    .as_security_advisory()
-                                    .and_then(|a| a.link.as_deref());
-                                if let Some(link) = link
-                                    && !link.is_empty()
-                                {
-                                    return format!(
-                                        "<href={}>{}</>",
-                                        OutputFormatter::escape(link)
-                                            .expect("OutputFormatter::escape does not fail")
-                                            .display_lossy(),
-                                        advisory_id.display_lossy()
-                                    );
-                                }
-
-                                if advisory_id.starts_with(b"PKSA-") {
-                                    return format!(
-                                        "<href={}>{}</>",
-                                        OutputFormatter::escape(format!(
-                                            "https://packagist.org/security-advisories/{}",
-                                            advisory_id.display_lossy()
-                                        ))
-                                        .expect("OutputFormatter::escape does not fail")
-                                        .display_lossy(),
-                                        advisory_id.display_lossy()
-                                    );
-                                }
-
-                                legacy_lossy(advisory_id).into_owned()
-                            })
-                            .collect(),
-                        _ => pool
-                            .get_security_advisory_identifiers_for_package_version(
-                                bstr::BStr::new(package_name),
-                                constraint,
-                            )
-                            .into_iter()
-                            .map(|advisory_id| {
-                                let advisory_id = advisory_id.display_lossy().to_string();
-                                if advisory_id.starts_with("PKSA-") {
-                                    return format!(
-                                        "<href={}>{}</>",
-                                        OutputFormatter::escape(format!(
-                                            "https://packagist.org/security-advisories/{}",
-                                            advisory_id
-                                        ))
-                                        .expect("OutputFormatter::escape does not fail")
-                                        .display_lossy(),
-                                        advisory_id
-                                    );
-                                }
-
-                                advisory_id
-                            })
-                            .collect(),
-                    };
-
-                return Ok((
-                    format!(
-                        "- Root composer.json requires {}{}, ",
-                        package_name,
-                        Self::constraint_to_text(constraint)
-                    ),
-                    format!(
-                        "found {} but these were not loaded, because they are affected by security advisories (\"{}\"). Go to https://packagist.org/security-advisories/ to find advisory details. To ignore the advisories, add them to the audit \"ignore\" config. To turn the feature off entirely, you can set \"block-insecure\" to false in your \"audit\" config.",
+                    bconcat!(
+                        "found ",
                         Self::get_package_list(
                             &packages,
                             is_verbose,
@@ -880,39 +779,157 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        implode("\", \"", &advisories_list).display_lossy()
+                        " in the lock file but not in remote repositories, make sure you avoid updating this package to keep the one from the lock file."
+                    ),
+                ));
+            }
+
+            if pool.is_abandoned_removed_package_version(package_name, constraint) {
+                return Ok((
+                    bconcat!(
+                        "- Root composer.json requires ",
+                        package_name,
+                        Self::constraint_to_text(constraint),
+                        ", "
+                    ),
+                    bconcat!(
+                        "found ",
+                        Self::get_package_list(
+                            &packages,
+                            is_verbose,
+                            Some(pool),
+                            constraint,
+                            false
+                        ),
+                        " but these were not loaded, because they are abandoned and you configured \"block-abandoned\" to true in your \"audit\" config."
+                    ),
+                ));
+            }
+
+            if pool.is_security_removed_package_version(package_name, constraint) {
+                let advisories = repository_set.get_matching_security_advisories(
+                    packages.clone(),
+                    false,
+                    true,
+                )?;
+                let advisories_list: Vec<BString> = match advisories.advisories.get(package_name) {
+                    Some(list) if !list.is_empty() => list
+                        .iter()
+                        .map(|advisory| {
+                            let advisory_id = advisory.advisory_id();
+                            let link = advisory
+                                .as_security_advisory()
+                                .and_then(|a| a.link.as_deref());
+                            if let Some(link) = link
+                                && !link.is_empty()
+                            {
+                                return bconcat!(
+                                    "<href=",
+                                    OutputFormatter::escape(link)
+                                        .expect("OutputFormatter::escape does not fail"),
+                                    ">",
+                                    advisory_id,
+                                    "</>"
+                                );
+                            }
+
+                            if advisory_id.starts_with(b"PKSA-") {
+                                return bconcat!(
+                                    "<href=",
+                                    OutputFormatter::escape(bconcat!(
+                                        "https://packagist.org/security-advisories/",
+                                        advisory_id
+                                    ))
+                                    .expect("OutputFormatter::escape does not fail"),
+                                    ">",
+                                    advisory_id,
+                                    "</>"
+                                );
+                            }
+
+                            BString::from(advisory_id)
+                        })
+                        .collect(),
+                    _ => pool
+                        .get_security_advisory_identifiers_for_package_version(
+                            package_name,
+                            constraint,
+                        )
+                        .into_iter()
+                        .map(|advisory_id| {
+                            if advisory_id.starts_with(b"PKSA-") {
+                                return bconcat!(
+                                    "<href=",
+                                    OutputFormatter::escape(bconcat!(
+                                        "https://packagist.org/security-advisories/",
+                                        advisory_id
+                                    ))
+                                    .expect("OutputFormatter::escape does not fail"),
+                                    ">",
+                                    advisory_id,
+                                    "</>"
+                                );
+                            }
+
+                            advisory_id
+                        })
+                        .collect(),
+                };
+
+                return Ok((
+                    bconcat!(
+                        "- Root composer.json requires ",
+                        package_name,
+                        Self::constraint_to_text(constraint),
+                        ", "
+                    ),
+                    bconcat!(
+                        "found ",
+                        Self::get_package_list(
+                            &packages,
+                            is_verbose,
+                            Some(pool),
+                            constraint,
+                            false
+                        ),
+                        " but these were not loaded, because they are affected by security advisories (\"",
+                        implode("\", \"", &advisories_list),
+                        "\"). Go to https://packagist.org/security-advisories/ to find advisory details. To ignore the advisories, add them to the audit \"ignore\" config. To turn the feature off entirely, you can set \"block-insecure\" to false in your \"audit\" config."
                     ),
                 ));
             }
 
             return Ok((
-                format!(
-                    "- Root composer.json requires {}{}, ",
+                bconcat!(
+                    "- Root composer.json requires ",
                     package_name,
-                    Self::constraint_to_text(constraint)
+                    Self::constraint_to_text(constraint),
+                    ", "
                 ),
-                format!(
-                    "found {} but these were not loaded, likely because {} with another require.",
+                bconcat!(
+                    "found ",
                     Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
+                    " but these were not loaded, likely because ",
                     if Self::has_multiple_names(&packages) {
                         "they conflict"
                     } else {
                         "it conflicts"
-                    }
+                    },
+                    " with another require."
                 ),
             ));
         }
 
         // check if the package is found when bypassing stability checks
         let packages = repository_set.find_packages(
-            bstr::BStr::new(package_name),
+            package_name,
             constraint.cloned(),
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
         )?;
         if !packages.is_empty() {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
-                bstr::BStr::new(package_name),
+                package_name,
                 constraint.cloned(),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             )?;
@@ -929,33 +946,36 @@ impl Problem {
             }
 
             return Ok((
-                format!(
-                    "- Root composer.json requires {}{}, ",
+                bconcat!(
+                    "- Root composer.json requires ",
                     package_name,
-                    Self::constraint_to_text(constraint)
+                    Self::constraint_to_text(constraint),
+                    ", "
                 ),
-                format!(
-                    "found {} but {} not match your minimum-stability.",
+                bconcat!(
+                    "found ",
                     Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
+                    " but ",
                     if Self::has_multiple_names(&packages) {
                         "these do"
                     } else {
                         "it does"
-                    }
+                    },
+                    " not match your minimum-stability."
                 ),
             ));
         }
 
         // check if the package is found when bypassing the constraint and stability checks
         let packages = repository_set.find_packages(
-            bstr::BStr::new(package_name),
+            package_name,
             None,
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
         )?;
         if !packages.is_empty() {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
-                bstr::BStr::new(package_name),
+                package_name,
                 constraint.cloned(),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             )?;
@@ -971,7 +991,7 @@ impl Problem {
                 );
             }
 
-            let mut suffix = String::new();
+            let mut suffix = BString::default();
             if let Some(c) = constraint
                 && c.is_constraint()
                 && c.get_version() == "dev-master"
@@ -981,9 +1001,10 @@ impl Problem {
                         candidate.get_version().as_slice(),
                         b"dev-default" | b"dev-main"
                     ) {
-                        suffix = format!(
-                            " Perhaps dev-master was renamed to {}?",
-                            candidate.get_pretty_version().display_lossy()
+                        suffix = bconcat!(
+                            " Perhaps dev-master was renamed to ",
+                            candidate.get_pretty_version(),
+                            "?"
                         );
                         break;
                     }
@@ -996,24 +1017,28 @@ impl Problem {
             if let Some(tp) = top_package
                 && tp.as_root().is_some()
             {
-                suffix = " See https://getcomposer.org/dep-on-root for details and assistance."
-                    .to_string();
+                suffix = BString::from(
+                    " See https://getcomposer.org/dep-on-root for details and assistance.",
+                );
             }
 
             return Ok((
-                format!(
-                    "- Root composer.json requires {}{}, ",
+                bconcat!(
+                    "- Root composer.json requires ",
                     package_name,
-                    Self::constraint_to_text(constraint)
+                    Self::constraint_to_text(constraint),
+                    ", "
                 ),
-                format!(
-                    "found {} but {} not match the constraint.{}",
+                bconcat!(
+                    "found ",
                     Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
+                    " but ",
                     if Self::has_multiple_names(&packages) {
                         "these do"
                     } else {
                         "it does"
                     },
+                    " not match the constraint.",
                     suffix
                 ),
             ));
@@ -1023,10 +1048,11 @@ impl Problem {
             let illegal_chars = preg_replace(php_regex!(r"{[A-Za-z0-9_./-]+}"), "", package_name);
 
             return Ok((
-                format!("- Root composer.json requires {}, it ", package_name),
-                format!(
-                    "could not be found, it looks like its name is invalid, \"{}\" is not allowed in package names.",
-                    illegal_chars.display_lossy()
+                bconcat!("- Root composer.json requires ", package_name, ", it "),
+                bconcat!(
+                    "could not be found, it looks like its name is invalid, \"",
+                    illegal_chars,
+                    "\" is not allowed in package names."
                 ),
             ));
         }
@@ -1034,22 +1060,27 @@ impl Problem {
         let providers_str = Self::get_providers_list(repository_set, package_name, 15)?;
         if let Some(ps) = providers_str {
             return Ok((
-                format!(
-                    "- Root composer.json requires {}{}, it ",
+                bconcat!(
+                    "- Root composer.json requires ",
                     package_name,
-                    Self::constraint_to_text(constraint)
+                    Self::constraint_to_text(constraint),
+                    ", it "
                 ),
-                format!(
-                    "could not be found in any version, but the following packages provide it:\n{}      Consider requiring one of these to satisfy the {} requirement.",
-                    ps, package_name
+                bconcat!(
+                    "could not be found in any version, but the following packages provide it:\n",
+                    ps,
+                    "      Consider requiring one of these to satisfy the ",
+                    package_name,
+                    " requirement."
                 ),
             ));
         }
 
         Ok((
-            format!("- Root composer.json requires {}, it ", package_name),
-            "could not be found in any version, there may be a typo in the package name."
-                .to_string(),
+            bconcat!("- Root composer.json requires ", package_name, ", it "),
+            BString::from(
+                "could not be found in any version, there may be a typo in the package name.",
+            ),
         ))
     }
 
@@ -1059,48 +1090,42 @@ impl Problem {
         pool: Option<&Pool>,
         constraint: Option<&AnyConstraint>,
         use_removed_version_group: bool,
-    ) -> String {
+    ) -> BString {
         struct PreparedEntry {
-            name: String,
-            versions: IndexMap<String, String>,
+            name: BString,
+            versions: IndexMap<BString, BString>,
         }
-        let mut prepared: IndexMap<String, PreparedEntry> = IndexMap::new();
-        let mut has_default_branch: IndexMap<String, bool> = IndexMap::new();
+        let mut prepared: IndexMap<BString, PreparedEntry> = IndexMap::new();
+        let mut has_default_branch: IndexMap<BString, bool> = IndexMap::new();
         for package in packages {
-            let pkg_name = legacy_lossy(&package.get_name()).into_owned();
+            let pkg_name = package.get_name();
             let entry = prepared
                 .entry(pkg_name.clone())
                 .or_insert_with(|| PreparedEntry {
-                    name: legacy_lossy(&package.get_pretty_name()).into_owned(),
+                    name: package.get_pretty_name(),
                     versions: IndexMap::new(),
                 });
-            entry.name = legacy_lossy(&package.get_pretty_name()).into_owned();
+            entry.name = package.get_pretty_name();
             let alias_suffix = if let Some(alias) = package.as_alias() {
-                format!(
-                    " (alias of {})",
-                    alias.get_alias_of().get_pretty_version().display_lossy()
+                bconcat!(
+                    " (alias of ",
+                    alias.get_alias_of().get_pretty_version(),
+                    ")"
                 )
             } else {
-                String::new()
+                BString::default()
             };
             entry.versions.insert(
-                legacy_lossy(&package.get_version()).into_owned(),
-                format!(
-                    "{}{}",
-                    package.get_pretty_version().display_lossy(),
-                    alias_suffix
-                ),
+                package.get_version(),
+                bconcat!(package.get_pretty_version(), alias_suffix),
             );
             if let Some(pool) = pool
                 && let Some(constraint) = constraint
             {
                 for (version, pretty_version) in
-                    pool.get_removed_versions(bstr::BStr::new(&pkg_name), constraint)
+                    pool.get_removed_versions(pkg_name.as_ref(), constraint)
                 {
-                    entry.versions.insert(
-                        legacy_lossy(&version).into_owned(),
-                        legacy_lossy(&pretty_version).into_owned(),
-                    );
+                    entry.versions.insert(version, pretty_version);
                 }
             }
             if let Some(pool) = pool
@@ -1109,10 +1134,7 @@ impl Problem {
                 for (version, pretty_version) in
                     pool.get_removed_versions_by_package(&package.ptr_id().to_string())
                 {
-                    entry.versions.insert(
-                        legacy_lossy(&version).into_owned(),
-                        legacy_lossy(&pretty_version).into_owned(),
-                    );
+                    entry.versions.insert(version, pretty_version);
                 }
             }
             if package.is_default_branch() {
@@ -1120,21 +1142,21 @@ impl Problem {
             }
         }
 
-        let mut prepared_strings: Vec<String> = Vec::new();
+        let mut prepared_strings: Vec<BString> = Vec::new();
         for (name, mut package) in prepared {
             // remove the implicit default branch alias to avoid cruft in the display
             if package
                 .versions
-                .contains_key(VersionParser::DEFAULT_BRANCH_ALIAS)
+                .contains_key(B(VersionParser::DEFAULT_BRANCH_ALIAS))
                 && has_default_branch.contains_key(&name)
             {
                 package
                     .versions
-                    .shift_remove(VersionParser::DEFAULT_BRANCH_ALIAS);
+                    .shift_remove(B(VersionParser::DEFAULT_BRANCH_ALIAS));
             }
 
             // uksort($package['versions'], 'version_compare')
-            let mut keys: Vec<String> = package.versions.keys().cloned().collect();
+            let mut keys: Vec<BString> = package.versions.keys().cloned().collect();
             keys.sort_by(|a, b| {
                 if version_compare(a, b, CmpOp::Lt) {
                     std::cmp::Ordering::Less
@@ -1144,33 +1166,34 @@ impl Problem {
                     std::cmp::Ordering::Equal
                 }
             });
-            let mut sorted: IndexMap<String, String> = IndexMap::new();
+            let mut sorted: IndexMap<BString, BString> = IndexMap::new();
             for k in &keys {
                 sorted.insert(k.clone(), package.versions.shift_remove(k).unwrap());
             }
             package.versions = sorted;
 
-            let version_list: Vec<String> = if !is_verbose {
+            let version_list: Vec<BString> = if !is_verbose {
                 Self::condense_version_list(&package.versions, 4, 16)
             } else {
                 package.versions.values().cloned().collect()
             };
-            prepared_strings.push(format!(
-                "{}[{}]",
+            prepared_strings.push(bconcat!(
                 package.name,
-                implode(", ", &version_list).display_lossy()
+                "[",
+                implode(", ", &version_list),
+                "]"
             ));
         }
 
-        legacy_lossy(&implode(", ", &prepared_strings)).into_owned()
+        implode(", ", &prepared_strings)
     }
 
     fn get_platform_package_version(
         pool: &mut Pool,
-        package_name: &str,
-        version: &str,
-    ) -> Option<String> {
-        let available = pool.what_provides(bstr::BStr::new(package_name), None);
+        package_name: &BStr,
+        version: &BStr,
+    ) -> Option<BString> {
+        let available = pool.what_provides(package_name, None);
 
         if !available.is_empty() {
             let mut selected: Option<&BasePackageHandle> = None;
@@ -1194,34 +1217,28 @@ impl Problem {
                 let replaces: Vec<Link> = selected.get_replaces().values().cloned().collect();
                 for link in provides.iter().chain(replaces.iter()) {
                     if link.get_target() == package_name {
-                        return Some(format!(
-                            "{} {}d by {}",
-                            link.get_pretty_constraint().display_lossy(),
-                            substr(link.get_description(), 0, Some(-1)).display_lossy(),
-                            selected.get_pretty_string().display_lossy()
+                        return Some(bconcat!(
+                            link.get_pretty_constraint(),
+                            " ",
+                            substr(link.get_description(), 0, Some(-1)),
+                            "d by ",
+                            selected.get_pretty_string()
                         ));
                     }
                 }
             }
 
-            let mut version: String = legacy_lossy(&selected.get_pretty_version()).into_owned();
+            let mut version: BString = selected.get_pretty_version();
             let extra = selected.get_extra();
             if selected.as_complete().is_some()
                 && extra.contains_key(B("config.platform"))
                 && extra[B("config.platform")].as_bool() == Some(true)
             {
-                let description: String = legacy_lossy(
-                    &selected
-                        .as_complete()
-                        .and_then(|c| c.get_description())
-                        .unwrap_or_default(),
-                )
-                .into_owned();
-                version = format!(
-                    "{}; {}",
-                    version,
-                    str_replace("Package ", "", &description).display_lossy()
-                );
+                let description: BString = selected
+                    .as_complete()
+                    .and_then(|c| c.get_description())
+                    .unwrap_or_default();
+                version = bconcat!(version, "; ", str_replace("Package ", "", &description));
             }
             return Some(version);
         }
@@ -1231,25 +1248,24 @@ impl Problem {
     }
 
     fn condense_version_list(
-        versions: &IndexMap<String, String>,
+        versions: &IndexMap<BString, BString>,
         max: i64,
         max_dev: i64,
-    ) -> Vec<String> {
+    ) -> Vec<BString> {
         if (versions.len() as i64) <= max {
             return versions.values().cloned().collect();
         }
 
-        let mut filtered: Vec<String> = Vec::new();
-        let mut by_major: IndexMap<String, Vec<String>> = IndexMap::new();
+        let mut filtered: Vec<BString> = Vec::new();
+        let mut by_major: IndexMap<BString, Vec<BString>> = IndexMap::new();
         for (version, pretty) in versions {
             if stripos(version, "dev-") == Some(0) {
                 by_major
-                    .entry("dev".to_string())
+                    .entry(BString::from("dev"))
                     .or_default()
                     .push(pretty.clone());
             } else {
-                let key = legacy_lossy(&preg_replace(php_regex!(r"{^(\d+)\..*}"), "$1", version))
-                    .into_owned();
+                let key = preg_replace(php_regex!(r"{^(\d+)\..*}"), "$1", version);
                 by_major.entry(key).or_default().push(pretty.clone());
             }
         }
@@ -1258,7 +1274,7 @@ impl Problem {
             if (versions_for_major.len() as i64) > max_versions {
                 // output only 1st and last versions
                 filtered.push(versions_for_major[0].clone());
-                filtered.push("...".to_string());
+                filtered.push(BString::from("..."));
                 filtered.push(versions_for_major[versions_for_major.len() - 1].clone());
             } else {
                 for v in versions_for_major {
@@ -1271,10 +1287,10 @@ impl Problem {
     }
 
     fn has_multiple_names(packages: &Vec<BasePackageHandle>) -> bool {
-        let mut name: Option<String> = None;
+        let mut name: Option<BString> = None;
         for package in packages {
             if name.is_none() || name.is_some_and(|n| n == package.get_name()) {
-                name = Some(legacy_lossy(&package.get_name()).into_owned());
+                name = Some(package.get_name());
             } else {
                 return true;
             }
@@ -1286,12 +1302,12 @@ impl Problem {
     fn compute_check_for_lower_prio_repo(
         pool: &Pool,
         is_verbose: bool,
-        package_name: &str,
+        package_name: &BStr,
         higher_repo_packages: &Vec<BasePackageHandle>,
         all_repos_packages: &Vec<BasePackageHandle>,
         reason: &str,
         constraint: Option<&AnyConstraint>,
-    ) -> anyhow::Result<(String, String)> {
+    ) -> anyhow::Result<(BString, BString)> {
         let mut next_repo_packages: Vec<BasePackageHandle> = Vec::new();
         let mut next_repo: Option<crate::repository::RepositoryInterfaceHandle> = None;
         for package in all_repos_packages {
@@ -1314,13 +1330,14 @@ impl Problem {
             let top_package = higher_repo_packages.first().unwrap();
             if top_package.as_root().is_some() {
                 return Ok((
-                    format!(
-                        "- Root composer.json requires {}{}, it is ",
+                    bconcat!(
+                        "- Root composer.json requires ",
                         package_name,
-                        Self::constraint_to_text(constraint)
+                        Self::constraint_to_text(constraint),
+                        ", it is "
                     ),
-                    format!(
-                        "satisfiable by {} from {} but {} {} is the root package and cannot be modified. See https://getcomposer.org/dep-on-root for details and assistance.",
+                    bconcat!(
+                        "satisfiable by ",
                         Self::get_package_list(
                             &next_repo_packages,
                             is_verbose,
@@ -1328,9 +1345,13 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        next_repo.get_repo_name()?.display_lossy(),
-                        top_package.get_pretty_name().display_lossy(),
-                        top_package.get_pretty_version().display_lossy()
+                        " from ",
+                        next_repo.get_repo_name()?,
+                        " but ",
+                        top_package.get_pretty_name(),
+                        " ",
+                        top_package.get_pretty_version(),
+                        " is the root package and cannot be modified. See https://getcomposer.org/dep-on-root for details and assistance."
                     ),
                 ));
             }
@@ -1339,40 +1360,42 @@ impl Problem {
         if next_repo.is::<LockArrayRepository>() {
             let singular = higher_repo_packages.len() == 1;
 
-            let mut suggestion = format!(
-                "Make sure you either fix the {} or avoid updating this package to keep the one present in the lock file ({}).",
+            let mut suggestion = bconcat!(
+                "Make sure you either fix the ",
                 reason,
+                " or avoid updating this package to keep the one present in the lock file (",
                 Self::get_package_list(
                     &next_repo_packages,
                     is_verbose,
                     Some(pool),
                     constraint,
                     false
-                )
+                ),
+                ")."
             );
             // symlinked path repos cannot be locked so do not suggest keeping it locked
-            if next_repo_packages[0].get_dist_type()
-                == Some(bstr::BString::from("path".to_string()))
-            {
+            if next_repo_packages[0].get_dist_type() == Some(BString::from("path")) {
                 let transport_options = next_repo_packages[0].get_transport_options();
                 if !transport_options.contains_key(B("symlink"))
                     || transport_options[B("symlink")].as_bool() != Some(false)
                 {
-                    suggestion = format!(
-                        "Make sure you fix the {} as packages installed from symlinked path repos are updated even in partial updates and the one from the lock file can thus not be used.",
-                        reason
+                    suggestion = bconcat!(
+                        "Make sure you fix the ",
+                        reason,
+                        " as packages installed from symlinked path repos are updated even in partial updates and the one from the lock file can thus not be used."
                     );
                 }
             }
 
             return Ok((
-                format!(
-                    "- Root composer.json requires {}{}, ",
+                bconcat!(
+                    "- Root composer.json requires ",
                     package_name,
-                    Self::constraint_to_text(constraint)
+                    Self::constraint_to_text(constraint),
+                    ", "
                 ),
-                format!(
-                    "found {} but {} not match your {} and {} therefore not installable. {}",
+                bconcat!(
+                    "found ",
                     Self::get_package_list(
                         higher_repo_packages,
                         is_verbose,
@@ -1380,22 +1403,27 @@ impl Problem {
                         constraint,
                         false
                     ),
+                    " but ",
                     if singular { "it does" } else { "these do" },
+                    " not match your ",
                     reason,
+                    " and ",
                     if singular { "is" } else { "are" },
+                    " therefore not installable. ",
                     suggestion
                 ),
             ));
         }
 
         Ok((
-            format!(
-                "- Root composer.json requires {}{}, it is ",
+            bconcat!(
+                "- Root composer.json requires ",
                 package_name,
-                Self::constraint_to_text(constraint)
+                Self::constraint_to_text(constraint),
+                ", it is "
             ),
-            format!(
-                "satisfiable by {} from {} but {} from {} has higher repository priority. The packages from the higher priority repository do not match your {} and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.",
+            bconcat!(
+                "satisfiable by ",
                 Self::get_package_list(
                     &next_repo_packages,
                     is_verbose,
@@ -1403,7 +1431,9 @@ impl Problem {
                     constraint,
                     false
                 ),
-                next_repo.get_repo_name()?.display_lossy(),
+                " from ",
+                next_repo.get_repo_name()?,
+                " but ",
                 Self::get_package_list(
                     higher_repo_packages,
                     is_verbose,
@@ -1411,30 +1441,29 @@ impl Problem {
                     constraint,
                     false
                 ),
+                " from ",
                 higher_repo_packages
                     .first()
                     .and_then(|p| p.get_repository())
                     .map(|r| r.get_repo_name())
                     .transpose()?
-                    .unwrap_or_default()
-                    .display_lossy(),
-                reason
+                    .unwrap_or_default(),
+                " has higher repository priority. The packages from the higher priority repository do not match your ",
+                reason,
+                " and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance."
             ),
         ))
     }
 
     /// Turns a constraint into text usable in a sentence describing a request
-    fn constraint_to_text(constraint: Option<&AnyConstraint>) -> String {
+    fn constraint_to_text(constraint: Option<&AnyConstraint>) -> BString {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == Some(CmpOp::Eq)
             && !c.get_version().starts_with(b"dev-")
         {
             if !preg_is_match(php_regex!(r"{^\d+(?:\.\d+)*$}"), c.get_pretty_string()) {
-                return format!(
-                    " {} (exact version match)",
-                    c.get_pretty_string().display_lossy()
-                );
+                return bconcat!(" ", c.get_pretty_string(), " (exact version match)");
             }
 
             let mut versions = vec![c.get_pretty_string()];
@@ -1447,33 +1476,35 @@ impl Problem {
 
             let last = versions.last().unwrap().clone();
             let detail = if versions.len() > 1 {
-                format!(
-                    "{} or {}",
-                    (implode(", ", &versions[..versions.len() - 1])).display_lossy(),
-                    last.display_lossy()
+                bconcat!(
+                    (implode(", ", &versions[..versions.len() - 1])),
+                    " or ",
+                    last
                 )
             } else {
-                legacy_lossy(&versions[0].clone()).into_owned()
+                versions[0].clone()
             };
-            return format!(
-                " {} (exact version match: {})",
-                c.get_pretty_string().display_lossy(),
-                detail
+            return bconcat!(
+                " ",
+                c.get_pretty_string(),
+                " (exact version match: ",
+                detail,
+                ")"
             );
         }
 
         match constraint {
-            Some(c) => format!(" {}", c.get_pretty_string().display_lossy()),
-            None => String::new(),
+            Some(c) => bconcat!(" ", c.get_pretty_string()),
+            None => BString::default(),
         }
     }
 
     fn get_providers_list(
         repository_set: &RepositorySet,
-        package_name: &str,
+        package_name: &BStr,
         max_providers: i64,
-    ) -> anyhow::Result<Option<String>> {
-        let providers = repository_set.get_providers(bstr::BStr::new(package_name))?;
+    ) -> anyhow::Result<Option<BString>> {
+        let providers = repository_set.get_providers(package_name)?;
         if !providers.is_empty() {
             let provider_count = providers.len() as i64;
             let slice: Vec<crate::repository::ProviderInfo> = if provider_count > max_providers + 1
@@ -1486,27 +1517,27 @@ impl Problem {
             } else {
                 providers.values().cloned().collect::<Vec<_>>()
             };
-            let mut providers_str = legacy_lossy(&implode(
+            let mut providers_str = implode(
                 "",
                 &slice
                     .iter()
                     .map(|p| {
                         let description = match &p.description {
                             Some(d) if !d.is_empty() => {
-                                format!(" {}", substr(d, 0, Some(100)).display_lossy())
+                                bconcat!(" ", substr(d, 0, Some(100)))
                             }
-                            _ => String::new(),
+                            _ => BString::default(),
                         };
 
-                        format!("      - {}{}\n", p.name.display_lossy(), description)
+                        bconcat!("      - ", p.name, description, "\n")
                     })
                     .collect::<Vec<_>>(),
-            ))
-            .into_owned();
+            );
             if provider_count > max_providers + 1 {
-                providers_str.push_str(&format!(
-                    "      ... and {} more.\n",
-                    provider_count - max_providers
+                providers_str.push_str(bconcat!(
+                    "      ... and ",
+                    provider_count - max_providers,
+                    " more.\n"
                 ));
             }
 

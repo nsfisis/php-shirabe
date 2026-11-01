@@ -27,7 +27,7 @@ use crate::repository::{
 };
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
@@ -1002,11 +1002,11 @@ impl Factory {
 
         let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
         let preferred = config.borrow_mut().get("preferred-install");
-        match preferred.as_string().map(|s| s.to_str_lossy()).as_deref() {
-            Some("dist") => {
+        match preferred.as_string().map(|s| &**s) {
+            Some(b"dist") => {
                 dm.set_prefer_dist(true);
             }
-            Some("source") => {
+            Some(b"source") => {
                 dm.set_prefer_source(true);
             }
             _ => {

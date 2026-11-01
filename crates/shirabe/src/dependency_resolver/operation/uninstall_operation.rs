@@ -2,6 +2,7 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug, Clone)]
 pub struct UninstallOperation {
@@ -17,17 +18,17 @@ impl UninstallOperation {
         self.package.clone()
     }
 
-    pub fn show(&self, lock: bool) -> String {
+    pub fn show(&self, lock: bool) -> bstr::BString {
         Self::format(self.package.clone(), lock)
     }
 
-    pub fn format(package: PackageInterfaceHandle, _lock: bool) -> String {
-        format!(
-            "Removing <info>{}</info> (<comment>{}</comment>)",
-            package.get_pretty_name().display_lossy(),
-            package
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-                .display_lossy(),
+    pub fn format(package: PackageInterfaceHandle, _lock: bool) -> bstr::BString {
+        bconcat!(
+            "Removing <info>",
+            package.get_pretty_name(),
+            "</info> (<comment>",
+            package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+            "</comment>)"
         )
     }
 }
@@ -38,6 +39,6 @@ impl SolverOperation for UninstallOperation {
 
 impl std::fmt::Display for UninstallOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false))
+        write!(f, "{}", self.show(false).display_lossy())
     }
 }

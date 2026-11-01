@@ -9,8 +9,9 @@ use crate::package::version::{VersionGuesser, VersionParser};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::ProcessExecutor;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{impl_php_class, legacy_lossy, path_to_bytes};
+use shirabe_php_shim::{bconcat, explode, impl_php_class, implode, ltrim, path_to_bytes};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -43,6 +44,14 @@ impl StatusCommand {
         command
     }
 
+    fn indent_changes(changes: &BStr) -> BString {
+        let lines: Vec<BString> = explode("\n", changes)
+            .iter()
+            .map(|line| bconcat!("    ", ltrim(line)))
+            .collect();
+        implode("\n", &lines)
+    }
+
     async fn do_execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
@@ -51,10 +60,12 @@ impl StatusCommand {
         let composer = crate::composer::composer_full(&composer);
         let io = self.get_io().clone();
 
-        let mut errors: IndexMap<String, String> = IndexMap::new();
-        let mut unpushed_changes: IndexMap<String, String> = IndexMap::new();
-        let mut vcs_version_changes: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
-            IndexMap::new();
+        let mut errors: IndexMap<BString, BString> = IndexMap::new();
+        let mut unpushed_changes: IndexMap<BString, BString> = IndexMap::new();
+        let mut vcs_version_changes: IndexMap<
+            BString,
+            IndexMap<String, IndexMap<String, BString>>,
+        > = IndexMap::new();
 
         let parser = VersionParser::new();
         let process_executor = composer
@@ -90,8 +101,7 @@ impl StatusCommand {
                 Some(d) => d,
                 None => continue,
             };
-            // TODO(bytes): IOInterface writes Strings, so the report is keyed by the lossy path.
-            let target_dir = legacy_lossy(path_to_bytes(&target_path)).into_owned();
+            let target_dir = BString::from(path_to_bytes(&target_path));
             let downloader_handle = match dm.borrow().get_downloader_for_package(package.clone())? {
                 Some(d) => d,
                 None => continue,
@@ -102,7 +112,7 @@ impl StatusCommand {
                 if target_path.is_symlink() {
                     errors.insert(
                         target_dir.clone(),
-                        format!("{} is a symbolic link.", target_dir),
+                        bconcat!(target_dir, " is a symbolic link."),
                     );
                 }
 
@@ -110,7 +120,7 @@ impl StatusCommand {
                     .get_local_changes(package.clone(), &target_path)
                     .await?
                 {
-                    errors.insert(target_dir.clone(), legacy_lossy(&changes).into_owned());
+                    errors.insert(target_dir.clone(), changes);
                 }
             }
 
@@ -137,24 +147,17 @@ impl StatusCommand {
                     && cur_version.pretty_version.as_ref() != Some(prev_ref)
                 {
                     let mut previous = IndexMap::new();
-                    previous.insert(
-                        "version".to_string(),
-                        legacy_lossy(&package.get_pretty_version()).into_owned(),
-                    );
-                    previous.insert(
-                        "ref".to_string(),
-                        legacy_lossy(&prev_ref.clone()).into_owned(),
-                    );
+                    previous.insert("version".to_string(), package.get_pretty_version());
+                    previous.insert("ref".to_string(), prev_ref.clone());
 
                     let mut current = IndexMap::new();
                     current.insert(
                         "version".to_string(),
-                        legacy_lossy(&cur_version.pretty_version.clone().unwrap_or_default())
-                            .into_owned(),
+                        cur_version.pretty_version.clone().unwrap_or_default(),
                     );
                     current.insert(
                         "ref".to_string(),
-                        legacy_lossy(&cur_version.commit.clone().unwrap_or_default()).into_owned(),
+                        cur_version.commit.clone().unwrap_or_default(),
                     );
 
                     let mut change = IndexMap::new();
@@ -169,7 +172,7 @@ impl StatusCommand {
                 && let Some(unpushed) =
                     dvcs_downloader.get_unpushed_changes(package.clone(), &target_path)?
             {
-                unpushed_changes.insert(target_dir, legacy_lossy(&unpushed).into_owned());
+                unpushed_changes.insert(target_dir, unpushed);
             }
         }
 
@@ -188,12 +191,8 @@ impl StatusCommand {
                     .as_bool()
                     .unwrap_or(false)
                 {
-                    let indented_changes = changes
-                        .lines()
-                        .map(|line| format!("    {}", line.trim_start()))
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    io.write(format!("<info>{}</info>:", path));
+                    let indented_changes = Self::indent_changes(BStr::new(changes));
+                    io.write(bconcat!("<info>", path, "</info>:"));
                     io.write(&indented_changes);
                 } else {
                     io.write(path);
@@ -211,12 +210,8 @@ impl StatusCommand {
                     .as_bool()
                     .unwrap_or(false)
                 {
-                    let indented_changes = changes
-                        .lines()
-                        .map(|line| format!("    {}", line.trim_start()))
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    io.write(format!("<info>{}</info>:", path));
+                    let indented_changes = Self::indent_changes(BStr::new(changes));
+                    io.write(bconcat!("<info>", path, "</info>:"));
                     io.write(&indented_changes);
                 } else {
                     io.write(path);
@@ -236,58 +231,33 @@ impl StatusCommand {
                     .as_bool()
                     .unwrap_or(false)
                 {
-                    let current_version = {
-                        let v = changes["current"]
-                            .get("version")
-                            .map(|s| s.as_str())
-                            .unwrap_or_default();
-                        let r = changes["current"]
-                            .get("ref")
-                            .map(|s| s.as_str())
-                            .unwrap_or_default();
-                        if v.is_empty() {
-                            r.to_string()
-                        } else {
-                            v.to_string()
-                        }
+                    let current_version = if changes["current"]["version"].is_empty() {
+                        changes["current"]["ref"].clone()
+                    } else {
+                        changes["current"]["version"].clone()
                     };
-                    let previous_version = {
-                        let v = changes["previous"]
-                            .get("version")
-                            .map(|s| s.as_str())
-                            .unwrap_or_default();
-                        let r = changes["previous"]
-                            .get("ref")
-                            .map(|s| s.as_str())
-                            .unwrap_or_default();
-                        if v.is_empty() {
-                            r.to_string()
-                        } else {
-                            v.to_string()
-                        }
+                    let previous_version = if changes["previous"]["version"].is_empty() {
+                        changes["previous"]["ref"].clone()
+                    } else {
+                        changes["previous"]["version"].clone()
                     };
 
                     let (current_display, previous_display) = if io.is_very_verbose() {
-                        let cur_ref = changes["current"]
-                            .get("ref")
-                            .map(|s| s.as_str())
-                            .unwrap_or_default();
-                        let prev_ref = changes["previous"]
-                            .get("ref")
-                            .map(|s| s.as_str())
-                            .unwrap_or_default();
                         (
-                            format!("{} ({})", current_version, cur_ref),
-                            format!("{} ({})", previous_version, prev_ref),
+                            bconcat!(current_version, " (", changes["current"]["ref"], ")"),
+                            bconcat!(previous_version, " (", changes["previous"]["ref"], ")"),
                         )
                     } else {
                         (current_version, previous_version)
                     };
 
-                    io.write(format!("<info>{}</info>:", path));
-                    io.write(format!(
-                        "    From <comment>{}</comment> to <comment>{}</comment>",
-                        previous_display, current_display
+                    io.write(bconcat!("<info>", path, "</info>:"));
+                    io.write(bconcat!(
+                        "    From <comment>",
+                        previous_display,
+                        "</comment> to <comment>",
+                        current_display,
+                        "</comment>"
                     ));
                 } else {
                     io.write(path);

@@ -12,8 +12,9 @@ use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
-    legacy_lossy, php_regex, php_to_string, preg_replace,
+    InvalidArgumentException, PATHINFO_EXTENSION, PhpMixed, UnexpectedValueException, bconcat,
+    get_debug_type, json_encode, path_from_bytes, path_to_bytes, pathinfo, php_regex,
+    php_to_string, preg_replace, realpath, strtr,
 };
 
 pub struct RepositoryFactory;
@@ -22,24 +23,20 @@ impl RepositoryFactory {
     pub fn config_from_string(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        repository: &str,
+        repository: impl AsRef<[u8]>,
         allow_filesystem: bool,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        if repository.starts_with("http") {
+        let repository = repository.as_ref().as_bstr();
+        if repository.starts_with(b"http") {
             let mut repo_config = IndexMap::new();
             repo_config.insert("type".into(), PhpMixed::string("composer".to_string()));
-            repo_config.insert("url".into(), PhpMixed::string(repository.to_string()));
+            repo_config.insert("url".into(), PhpMixed::string(repository));
             return Ok(repo_config);
         }
 
-        let extension = std::path::Path::new(repository)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or_default();
-
-        if extension == "json" {
+        if pathinfo(repository, PATHINFO_EXTENSION) == "json" {
             let json = JsonFile::new(
-                repository,
+                path_from_bytes(repository),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
                     Factory::create_http_downloader(io.clone(), config, IndexMap::new())?,
                 ))),
@@ -50,42 +47,41 @@ impl RepositoryFactory {
             let has_includes = data.get("includes").is_some_and(|v| !v.is_null());
             let has_provider_includes = data.get("provider-includes").is_some_and(|v| !v.is_null());
             if has_packages || has_includes || has_provider_includes {
-                let real_path = std::fs::canonicalize(repository)
-                    .ok()
-                    .and_then(|p| p.to_str().map(|s| s.to_string()))
-                    .unwrap_or_else(|| repository.to_string())
-                    .replace('\\', "/");
+                let real_path = realpath(path_from_bytes(repository))
+                    .map(|p| BString::from(path_to_bytes(&p)))
+                    .unwrap_or_else(|| BString::from(repository));
+                let real_path = strtr(&real_path, "\\", "/");
                 let mut repo_config = IndexMap::new();
                 repo_config.insert("type".into(), PhpMixed::string("composer".to_string()));
                 repo_config.insert(
                     "url".into(),
-                    PhpMixed::string(format!("file://{}", real_path)),
+                    PhpMixed::string(bconcat!("file://", real_path)),
                 );
                 return Ok(repo_config);
             } else if allow_filesystem {
                 let mut repo_config = IndexMap::new();
                 repo_config.insert("type".into(), PhpMixed::string("filesystem".to_string()));
-                repo_config.insert("json".into(), PhpMixed::string(repository.to_string()));
+                repo_config.insert("json".into(), PhpMixed::string(repository));
                 return Ok(repo_config);
             } else {
-                return Err(InvalidArgumentException::new(format!("Invalid repository URL ({}) given. This file does not contain a valid composer repository.", repository)).into());
+                return Err(InvalidArgumentException::new(format!("Invalid repository URL ({}) given. This file does not contain a valid composer repository.", repository.display_lossy())).into());
             }
         }
 
-        if repository.starts_with("{") {
+        if repository.starts_with(b"{") {
             let parsed = JsonFile::parse_json(Some(repository), None)?;
             let repo_config: IndexMap<BString, PhpMixed> =
                 parsed.as_array().cloned().unwrap_or_default();
             return Ok(repo_config);
         }
 
-        Err(InvalidArgumentException::new(format!("Invalid repository url ({}) given. Has to be a .json file, an http url or a JSON object.", repository)).into())
+        Err(InvalidArgumentException::new(format!("Invalid repository url ({}) given. Has to be a .json file, an http url or a JSON object.", repository.display_lossy())).into())
     }
 
     pub fn from_string(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        repository: &str,
+        repository: impl AsRef<[u8]>,
         allow_filesystem: bool,
         rm: Option<&mut dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
@@ -296,13 +292,12 @@ impl RepositoryFactory {
                         Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);
 
                     if repo_type == "filesystem" {
-                        let json_path = legacy_lossy(&BString::from(
+                        let json_path = path_from_bytes(
                             repo_arr
                                 .get(B("json"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default(),
-                        ))
-                        .into_owned();
+                        );
                         let created: RepositoryInterfaceHandle =
                             RepositoryInterfaceHandle::new(FilesystemRepository::new(
                                 JsonFile::new(json_path, None, None)?,

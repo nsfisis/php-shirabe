@@ -3,9 +3,9 @@
 use crate::dependency_resolver::{PolicyInterface, Pool, Request};
 use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
-use bstr::{BString, ByteVec};
+use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, bconcat, implode, ksort, legacy_lossy};
+use shirabe_php_shim::{CmpOp, bconcat, implode, ksort};
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
 
@@ -83,10 +83,7 @@ impl PoolOptimizer {
 
         // Extract requested package requirements
         for (require, constraint) in request.get_requires().iter() {
-            self.extract_require_constraints_per_package(
-                &legacy_lossy(require),
-                constraint.clone(),
-            );
+            self.extract_require_constraints_per_package(require.as_bstr(), constraint.clone());
         }
 
         // First pass over all packages to extract information and mark package constraints irremovable
@@ -94,14 +91,14 @@ impl PoolOptimizer {
             // Extract package requirements
             for link in package.get_requires().values() {
                 self.extract_require_constraints_per_package(
-                    &legacy_lossy(link.get_target()),
+                    link.get_target(),
                     link.get_constraint().clone(),
                 );
             }
             // Extract package conflicts
             for link in package.get_conflicts().values() {
                 self.extract_conflict_constraints_per_package(
-                    &legacy_lossy(link.get_target()),
+                    link.get_target(),
                     link.get_constraint().clone(),
                 );
             }
@@ -598,12 +595,12 @@ impl PoolOptimizer {
     /// only keep either one which can cause trouble (e.g. when using --prefer-lowest).
     fn extract_require_constraints_per_package(
         &mut self,
-        package: &str,
+        package: &BStr,
         constraint: AnyConstraint,
     ) {
         for expanded in self.expand_disjunctive_multi_constraints(constraint) {
             self.require_constraints_per_package
-                .entry(bstr::BString::from(package.to_string()))
+                .entry(BString::from(package))
                 .or_default()
                 .insert(BString::from(&expanded.to_php_string()[..]), expanded);
         }
@@ -614,12 +611,12 @@ impl PoolOptimizer {
     /// only keep either one which can cause trouble (e.g. when using --prefer-lowest).
     fn extract_conflict_constraints_per_package(
         &mut self,
-        package: &str,
+        package: &BStr,
         constraint: AnyConstraint,
     ) {
         for expanded in self.expand_disjunctive_multi_constraints(constraint) {
             self.conflict_constraints_per_package
-                .entry(bstr::BString::from(package.to_string()))
+                .entry(BString::from(package))
                 .or_default()
                 .insert(BString::from(&expanded.to_php_string()[..]), expanded);
         }

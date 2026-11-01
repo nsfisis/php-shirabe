@@ -16,13 +16,13 @@ use crate::repository::{
     PlatformRepository, RepositoryInterfaceHandle, RootPackageRepository,
 };
 use crate::util::{Git as GitUtil, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect,
     array_keys, array_map, array_merge, empty, file_get_contents, filemtime, hash, in_array_loose,
-    intval, is_int, ksort, legacy_lossy, php_regex, preg_is_match, preg_match, realpath, strcmp,
-    strtolower, touch2, trim, usort,
+    intval, is_int, ksort, php_regex, preg_is_match, preg_match, realpath, strcmp, strtolower,
+    touch2, trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -115,15 +115,12 @@ impl Locker {
 
         ksort(&mut relevant_content);
 
-        Ok(bstr::BString::from(
-            legacy_lossy(&hash(
-                "md5",
-                &JsonFile::encode_with_options(
-                    &PhpMixed::Array(relevant_content.into_iter().collect()),
-                    JsonEncodeOptions::none(),
-                )?,
-            ))
-            .into_owned(),
+        Ok(hash(
+            "md5",
+            &JsonFile::encode_with_options(
+                &PhpMixed::Array(relevant_content.into_iter().collect()),
+                JsonEncodeOptions::none(),
+            )?,
         ))
     }
 
@@ -238,21 +235,15 @@ impl Locker {
                                 );
                             let alias_pkg = CompleteAliasPackageHandle::new(
                                 alias_of,
-                                bstr::BString::from(
-                                    legacy_lossy(
-                                        m.get(B("alias_normalized"))
-                                            .and_then(|v| v.as_string())
-                                            .unwrap_or_default(),
-                                    )
-                                    .into_owned(),
+                                BString::from(
+                                    m.get(B("alias_normalized"))
+                                        .and_then(|v| v.as_string())
+                                        .unwrap_or_default(),
                                 ),
-                                bstr::BString::from(
-                                    legacy_lossy(
-                                        m.get(B("alias"))
-                                            .and_then(|v| v.as_string())
-                                            .unwrap_or_default(),
-                                    )
-                                    .into_owned(),
+                                BString::from(
+                                    m.get(B("alias"))
+                                        .and_then(|v| v.as_string())
+                                        .unwrap_or_default(),
                                 ),
                             );
                             alias_pkg.set_root_package_alias(true);
@@ -278,13 +269,10 @@ impl Locker {
         if let Some(PhpMixed::List(list)) = lock_data.get(B("packages-dev")) {
             for package in list {
                 if let PhpMixed::Array(m) = package {
-                    names.push(bstr::BString::from(
-                        legacy_lossy(&strtolower(
-                            m.get(B("name"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        ))
-                        .into_owned(),
+                    names.push(strtolower(
+                        m.get(B("name"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
                     ));
                 }
             }
@@ -342,14 +330,11 @@ impl Locker {
     pub fn get_minimum_stability(&mut self) -> anyhow::Result<BString> {
         let lock_data = self.get_lock_data()?;
 
-        Ok(bstr::BString::from(
-            legacy_lossy(
-                lock_data
-                    .get(B("minimum-stability"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("stable".into()),
-            )
-            .into_owned(),
+        Ok(BString::from(
+            lock_data
+                .get(B("minimum-stability"))
+                .and_then(|v| v.as_string())
+                .unwrap_or("stable".into()),
         ))
     }
 
@@ -432,14 +417,11 @@ impl Locker {
     pub fn get_plugin_api(&mut self) -> anyhow::Result<BString> {
         let lock_data = self.get_lock_data()?;
 
-        Ok(bstr::BString::from(
-            legacy_lossy(
-                lock_data
-                    .get(B("plugin-api-version"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("1.1.0".into()),
-            )
-            .into_owned(),
+        Ok(BString::from(
+            lock_data
+                .get(B("plugin-api-version"))
+                .and_then(|v| v.as_string())
+                .unwrap_or("1.1.0".into()),
         ))
     }
 
@@ -474,7 +456,7 @@ impl Locker {
         platform_reqs: IndexMap<BString, BString>,
         platform_dev_reqs: IndexMap<BString, BString>,
         aliases: Vec<IndexMap<BString, PhpMixed>>,
-        minimum_stability: &str,
+        minimum_stability: &BStr,
         stability_flags: IndexMap<BString, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,
@@ -487,12 +469,12 @@ impl Locker {
             |alias: &IndexMap<BString, PhpMixed>| {
                 let mut alias = alias.clone();
                 if matches!(
-                    &*alias
+                    alias
                         .get(B("version"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
-                        .to_str_lossy(),
-                    "dev-master" | "dev-trunk" | "dev-default"
+                        .as_bytes(),
+                    b"dev-master" | b"dev-trunk" | b"dev-default"
                 ) {
                     alias.insert(
                         "version".into(),
@@ -538,7 +520,7 @@ impl Locker {
         );
         lock.insert(
             "minimum-stability".into(),
-            PhpMixed::string(minimum_stability.to_string()),
+            PhpMixed::string(minimum_stability),
         );
         lock.insert(
             "stability-flags".into(),
@@ -1015,7 +997,7 @@ pub trait LockerInterface: std::fmt::Debug {
         platform_reqs: IndexMap<BString, BString>,
         platform_dev_reqs: IndexMap<BString, BString>,
         aliases: Vec<IndexMap<BString, PhpMixed>>,
-        minimum_stability: &str,
+        minimum_stability: &BStr,
         stability_flags: IndexMap<BString, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,
@@ -1107,7 +1089,7 @@ impl LockerInterface for Locker {
         platform_reqs: IndexMap<BString, BString>,
         platform_dev_reqs: IndexMap<BString, BString>,
         aliases: Vec<IndexMap<BString, PhpMixed>>,
-        minimum_stability: &str,
+        minimum_stability: &BStr,
         stability_flags: IndexMap<BString, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,

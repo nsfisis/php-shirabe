@@ -61,7 +61,7 @@ fn test_parse_openssl_versions() {
     for (input, parsed_version, fips_expected, normalized_version) in provide_openssl_versions() {
         let mut is_fips = false;
         assert_eq!(
-            Some(parsed_version.to_string()),
+            Some(bstr::BString::from(parsed_version)),
             Version::parse_openssl(input, &mut is_fips)
         );
         assert_eq!(fips_expected, is_fips);
@@ -86,7 +86,7 @@ fn test_parse_libjpeg_version() {
 
     for (input, parsed_version) in cases {
         assert_eq!(
-            Some(parsed_version.to_string()),
+            Some(bstr::BString::from(parsed_version)),
             Version::parse_libjpeg(input)
         );
     }
@@ -103,7 +103,7 @@ fn test_parse_zoneinfo_version() {
 
     for (input, parsed_version) in cases {
         assert_eq!(
-            Some(parsed_version.to_string()),
+            Some(bstr::BString::from(parsed_version)),
             Version::parse_zoneinfo_version(input)
         );
     }

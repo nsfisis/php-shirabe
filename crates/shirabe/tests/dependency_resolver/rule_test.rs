@@ -12,7 +12,7 @@ use shirabe_semver::constraint::MatchAllConstraint;
 
 fn root_require_reason() -> ReasonData {
     ReasonData::RootRequire {
-        package_name: String::new(),
+        package_name: bstr::BString::default(),
         constraint: MatchAllConstraint::new(None).into(),
     }
 }

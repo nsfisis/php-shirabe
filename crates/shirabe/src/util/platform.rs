@@ -159,7 +159,6 @@ impl Platform {
             let file_contents = file_get_contents("/proc/version").unwrap_or_default();
             if !ini_get("open_basedir").is_some_and(|s| PhpMixed::string(s).to_bool())
                 && is_readable("/proc/version")
-                // TODO(bytes)
                 && stripos(&file_contents, "microsoft").is_some()
                 && !Self::is_docker()
             // Docker and Podman running inside WSL should not be seen as WSL
@@ -225,7 +224,8 @@ impl Platform {
         false
     }
 
-    pub fn strlen(str: &str) -> i64 {
+    pub fn strlen(str: impl AsRef<[u8]>) -> i64 {
+        let str = str.as_ref();
         static USE_MB_STRING: Mutex<Option<bool>> = Mutex::new(None);
         let mut use_mb_string = USE_MB_STRING.lock().unwrap();
         if use_mb_string.is_none() {
@@ -295,10 +295,10 @@ impl Platform {
 
             if php_os_family() == "Linux" {
                 let process = ProcessExecutor::new(None);
-                let mut output = String::new();
+                let mut output = BString::default();
                 let result: anyhow::Result<()> = (|| {
                     if process.execute(&["lsmod".to_string()], &mut output, None)? == 0
-                        && output.contains("vboxguest")
+                        && output.contains_str("vboxguest")
                     {
                         *cached = Some(true);
                         return Ok(());

@@ -12,8 +12,8 @@ use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
 use bstr::{B, BString};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, file_get_contents, file_put_contents, impl_php_class, is_writable,
-    legacy_lossy, php_regex, preg_is_match, preg_replace, strtolower,
+    PhpMixed, RuntimeException, bconcat, file_get_contents, file_put_contents, impl_php_class,
+    is_writable, php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -176,14 +176,13 @@ impl BumpCommand {
         }
 
         let packages_filter = if !packages_filter.is_empty() {
-            let packages_filter: Vec<String> = packages_filter
+            let packages_filter: Vec<BString> = packages_filter
                 .iter()
                 .map(|constraint| preg_replace(php_regex!(r"{[:= ].+}"), "", constraint))
-                .map(|s| legacy_lossy(&s).into_owned())
                 .collect();
-            let unique_lower: Vec<String> = packages_filter
+            let unique_lower: Vec<BString> = packages_filter
                 .iter()
-                .map(|s| legacy_lossy(&strtolower(s)).into_owned())
+                .map(strtolower)
                 .collect::<indexmap::IndexSet<_>>()
                 .into_iter()
                 .collect();
@@ -194,12 +193,9 @@ impl BumpCommand {
             packages_filter
         } else {
             packages_filter
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<String>>()
         };
 
-        let mut updates: indexmap::IndexMap<&str, indexmap::IndexMap<String, String>> =
+        let mut updates: indexmap::IndexMap<&str, indexmap::IndexMap<BString, BString>> =
             indexmap::IndexMap::new();
         for (key, reqs) in &tasks {
             for (pkg_name, link) in reqs.iter() {
@@ -231,7 +227,7 @@ impl BumpCommand {
                 updates
                     .entry(*key)
                     .or_default()
-                    .insert(legacy_lossy(&pkg_name.clone()).into_owned(), bumped);
+                    .insert(pkg_name.clone(), bumped);
             }
         }
 
@@ -246,7 +242,7 @@ impl BumpCommand {
                         .entry(key.to_string().into())
                         .or_insert_with(|| PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(map) = section {
-                        map.insert(package.as_str().into(), PhpMixed::string(version.clone()));
+                        map.insert(package.clone(), PhpMixed::string(version.clone()));
                     }
                 }
             }
@@ -262,9 +258,14 @@ impl BumpCommand {
                 ));
                 for (require_type, packages) in &updates {
                     for (package, version) in packages {
-                        io.write(format!(
-                            "<info> - {}.{}: {}</info>",
-                            require_type, package, version
+                        io.write(bconcat!(
+                            "<info> - ",
+                            *require_type,
+                            ".",
+                            package,
+                            ": ",
+                            version,
+                            "</info>"
                         ));
                     }
                 }
@@ -308,7 +309,7 @@ impl BumpCommand {
     fn update_file_cleanly(
         &self,
         json: &JsonFile,
-        updates: &indexmap::IndexMap<&str, indexmap::IndexMap<String, String>>,
+        updates: &indexmap::IndexMap<&str, indexmap::IndexMap<BString, BString>>,
     ) -> anyhow::Result<bool> {
         let contents = match file_get_contents(json.get_path()) {
             Ok(c) => c,

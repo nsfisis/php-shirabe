@@ -5,7 +5,8 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
-use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class, legacy_lossy};
+use bstr::BStr;
+use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class};
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
@@ -124,7 +125,7 @@ impl Command for DumpAutoloadCommand {
             .borrow()
             .get_option("apcu-prefix")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()

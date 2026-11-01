@@ -9,7 +9,7 @@ use crate::event_dispatcher::{
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
-use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, rpc_name};
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
@@ -28,10 +28,10 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, bconcat, explode, explode_with_limit, file_exists,
     get_class, hash, implode, ini_get, is_array, is_callable, is_dir, is_object, is_string, krsort,
-    legacy_lossy, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
+    os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
+    preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
     spl_autoload_register, spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos,
-    strtoupper, substr, trim2,
+    strtoupper, substr, trim2, utf8_text,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -322,7 +322,7 @@ impl EventDispatcher {
         // finally block
         self.pop_event();
 
-        let mut known_identifiers: IndexMap<String, IndexMap<BString, PhpMixed>> = IndexMap::new();
+        let mut known_identifiers: IndexMap<BString, IndexMap<BString, PhpMixed>> = IndexMap::new();
         for (key, cb) in autoloaders_before.iter().enumerate() {
             let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
             entry.insert("key".into(), PhpMixed::Int(key as i64));
@@ -467,36 +467,38 @@ impl EventDispatcher {
                     let (class_name, method) = match &callable {
                         Callable::ArrayCallable(first, m) => {
                             let cls = if is_object(first.as_ref()) {
-                                legacy_lossy(&get_class(first.as_ref())).into_owned()
+                                get_class(first.as_ref())
                             } else if let PhpMixed::String(s) = first.as_ref() {
-                                s.to_str_lossy().into_owned()
+                                s.clone()
                             } else {
-                                "?".to_string()
+                                BString::from("?")
                             };
                             (cls, m.clone())
                         }
-                        _ => ("?".to_string(), "?".to_string()),
+                        _ => (BString::from("?"), "?".to_string()),
                     };
                     return Err(RuntimeException::new(format!(
                         "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
-                        class_name,
+                        class_name.display_lossy(),
                         method,
                         event.get_name()
                     )).into());
                 }
                 if let Callable::ArrayCallable(first, method_name) = &callable {
                     let prefix = if is_object(first.as_ref()) {
-                        legacy_lossy(&get_class(first.as_ref())).into_owned()
+                        get_class(first.as_ref())
                     } else if let PhpMixed::String(s) = first.as_ref() {
-                        s.to_str_lossy().into_owned()
+                        s.clone()
                     } else {
-                        "?".to_string()
+                        BString::from("?")
                     };
                     self.io.write_error3(
-                        format!(
-                            "> {}: {}->{}",
-                            formatted_event_name_with_args.clone(),
+                        bconcat!(
+                            "> ",
+                            formatted_event_name_with_args,
+                            ": ",
                             prefix,
+                            "->",
                             method_name,
                         ),
                         true,
@@ -521,8 +523,7 @@ impl EventDispatcher {
                         );
 
                         let mut script: Vec<BString> = explode(" ", substr(callable_str, 1, None));
-                        // TODO(bytes): event names are Strings, so non-UTF-8 bytes are replaced.
-                        let script_name = legacy_lossy(&script.remove(0)).into_owned();
+                        let script_name = script.remove(0);
 
                         let args: Vec<BString>;
                         if let Some(index) = array_search_in_vec("@additional_args", &script) {
@@ -587,19 +588,25 @@ impl EventDispatcher {
                                 .into());
                             }
                         } else {
-                            if self
-                                .get_listeners(&Event::new(
+                            // Event names are text, so a script name that is not valid UTF-8 has
+                            // no listeners, and dispatching it would do nothing.
+                            let script_name = utf8_text(&script_name).map(str::to_owned);
+                            if script_name.as_ref().is_none_or(|script_name| {
+                                self.get_listeners(&Event::new(
                                     script_name.clone(),
                                     Vec::new(),
                                     IndexMap::new(),
                                 ))
                                 .is_empty()
-                            {
+                            }) {
                                 self.io.write_error3(format!(
                                     "<warning>You made a reference to a non-existent script {}</warning>",
                                     callable_str.display_lossy(),
                                 ), true, crate::io::QUIET);
                             }
+                            let Some(script_name) = script_name else {
+                                continue;
+                            };
 
                             // TODO(plugin): reached only with a fully loaded Composer (script dispatch asserts full upstream).
                             let composer = self.composer();
@@ -741,9 +748,9 @@ impl EventDispatcher {
                         }
                         if self.php_runtime_bool(
                             "defined",
-                            vec![PluginValue::string(format!(
-                                "Composer\\Script\\ScriptEvents::{}",
-                                legacy_lossy(&str_replace("-", "_", strtoupper(event.get_name())))
+                            vec![PluginValue::string(bconcat!(
+                                "Composer\\Script\\ScriptEvents::",
+                                str_replace("-", "_", strtoupper(event.get_name()))
                             ))],
                         )? {
                             self.io.write_error3(format!(
@@ -964,7 +971,6 @@ try {
                                 let m0 = m.get(0).unwrap_or_default();
                                 if !file_exists(path_from_bytes(m0)) {
                                     let finder = ExecutableFinder::new();
-                                    // TODO(bytes): ExecutableFinder looks the name up as a &str.
                                     if let Some(path_to_exec) = finder.find(m0, None, &[]) {
                                         let mut path_to_exec = path_to_exec;
                                         if Platform::is_windows() {
@@ -1169,10 +1175,9 @@ try {
             loader: self.loader.clone(),
             event: Some((rhandle, event)),
         };
-        // TODO(bytes): the RPC layer carries class and method names as Strings.
         let outcome = call_static_method(
-            &legacy_lossy(class_name),
-            &legacy_lossy(method_name),
+            rpc_name(class_name)?,
+            rpc_name(method_name)?,
             vec![PluginValue::RustHandle(RustObjHandle {
                 rhandle,
                 class: stub_class.to_string(),
@@ -1451,18 +1456,15 @@ try {
             .borrow()
             .get("bin-dir")
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned())
+            .map(|s| std::path::PathBuf::from(path_from_bytes(s)))
             .unwrap_or_default();
         if is_dir(&bin_dir) {
-            let bin_dir = realpath(&bin_dir)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .unwrap_or(bin_dir);
+            let bin_dir = realpath(&bin_dir).unwrap_or(bin_dir);
             let path_value = Platform::get_env(path_env).unwrap_or_default();
             let path_value = os_str_from_bytes(&path_value);
-            if !std::env::split_paths(path_value).any(|dir| dir == std::path::Path::new(&bin_dir)) {
+            if !std::env::split_paths(path_value).any(|dir| dir == bin_dir) {
                 let path_value = std::env::join_paths(
-                    std::iter::once(std::path::PathBuf::from(&bin_dir))
-                        .chain(std::env::split_paths(path_value)),
+                    std::iter::once(bin_dir).chain(std::env::split_paths(path_value)),
                 )
                 .expect("bin-dir holds no path separator");
                 Platform::put_env(path_env, path_to_bytes(&path_value));
@@ -1470,12 +1472,12 @@ try {
         }
     }
 
-    fn get_callback_identifier(cb: &PhpMixed) -> String {
+    fn get_callback_identifier(cb: &PhpMixed) -> BString {
         if let PhpMixed::String(s) = cb {
-            return format!("fn:{}", legacy_lossy(&s));
+            return bconcat!("fn:", s);
         }
         if is_object(cb) {
-            return format!("obj:{}", spl_object_hash(cb));
+            return bconcat!("obj:", spl_object_hash(cb));
         }
         if is_array(cb)
             && let PhpMixed::Array(map) = cb
@@ -1486,28 +1488,24 @@ try {
                 let second = entries[1];
                 let prefix = if is_string(first) {
                     if let PhpMixed::String(s) = first {
-                        s.to_str_lossy().into_owned()
+                        s.clone()
                     } else {
-                        "?".to_string()
+                        BString::from("?")
                     }
                 } else {
-                    format!(
-                        "{}#{}",
-                        legacy_lossy(&get_class(first)),
-                        spl_object_hash(first)
-                    )
+                    bconcat!(get_class(first), "#", spl_object_hash(first))
                 };
                 let suffix = if let PhpMixed::String(s) = second {
-                    s.to_str_lossy().into_owned()
+                    s.clone()
                 } else {
-                    "?".to_string()
+                    BString::from("?")
                 };
-                return format!("array:{}::{}", prefix, suffix);
+                return bconcat!("array:", prefix, "::", suffix);
             }
         }
 
         // not great but also do not want to break everything here
-        "unsupported".to_string()
+        BString::from("unsupported")
     }
 
     fn make_autoloader(
@@ -1636,10 +1634,10 @@ try {
     }
 
     /// The `vendor/autoload.php` of the Composer PHP runtime.
-    fn composer_php_runtime_autoload(cache_dir: &std::path::Path) -> anyhow::Result<String> {
-        Ok(format!(
-            "{}/vendor/autoload.php",
-            legacy_lossy(&shirabe_php_rpc::composer_runtime::base_path(cache_dir)?)
+    fn composer_php_runtime_autoload(cache_dir: &std::path::Path) -> anyhow::Result<BString> {
+        Ok(bconcat!(
+            shirabe_php_rpc::composer_runtime::base_path(cache_dir)?,
+            "/vendor/autoload.php"
         ))
     }
 
@@ -1713,7 +1711,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
                 let class = match args.first() {
-                    Some(PluginValue::String(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
+                    Some(PluginValue::String(bytes)) => bytes,
                     other => {
                         return Err(runtime_throw(format!(
                             "__shirabe_find_file expects a class name argument, got {other:?}"
@@ -1724,7 +1722,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                     match self
                         .loader
                         .as_mut()
-                        .and_then(|loader| loader.find_file(&class))
+                        .and_then(|loader| loader.find_file(class))
                     {
                         Some(file) => PluginValue::string(file),
                         None => PluginValue::Null,

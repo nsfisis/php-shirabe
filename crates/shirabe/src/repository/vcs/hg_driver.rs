@@ -11,8 +11,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bconcat, date_create, dirname, is_dir, is_writable,
-    legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_replace,
+    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
 };
 
 #[derive(Debug)]
@@ -158,7 +157,7 @@ impl HgDriver {
         map
     }
 
-    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<BString, BString>> {
+    pub fn get_dist(&self, _identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         None
     }
 
@@ -176,12 +175,12 @@ impl HgDriver {
         }
 
         let resource = vec![
-            "hg".to_string(),
-            "cat".to_string(),
-            "-r".to_string(),
-            legacy_lossy(&identifier).into_owned(),
-            "--".to_string(),
-            legacy_lossy(&file).into_owned(),
+            BString::from("hg"),
+            "cat".into(),
+            "-r".into(),
+            identifier.into(),
+            "--".into(),
+            file.into(),
         ];
         let mut content = BString::default();
         self.inner.process.borrow_mut().execute(
@@ -211,16 +210,14 @@ impl HgDriver {
 
         let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
-            [
-                "hg",
-                "log",
-                "--template",
-                "{date|rfc3339date}",
-                "-r",
-                &*legacy_lossy(identifier),
-            ]
-            .map(|s| s.to_string())
-            .as_ref(),
+            &[
+                BString::from("hg"),
+                "log".into(),
+                "--template".into(),
+                "{date|rfc3339date}".into(),
+                "-r".into(),
+                identifier.into(),
+            ],
             &mut output,
             Some(path_from_bytes(&self.repo_dir)),
         )?;
@@ -331,9 +328,7 @@ impl HgDriver {
             if process.execute(
                 ["hg", "summary"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(std::path::Path::new(&*legacy_lossy(path_to_bytes(
-                    path_from_bytes(&url),
-                )))),
+                Some(path_from_bytes(&url)),
             )? == 0
             {
                 return Ok(true);
@@ -347,9 +342,12 @@ impl HgDriver {
         let process = crate::util::ProcessExecutor::new(Some(io));
         let mut ignored = BString::default();
         let exit = process.execute(
-            ["hg", "identify", "--", &*legacy_lossy(url)]
-                .map(|s| s.to_string())
-                .as_ref(),
+            &[
+                BString::from("hg"),
+                "identify".into(),
+                "--".into(),
+                url.into(),
+            ],
             &mut ignored,
             None,
         )?;
@@ -415,7 +413,7 @@ impl crate::repository::vcs::VcsDriverInterface for HgDriver {
     }
 
     fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
-        HgDriver::get_dist(self, &legacy_lossy(identifier))
+        HgDriver::get_dist(self, identifier)
     }
 
     fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {

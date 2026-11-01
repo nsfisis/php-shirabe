@@ -23,10 +23,10 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
     array_keys, array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs,
     array_unique, bconcat, bin2hex, dirname, empty, explode, file_exists, file_get_contents, hash,
-    implode, intval, is_array, is_dir, ksort, legacy_lossy, ltrim, ltrim2, path_from_bytes,
-    path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
-    preg_replace_callback, random_bytes, realpath, rtrim2, str_replace, strlen, strpos, strtr,
-    strtr_array, substr, substr_count, trim, trim2, unlink, var_export,
+    implode, intval, is_array, is_dir, ksort, ltrim, ltrim2, path_from_bytes, path_to_bytes,
+    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback,
+    random_bytes, realpath, rtrim2, str_replace, strlen, strpos, strtr, strtr_array, substr,
+    substr_count, trim, trim2, unlink, utf8_text, var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -41,7 +41,7 @@ pub struct AutoloadGenerator {
     dev_mode: std::cell::Cell<Option<bool>>,
     class_map_authoritative: std::cell::Cell<bool>,
     apcu: std::cell::Cell<bool>,
-    apcu_prefix: std::cell::RefCell<Option<String>>,
+    apcu_prefix: std::cell::RefCell<Option<BString>>,
     dry_run: std::cell::Cell<bool>,
     run_scripts: std::cell::Cell<bool>,
     platform_requirement_filter:
@@ -81,7 +81,7 @@ impl AutoloadGenerator {
     }
 
     /// Whether generated autoloader considers APCu caching.
-    pub fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>) {
+    pub fn set_apcu(&self, apcu: bool, apcu_prefix: Option<BString>) {
         self.apcu.set(apcu);
         *self.apcu_prefix.borrow_mut() = apcu_prefix;
     }
@@ -128,13 +128,11 @@ impl AutoloadGenerator {
             // we assume no-dev mode if no vendor dir is present or it is too old to contain dev information
             self.dev_mode.set(Some(false));
 
-            // TODO(bytes): JsonFile holds its path as a String.
             let installed_json = JsonFile::new(
-                legacy_lossy(&bconcat!(
+                path_from_bytes(&bconcat!(
                     config.get("vendor-dir").as_string().unwrap_or_default(),
                     "/composer/installed.json"
-                ))
-                .into_owned(),
+                )),
                 None,
                 None,
             )?;
@@ -449,7 +447,8 @@ impl AutoloadGenerator {
                     let group_type = group
                         .get(B("type"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default();
+                        .and_then(utf8_text)
+                        .expect("the group type is one of the PSR names set above");
                     for dir in &paths {
                         let dir_str = dir.as_string().unwrap_or_default();
                         let joined = bconcat!(base_path, "/", dir_str);
@@ -478,12 +477,10 @@ impl AutoloadGenerator {
                             )
                         };
 
-                        // TODO(bytes): ClassMapGenerator::scan_paths takes the autoload type as a
-                        // &str.
                         class_map_generator.scan_paths(
                             path_to_bytes(&dir_str),
                             exclusion_regex,
-                            &legacy_lossy(group_type),
+                            group_type,
                             Some(namespace.clone()),
                             vec![],
                         )?;
@@ -1191,7 +1188,6 @@ impl AutoloadGenerator {
             }
 
             for (_k, link) in package.get_requires().iter() {
-                // TODO(bytes): PlatformRequirementFilterInterface takes requirement names as &str.
                 if self
                     .platform_requirement_filter
                     .borrow()
@@ -1511,7 +1507,7 @@ require_once "#,
         if self.apcu.get() {
             let apcu_prefix = var_export(
                 &PhpMixed::string(if let Some(ref prefix) = *self.apcu_prefix.borrow() {
-                    BString::from(prefix.as_str())
+                    prefix.clone()
                 } else {
                     bin2hex(random_bytes(10))
                 }),
@@ -2062,7 +2058,7 @@ require_once "#,
 pub trait AutoloadGeneratorInterface: std::fmt::Debug {
     fn set_dev_mode(&self, dev_mode: bool);
     fn set_class_map_authoritative(&self, class_map_authoritative: bool);
-    fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>);
+    fn set_apcu(&self, apcu: bool, apcu_prefix: Option<BString>);
     fn set_run_scripts(&self, run_scripts: bool);
     fn set_dry_run(&self, dry_run: bool);
     fn set_platform_requirement_filter(
@@ -2110,7 +2106,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         self.set_class_map_authoritative(class_map_authoritative);
     }
 
-    fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>) {
+    fn set_apcu(&self, apcu: bool, apcu_prefix: Option<BString>) {
         self.set_apcu(apcu, apcu_prefix);
     }
 

@@ -4,20 +4,20 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::base_package::{self};
 use crate::repository::{
     CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryFactory,
 };
 use crate::util::{Filesystem, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, bconcat, empty,
     explode, file, file_exists, file_get_contents, file_put_contents, filter_var_email,
-    get_current_user, impl_php_class, implode, is_dir, is_string, legacy_lossy, path_to_bytes,
+    get_current_user, impl_php_class, implode, is_dir, is_string, path_from_bytes, path_to_bytes,
     php_regex, preg_is_match, preg_match, preg_match_all, preg_quote, preg_replace, realpath,
     str_replace, strpos, strtolower, trim, ucwords, unlink,
 };
@@ -28,12 +28,13 @@ use shirabe_symfony_console::{
     input::{ArrayInput, InputInterface, InputValue},
     output::OutputInterface,
 };
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct InitCommand {
     base_command_data: BaseCommandData,
 
-    git_config: std::cell::RefCell<Option<IndexMap<String, String>>>,
+    git_config: std::cell::RefCell<Option<IndexMap<BString, BString>>>,
     repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
     repository_sets: std::cell::RefCell<
         IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
@@ -81,25 +82,27 @@ impl InitCommand {
 
     fn parse_author_string(
         &self,
-        author: &str,
-    ) -> anyhow::Result<IndexMap<String, Option<String>>> {
+        author: &BStr,
+    ) -> anyhow::Result<IndexMap<String, Option<BString>>> {
         if let Some(m) = preg_match(
             php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
             author,
         ) {
-            let email = m.name("email").map(|s| legacy_lossy(s).into_owned());
+            let email = m.name("email").map(BString::from);
             if let Some(ref email) = email
-                && !self.is_valid_email(email)
+                && !self.is_valid_email(email.as_bstr())
             {
-                return Err(
-                    InvalidArgumentException::new(format!("Invalid email \"{}\"", email)).into(),
-                );
+                return Err(InvalidArgumentException::new(format!(
+                    "Invalid email \"{}\"",
+                    email.display_lossy()
+                ))
+                .into());
             }
 
-            let mut result: IndexMap<String, Option<String>> = IndexMap::new();
+            let mut result: IndexMap<String, Option<BString>> = IndexMap::new();
             result.insert(
                 "name".to_string(),
-                Some(legacy_lossy(&trim(m.name("name").unwrap_or_default())).into_owned()),
+                Some(trim(m.name("name").unwrap_or_default())),
             );
             result.insert("email".to_string(), email);
 
@@ -111,7 +114,7 @@ impl InitCommand {
         .into())
     }
 
-    fn format_authors(&self, author: &str) -> anyhow::Result<Vec<IndexMap<BString, PhpMixed>>> {
+    fn format_authors(&self, author: &BStr) -> anyhow::Result<Vec<IndexMap<BString, PhpMixed>>> {
         let parsed = self.parse_author_string(author)?;
         let mut author_map: IndexMap<BString, PhpMixed> = IndexMap::new();
         let name = parsed.get("name").cloned().unwrap_or(None);
@@ -129,32 +132,32 @@ impl InitCommand {
     /// Extract namespace from package's vendor name.
     ///
     /// new_projects.acme-extra/package-name becomes "NewProjectsAcmeExtra\PackageName"
-    pub fn namespace_from_package_name(&self, package_name: &str) -> Option<String> {
+    pub fn namespace_from_package_name(&self, package_name: impl AsRef<[u8]>) -> Option<BString> {
+        let package_name = package_name.as_ref();
         if package_name.is_empty() || strpos(package_name, "/").is_none() {
             return None;
         }
 
         let namespace: Vec<BString> = array_map(
             |part: &BString| {
-                let part = legacy_lossy(&preg_replace(php_regex!(r"/[^a-z0-9]/i"), " ", part))
-                    .into_owned();
+                let part = preg_replace(php_regex!(r"/[^a-z0-9]/i"), " ", part);
                 let part = ucwords(&part);
                 str_replace(" ", "", &part)
             },
             &explode("/", package_name),
         );
 
-        Some(legacy_lossy(&implode("\\", &namespace)).into_owned())
+        Some(implode("\\", &namespace))
     }
 
-    fn get_git_config(&self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_git_config(&self) -> anyhow::Result<IndexMap<BString, BString>> {
         if self.git_config.borrow().is_some() {
             return Ok(self.git_config.borrow().clone().unwrap_or_default());
         }
 
         let process = ProcessExecutor::new(Some(self.get_io().clone()));
 
-        let mut output = String::new();
+        let mut output = BString::default();
         if process.execute(
             &["git".to_string(), "config".to_string(), "-l".to_string()],
             &mut output,
@@ -164,16 +167,14 @@ impl InitCommand {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
             for m in preg_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output) {
                 self.git_config.borrow_mut().as_mut().unwrap().insert(
-                    legacy_lossy(
+                    BString::from(
                         m.get(1)
                             .expect("group 1 participates whenever the pattern matches"),
-                    )
-                    .into_owned(),
-                    legacy_lossy(
+                    ),
+                    BString::from(
                         m.get(2)
                             .expect("group 2 participates whenever the pattern matches"),
-                    )
-                    .into_owned(),
+                    ),
                 );
             }
 
@@ -193,7 +194,8 @@ impl InitCommand {
     ///  "/$vendor/"
     ///  "/$vendor/*"
     ///  "$vendor/*"
-    fn has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
+    fn has_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &str) -> bool {
+        let ignore_file = ignore_file.as_ref();
         if !file_exists(ignore_file) {
             return false;
         }
@@ -210,27 +212,26 @@ impl InitCommand {
         false
     }
 
-    fn add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
-        let mut contents = String::new();
+    fn add_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &str) {
+        let ignore_file = ignore_file.as_ref();
+        let mut contents: Vec<u8> = vec![];
         if file_exists(ignore_file) {
-            // TODO(bytes): the ignore file is edited as a String.
-            contents = String::from_utf8_lossy(&file_get_contents(ignore_file).unwrap_or_default())
-                .into_owned();
+            contents = file_get_contents(ignore_file).unwrap_or_default();
 
             if strpos(&contents, "\n") != Some(0) {
-                contents.push('\n');
+                contents.push(b'\n');
             }
         }
 
-        file_put_contents(ignore_file, format!("{}{}\n", contents, vendor).as_bytes());
+        file_put_contents(ignore_file, bconcat!(contents, vendor, "\n"));
     }
 
     /// For testing only: invoke the private `parse_author_string`.
     pub fn __parse_author_string(
         &self,
         author: &str,
-    ) -> anyhow::Result<IndexMap<String, Option<String>>> {
-        self.parse_author_string(author)
+    ) -> anyhow::Result<IndexMap<String, Option<BString>>> {
+        self.parse_author_string(author.into())
     }
 
     /// For testing only: invoke the crate-private `format_authors`.
@@ -238,11 +239,11 @@ impl InitCommand {
         &self,
         author: &str,
     ) -> anyhow::Result<Vec<IndexMap<BString, PhpMixed>>> {
-        self.format_authors(author)
+        self.format_authors(author.into())
     }
 
     /// For testing only: invoke the crate-private `get_git_config`.
-    pub fn __get_git_config(&self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn __get_git_config(&self) -> anyhow::Result<IndexMap<BString, BString>> {
         self.get_git_config()
     }
 
@@ -256,7 +257,7 @@ impl InitCommand {
         self.add_vendor_ignore(ignore_file, vendor)
     }
 
-    fn is_valid_email(&self, email: &str) -> bool {
+    fn is_valid_email(&self, email: &BStr) -> bool {
         filter_var_email(email)
     }
 
@@ -329,55 +330,28 @@ impl InitCommand {
         !requires_arr_empty || !dev_requires_arr_empty
     }
 
-    fn sanitize_package_name_component(&self, name: &str) -> String {
+    fn sanitize_package_name_component(&self, name: &BStr) -> BString {
         let name = preg_replace(
             php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
             "$1$3-$2$4",
             name,
         );
         let name = strtolower(&name);
-        let name = legacy_lossy(&preg_replace(
-            php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"),
-            "",
-            &name,
-        ))
-        .into_owned();
+        let name = preg_replace(php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"), "", &name);
 
-        legacy_lossy(&preg_replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)).into_owned()
+        preg_replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)
     }
 
-    fn get_default_package_name(&self) -> anyhow::Result<String> {
+    fn get_default_package_name(&self) -> anyhow::Result<BString> {
         let git = self.get_git_config()?;
-        let cwd = realpath(".")
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .unwrap_or_default();
-        let name = basename(&cwd);
-        let name =
-            legacy_lossy(&self.sanitize_package_name_component(&legacy_lossy(&name))).into_owned();
+        let cwd = realpath(".").unwrap_or_default();
+        let name = basename(path_to_bytes(&cwd));
+        let name = self.sanitize_package_name_component(name.as_bstr());
 
         let mut vendor = name.clone();
-        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-        let composer_default_vendor = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("COMPOSER_DEFAULT_VENDOR")
-            .map(|value| {
-                value.into_string().unwrap_or_else(|value| {
-                    panic!("COMPOSER_DEFAULT_VENDOR is not valid UTF-8: {value:?}")
-                })
-            });
-        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-        let server_username = PHP_SERVER.lock().unwrap().get("USERNAME").map(|value| {
-            value
-                .into_string()
-                .unwrap_or_else(|value| panic!("USERNAME is not valid UTF-8: {value:?}"))
-        });
-        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-        let server_user = PHP_SERVER.lock().unwrap().get("USER").map(|value| {
-            value
-                .into_string()
-                .unwrap_or_else(|value| panic!("USER is not valid UTF-8: {value:?}"))
-        });
+        let composer_default_vendor = server_value("COMPOSER_DEFAULT_VENDOR");
+        let server_username = server_value("USERNAME");
+        let server_user = server_value("USER");
         if !empty(
             &composer_default_vendor
                 .clone()
@@ -385,8 +359,8 @@ impl InitCommand {
                 .unwrap_or(PhpMixed::Null),
         ) {
             vendor = composer_default_vendor.unwrap_or_default();
-        } else if git.contains_key("github.user") {
-            vendor = git.get("github.user").cloned().unwrap_or_default();
+        } else if git.contains_key(B("github.user")) {
+            vendor = git.get(B("github.user")).cloned().unwrap_or_default();
         } else if !empty(
             &server_username
                 .clone()
@@ -402,28 +376,19 @@ impl InitCommand {
         ) {
             vendor = server_user.unwrap_or_default();
         } else if !get_current_user().is_empty() {
-            vendor = get_current_user();
+            vendor = get_current_user().into();
         }
 
-        let vendor = self.sanitize_package_name_component(&vendor);
+        let vendor = self.sanitize_package_name_component(vendor.as_bstr());
 
-        Ok(format!("{}/{}", vendor, name))
+        Ok(bconcat!(vendor, "/", name))
     }
 
-    fn get_default_author(&self) -> anyhow::Result<Option<String>> {
+    fn get_default_author(&self) -> anyhow::Result<Option<BString>> {
         let git = self.get_git_config()?;
 
-        let mut author_name: Option<String> = None;
-        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-        let composer_default_author = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("COMPOSER_DEFAULT_AUTHOR")
-            .map(|value| {
-                value.into_string().unwrap_or_else(|value| {
-                    panic!("COMPOSER_DEFAULT_AUTHOR is not valid UTF-8: {value:?}")
-                })
-            });
+        let mut author_name: Option<BString> = None;
+        let composer_default_author = server_value("COMPOSER_DEFAULT_AUTHOR");
         if !empty(
             &composer_default_author
                 .clone()
@@ -431,21 +396,12 @@ impl InitCommand {
                 .unwrap_or(PhpMixed::Null),
         ) {
             author_name = composer_default_author;
-        } else if git.contains_key("user.name") {
-            author_name = git.get("user.name").cloned();
+        } else if git.contains_key(B("user.name")) {
+            author_name = git.get(B("user.name")).cloned();
         }
 
-        let mut author_email: Option<String> = None;
-        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-        let composer_default_email = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("COMPOSER_DEFAULT_EMAIL")
-            .map(|value| {
-                value.into_string().unwrap_or_else(|value| {
-                    panic!("COMPOSER_DEFAULT_EMAIL is not valid UTF-8: {value:?}")
-                })
-            });
+        let mut author_email: Option<BString> = None;
+        let composer_default_email = server_value("COMPOSER_DEFAULT_EMAIL");
         if !empty(
             &composer_default_email
                 .clone()
@@ -453,16 +409,25 @@ impl InitCommand {
                 .unwrap_or(PhpMixed::Null),
         ) {
             author_email = composer_default_email;
-        } else if git.contains_key("user.email") {
-            author_email = git.get("user.email").cloned();
+        } else if git.contains_key(B("user.email")) {
+            author_email = git.get(B("user.email")).cloned();
         }
 
         if let (Some(name), Some(email)) = (author_name, author_email) {
-            return Ok(Some(format!("{} <{}>", name, email)));
+            return Ok(Some(bconcat!(name, " <", email, ">")));
         }
 
         Ok(None)
     }
+}
+
+/// `$_SERVER[$name]`, holding the bytes of the environment.
+fn server_value(name: &str) -> Option<BString> {
+    PHP_SERVER
+        .lock()
+        .unwrap()
+        .get(name)
+        .map(|value| BString::from(value.into_encoded_bytes()))
 }
 
 #[async_trait::async_trait(?Send)]
@@ -478,7 +443,7 @@ impl Command for InitCommand {
         InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
         InputOption::new6("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
         InputOption::new6("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
-        InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", legacy_lossy(&implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()))), None).unwrap().into(),
+        InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()).display_lossy()), None).unwrap().into(),
         InputOption::new("license", Some("l"), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
         InputOption::new("autoload", Some("a"), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
@@ -544,17 +509,16 @@ impl Command for InitCommand {
         }
 
         if options.contains_key(B("author")) {
-            let author = legacy_lossy(
+            let authors = self.format_authors(
                 options
                     .get(B("author"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
-            )
-            .into_owned();
+            )?;
             options.insert(
                 "authors".into(),
                 PhpMixed::List(
-                    self.format_authors(&author)?
+                    authors
                         .into_iter()
                         .map(|m| PhpMixed::Array(m.into_iter().collect()))
                         .collect(),
@@ -575,12 +539,8 @@ impl Command for InitCommand {
                 None,
             )?));
             for repo in &repositories {
-                let repo_config = RepositoryFactory::config_from_string(
-                    io.clone(),
-                    &config,
-                    &legacy_lossy(repo),
-                    true,
-                )?;
+                let repo_config =
+                    RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                 let entry = options
                     .entry("repositories".into())
                     .or_insert_with(|| PhpMixed::List(vec![]));
@@ -650,27 +610,21 @@ impl Command for InitCommand {
         }
 
         // --autoload - create autoload object
-        let mut autoload_path: Option<String> = None;
+        let mut autoload_path: Option<BString> = None;
         if options.contains_key(B("autoload")) {
-            let ap = legacy_lossy(
+            let ap = BString::from(
                 options
                     .get(B("autoload"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
-            )
-            .into_owned();
+            );
             autoload_path = Some(ap.clone());
-            let name = legacy_lossy(
-                input
-                    .borrow()
-                    .get_option("name")?
-                    .as_string()
-                    .unwrap_or_default(),
-            )
-            .into_owned();
-            let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
+            let name = input.borrow().get_option("name")?;
+            let namespace = self
+                .namespace_from_package_name(name.as_string().unwrap_or_default())
+                .unwrap_or_default();
             let mut psr4 = IndexMap::new();
-            psr4.insert(format!("{}\\", namespace).into(), PhpMixed::string(ap));
+            psr4.insert(bconcat!(namespace, "\\"), PhpMixed::string(ap));
             let mut autoload_obj = IndexMap::new();
             autoload_obj.insert("psr-4".into(), PhpMixed::Array(psr4));
             options.insert("autoload".into(), PhpMixed::Array(autoload_obj));
@@ -682,10 +636,7 @@ impl Command for InitCommand {
 
         if input.borrow().is_interactive() {
             io.write_error3(format!("\n{}\n", json), true, io_interface::NORMAL);
-            if !io.ask_confirmation(
-                "Do you confirm generation [<comment>yes</comment>]? ".to_string(),
-                true,
-            )? {
+            if !io.ask_confirmation("Do you confirm generation [<comment>yes</comment>]? ", true)? {
                 io.write_error3("<error>Command aborted</error>", true, io_interface::NORMAL);
 
                 return Ok(1);
@@ -727,7 +678,7 @@ impl Command for InitCommand {
         // --autoload - Create src folder
         if let Some(ref ap) = autoload_path {
             let mut filesystem = Filesystem::new(None);
-            filesystem.ensure_directory_exists(ap);
+            filesystem.ensure_directory_exists(path_from_bytes(ap));
 
             // dump-autoload only for projects without added dependencies.
             if !self.has_dependencies(&options) {
@@ -736,18 +687,10 @@ impl Command for InitCommand {
         }
 
         if input.borrow().is_interactive() && is_dir(".git") {
-            let mut ignore_file = realpath(".gitignore")
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .unwrap_or_default();
-
-            if ignore_file.is_empty() {
-                ignore_file = format!(
-                    "{}/.gitignore",
-                    realpath(".")
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default()
-                );
-            }
+            let ignore_file = realpath(".gitignore").unwrap_or_else(|| {
+                path_from_bytes(&bconcat!(realpath(".").unwrap_or_default(), "/.gitignore"))
+                    .to_path_buf()
+            });
 
             if !self.has_vendor_ignore(&ignore_file, "vendor") {
                 let question = "Would you like the <info>vendor</info> directory added to your <info>.gitignore</info> [<comment>yes</comment>]? ".to_string();
@@ -769,21 +712,17 @@ impl Command for InitCommand {
 
         // --autoload - Show post-install configuration info
         if autoload_path.is_some() {
-            let name = legacy_lossy(
-                input
-                    .borrow()
-                    .get_option("name")?
-                    .as_string()
-                    .unwrap_or_default(),
-            )
-            .into_owned();
-            let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
+            let name = input.borrow().get_option("name")?;
+            let namespace = self
+                .namespace_from_package_name(name.as_string().unwrap_or_default())
+                .unwrap_or_default();
 
             io.write_error3(
-                format!(
-                    "PSR-4 autoloading configured. Use \"<comment>namespace {};</comment>\" in {}",
+                bconcat!(
+                    "PSR-4 autoloading configured. Use \"<comment>namespace ",
                     namespace,
-                    autoload_path.as_deref().unwrap_or_default()
+                    ";</comment>\" in ",
+                    autoload_path.clone().unwrap_or_default()
                 ),
                 true,
                 io_interface::NORMAL,
@@ -859,12 +798,8 @@ impl Command for InitCommand {
                     )];
                 let mut create_default_packagist_repo = true;
                 for repo in &repositories {
-                    let repo_config = RepositoryFactory::config_from_string(
-                        io.clone(),
-                        &config,
-                        &legacy_lossy(repo),
-                        true,
-                    )?;
+                    let repo_config =
+                        RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                     let is_packagist_false = repo_config
                         .get(B("packagist"))
                         .map(|v| v.as_bool() == Some(false))
@@ -935,7 +870,7 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("name")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
             let mut name = match name_option {
                 Some(name) => name,
                 None => self.get_default_package_name()?,
@@ -943,11 +878,11 @@ impl Command for InitCommand {
 
             let name_default = name.clone();
             let name_for_validate = name.clone();
-            name = legacy_lossy(io
+            name = BString::from(io
             .ask_and_validate(
                 format!(
                     "Package name (<vendor>/<name>) [<comment>{}</comment>]: ",
-                    name_default
+                    name_default.display_lossy()
                 ),
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     if value.is_null() {
@@ -973,21 +908,21 @@ impl Command for InitCommand {
                 PhpMixed::string(name.clone()),
             )?
             .as_string()
-            .unwrap_or_default()).into_owned();
+            .unwrap_or_default());
             input
                 .borrow_mut()
-                .set_option("name", InputValue::String(bstr::BString::from(name)));
+                .set_option("name", InputValue::String(name));
 
             let description = input
                 .borrow()
                 .get_option("description")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
             let description_default = description.clone();
             let description = io.ask(
                 format!(
                     "Description [<comment>{}</comment>]: ",
-                    description.unwrap_or_default()
+                    description.unwrap_or_default().display_lossy()
                 ),
                 description_default
                     .map(PhpMixed::string)
@@ -1001,7 +936,7 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("author")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
             let author = match author_option {
                 Some(author) => author,
                 None => self.get_default_author()?.unwrap_or_default(),
@@ -1014,7 +949,7 @@ impl Command for InitCommand {
                 format!(
                     "Author [{} n to skip]: ",
                     if is_string(&PhpMixed::string(author.clone())) {
-                        format!("<comment>{}</comment>, ", author)
+                        format!("<comment>{}</comment>, ", author.display_lossy())
                     } else {
                         String::new()
                     }
@@ -1024,20 +959,20 @@ impl Command for InitCommand {
                 // parse_author_string is stateless (it only delegates to the stateless
                 // is_valid_email), so a fresh InitCommand stands in for `$self` here.
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
-                    let value_str = value.as_string().map(|s| legacy_lossy(s).into_owned());
-                    if value_str.as_deref() == Some("n") || value_str.as_deref() == Some("no") {
+                    let value_str = value.as_string();
+                    if value_str == Some("n".into()) || value_str == Some("no".into()) {
                         return Ok(PhpMixed::Null);
                     }
                     // PHP: $value = $value ?: $author
-                    let value = match &value_str {
-                        Some(s) if !s.is_empty() => s.clone(),
-                        _ => author_for_validate.clone(),
+                    let value = match value_str {
+                        Some(s) if !s.is_empty() => s,
+                        _ => author_for_validate.as_bstr(),
                     };
-                    let parsed = InitCommand::new().parse_author_string(&value)?;
+                    let parsed = InitCommand::new().parse_author_string(value)?;
                     let name = parsed.get("name").cloned().flatten().unwrap_or_default();
                     match parsed.get("email").cloned().flatten() {
                         None => Ok(PhpMixed::string(name)),
-                        Some(email) => Ok(PhpMixed::string(format!("{} <{}>", name, email))),
+                        Some(email) => Ok(PhpMixed::string(bconcat!(name, " <", email, ">"))),
                     }
                 }),
                 None,
@@ -1051,13 +986,13 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("stability")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
             let minimum_stability_default = minimum_stability.clone();
             let minimum_stability_for_validate = minimum_stability.clone();
             let minimum_stability_value = io.ask_and_validate(
                 format!(
                     "Minimum Stability [<comment>{}</comment>]: ",
-                    minimum_stability.unwrap_or_default()
+                    minimum_stability.unwrap_or_default().display_lossy()
                 ),
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     if value.is_null() {
@@ -1067,8 +1002,8 @@ impl Command for InitCommand {
                             .unwrap_or(PhpMixed::Null));
                     }
 
-                    if !base_package::STABILITIES
-                        .contains_key(&*value.as_string().unwrap_or_default().to_str_lossy())
+                    if base_package::stability_priority(value.as_string().unwrap_or_default())
+                        .is_none()
                     {
                         return Err(InvalidArgumentException::new(format!(
                             "Invalid minimum stability \"{}\". Must be empty or one of: {}",
@@ -1099,11 +1034,11 @@ impl Command for InitCommand {
             );
 
             let type_val = input.borrow().get_option("type")?;
-            let type_str = legacy_lossy(type_val.as_string().unwrap_or_default()).into_owned();
+            let type_str = BString::from(type_val.as_string().unwrap_or_default());
             let mut type_value = io.ask(
             format!(
                 "Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>{}</comment>]: ",
-                type_str
+                type_str.display_lossy()
             ),
             type_val.into(),
         )?;
@@ -1120,18 +1055,9 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("license")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BString::from);
             if license.is_none() {
-                // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-                let default_license = PHP_SERVER
-                    .lock()
-                    .unwrap()
-                    .get("COMPOSER_DEFAULT_LICENSE")
-                    .map(|value| {
-                        value.into_string().unwrap_or_else(|value| {
-                            panic!("COMPOSER_DEFAULT_LICENSE is not valid UTF-8: {value:?}")
-                        })
-                    });
+                let default_license = server_value("COMPOSER_DEFAULT_LICENSE");
                 if !empty(
                     &default_license
                         .clone()
@@ -1145,13 +1071,13 @@ impl Command for InitCommand {
             let license = io.ask(
                 format!(
                     "License [<comment>{}</comment>]: ",
-                    license.clone().unwrap_or_default()
+                    license.clone().unwrap_or_default().display_lossy()
                 ),
                 license.map(PhpMixed::string).unwrap_or(PhpMixed::Null),
             )?;
             let spdx = SpdxLicenses::new();
             if !license.is_null()
-                && !spdx.validate(&license.as_string().unwrap_or_default().to_str_lossy())
+                && !spdx.validate(license.as_string().unwrap_or_default())
                 && license.as_string() != Some("proprietary".into())
             {
                 return Err(InvalidArgumentException::new(format!(
@@ -1169,10 +1095,10 @@ impl Command for InitCommand {
             // prepare to resolve dependencies
             let repos = self.get_repos();
             let preferred_stability =
-                if let Some(s) = minimum_stability_default.filter(|s: &String| !s.is_empty()) {
+                if let Some(s) = minimum_stability_default.filter(|s: &BString| !s.is_empty()) {
                     s
                 } else {
-                    "stable".to_string()
+                    BString::from("stable")
                 };
             let platform_repo: Option<PlatformRepositoryHandle> =
                 if repos.is::<CompositeRepository>() {
@@ -1245,33 +1171,27 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("autoload")?
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned())
-                .filter(|s: &String| !s.is_empty())
-                .unwrap_or_else(|| "src/".to_string());
-            let name_str = legacy_lossy(
-                input
-                    .borrow()
-                    .get_option("name")?
-                    .as_string()
-                    .unwrap_or_default(),
-            )
-            .into_owned();
+                .map(BString::from)
+                .filter(|s: &BString| !s.is_empty())
+                .unwrap_or_else(|| "src/".into());
+            let name_str = input.borrow().get_option("name")?;
             let namespace = self
-                .namespace_from_package_name(&name_str)
+                .namespace_from_package_name(name_str.as_string().unwrap_or_default())
                 .unwrap_or_default();
             let autoload_for_validate = autoload.clone();
             let autoload_default = autoload.clone();
             let autoload_value = io.ask_and_validate(
             format!(
                 "Add PSR-4 autoload mapping? Maps namespace \"{}\" to the entered relative path. [<comment>{}</comment>, n to skip]: ",
-                namespace, autoload
+                namespace.display_lossy(),
+                autoload.display_lossy()
             ),
             Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                 if value.is_null() {
                     return Ok(PhpMixed::string(autoload_for_validate.clone()));
                 }
 
-                let value_str = legacy_lossy(value.as_string().unwrap_or_default()).into_owned();
+                let value_str = BString::from(value.as_string().unwrap_or_default());
                 if value_str == "n" || value_str == "no" {
                     return Ok(PhpMixed::Null);
                 }
@@ -1286,7 +1206,7 @@ impl Command for InitCommand {
                 {
                     return Err(InvalidArgumentException::new(format!(
                         "The src folder name \"{}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
-                        value_or_default,
+                        value_or_default.display_lossy(),
                     ))
                     .into());
                 }

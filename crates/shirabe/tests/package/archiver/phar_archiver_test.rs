@@ -5,8 +5,7 @@ use shirabe::package::archiver::{ArchiverInterface, PharArchiver};
 use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::{Filesystem, Platform};
 use shirabe_php_shim::{
-    dirname, file_exists, file_put_contents, legacy_lossy, mkdir, path_from_bytes, path_to_bytes,
-    realpath,
+    dirname, file_exists, file_put_contents, mkdir, path_from_bytes, path_to_bytes, realpath,
 };
 use tempfile::TempDir;
 
@@ -36,7 +35,8 @@ impl ArchiverTestCase {
         );
         package.set_source_url(Some(bstr::BString::from(
             realpath(&self.test_dir)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .as_deref()
+                .map(path_to_bytes)
                 .unwrap_or_default(),
         )));
         package.set_source_reference(Some(bstr::BString::from("master".to_string())));
@@ -49,36 +49,16 @@ impl ArchiverTestCase {
         let current_work_dir = Platform::get_cwd(false).unwrap();
         std::env::set_current_dir(&self.test_dir).unwrap();
 
-        self.write_file(
-            "file.txt",
-            "content",
-            &legacy_lossy(path_to_bytes(&current_work_dir)),
-        );
-        self.write_file(
-            "foo/bar/baz",
-            "content",
-            &legacy_lossy(path_to_bytes(&current_work_dir)),
-        );
-        self.write_file(
-            "foo/bar/ignoreme",
-            "content",
-            &legacy_lossy(path_to_bytes(&current_work_dir)),
-        );
-        self.write_file(
-            "x/baz",
-            "content",
-            &legacy_lossy(path_to_bytes(&current_work_dir)),
-        );
-        self.write_file(
-            "x/includeme",
-            "content",
-            &legacy_lossy(path_to_bytes(&current_work_dir)),
-        );
+        self.write_file("file.txt", "content", &current_work_dir);
+        self.write_file("foo/bar/baz", "content", &current_work_dir);
+        self.write_file("foo/bar/ignoreme", "content", &current_work_dir);
+        self.write_file("x/baz", "content", &current_work_dir);
+        self.write_file("x/includeme", "content", &current_work_dir);
 
         std::env::set_current_dir(&current_work_dir).unwrap();
     }
 
-    fn write_file(&self, path: &str, content: &str, current_work_dir: &str) {
+    fn write_file(&self, path: &str, content: &str, current_work_dir: &std::path::Path) {
         if !file_exists(path_from_bytes(&dirname(path))) {
             mkdir(path_from_bytes(&dirname(path)), 0o777, true);
         }
@@ -99,24 +79,15 @@ fn test_tar_archive() {
     test_case.setup_dummy_repo();
     let package = test_case.setup_package();
     let target_dir = TempDir::new().unwrap();
-    let target = target_dir
-        .path()
-        .join("composer_archiver_test.tar")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let target = target_dir.path().join("composer_archiver_test.tar");
 
     let archiver = PharArchiver::new();
     archiver
         .archive(
-            legacy_lossy(&package.get_source_url().unwrap()).into_owned(),
-            target.clone(),
-            "tar".to_string(),
-            vec![
-                "foo/bar".to_string(),
-                "baz".to_string(),
-                "!/foo/bar/baz".to_string(),
-            ],
+            path_from_bytes(&package.get_source_url().unwrap()),
+            &target,
+            "tar".into(),
+            vec!["foo/bar".into(), "baz".into(), "!/foo/bar/baz".into()],
             false,
         )
         .unwrap();
@@ -124,7 +95,7 @@ fn test_tar_archive() {
 
     test_case
         .filesystem
-        .remove_directory(path_from_bytes(&dirname(&target)))
+        .remove_directory(path_from_bytes(&dirname(path_to_bytes(&target))))
         .unwrap();
 }
 
@@ -136,19 +107,14 @@ fn test_zip_archive() {
     test_case.setup_dummy_repo();
     let package = test_case.setup_package();
     let target_dir = TempDir::new().unwrap();
-    let target = target_dir
-        .path()
-        .join("composer_archiver_test.zip")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let target = target_dir.path().join("composer_archiver_test.zip");
 
     let archiver = PharArchiver::new();
     archiver
         .archive(
-            legacy_lossy(&package.get_source_url().unwrap()).into_owned(),
-            target.clone(),
-            "zip".to_string(),
+            path_from_bytes(&package.get_source_url().unwrap()),
+            &target,
+            "zip".into(),
             vec![],
             false,
         )
@@ -157,6 +123,6 @@ fn test_zip_archive() {
 
     test_case
         .filesystem
-        .remove_directory(path_from_bytes(&dirname(&target)))
+        .remove_directory(path_from_bytes(&dirname(path_to_bytes(&target))))
         .unwrap();
 }

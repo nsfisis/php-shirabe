@@ -13,7 +13,7 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::BasePackageHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{array_shift, array_unshift, legacy_lossy, microtime, spl_object_hash};
+use shirabe_php_shim::{array_shift, array_unshift, microtime, spl_object_hash};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -200,7 +200,7 @@ impl Solver {
                         Vec::new(),
                         rule::RULE_ROOT_REQUIRE,
                         rule::ReasonData::RootRequire {
-                            package_name: legacy_lossy(&package_name.clone()).into_owned(),
+                            package_name: package_name.clone(),
                             constraint: active_constraint.clone(),
                         },
                     ),
@@ -411,9 +411,7 @@ impl Solver {
         let mut literals = self.policy.select_preferred_packages(
             &self.pool.borrow(),
             decision_queue,
-            rule.borrow()
-                .get_required_package()
-                .map(bstr::BString::from),
+            rule.borrow().get_required_package(),
         );
 
         let selected_literal = array_shift::<i64>(&mut literals)

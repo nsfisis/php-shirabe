@@ -681,7 +681,7 @@ impl Git {
                         "username".to_string(),
                         self.io
                             .ask(
-                                "      Username: ".to_string(),
+                                "      Username: ",
                                 default_username
                                     .map(PhpMixed::string)
                                     .unwrap_or(PhpMixed::Null),
@@ -691,9 +691,7 @@ impl Git {
                     );
                     auth_map.insert(
                         "password".to_string(),
-                        self.io
-                            .ask_and_hide_answer("      Password: ".to_string())?
-                            .map(BString::from),
+                        self.io.ask_and_hide_answer("      Password: ")?,
                     );
                     auth = Some(auth_map);
                     store_auth = self.config.borrow_mut().get("store-auths");

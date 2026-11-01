@@ -3,6 +3,7 @@
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug, Clone)]
 pub struct UpdateOperation {
@@ -26,7 +27,7 @@ impl UpdateOperation {
         self.target_package.clone()
     }
 
-    pub fn show(&self, lock: bool) -> String {
+    pub fn show(&self, lock: bool) -> bstr::BString {
         Self::format(
             self.initial_package.clone(),
             self.target_package.clone(),
@@ -38,7 +39,7 @@ impl UpdateOperation {
         initial_package: PackageInterfaceHandle,
         target_package: PackageInterfaceHandle,
         lock: bool,
-    ) -> String {
+    ) -> bstr::BString {
         let mut from_version = initial_package
             .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev);
         let mut to_version = target_package
@@ -71,12 +72,15 @@ impl UpdateOperation {
             "Downgrading"
         };
 
-        format!(
-            "{} <info>{}</info> (<comment>{}</comment> => <comment>{}</comment>)",
+        bconcat!(
             action_name,
-            initial_package.get_pretty_name().display_lossy(),
-            from_version.display_lossy(),
-            to_version.display_lossy(),
+            " <info>",
+            initial_package.get_pretty_name(),
+            "</info> (<comment>",
+            from_version,
+            "</comment> => <comment>",
+            to_version,
+            "</comment>)"
         )
     }
 }
@@ -87,6 +91,6 @@ impl SolverOperation for UpdateOperation {
 
 impl std::fmt::Display for UpdateOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false))
+        write!(f, "{}", self.show(false).display_lossy())
     }
 }

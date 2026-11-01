@@ -4,7 +4,7 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::package::ArrayDumper;
 use shirabe::package::handle::{CompletePackageHandle, RootPackageHandle};
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 
 fn set_up() -> ArrayDumper {
@@ -12,19 +12,19 @@ fn set_up() -> ArrayDumper {
 }
 
 fn complete_package() -> CompletePackageHandle {
-    let norm = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
+    let norm = VersionParser.normalize("1.0.0", None).unwrap();
     CompletePackageHandle::new(
         bstr::BString::from("dummy/pkg".to_string()),
-        bstr::BString::from(norm),
+        norm,
         bstr::BString::from("1.0.0".to_string()),
     )
 }
 
 fn root_package() -> RootPackageHandle {
-    let norm = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
+    let norm = VersionParser.normalize("1.0.0", None).unwrap();
     RootPackageHandle::new(
         bstr::BString::from("dummy/pkg".to_string()),
-        bstr::BString::from(norm),
+        norm,
         bstr::BString::from("1.0.0".to_string()),
     )
 }

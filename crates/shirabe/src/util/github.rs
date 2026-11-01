@@ -2,13 +2,13 @@
 
 use crate::config::Config;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, bconcat, date_local, explode_limit, in_array_loose, intval, legacy_lossy,
-    php_regex, preg_is_match, preg_match, rawurlencode, str_replace, stripos, strtolower, trim,
+    Catch as _, PhpMixed, bconcat, date_local, explode_limit, in_array_loose, intval, php_regex,
+    preg_is_match, preg_match, rawurlencode, str_replace, stripos, strtolower, trim,
 };
 
 #[derive(Debug)]
@@ -187,15 +187,14 @@ impl GitHub {
         let mut store_in_local_auth_config = false;
         if local_name.is_some() {
             store_in_local_auth_config = self.io.ask_confirmation(
-                "A local auth config source was found, do you want to store the token there?"
-                    .to_string(),
+                "A local auth config source was found, do you want to store the token there?",
                 true,
             )?;
         }
 
         let token = trim(
             self.io
-                .ask_and_hide_answer("Token (hidden): ".to_string())?
+                .ask_and_hide_answer("Token (hidden): ")?
                 .unwrap_or_default(),
         );
 
@@ -262,7 +261,7 @@ impl GitHub {
                 .borrow()
                 .get_local_auth_config_source()
                 .is_some();
-        let key = legacy_lossy(&bconcat!("github-oauth.", origin_url)).into_owned();
+        let key = bconcat!("github-oauth.", origin_url);
         {
             let mut cfg = self.config.borrow_mut();
             cfg.get_config_source_mut()

@@ -16,9 +16,11 @@
 use crate::package::Link;
 use crate::plugin::php_plugin_proxy::ToPluginValue;
 use crate::util::http::Response;
+use bstr::BString;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_rpc::{PhpObject, PhpThrow, PluginValue};
+use shirabe_php_shim::utf8_text;
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -55,16 +57,16 @@ fn as_object(value: &PluginValue) -> Option<&PhpObject> {
     }
 }
 
-fn optional_string(value: Option<&PluginValue>) -> Option<String> {
+fn optional_string(value: Option<&PluginValue>) -> Option<BString> {
     match value {
-        Some(PluginValue::String(bytes)) => Some(String::from_utf8_lossy(bytes).into_owned()),
+        Some(PluginValue::String(bytes)) => Some(bytes.clone()),
         _ => None,
     }
 }
 
-fn required_string(context: &str, value: Option<&PluginValue>) -> Result<String, PhpThrow> {
+fn required_string(context: &str, value: Option<&PluginValue>) -> Result<BString, PhpThrow> {
     match value {
-        Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
+        Some(PluginValue::String(bytes)) => Ok(bytes.clone()),
         other => Err(throw(format!("{context} expects a string, got {other:?}"))),
     }
 }
@@ -146,7 +148,7 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
             AnyConstraint::Simple(SimpleConstraint::new(
                 operator.to_string(),
                 required_string("a semver constraint version", object.protected("version"))?,
-                pretty_string.map(bstr::BString::from),
+                pretty_string,
             ))
         }
         MULTI_CONSTRAINT_CLASS => {
@@ -182,15 +184,11 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
             AnyConstraint::Multi(MultiConstraint::new(
                 constraints,
                 conjunctive,
-                pretty_string.map(bstr::BString::from),
+                pretty_string,
             ))
         }
-        MATCH_ALL_CLASS => AnyConstraint::MatchAll(MatchAllConstraint::new(
-            pretty_string.map(bstr::BString::from),
-        )),
-        MATCH_NONE_CLASS => AnyConstraint::MatchNone(MatchNoneConstraint::new(
-            pretty_string.map(bstr::BString::from),
-        )),
+        MATCH_ALL_CLASS => AnyConstraint::MatchAll(MatchAllConstraint::new(pretty_string)),
+        MATCH_NONE_CLASS => AnyConstraint::MatchNone(MatchNoneConstraint::new(pretty_string)),
         // TODO(plugin): a plugin-defined ConstraintInterface implementation has no Rust
         // counterpart; the four composer/semver classes are the whole vocabulary here.
         other => {
@@ -322,17 +320,11 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     let pretty_constraint =
         optional_string(object.protected("prettyConstraint")).unwrap_or_default();
     Ok(Link::new(
-        bstr::BString::from(required_string(
-            "a Link source",
-            object.protected("source"),
-        )?),
-        bstr::BString::from(required_string(
-            "a Link target",
-            object.protected("target"),
-        )?),
+        required_string("a Link source", object.protected("source"))?,
+        required_string("a Link target", object.protected("target"))?,
         constraint,
-        optional_string(object.protected("description")).map(bstr::BString::from),
-        bstr::BString::from(pretty_constraint),
+        optional_string(object.protected("description")),
+        pretty_constraint,
     ))
 }
 
@@ -358,14 +350,16 @@ pub(crate) fn date_time_from_wire(value: &PluginValue) -> Result<DateTime<Utc>, 
     }
     let zone = optional_string(object.public("timezone"));
     if object.public("timezone_type") != Some(&PluginValue::Int(TIMEZONE_TYPE_IDENTIFIER))
-        || zone.as_deref() != Some(TIMEZONE_UTC)
+        || zone.as_ref().is_none_or(|zone| zone != TIMEZONE_UTC)
     {
         return Err(throw(format!(
             "a date crosses the plugin boundary rebased on {TIMEZONE_UTC}, got the zone {zone:?}"
         )));
     }
     let rendered = required_string("a date", object.public("date"))?;
-    let parsed = NaiveDateTime::parse_from_str(&rendered, DATE_FORMAT).map_err(|e| {
+    let rendered = utf8_text(&rendered)
+        .ok_or_else(|| throw(format!("the date {rendered:?} from the plugin is not text")))?;
+    let parsed = NaiveDateTime::parse_from_str(rendered, DATE_FORMAT).map_err(|e| {
         throw(format!(
             "the date `{rendered}` from the plugin is not in the expected format: {e}"
         ))
@@ -376,6 +370,7 @@ pub(crate) fn date_time_from_wire(value: &PluginValue) -> Result<DateTime<Utc>, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bstr::BStr;
     use chrono::Timelike;
     use shirabe_php_rpc::value::serialize;
 
@@ -401,8 +396,8 @@ mod tests {
             bstr::BString::from("^1.0".to_string()),
         );
         assert_eq!(
-            String::from_utf8_lossy(&serialize(&link_to_wire(&link))),
-            String::from_utf8_lossy(
+            BStr::new(&serialize(&link_to_wire(&link))),
+            BStr::new(
                 b"O:21:\"Composer\\Package\\Link\":5:{\
                     s:9:\"\0*\0source\";s:3:\"a/b\";\
                     s:9:\"\0*\0target\";s:3:\"c/d\";\
@@ -429,8 +424,8 @@ mod tests {
             Some(bstr::BString::from("^1.0".to_string())),
         ));
         assert_eq!(
-            String::from_utf8_lossy(&serialize(&constraint_to_wire(&constraint))),
-            String::from_utf8_lossy(
+            BStr::new(&serialize(&constraint_to_wire(&constraint))),
+            BStr::new(
                 b"O:42:\"Composer\\Semver\\Constraint\\MultiConstraint\":6:{\
                     s:14:\"\0*\0constraints\";a:2:{\
                         i:0;O:37:\"Composer\\Semver\\Constraint\\Constraint\":5:{\

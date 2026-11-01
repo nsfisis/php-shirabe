@@ -7,8 +7,8 @@ use shirabe_php_shim::{
     SELF_FIRST, SKIP_DOTS, array_pop, basename, bconcat, chdir, clearstatcache, clearstatcache2,
     copy, dirname, explode, fclose, feof, file_exists, file_get_contents, file_put_contents,
     fileatime, filemtime, filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link,
-    is_readable, legacy_lossy, lstat, mkdir, path_from_bytes, path_to_bytes, php_regex,
-    preg_is_match, preg_match, preg_replace, preg_replace_callback, recursive_directory_iterator,
+    is_readable, lstat, mkdir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_replace, preg_replace_callback, recursive_directory_iterator,
     recursive_iterator_iterator, rename, rmdir, rtrim2, str_repeat, str_replace,
     stream_copy_to_stream, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch,
     unlink, usleep, var_export,
@@ -126,12 +126,11 @@ impl Filesystem {
         let result = if Platform::is_windows() {
             // TODO(perf,windows): `std::fs::remove_dir_all` is expected to be faster here too,
             // but how it differs from the `rmdir` command has to be investigated first.
-            let cmd: Vec<String> = vec![
-                "rmdir".to_string(),
-                "/S".to_string(),
-                "/Q".to_string(),
-                // TODO(bytes): ProcessExecutor takes the command as Strings.
-                legacy_lossy(path_to_bytes(&Platform::realpath(directory))).into_owned(),
+            let cmd: Vec<BString> = vec![
+                "rmdir".into(),
+                "/S".into(),
+                "/Q".into(),
+                path_to_bytes(&Platform::realpath(directory)).into(),
             ];
 
             let mut output = PhpMixed::Null;
@@ -179,12 +178,11 @@ impl Filesystem {
         let result = if Platform::is_windows() {
             // TODO(perf,windows): `std::fs::remove_dir_all` is expected to be faster here too,
             // but how it differs from the `rmdir` command has to be investigated first.
-            let cmd: Vec<String> = vec![
-                "rmdir".to_string(),
-                "/S".to_string(),
-                "/Q".to_string(),
-                // TODO(bytes): ProcessExecutor takes the command as Strings.
-                legacy_lossy(path_to_bytes(&Platform::realpath(directory))).into_owned(),
+            let cmd: Vec<BString> = vec![
+                "rmdir".into(),
+                "/S".into(),
+                "/Q".into(),
+                path_to_bytes(&Platform::realpath(directory)).into(),
             ];
 
             let process_executor = this.borrow_mut().get_process_handle();
@@ -465,22 +463,21 @@ impl Filesystem {
             return Ok(());
         }
 
-        // TODO(bytes): ProcessExecutor takes the command as Strings.
-        let source_arg = legacy_lossy(path_to_bytes(source)).into_owned();
-        let target_arg = legacy_lossy(path_to_bytes(target)).into_owned();
+        let source_arg = BString::from(path_to_bytes(source));
+        let target_arg = BString::from(path_to_bytes(target));
 
         if Platform::is_windows() {
             // Try to copy & delete - this is a workaround for random "Access denied" errors.
-            let mut output = String::new();
+            let mut output = BString::default();
             let result = self.get_process().execute(
                 &[
-                    "xcopy".to_string(),
+                    "xcopy".into(),
                     source_arg,
                     target_arg,
-                    "/E".to_string(),
-                    "/I".to_string(),
-                    "/Q".to_string(),
-                    "/Y".to_string(),
+                    "/E".into(),
+                    "/I".into(),
+                    "/Q".into(),
+                    "/Y".into(),
                 ],
                 &mut output,
                 None,
@@ -497,9 +494,9 @@ impl Filesystem {
         } else {
             // We do not use PHP's "rename" function here since it does not support
             // the case where $source, and $target are located on different partitions.
-            let mut output = String::new();
+            let mut output = BString::default();
             let result = self.get_process().execute(
-                &["mv".to_string(), source_arg, target_arg],
+                &["mv".into(), source_arg, target_arg],
                 &mut output,
                 None,
             )?;
@@ -938,19 +935,13 @@ impl Filesystem {
             let _ = rmdir(junction);
         }
 
-        let cmd = vec![
-            "mklink".to_string(),
-            "/J".to_string(),
-            // TODO(bytes): ProcessExecutor takes the command as Strings.
-            legacy_lossy(&str_replace(
-                "/",
-                std::path::MAIN_SEPARATOR_STR,
-                path_to_bytes(junction),
-            ))
-            .into_owned(),
-            legacy_lossy(path_to_bytes(&Platform::realpath(target))).into_owned(),
+        let cmd: Vec<BString> = vec![
+            "mklink".into(),
+            "/J".into(),
+            str_replace("/", std::path::MAIN_SEPARATOR_STR, path_to_bytes(junction)),
+            path_to_bytes(&Platform::realpath(target)).into(),
         ];
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.get_process().execute(&cmd, &mut output, None)? != 0 {
             return Err(IOException::new(
                 format!(

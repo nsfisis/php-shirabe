@@ -571,7 +571,7 @@ fn curl_field(payload: &Payload, key: &str) -> Option<Curl> {
 }
 
 /// PHP `phpversion($extension)`.
-pub fn phpversion(extension: &str) -> Option<BString> {
+pub fn phpversion(extension: impl AsRef<[u8]>) -> Option<BString> {
     match call("phpversion", extension) {
         PhpMixed::String(s) => Some(s),
         PhpMixed::Bool(false) => None,
@@ -582,7 +582,8 @@ pub fn phpversion(extension: &str) -> Option<BString> {
 /// PHP `stream_resolve_include_path($filename)`. It is answered by the worker because the
 /// `include_path` it searches is the worker's own, including whatever a required `autoload_real.php`
 /// put there with `set_include_path()`.
-pub fn stream_resolve_include_path(filename: &str) -> Option<std::path::PathBuf> {
+pub fn stream_resolve_include_path(filename: impl AsRef<[u8]>) -> Option<std::path::PathBuf> {
+    let filename = filename.as_ref();
     match call("stream_resolve_include_path", filename) {
         PhpMixed::String(s) => Some(path_from_bytes(&s).to_path_buf()),
         PhpMixed::Bool(false) => None,
@@ -920,8 +921,8 @@ fn rpc_call(
     }
 }
 
-fn call(name: &str, arg: &str) -> PhpMixed {
-    let outcome = call_function(name, vec![PluginValue::string(arg)])
+fn call(name: &str, arg: impl AsRef<[u8]>) -> PhpMixed {
+    let outcome = call_function(name, vec![PluginValue::string(arg.as_ref())])
         .unwrap_or_else(|e| panic!("PHP RPC: request `{name}` failed: {e:#}"));
     let value = match outcome {
         Ok(value) => value,

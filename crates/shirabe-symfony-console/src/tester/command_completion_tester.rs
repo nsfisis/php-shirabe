@@ -49,7 +49,7 @@ impl CommandCompletionTester {
             suggestions
                 .get_value_suggestions()
                 .iter()
-                .map(|suggestion| suggestion.to_string()),
+                .map(|suggestion| suggestion.get_value().display_lossy().to_string()),
         );
         Ok(result)
     }

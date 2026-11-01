@@ -4,7 +4,7 @@
 // password hiding, line splitting and argument escaping. A few data points remain unportable —
 // see the individual `// TODO(async)` comments below.
 
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{ConsoleIO, IOInterface};
 use shirabe::util::process_executor::ProcessExecutor;
@@ -18,7 +18,7 @@ use shirabe_symfony_console::output::{
 #[test]
 fn test_execute_captures_output() {
     let process = ProcessExecutor::new(None);
-    let mut output = String::new();
+    let mut output = BString::default();
     process.execute("echo foo", &mut output, None).unwrap();
     assert_eq!(format!("foo{}", PHP_EOL), output);
 }
@@ -51,7 +51,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
 #[test]
 fn test_execute_captures_stderr() {
     let process = ProcessExecutor::new(None);
-    let mut output = String::new();
+    let mut output = BString::default();
     process.execute("cat foo", &mut output, None).unwrap();
     assert!(
         process
@@ -104,7 +104,7 @@ fn test_hide_passwords() {
         let process = ProcessExecutor::new(Some(
             buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
         ));
-        let mut output = String::new();
+        let mut output = BString::default();
         process.execute(command, &mut output, None).unwrap();
         assert_eq!(
             format!("Executing command (CWD): {}", expected_command_output),
@@ -121,7 +121,7 @@ fn test_doesnt_hide_ports() {
     let process = ProcessExecutor::new(Some(
         buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
     ));
-    let mut output = String::new();
+    let mut output = BString::default();
     process
         .execute("echo https://localhost:1234/", &mut output, None)
         .unwrap();
@@ -240,7 +240,7 @@ fn test_mock_consumes_expectations_in_order() {
         MockHandler::default(),
     );
 
-    let mut output = String::new();
+    let mut output = BString::default();
     let rc = process
         .borrow_mut()
         .execute("git command", &mut output, None)
@@ -248,7 +248,7 @@ fn test_mock_consumes_expectations_in_order() {
     assert_eq!(1, rc);
     assert_eq!("out one", output);
 
-    let mut output2 = String::new();
+    let mut output2 = BString::default();
     let rc2 = process
         .borrow_mut()
         .execute(&["git", "--version"], &mut output2, None)
@@ -274,7 +274,7 @@ fn test_mock_default_handler_for_unexpected_command() {
         },
     );
 
-    let mut output = String::new();
+    let mut output = BString::default();
     let rc = process
         .borrow_mut()
         .execute("anything goes", &mut output, None)
