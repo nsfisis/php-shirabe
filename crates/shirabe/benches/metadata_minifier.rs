@@ -30,15 +30,17 @@ fn minified_versions(package: &str) -> Vec<IndexMap<BString, PhpMixed>> {
         .expect("invalid fixture JSON");
     let response = response.as_array().expect("the fixture is not an object");
     assert_eq!(
-        response.get("minified").and_then(|v| v.as_string()),
+        response
+            .get(bstr::B("minified"))
+            .and_then(|v| v.as_string()),
         Some("composer/2.0".into()),
         "{package} is not served in the minified format",
     );
 
     response
-        .get("packages")
+        .get(bstr::B("packages"))
         .and_then(|v| v.as_array())
-        .and_then(|packages| packages.get(package))
+        .and_then(|packages| packages.get(bstr::B(package)))
         .and_then(|v| v.as_list())
         .expect("the fixture has no version list for the package")
         .iter()

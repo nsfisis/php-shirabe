@@ -113,10 +113,10 @@ fn load(
     repository: &mut ComposerRepository,
     package: &str,
     constraint: &AnyConstraint,
-    acceptable_stabilities: &IndexMap<String, i64>,
+    acceptable_stabilities: &IndexMap<bstr::BString, i64>,
 ) -> usize {
-    let mut package_name_map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-    package_name_map.insert(package.to_string(), Some(constraint.clone()));
+    let mut package_name_map: IndexMap<bstr::BString, Option<AnyConstraint>> = IndexMap::new();
+    package_name_map.insert(package.into(), Some(constraint.clone()));
     repository
         .load_packages(
             package_name_map,
@@ -134,9 +134,9 @@ fn version_count(package: &str, metadata: &str) -> usize {
     JsonFile::parse_json(Some(metadata), None)
         .expect("invalid fixture JSON")
         .as_array()
-        .and_then(|response| response.get("packages"))
+        .and_then(|response| response.get(bstr::B("packages")))
         .and_then(|v| v.as_array())
-        .and_then(|packages| packages.get(package))
+        .and_then(|packages| packages.get(bstr::B(package)))
         .and_then(|v| v.as_list())
         .expect("the fixture has no version list for the package")
         .len()
@@ -148,8 +148,8 @@ fn bench_load_packages(c: &mut Criterion) {
     let root = root_file();
     let version_parser = VersionParser::new();
 
-    let mut acceptable_stabilities: IndexMap<String, i64> = IndexMap::new();
-    acceptable_stabilities.insert("stable".to_string(), STABILITY_STABLE);
+    let mut acceptable_stabilities: IndexMap<bstr::BString, i64> = IndexMap::new();
+    acceptable_stabilities.insert("stable".into(), STABILITY_STABLE);
 
     for package in PACKAGES {
         let metadata = packagist_fixture::fetch(package);
