@@ -8,7 +8,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn funding_entry(r#type: &str, url: &str) -> IndexMap<BString, PhpMixed> {
@@ -59,7 +59,7 @@ fn run_fund_case(
     let mut app_tester = get_application_tester();
     let status_code = app_tester.run(input, RunOptions::default()).unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(expected.trim(), trim(app_tester.get_display()));
 
     drop(tear_down);
 }

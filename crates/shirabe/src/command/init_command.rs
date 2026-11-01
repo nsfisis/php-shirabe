@@ -253,12 +253,12 @@ impl InitCommand {
     }
 
     /// For testing only: invoke the crate-private `has_vendor_ignore`.
-    pub fn __has_vendor_ignore(&self, ignore_file: &str, vendor: &str) -> bool {
+    pub fn __has_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &str) -> bool {
         self.has_vendor_ignore(ignore_file, vendor)
     }
 
     /// For testing only: invoke the crate-private `add_vendor_ignore`.
-    pub fn __add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
+    pub fn __add_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &str) {
         self.add_vendor_ignore(ignore_file, vendor)
     }
 

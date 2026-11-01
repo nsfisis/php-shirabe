@@ -6,6 +6,7 @@ use shirabe::installer::BinaryInstaller;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::{Filesystem, ProcessExecutor};
+use shirabe_php_shim::bconcat;
 use std::fs;
 use tempfile::TempDir;
 
@@ -87,23 +88,19 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
 
     let mut installer = BinaryInstaller::new(
         setup.io.clone(),
-        std::path::PathBuf::from(setup.bin_dir.to_str().unwrap().to_string()),
+        setup.bin_dir.to_path_buf(),
         bstr::BString::from("full".to_string()),
         Some(std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
             None,
         )))),
         None,
     );
-    installer.install_binaries(
-        package,
-        std::path::Path::new(pkg_dir.to_str().unwrap()),
-        true,
-    );
+    installer.install_binaries(package, std::path::Path::new(&pkg_dir), true);
 
     let proc = ProcessExecutor::new(None);
     let mut output = bstr::BString::default();
     proc.execute(
-        format!("{} arg", setup.bin_dir.join("binary").to_str().unwrap()),
+        bconcat!(setup.bin_dir.join("binary"), " arg"),
         &mut output,
         None,
     )

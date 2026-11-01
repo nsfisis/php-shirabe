@@ -6,7 +6,7 @@ use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, bconcat, legacy_lossy, php_regex, preg_is_match, preg_quote, preg_split,
+    PHP_EOL, PhpMixed, bconcat, php_regex, preg_is_match, preg_quote, preg_split,
 };
 use shirabe_symfony_console::output::output_interface;
 use std::collections::VecDeque;
@@ -130,9 +130,8 @@ impl IOMock {
         };
 
         if !expectations.is_empty() {
-            let mut lines: VecDeque<String> = preg_split(php_regex!("{\r?\n}"), &output)
-                .iter()
-                .map(|line| legacy_lossy(line).into_owned())
+            let mut lines: VecDeque<bstr::BString> = preg_split(php_regex!("{\r?\n}"), &output)
+                .into_iter()
                 .collect();
             let mut auth_log: VecDeque<(bstr::BString, bstr::BString, Option<bstr::BString>)> =
                 self.auth_log.clone().into();
@@ -184,7 +183,8 @@ impl IOMock {
 
                     if self.strict {
                         panic!(
-                            "IO output mismatch. Expected:{PHP_EOL}{label}{PHP_EOL}Got:{PHP_EOL}{line}"
+                            "IO output mismatch. Expected:{PHP_EOL}{label}{PHP_EOL}Got:{PHP_EOL}{}",
+                            line.display_lossy()
                         );
                     }
                 }

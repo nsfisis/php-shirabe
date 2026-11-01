@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolBuilderTest.php
 
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
@@ -20,8 +20,8 @@ use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_factory::RepositoryFactory;
 use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
 use shirabe_php_shim::{
-    PhpMixed, bconcat, file_get_contents, legacy_lossy, php_regex, preg_is_match,
-    preg_split_delim_capture,
+    PhpMixed, bconcat, file_get_contents, path_to_bytes, php_regex, preg_is_match,
+    preg_split_delim_capture, str_replace, utf8_text,
 };
 use std::path::PathBuf;
 
@@ -56,9 +56,11 @@ fn load_package(
     pkg
 }
 
-fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
-    // TODO(bytes)
-    let contents = String::from_utf8_lossy(&file_get_contents(file).unwrap()).into_owned();
+fn read_test_file(
+    file: &std::path::Path,
+    fixtures_dir: &std::path::Path,
+) -> IndexMap<BString, BString> {
+    let contents = file_get_contents(file).unwrap();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
     // PHP section_info is a map of name => required flag.
@@ -72,37 +74,34 @@ fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
         ("EXPECT-OPTIMIZED", false),
     ];
 
-    let mut section: Option<String> = None;
-    let mut data: IndexMap<String, String> = IndexMap::new();
+    let mut section: Option<BString> = None;
+    let mut data: IndexMap<BString, BString> = IndexMap::new();
     for token in tokens {
         if section.is_none() && token.is_empty() {
             continue;
         }
 
         if section.is_none() {
-            if !section_info
-                .iter()
-                .any(|(name, _)| *name == &*legacy_lossy(&token))
-            {
+            if !section_info.iter().any(|(name, _)| *name == token) {
                 panic!(
                     "The test file \"{}\" must not contain a section named \"{}\".",
-                    file.replace(&format!("{}/", fixtures_dir), ""),
+                    str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file))
+                        .display_lossy(),
                     token.display_lossy()
                 );
             }
-            section = Some(legacy_lossy(&token).into_owned());
+            section = Some(token);
             continue;
         }
 
-        let section_data = legacy_lossy(&token).into_owned();
-        data.insert(section.take().unwrap(), section_data);
+        data.insert(section.take().unwrap(), token);
     }
 
     for (section, required) in &section_info {
-        if *required && !data.contains_key(*section) {
+        if *required && !data.contains_key(B(section)) {
             panic!(
                 "The test file \"{}\" must have a section named \"{}\".",
-                file.replace(&format!("{}/", fixtures_dir), ""),
+                str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file)).display_lossy(),
                 section
             );
         }
@@ -124,8 +123,8 @@ fn collect_test_files(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
 }
 
 struct IntegrationTest {
-    file: String,
-    message: String,
+    file: BString,
+    message: BString,
     expect: PhpMixed,
     expect_optimized: PhpMixed,
     root: PhpMixed,
@@ -134,52 +133,44 @@ struct IntegrationTest {
     fixed: PhpMixed,
 }
 
-fn get_integration_tests(fixtures_dir: &std::path::Path) -> IndexMap<String, IntegrationTest> {
-    let fixtures_dir_str = fixtures_dir.to_str().unwrap().to_string();
-
+fn get_integration_tests(fixtures_dir: &std::path::Path) -> IndexMap<BString, IntegrationTest> {
     let mut files: Vec<PathBuf> = Vec::new();
     collect_test_files(fixtures_dir, &mut files);
 
-    let mut tests: IndexMap<String, IntegrationTest> = IndexMap::new();
+    let mut tests: IndexMap<BString, IntegrationTest> = IndexMap::new();
     for file in files {
-        let file = file.to_str().unwrap().to_string();
-
-        if !preg_is_match(php_regex!(r"/\.test$/"), &file) {
+        if !preg_is_match(php_regex!(r"/\.test$/"), path_to_bytes(&file)) {
             continue;
         }
 
-        let test_data = read_test_file(&file, &fixtures_dir_str);
+        let test_data = read_test_file(&file, fixtures_dir);
 
-        let message = test_data["TEST"].clone();
+        let message = test_data[B("TEST")].clone();
 
-        let request = JsonFile::parse_json(Some(&test_data["REQUEST"]), None).unwrap();
+        let request = JsonFile::parse_json(Some(&test_data[B("REQUEST")]), None).unwrap();
         // PHP: !empty($testData['ROOT']) ? parseJson(...) : []
-        let root = match test_data.get("ROOT") {
+        let root = match test_data.get(B("ROOT")) {
             Some(s) if !s.is_empty() => JsonFile::parse_json(Some(s), None).unwrap(),
             _ => PhpMixed::List(vec![]),
         };
 
-        let package_repos = JsonFile::parse_json(Some(&test_data["PACKAGE-REPOS"]), None).unwrap();
-        let fixed = match test_data.get("FIXED") {
+        let package_repos =
+            JsonFile::parse_json(Some(&test_data[B("PACKAGE-REPOS")]), None).unwrap();
+        let fixed = match test_data.get(B("FIXED")) {
             Some(s) if !s.is_empty() => JsonFile::parse_json(Some(s), None).unwrap(),
             _ => PhpMixed::List(vec![]),
         };
-        let expect = JsonFile::parse_json(Some(&test_data["EXPECT"]), None).unwrap();
-        let expect_optimized = match test_data.get("EXPECT-OPTIMIZED") {
+        let expect = JsonFile::parse_json(Some(&test_data[B("EXPECT")]), None).unwrap();
+        let expect_optimized = match test_data.get(B("EXPECT-OPTIMIZED")) {
             Some(s) if !s.is_empty() => JsonFile::parse_json(Some(s), None).unwrap(),
             _ => expect.clone(),
         };
 
-        let basename = std::path::Path::new(&file)
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let basename = BString::from(path_to_bytes(file.file_name().unwrap()));
         tests.insert(
             basename,
             IntegrationTest {
-                file: file.replace(&format!("{}/", fixtures_dir_str), ""),
+                file: str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(&file)),
                 message,
                 expect,
                 expect_optimized,
@@ -204,16 +195,18 @@ fn php_sort_mixed(values: &mut [PhpMixed]) {
             match m {
                 PhpMixed::Int(i) => Some(*i as f64),
                 PhpMixed::Float(f) => Some(*f),
-                PhpMixed::String(s) => s.to_str_lossy().trim().parse::<f64>().ok(),
+                PhpMixed::String(s) => {
+                    utf8_text(s).and_then(|s: &str| s.trim().parse::<f64>().ok())
+                }
                 _ => None,
             }
         };
-        let str_of = |m: &PhpMixed| -> String {
+        let str_of = |m: &PhpMixed| -> BString {
             match m {
-                PhpMixed::Int(i) => i.to_string(),
-                PhpMixed::Float(f) => f.to_string(),
-                PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-                _ => String::new(),
+                PhpMixed::Int(i) => i.to_string().into(),
+                PhpMixed::Float(f) => f.to_string().into(),
+                PhpMixed::String(s) => s.clone(),
+                _ => BString::default(),
             }
         };
         match (a, b) {
@@ -259,14 +252,14 @@ fn get_package_result_set(
                 return PhpMixed::Int(id);
             }
 
-            let mut suffix = String::new();
+            let mut suffix = BString::default();
             if let Some(source_reference) = package.get_source_reference() {
-                suffix = format!("#{}", legacy_lossy(&source_reference));
+                suffix = bconcat!("#", source_reference);
             }
             if let Some(repo) = package.get_repository()
                 && repo.is::<LockArrayRepository>()
             {
-                suffix.push_str(" (locked)");
+                suffix.extend_from_slice(b" (locked)");
             }
 
             if let Some(alias) = package.as_alias() {
@@ -316,8 +309,8 @@ fn get_package_result_set(
 #[allow(clippy::too_many_arguments)]
 fn run_test_pool_builder(
     fixtures_dir: &std::path::Path,
-    _file: &str,
-    message: &str,
+    _file: &BStr,
+    message: &BStr,
     expect: &PhpMixed,
     expect_optimized: &PhpMixed,
     root: &PhpMixed,
@@ -356,27 +349,23 @@ fn run_test_pool_builder(
         vec![]
     };
 
-    let minimum_stability: String = if !is_empty(get_root("minimum-stability")) {
-        legacy_lossy(
-            get_root("minimum-stability")
-                .and_then(|v| v.as_string())
-                .unwrap_or("stable".into()),
-        )
-        .into_owned()
+    let minimum_stability: BString = if !is_empty(get_root("minimum-stability")) {
+        get_root("minimum-stability")
+            .and_then(|v| v.as_string())
+            .unwrap_or("stable".into())
+            .to_owned()
     } else {
-        "stable".to_string()
+        "stable".into()
     };
 
     // PHP: $stabilityFlags map of name => stability string.
-    let stability_flags_data: IndexMap<String, String> = if !is_empty(get_root("stability-flags")) {
+    let stability_flags_data: IndexMap<BString, BString> = if !is_empty(get_root("stability-flags"))
+    {
         get_root("stability-flags")
             .and_then(|v| v.as_array())
             .map(|m| {
                 m.iter()
-                    .filter_map(|(k, v)| {
-                        v.as_string()
-                            .map(|s| (k.to_str_lossy().into_owned(), legacy_lossy(s).into_owned()))
-                    })
+                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_owned())))
                     .collect()
             })
             .unwrap_or_default()
@@ -384,15 +373,12 @@ fn run_test_pool_builder(
         IndexMap::new()
     };
 
-    let root_references: IndexMap<String, String> = if !is_empty(get_root("references")) {
+    let root_references: IndexMap<BString, BString> = if !is_empty(get_root("references")) {
         get_root("references")
             .and_then(|v| v.as_array())
             .map(|m| {
                 m.iter()
-                    .filter_map(|(k, v)| {
-                        v.as_string()
-                            .map(|s| (k.to_str_lossy().into_owned(), legacy_lossy(s).into_owned()))
-                    })
+                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_owned())))
                     .collect()
             })
             .unwrap_or_default()
@@ -403,23 +389,21 @@ fn run_test_pool_builder(
     // PHP: array_map over stability flags, mapping to BasePackage::STABILITIES[$stability].
     let mut stability_flags: IndexMap<BString, i64> = IndexMap::new();
     for (name, stability) in &stability_flags_data {
-        let Some(value) = STABILITIES.get(stability.as_str()) else {
-            panic!("Invalid stability given: {}", stability);
+        let Some(value) = utf8_text(stability).and_then(|s| STABILITIES.get(s)) else {
+            panic!("Invalid stability given: {}", stability.display_lossy());
         };
-        stability_flags.insert(bstr::BString::from(name.clone()), *value);
+        stability_flags.insert(name.clone(), *value);
     }
 
     let parser = VersionParser::new();
     // PHP: foreach ($rootAliases as $index => $alias) { normalize version + alias }
     let mut root_aliases: Vec<RootAliasInput> = Vec::new();
     for alias in &root_aliases_data {
-        let package = legacy_lossy(
-            alias
-                .get(B("package"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default(),
-        )
-        .into_owned();
+        let package = alias
+            .get(B("package"))
+            .and_then(|v| v.as_string())
+            .unwrap_or_default()
+            .to_owned();
         let version = parser
             .normalize(
                 alias
@@ -429,13 +413,11 @@ fn run_test_pool_builder(
                 None,
             )
             .unwrap();
-        let alias_str = legacy_lossy(
-            alias
-                .get(B("alias"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default(),
-        )
-        .into_owned();
+        let alias_str = alias
+            .get(B("alias"))
+            .and_then(|v| v.as_string())
+            .unwrap_or_default()
+            .to_owned();
         let alias_normalized = parser
             .normalize(
                 alias
@@ -446,9 +428,9 @@ fn run_test_pool_builder(
             )
             .unwrap();
         root_aliases.push(RootAliasInput {
-            package: bstr::BString::from(package),
+            package,
             version,
-            alias: bstr::BString::from(alias_str),
+            alias: alias_str,
             alias_normalized,
         });
     }
@@ -466,7 +448,6 @@ fn run_test_pool_builder(
         root_aliases,
         root_references
             .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
             .collect::<indexmap::IndexMap<_, _>>(),
         IndexMap::new(),
         IndexMap::new(),
@@ -593,19 +574,13 @@ fn run_test_pool_builder(
         {
             transitive_deps = UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps;
         }
-        let allow_list_names: Vec<String> = allow_list
+        let allow_list_names: Vec<BString> = allow_list
             .as_list()
             .unwrap()
             .iter()
-            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+            .filter_map(|v| v.as_string().map(|s| s.to_owned()))
             .collect();
-        request.set_update_allow_list(
-            allow_list_names
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-            transitive_deps,
-        );
+        request.set_update_allow_list(allow_list_names, transitive_deps);
     }
 
     // PHP: foreach ($fixed as $fixedPackage)
@@ -627,9 +602,10 @@ fn run_test_pool_builder(
     php_sort_mixed(&mut expect);
     php_sort_mixed(&mut result);
     assert_eq!(
-        expect, result,
+        expect,
+        result,
         "Unoptimized pool does not match expected package set ({})",
-        message
+        message.display_lossy()
     );
 
     let mut optimizer =
@@ -640,9 +616,10 @@ fn run_test_pool_builder(
     php_sort_mixed(&mut expect_optimized);
     php_sort_mixed(&mut result);
     assert_eq!(
-        expect_optimized, result,
+        expect_optimized,
+        result,
         "Optimized pool does not match expected package set ({})",
-        message
+        message.display_lossy()
     );
 
     // PHP: chdir($oldCwd);
@@ -659,8 +636,8 @@ fn test_pool_builder() {
     for (_name, test) in tests {
         run_test_pool_builder(
             &fixtures_dir,
-            &test.file,
-            &test.message,
+            test.file.as_bstr(),
+            test.message.as_bstr(),
             &test.expect,
             &test.expect_optimized,
             &test.root,

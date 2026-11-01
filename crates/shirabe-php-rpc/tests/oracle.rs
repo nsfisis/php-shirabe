@@ -40,8 +40,8 @@ fn assert_php_agrees(value: &PluginValue) {
     let encoded = serialize(value);
     let reserialized = php_reserialize(&encoded);
     assert_eq!(
-        String::from_utf8_lossy(&reserialized),
-        String::from_utf8_lossy(&encoded),
+        bstr::BStr::new(&reserialized),
+        bstr::BStr::new(&encoded),
         "PHP re-serialized {value:?} differently"
     );
 }
@@ -200,8 +200,8 @@ fn decode_direction_matches_php_for_object_records() {
         let decoded = unserialize(&php_bytes)
             .unwrap_or_else(|e| panic!("failed to decode PHP output for `{snippet}`: {e:#}"));
         assert_eq!(
-            String::from_utf8_lossy(&serialize(&decoded)),
-            String::from_utf8_lossy(&php_bytes),
+            bstr::BStr::new(&serialize(&decoded)),
+            bstr::BStr::new(&php_bytes),
             "re-encoding diverged for `{snippet}`"
         );
     }
@@ -265,8 +265,8 @@ fn decode_direction_matches_php_serialize_output() {
             .unwrap_or_else(|e| panic!("failed to decode PHP output for `{snippet}`: {e:#}"));
         let reencoded = serialize(&decoded);
         assert_eq!(
-            String::from_utf8_lossy(&reencoded),
-            String::from_utf8_lossy(&php_bytes),
+            bstr::BStr::new(&reencoded),
+            bstr::BStr::new(&php_bytes),
             "re-encoding diverged for `{snippet}`"
         );
     }

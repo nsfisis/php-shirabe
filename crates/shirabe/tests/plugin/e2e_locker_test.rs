@@ -7,6 +7,7 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -21,7 +22,7 @@ struct Run {
 
 /// Runs `install` twice in a fresh copy of the fixture and returns both exit codes with the
 /// plugin's trace.
-fn install_twice(program: &str, prefix_args: &[&str]) -> Run {
+fn install_twice(program: &str, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
@@ -56,9 +57,8 @@ fn test_plugin_read_locker_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = install_twice("php", &[composer_bin.as_str()]);
+    let upstream = install_twice("php", &[composer_bin.as_os_str()]);
     let shirabe = install_twice(env!("CARGO_BIN_EXE_shirabe"), &[]);
 
     assert_eq!(

@@ -8,7 +8,7 @@
 
 use shirabe::config::Config;
 use shirabe::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 
 // Records call arguments for a stubbed method, equivalent to PHPUnit's
 // `->expects($this->once())->method(...)->with(...)` call-count/argument verification.
@@ -55,15 +55,15 @@ pub struct IOStub {
     ask_and_hide_answer_responses: Option<indexmap::IndexMap<bstr::BString, bstr::BString>>,
 
     // Records `writeError` calls.
-    write_error_calls: CallRecorder<(String, bool)>,
+    write_error_calls: CallRecorder<(bstr::BString, bool)>,
     // Records `writeRaw` calls.
-    write_raw_calls: CallRecorder<(String, bool)>,
+    write_raw_calls: CallRecorder<(bstr::BString, bool)>,
     // Records `setAuthentication` calls. Kept separate from `authentications` so
     // `with_has_authentication`/`with_get_authentication` stay static (matching a PHPUnit
     // `willReturn`) even while `setAuthentication` is invoked.
     set_authentication_calls: CallRecorder<(bstr::BString, bstr::BString, Option<bstr::BString>)>,
     // Records `askAndValidate` calls (question, attempts, default).
-    ask_and_validate_calls: CallRecorder<(String, Option<i64>, PhpMixed)>,
+    ask_and_validate_calls: CallRecorder<(bstr::BString, Option<i64>, PhpMixed)>,
     // Records `hasAuthentication` calls.
     has_authentication_calls: CallRecorder<bstr::BString>,
     // Records `getAuthentication` calls.
@@ -161,12 +161,12 @@ impl IOStub {
     }
 
     // For testing only. Returns the recorded `writeError` calls in call order.
-    pub fn write_error_calls(&self) -> Vec<(String, bool)> {
+    pub fn write_error_calls(&self) -> Vec<(bstr::BString, bool)> {
         self.write_error_calls.calls()
     }
 
     // For testing only. Returns the recorded `writeRaw` calls in call order.
-    pub fn write_raw_calls(&self) -> Vec<(String, bool)> {
+    pub fn write_raw_calls(&self) -> Vec<(bstr::BString, bool)> {
         self.write_raw_calls.calls()
     }
 
@@ -178,7 +178,7 @@ impl IOStub {
     }
 
     // For testing only. Returns the recorded `askAndValidate` calls in call order.
-    pub fn ask_and_validate_calls(&self) -> Vec<(String, Option<i64>, PhpMixed)> {
+    pub fn ask_and_validate_calls(&self) -> Vec<(bstr::BString, Option<i64>, PhpMixed)> {
         self.ask_and_validate_calls.calls()
     }
 
@@ -212,12 +212,10 @@ impl IOInterfaceImmutable for IOStub {
 
     fn write_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
     fn write_error_bytes(&self, message: &bstr::BStr, newline: bool, _verbosity: i64) {
-        self.write_error_calls
-            .push((legacy_lossy(message).into_owned(), newline));
+        self.write_error_calls.push((message.to_owned(), newline));
     }
     fn write_raw_bytes(&self, message: &bstr::BStr, newline: bool, _verbosity: i64) {
-        self.write_raw_calls
-            .push((legacy_lossy(message).into_owned(), newline));
+        self.write_raw_calls.push((message.to_owned(), newline));
     }
     fn write_error_raw_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
     fn overwrite_bytes(
@@ -254,11 +252,8 @@ impl IOInterfaceImmutable for IOStub {
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
-        self.ask_and_validate_calls.push((
-            legacy_lossy(question).into_owned(),
-            attempts,
-            default.clone(),
-        ));
+        self.ask_and_validate_calls
+            .push((question.to_owned(), attempts, default.clone()));
         match &self.ask_and_validate_answer {
             Some(answer) => validator(answer.clone()),
             None => Ok(default),

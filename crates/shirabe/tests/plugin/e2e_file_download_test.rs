@@ -10,6 +10,7 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -66,7 +67,7 @@ impl Drop for HttpServer {
 
 struct Run {
     exit_codes: Vec<i32>,
-    output: String,
+    output: bstr::BString,
     trace: String,
     installed: bool,
 }
@@ -75,7 +76,7 @@ struct Run {
 /// fixture: the plugin is only active once the first command has installed it, so the events it
 /// records are the ones the second command dispatches. The server's base URL is written into the
 /// project's repository list and replaced by `{server}` in the trace.
-fn install_then_require(program: &str, prefix_args: &[&str], server: &HttpServer) -> Run {
+fn install_then_require(program: &str, prefix_args: &[&OsStr], server: &HttpServer) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
@@ -87,7 +88,7 @@ fn install_then_require(program: &str, prefix_args: &[&str], server: &HttpServer
     )
     .unwrap();
     let commands: [&[&str]; 2] = [&["install"], &["require", "shirabe-test/remote-lib:1.0.0"]];
-    let mut output = String::new();
+    let mut output = bstr::BString::default();
     let exit_codes = commands
         .iter()
         .map(|args| {
@@ -102,8 +103,8 @@ fn install_then_require(program: &str, prefix_args: &[&str], server: &HttpServer
                 .env("LINES", "30")
                 .output()
                 .unwrap();
-            output.push_str(&String::from_utf8_lossy(&result.stdout));
-            output.push_str(&String::from_utf8_lossy(&result.stderr));
+            output.extend_from_slice(&result.stdout);
+            output.extend_from_slice(&result.stderr);
             result.status.code().unwrap_or(-1)
         })
         .collect();
@@ -128,22 +129,22 @@ fn test_file_download_events_match_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let server = HttpServer::start();
-    let upstream = install_then_require("php", &[composer_bin.as_str()], &server);
+    let upstream = install_then_require("php", &[composer_bin.as_os_str()], &server);
     let shirabe = install_then_require(env!("CARGO_BIN_EXE_shirabe"), &[], &server);
 
     assert_eq!(
         vec![0, 0],
         upstream.exit_codes,
         "upstream commands must succeed: {}",
-        upstream.output
+        upstream.output.display_lossy()
     );
     assert_eq!(
-        upstream.exit_codes, shirabe.exit_codes,
+        upstream.exit_codes,
+        shirabe.exit_codes,
         "shirabe output: {}",
-        shirabe.output
+        shirabe.output.display_lossy()
     );
     assert!(upstream.installed);
     assert!(shirabe.installed);

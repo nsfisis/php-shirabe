@@ -440,19 +440,10 @@ fn test_remove_directory_php() {
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(working_dir.join("level1/level2"), 0o777, true);
-    file_put_contents(
-        working_dir
-            .join("level1/level2/hello.txt")
-            .to_str()
-            .unwrap(),
-        b"hello world",
-    );
+    file_put_contents(working_dir.join("level1/level2/hello.txt"), b"hello world");
 
     let mut fs = Filesystem::new(None);
-    assert!(
-        fs.remove_directory_php(working_dir.to_str().unwrap())
-            .unwrap()
-    );
+    assert!(fs.remove_directory_php(&working_dir).unwrap());
     assert!(!file_exists(working_dir.join("level1/level2/hello.txt")));
 }
 
@@ -461,7 +452,7 @@ fn test_file_size() {
     let unique_tmp = tempfile::TempDir::new().unwrap();
     let test_file = unique_tmp.path().join("composer_test_file");
 
-    file_put_contents(test_file.to_str().unwrap(), b"Hello");
+    file_put_contents(&test_file, b"Hello");
 
     let fs = Filesystem::new(None);
     assert!(fs.size(&test_file).unwrap() >= 5);
@@ -473,8 +464,8 @@ fn test_directory_size() {
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(&working_dir, 0o777, true);
-    file_put_contents(working_dir.join("file1.txt").to_str().unwrap(), b"Hello");
-    file_put_contents(working_dir.join("file2.txt").to_str().unwrap(), b"World");
+    file_put_contents(working_dir.join("file1.txt"), b"Hello");
+    file_put_contents(working_dir.join("file2.txt"), b"World");
 
     let fs = Filesystem::new(None);
     assert!(fs.size(&working_dir).unwrap() >= 10);
@@ -586,14 +577,12 @@ fn test_junctions() {
     // Non-Windows systems do not support this and will return false on all tests, and an exception
     // on creation.
     if !Platform::is_windows() {
-        assert!(!fs.is_junction(working_dir.to_str().unwrap()));
-        assert!(!fs.remove_junction(working_dir.to_str().unwrap()).unwrap());
+        assert!(!fs.is_junction(&working_dir));
+        assert!(!fs.remove_junction(&working_dir).unwrap());
 
         let target = working_dir.join("real/../real/nesting");
         let junction = working_dir.join("junction");
-        let err = fs
-            .junction(target.to_str().unwrap(), junction.to_str().unwrap())
-            .unwrap_err();
+        let err = fs.junction(&target, &junction).unwrap_err();
         assert!(
             err.to_string()
                 .contains("not available on non-Windows platform")
@@ -605,30 +594,29 @@ fn test_junctions() {
     let junction = working_dir.join("junction");
 
     // Create and detect junction
-    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
+    fs.junction(&target, &junction).unwrap();
     assert!(
-        fs.is_junction(junction.to_str().unwrap()),
+        fs.is_junction(&junction),
         "{}: is a junction",
         junction.display()
     );
     assert!(
-        !fs.is_junction(target.to_str().unwrap()),
+        !fs.is_junction(&target),
         "{}: is not a junction",
         target.display()
     );
     assert!(
-        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        fs.is_junction(target.join("../../junction")),
         "{}/../../junction: is a junction",
         target.display()
     );
     assert!(
-        !fs.is_junction(junction.join("../real").to_str().unwrap()),
+        !fs.is_junction(junction.join("../real")),
         "{}/../real: is not a junction",
         junction.display()
     );
     assert!(
-        fs.is_junction(junction.join("../junction").to_str().unwrap()),
+        fs.is_junction(junction.join("../junction")),
         "{}/../junction: is a junction",
         junction.display()
     );
@@ -636,7 +624,7 @@ fn test_junctions() {
     // Remove junction
     assert!(is_dir(&junction), "{} is a directory", junction.display());
     assert!(
-        fs.remove_junction(junction.to_str().unwrap()).unwrap(),
+        fs.remove_junction(&junction).unwrap(),
         "{} has been removed",
         junction.display()
     );
@@ -665,43 +653,39 @@ fn test_override_junctions() {
     let junction = working_dir.join("junction");
 
     // Override non-broken junction
-    fs.junction(old_target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
-    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
+    fs.junction(&old_target, &junction).unwrap();
+    fs.junction(&target, &junction).unwrap();
 
     assert!(
-        fs.is_junction(junction.to_str().unwrap()),
+        fs.is_junction(&junction),
         "{}: is a junction",
         junction.display()
     );
     assert!(
-        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        fs.is_junction(target.join("../../junction")),
         "{}/../../junction: is a junction",
         target.display()
     );
 
     // Remove junction
     assert!(
-        fs.remove_junction(junction.to_str().unwrap()).unwrap(),
+        fs.remove_junction(&junction).unwrap(),
         "{} has been removed",
         junction.display()
     );
 
     // Override broken junction
-    fs.junction(old_target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
+    fs.junction(&old_target, &junction).unwrap();
     fs.remove_directory(&old_target).unwrap();
-    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
+    fs.junction(&target, &junction).unwrap();
 
     assert!(
-        fs.is_junction(junction.to_str().unwrap()),
+        fs.is_junction(&junction),
         "{}: is a junction",
         junction.display()
     );
     assert!(
-        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        fs.is_junction(target.join("../../junction")),
         "{}/../../junction: is a junction",
         target.display()
     );
@@ -716,24 +700,15 @@ fn test_copy() {
 
     mkdir(working_dir.join("foo/bar"), 0o777, true);
     mkdir(working_dir.join("foo/baz"), 0o777, true);
-    file_put_contents(working_dir.join("foo/foo.file").to_str().unwrap(), b"foo");
-    file_put_contents(
-        working_dir.join("foo/bar/foobar.file").to_str().unwrap(),
-        b"foobar",
-    );
-    file_put_contents(
-        working_dir.join("foo/baz/foobaz.file").to_str().unwrap(),
-        b"foobaz",
-    );
-    file_put_contents(test_file.to_str().unwrap(), b"testfile");
+    file_put_contents(working_dir.join("foo/foo.file"), b"foo");
+    file_put_contents(working_dir.join("foo/bar/foobar.file"), b"foobar");
+    file_put_contents(working_dir.join("foo/baz/foobaz.file"), b"foobaz");
+    file_put_contents(&test_file, b"testfile");
 
     let mut fs = Filesystem::new(None);
 
     let result1 = fs
-        .copy(
-            working_dir.join("foo").to_str().unwrap(),
-            working_dir.join("foop").to_str().unwrap(),
-        )
+        .copy(working_dir.join("foo"), working_dir.join("foop"))
         .unwrap();
     assert!(result1, "Copying directory failed.");
     assert!(
@@ -768,10 +743,7 @@ fn test_copy() {
     );
 
     let result2 = fs
-        .copy(
-            test_file.to_str().unwrap(),
-            working_dir.join("testfile.file").to_str().unwrap(),
-        )
+        .copy(&test_file, working_dir.join("testfile.file"))
         .unwrap();
     assert!(result2);
     assert!(file_exists(working_dir.join("testfile.file")));
@@ -786,35 +758,23 @@ fn test_copy_then_remove() {
 
     mkdir(working_dir.join("foo/bar"), 0o777, true);
     mkdir(working_dir.join("foo/baz"), 0o777, true);
-    file_put_contents(working_dir.join("foo/foo.file").to_str().unwrap(), b"foo");
-    file_put_contents(
-        working_dir.join("foo/bar/foobar.file").to_str().unwrap(),
-        b"foobar",
-    );
-    file_put_contents(
-        working_dir.join("foo/baz/foobaz.file").to_str().unwrap(),
-        b"foobaz",
-    );
-    file_put_contents(test_file.to_str().unwrap(), b"testfile");
+    file_put_contents(working_dir.join("foo/foo.file"), b"foo");
+    file_put_contents(working_dir.join("foo/bar/foobar.file"), b"foobar");
+    file_put_contents(working_dir.join("foo/baz/foobaz.file"), b"foobaz");
+    file_put_contents(&test_file, b"testfile");
 
     let mut fs = Filesystem::new(None);
 
-    fs.copy_then_remove(
-        test_file.to_str().unwrap(),
-        working_dir.join("testfile.file").to_str().unwrap(),
-    )
-    .unwrap();
+    fs.copy_then_remove(&test_file, working_dir.join("testfile.file"))
+        .unwrap();
     assert!(
         !file_exists(&test_file),
         "Still a file: {}",
         test_file.display()
     );
 
-    fs.copy_then_remove(
-        working_dir.join("foo").to_str().unwrap(),
-        working_dir.join("foop").to_str().unwrap(),
-    )
-    .unwrap();
+    fs.copy_then_remove(working_dir.join("foo"), working_dir.join("foop"))
+        .unwrap();
     assert!(
         !file_exists(working_dir.join("foo/baz/foobaz.file")),
         "Still a file: {}/foo/baz/foobaz.file",

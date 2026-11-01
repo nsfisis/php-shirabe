@@ -207,7 +207,7 @@ fn test_preserve_indentation_after_read() {
     let dst = fixture_path("tabs2.json");
     std::fs::copy(&src, &dst).unwrap();
 
-    let json_file = JsonFile::new(dst.to_str().unwrap(), None, None).unwrap();
+    let json_file = JsonFile::new(&dst, None, None).unwrap();
     let _data = json_file.read().unwrap();
     let mut hash: IndexMap<BString, PhpMixed> = IndexMap::new();
     hash.insert("foo".into(), PhpMixed::string("baz".to_string()));
@@ -229,7 +229,7 @@ fn test_overwrites_indentation_by_default() {
     let dst = fixture_path("tabs2.json");
     std::fs::copy(&src, &dst).unwrap();
 
-    let json_file = JsonFile::new(dst.to_str().unwrap(), None, None).unwrap();
+    let json_file = JsonFile::new(&dst, None, None).unwrap();
     let mut hash: IndexMap<BString, PhpMixed> = IndexMap::new();
     hash.insert("foo".into(), PhpMixed::string("baz".to_string()));
     json_file.write(PhpMixed::Array(hash)).unwrap();
@@ -245,7 +245,7 @@ fn test_overwrites_indentation_by_default() {
 #[test]
 fn test_schema_validation() {
     let path = fixture_path("composer.json");
-    let json = JsonFile::new(path.to_str().unwrap(), None, None).unwrap();
+    let json = JsonFile::new(&path, None, None).unwrap();
     json.validate_schema(JsonFile::STRICT_SCHEMA, None).unwrap();
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
 }
@@ -255,10 +255,13 @@ fn test_schema_validation_error() {
     // INCOMPATIBILITY NOTE: upstream asserts justinrainbow's "name : NULL value found, but a string is
     // required". The jsonschema crate reports the same violation with different wording.
     let file_tmp = create_temp_file();
-    let file = file_tmp.path().to_str().unwrap().to_string();
+    let file = file_tmp.path().to_path_buf();
     std::fs::write(&file, b"{ \"name\": null }").unwrap();
     let json = JsonFile::new(file.clone(), None, None).unwrap();
-    let expected_message = format!("\"{}\" does not match the expected JSON schema", file);
+    let expected_message = format!(
+        "\"{}\" does not match the expected JSON schema",
+        file.display()
+    );
     let expected_error = "name : null is not of type \"string\"".to_string();
 
     let err = json
@@ -282,7 +285,7 @@ fn test_schema_validation_lax_additional_properties() {
     // definition does not allow additional properties". The jsonschema crate reports the same
     // additionalProperties violation with different wording.
     let file_tmp = create_temp_file();
-    let file = file_tmp.path().to_str().unwrap().to_string();
+    let file = file_tmp.path().to_path_buf();
     std::fs::write(
         &file,
         b"{ \"name\": \"vendor/package\", \"description\": \"generic description\", \"foo\": \"bar\" }",
@@ -295,7 +298,10 @@ fn test_schema_validation_lax_additional_properties() {
         .unwrap_err();
     let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(
-        format!("\"{}\" does not match the expected JSON schema", file),
+        format!(
+            "\"{}\" does not match the expected JSON schema",
+            file.display()
+        ),
         e.get_message()
     );
     assert_eq!(
@@ -313,10 +319,13 @@ fn test_schema_validation_lax_required() {
     // differently ("name : \"name\" is a required property"), but the property prefix is reconstructed,
     // so the "PROPERTY : MESSAGE" shape matches: "name : \"name\" is a required property".
     let file_tmp = create_temp_file();
-    let file = file_tmp.path().to_str().unwrap().to_string();
+    let file = file_tmp.path().to_path_buf();
     let json = JsonFile::new(file.clone(), None, None).unwrap();
 
-    let expected_message = format!("\"{}\" does not match the expected JSON schema", file);
+    let expected_message = format!(
+        "\"{}\" does not match the expected JSON schema",
+        file.display()
+    );
 
     std::fs::write(&file, b"{ }").unwrap();
     let err = json
@@ -387,7 +396,7 @@ fn test_schema_validation_lax_required() {
 #[test]
 fn test_custom_schema_validation_lax() {
     let file_tmp = create_temp_file();
-    let file = file_tmp.path().to_str().unwrap().to_string();
+    let file = file_tmp.path().to_path_buf();
     std::fs::write(
         &file,
         b"{ \"custom\": \"property\", \"another custom\": \"property\" }",
@@ -411,7 +420,7 @@ fn test_custom_schema_validation_lax() {
 #[test]
 fn test_custom_schema_validation_strict() {
     let file_tmp = create_temp_file();
-    let file = file_tmp.path().to_str().unwrap().to_string();
+    let file = file_tmp.path().to_path_buf();
     std::fs::write(&file, b"{ \"custom\": \"property\" }").unwrap();
 
     let schema_tmp = create_temp_file();

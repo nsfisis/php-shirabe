@@ -7,6 +7,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BString, ByteSlice};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -17,12 +19,12 @@ fn fixture_dir() -> PathBuf {
 struct Run {
     exit_code: i32,
     trace: String,
-    stdout: String,
+    stdout: BString,
 }
 
 /// Runs `dump-autoload` in a fresh copy of the fixture and returns the exit code with what the
 /// script wrote to its trace file and through the event's IO.
-fn dump_autoload(program: &str, prefix_args: &[&str]) -> Run {
+fn dump_autoload(program: &str, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
@@ -40,7 +42,7 @@ fn dump_autoload(program: &str, prefix_args: &[&str]) -> Run {
     Run {
         exit_code: output.status.code().unwrap_or(-1),
         trace: std::fs::read_to_string(project.join("script-event-trace.txt")).unwrap_or_default(),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stdout: BString::from(output.stdout),
     }
 }
 
@@ -53,9 +55,8 @@ fn test_script_event_object_graph_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = dump_autoload("php", &[composer_bin.as_str()]);
+    let upstream = dump_autoload("php", &[composer_bin.as_os_str()]);
     let shirabe = dump_autoload(env!("CARGO_BIN_EXE_shirabe"), &[]);
 
     assert_eq!(0, upstream.exit_code, "upstream dump-autoload must succeed");
@@ -74,12 +75,13 @@ bin-dir=bin
         upstream.trace
     );
 
-    let io_line = |run: &Run| -> String {
-        run.stdout
-            .lines()
-            .find(|line| line.starts_with("script-event: "))
-            .unwrap_or_default()
-            .to_string()
+    let io_line = |run: &Run| -> BString {
+        BString::from(
+            run.stdout
+                .lines()
+                .find(|line| line.starts_with(b"script-event: "))
+                .unwrap_or_default(),
+        )
     };
     assert_eq!(io_line(&upstream), io_line(&shirabe));
     assert_eq!(

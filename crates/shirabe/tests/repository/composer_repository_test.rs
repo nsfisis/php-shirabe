@@ -9,7 +9,7 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::composer_repository::{ComposerRepository, ProviderListingEntry};
 use shirabe::repository::{RepositoryInterface, SEARCH_FULLTEXT};
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe_php_shim::{PhpMixed, bconcat, hash, uniqid};
+use shirabe_php_shim::{PhpMixed, bconcat, hash, path_to_bytes, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use tempfile::TempDir;
 
@@ -29,10 +29,7 @@ fn create_config() -> (Config, TempDir) {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     top.insert("config".into(), PhpMixed::Array(config_section));
     let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
     repositories.insert("packagist".into(), PhpMixed::Bool(false));

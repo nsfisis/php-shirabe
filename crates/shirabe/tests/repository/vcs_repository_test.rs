@@ -11,7 +11,7 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::{PhpMixed, implode};
+use shirabe_php_shim::{PhpMixed, implode, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -191,7 +191,7 @@ fn test_load_versions() {
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".into(),
-        PhpMixed::string(composer_home.to_str().unwrap().to_string()),
+        PhpMixed::string(path_to_bytes(&composer_home)),
     );
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -213,10 +213,7 @@ fn test_load_versions() {
     let _loop = Loop::new(http_downloader.clone(), Some(process.clone()));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert(
-        "url".into(),
-        PhpMixed::string(git_repo.to_str().unwrap().to_string()),
-    );
+    repo_config.insert("url".into(), PhpMixed::string(path_to_bytes(&git_repo)));
     repo_config.insert("type".into(), PhpMixed::string("vcs".to_string()));
 
     let mut repo = VcsRepository::new(

@@ -4,11 +4,13 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::trim;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -105,11 +107,10 @@ fn test_warning_when_removing_non_existent_package() {
         .unwrap();
     assert_eq!(SUCCESS, status_code);
     assert!(
-        app_tester.get_display().trim().starts_with(
-            "<warning>vendor1/package1 is not required in your composer.json and has not been removed</warning>"
+        trim(app_tester.get_display()).starts_with_str("<warning>vendor1/package1 is not required in your composer.json and has not been removed</warning>"
         ),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
 
     drop(tear_down);
@@ -144,7 +145,7 @@ fn test_warning_when_removing_package_from_wrong_type() {
     assert_eq!(
         "<warning>root/req could not be found in require-dev but it is present in require</warning>
 ./composer.json has been updated",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert_eq!(
         serde_json::json!({ "require": { "root/req": "1.*" } }),
@@ -183,7 +184,7 @@ fn test_warning_when_removing_package_with_deprecated_dependencies_flag() {
     assert_eq!(
         "<warning>You are using the deprecated option \"update-with-dependencies\". This is now default behaviour. The --no-update-with-dependencies option can be used to remove a package without its dependencies.</warning>
 ./composer.json has been updated",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert!(
         is_empty_json(&read_json_file("./composer.json")),
@@ -254,7 +255,7 @@ fn test_message_output_when_no_unused_packages_to_remove() {
     assert_eq!(SUCCESS, status_code);
     assert_eq!(
         "No unused packages to remove",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     drop(tear_down);
@@ -301,25 +302,24 @@ fn test_remove_unused_package() {
         .unwrap();
     assert_eq!(SUCCESS, status_code);
     assert!(
-        app_tester.get_display().starts_with(
-            "<warning>not/req is not required in your composer.json and has not been removed</warning>"
+        app_tester.get_display().starts_with_str("<warning>not/req is not required in your composer.json and has not been removed</warning>"
         ),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
     assert!(
         app_tester
             .get_display()
-            .contains("Running shirabe update not/req"),
+            .contains_str("Running shirabe update not/req"),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
     assert!(
         app_tester
             .get_display()
-            .contains("- Removing not/req (1.0.0)"),
+            .contains_str("- Removing not/req (1.0.0)"),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
 
     drop(tear_down);
@@ -372,29 +372,29 @@ fn test_remove_package_by_name() {
     let display = app_tester.get_display();
     let trimmed = display.trim();
     assert!(
-        trimmed.starts_with("./composer.json has been updated"),
+        trimmed.starts_with_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Running shirabe update root/req"),
+        trimmed.contains_str("Running shirabe update root/req"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        trimmed.contains_str("Lock file operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("- Removing root/req (1.0.0)"),
+        trimmed.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Package operations: 0 installs, 0 updates, 1 removal"),
+        trimmed.contains_str("Package operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert_eq!(
         serde_json::json!({ "root/another": "1.*" }),
@@ -454,29 +454,29 @@ fn test_remove_package_by_name_with_dry_run() {
     let display = app_tester.get_display();
     let trimmed = display.trim();
     assert!(
-        trimmed.contains("./composer.json has been updated"),
+        trimmed.contains_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Running shirabe update root/req"),
+        trimmed.contains_str("Running shirabe update root/req"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        trimmed.contains_str("Lock file operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("- Removing root/req (1.0.0)"),
+        trimmed.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Package operations: 0 installs, 0 updates, 1 removal"),
+        trimmed.contains_str("Package operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert_eq!(
         serde_json::json!({ "root/req": "1.*", "root/another": "1.*" }),
@@ -646,28 +646,30 @@ fn test_remove_packages_by_vendor() {
     assert_eq!(SUCCESS, status_code);
     let display = app_tester.get_display();
     assert!(
-        display
-            .trim()
-            .starts_with("./composer.json has been updated"),
+        trim(&display).starts_with_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("Running shirabe update root/*"),
+        display.contains_str("Running shirabe update root/*"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("- Removing root/another (1.0.0)"),
+        display.contains_str("- Removing root/another (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("- Removing root/req (1.0.0)"),
+        display.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
-    assert!(display.contains("Writing lock file"), "got: {}", display);
+    assert!(
+        display.contains_str("Writing lock file"),
+        "got: {}",
+        display.display_lossy()
+    );
     assert_eq!(
         serde_json::json!({ "another/req": "1.*" }),
         read_json_file("./composer.json")["require"]
@@ -733,12 +735,12 @@ Updating dependencies
 Lock file operations: 0 installs, 0 updates, 2 removals
   - Removing root/another (1.0.0)
   - Removing root/req (1.0.0)",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert!(
-        !app_tester.get_display().contains("Writing lock file"),
+        !app_tester.get_display().contains_str("Writing lock file"),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
     assert_eq!(
         serde_json::json!({ "root/req": "1.*", "root/another": "1.*", "another/req": "1.*" }),
@@ -786,7 +788,7 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
         "<warning>root/req could not be found in require-dev but it is present in require</warning>
 <warning>root/another could not be found in require-dev but it is present in require</warning>
 ./composer.json has been updated",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert_eq!(
         serde_json::json!({
@@ -830,27 +832,31 @@ fn test_package_still_present_error_when_no_install_flag_used() {
     assert_eq!(INVALID, status_code);
     let display = app_tester.get_display();
     assert!(
-        display.contains("./composer.json has been updated"),
+        display.contains_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        display.contains_str("Lock file operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("- Removing root/req (1.0.0)"),
+        display.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
-    assert!(display.contains("Writing lock file"), "got: {}", display);
     assert!(
-        display.contains(
+        display.contains_str("Writing lock file"),
+        "got: {}",
+        display.display_lossy()
+    );
+    assert!(
+        display.contains_str(
             "Removal failed, root/req is still present, it may be required by another package. See `shirabe why root/req`"
         ),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
         is_empty_json(&read_json_file("./composer.json")),
@@ -920,30 +926,34 @@ fn run_update_inherited_dependencies_flag_case(
     assert_eq!(SUCCESS, status_code);
     let display = app_tester.get_display();
     assert!(
-        display.contains("./composer.json has been updated"),
+        display.contains_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains(expected_composer_update_command),
+        display.contains_str(expected_composer_update_command),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("Package operations: 0 installs, 0 updates, 1 removal"),
+        display.contains_str("Package operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("- Removing root/req (1.0.0)"),
+        display.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
-    assert!(display.contains("Writing lock file"), "got: {}", display);
     assert!(
-        display.contains("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        display.contains_str("Writing lock file"),
         "got: {}",
-        display
+        display.display_lossy()
+    );
+    assert!(
+        display.contains_str("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        "got: {}",
+        display.display_lossy()
     );
     assert!(
         is_empty_json(&read_json_file("./composer.lock")["packages"]),

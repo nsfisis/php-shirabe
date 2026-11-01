@@ -7,6 +7,7 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -22,7 +23,7 @@ struct Run {
 /// Runs `install` and then `require shirabe-test/lib-b:1.0.0` in a fresh copy of the fixture: the
 /// plugin is only active once the first command has installed it, so the event it records is the
 /// one the second command dispatches.
-fn install_then_require(program: &str, prefix_args: &[&str]) -> Run {
+fn install_then_require(program: &str, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
@@ -62,9 +63,8 @@ fn test_installer_events_match_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = install_then_require("php", &[composer_bin.as_str()]);
+    let upstream = install_then_require("php", &[composer_bin.as_os_str()]);
     let shirabe = install_then_require(env!("CARGO_BIN_EXE_shirabe"), &[]);
 
     assert_eq!(

@@ -2,6 +2,7 @@
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn repositories_json() -> serde_json::Value {
@@ -31,7 +32,7 @@ fn run_search_case(command: Vec<(ParameterName, InputValue)>, expected: &str) {
 
     let mut app_tester = get_application_tester();
     app_tester.run(input, RunOptions::default()).unwrap();
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(expected.trim(), trim(app_tester.get_display()));
 }
 
 #[test]
@@ -143,7 +144,7 @@ fn test_invalid_format() {
     assert_eq!(1, result);
     assert_eq!(
         "Unsupported format \"test-format\". See help for supported formats.",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 

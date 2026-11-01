@@ -3,6 +3,7 @@
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
 use shirabe::json::JsonFile;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// Read the composer.json in the CWD and decode it.
@@ -31,7 +32,7 @@ fn test_list_with_no_repositories() {
 
     assert_eq!(
         "[packagist.org] composer https://repo.packagist.org",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     // composer.json should remain unchanged
     assert_eq!(serde_json::json!([]), read_composer_json());
@@ -72,7 +73,7 @@ fn test_list_with_repositories_as_list() {
 [foo] vcs https://old.example.org
 [bar] vcs https://other.example.org
 [packagist.org] disabled",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     drop(tear_down);
@@ -111,7 +112,7 @@ fn test_list_with_repositories_as_assoc() {
 [foo] vcs https://old.example.org
 [bar] vcs https://other.example.org
 [packagist.org] disabled",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     drop(tear_down);
@@ -138,7 +139,12 @@ fn test_add_repository_with_type_and_url() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -248,7 +254,12 @@ fn run_set_and_get_url_assoc_case(name: &str, index: &str, new_url: &str) {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     let json = read_composer_json();
     // calling it still in assoc means, the repository has not been converted, which is good
@@ -271,7 +282,7 @@ fn run_set_and_get_url_assoc_case(name: &str, index: &str, new_url: &str) {
         )
         .unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(new_url, app_tester.get_display().trim());
+    assert_eq!(new_url, trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -313,7 +324,12 @@ fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     let json = read_composer_json();
     assert_eq!(
@@ -341,7 +357,7 @@ fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
         )
         .unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(new_url, app_tester.get_display().trim());
+    assert_eq!(new_url, trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -447,7 +463,12 @@ fn test_prepend_repository_by_name_list_to_assoc() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -488,7 +509,12 @@ fn test_append_repository_by_name_list_to_assoc() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -528,7 +554,12 @@ fn test_prepend_repository_assoc_with_packagist_disabled() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -570,7 +601,12 @@ fn test_append_repository_assoc_with_packagist_disabled() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -621,7 +657,12 @@ fn test_add_before_and_after_by_name() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     // Insert after alpha
     let mut app_tester = get_application_tester();
@@ -641,7 +682,12 @@ fn test_add_before_and_after_by_name() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     // Expect order: alpha, gamma, beta, omega, then packagist.org boolean preserved
     assert_eq!(
@@ -682,7 +728,12 @@ fn test_add_same_name_replaces_existing() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     // second add with same name but different url
     let mut app_tester = get_application_tester();
@@ -702,7 +753,12 @@ fn test_add_same_name_replaces_existing() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     let json = read_composer_json();
 

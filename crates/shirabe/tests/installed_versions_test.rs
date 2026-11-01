@@ -14,7 +14,7 @@ use php_worker::{
     php_single_quote,
 };
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{PhpMixed, legacy_lossy, path_to_bytes, realpath};
+use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes, path_to_bytes, realpath};
 use tempfile::TempDir;
 
 const INSTALLED_VERSIONS: &str = "Composer\\InstalledVersions";
@@ -25,8 +25,8 @@ struct SetUp {
 }
 
 impl SetUp {
-    fn root(&self) -> &str {
-        self.root.path().to_str().unwrap()
+    fn root(&self) -> &std::path::Path {
+        self.root.path()
     }
 }
 
@@ -47,39 +47,38 @@ fn set_up() -> SetUp {
     );
 
     let root = TempDir::new().unwrap();
-    let data = fixture_data(root.path().to_str().unwrap());
+    let data = fixture_data(root.path());
     call_static("reload", vec![data]);
     SetUp { root }
 }
 
 /// `require __DIR__.'/Repository/Fixtures/installed_relative.php'` with `$dir` bound, evaluated in
 /// the worker so the upstream fixture file is used as-is.
-fn fixture_data(dir: &str) -> PluginValue {
-    php_eval(&format!(
-        "$dir = {};\nreturn require {};",
-        php_single_quote(dir),
-        php_single_quote(&fixture_path("installed_relative.php")),
+fn fixture_data(dir: &std::path::Path) -> PluginValue {
+    php_eval(bconcat!(
+        "$dir = ",
+        php_single_quote(path_to_bytes(dir)),
+        ";\nreturn require ",
+        php_single_quote(path_to_bytes(&fixture_path("installed_relative.php"))),
+        ";",
     ))
 }
 
-fn fixture_path(name: &str) -> String {
+fn fixture_path(name: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Repository/Fixtures")
         .join(name)
         .canonicalize()
         .expect("the Composer checkout must provide the repository fixtures")
-        .to_str()
-        .unwrap()
-        .to_string()
 }
 
 fn call_static(method: &str, args: Vec<PluginValue>) -> PluginValue {
     php_call_static(INSTALLED_VERSIONS, method, args)
 }
 
-fn string_of(value: &PluginValue) -> String {
+fn string_of(value: &PluginValue) -> bstr::BString {
     match value {
-        PluginValue::String(bytes) => String::from_utf8(bytes.clone().into()).unwrap(),
+        PluginValue::String(bytes) => bytes.clone(),
         other => panic!("expected a string, got {other:?}"),
     }
 }
@@ -346,7 +345,7 @@ fn test_get_root_package() {
         ("type".into(), PhpMixed::string("library".to_string())),
         (
             "install_path".into(),
-            PhpMixed::string(format!("{}/./", set_up.root())),
+            PhpMixed::string(bconcat!(set_up.root(), "/./")),
         ),
         (
             "aliases".into(),
@@ -436,8 +435,9 @@ fn test_get_install_path() {
         vec![PluginValue::string("__root__")],
     ));
     assert_eq!(
-        realpath(set_up.root()).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned()),
-        realpath(root_install_path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+        realpath(set_up.root()).map(|p| bstr::BString::from(path_to_bytes(&p))),
+        realpath(path_from_bytes(&root_install_path))
+            .map(|p| bstr::BString::from(path_to_bytes(&p)))
     );
     assert_eq!(
         PluginValue::string("/foo/bar/vendor/c/c"),
@@ -525,6 +525,7 @@ fn test_worker_loads_the_installed_versions_file_shirabe_dumps() {
     assert_eq!(
         include_str!("../../../composer/src/Composer/InstalledVersions.php"),
         contents,
-        "the worker autoloads {loaded}, which must match the file Shirabe dumps",
+        "the worker autoloads {}, which must match the file Shirabe dumps",
+        loaded.display_lossy(),
     );
 }

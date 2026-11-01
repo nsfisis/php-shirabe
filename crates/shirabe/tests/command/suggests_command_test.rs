@@ -8,6 +8,7 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: SuggestsCommandTest::getPackageWithSuggestAndRequires
@@ -103,7 +104,7 @@ fn test_installed_packages_with_no_suggestions() {
         .unwrap();
     assert_eq!(0, status_code);
     assert!(
-        app_tester.get_display().trim().is_empty(),
+        trim(app_tester.get_display()).is_empty(),
         "expected empty display, got: {:?}",
         app_tester.get_display()
     );
@@ -223,7 +224,7 @@ fn run_suggest_case(has_lock_file: bool, command: &[(&str, InputValue)], expecte
     let mut app_tester = get_application_tester();
     let status_code = app_tester.run(input, RunOptions::default()).unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(expected.trim(), trim(app_tester.get_display()));
 
     drop(tear_down);
 }

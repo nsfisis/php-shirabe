@@ -15,7 +15,7 @@ use shirabe::io::null_io::NullIO;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::{PhpMixed, path_from_bytes};
+use shirabe_php_shim::{PhpMixed, path_from_bytes, path_to_bytes};
 use std::fs;
 use tempfile::TempDir;
 
@@ -126,12 +126,9 @@ fn set_up() -> SetUp {
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".into(),
-        PhpMixed::string(vendor_dir.to_str().unwrap().to_string()),
+        PhpMixed::string(path_to_bytes(&vendor_dir)),
     );
-    config_section.insert(
-        "bin-dir".into(),
-        PhpMixed::string(bin_dir.to_str().unwrap().to_string()),
-    );
+    config_section.insert("bin-dir".into(), PhpMixed::string(path_to_bytes(&bin_dir)));
     let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
     merged.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&merged, Config::SOURCE_UNKNOWN);
@@ -234,17 +231,12 @@ fn test_install() {
     // ($package, vendorDir/some/package).
     let mut dm = MockDownloadManager::new();
     let expected_package = package.clone();
-    let expected_path = setup
-        .vendor_dir
-        .join("some/package")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let expected_path = setup.vendor_dir.join("some/package").to_path_buf();
     dm.expect_install()
         .times(1)
         .withf_st(move |package, target_dir| {
             std::rc::Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
-                && target_dir.as_os_str() == expected_path.as_str()
+                && target_dir.as_os_str() == expected_path.as_os_str()
         })
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
@@ -287,13 +279,13 @@ fn test_update() {
     let mut dm = MockDownloadManager::new();
     let expected_initial = initial.clone();
     let expected_target = target.clone();
-    let expected_path = new_target_dir.to_str().unwrap().to_string();
+    let expected_path = new_target_dir.to_path_buf();
     dm.expect_update()
         .times(1)
         .withf_st(move |initial, target, target_dir| {
             std::rc::Rc::ptr_eq(initial.as_rc(), expected_initial.as_rc())
                 && std::rc::Rc::ptr_eq(target.as_rc(), expected_target.as_rc())
-                && target_dir.as_os_str() == expected_path.as_str()
+                && target_dir.as_os_str() == expected_path.as_os_str()
         })
         .returning(|_, _, _| Ok(None));
     set_download_manager(&setup, dm);
@@ -342,17 +334,12 @@ fn test_uninstall() {
     // ($package, vendorDir/vendor/pkg).
     let mut dm = MockDownloadManager::new();
     let expected_package = package.clone();
-    let expected_path = setup
-        .vendor_dir
-        .join("vendor/pkg")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let expected_path = setup.vendor_dir.join("vendor/pkg").to_path_buf();
     dm.expect_remove()
         .times(1)
         .withf_st(move |package, target_dir| {
             std::rc::Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
-                && target_dir.as_os_str() == expected_path.as_str()
+                && target_dir.as_os_str() == expected_path.as_os_str()
         })
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);

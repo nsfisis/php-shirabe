@@ -7,6 +7,7 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -22,7 +23,7 @@ struct Run {
 
 /// Runs `install` and then the commands whose events the plugin records in a fresh copy of the
 /// fixture: the plugin is only active once the first command has installed it.
-fn run_commands(program: &str, prefix_args: &[&str]) -> Run {
+fn run_commands(program: &str, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
@@ -69,9 +70,8 @@ fn test_command_events_match_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = run_commands("php", &[composer_bin.as_str()]);
+    let upstream = run_commands("php", &[composer_bin.as_os_str()]);
     let shirabe = run_commands(env!("CARGO_BIN_EXE_shirabe"), &[]);
 
     // `prohibits` finds nothing prohibiting the version and reports that with exit code 1.
@@ -105,9 +105,8 @@ fn test_command_event_console_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = run_commands("php", &[composer_bin.as_str()]);
+    let upstream = run_commands("php", &[composer_bin.as_os_str()]);
     let shirabe = run_commands(env!("CARGO_BIN_EXE_shirabe"), &[]);
 
     assert_eq!(upstream.console_trace, shirabe.console_trace);

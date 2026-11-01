@@ -2,6 +2,7 @@
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// `['command' => 'config'] + $command`, with the command name prepended.
@@ -318,7 +319,7 @@ fn test_config_updates() {
             app_tester.get_status_code(),
             "case {:?}: display: {}",
             case.name,
-            app_tester.get_display()
+            app_tester.get_display().display_lossy()
         );
 
         assert_eq!(case.expected, read_composer_json(), "case {:?}", case.name);
@@ -386,7 +387,7 @@ fn test_config_reads() {
 
         assert_eq!(
             case.expected,
-            app_tester.get_display().trim(),
+            trim(app_tester.get_display()),
             "case {:?}",
             case.name
         );
@@ -420,7 +421,7 @@ fn test_config_reads_repos_by_numeric_index() {
     assert_eq!(0, app_tester.get_status_code());
     assert_eq!(
         "{\"type\":\"vcs\",\"url\":\"https://example.org\"}",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 

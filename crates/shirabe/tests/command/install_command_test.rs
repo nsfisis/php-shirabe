@@ -5,6 +5,7 @@ use crate::test_case::{
     init_temp_composer,
 };
 use serial_test::serial;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
@@ -76,7 +77,7 @@ fn test_install_command_errors() {
 
         assert_eq!(
             expected.trim(),
-            app_tester.get_display().trim(),
+            trim(app_tester.get_display()),
             "case: {label}"
         );
     }
@@ -118,7 +119,7 @@ Package operations: 2 installs, 0 updates, 0 removals
   - Installing root/another (1.0.0)
   - Installing root/req (1.0.0)
 Generating autoload files",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -158,7 +159,7 @@ Verifying lock file contents can be installed on current platform.
 Package operations: 1 install, 0 updates, 0 removals
   - Installing root/req (1.0.0)
 Generating autoload files",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -200,6 +201,6 @@ Verifying lock file contents can be installed on current platform.
 Package operations: 1 install, 0 updates, 0 removals
   - Installing root/another (1.0.0)
 Generating autoload files",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }

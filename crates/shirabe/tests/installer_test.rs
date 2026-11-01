@@ -7,9 +7,14 @@ mod config_stub;
 #[path = "common/test_case.rs"]
 mod test_case;
 
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
+use shirabe_php_shim::{
+    PHP_EOL, PhpMixed, bconcat, implode, path_to_bytes, php_fopen_resource, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind, stream_get_contents,
+    trim, utf8_text,
+};
 use shirabe_symfony_console::input::{
     InputArgument, InputInterface, InputOption, InputValue, StringInput,
 };
@@ -46,10 +51,6 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, implode, legacy_lossy, php_fopen_resource, php_regex, preg_is_match,
-    preg_match, preg_replace, preg_split_delim_capture, rewind, stream_get_contents,
-};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::command::{Command as SymfonyCommand, CommandData};
@@ -260,23 +261,23 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
 
 /// ref: TestCase::getPackage with class `Composer\Package\RootPackage`.
 fn root_package(name: &str, version: &str) -> RootPackageHandle {
-    let normalized = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
+    let normalized = VersionParser.normalize(version, None).unwrap();
     RootPackageHandle::new(
         bstr::BString::from(name.to_string()),
-        bstr::BString::from(normalized),
+        normalized,
         bstr::BString::from(version.to_string()),
     )
 }
 
 /// ref: `new Link($source, $target, $constraint, $type, $constraint->getPrettyString())`.
 fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
-    let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
+    let pretty = constraint.get_pretty_string();
     Link::new(
         bstr::BString::from(source.to_string()),
         bstr::BString::from(target.to_string()),
         constraint,
         Some(bstr::BString::from(r#type.to_string())),
-        bstr::BString::from(pretty),
+        pretty,
     )
 }
 
@@ -447,7 +448,7 @@ fn test_installer() {
         // the installer falls back to an update; PHP uses an in-memory JsonFile mock instead).
         let lock_dir = tempfile::TempDir::new().unwrap();
         let lock_path = lock_dir.path().join("composer.lock");
-        let lock_json = JsonFile::new(lock_path.to_str().unwrap(), None, None).unwrap();
+        let lock_json = JsonFile::new(&lock_path, None, None).unwrap();
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
@@ -544,16 +545,16 @@ fn create_pattern_from_format(format: &str) -> String {
 }
 
 /// ref: PHPUnit self::assertStringMatchesFormat.
-fn assert_string_matches_format(format: &str, subject: &str, context: &str) {
-    let pattern = create_pattern_from_format(format);
-    let re = regex::Regex::new(&pattern)
+fn assert_string_matches_format(format: &[u8], subject: &[u8], context: &[u8]) {
+    let pattern = create_pattern_from_format(utf8_text(format).unwrap());
+    let re = regex::bytes::Regex::new(&pattern)
         .unwrap_or_else(|e| panic!("invalid format pattern {}: {}", pattern, e));
     assert!(
         re.is_match(subject),
         "output does not match format.\n--- format ---\n{}\n--- output ---\n{}\n--- context ---\n{}",
-        format,
-        subject,
-        context
+        format.as_bstr().display_lossy(),
+        subject.as_bstr().display_lossy(),
+        context.as_bstr().display_lossy()
     );
 }
 
@@ -571,33 +572,34 @@ enum ExpectLock {
 enum ExpectResult {
     ExitCode(i64),
     /// EXPECT-EXCEPTION: the class-string of an expected exception.
-    Exception(String),
+    Exception(BString),
 }
 
 #[derive(Debug, Clone)]
 struct IntegrationCase {
-    file: String,
-    message: String,
-    condition: Option<String>,
+    file: BString,
+    message: BString,
+    condition: Option<BString>,
     composer: serde_json::Value,
     lock: Option<serde_json::Value>,
     installed: Option<serde_json::Value>,
-    run: String,
+    run: BString,
     expect_lock: ExpectLock,
     expect_installed: Option<serde_json::Value>,
-    expect_output: Option<String>,
-    expect_output_optimized: Option<String>,
-    expect: String,
+    expect_output: Option<BString>,
+    expect_output_optimized: Option<BString>,
+    expect: BString,
     expect_result: ExpectResult,
 }
 
 /// The fixtures come from Composer's tree and name the `composer` binary in the hints they expect
 /// on stdout; Shirabe prints its own name there.
-fn rename_binary_in_expected_output(expected: String) -> String {
-    regex::Regex::new(r"\bcomposer (?P<cmd>config|fund|suggest|update)\b")
+fn rename_binary_in_expected_output(expected: BString) -> BString {
+    regex::bytes::Regex::new(r"\bcomposer (?P<cmd>config|fund|suggest|update)\b")
         .unwrap()
-        .replace_all(&expected, "shirabe $cmd")
+        .replace_all(&expected, &b"shirabe $cmd"[..])
         .into_owned()
+        .into()
 }
 
 fn fixtures_dir(path: &str) -> std::path::PathBuf {
@@ -612,8 +614,8 @@ fn fixtures_dir(path: &str) -> std::path::PathBuf {
 fn read_test_file(
     file: &std::path::Path,
     fixtures_dir: &std::path::Path,
-) -> IndexMap<String, String> {
-    let contents = std::fs::read_to_string(file).unwrap();
+) -> IndexMap<BString, BString> {
+    let contents = std::fs::read(file).unwrap();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
     let section_info: [(&str, bool); 13] = [
@@ -633,30 +635,30 @@ fn read_test_file(
     ];
     let known: indexmap::IndexSet<&str> = section_info.iter().map(|(k, _)| *k).collect();
 
-    let mut section: Option<String> = None;
-    let mut data: IndexMap<String, String> = IndexMap::new();
+    let mut section: Option<BString> = None;
+    let mut data: IndexMap<BString, BString> = IndexMap::new();
     for token in tokens {
         if section.is_none() && token.is_empty() {
             continue; // skip leading blank
         }
         if section.is_none() {
             assert!(
-                known.contains(&*legacy_lossy(&token)),
+                known.iter().any(|name| *name == token),
                 "The test file \"{}\" must not contain a section named \"{}\".",
                 file.display(),
                 token.display_lossy()
             );
-            section = Some(legacy_lossy(&token).into_owned());
+            section = Some(token);
             continue;
         }
         let sec = section.take().unwrap();
-        data.insert(sec, legacy_lossy(&token).into_owned());
+        data.insert(sec, token);
     }
 
     for (sec, required) in section_info {
         if required {
             assert!(
-                data.contains_key(sec),
+                data.contains_key(B(sec)),
                 "The test file \"{}\" must have a section named \"{}\".",
                 file.display(),
                 sec
@@ -685,7 +687,7 @@ fn collect_test_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) 
         let path = entry.path();
         if path.is_dir() {
             collect_test_files(&path, out);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("test") {
+        } else if path.extension() == Some(std::ffi::OsStr::new("test")) {
             out.push(path);
         }
     }
@@ -704,23 +706,24 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
 
         // skip 64bit related tests on 32bit (usize is 64-bit here, so this never triggers).
         if test_data
-            .get("EXPECT-OUTPUT")
-            .map(|s| s.contains("php-64bit"))
+            .get(B("EXPECT-OUTPUT"))
+            .map(|s| s.contains_str("php-64bit"))
             .unwrap_or(false)
             && (usize::BITS == 32)
         {
             continue;
         }
 
-        let message = test_data["TEST"].clone();
+        let message = test_data[B("TEST")].clone();
         let condition = test_data
-            .get("CONDITION")
+            .get(B("CONDITION"))
             .filter(|s| !s.is_empty())
             .cloned();
-        let mut composer: serde_json::Value = serde_json::from_str(&test_data["COMPOSER"]).unwrap();
+        let mut composer: serde_json::Value =
+            serde_json::from_slice(&test_data[B("COMPOSER")]).unwrap();
 
         if let Some(repositories) = composer.get_mut("repositories") {
-            let fixtures_str = dir.to_str().unwrap().replace('\\', "/");
+            let fixtures_str = dir.display().to_string().replace('\\', "/");
             let rewrite = |repo: &mut serde_json::Value| {
                 if repo.get("type").and_then(|t| t.as_str()) != Some("composer") {
                     return;
@@ -739,8 +742,8 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
             }
         }
 
-        let lock = test_data.get("LOCK").filter(|s| !s.is_empty()).map(|s| {
-            let mut lock: serde_json::Value = serde_json::from_str(s).unwrap();
+        let lock = test_data.get(B("LOCK")).filter(|s| !s.is_empty()).map(|s| {
+            let mut lock: serde_json::Value = serde_json::from_slice(s).unwrap();
             if lock.get("hash").is_none() {
                 let encoded = JsonFile::encode_with_options(
                     &composer,
@@ -754,11 +757,11 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
         });
 
         let installed = test_data
-            .get("INSTALLED")
+            .get(B("INSTALLED"))
             .filter(|s| !s.is_empty())
-            .map(|s| serde_json::from_str(s).unwrap());
+            .map(|s| serde_json::from_slice(s).unwrap());
 
-        let run = test_data["RUN"].clone();
+        let run = test_data[B("RUN")].clone();
 
         // PHP: `$expectLock === 'false' ? false : JsonFile::parseJson(...)`, then branches on
         // truthiness (`if ($expectLock)` / `elseif ($expectLock === false)`). A bare `false`
@@ -766,10 +769,10 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
         // collapse to the same outcome; mirror that by checking truthiness of the parsed value
         // rather than the raw string (the section's trailing newline defeats a literal "false"
         // string comparison when it is the file's last section).
-        let expect_lock = match test_data.get("EXPECT-LOCK").filter(|s| !s.is_empty()) {
+        let expect_lock = match test_data.get(B("EXPECT-LOCK")).filter(|s| !s.is_empty()) {
             None => ExpectLock::Unset,
             Some(s) => {
-                let parsed: serde_json::Value = serde_json::from_str(s).unwrap();
+                let parsed: serde_json::Value = serde_json::from_slice(s).unwrap();
                 if php_json_truthy(&parsed) {
                     ExpectLock::Json(parsed)
                 } else {
@@ -779,43 +782,43 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
         };
 
         let expect_installed = test_data
-            .get("EXPECT-INSTALLED")
+            .get(B("EXPECT-INSTALLED"))
             .filter(|s| !s.is_empty())
-            .map(|s| serde_json::from_str(s).unwrap());
+            .map(|s| serde_json::from_slice(s).unwrap());
 
         let expect_output = test_data
-            .get("EXPECT-OUTPUT")
+            .get(B("EXPECT-OUTPUT"))
             .cloned()
             .map(rename_binary_in_expected_output);
         let expect_output_optimized = test_data
-            .get("EXPECT-OUTPUT-OPTIMIZED")
+            .get(B("EXPECT-OUTPUT-OPTIMIZED"))
             .cloned()
             .map(rename_binary_in_expected_output);
-        let expect = test_data["EXPECT"].clone();
+        let expect = test_data[B("EXPECT")].clone();
 
-        let expect_result =
-            if let Some(exc) = test_data.get("EXPECT-EXCEPTION").filter(|s| !s.is_empty()) {
-                assert!(
-                    test_data
-                        .get("EXPECT-EXIT-CODE")
-                        .filter(|s| !s.is_empty())
-                        .is_none(),
-                    "EXPECT-EXCEPTION and EXPECT-EXIT-CODE are mutually exclusive"
-                );
-                ExpectResult::Exception(exc.clone())
-            } else if let Some(code) = test_data.get("EXPECT-EXIT-CODE").filter(|s| !s.is_empty()) {
-                ExpectResult::ExitCode(code.trim().parse().unwrap())
-            } else {
-                ExpectResult::ExitCode(0)
-            };
+        let expect_result = if let Some(exc) = test_data
+            .get(B("EXPECT-EXCEPTION"))
+            .filter(|s| !s.is_empty())
+        {
+            assert!(
+                test_data
+                    .get(B("EXPECT-EXIT-CODE"))
+                    .filter(|s| !s.is_empty())
+                    .is_none(),
+                "EXPECT-EXCEPTION and EXPECT-EXIT-CODE are mutually exclusive"
+            );
+            ExpectResult::Exception(exc.clone())
+        } else if let Some(code) = test_data
+            .get(B("EXPECT-EXIT-CODE"))
+            .filter(|s| !s.is_empty())
+        {
+            ExpectResult::ExitCode(utf8_text(&trim(code)).unwrap().parse().unwrap())
+        } else {
+            ExpectResult::ExitCode(0)
+        };
 
         tests.push(IntegrationCase {
-            file: file
-                .strip_prefix(&dir)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string(),
+            file: BString::from(path_to_bytes(file.strip_prefix(&dir).unwrap())),
             message,
             condition,
             composer,
@@ -835,8 +838,9 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
 }
 
 /// ref: the inline `eval($condition)` in doTestIntegration, ported for the known fixture conditions.
-fn evaluate_condition(condition: &str) -> bool {
-    match condition.trim() {
+fn evaluate_condition(condition: &BString) -> bool {
+    let condition = trim(condition);
+    match utf8_text(&condition).unwrap_or_default() {
         // putenv() returns true on success, so these conditions always run the test (with the env set).
         "putenv('COMPOSER_FUND=1')" => {
             Platform::put_env("COMPOSER_FUND", "1");
@@ -880,7 +884,7 @@ fn write_json(path: &std::path::Path, value: &serde_json::Value) {
 }
 
 /// ref: InstallerTest::doTestIntegration
-fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
+fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) {
     bootstrap::bootstrap();
 
     if let Some(condition) = &case.condition
@@ -913,13 +917,13 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     // expected from the fixture can come from composer construction itself, not just the later
     // install/update run; check for that here since Rust has no equivalent ambient wrapper.
     if is_exception && let Err(e) = &composer_result {
-        let normalized = case.expect.replace('\n', PHP_EOL);
-        let normalized = normalized.trim_end();
+        let normalized = case.expect.replace("\n", PHP_EOL);
+        let normalized = normalized.trim_end().as_bstr();
         let err = format!("{}", e);
         assert!(
-            err.contains(normalized),
+            err.as_bytes().contains_str(normalized),
             "expected exception message containing:\n{}\n--- got ---\n{}",
-            normalized,
+            normalized.display_lossy(),
             err
         );
         return;
@@ -934,7 +938,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         &installed_path,
         case.installed.as_ref().unwrap_or(&serde_json::json!([])),
     );
-    let installed_json = JsonFile::new(installed_path.to_str().unwrap(), None, None).unwrap();
+    let installed_json = JsonFile::new(&installed_path, None, None).unwrap();
     let local_repo = shirabe::repository::InstalledFilesystemRepository::__new_mock(
         installed_json,
         false,
@@ -954,7 +958,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         write_json(&lock_path, lock);
     }
     let lock_before = std::fs::read_to_string(&lock_path).ok();
-    let lock_json = JsonFile::new(lock_path.to_str().unwrap(), None, None).unwrap();
+    let lock_json = JsonFile::new(&lock_path, None, None).unwrap();
 
     // The Locker needs a concrete InstallationManager; build a fresh recording mock just for it. The
     // asserted trace comes from the composer's own installation manager (read via as_any below).
@@ -1184,7 +1188,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let app_output = StreamOutput::new(app_output_stream.clone(), None, None, None)
         .unwrap()
         .expect("php://memory is a valid stream");
-    let mut string_input = StringInput::new(format!("{} -vvv", case.run)).unwrap();
+    let mut string_input = StringInput::new(bconcat!(case.run, " -vvv")).unwrap();
     string_input.set_interactive(false);
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(string_input));
@@ -1194,20 +1198,15 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let app_run =
         shirabe::util::sync_executor::block_on(application.run(Some(input), Some(output)));
 
-    let output_string = io_buffer
-        .borrow()
-        .get_output()
-        .display_lossy()
-        .to_string()
-        .replace('\r', "");
+    let output_string: BString = io_buffer.borrow().get_output().replace("\r", "").into();
 
     // Shouldn't check output and results if an exception was expected by this point.
     if is_exception {
         let ExpectResult::Exception(_) = &case.expect_result else {
             unreachable!()
         };
-        let normalized = case.expect.replace('\n', PHP_EOL);
-        let normalized = normalized.trim_end();
+        let normalized = case.expect.replace("\n", PHP_EOL);
+        let normalized = normalized.trim_end().as_bstr();
         let err = match run_result.borrow().as_ref() {
             Some(Err(e)) => format!("{}", e),
             _ => app_run
@@ -1217,9 +1216,9 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                 .unwrap_or_default(),
         };
         assert!(
-            err.contains(normalized),
+            err.as_bytes().contains_str(normalized),
             "expected exception message containing:\n{}\n--- got ---\n{}",
-            normalized,
+            normalized.display_lossy(),
             err
         );
         return;
@@ -1227,7 +1226,11 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
 
     let result = match run_result.borrow().as_ref() {
         Some(Ok(c)) => *c,
-        Some(Err(e)) => panic!("installer run failed: {}\n{}", e, output_string),
+        Some(Err(e)) => panic!(
+            "installer run failed: {}\n{}",
+            e,
+            output_string.display_lossy()
+        ),
         None => app_run.unwrap_or(-1) as i64,
     };
 
@@ -1240,7 +1243,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         *expect_result,
         result,
         "{}{}",
-        output_string,
+        output_string.display_lossy(),
         bstr::BStr::new(&app_output_contents).display_lossy()
     );
 
@@ -1286,12 +1289,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                 let an = a
                     .get(B("name"))
                     .and_then(|m| m.as_string())
-                    .map(|s| legacy_lossy(s).into_owned())
+                    .map(|s| s.to_owned())
                     .unwrap_or_default();
                 let bn = b
                     .get(B("name"))
                     .and_then(|m| m.as_string())
-                    .map(|s| legacy_lossy(s).into_owned())
+                    .map(|s| s.to_owned())
                     .unwrap_or_default();
                 an.cmp(&bn)
             },
@@ -1316,7 +1319,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         .downcast_ref::<InstallationManager>()
         .expect("composer installation manager is the recording mock")
         .__get_trace();
-    assert_eq!(case.expect.trim_end(), implode("\n", &trace));
+    assert_eq!(case.expect.trim_end().as_bstr(), implode("\n", &trace));
 
     if let Some(expect_output) = expect_output
         && !expect_output.is_empty()
@@ -1331,11 +1334,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
             "__inilist__\n",
             &output,
         );
-        assert_string_matches_format(
-            legacy_lossy(&expect_output).trim_end(),
-            legacy_lossy(&output).trim_end(),
-            &output_string,
-        );
+        assert_string_matches_format(expect_output.trim_end(), output.trim_end(), &output_string);
     }
 }
 
@@ -1364,7 +1363,7 @@ fn test_slow_integration() {
         Platform::clear_env("COMPOSER_FUND");
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
         let expect_output = case.expect_output.clone();
-        do_test_integration(&case, expect_output.as_deref());
+        do_test_integration(&case, expect_output.as_ref());
     }
 }
 
@@ -1380,7 +1379,7 @@ fn test_integration_with_pool_optimizer() {
             .clone()
             .filter(|s| !s.is_empty())
             .or_else(|| case.expect_output.clone());
-        do_test_integration(&case, expect_output.as_deref());
+        do_test_integration(&case, expect_output.as_ref());
     }
 }
 
@@ -1392,6 +1391,6 @@ fn test_integration_with_raw_pool() {
         Platform::clear_env("COMPOSER_FUND");
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
         let expect_output = case.expect_output.clone();
-        do_test_integration(&case, expect_output.as_deref());
+        do_test_integration(&case, expect_output.as_ref());
     }
 }

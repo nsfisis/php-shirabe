@@ -561,9 +561,9 @@ fn test_store_auth_with_prompt_invalid_answer() {
     // $configSourceName.' ? [Yn] ', $this->anything(), null, 'y')` verification on askAndValidate.
     assert_eq!(
         vec![(
-            format!(
+            bstr::BString::from(format!(
                 "Do you want to store credentials for {origin} in {config_source_name} ? [Yn] "
-            ),
+            )),
             None,
             PhpMixed::string("y".to_string()),
         )],

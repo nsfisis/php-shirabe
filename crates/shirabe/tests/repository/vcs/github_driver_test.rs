@@ -17,7 +17,7 @@ use shirabe::util::Git as GitUtil;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, base64_encode};
+use shirabe_php_shim::{PhpMixed, base64_encode, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -30,10 +30,7 @@ fn set_up() -> SetUp {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 
@@ -783,13 +780,14 @@ fn test_private_repository_no_interaction() {
     let _ = fs.remove_directory(&cache_dir);
     let cache_vcs_dir = std::env::temp_dir()
         .join("composer-test/cache")
-        .to_str()
-        .unwrap()
-        .to_string();
+        .to_path_buf();
     {
         let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
         let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-        config_section.insert("cache-vcs-dir".into(), PhpMixed::string(cache_vcs_dir));
+        config_section.insert(
+            "cache-vcs-dir".into(),
+            PhpMixed::string(path_to_bytes(&cache_vcs_dir)),
+        );
         top.insert("config".into(), PhpMixed::Array(config_section));
         config.borrow_mut().merge(&top, Config::SOURCE_UNKNOWN);
     }

@@ -28,7 +28,7 @@ fn set_up() -> SetUp {
     // that role and the Cache otherwise operates on the real temp directory.
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let cache = Cache::new(io, root.path().to_str().unwrap(), None, None, false);
+    let cache = Cache::new(io, root.path(), None, None, false);
 
     SetUp { root, files, cache }
 }
@@ -114,13 +114,7 @@ fn test_clear_cache() {
     let root = TempDir::new().unwrap();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let mut cache = Cache::new(
-        io,
-        root.path().to_str().unwrap(),
-        Some("a-z0-9."),
-        None,
-        false,
-    );
+    let mut cache = Cache::new(io, root.path(), Some("a-z0-9."), None, false);
 
     assert!(cache.clear());
 }

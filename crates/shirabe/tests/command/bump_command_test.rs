@@ -4,6 +4,7 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::handle::PackageInterfaceHandle;
@@ -223,7 +224,7 @@ fn test_bump_fails_on_non_existing_composer_file() {
     assert_eq!(1, status_code);
     let error_output = app_tester.get_error_output();
     assert!(
-        error_output.contains("./composer.json is not readable."),
+        error_output.contains_str("./composer.json is not readable."),
         "expected error output to mention composer.json not readable, got: {:?}",
         error_output,
     );
@@ -257,7 +258,7 @@ fn test_bump_fails_on_write_error_to_composer_file() {
     assert_eq!(1, status_code);
     let error_output = app_tester.get_error_output();
     assert!(
-        error_output.contains("./composer.json is not writable."),
+        error_output.contains_str("./composer.json is not writable."),
         "expected error output to mention composer.json not writable, got: {:?}",
         error_output,
     );

@@ -4,7 +4,9 @@
 //! `#[path = "../common/php_worker.rs"] mod php_worker;`.
 #![allow(dead_code)]
 
+use bstr::BString;
 use shirabe_php_rpc::PluginValue;
+use shirabe_php_shim::{bconcat, str_replace};
 use shirabe_symfony_process::PhpExecutableFinder;
 
 /// Whether a PHP binary is available. Without one the worker cannot start, so tests that need it
@@ -48,13 +50,14 @@ pub fn php_call_static(class: &str, method: &str, args: Vec<PluginValue>) -> Plu
 }
 
 /// Runs a PHP snippet in the worker and returns its `return` value.
-pub fn php_eval(code: &str) -> PluginValue {
-    shirabe_php_rpc::call_function("__shirabe_eval", vec![PluginValue::string(code)])
+pub fn php_eval(code: impl AsRef<[u8]>) -> PluginValue {
+    shirabe_php_rpc::call_function("__shirabe_eval", vec![PluginValue::string(code.as_ref())])
         .expect("eval request failed")
         .expect("eval threw")
 }
 
 /// Quotes a string as a PHP single-quoted literal for a generated snippet.
-pub fn php_single_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\'"))
+pub fn php_single_quote(value: impl AsRef<[u8]>) -> BString {
+    let escaped = str_replace("'", "\\'", str_replace("\\", "\\\\", value));
+    bconcat!("'", escaped, "'")
 }

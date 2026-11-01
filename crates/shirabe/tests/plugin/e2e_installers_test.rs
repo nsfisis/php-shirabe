@@ -7,6 +7,9 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BString, ByteSlice};
+use shirabe_php_shim::path_to_bytes;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -21,7 +24,7 @@ fn plugin_fetched() -> bool {
 }
 
 /// The two implementations under comparison: upstream Composer first, Shirabe second.
-pub(crate) fn implementations(composer_bin: &str) -> [(&str, Vec<&str>); 2] {
+pub(crate) fn implementations(composer_bin: &OsStr) -> [(&str, Vec<&OsStr>); 2] {
     [
         ("php", vec![composer_bin]),
         (env!("CARGO_BIN_EXE_shirabe"), vec![]),
@@ -30,13 +33,13 @@ pub(crate) fn implementations(composer_bin: &str) -> [(&str, Vec<&str>); 2] {
 
 pub(crate) struct CommandRun {
     pub(crate) exit_code: i32,
-    pub(crate) stdout: Vec<String>,
+    pub(crate) stdout: Vec<BString>,
 }
 
 pub(crate) fn run_command(
     work: &Path,
     program: &str,
-    prefix_args: &[&str],
+    prefix_args: &[&OsStr],
     args: &[&str],
 ) -> CommandRun {
     let output = std::process::Command::new(program)
@@ -52,7 +55,7 @@ pub(crate) fn run_command(
         .unwrap();
     CommandRun {
         exit_code: output.status.code().unwrap_or(-1),
-        stdout: normalize_output(&String::from_utf8_lossy(&output.stdout), work),
+        stdout: normalize_output(&output.stdout, work),
     }
 }
 
@@ -60,40 +63,38 @@ pub(crate) fn run_command(
 /// prints absolutely when it deletes a package) is replaced by a placeholder, and progress bar
 /// frames are dropped — Shirabe renders those differently from upstream for every install,
 /// including projects with no plugin at all, so they say nothing about this plugin.
-fn normalize_output(stdout: &str, work: &Path) -> Vec<String> {
-    let work = work.to_str().unwrap();
+fn normalize_output(stdout: &[u8], work: &Path) -> Vec<BString> {
+    let work = path_to_bytes(work);
     stdout
         .lines()
         .filter(|line| {
             let trimmed = line.trim_start();
-            !(trimmed.starts_with(|c: char| c.is_ascii_digit()) && trimmed.contains('['))
+            !(trimmed.first().is_some_and(u8::is_ascii_digit) && trimmed.contains(&b'['))
         })
-        .map(|line| line.replace(work, "<work>"))
+        .map(|line| BString::from(line.replace(work, "<work>")))
         .collect()
 }
 
 /// Every file under `dir` as (relative path, contents), so two project trees compare as a whole.
-pub(crate) fn tree(dir: &Path) -> Vec<(String, String)> {
+pub(crate) fn tree(dir: &Path) -> Vec<(BString, BString)> {
     let mut files = Vec::new();
     collect(dir, dir, &mut files);
     files.sort();
     files
 }
 
-fn collect(root: &Path, dir: &Path, files: &mut Vec<(String, String)>) {
+fn collect(root: &Path, dir: &Path, files: &mut Vec<(BString, BString)>) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         if entry.file_type().unwrap().is_dir() {
             collect(root, &path, files);
         } else {
-            let relative = path
-                .strip_prefix(root)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string();
-            files.push((relative, std::fs::read_to_string(&path).unwrap_or_default()));
+            let relative = BString::from(path_to_bytes(path.strip_prefix(root).unwrap()));
+            files.push((
+                relative,
+                BString::from(std::fs::read(&path).unwrap_or_default()),
+            ));
         }
     }
 }
@@ -118,10 +119,9 @@ fn test_composer_installers_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let mut results = Vec::new();
-    for (program, prefix) in &implementations(&composer_bin) {
+    for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let run = run_command(work.path(), program, prefix, &["install"]);
@@ -159,10 +159,9 @@ fn test_composer_installers_update_and_remove_match_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let mut results = Vec::new();
-    for (program, prefix) in &implementations(&composer_bin) {
+    for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let install = run_command(work.path(), program, prefix, &["install"]);
@@ -224,10 +223,9 @@ fn test_composer_installers_custom_paths_match_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let mut results = Vec::new();
-    for (program, prefix) in &implementations(&composer_bin) {
+    for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         edit(

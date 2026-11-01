@@ -23,8 +23,9 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{
-    PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, function_exists, fwrite_resource, getenv,
-    legacy_lossy, php_fopen_resource, putenv, putenv_clear, rewind, stream_get_contents,
+    PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, bconcat, function_exists, fwrite_resource, getenv,
+    path_from_bytes, path_to_bytes, php_fopen_resource, putenv, putenv_clear, rewind,
+    stream_get_contents,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -39,10 +40,10 @@ use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 pub fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
-    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize(version, None).unwrap();
     CompletePackageHandle::new(
         bstr::BString::from(name.to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from(version.to_string()),
     )
     .into()
@@ -51,10 +52,10 @@ pub fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
 /// ref: TestCase::getPackage but returning the concrete `CompletePackageHandle` so the
 /// `CompletePackage`-only setters (`set_license`, `set_homepage`, ...) are reachable.
 pub fn get_complete_package(name: &str, version: &str) -> CompletePackageHandle {
-    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize(version, None).unwrap();
     CompletePackageHandle::new(
         bstr::BString::from(name.to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from(version.to_string()),
     )
 }
@@ -64,11 +65,11 @@ pub fn get_alias_package(
     package: &PackageInterfaceHandle,
     version: &str,
 ) -> PackageInterfaceHandle {
-    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize(version, None).unwrap();
     let complete = CompletePackageHandle::from_rc_unchecked(package.as_rc().clone());
     CompleteAliasPackageHandle::new(
         complete,
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from(version.to_string()),
     )
     .into()
@@ -127,7 +128,7 @@ pub fn init_temp_composer(
     let prev_cwd = std::env::current_dir().unwrap();
     let prev_composer_home = Platform::get_env("COMPOSER_HOME");
 
-    Platform::put_env("COMPOSER_HOME", dir.join("composer-home").to_str().unwrap());
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&dir.join("composer-home")));
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");
 
     let mut composer_json = composer_json
@@ -268,7 +269,7 @@ pub fn create_installed_json(
     );
     for pkg in packages.iter().chain(dev_packages.iter()) {
         repo.add_package(pkg.clone()).unwrap();
-        std::fs::create_dir_all(format!("vendor/{}", legacy_lossy(&pkg.get_name()))).unwrap();
+        std::fs::create_dir_all(path_from_bytes(&bconcat!("vendor/", pkg.get_name()))).unwrap();
     }
 
     let io = null_io();
@@ -485,17 +486,16 @@ impl ApplicationTester {
             .expect("status code not initialized; did you run() before requesting it?")
     }
 
-    pub fn get_display(&self) -> String {
+    pub fn get_display(&self) -> bstr::BString {
         let stream = self
             .output_stream
             .as_ref()
             .expect("output not initialized; did you run() before requesting the display?");
         rewind(stream);
-        // TODO(bytes): the captured output is returned as a String.
-        String::from_utf8_lossy(&stream_get_contents(stream).unwrap_or_default()).into_owned()
+        stream_get_contents(stream).unwrap_or_default().into()
     }
 
-    pub fn get_error_output(&self) -> String {
+    pub fn get_error_output(&self) -> bstr::BString {
         assert!(
             self.capture_streams_independently,
             "The error output is not available when the tester is run without \"capture_stderr_separately\" option set."
@@ -505,7 +505,6 @@ impl ApplicationTester {
             .as_ref()
             .expect("error output not initialized; did you run() before requesting it?");
         rewind(stream);
-        // TODO(bytes): the captured output is returned as a String.
-        String::from_utf8_lossy(&stream_get_contents(stream).unwrap_or_default()).into_owned()
+        stream_get_contents(stream).unwrap_or_default().into()
     }
 }

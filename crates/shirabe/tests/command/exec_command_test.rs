@@ -2,6 +2,7 @@
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: ExecCommandTest::testListThrowsIfNoBinariesExist
@@ -71,7 +72,7 @@ fn test_list() {
 
     let output = app_tester.get_display();
 
-    assert_eq!("Available binaries:\n- b\n- c\n- a (local)", output.trim());
+    assert_eq!("Available binaries:\n- b\n- c\n- a (local)", trim(&output));
 
     drop(tear_down);
 }

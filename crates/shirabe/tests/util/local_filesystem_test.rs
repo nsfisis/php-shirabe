@@ -8,7 +8,7 @@ use crate::io_stub::IOStub;
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, LocalFilesystem};
-use shirabe_php_shim::{PhpMixed, file_get_contents, strpos, unlink};
+use shirabe_php_shim::{PhpMixed, bconcat, file_get_contents, strpos, unlink};
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
 // get('gitlab-domains') return [], everything else returns null.
@@ -29,12 +29,8 @@ fn get_result_to_string(res: &GetResult) -> bstr::BString {
 }
 
 // Mirrors PHP's `__FILE__`: the path to this test source file.
-fn this_file() -> String {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/util/local_filesystem_test.rs")
-        .to_str()
-        .unwrap()
-        .to_string()
+fn this_file() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/util/local_filesystem_test.rs")
 }
 
 #[test]
@@ -46,7 +42,7 @@ fn test_get_contents() {
     let res = fs
         .get_contents(
             "http://example.org",
-            format!("file://{}", this_file()),
+            bconcat!("file://", this_file()),
             false,
             IndexMap::new(),
         )
@@ -61,11 +57,11 @@ fn test_copy() {
     let fs = LocalFilesystem::new(io, config_mock());
 
     let file = tempfile::NamedTempFile::new().unwrap();
-    let file = file.path().to_str().unwrap().to_string();
+    let file = file.path().to_path_buf();
     assert!(matches!(
         fs.copy(
             "http://example.org",
-            format!("file://{}", this_file()),
+            bconcat!("file://", this_file()),
             &file,
             false,
             IndexMap::new()
@@ -74,7 +70,6 @@ fn test_copy() {
         GetResult::True
     ));
     assert!(std::path::Path::new(&file).exists());
-    // TODO(bytes)
     assert!(strpos(file_get_contents(&file).unwrap_or_default(), "testCopy").is_some());
     unlink(&file);
 }

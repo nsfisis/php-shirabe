@@ -4,8 +4,10 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::package::Link;
+use shirabe_php_shim::trim;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -18,7 +20,8 @@ fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
 
 /// Minimal port of PHPUnit's `assertStringMatchesFormat` covering the placeholders these fixtures
 /// use: `%d` (integer), `%f` (float), `%s` (non-newline run), `%a` (any run incl. newlines).
-fn assert_string_matches_format(expected: &str, actual: &str) {
+fn assert_string_matches_format(expected: &str, actual: impl AsRef<[u8]>) {
+    let actual = actual.as_ref();
     let mut pattern = String::from("(?s)^");
     let mut chars = expected.chars().peekable();
     while let Some(c) = chars.next() {
@@ -52,10 +55,11 @@ fn assert_string_matches_format(expected: &str, actual: &str) {
         pattern.push_str(&regex::escape(&c.to_string()));
     }
     pattern.push('$');
-    let re = regex::Regex::new(&pattern).unwrap();
+    let re = regex::bytes::Regex::new(&pattern).unwrap();
     assert!(
         re.is_match(actual),
-        "string did not match format.\n--- expected format ---\n{expected}\n--- actual ---\n{actual}"
+        "string did not match format.\n--- expected format ---\n{expected}\n--- actual ---\n{}",
+        actual.as_bstr().display_lossy()
     );
 }
 
@@ -252,7 +256,7 @@ fn test_update() {
         args.extend(command);
         app_tester.run(input(args), RunOptions::default()).unwrap();
 
-        assert_string_matches_format(expected.trim(), app_tester.get_display().trim());
+        assert_string_matches_format(expected.trim(), trim(app_tester.get_display()));
         let _ = label;
     }
 }
@@ -304,7 +308,7 @@ Your requirements could not be resolved to an installable set of packages.
 
   Problem 1
     - Root composer.json requires root/req 1.*, found root/req[1.0.0, 1.0.1, 1.1.0] but it conflicts with your temporary update constraint (root/req:[[>= 1.1.0.0-dev < 2.0.0.0-dev] [>= 1.0.0.0-dev < 1.1.0.0-dev]]).",
-        app_tester.get_display().trim(),
+        trim(app_tester.get_display()),
     );
 
     let mut app_tester = get_application_tester();
@@ -335,7 +339,7 @@ Updating dependencies
 Lock file operations: 0 installs, 2 updates, 0 removals
   - Upgrading root/req (1.0.0 => 1.0.1)
   - Upgrading root/req2 (1.0.0 => 1.0.1)",
-        app_tester.get_display().trim(),
+        trim(app_tester.get_display()),
     );
 }
 
@@ -501,9 +505,9 @@ fn test_interactive_tmp() {
             .unwrap();
 
         assert!(
-            app_tester.get_display().trim().ends_with(expected.trim()),
+            trim(app_tester.get_display()).ends_with_str(expected.trim()),
             "expected display to end with:\n{expected}\n--- got ---\n{}",
-            app_tester.get_display()
+            app_tester.get_display().display_lossy()
         );
     }
 }
@@ -556,12 +560,14 @@ fn test_no_security_blocking_allows_insecure_packages() {
         .unwrap();
     let display = app_tester.get_display();
     assert!(
-        display.contains("Locking vulnerable/pkg (1.0.0)"),
-        "got: {display}"
+        display.contains_str("Locking vulnerable/pkg (1.0.0)"),
+        "got: {}",
+        display.display_lossy()
     );
     assert!(
-        !display.contains("Locking vulnerable/pkg (1.1.0)"),
-        "got: {display}"
+        !display.contains_str("Locking vulnerable/pkg (1.1.0)"),
+        "got: {}",
+        display.display_lossy()
     );
 
     // Test 2: With --no-security-blocking, the vulnerable version 1.1.0 should be allowed
@@ -580,12 +586,14 @@ fn test_no_security_blocking_allows_insecure_packages() {
         .unwrap();
     let display = app_tester.get_display();
     assert!(
-        display.contains("Locking vulnerable/pkg (1.1.0)"),
-        "got: {display}"
+        display.contains_str("Locking vulnerable/pkg (1.1.0)"),
+        "got: {}",
+        display.display_lossy()
     );
     assert!(
-        !display.contains("Locking vulnerable/pkg (1.0.0)"),
-        "got: {display}"
+        !display.contains_str("Locking vulnerable/pkg (1.0.0)"),
+        "got: {}",
+        display.display_lossy()
     );
 }
 
@@ -623,6 +631,6 @@ Package operations: 1 install, 0 updates, 0 removals
 Bumping dependencies
 ./composer.json would be updated with:
  - require-dev.root/a: ^1.1.0",
-        app_tester.get_display().trim(),
+        trim(app_tester.get_display()),
     );
 }

@@ -4,8 +4,10 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, get_package, init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
@@ -41,7 +43,7 @@ fn test_no_local_changes() {
         )
         .unwrap();
 
-    assert_eq!("No local changes", app_tester.get_display().trim());
+    assert_eq!("No local changes", trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -121,8 +123,8 @@ fn run_locally_modified_packages_case(
     let actual = app_tester.get_display();
     let actual = actual.trim();
 
-    assert!(actual.contains(expected));
-    assert!(actual.contains(package_data.name));
+    assert!(actual.contains_str(expected));
+    assert!(actual.contains_str(package_data.name));
 }
 
 #[test]

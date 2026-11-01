@@ -8,6 +8,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -17,11 +19,11 @@ fn fixture_dir() -> PathBuf {
 
 struct CommandRun {
     exit_code: i32,
-    stdout: String,
+    stdout: BString,
 }
 
 /// One composer-CLI invocation inside the prepared project.
-fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) -> CommandRun {
+fn run_command(work: &Path, program: &str, prefix_args: &[&OsStr], args: &[&str]) -> CommandRun {
     let output = std::process::Command::new(program)
         .args(prefix_args)
         .args(args)
@@ -36,21 +38,23 @@ fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) 
         .unwrap();
     CommandRun {
         exit_code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stdout: BString::from(output.stdout),
     }
 }
 
-fn greet_lines(stdout: &str) -> Vec<&str> {
+fn greet_lines(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
-        .filter(|line| line.starts_with("greet:"))
+        .filter(|line| line.starts_with(b"greet:"))
+        .map(ByteSlice::as_bstr)
         .collect()
 }
 
-fn list_lines_mentioning_greet(stdout: &str) -> Vec<&str> {
+fn list_lines_mentioning_greet(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
-        .filter(|line| line.contains("greet"))
+        .filter(|line| line.contains_str("greet"))
+        .map(ByteSlice::as_bstr)
         .collect()
 }
 
@@ -63,10 +67,8 @@ fn test_command_provider_execution_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
-    let implementations: [(&str, Vec<&str>); 2] = [
-        ("php", vec![composer_bin.as_str()]),
+    let implementations: [(&str, Vec<&OsStr>); 2] = [
+        ("php", vec![composer_bin.as_os_str()]),
         (env!("CARGO_BIN_EXE_shirabe"), vec![]),
     ];
 
@@ -85,7 +87,7 @@ fn test_command_provider_execution_matches_upstream_composer() {
         assert_eq!(0, install.exit_code, "{program}: install must succeed");
 
         let observed = work.path().join("project/observed.txt");
-        let observed_arg = format!("--out={}", observed.to_str().unwrap());
+        let observed_arg = format!("--out={}", observed.display());
         let greet = run_command(
             work.path(),
             program,

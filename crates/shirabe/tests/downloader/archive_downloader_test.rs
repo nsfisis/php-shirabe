@@ -14,15 +14,15 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
-use shirabe_php_shim::{PhpMixed, legacy_lossy, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use shirabe_semver::VersionParser;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
-    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize(version, None).unwrap();
     CompletePackageHandle::new(
         bstr::BString::from(name.to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from(version.to_string()),
     )
     .into()
@@ -67,8 +67,8 @@ fn test_get_file_name() {
     let downloader = get_archive_downloader(Some("/vendor"));
 
     let first = downloader.__get_file_name(package.clone(), std::path::Path::new("/path"));
-    let re = regex::Regex::new(r"/vendor/composer/tmp-[a-z0-9]+\.js").unwrap();
-    assert!(re.is_match(&legacy_lossy(path_to_bytes(&first))));
+    let re = regex::bytes::Regex::new(r"/vendor/composer/tmp-[a-z0-9]+\.js").unwrap();
+    assert!(re.is_match(path_to_bytes(&first)));
     assert_eq!(
         first,
         downloader.__get_file_name(package, std::path::Path::new("/path"))

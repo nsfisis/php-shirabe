@@ -10,7 +10,6 @@ use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
-use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -47,10 +46,10 @@ impl Drop for TearDown {
 /// for a PackageInterface mock as long as `getSourceUrls()` equals
 /// `[getSourceUrl()]`, which holds for every non-ignored case here.
 fn get_package(source_reference: Option<&str>, source_url: Option<&str>) -> PackageInterfaceHandle {
-    let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package = CompletePackageHandle::new(
         bstr::BString::from("dummy/pkg".to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from("1.0.0".to_string()),
     );
     package.__set_source_type(Some(bstr::BString::from("hg".to_string())));
@@ -107,7 +106,7 @@ fn test_download() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().display().to_string();
     let package = get_package(Some("ref"), Some("https://mercurial.dev/l3l0/composer"));
 
     let (process, _guard) = get_process_executor_mock(
@@ -176,10 +175,10 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().display().to_string();
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".hg").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".hg"))
         .unwrap();
 
     let package = get_package(Some("ref"), Some("https://github.com/l3l0/composer"));
@@ -229,10 +228,10 @@ fn test_update() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().display().to_string();
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".hg").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".hg"))
         .unwrap();
 
     let package = get_package(None, None);

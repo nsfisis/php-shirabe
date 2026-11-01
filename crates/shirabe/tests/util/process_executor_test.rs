@@ -43,7 +43,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
         .unwrap();
 
     assert_eq!(
-        vec![(format!("foo{}", PHP_EOL), false)],
+        vec![(bstr::BString::from(format!("foo{}", PHP_EOL)), false)],
         io.borrow().write_raw_calls()
     );
 }

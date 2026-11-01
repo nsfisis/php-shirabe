@@ -4,8 +4,10 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, get_package, init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::util::platform::Platform;
+use shirabe_php_shim::path_to_bytes;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -47,9 +49,9 @@ fn test_global() {
         true,
     );
     let composer_home: PathBuf = tear_down.working_dir();
-    let composer_home_str = composer_home.to_str().unwrap().to_string();
+    let composer_home_str = composer_home.to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", &composer_home_str);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
     Platform::put_env("COMPOSER", fake_composer);
 
     let _test_dir = chdir_unique_tmp_directory();
@@ -75,7 +77,7 @@ fn test_global() {
     assert_eq!(
         format!(
             "Changed current directory to {}\nCOMPOSER SCRIPT OUTPUT: \n",
-            composer_home_str
+            composer_home_str.display()
         ),
         display
     );
@@ -91,9 +93,9 @@ fn test_cannot_create_home() {
     let dir = TempDir::new().unwrap();
     let filename = dir.path().join("file");
     std::fs::write(&filename, "").unwrap();
-    let filename_str = filename.to_str().unwrap().to_string();
+    let filename_str = filename.to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", &filename_str);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&filename_str));
 
     let mut app_tester = get_application_tester();
     let err = app_tester
@@ -114,8 +116,10 @@ fn test_cannot_create_home() {
         .expect_err("expected RuntimeException for a non-directory COMPOSER_HOME");
 
     assert!(
-        err.to_string()
-            .contains(&format!("{} exists and is not a directory.", filename_str)),
+        err.to_string().contains(&format!(
+            "{} exists and is not a directory.",
+            filename_str.display()
+        )),
         "got: {}",
         err
     );
@@ -146,13 +150,13 @@ fn test_global_show() {
         None,
         true,
     );
-    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
+    let composer_home_str = tear_down.working_dir().to_path_buf();
 
     let pkg = get_complete_package("vendor/global-tool", "1.0.0");
     pkg.set_description(bstr::BString::from("A globally installed tool".to_string()));
     create_installed_json(&[pkg.into()], &[], true);
 
-    Platform::put_env("COMPOSER_HOME", &composer_home_str);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -167,8 +171,16 @@ fn test_global_show() {
     );
 
     let output = app_tester.get_display();
-    assert!(output.contains("vendor/global-tool"), "got: {}", output);
-    assert!(output.contains("1.0.0"), "got: {}", output);
+    assert!(
+        output.contains_str("vendor/global-tool"),
+        "got: {}",
+        output.display_lossy()
+    );
+    assert!(
+        output.contains_str("1.0.0"),
+        "got: {}",
+        output.display_lossy()
+    );
 
     drop(tear_down);
 }
@@ -179,11 +191,11 @@ fn test_global_show_without_packages() {
     let _env_guard = EnvGuard;
 
     let tear_down = init_temp_composer(None, None, None, true);
-    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
+    let composer_home_str = tear_down.working_dir().to_path_buf();
 
     create_installed_json(&[], &[], true);
 
-    Platform::put_env("COMPOSER_HOME", &composer_home_str);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -229,9 +241,9 @@ fn test_global_require() {
         None,
         true,
     );
-    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
+    let composer_home_str = tear_down.working_dir().to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", &composer_home_str);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -258,9 +270,9 @@ fn test_global_require() {
     assert!(
         app_tester
             .get_display()
-            .contains("Installing vendor/required-pkg"),
+            .contains_str("Installing vendor/required-pkg"),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
 
     drop(tear_down);
@@ -289,13 +301,13 @@ fn test_global_update() {
         None,
         true,
     );
-    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
+    let composer_home_str = tear_down.working_dir().to_path_buf();
 
     let pkg = get_package("vendor/pkg", "1.0.0");
     create_installed_json(std::slice::from_ref(&pkg), &[], true);
     create_composer_lock(&[pkg], &[]);
 
-    Platform::put_env("COMPOSER_HOME", &composer_home_str);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -332,9 +344,9 @@ fn test_global_changes_directory() {
         None,
         true,
     );
-    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
+    let composer_home_str = tear_down.working_dir().to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", &composer_home_str);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -354,12 +366,12 @@ fn test_global_changes_directory() {
 
     let output = app_tester.get_display();
     assert!(
-        output.contains(&format!(
+        output.contains_str(format!(
             "Changed current directory to {}",
-            composer_home_str
+            composer_home_str.display()
         )),
         "got: {}",
-        output
+        output.display_lossy()
     );
 
     drop(tear_down);
@@ -371,9 +383,9 @@ fn test_global_missing_command_name() {
     let _env_guard = EnvGuard;
 
     let tear_down = init_temp_composer(None, None, None, true);
-    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
+    let composer_home_str = tear_down.working_dir().to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", &composer_home_str);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
 
     let mut app_tester = get_application_tester();
     app_tester.set_inputs(vec!["".to_string()]);

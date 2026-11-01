@@ -7,7 +7,7 @@ use shirabe::downloader::DownloaderInterface;
 use shirabe::downloader::download_manager::DownloadManager;
 use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class};
 use shirabe_semver::VersionParser;
 
 // PHP mocks `Composer\Downloader\DownloaderInterface` with getMockBuilder.
@@ -76,16 +76,16 @@ fn create_package_mock() -> PackageInterfaceHandle {
 /// `isDev()` can be controlled (`dev-master` => dev, `1.0.0` => stable).
 fn make_package(name: &str, is_dev: bool) -> PackageInterfaceHandle {
     let (version, pretty) = if is_dev {
-        ("dev-master".to_string(), "dev-master".to_string())
+        (bstr::BString::from("dev-master"), "dev-master".to_string())
     } else {
         (
-            legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned(),
+            VersionParser.normalize("1.0.0", None).unwrap(),
             "1.0.0".to_string(),
         )
     };
     CompletePackageHandle::new(
         bstr::BString::from(name.to_string()),
-        bstr::BString::from(version),
+        version,
         bstr::BString::from(pretty),
     )
     .into()

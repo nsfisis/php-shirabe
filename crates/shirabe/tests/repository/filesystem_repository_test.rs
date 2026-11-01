@@ -15,12 +15,12 @@ use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, path_from_bytes};
+use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, path_from_bytes, path_to_bytes};
 use shirabe_semver::VersionParser;
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is
 /// materialized as a real temp file whose decoded JSON reproduces the mock return value exactly.
-fn create_temp_json_file(contents: &str) -> String {
+fn create_temp_json_file(contents: &str) -> std::path::PathBuf {
     let mut path = std::env::temp_dir();
     let unique = format!(
         "shirabe_filesystemrepositorytest_{}_{}",
@@ -32,7 +32,7 @@ fn create_temp_json_file(contents: &str) -> String {
     );
     path.push(unique);
     std::fs::write(&path, contents.as_bytes()).unwrap();
-    path.to_str().unwrap().to_string()
+    path
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn test_unexistent_repository_file() {
             .unwrap()
             .as_nanos()
     ));
-    let json = JsonFile::new(path.to_str().unwrap(), None, None).unwrap();
+    let json = JsonFile::new(&path, None, None).unwrap();
 
     let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
 
@@ -136,18 +136,14 @@ fn test_repository_write() {
     fs.remove_directory(&repo_dir).ok();
 
     let json_path = repo_dir.join("vendor/composer/installed.json");
-    let json = JsonFile::new(json_path.to_str().unwrap(), None, None).unwrap();
+    let json = JsonFile::new(&json_path, None, None).unwrap();
     let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
 
     let mut im = MockInstallationManager::new();
-    let fixed_path = repo_dir
-        .join("vendor/woop/woop")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let fixed_path = repo_dir.join("vendor/woop/woop").to_path_buf();
     im.expect_get_install_path()
         .times(2)
-        .returning(move |_| Some(std::path::PathBuf::from(fixed_path.clone())));
+        .returning(move |_| Some(fixed_path.clone()));
 
     repository.set_dev_package_names(vec![bstr::BString::from("mypkg2".to_string())]);
     repository
@@ -232,7 +228,7 @@ fn test_repository_writes_installed_php() {
     let guard = CwdGuard::new();
     let dir = guard.path();
 
-    let json = JsonFile::new(dir.join("installed.json").to_str().unwrap(), None, None).unwrap();
+    let json = JsonFile::new(dir.join("installed.json"), None, None).unwrap();
 
     let root_package = RootPackageHandle::new(
         bstr::BString::from("__root__".to_string()),
@@ -309,7 +305,7 @@ fn test_repository_writes_installed_php() {
     repository.add_package(pkg).unwrap();
 
     let mut im = MockInstallationManager::new();
-    let cwd = dir.to_str().unwrap().to_string();
+    let cwd = dir.to_path_buf();
     im.expect_get_install_path().returning(move |package| {
         // check for empty paths handling
         if package.get_type() == "metapackage" {
@@ -328,7 +324,7 @@ fn test_repository_writes_installed_php() {
         }
         // check for cwd
         if package.as_root().is_some() {
-            return Some(std::path::PathBuf::from(cwd.clone()));
+            return Some(cwd.clone());
         }
         // check for relative paths
         Some(path_from_bytes(&bconcat!("vendor/", package.get_name())).to_path_buf())
@@ -362,19 +358,14 @@ fn test_safely_load_installed_versions() {
         .join("../../composer/tests/Composer/Test/Repository/Fixtures")
         .canonicalize()
         .expect("the Composer checkout must provide the repository fixtures")
-        .to_str()
-        .unwrap()
-        .to_string();
+        .to_path_buf();
 
     let result = php_call_static(
         "Composer\\Repository\\FilesystemRepository",
         "safelyLoadInstalledVersions",
-        vec![PluginValue::string(
-            std::path::Path::new(&fixtures_dir)
-                .join("installed_complex.php")
-                .to_str()
-                .unwrap(),
-        )],
+        vec![PluginValue::string(path_to_bytes(
+            &std::path::Path::new(&fixtures_dir).join("installed_complex.php"),
+        ))],
     );
     assert_eq!(
         PluginValue::Bool(true),
@@ -391,7 +382,7 @@ fn test_safely_load_installed_versions() {
     let root = PhpMixed::Array(IndexMap::from([
         (
             "install_path".into(),
-            PhpMixed::string(format!("{}/./", fixtures_dir)),
+            PhpMixed::string(bconcat!(fixtures_dir, "/./")),
         ),
         (
             "aliases".into(),
@@ -413,10 +404,7 @@ fn test_safely_load_installed_versions() {
         ),
         (
             "install_path".into(),
-            PhpMixed::string(format!(
-                "{}/vendor/{{${{passthru('bash -i')}}}}",
-                fixtures_dir
-            )),
+            PhpMixed::string(bconcat!(fixtures_dir, "/vendor/{${passthru('bash -i')}}")),
         ),
         ("empty array".into(), PhpMixed::List(vec![])),
     ]));

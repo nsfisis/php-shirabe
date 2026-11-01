@@ -4,7 +4,7 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
-use shirabe_php_shim::{PhpMixed, bconcat, extension_loaded};
+use shirabe_php_shim::{PhpMixed, bconcat, extension_loaded, path_to_bytes, str_replace};
 
 /// Returns true when the test should be skipped because the zip extension is
 /// unavailable, mirroring PHP's markTestSkipped in setUp.
@@ -16,18 +16,15 @@ fn set_up() -> bool {
     false
 }
 
-fn artifacts_dir() -> String {
+fn artifacts_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Repository/Fixtures/artifacts")
-        .to_str()
-        .unwrap()
-        .to_string()
 }
 
-fn create_repo(url: &str) -> ArtifactRepository {
+fn create_repo(url: impl AsRef<[u8]>) -> ArtifactRepository {
     let mut coordinates: IndexMap<BString, PhpMixed> = IndexMap::new();
     coordinates.insert("type".into(), PhpMixed::string("artifact".to_string()));
-    coordinates.insert("url".into(), PhpMixed::string(url.to_string()));
+    coordinates.insert("url".into(), PhpMixed::string(url.as_ref()));
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -52,7 +49,7 @@ fn test_extracts_configs_from_zip_archives() {
         // artifacts and do not get detected.
     ];
 
-    let mut repo = create_repo(&artifacts_dir());
+    let mut repo = create_repo(path_to_bytes(&artifacts_dir()));
 
     let mut found_packages: Vec<bstr::BString> = repo
         .__get_packages()
@@ -87,14 +84,15 @@ fn test_absolute_repo_url_creates_absolute_url_packages() {
     }
 
     let absolute_path = artifacts_dir();
-    let mut repo = create_repo(&absolute_path);
+    let mut repo = create_repo(path_to_bytes(&absolute_path));
 
     for package in repo.__get_packages().unwrap() {
         assert_eq!(
-            package
-                .get_dist_url()
-                .unwrap_or_default()
-                .find(absolute_path.replace('\\', "/")),
+            package.get_dist_url().unwrap_or_default().find(str_replace(
+                "\\",
+                "/",
+                path_to_bytes(&absolute_path)
+            )),
             Some(0)
         );
     }

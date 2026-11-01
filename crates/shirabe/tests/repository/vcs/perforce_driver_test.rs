@@ -10,7 +10,7 @@ use shirabe::repository::vcs::PerforceDriver;
 use shirabe::util::HttpDownloader;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use tempfile::TempDir;
 
 const TEST_URL: &str = "TEST_PERFORCE_URL";
@@ -53,10 +53,7 @@ fn get_test_config(test_path: &std::path::Path) -> Config {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(test_path.to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&test_path)));
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 

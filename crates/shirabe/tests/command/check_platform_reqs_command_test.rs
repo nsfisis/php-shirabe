@@ -6,6 +6,7 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: CheckPlatformReqsCommandTest::testPlatformReqsAreSatisfied (data provider rolled into one body).
@@ -40,8 +41,13 @@ fn run_platform_reqs_are_satisfied_case(
     let status_code = app_tester.run(input, RunOptions::default()).unwrap();
 
     // assertCommandIsSuccessful
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
+    assert_eq!(expected.trim(), trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -157,7 +163,7 @@ fn test_failed_platform_requirement() {
     }
 ]"#;
 
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(expected.trim(), trim(app_tester.get_display()));
 
     drop(tear_down);
 }

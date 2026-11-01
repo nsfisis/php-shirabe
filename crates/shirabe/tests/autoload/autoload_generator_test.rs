@@ -20,8 +20,7 @@ use shirabe::script::ScriptEvents;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
-    PhpMixed, dirname, legacy_lossy, path_from_bytes, path_to_bytes, preg_quote, realpath, strtr,
-    symlink,
+    PhpMixed, dirname, path_from_bytes, path_to_bytes, preg_quote, realpath, strtr, symlink,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -113,7 +112,7 @@ impl InstallerInterface for InstallPathStubInstaller {
             path = path.join(path_from_bytes(&dir));
         }
 
-        Some(std::path::PathBuf::from(path.to_str().unwrap().to_string()))
+        Some(path.to_path_buf())
     }
 }
 
@@ -223,7 +222,7 @@ impl SetUp {
         ConfigStubBuilder::new()
             .with(
                 "vendor-dir",
-                PhpMixed::string(self.vendor_dir.to_str().unwrap().to_string()),
+                PhpMixed::string(path_to_bytes(&self.vendor_dir)),
             )
             .with("platform-check", PhpMixed::Bool(true))
             .with("use-include-path", PhpMixed::Bool(self.use_include_path))
@@ -639,19 +638,19 @@ fn test_root_package_autoloading_with_target_dir() {
 
     let fx = fixtures_dir();
     assert_file_content_equals(
-        fx.join("autoload_target_dir.php").to_str().unwrap(),
+        fx.join("autoload_target_dir.php"),
         vendor.join("autoload.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_real_target_dir.php").to_str().unwrap(),
+        fx.join("autoload_real_target_dir.php"),
         composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_static_target_dir.php").to_str().unwrap(),
+        fx.join("autoload_static_target_dir.php"),
         composer_out.join("autoload_static.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_files_target_dir.php").to_str().unwrap(),
+        fx.join("autoload_files_target_dir.php"),
         composer_out.join("autoload_files.php"),
     );
     assert_autoload_files("classmap6", &composer_out, "classmap");
@@ -678,10 +677,7 @@ fn test_duplicate_files_warning() {
     dump(&mut s, package.into(), false, "FilesWarning").unwrap();
 
     assert_file_content_equals(
-        fixtures_dir()
-            .join("autoload_files_duplicates.php")
-            .to_str()
-            .unwrap(),
+        fixtures_dir().join("autoload_files_duplicates.php"),
         composer_out.join("autoload_files.php"),
     );
     let expected = "<warning>The following \"files\" autoload rules are included multiple times, this may cause issues and should be resolved:</warning>\n<warning> - $baseDir . '/foo.php'</warning>\n";
@@ -878,21 +874,13 @@ fn test_non_dev_autoload_should_include_replaced_packages() {
     let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
         "B\\C\\C".to_string().into(),
-        vendor
-            .join("b/b/src/C/C.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("b/b/src/C/C.php"))),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string().into(),
-        vendor
-            .join("composer/InstalledVersions.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(
+            &vendor.join("composer/InstalledVersions.php"),
+        )),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -1092,12 +1080,9 @@ fn test_psr_to_class_map_ignores_non_existing_dir() {
     let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
         "Composer\\InstalledVersions".to_string().into(),
-        vendor
-            .join("composer/InstalledVersions.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(
+            &vendor.join("composer/InstalledVersions.php"),
+        )),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -1187,39 +1172,21 @@ fn test_vendors_class_map_autoloading() {
     let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string().into(),
-        vendor
-            .join("b/b/src/b.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("b/b/src/b.php"))),
     );
     expected.insert(
         "ClassMapBaz".to_string().into(),
-        vendor
-            .join("b/b/lib/c.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("b/b/lib/c.php"))),
     );
     expected.insert(
         "ClassMapFoo".to_string().into(),
-        vendor
-            .join("a/a/src/a.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("a/a/src/a.php"))),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string().into(),
-        vendor
-            .join("composer/InstalledVersions.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(
+            &vendor.join("composer/InstalledVersions.php"),
+        )),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap4", &composer_out, "classmap");
@@ -1276,39 +1243,21 @@ fn test_vendors_class_map_autoloading_with_target_dir() {
     let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string().into(),
-        vendor
-            .join("a/a/target/lib/b.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("a/a/target/lib/b.php"))),
     );
     expected.insert(
         "ClassMapBaz".to_string().into(),
-        vendor
-            .join("b/b/src/c.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("b/b/src/c.php"))),
     );
     expected.insert(
         "ClassMapFoo".to_string().into(),
-        vendor
-            .join("a/a/target/src/a.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("a/a/target/src/a.php"))),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string().into(),
-        vendor
-            .join("composer/InstalledVersions.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(
+            &vendor.join("composer/InstalledVersions.php"),
+        )),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -1364,39 +1313,21 @@ fn test_class_map_autoloading_empty_dir_and_exact_file() {
     let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string().into(),
-        vendor
-            .join("b/b/test.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("b/b/test.php"))),
     );
     expected.insert(
         "ClassMapBaz".to_string().into(),
-        vendor
-            .join("c/c/foo/test.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("c/c/foo/test.php"))),
     );
     expected.insert(
         "ClassMapFoo".to_string().into(),
-        vendor
-            .join("a/a/src/a.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("a/a/src/a.php"))),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string().into(),
-        vendor
-            .join("composer/InstalledVersions.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(
+            &vendor.join("composer/InstalledVersions.php"),
+        )),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap5", &composer_out, "classmap");
@@ -1458,39 +1389,21 @@ fn test_class_map_autoloading_authoritative_and_apcu() {
     let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string().into(),
-        vendor
-            .join("b/b/ClassMapBar.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("b/b/ClassMapBar.php"))),
     );
     expected.insert(
         "ClassMapBaz".to_string().into(),
-        vendor
-            .join("c/c/foo/ClassMapBaz.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("c/c/foo/ClassMapBaz.php"))),
     );
     expected.insert(
         "ClassMapFoo".to_string().into(),
-        vendor
-            .join("a/a/src/ClassMapFoo.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("a/a/src/ClassMapFoo.php"))),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string().into(),
-        vendor
-            .join("composer/InstalledVersions.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(
+            &vendor.join("composer/InstalledVersions.php"),
+        )),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap8", &composer_out, "classmap");
@@ -1552,39 +1465,21 @@ fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
     let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string().into(),
-        vendor
-            .join("b/b/ClassMapBar.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("b/b/ClassMapBar.php"))),
     );
     expected.insert(
         "ClassMapBaz".to_string().into(),
-        vendor
-            .join("c/c/foo/ClassMapBaz.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("c/c/foo/ClassMapBaz.php"))),
     );
     expected.insert(
         "ClassMapFoo".to_string().into(),
-        vendor
-            .join("a/a/src/ClassMapFoo.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(&vendor.join("a/a/src/ClassMapFoo.php"))),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string().into(),
-        vendor
-            .join("composer/InstalledVersions.php")
-            .to_str()
-            .unwrap()
-            .to_string()
-            .into(),
+        bstr::BString::from(path_to_bytes(
+            &vendor.join("composer/InstalledVersions.php"),
+        )),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap8", &composer_out, "classmap");
@@ -1653,19 +1548,19 @@ fn test_files_autoload_generation() {
     dump(&mut s, package.into(), false, "FilesAutoload").unwrap();
     let fx = fixtures_dir();
     assert_file_content_equals(
-        fx.join("autoload_functions.php").to_str().unwrap(),
+        fx.join("autoload_functions.php"),
         vendor.join("autoload.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_real_functions.php").to_str().unwrap(),
+        fx.join("autoload_real_functions.php"),
         composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_static_functions.php").to_str().unwrap(),
+        fx.join("autoload_static_functions.php"),
         composer_out.join("autoload_static.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_files_functions.php").to_str().unwrap(),
+        fx.join("autoload_files_functions.php"),
         composer_out.join("autoload_files.php"),
     );
 }
@@ -1679,11 +1574,16 @@ fn test_override_vendors_autoloading() {
     root_package.set_autoload(autoload(vec![
         (
             "psr-0",
-            str_map(&[("A\\B", pstr(working_dir.join("lib").to_str().unwrap()))]),
+            str_map(&[(
+                "A\\B",
+                PhpMixed::string(path_to_bytes(&working_dir.join("lib"))),
+            )]),
         ),
         (
             "classmap",
-            str_list(&[working_dir.join("src").to_str().unwrap()]),
+            PhpMixed::List(vec![PhpMixed::string(path_to_bytes(
+                &working_dir.join("src"),
+            ))]),
         ),
     ]));
     root_package.set_requires(
@@ -1779,7 +1679,7 @@ fn test_include_path_file_generation() {
     dump(&mut s, package.into(), false, "_10").unwrap();
 
     assert_file_content_equals(
-        fixtures_dir().join("include_paths.php").to_str().unwrap(),
+        fixtures_dir().join("include_paths.php"),
         composer_out.join("include_paths.php"),
     );
 }
@@ -2073,27 +1973,23 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
     )
     .unwrap();
     assert_file_content_equals(
-        fx.join("autoload_functions.php").to_str().unwrap(),
+        fx.join("autoload_functions.php"),
         vendor.join("autoload.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_real_functions_with_include_paths.php")
-            .to_str()
-            .unwrap(),
+        fx.join("autoload_real_functions_with_include_paths.php"),
         composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_static_functions_with_include_paths.php")
-            .to_str()
-            .unwrap(),
+        fx.join("autoload_static_functions_with_include_paths.php"),
         composer_out.join("autoload_static.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_files_functions.php").to_str().unwrap(),
+        fx.join("autoload_files_functions.php"),
         composer_out.join("autoload_files.php"),
     );
     assert_file_content_equals(
-        fx.join("include_paths_functions.php").to_str().unwrap(),
+        fx.join("include_paths_functions.php"),
         composer_out.join("include_paths.php"),
     );
 
@@ -2109,25 +2005,19 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
     )
     .unwrap();
     assert_file_content_equals(
-        fx.join("autoload_functions.php").to_str().unwrap(),
+        fx.join("autoload_functions.php"),
         vendor.join("autoload.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_real_functions_with_include_paths.php")
-            .to_str()
-            .unwrap(),
+        fx.join("autoload_real_functions_with_include_paths.php"),
         composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_files_functions_with_removed_extra.php")
-            .to_str()
-            .unwrap(),
+        fx.join("autoload_files_functions_with_removed_extra.php"),
         composer_out.join("autoload_files.php"),
     );
     assert_file_content_equals(
-        fx.join("include_paths_functions_with_removed_extra.php")
-            .to_str()
-            .unwrap(),
+        fx.join("include_paths_functions_with_removed_extra.php"),
         composer_out.join("include_paths.php"),
     );
 
@@ -2137,19 +2027,15 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
     s.set_canonical_packages(not_autoload_packages());
     dump(&mut s, not_autoload_package.into(), false, "FilesAutoload").unwrap();
     assert_file_content_equals(
-        fx.join("autoload_functions.php").to_str().unwrap(),
+        fx.join("autoload_functions.php"),
         vendor.join("autoload.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_real_functions_with_removed_include_paths_and_autolad_files.php")
-            .to_str()
-            .unwrap(),
+        fx.join("autoload_real_functions_with_removed_include_paths_and_autolad_files.php"),
         composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_static_functions_with_removed_include_paths_and_autolad_files.php")
-            .to_str()
-            .unwrap(),
+        fx.join("autoload_static_functions_with_removed_include_paths_and_autolad_files.php"),
         composer_out.join("autoload_static.php"),
     );
     assert!(!std::path::Path::new(&composer_out.join("autoload_files.php")).exists());
@@ -2225,13 +2111,11 @@ fn test_use_global_include_path() {
     dump(&mut s, package.into(), false, "IncludePath").unwrap();
     let fx = fixtures_dir();
     assert_file_content_equals(
-        fx.join("autoload_real_include_path.php").to_str().unwrap(),
+        fx.join("autoload_real_include_path.php"),
         composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
-        fx.join("autoload_static_include_path.php")
-            .to_str()
-            .unwrap(),
+        fx.join("autoload_static_include_path.php"),
         composer_out.join("autoload_static.php"),
     );
 }
@@ -2480,7 +2364,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     dep.__set_autoload(autoload(vec![("classmap", str_list(&["classmap"]))]));
     let expected_message = format!(
         "Could not scan for classes inside \"{}/dep/a/classmap\" which does not appear to be a file nor a folder",
-        s.vendor_dir.to_str().unwrap()
+        s.vendor_dir.display()
     );
     if let Err(e) = dump(&mut s, package.clone().into(), true, "_19") {
         assert_eq!(expected_message, e.to_string());
@@ -2514,8 +2398,8 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
         "{}/excludedroot($|/)",
         preg_quote(
             strtr(
-                realpath(path_from_bytes(&dirname(s.working_dir.to_str().unwrap())))
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                realpath(path_from_bytes(&dirname(path_to_bytes(&s.working_dir))))
+                    .map(|p| bstr::BString::from(path_to_bytes(&p)))
                     .unwrap_or_default(),
                 "\\",
                 "/"
@@ -2528,7 +2412,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
         preg_quote(
             strtr(
                 realpath(&s.working_dir)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .map(|p| bstr::BString::from(path_to_bytes(&p)))
                     .unwrap_or_default(),
                 "\\",
                 "/"
@@ -2761,9 +2645,7 @@ fn test_generates_platform_check() {
                 assert_file_content_equals(
                     fixtures_dir()
                         .join("platform")
-                        .join(format!("{}.php", fixture))
-                        .to_str()
-                        .unwrap(),
+                        .join(format!("{}.php", fixture)),
                     &platform_check,
                 );
                 assert!(

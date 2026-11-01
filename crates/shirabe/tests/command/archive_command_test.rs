@@ -16,7 +16,7 @@ use shirabe::repository::{
     InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use shirabe::util::Platform;
-use shirabe_php_shim::{PhpMixed, legacy_lossy, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
@@ -106,10 +106,10 @@ fn noop_event_dispatcher() -> MockEventDispatcher {
 }
 
 fn root_package(name: &str, version: &str) -> RootPackageHandle {
-    let normalized = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
+    let normalized = VersionParser.normalize(version, None).unwrap();
     RootPackageHandle::new(
         bstr::BString::from(name.to_string()),
-        bstr::BString::from(normalized),
+        normalized,
         bstr::BString::from(version.to_string()),
     )
 }

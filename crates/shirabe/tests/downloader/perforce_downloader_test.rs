@@ -14,7 +14,7 @@ use shirabe::io::io_interface::NORMAL;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::{PhpMixed, legacy_lossy, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -49,10 +49,7 @@ fn get_config(test_path: &std::path::Path) -> Config {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    section.insert(
-        "home".into(),
-        PhpMixed::string(test_path.to_str().unwrap().to_string()),
-    );
+    section.insert("home".into(), PhpMixed::string(path_to_bytes(&test_path)));
     top.insert("config".into(), PhpMixed::Array(section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     config
@@ -61,10 +58,10 @@ fn get_config(test_path: &std::path::Path) -> Config {
 /// ref: PerforceDownloaderTest::getMockPackageInterface. A real CompletePackage stands in for
 /// the PHPUnit PackageInterface mock; the source reference is returned by getSourceReference.
 fn make_package(source_reference: Option<&str>) -> PackageInterfaceHandle {
-    let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package = CompletePackageHandle::new(
         bstr::BString::from("test/pkg".to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from("1.0.0".to_string()),
     );
     package.set_source_reference(
@@ -131,7 +128,7 @@ fn test_do_install_with_no_tag() {
 // against a mocked Perforce, asserting each step is invoked exactly once.
 fn do_install_workflow(source_ref: &'static str, expected_label: Option<BString>) {
     let test_path = TempDir::new().unwrap();
-    let test_path_str = test_path.path().to_str().unwrap().to_string();
+    let test_path_str = test_path.path().to_path_buf();
 
     let (io_mock, _io_guard) = get_io_mock(NORMAL).unwrap();
     io_mock
@@ -153,7 +150,7 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<BString>
     perforce
         .expect_initialize_path()
         .times(1)
-        .withf(move |path: &std::path::Path| bstr::BStr::new(path_to_bytes(path)) == expected_path)
+        .withf(move |path: &std::path::Path| path_to_bytes(path) == path_to_bytes(&expected_path))
         .returning(|_| ());
     perforce
         .expect_set_stream()

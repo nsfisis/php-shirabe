@@ -21,7 +21,7 @@ fn set_up() -> SetUp {
     let mut fs = Filesystem::new(None);
 
     let sources_dir = TempDir::new().unwrap();
-    let sources = fs.normalize_path(sources_dir.path().canonicalize().unwrap().to_str().unwrap());
+    let sources = fs.normalize_path(sources_dir.path().canonicalize().unwrap());
 
     let file_tree = [
         ".foo",
@@ -74,7 +74,7 @@ fn set_up() -> SetUp {
         let path = std::path::Path::new(&sources).join(relative_path);
         fs.ensure_directory_exists(path_from_bytes(&dirname(path_to_bytes(&path))))
             .unwrap();
-        file_put_contents(path.to_str().unwrap(), b"");
+        file_put_contents(&path, b"");
     }
 
     SetUp {
@@ -245,10 +245,7 @@ fn test_git_excludes() {
     let set_up = set_up();
 
     file_put_contents(
-        std::path::Path::new(&set_up.sources)
-            .join(".gitattributes")
-            .to_str()
-            .unwrap(),
+        std::path::Path::new(&set_up.sources).join(".gitattributes"),
         [
             "",
             "# gitattributes rules with comments and blank lines",

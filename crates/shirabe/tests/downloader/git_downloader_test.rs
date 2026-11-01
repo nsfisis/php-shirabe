@@ -16,7 +16,7 @@ use shirabe::package::Mirror;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe::util::{Git as GitUtil, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -67,11 +67,10 @@ fn get_package(
     source_reference: Option<&str>,
     source_url: Option<&str>,
 ) -> PackageInterfaceHandle {
-    let norm_version =
-        legacy_lossy(&VersionParser.normalize(pretty_version, None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize(pretty_version, None).unwrap();
     let package = CompletePackageHandle::new(
         bstr::BString::from(name.to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from(pretty_version.to_string()),
     );
     package.__set_source_type(Some(bstr::BString::from("git".to_string())));
@@ -91,10 +90,7 @@ fn setup_config(config: Config) -> Config {
         let tmp_dir = TempDir::new().unwrap().keep();
         let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
         let mut section: IndexMap<BString, PhpMixed> = IndexMap::new();
-        section.insert(
-            "home".into(),
-            PhpMixed::string(tmp_dir.to_str().unwrap().to_string()),
-        );
+        section.insert("home".into(), PhpMixed::string(path_to_bytes(&tmp_dir)));
         top.insert("config".into(), PhpMixed::Array(section));
         config.merge(&top, Config::SOURCE_UNKNOWN);
     }
@@ -170,8 +166,7 @@ fn test_download() {
     let expected_path = working_dir
         .path()
         .join("composerPath")
-        .to_str()
-        .unwrap()
+        .display()
         .to_string();
 
     let (process, _guard) = get_process_executor_mock(
@@ -252,8 +247,11 @@ fn test_download_with_cache() {
     GitUtil::__set_version(Some("2.17.0".into()));
 
     let config = setup_config(Config::new(false, None));
-    let cache_vcs_dir =
-        legacy_lossy(config.get("cache-vcs-dir").as_string().unwrap_or_default()).into_owned();
+    let cache_vcs_dir = config
+        .get("cache-vcs-dir")
+        .as_string()
+        .unwrap_or_default()
+        .to_owned();
     // ref: GitDownloaderTest cachePath = cache-vcs-dir.'/'.preg_replace('{[^a-z0-9.]}i', '-', url).'/'
     let sanitized: String = url
         .chars()
@@ -265,7 +263,7 @@ fn test_download_with_cache() {
             }
         })
         .collect();
-    let cache_path = format!("{}/{}/", cache_vcs_dir, sanitized);
+    let cache_path = format!("{}/{}/", cache_vcs_dir.display_lossy(), sanitized);
 
     let mut filesystem = Filesystem::new(None);
     filesystem.remove_directory(&cache_path).unwrap();
@@ -273,8 +271,7 @@ fn test_download_with_cache() {
     let expected_path = working_dir
         .path()
         .join("composerPath")
-        .to_str()
-        .unwrap()
+        .display()
         .to_string();
 
     let cache_path_for_callback = cache_path.clone();
@@ -389,8 +386,7 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     let expected_path = working_dir
         .path()
         .join("composerPath")
-        .to_str()
-        .unwrap()
+        .display()
         .to_string();
 
     let (process, _guard) = get_process_executor_mock(
@@ -534,8 +530,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
         let expected_path = working_dir
             .path()
             .join("composerPath")
-            .to_str()
-            .unwrap()
+            .display()
             .to_string();
 
         let (process, _guard) = get_process_executor_mock(
@@ -623,8 +618,7 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
     let expected_path = working_dir
         .path()
         .join("composerPath")
-        .to_str()
-        .unwrap()
+        .display()
         .to_string();
 
     let (process, _guard) = get_process_executor_mock(
@@ -757,9 +751,9 @@ fn test_update() {
     );
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
@@ -850,9 +844,9 @@ fn test_update_with_new_repo_url() {
     );
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
@@ -935,9 +929,9 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
     );
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let config = Config::new(false, None);
 
@@ -1053,9 +1047,9 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
     );
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
@@ -1122,9 +1116,9 @@ fn test_downgrade_shows_appropriate_message() {
     let io = io_mock as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(Some(io), None, process, None);
 
@@ -1209,9 +1203,9 @@ fn test_not_using_downgrading_with_references() {
     let io = io_mock as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(Some(io), None, process, None);
 
@@ -1258,7 +1252,7 @@ fn test_not_using_downgrading_with_references() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let package = get_package("dummy/pkg", "1.0.0", None, None);
     let (process, _guard) = get_process_executor_mock(
@@ -1271,7 +1265,7 @@ fn test_remove() {
     );
 
     Filesystem::new(None)
-        .ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+        .ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
 
     let mut filesystem = Filesystem::new(None);

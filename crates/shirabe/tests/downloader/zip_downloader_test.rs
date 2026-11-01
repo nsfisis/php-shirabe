@@ -14,7 +14,7 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::MockHandler;
 use shirabe::util::{HttpDownloader, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -45,10 +45,10 @@ fn set_up() -> SetUp {
         dl_config,
     )));
 
-    let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package: PackageInterfaceHandle = CompletePackageHandle::new(
         bstr::BString::from("test/pkg".to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from("1.0.0".to_string()),
     )
     .into();
@@ -128,7 +128,7 @@ fn test_error_messages() {
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".into(),
-        PhpMixed::string(test_dir.path().to_str().unwrap().to_string()),
+        PhpMixed::string(path_to_bytes(&test_dir.path())),
     );
     let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
     merged.insert("config".into(), PhpMixed::Array(config_options));
@@ -146,10 +146,10 @@ fn test_error_messages() {
 
     // $distUrl = 'file://'.__FILE__: an existing, non-zip file referenced by a file:// URL.
     let dist_url = format!("file://{}/Cargo.toml", env!("CARGO_MANIFEST_DIR"));
-    let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package: PackageInterfaceHandle = CompletePackageHandle::new(
         bstr::BString::from("test/pkg".to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from("1.0.0".to_string()),
     )
     .into();
@@ -169,11 +169,7 @@ fn test_error_messages() {
         process,
     );
 
-    let path = std::env::temp_dir()
-        .join("composer-zip-test")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let path = std::env::temp_dir().join("composer-zip-test").to_path_buf();
 
     let result: anyhow::Result<()> = (|| {
         let loop_ = Loop::new(http_downloader.clone(), None);
@@ -217,7 +213,7 @@ fn test_zip_archive_only_failed() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_str().unwrap().to_string();
+    let filename = set_up.filename.to_path_buf();
     let result = run(downloader.extract(
         set_up.package,
         std::path::Path::new(&filename),
@@ -247,7 +243,7 @@ fn test_zip_archive_extract_only_failed() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_str().unwrap().to_string();
+    let filename = set_up.filename.to_path_buf();
     let result = run(downloader.extract(
         set_up.package,
         std::path::Path::new(&filename),
@@ -279,7 +275,7 @@ fn test_zip_archive_only_good() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_str().unwrap().to_string();
+    let filename = set_up.filename.to_path_buf();
     let result = run(downloader.extract(
         set_up.package,
         std::path::Path::new(&filename),
@@ -321,7 +317,7 @@ fn test_system_unzip_only_failed() {
     );
     let downloader = make_downloader_with_process(&set_up, process);
 
-    let filename = set_up.filename.to_str().unwrap().to_string();
+    let filename = set_up.filename.to_path_buf();
     let result = run(downloader.extract(
         set_up.package,
         std::path::Path::new(&filename),
@@ -358,7 +354,7 @@ fn test_system_unzip_only_good() {
     );
     let downloader = make_downloader_with_process(&set_up, process);
 
-    let filename = set_up.filename.to_str().unwrap().to_string();
+    let filename = set_up.filename.to_path_buf();
     let result = run(downloader.extract(
         set_up.package,
         std::path::Path::new(&filename),
@@ -396,7 +392,7 @@ fn test_non_windows_fallback_good() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_str().unwrap().to_string();
+    let filename = set_up.filename.to_path_buf();
     let result = run(downloader.extract(
         set_up.package,
         std::path::Path::new(&filename),
@@ -434,7 +430,7 @@ fn test_non_windows_fallback_failed() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_str().unwrap().to_string();
+    let filename = set_up.filename.to_path_buf();
     let result = run(downloader.extract(
         set_up.package,
         std::path::Path::new(&filename),

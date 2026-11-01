@@ -28,7 +28,9 @@ use shirabe::script::{Event as ScriptEvent, ScriptEvents};
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, RuntimeException, getenv, legacy_lossy};
+use shirabe_php_shim::{
+    Catch as _, PHP_EOL, PhpMixed, RuntimeException, bconcat, getenv, path_to_bytes,
+};
 use shirabe_symfony_console::output::output_interface;
 
 fn tear_down() {
@@ -115,8 +117,8 @@ fn load_php_listener_class() {
             composer_test_dir().join("TestCase.php"),
             composer_test_dir().join("EventDispatcher/EventDispatcherTest.php"),
         ] {
-            let path = file.to_str().expect("the fixture paths are UTF-8");
-            php_eval(&format!("require {};", php_single_quote(path)));
+            let path = path_to_bytes(&file);
+            php_eval(bconcat!("require ", php_single_quote(path), ";"));
         }
     });
 }
@@ -143,7 +145,7 @@ fn ensure_php_binary() -> bool {
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join("php");
         if candidate.is_file() {
-            Platform::put_env("PHP_BINARY", candidate.to_str().unwrap());
+            Platform::put_env("PHP_BINARY", path_to_bytes(&candidate));
             return true;
         }
     }
@@ -274,9 +276,9 @@ fn test_recursion_in_scripts_names() {
         return;
     }
     let (process, _process_guard) = get_process_executor_mock(
-        vec![cmd(format!(
-            "echo Hello {}",
-            legacy_lossy(&ProcessExecutor::escape("World"))
+        vec![cmd(bconcat!(
+            "echo Hello ",
+            ProcessExecutor::escape("World")
         ))],
         true,
         MockHandler::default(),
@@ -306,10 +308,12 @@ fn test_recursion_in_scripts_names() {
         .dispatch(Some("helloWorld"), Some(&mut event))
         .unwrap();
 
-    let expected = format!(
-        "> helloWorld: @hello World{eol}> hello: echo Hello {world}{eol}",
-        eol = PHP_EOL,
-        world = legacy_lossy(&ProcessExecutor::escape("World")),
+    let expected = bconcat!(
+        "> helloWorld: @hello World",
+        PHP_EOL,
+        "> hello: echo Hello ",
+        ProcessExecutor::escape("World"),
+        PHP_EOL,
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -818,7 +822,7 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     std::env::set_current_dir(&php_test_dir).unwrap();
     Platform::put_env(
         "COMPOSER_BIN_DIR",
-        php_test_dir.join("vendor/bin").to_str().unwrap(),
+        path_to_bytes(&php_test_dir.join("vendor/bin")),
     );
 
     let (process, _process_guard) =
@@ -876,22 +880,19 @@ fn test_dispatcher_support_for_additional_args() {
         .__get_php_exec_command()
         .unwrap();
 
-    let args = format!(
-        "{} {} {}",
-        legacy_lossy(&ProcessExecutor::escape("ARG")),
-        legacy_lossy(&ProcessExecutor::escape("ARG2")),
-        legacy_lossy(&ProcessExecutor::escape("--arg")),
+    let args = bconcat!(
+        ProcessExecutor::escape("ARG"),
+        " ",
+        ProcessExecutor::escape("ARG2"),
+        " ",
+        ProcessExecutor::escape("--arg"),
     );
 
     let (process, _process_guard) = get_process_executor_mock(
         vec![
             cmd("echo -n foo"),
-            cmd(format!(
-                "{} foo.php {} then the rest",
-                php_cmd.display_lossy(),
-                args
-            )),
-            cmd(format!("echo -n bar {}", args)),
+            cmd(bconcat!(php_cmd, " foo.php ", args, " then the rest")),
+            cmd(bconcat!("echo -n bar ", args)),
         ],
         true,
         MockHandler::default(),
@@ -917,10 +918,16 @@ fn test_dispatcher_support_for_additional_args() {
         )
         .unwrap();
 
-    let expected = format!(
-        "> post-install-cmd: echo -n foo{eol}> post-install-cmd: @php foo.php {args} then the rest{eol}> post-install-cmd: echo -n bar {args}{eol}",
-        eol = PHP_EOL,
-        args = args,
+    let expected = bconcat!(
+        "> post-install-cmd: echo -n foo",
+        PHP_EOL,
+        "> post-install-cmd: @php foo.php ",
+        args,
+        " then the rest",
+        PHP_EOL,
+        "> post-install-cmd: echo -n bar ",
+        args,
+        PHP_EOL,
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -954,7 +961,7 @@ fn test_dispatcher_outputs_command() {
         .unwrap();
 
     // ref: $io->expects($this->once())->method('writeError')->with('> echo foo')
-    let write_error_messages: Vec<String> = io
+    let write_error_messages: Vec<bstr::BString> = io
         .borrow()
         .write_error_calls()
         .into_iter()
@@ -965,7 +972,7 @@ fn test_dispatcher_outputs_command() {
     // ref: $io->expects($this->once())->method('writeRaw')->with('foo'.PHP_EOL, false)
     assert_eq!(
         io.borrow().write_raw_calls(),
-        vec![(format!("foo{PHP_EOL}"), false)]
+        vec![(bstr::BString::from(format!("foo{PHP_EOL}")), false)]
     );
 }
 
@@ -1015,8 +1022,8 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
 
     let (process, _process_guard) = get_process_executor_mock(
         vec![
-            cmd(format!("{} install --no-dev", legacy_lossy(&binary))),
-            cmd(format!("{} update", legacy_lossy(&binary))),
+            cmd(bconcat!(binary, " install --no-dev")),
+            cmd(bconcat!(binary, " update")),
         ],
         true,
         MockHandler::default(),

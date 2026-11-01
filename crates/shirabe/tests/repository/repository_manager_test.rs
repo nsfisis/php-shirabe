@@ -14,7 +14,7 @@ use shirabe::repository::{
 };
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -105,7 +105,7 @@ fn test_repo_creation() {
             "config",
             PhpMixed::Array(str_config(&[(
                 "cache-repo-dir",
-                PhpMixed::string(tmpdir.path().to_str().unwrap().to_string()),
+                PhpMixed::string(path_to_bytes(&tmpdir.path())),
             )])),
         )]),
         "unknown",
@@ -214,7 +214,7 @@ fn test_invalid_repo_creation_throws() {
             "config",
             PhpMixed::Array(str_config(&[(
                 "cache-repo-dir",
-                PhpMixed::string(tmpdir.path().to_str().unwrap().to_string()),
+                PhpMixed::string(path_to_bytes(&tmpdir.path())),
             )])),
         )]),
         "unknown",
@@ -259,13 +259,9 @@ fn test_filter_repo_wrapping() {
                 ("type", PhpMixed::string("path".to_string())),
                 (
                     "url",
-                    PhpMixed::string(
-                        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                            .join("tests/repository")
-                            .to_str()
-                            .unwrap()
-                            .to_string(),
-                    ),
+                    PhpMixed::string(bstr::BString::from(path_to_bytes(
+                        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/repository"),
+                    ))),
                 ),
                 (
                     "only",

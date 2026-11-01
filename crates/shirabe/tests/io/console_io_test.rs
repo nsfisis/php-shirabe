@@ -130,12 +130,12 @@ fn test_write_error() {
     );
 }
 
-#[ignore = "ConsoleIO::write3 takes a single &str; the test feeds a 2-element array ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed messages array, which the &str signature cannot represent"]
+#[ignore = "ConsoleIO::write3 takes a single string; the test feeds a 2-element array ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed messages array, which the string signature cannot represent"]
 #[test]
 fn test_write_with_multiple_line_string_when_debugging() {
-    // TODO(type-model): ConsoleIO::write3 takes a single &str; the test feeds a 2-element array
+    // TODO(type-model): ConsoleIO::write3 takes a single string; the test feeds a 2-element array
     // ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed
-    // messages array, which the &str signature cannot represent.
+    // messages array, which the string signature cannot represent.
     todo!()
 }
 

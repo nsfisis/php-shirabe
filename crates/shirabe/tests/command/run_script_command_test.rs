@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/RunScriptCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -60,11 +61,11 @@ fn test_can_list_scripts() {
     let output = app_tester.get_display();
 
     assert!(
-        output.contains("Runs the test script as defined in composer.json"),
+        output.contains_str("Runs the test script as defined in composer.json"),
         "The default description for the test script should be printed"
     );
     assert!(
-        output.contains("Run the codestyle fixer"),
+        output.contains_str("Run the codestyle fixer"),
         "The custom description for the fix-cs script should be printed"
     );
 
@@ -105,7 +106,7 @@ fn test_can_define_aliases() {
     assert_eq!(0, status_code, "assertCommandIsSuccessful");
 
     let output = app_tester.get_display();
-    let array: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let array: serde_json::Value = serde_json::from_slice(&output).unwrap();
     let mut actual_aliases: Vec<serde_json::Value> = array["usage"].as_array().unwrap().clone();
     actual_aliases.remove(0);
 
@@ -242,7 +243,7 @@ class MyCommand extends Command
     assert_eq!(0, status_code, "assertCommandIsSuccessful");
     let output = app_tester.get_display();
     assert!(
-        output.contains(description),
+        output.contains_str(description),
         "The contents of scripts-description for the test script should be printed"
     );
 
@@ -358,11 +359,11 @@ class MyCommandWithDefinitions extends Command
     assert_eq!(0, status_code, "assertCommandIsSuccessful");
     let output = app_tester.get_display();
     assert!(
-        output.contains(cmd_desc),
+        output.contains_str(cmd_desc),
         "The custom description for the test script should be printed"
     );
     assert!(
-        !output.contains(wrong_desc),
+        !output.contains_str(wrong_desc),
         "The dummy description shouldn't show"
     );
 

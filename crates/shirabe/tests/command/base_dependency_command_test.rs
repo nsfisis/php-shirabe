@@ -4,20 +4,21 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     get_version_constraint, init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::trim;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: TestCase::trimLines — strip trailing spaces from each line, then trim the whole string.
-fn trim_lines(s: &str) -> String {
+fn trim_lines(s: &[u8]) -> bstr::BString {
     let stripped = s
         .lines()
-        .map(|line| line.trim_end_matches(' '))
-        .collect::<Vec<_>>()
-        .join("\n");
-    stripped.trim().to_string()
+        .map(|line| line.trim_end_with(|c| c == ' '))
+        .collect::<Vec<_>>();
+    trim(bstr::join("\n", stripped))
 }
 
 fn match_all() -> AnyConstraint {
@@ -288,7 +289,7 @@ fn test_warning_when_dependencies_are_not_installed() {
         let mut app_tester = get_application_tester();
         app_tester.run(input, RunOptions::default()).unwrap();
 
-        assert_eq!(expected_warning_message, app_tester.get_display().trim());
+        assert_eq!(expected_warning_message, trim(app_tester.get_display()));
 
         drop(tear_down);
     }

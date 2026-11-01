@@ -6,7 +6,7 @@ use serial_test::serial;
 use shirabe::command::init_command::InitCommand;
 use shirabe::json::JsonFile;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{PHP_SERVER, PhpMixed};
+use shirabe_php_shim::{PHP_SERVER, PhpMixed, path_to_bytes};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use tempfile::TempDir;
 
@@ -25,7 +25,7 @@ fn default_authors() -> serde_json::Value {
 /// `serde_json::Value` so the comparison ignores object key order (matching PHPUnit's `assertEquals`
 /// on arrays) while staying order-sensitive for lists.
 fn read_composer_json(dir: &std::path::Path) -> serde_json::Value {
-    let file = JsonFile::new(dir.join("composer.json").to_str().unwrap(), None, None).unwrap();
+    let file = JsonFile::new(dir.join("composer.json"), None, None).unwrap();
     serde_json::to_value(file.read().unwrap()).unwrap()
 }
 
@@ -473,7 +473,7 @@ fn test_run_command_invalid() {
             InvalidExpectation::StderrMatches(pattern) => {
                 result.unwrap();
                 assert_eq!(1, app_tester.get_status_code());
-                let regex = regex::Regex::new(pattern).unwrap();
+                let regex = regex::bytes::Regex::new(pattern).unwrap();
                 let stderr = app_tester.get_error_output();
                 assert!(
                     regex.is_match(&stderr),
@@ -609,7 +609,7 @@ fn test_get_git_config() {
     )
     .unwrap();
     let original_home = Platform::get_env("HOME");
-    Platform::put_env("HOME", home.path().to_str().unwrap());
+    Platform::put_env("HOME", path_to_bytes(&home.path()));
     let _restore_home = RestoreEnv::new("HOME", original_home);
 
     let command = InitCommand::new();
@@ -624,12 +624,11 @@ fn test_add_vendor_ignore() {
 
     let tmp = TempDir::new().unwrap();
     let ignore_file = tmp.path().join("ignore");
-    let ignore_file = ignore_file.to_str().unwrap();
 
     let command = InitCommand::new();
-    command.__add_vendor_ignore(ignore_file, "/vendor/");
-    assert!(std::path::Path::new(ignore_file).exists());
-    let content = std::fs::read_to_string(ignore_file).unwrap();
+    command.__add_vendor_ignore(&ignore_file, "/vendor/");
+    assert!(std::path::Path::new(&ignore_file).exists());
+    let content = std::fs::read_to_string(&ignore_file).unwrap();
     assert!(content.contains("/vendor/"));
 }
 
@@ -639,10 +638,9 @@ fn test_has_vendor_ignore() {
 
     let tmp = TempDir::new().unwrap();
     let ignore_file = tmp.path().join("ignore");
-    let ignore_file = ignore_file.to_str().unwrap();
 
     let command = InitCommand::new();
-    assert!(!command.__has_vendor_ignore(ignore_file, "vendor"));
-    command.__add_vendor_ignore(ignore_file, "/vendor/");
-    assert!(command.__has_vendor_ignore(ignore_file, "vendor"));
+    assert!(!command.__has_vendor_ignore(&ignore_file, "vendor"));
+    command.__add_vendor_ignore(&ignore_file, "/vendor/");
+    assert!(command.__has_vendor_ignore(&ignore_file, "vendor"));
 }

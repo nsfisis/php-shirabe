@@ -2,7 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_runtime_available};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{Composer, ComposerHandle, PartialOrFullComposer};
@@ -35,7 +35,8 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy, path_from_bytes,
+    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, path_from_bytes,
+    path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
@@ -183,18 +184,10 @@ impl InstallationManagerInterface for MockInstallationManager {
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         let upstream = fixtures_dir().join(path_from_bytes(&package.get_pretty_name()));
         if upstream.exists() {
-            return Some(std::path::PathBuf::from(
-                upstream.to_str().unwrap().to_string(),
-            ));
+            return Some(upstream);
         }
         // Shirabe-specific fixtures (subscriber_test) live next to this test binary.
-        Some(std::path::PathBuf::from(
-            shirabe_fixtures_dir()
-                .join(path_from_bytes(&package.get_pretty_name()))
-                .to_str()
-                .unwrap()
-                .to_string(),
-        ))
+        Some(shirabe_fixtures_dir().join(path_from_bytes(&package.get_pretty_name())))
     }
 
     fn set_output_progress(&mut self, _output_progress: bool) {}
@@ -298,33 +291,21 @@ pub(crate) fn set_up() -> SetUp {
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".into(),
-        PhpMixed::string(
-            directory_path
-                .join("Fixtures/")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        ),
+        PhpMixed::string(bstr::BString::from(path_to_bytes(
+            &directory_path.join("Fixtures/"),
+        ))),
     );
     config_section.insert(
         "home".into(),
-        PhpMixed::string(
-            directory_path
-                .join("Fixtures")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        ),
+        PhpMixed::string(bstr::BString::from(path_to_bytes(
+            &directory_path.join("Fixtures"),
+        ))),
     );
     config_section.insert(
         "bin-dir".into(),
-        PhpMixed::string(
-            directory_path
-                .join("Fixtures/bin")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        ),
+        PhpMixed::string(bstr::BString::from(path_to_bytes(
+            &directory_path.join("Fixtures/bin"),
+        ))),
     );
     config_section.insert("allow-plugins".into(), PhpMixed::Bool(true));
     let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -399,13 +380,13 @@ pub(crate) fn set_up() -> SetUp {
 fn plugin_property(
     plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
     name: &str,
-) -> String {
+) -> bstr::BString {
     let plugin = plugin.borrow();
     let proxy = plugin
         .__as_php_plugin_proxy()
         .expect("registered plugins are PHP-backed proxies");
     match proxy.__get_property(name).unwrap() {
-        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
+        PhpMixed::String(s) => s,
         other => panic!("property `{name}` is not a string: {other:?}"),
     }
 }
@@ -452,13 +433,11 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
     set_up.autoload_generator.borrow_mut().set_dev_mode(true);
     let files_autoload = fixtures_dir()
         .join("files_autoload_which_should_not_run.php")
-        .to_str()
-        .unwrap()
-        .to_string();
+        .to_path_buf();
     let mut autoload: IndexMap<BString, PhpMixed> = IndexMap::new();
     autoload.insert(
         "files".into(),
-        PhpMixed::List(vec![PhpMixed::string(files_autoload)]),
+        PhpMixed::List(vec![PhpMixed::string(path_to_bytes(&files_autoload))]),
     );
     let root = set_up.composer.borrow().get_package().clone();
     root.set_autoload(autoload.clone());
@@ -642,14 +621,9 @@ fn set_plugin_api_version_with_plugins(
 
     let plug_api_internal_package: PackageInterfaceHandle = CompletePackageHandle::new(
         bstr::BString::from("composer-plugin-api".to_string()),
-        bstr::BString::from(
-            legacy_lossy(
-                &VersionParser
-                    .normalize(new_plugin_api_version, None)
-                    .unwrap(),
-            )
-            .into_owned(),
-        ),
+        VersionParser
+            .normalize(new_plugin_api_version, None)
+            .unwrap(),
         bstr::BString::from(new_plugin_api_version.to_string()),
     )
     .into();
@@ -837,7 +811,7 @@ fn load_mock_capability_class() {
         .expect("the Composer checkout must provide the plugin test mocks");
     shirabe_php_rpc::call_function(
         "__shirabe_require",
-        vec![PluginValue::string(path.to_str().unwrap())],
+        vec![PluginValue::string(path_to_bytes(&path))],
     )
     .unwrap()
     .unwrap();

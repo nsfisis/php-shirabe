@@ -113,7 +113,7 @@ impl TestCase {
     // effect-equivalent for setting up the local repository the archive path clones from.
     fn setup_git_repo(&self) {
         file_put_contents(
-            self.test_dir.join("composer.json").to_str().unwrap(),
+            self.test_dir.join("composer.json"),
             br#"{"name":"faker/faker", "description": "description", "license": "MIT"}"#,
         );
 
@@ -125,7 +125,7 @@ impl TestCase {
              git config user.name \"Your Name\" && \
              git add composer.json && \
              git commit -m \"commit composer.json\" -q",
-            Some(std::path::Path::new(self.test_dir.to_str().unwrap())),
+            Some(std::path::Path::new(&self.test_dir)),
             None,
             PhpMixed::Bool(false),
             Some(60.0),

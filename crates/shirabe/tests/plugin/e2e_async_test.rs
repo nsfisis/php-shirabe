@@ -8,6 +8,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use shirabe_php_shim::bconcat;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -17,7 +19,7 @@ fn fixture_dir() -> PathBuf {
 
 struct Run {
     exit_code: i32,
-    output: String,
+    output: bstr::BString,
     trace: String,
     installer_trace: String,
     asset: String,
@@ -78,7 +80,7 @@ impl Drop for HttpServer {
 
 /// Runs `install` in a fresh copy of the fixture and returns the exit code with the plugin's
 /// traces.
-fn install(program: &str, prefix_args: &[&str], http_base_url: &str) -> Run {
+fn install(program: &str, prefix_args: &[&OsStr], http_base_url: &str) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
@@ -97,11 +99,7 @@ fn install(program: &str, prefix_args: &[&str], http_base_url: &str) -> Run {
     let read = |name: &str| std::fs::read_to_string(project.join(name)).unwrap_or_default();
     Run {
         exit_code: output.status.code().unwrap_or(-1),
-        output: format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        ),
+        output: bconcat!(&output.stdout, &output.stderr),
         trace: read("async-trace.txt"),
         installer_trace: read("async-installer-trace.txt"),
         asset: read("assets/shirabe-test/async-asset-a/asset.txt"),
@@ -117,21 +115,22 @@ fn test_async_surface_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let server = HttpServer::start();
-    let upstream = install("php", &[composer_bin.as_str()], &server.base_url);
+    let upstream = install("php", &[composer_bin.as_os_str()], &server.base_url);
     let shirabe = install(env!("CARGO_BIN_EXE_shirabe"), &[], &server.base_url);
 
     assert_eq!(
-        0, upstream.exit_code,
+        0,
+        upstream.exit_code,
         "upstream install must succeed: {}",
-        upstream.output
+        upstream.output.display_lossy()
     );
     assert_eq!(
-        upstream.exit_code, shirabe.exit_code,
+        upstream.exit_code,
+        shirabe.exit_code,
         "shirabe output: {}",
-        shirabe.output
+        shirabe.output.display_lossy()
     );
     assert_eq!(upstream.installer_trace, shirabe.installer_trace);
     assert_eq!(upstream.asset, shirabe.asset);

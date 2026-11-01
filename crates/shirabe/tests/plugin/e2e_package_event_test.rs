@@ -7,6 +7,7 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -22,7 +23,7 @@ struct Run {
 
 /// Runs `install` in a fresh copy of the fixture and returns the exit code with the traces the
 /// plugin wrote.
-fn install(program: &str, prefix_args: &[&str]) -> Run {
+fn install(program: &str, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
@@ -54,9 +55,8 @@ fn test_package_events_match_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = install("php", &[composer_bin.as_str()]);
+    let upstream = install("php", &[composer_bin.as_os_str()]);
     let shirabe = install(env!("CARGO_BIN_EXE_shirabe"), &[]);
 
     assert_eq!(0, upstream.exit_code, "upstream install must succeed");
@@ -96,9 +96,8 @@ fn test_local_repository_seen_by_package_events_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = install("php", &[composer_bin.as_str()]);
+    let upstream = install("php", &[composer_bin.as_os_str()]);
     let shirabe = install(env!("CARGO_BIN_EXE_shirabe"), &[]);
 
     assert_eq!(upstream.repo_trace, shirabe.repo_trace);

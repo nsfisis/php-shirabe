@@ -12,7 +12,6 @@ use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterface
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[allow(dead_code)]
@@ -585,13 +584,13 @@ fn test_select_local_repos_first() {
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
 fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
-    let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
+    let pretty = constraint.get_pretty_string();
     Link::new(
         bstr::BString::from(source.to_string()),
         bstr::BString::from(target.to_string()),
         constraint,
         Some(bstr::BString::from(r#type.to_string())),
-        bstr::BString::from(pretty),
+        pretty,
     )
 }
 

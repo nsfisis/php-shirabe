@@ -52,7 +52,7 @@ fn assert_file_equals(expected: &std::path::Path, actual: &std::path::Path) {
 }
 
 fn json_config_source(config: &std::path::Path) -> JsonConfigSource {
-    let json_file = JsonFile::new(config.to_str().unwrap(), None, None).unwrap();
+    let json_file = JsonFile::new(config, None, None).unwrap();
     JsonConfigSource::new(std::rc::Rc::new(std::cell::RefCell::new(json_file)), false)
 }
 

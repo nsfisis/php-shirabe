@@ -9,6 +9,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -24,10 +26,10 @@ fn fixture_fetched() -> bool {
 
 struct CommandRun {
     exit_code: i32,
-    stdout: String,
+    stdout: BString,
 }
 
-fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) -> CommandRun {
+fn run_command(work: &Path, program: &str, prefix_args: &[&OsStr], args: &[&str]) -> CommandRun {
     let output = std::process::Command::new(program)
         .args(prefix_args)
         .args(args)
@@ -41,11 +43,11 @@ fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) 
         .unwrap();
     CommandRun {
         exit_code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stdout: BString::from(output.stdout),
     }
 }
 
-fn prepared_project(program: &str, prefix: &[&str]) -> TempDir {
+fn prepared_project(program: &str, prefix: &[&OsStr]) -> TempDir {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let install = run_command(work.path(), program, prefix, &["install"]);
@@ -53,10 +55,11 @@ fn prepared_project(program: &str, prefix: &[&str]) -> TempDir {
     work
 }
 
-fn normalize_lines(stdout: &str) -> Vec<&str> {
+fn normalize_lines(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
-        .filter(|line| line.contains("normalize"))
+        .filter(|line| line.contains_str("normalize"))
+        .map(ByteSlice::as_bstr)
         .collect()
 }
 
@@ -76,9 +79,7 @@ fn test_normalize_listing_matches_upstream_composer() {
         return;
     }
     let _worker = lock_php_worker();
-
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
-    let upstream_prefix = [composer_bin.as_str()];
+    let upstream_prefix = [composer_bin.as_os_str()];
     let u_work = prepared_project("php", &upstream_prefix);
     let s_work = prepared_project(env!("CARGO_BIN_EXE_shirabe"), &[]);
 
@@ -142,9 +143,7 @@ fn test_normalize_execution_matches_upstream_composer() {
         return;
     }
     let _worker = lock_php_worker();
-
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
-    let upstream_prefix = [composer_bin.as_str()];
+    let upstream_prefix = [composer_bin.as_os_str()];
     let u_work = prepared_project("php", &upstream_prefix);
     let s_work = prepared_project(env!("CARGO_BIN_EXE_shirabe"), &[]);
 

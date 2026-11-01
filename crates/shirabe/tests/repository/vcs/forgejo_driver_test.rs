@@ -11,7 +11,7 @@ use shirabe::repository::vcs::ForgejoDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -25,10 +25,7 @@ fn set_up() -> SetUp {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     config_section.insert(
         "forgejo-domains".into(),
         PhpMixed::List(vec![PhpMixed::string("codeberg.org".to_string())]),

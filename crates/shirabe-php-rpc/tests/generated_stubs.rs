@@ -37,6 +37,6 @@ fn generated_stubs_are_fresh() {
         output.status.success(),
         "generate-stubs --check failed; regenerate the stubs with \
          scripts/plugin-stub-generator/generate-stubs:\n{}",
-        String::from_utf8_lossy(&output.stderr),
+        bstr::BStr::new(&output.stderr).display_lossy(),
     );
 }

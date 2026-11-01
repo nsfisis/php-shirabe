@@ -43,6 +43,12 @@ impl IntoMockCmd for String {
     }
 }
 
+impl IntoMockCmd for bstr::BString {
+    fn into_mock_cmd(self) -> CommandLine {
+        CommandLine::Shell(self)
+    }
+}
+
 impl IntoMockCmd for Vec<&str> {
     fn into_mock_cmd(self) -> CommandLine {
         CommandLine::Args(self.into_iter().map(bstr::BString::from).collect())

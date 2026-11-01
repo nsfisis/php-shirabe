@@ -4,6 +4,7 @@ use crate::test_case::{
     RunOptions, TearDown, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -52,9 +53,9 @@ fn set_up() -> TearDown {
 
 /// Asserts each non-blank line of `display` matches the regex built from `expected[i]`
 /// (`implode("\s+", expected[i])` in PHP).
-fn assert_lines(display: &str, expected: &[Vec<&str>]) {
+fn assert_lines(display: &[u8], expected: &[Vec<&str>]) {
     let mut i = 0usize;
-    for line in display.split('\n') {
+    for line in display.split_str("\n") {
         if line.trim().is_empty() {
             i += 1;
             continue;
@@ -65,12 +66,12 @@ fn assert_lines(display: &str, expected: &[Vec<&str>]) {
             .map(|s| regex::escape(s))
             .collect::<Vec<_>>()
             .join(r"\s+");
-        let re = regex::Regex::new(&pattern).unwrap();
+        let re = regex::bytes::Regex::new(&pattern).unwrap();
         assert!(
             re.is_match(line),
             "line {} {:?} did not match {:?}",
             i,
-            line,
+            line.as_bstr(),
             pattern
         );
         i += 1;
@@ -169,7 +170,7 @@ fn test_format_json() {
         },
     });
 
-    let actual: serde_json::Value = serde_json::from_str(&app_tester.get_display()).unwrap();
+    let actual: serde_json::Value = serde_json::from_slice(&app_tester.get_display()).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -201,15 +202,15 @@ fn test_format_summary() {
     ];
 
     let display = app_tester.get_display();
-    let lines: Vec<&str> = display.split('\n').collect();
+    let lines: Vec<&[u8]> = display.split_str("\n").collect();
     for (i, (key, value)) in expected.iter().enumerate() {
         let pattern = format!(r"{}\s+{}", regex::escape(key), regex::escape(value));
-        let re = regex::Regex::new(&pattern).unwrap();
+        let re = regex::bytes::Regex::new(&pattern).unwrap();
         assert!(
             re.is_match(lines[i]),
             "line {} {:?} did not match {:?}",
             i,
-            lines[i],
+            lines[i].as_bstr(),
             pattern
         );
     }

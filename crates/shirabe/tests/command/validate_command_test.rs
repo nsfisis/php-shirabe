@@ -5,7 +5,7 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{chmod, function_exists, posix_getuid};
+use shirabe_php_shim::{chmod, function_exists, posix_getuid, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: ValidateCommandTest::MINIMAL_VALID_CONFIGURATION
@@ -109,7 +109,7 @@ fn test_validate() {
 
         assert_eq!(
             case.expected.trim(),
-            app_tester.get_display().trim(),
+            trim(app_tester.get_display()),
             "case {:?}",
             case.name
         );
@@ -127,10 +127,7 @@ fn test_validate_on_file_issues() {
         .run(validate_input(vec![]), RunOptions::default())
         .unwrap();
 
-    assert_eq!(
-        "./composer.json not found.",
-        app_tester.get_display().trim()
-    );
+    assert_eq!("./composer.json not found.", trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -148,7 +145,7 @@ fn test_with_composer_lock() {
 
     let expected = "<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid but your composer.lock has some errors\n# Lock file errors\n- Required package \"root/req\" is not present in the lock file.\nThis usually happens when composer files are incorrectly merged or the composer.json file is manually edited.\nRead more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md\nand prefer using the \"require\" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r";
 
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(expected.trim(), trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -176,7 +173,7 @@ fn test_unaccessible_file() {
 
     assert_eq!(
         "./composer.json is not readable.",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert_eq!(3, app_tester.get_status_code());
 

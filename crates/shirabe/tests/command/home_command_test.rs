@@ -6,6 +6,7 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: HomeCommandTest::testHomeCommandWithShowFlag
@@ -42,7 +43,7 @@ fn run_use_case(
     input.extend(command);
     app_tester.run(input, RunOptions::default()).unwrap();
 
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(expected.trim(), trim(app_tester.get_display()));
 }
 
 /// ref: useCaseProvider 'Invalid or missing repository URL'

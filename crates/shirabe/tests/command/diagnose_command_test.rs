@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/DiagnoseCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::util::platform::Platform;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -30,12 +31,12 @@ fn test_cmd_fail() {
     }
 
     let output = app_tester.get_display();
-    assert!(output.contains(
+    assert!(output.contains_str(
         "Checking composer.json: <warning>WARNING</warning>
 <warning>No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.</warning>"
     ));
 
-    assert!(output.contains(
+    assert!(output.contains_str(
         "Checking http connectivity to packagist: OK
 Checking https connectivity to packagist: OK
 Checking github.com rate limit: "
@@ -76,14 +77,14 @@ fn test_cmd_success() {
             0,
             app_tester.get_status_code(),
             "{}",
-            app_tester.get_display()
+            app_tester.get_display().display_lossy()
         );
     }
 
     let output = app_tester.get_display();
-    assert!(output.contains("Checking composer.json: OK"));
+    assert!(output.contains_str("Checking composer.json: OK"));
 
-    assert!(output.contains(
+    assert!(output.contains_str(
         "Checking http connectivity to packagist: OK
 Checking https connectivity to packagist: OK
 Checking github.com rate limit: "

@@ -4,8 +4,10 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::json::JsonFile;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
@@ -270,26 +272,28 @@ fn test_require() {
         app_tester.run(input(args), RunOptions::default()).unwrap();
 
         let display = app_tester.get_display();
-        let display = display.trim();
+        let display = trim(&display);
         if expected.contains("%d") {
             // The PHP test builds a regex by quoting the expected and replacing %d with [0-9.]+.
             // Compare line-by-line, treating "%d" as a numeric wildcard.
             let exp_lines: Vec<&str> = expected.trim().lines().collect();
-            let got_lines: Vec<&str> = display.lines().collect();
+            let got_lines: Vec<&[u8]> = display.lines().collect();
             assert_eq!(
                 exp_lines.len(),
                 got_lines.len(),
-                "case: {label}\n--- expected ---\n{expected}\n--- got ---\n{display}"
+                "case: {label}\n--- expected ---\n{expected}\n--- got ---\n{}",
+                display.display_lossy()
             );
             for (exp, got) in exp_lines.iter().zip(got_lines.iter()) {
                 if exp.contains("%d") {
                     let prefix = &exp[..exp.find("%d").unwrap()];
                     assert!(
-                        got.starts_with(prefix),
-                        "case: {label}\nexpected line prefix {prefix:?}, got {got:?}"
+                        got.starts_with(prefix.as_bytes()),
+                        "case: {label}\nexpected line prefix {prefix:?}, got {:?}",
+                        got.as_bstr()
                     );
                 } else {
-                    assert_eq!(exp, got, "case: {label}");
+                    assert_eq!(exp.as_bytes().as_bstr(), got.as_bstr(), "case: {label}");
                 }
             }
         } else {
@@ -368,13 +372,12 @@ fn test_inconsistent_require_keys() {
             .unwrap();
 
         assert!(
-            app_tester.get_display().contains(expected_warning),
+            app_tester.get_display().contains_str(expected_warning),
             "case is_dev={is_dev} is_interactive={is_interactive}\ngot: {}",
-            app_tester.get_display()
+            app_tester.get_display().display_lossy()
         );
 
-        let composer_content =
-            JsonFile::new(dir.join("composer.json").to_str().unwrap(), None, None).unwrap();
+        let composer_content = JsonFile::new(dir.join("composer.json"), None, None).unwrap();
         let content = composer_content.read().unwrap();
         let content: serde_json::Value =
             serde_json::from_str(&JsonFile::encode(&content).unwrap()).unwrap();

@@ -17,7 +17,7 @@ use shirabe::repository::array_repository::ArrayRepository;
 use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
-use shirabe_php_shim::{bconcat, legacy_lossy};
+use shirabe_php_shim::bconcat;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 
 #[allow(dead_code)]
@@ -56,13 +56,13 @@ fn set_up() -> Fixtures {
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
 fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
-    let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
+    let pretty = constraint.get_pretty_string();
     Link::new(
         bstr::BString::from(source.to_string()),
         bstr::BString::from(target.to_string()),
         constraint,
         Some(bstr::BString::from(r#type.to_string())),
-        bstr::BString::from(pretty),
+        pretty,
     )
 }
 
@@ -140,7 +140,7 @@ fn check_solver_result_repo_set(
 
     // Build readable (unique-name) and identity (ptr) representations of the result and
     // the expectation, mirroring the dual assertEquals in the PHP helper.
-    let mut result_readable: Vec<(String, String)> = Vec::new();
+    let mut result_readable: Vec<(String, bstr::BString)> = Vec::new();
     let mut result_ids: Vec<(String, Vec<usize>)> = Vec::new();
     for operation in transaction.get_operations() {
         if let AnyOperation::Update(update) = &**operation {
@@ -148,11 +148,7 @@ fn check_solver_result_repo_set(
             let to = update.get_target_package();
             result_readable.push((
                 "update".to_string(),
-                format!(
-                    "{} => {}",
-                    legacy_lossy(&from.get_unique_name()),
-                    legacy_lossy(&to.get_unique_name())
-                ),
+                bconcat!(from.get_unique_name(), " => ", to.get_unique_name()),
             ));
             result_ids.push(("update".to_string(), vec![from.ptr_id(), to.ptr_id()]));
         } else {
@@ -164,33 +160,23 @@ fn check_solver_result_repo_set(
                 other => panic!("Unexpected operation: {}", other),
             };
             let package = operation.get_target_package();
-            result_readable.push((
-                job.to_string(),
-                legacy_lossy(&package.get_unique_name()).into_owned(),
-            ));
+            result_readable.push((job.to_string(), package.get_unique_name()));
             result_ids.push((job.to_string(), vec![package.ptr_id()]));
         }
     }
 
-    let mut expected_readable: Vec<(String, String)> = Vec::new();
+    let mut expected_readable: Vec<(String, bstr::BString)> = Vec::new();
     let mut expected_ids: Vec<(String, Vec<usize>)> = Vec::new();
     for job in &expected {
         match job {
             ExpectedJob::Single { job, package } => {
-                expected_readable.push((
-                    job.to_string(),
-                    legacy_lossy(&package.get_unique_name()).into_owned(),
-                ));
+                expected_readable.push((job.to_string(), package.get_unique_name()));
                 expected_ids.push((job.to_string(), vec![package.ptr_id()]));
             }
             ExpectedJob::Update { from, to } => {
                 expected_readable.push((
                     "update".to_string(),
-                    format!(
-                        "{} => {}",
-                        legacy_lossy(&from.get_unique_name()),
-                        legacy_lossy(&to.get_unique_name())
-                    ),
+                    bconcat!(from.get_unique_name(), " => ", to.get_unique_name()),
                 ));
                 expected_ids.push(("update".to_string(), vec![from.ptr_id(), to.ptr_id()]));
             }

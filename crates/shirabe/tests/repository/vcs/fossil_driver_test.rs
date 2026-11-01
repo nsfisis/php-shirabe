@@ -7,7 +7,7 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::FossilDriver;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -20,10 +20,7 @@ fn set_up() -> SetUp {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 

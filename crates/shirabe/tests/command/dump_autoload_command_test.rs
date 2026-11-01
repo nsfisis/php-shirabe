@@ -1,7 +1,8 @@
 //! ref: composer/tests/Composer/Test/Command/DumpAutoloadCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use regex::Regex;
+use bstr::ByteSlice;
+use regex::bytes::Regex;
 use serial_test::serial;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -24,8 +25,8 @@ fn test_dump_autoload() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating autoload files"));
-    assert!(output.contains("Generated autoload files"));
+    assert!(output.contains_str("Generating autoload files"));
+    assert!(output.contains_str("Generated autoload files"));
 
     drop(tear_down);
 }
@@ -52,8 +53,8 @@ fn test_dump_dev_autoload() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating autoload files"));
-    assert!(output.contains("Generated autoload files"));
+    assert!(output.contains_str("Generating autoload files"));
+    assert!(output.contains_str("Generated autoload files"));
 
     drop(tear_down);
 }
@@ -80,8 +81,8 @@ fn test_dump_no_dev_autoload() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating autoload files"));
-    assert!(output.contains("Generated autoload files"));
+    assert!(output.contains_str("Generating autoload files"));
+    assert!(output.contains_str("Generated autoload files"));
 
     drop(tear_down);
 }
@@ -109,7 +110,7 @@ fn test_using_optimize_and_strict_psr() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating optimized autoload files"));
+    assert!(output.contains_str("Generating optimized autoload files"));
     let re = Regex::new(r"Generated optimized autoload files containing \d+ classes").unwrap();
     assert!(re.is_match(&output));
 
@@ -191,7 +192,7 @@ fn test_using_classmap_authoritative() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating optimized autoload files (authoritative)"));
+    assert!(output.contains_str("Generating optimized autoload files (authoritative)"));
     let re =
         Regex::new(r"Generated optimized autoload files \(authoritative\) containing \d+ classes")
             .unwrap();
@@ -226,7 +227,7 @@ fn test_using_classmap_authoritative_and_strict_psr() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating optimized autoload files"));
+    assert!(output.contains_str("Generating optimized autoload files"));
     let re =
         Regex::new(r"Generated optimized autoload files \(authoritative\) containing \d+ classes")
             .unwrap();

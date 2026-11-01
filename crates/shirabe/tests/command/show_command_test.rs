@@ -4,11 +4,12 @@ use crate::test_case::{
     RunOptions, get_application_tester, get_complete_package, get_package, get_version_constraint,
     init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::PlatformRepository;
-use shirabe_php_shim::date_local;
+use shirabe_php_shim::{date_local, trim};
 
 /// Build a `Vec<(ParameterName, InputValue)>` command input from `(key, value)` pairs.
 fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
@@ -80,7 +81,7 @@ fn run_show_case(
 
     let mut app_tester = get_application_tester();
     app_tester.run(command, RunOptions::default()).unwrap();
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(expected.trim(), trim(app_tester.get_display()));
 }
 
 use crate::test_case::{create_composer_lock, create_installed_json};
@@ -362,7 +363,7 @@ Everything up to date
 
 Transitive dependencies not required in composer.json:
 vendor/package 1.1.0 ~ 1.0.0",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     let mut app_tester = get_application_tester();
@@ -388,7 +389,7 @@ Everything up to date
 
 Transitive dependencies not required in composer.json:
 vendor/package 1.1.0 ~ 1.0.0",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -433,7 +434,7 @@ Everything up to date
 
 Transitive dependencies not required in composer.json:
 vendor/package 1.1.0 <highlight>! 1.2.0</highlight>",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -526,7 +527,7 @@ fn test_show_direct_with_name_only_shows_direct_dependents() {
     assert!(
         app_tester
             .get_display()
-            .contains("name     : direct/dependent\n")
+            .contains_str("name     : direct/dependent\n")
     );
 
     let mut app_tester = get_application_tester();
@@ -544,7 +545,7 @@ fn test_show_direct_with_name_only_shows_direct_dependents() {
     assert!(
         app_tester
             .get_display()
-            .contains("name     : direct/dependent2\n")
+            .contains_str("name     : direct/dependent2\n")
     );
 }
 
@@ -556,17 +557,17 @@ fn test_show_direct_with_name_only_shows_direct_dependents() {
 /// The PHP loop therefore iterates that outer (group-indexed) array twice, each time reading index
 /// `[1]` of it — i.e. it only ever asserts on the *second* matched line, not on every line. Ported
 /// verbatim, quirk included.
-fn assert_all_platform_packages(output: &str) {
-    let re = regex::Regex::new(r"(?m)^(\w+)").unwrap();
-    let matches: Vec<&str> = re
+fn assert_all_platform_packages(output: &[u8]) {
+    let re = regex::bytes::Regex::new(r"(?m)^(\w+)").unwrap();
+    let matches: Vec<&bstr::BStr> = re
         .captures_iter(output)
-        .map(|caps| caps.get(1).unwrap().as_str())
+        .map(|caps| caps.get(1).unwrap().as_bytes().as_bstr())
         .collect();
     if let Some(m) = matches.get(1) {
         assert!(
             PlatformRepository::is_platform_package(m),
             "{} is not a platform package",
-            m
+            m.display_lossy()
         );
     }
 }
@@ -603,7 +604,7 @@ fn test_show_platform_only_shows_platform_packages() {
         )
         .unwrap();
     let output = app_tester.get_display();
-    assert_all_platform_packages(output.trim());
+    assert_all_platform_packages(&trim(&output));
 }
 
 #[test]
@@ -625,7 +626,7 @@ fn test_show_platform_works_without_composer_json() {
         )
         .unwrap();
     let output = app_tester.get_display();
-    assert_all_platform_packages(output.trim());
+    assert_all_platform_packages(&trim(&output));
 
     // getting a single package
     let status_code = app_tester
@@ -713,7 +714,7 @@ fn test_outdated_with_zero_major() {
 ! patch or minor release available - update recommended
 ~ major release available - update possible
 zero/patch 0.1.2 <highlight>! 0.1.2.1</highlight>",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     let mut app_tester = get_application_tester();
@@ -733,7 +734,7 @@ zero/patch 0.1.2 <highlight>! 0.1.2.1</highlight>",
 ~ major release available - update possible
 zero/minor 0.1.0 <highlight>! 0.1.2  </highlight>
 zero/patch 0.1.2 <highlight>! 0.1.2.1</highlight>",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     let mut app_tester = get_application_tester();
@@ -753,7 +754,7 @@ zero/patch 0.1.2 <highlight>! 0.1.2.1</highlight>",
 ~ major release available - update possible
 zero/major     0.1.0 ~ 0.2.0
 zerozero/major 0.0.1 ~ 0.0.2",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -799,9 +800,9 @@ fn test_show_all_shows_all_sections() {
         )
         .unwrap();
     let output = app_tester.get_display();
-    let output = output.trim();
-    let re = regex::Regex::new(r"platform:(\n  .*)+").unwrap();
-    let output = re.replace(output, "platform: wiped");
+    let output = trim(&output);
+    let re = regex::bytes::Regex::new(r"platform:(\n  .*)+").unwrap();
+    let output = bstr::BString::from(re.replace(&output, &b"platform: wiped"[..]).into_owned());
 
     assert_eq!(
         "platform: wiped
@@ -865,7 +866,7 @@ fn test_locked_shows_all_locked() {
         .unwrap();
     assert_eq!(
         "vendor/locked 3.0.0 description of locked package",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     let pkg2 = get_complete_package("vendor/locked2", "2.0.0");
@@ -887,7 +888,7 @@ fn test_locked_shows_all_locked() {
     assert_eq!(
         "vendor/locked  3.0.0 description of locked package
 vendor/locked2 2.0.0 description of locked2 package",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -970,7 +971,7 @@ fn test_ignored_option_combinations() {
     assert!(
         app_tester
             .get_display()
-            .contains("You are using the deprecated option \"installed\".")
+            .contains_str("You are using the deprecated option \"installed\".")
     );
 
     let mut app_tester = get_application_tester();
@@ -986,7 +987,7 @@ fn test_ignored_option_combinations() {
     assert!(
         app_tester
             .get_display()
-            .contains("You are using the option \"ignore\"")
+            .contains_str("You are using the option \"ignore\"")
     );
 }
 
@@ -1011,7 +1012,7 @@ fn test_self_and_name_only() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!("vendor/package", app_tester.get_display().trim());
+    assert_eq!("vendor/package", trim(app_tester.get_display()));
 }
 
 #[test]
@@ -1110,10 +1111,8 @@ fn test_not_installed_error() {
         )
         .unwrap();
     assert!(
-        app_tester
-            .get_display()
-            .trim()
-            .contains("No dependencies installed. Try running shirabe install or update."),
+        trim(app_tester.get_display())
+            .contains_str("No dependencies installed. Try running shirabe install or update."),
         "Should show error message when no dependencies are installed"
     );
 }
@@ -1149,7 +1148,7 @@ fn test_no_dev_option() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!("vendor/package 1.0.0", app_tester.get_display().trim());
+    assert_eq!("vendor/package 1.0.0", trim(app_tester.get_display()));
 }
 
 #[test]
@@ -1191,10 +1190,10 @@ fn test_package_filter() {
         .unwrap();
     let output = app_tester.get_display();
     let output = output.trim();
-    assert!(output.contains("vendor/package"));
-    assert!(!output.contains("vendor/other-package"));
-    assert!(!output.contains("company/package"));
-    assert!(!output.contains("company/other-package"));
+    assert!(output.contains_str("vendor/package"));
+    assert!(!output.contains_str("vendor/other-package"));
+    assert!(!output.contains_str("company/package"));
+    assert!(!output.contains_str("company/other-package"));
 
     let mut app_tester = get_application_tester();
     app_tester
@@ -1209,10 +1208,10 @@ fn test_package_filter() {
         .unwrap();
     let output = app_tester.get_display();
     let output = output.trim();
-    assert!(!output.contains("vendor/package"));
-    assert!(!output.contains("vendor/other-package"));
-    assert!(output.contains("company/package"));
-    assert!(output.contains("company/other-package"));
+    assert!(!output.contains_str("vendor/package"));
+    assert!(!output.contains_str("vendor/other-package"));
+    assert!(output.contains_str("company/package"));
+    assert!(output.contains_str("company/other-package"));
 }
 
 /// ref: ShowCommandTest::testNotExistingPackage (one data-provider case).
@@ -1366,7 +1365,7 @@ fn run_specific_package_and_tree_case(
 
     let mut app_tester = get_application_tester();
     app_tester.run(input(pairs), RunOptions::default()).unwrap();
-    assert_eq!(expected, app_tester.get_display().trim());
+    assert_eq!(expected, trim(app_tester.get_display()));
 }
 
 #[test]
@@ -1501,7 +1500,7 @@ fn test_name_only_prints_no_trailing_whitespace() {
         "vendor/apackage
 vendor/longpackagename
 vendor/somepackage",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     let mut app_tester = get_application_tester();
@@ -1521,7 +1520,7 @@ vendor/somepackage",
 ~ major release available - update possible
 vendor/apackage
 vendor/longpackagename",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -1640,9 +1639,9 @@ vendor/conflicted <1.0.0
 replaces
 vendor/replaced 3.0.0";
     assert!(
-        display.trim_end().ends_with(expected),
+        display.trim_end().ends_with_str(expected),
         "expected link sections at the end of:\n{}",
-        display
+        display.display_lossy()
     );
 }
 
@@ -1664,7 +1663,7 @@ fn test_show_package_as_json_includes_every_link_type() {
         .unwrap();
 
     let display = app_tester.get_display();
-    let json: serde_json::Value = serde_json::from_str(display.trim()).unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&trim(&display)).unwrap();
     assert_eq!(
         serde_json::json!({"vendor/required": "1.0.0"}),
         json["requires"]

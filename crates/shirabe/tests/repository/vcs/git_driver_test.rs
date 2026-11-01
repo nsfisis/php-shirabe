@@ -13,7 +13,7 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException};
+use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -27,10 +27,7 @@ fn set_up() -> SetUp {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     let network_env = Platform::get_env("COMPOSER_DISABLE_NETWORK");
@@ -76,7 +73,7 @@ fn test_get_root_identifier_from_remote_local_repository() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_str().unwrap().to_string();
+    let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -95,10 +92,10 @@ fn test_get_root_identifier_from_remote_local_repository() {
     );
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(home_path.clone()));
+    repo_config.insert("url".into(), PhpMixed::string(path_to_bytes(&home_path)));
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(bstr::BString::from(home_path));
+    driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -111,7 +108,7 @@ fn test_get_root_identifier_from_remote() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_str().unwrap().to_string();
+    let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -165,7 +162,7 @@ fn test_get_root_identifier_from_remote() {
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(bstr::BString::from(home_path));
+    driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -178,7 +175,7 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_str().unwrap().to_string();
+    let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
@@ -205,7 +202,7 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(bstr::BString::from(home_path));
+    driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -217,7 +214,7 @@ fn test_get_branches_filter_invalid_branch_names() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_str().unwrap().to_string();
+    let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -249,7 +246,7 @@ fn test_get_branches_filter_invalid_branch_names() {
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(bstr::BString::from(home_path));
+    driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     let branches = driver.get_branches().unwrap();
     let mut expected: IndexMap<String, String> = IndexMap::new();

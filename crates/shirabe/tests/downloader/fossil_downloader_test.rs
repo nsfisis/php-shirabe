@@ -11,7 +11,7 @@ use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -48,10 +48,10 @@ impl Drop for TearDown {
 /// for a PackageInterface mock as long as `getSourceUrls()` equals
 /// `[getSourceUrl()]`, which holds for every non-ignored case here.
 fn get_package(source_reference: Option<&str>, source_url: Option<&str>) -> PackageInterfaceHandle {
-    let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package = CompletePackageHandle::new(
         bstr::BString::from("dummy/pkg".to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from("1.0.0".to_string()),
     );
     package.__set_source_type(Some(bstr::BString::from("fossil".to_string())));
@@ -97,7 +97,7 @@ fn test_install_for_package_without_source_reference() {
     let downloader = get_downloader_mock(None, None, process, None);
 
     let path = working_dir.path().join("path");
-    let result = run(downloader.install(package, std::path::Path::new(path.to_str().unwrap())));
+    let result = run(downloader.install(package, std::path::Path::new(&path)));
 
     let e = result.expect_err("missing source reference should throw");
     assert!(e.to_string().contains("missing reference information"));
@@ -108,7 +108,7 @@ fn test_install() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().display().to_string();
     let package = get_package(Some("trunk"), Some("http://fossil.kd2.org/kd2fw/"));
 
     let repo_file = format!("{}.fossil", working_dir_str);
@@ -178,7 +178,7 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().display().to_string();
 
     // Ensure the .fslckout metadata file exists.
     let fslckout = working_dir.path().join(".fslckout");
@@ -233,7 +233,7 @@ fn test_update() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().display().to_string();
 
     // Ensure file exists
     let file = working_dir.path().join(".fslckout");

@@ -33,10 +33,9 @@ fn test_jetpack_autoloader_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let mut results = Vec::new();
-    for (program, prefix) in &implementations(&composer_bin) {
+    for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let install = run_command(work.path(), program, prefix, &["install"]);

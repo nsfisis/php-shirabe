@@ -12,16 +12,16 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
-    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
+    let norm_version = VersionParser.normalize(version, None).unwrap();
     CompletePackageHandle::new(
         bstr::BString::from(name.to_string()),
-        bstr::BString::from(norm_version),
+        norm_version,
         bstr::BString::from(version.to_string()),
     )
     .into()
@@ -83,7 +83,7 @@ fn test_error_messages() {
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".into(),
-        PhpMixed::string(test_dir.to_str().unwrap().to_string()),
+        PhpMixed::string(path_to_bytes(&test_dir)),
     );
     let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(config_options, false)));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
@@ -107,7 +107,7 @@ fn test_error_messages() {
     );
 
     let install_path = test_dir.join("install-path");
-    let install_path = install_path.to_str().unwrap().to_string();
+    let install_path = install_path.to_path_buf();
 
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {

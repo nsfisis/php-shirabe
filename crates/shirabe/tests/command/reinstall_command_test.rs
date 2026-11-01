@@ -5,6 +5,7 @@ use crate::test_case::{
     init_temp_composer,
 };
 use serial_test::serial;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
@@ -94,6 +95,6 @@ fn test_reinstall_command() {
         args.extend(options);
         app_tester.run(input(args), RunOptions::default()).unwrap();
 
-        assert_eq!(expected, app_tester.get_display().trim(), "case: {label}");
+        assert_eq!(expected, trim(app_tester.get_display()), "case: {label}");
     }
 }
