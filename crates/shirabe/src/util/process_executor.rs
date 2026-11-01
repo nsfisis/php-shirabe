@@ -7,19 +7,19 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
-    array_map, bconcat, escapeshellarg, explode, implode, in_array_strict, is_dir, is_numeric,
-    legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
+    array_map, bconcat, escapeshellarg, explode, implode, in_array_strict, intval, is_dir,
+    is_numeric, legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
     preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim2, str_replace, strcspn,
     strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
-use shirabe_symfony_process::exception::{
-    ProcessSignaledException, RuntimeException as SymfonyProcessRuntimeException,
+use shirabe_symfony_process::{
+    ExecutableFinder, Process, ProcessMock,
+    exception::{ProcessSignaledException, RuntimeException as SymfonyProcessRuntimeException},
 };
-use shirabe_symfony_process::{ExecutableFinder, Process, ProcessMock};
 use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
-static EXECUTABLES: LazyLock<Mutex<IndexMap<String, String>>> =
+static EXECUTABLES: LazyLock<Mutex<IndexMap<BString, BString>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 static TIMEOUT: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(300));
@@ -677,8 +677,7 @@ impl ProcessExecutor {
             None => PhpMixed::Null,
         };
         if is_numeric(&max_jobs_env_mixed) {
-            self.max_jobs
-                .set(shirabe_php_shim::intval(&max_jobs_env_mixed).clamp(1, 50));
+            self.max_jobs.set(intval(&max_jobs_env_mixed).clamp(1, 50));
         } else {
             self.max_jobs.set(10);
         }
@@ -864,17 +863,16 @@ impl ProcessExecutor {
             return name.into();
         }
 
-        // TODO(bytes,windows): ExecutableFinder looks the name up as a &str.
-        let name = legacy_lossy(name).into_owned();
+        let name = BString::from(name);
         let mut executables = EXECUTABLES.lock().unwrap();
         if !executables.contains_key(&name) {
-            let path = ExecutableFinder::new().find(&name, Some(&name), &[]);
+            let path = ExecutableFinder::new().find(&name, None, &[]);
             if let Some(p) = path {
                 executables.insert(name.clone(), p);
             }
         }
 
-        executables.get(&name).cloned().unwrap_or(name).into()
+        executables.get(&name).cloned().unwrap_or(name)
     }
 }
 

@@ -10,9 +10,8 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy,
-    php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
-    trim,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -56,7 +55,7 @@ impl RootPackageLoader {
         &mut self,
         config: IndexMap<BString, PhpMixed>,
         class: &str,
-        cwd: Option<&str>,
+        cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<crate::package::PackageInterfaceHandle> {
         if class != "Composer\\Package\\RootPackage" {
             trigger_error(
@@ -85,7 +84,7 @@ impl RootPackageLoader {
                 config.insert("version".into(), PhpMixed::string(version));
             } else {
                 let cwd = cwd
-                    .map(std::path::PathBuf::from)
+                    .map(std::path::Path::to_path_buf)
                     .unwrap_or_else(|| Platform::get_cwd(true).unwrap_or_default());
                 let version_data = self.version_guesser.guess_version(&config, &cwd)?;
                 if let Some(data) = version_data {
@@ -111,7 +110,7 @@ impl RootPackageLoader {
                     if name != "__root__" && package_type != "project" {
                         io.warning(&format!(
                             "Shirabe could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
-                            legacy_lossy(&name)
+                            name.display_lossy()
                         ), &[]);
                     }
                 }

@@ -39,22 +39,16 @@ impl RepositoryFactory {
 
         if extension == "json" {
             let json = JsonFile::new(
-                repository.to_string(),
+                repository,
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
                     Factory::create_http_downloader(io.clone(), config, IndexMap::new())?,
                 ))),
                 Some(io.clone()),
             )?;
             let data = json.read()?;
-            let has_packages = data
-                .get(&legacy_lossy(b"packages".as_slice()))
-                .is_some_and(|v| !v.is_null());
-            let has_includes = data
-                .get(&legacy_lossy(b"includes".as_slice()))
-                .is_some_and(|v| !v.is_null());
-            let has_provider_includes = data
-                .get(&legacy_lossy(b"provider-includes".as_slice()))
-                .is_some_and(|v| !v.is_null());
+            let has_packages = data.get("packages").is_some_and(|v| !v.is_null());
+            let has_includes = data.get("includes").is_some_and(|v| !v.is_null());
+            let has_provider_includes = data.get("provider-includes").is_some_and(|v| !v.is_null());
             if has_packages || has_includes || has_provider_includes {
                 let real_path = std::fs::canonicalize(repository)
                     .ok()

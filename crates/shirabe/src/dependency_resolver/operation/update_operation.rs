@@ -3,7 +3,6 @@
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
-use shirabe_php_shim::legacy_lossy;
 
 #[derive(Debug, Clone)]
 pub struct UpdateOperation {
@@ -75,9 +74,9 @@ impl UpdateOperation {
         format!(
             "{} <info>{}</info> (<comment>{}</comment> => <comment>{}</comment>)",
             action_name,
-            legacy_lossy(&initial_package.get_pretty_name()),
-            legacy_lossy(&from_version),
-            legacy_lossy(&to_version),
+            initial_package.get_pretty_name().display_lossy(),
+            from_version.display_lossy(),
+            to_version.display_lossy(),
         )
     }
 }

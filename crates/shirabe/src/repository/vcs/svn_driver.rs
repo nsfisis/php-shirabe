@@ -97,7 +97,7 @@ impl SvnDriver {
                         .inner
                         .config
                         .borrow_mut()
-                        .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
+                        .get("cache-repo-dir")
                         .as_string()
                         .unwrap_or_default()
                 ),
@@ -115,7 +115,7 @@ impl SvnDriver {
             self.inner
                 .config
                 .borrow_mut()
-                .get(&legacy_lossy(b"cache-read-only".as_slice()))
+                .get("cache-read-only")
                 .as_bool()
                 .unwrap_or(false),
         );

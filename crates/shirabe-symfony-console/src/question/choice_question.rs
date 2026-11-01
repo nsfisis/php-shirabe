@@ -2,11 +2,9 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::question::{Question, QuestionInterface};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    PhpMixed, array_search, explode, legacy_lossy, php_regex, preg_is_match, sprintf, strval, trim,
-};
+use shirabe_php_shim::{PhpMixed, explode, php_regex, preg_is_match, sprintf, strval, trim};
 
 /// Represents a choice question.
 #[derive(Debug)]
@@ -125,8 +123,9 @@ impl ChoiceQuestion {
                 // Check for a separated comma values
                 if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), strval(&selected)) {
                     return Err(InvalidArgumentException::new(
-                        legacy_lossy(&sprintf(&error_message, std::slice::from_ref(&selected)))
-                            .into_owned(),
+                        sprintf(&error_message, std::slice::from_ref(&selected))
+                            .display_lossy()
+                            .to_string(),
                     ));
                 }
 
@@ -163,7 +162,11 @@ impl ChoiceQuestion {
                 }
 
                 // array_search($value, $choices)
-                let result_key = array_search(strval(value), &choices_as_str(&choices));
+                let needle = strval(value);
+                let result_key = choices
+                    .iter()
+                    .find(|(_, choice)| strval(choice) == needle)
+                    .map(|(key, _)| key.clone());
 
                 let mut result: PhpMixed;
                 if !is_assoc {
@@ -191,8 +194,9 @@ impl ChoiceQuestion {
                 // false === $result
                 if matches!(result, PhpMixed::Bool(false)) {
                     return Err(InvalidArgumentException::new(
-                        legacy_lossy(&sprintf(&error_message, std::slice::from_ref(value)))
-                            .into_owned(),
+                        sprintf(&error_message, std::slice::from_ref(value))
+                            .display_lossy()
+                            .to_string(),
                     ));
                 }
 
@@ -240,7 +244,7 @@ impl QuestionInterface for ChoiceQuestion {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
         self.inner.get_autocompleter_callback()
     }
 
@@ -265,19 +269,4 @@ impl QuestionInterface for ChoiceQuestion {
     fn as_choice(&self) -> Option<&ChoiceQuestion> {
         Some(self)
     }
-}
-
-/// array_search operates over the choice values as strings; this projects the
-/// choices map's values into the string-keyed form the shim expects.
-fn choices_as_str(choices: &IndexMap<BString, PhpMixed>) -> IndexMap<String, String> {
-    choices
-        .iter()
-        // TODO(bytes): the result is keyed by String, so non-UTF-8 bytes are replaced.
-        .map(|(k, v)| {
-            (
-                k.to_str_lossy().into_owned(),
-                legacy_lossy(&strval(v)).into_owned(),
-            )
-        })
-        .collect()
 }

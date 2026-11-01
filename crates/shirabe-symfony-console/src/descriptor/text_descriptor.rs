@@ -12,8 +12,8 @@ use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, count, json_encode_ex, legacy_lossy,
-    php_truthy, preg_replace, str_replace, strip_tags, strlen, strtoupper,
+    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, bconcat, count, json_encode_ex,
+    php_truthy, preg_replace, str_replace, strip_tags, strlen,
 };
 
 /// Text descriptor.
@@ -43,7 +43,7 @@ impl TextDescriptor {
         {
             format!(
                 "<comment> [default: {}]</comment>",
-                self.format_default_value(&default_value)?
+                self.format_default_value(&default_value)?.display_lossy()
             )
         } else {
             String::new()
@@ -56,16 +56,17 @@ impl TextDescriptor {
         let spacing_width = total_width - strlen(argument.get_name());
 
         self.write_text(
-            &format!(
+            format!(
                 "  <info>{}</info>  {}{}{}",
                 argument.get_name(),
                 " ".repeat(spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                legacy_lossy(&preg_replace(
+                (preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
                     format!("\n{}", " ".repeat((total_width + 4) as usize)),
                     argument.get_description(),
-                )),
+                ))
+                .display_lossy(),
                 default,
             ),
             &options,
@@ -86,7 +87,7 @@ impl TextDescriptor {
         {
             format!(
                 "<comment> [default: {}]</comment>",
-                self.format_default_value(&default_value)?
+                self.format_default_value(&default_value)?.display_lossy()
             )
         } else {
             String::new()
@@ -94,7 +95,7 @@ impl TextDescriptor {
 
         let mut value = String::new();
         if option.accept_value() {
-            value = format!("={}", legacy_lossy(&strtoupper(option.get_name())));
+            value = format!("={}", option.get_name().to_ascii_uppercase());
 
             if option.is_value_optional() {
                 value = format!("[{}]", value);
@@ -122,16 +123,17 @@ impl TextDescriptor {
         let spacing_width = total_width - Helper::width(&synopsis);
 
         self.write_text(
-            &format!(
+            format!(
                 "  <info>{}</info>  {}{}{}{}",
                 synopsis,
                 " ".repeat(spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                legacy_lossy(&preg_replace(
+                (preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
                     format!("\n{}", " ".repeat((total_width + 4) as usize)),
                     option.get_description(),
-                )),
+                ))
+                .display_lossy(),
                 default,
                 if option.is_array() {
                     "<comment> (multiple values allowed)</comment>".to_string()
@@ -210,7 +212,7 @@ impl TextDescriptor {
         if !description.is_empty() {
             self.write_text("<comment>Description:</comment>", &options);
             self.write_text("\n", &IndexMap::new());
-            self.write_text(&format!("  {}", description), &IndexMap::new());
+            self.write_text(format!("  {}", description), &IndexMap::new());
             self.write_text("\n\n", &IndexMap::new());
         }
 
@@ -221,7 +223,7 @@ impl TextDescriptor {
         for usage in usages {
             self.write_text("\n", &IndexMap::new());
             self.write_text(
-                &format!("  {}", legacy_lossy(&OutputFormatter::escape(&usage)?)),
+                format!("  {}", OutputFormatter::escape(&usage)?.display_lossy()),
                 &options,
             );
         }
@@ -239,10 +241,7 @@ impl TextDescriptor {
             self.write_text("\n", &IndexMap::new());
             self.write_text("<comment>Help:</comment>", &options);
             self.write_text("\n", &IndexMap::new());
-            self.write_text(
-                &format!("  {}", legacy_lossy(&str_replace("\n", "\n  ", &help))),
-                &options,
-            );
+            self.write_text(bconcat!("  ", str_replace("\n", "\n  ", &help)), &options);
             self.write_text("\n", &IndexMap::new());
         }
         Ok(())
@@ -273,7 +272,7 @@ impl TextDescriptor {
             for command in &command_list {
                 let command = command.borrow();
                 self.write_text(
-                    &format!(
+                    format!(
                         "{:<w$} {}",
                         command.get_name().unwrap_or_default(),
                         command.get_description(),
@@ -286,7 +285,7 @@ impl TextDescriptor {
         } else {
             let help = application.borrow().get_help();
             if !help.is_empty() {
-                self.write_text(&format!("{}\n\n", help), &options);
+                self.write_text(format!("{}\n\n", help), &options);
             }
 
             self.write_text("<comment>Usage:</comment>\n", &options);
@@ -311,9 +310,10 @@ impl TextDescriptor {
                 // make sure all alias commands are included when describing a specific namespace
                 let described_namespace_info = namespaces.values().next().unwrap();
                 if let Some(PhpMixed::List(names)) = described_namespace_info.get(B("commands")) {
+                    // Command names are declared in code.
                     let names: Vec<String> = names
                         .iter()
-                        .filter_map(|n| n.as_string().map(|s| legacy_lossy(s).into_owned()))
+                        .filter_map(|n| n.as_string().map(|s| s.display_lossy().to_string()))
                         .collect();
                     for name in names {
                         let command = description.get_command(&name)?;
@@ -344,7 +344,7 @@ impl TextDescriptor {
 
             if let Some(ref described_namespace) = described_namespace {
                 self.write_text(
-                    &format!(
+                    format!(
                         "<comment>Available commands for the \"{}\" namespace:</comment>",
                         described_namespace.clone(),
                     ),
@@ -383,7 +383,7 @@ impl TextDescriptor {
                     && ApplicationDescription::GLOBAL_NAMESPACE != namespace_id
                 {
                     self.write_text("\n", &IndexMap::new());
-                    self.write_text(&format!(" <comment>{}</comment>", namespace_id), &options);
+                    self.write_text(format!(" <comment>{}</comment>", namespace_id), &options);
                 }
 
                 for name in ns_commands {
@@ -397,7 +397,7 @@ impl TextDescriptor {
                         String::new()
                     };
                     self.write_text(
-                        &format!(
+                        format!(
                             "  <info>{}</info>{}{}{}",
                             name.clone(),
                             " ".repeat(spacing_width as usize),
@@ -414,12 +414,12 @@ impl TextDescriptor {
         Ok(())
     }
 
-    fn write_text(&self, content: &str, options: &IndexMap<BString, PhpMixed>) {
+    fn write_text(&self, content: impl AsRef<[u8]>, options: &IndexMap<BString, PhpMixed>) {
         let raw_text = matches!(options.get(B("raw_text")), Some(v) if php_truthy(v));
         let content = if raw_text {
-            legacy_lossy(&strip_tags(content)).into_owned()
+            strip_tags(content)
         } else {
-            content.to_string()
+            BString::from(content.as_ref())
         };
         let decorated = match options.get(B("raw_output")) {
             Some(v) => !php_truthy(v),
@@ -441,9 +441,9 @@ impl TextDescriptor {
     }
 
     /// Formats input option/argument default value.
-    fn format_default_value(&self, default: &PhpMixed) -> anyhow::Result<String> {
+    fn format_default_value(&self, default: &PhpMixed) -> anyhow::Result<BString> {
         if matches!(default, PhpMixed::Float(f) if f.is_infinite() && *f > 0.0) {
-            return Ok("INF".to_string());
+            return Ok("INF".into());
         }
 
         let default = match default {
@@ -469,13 +469,12 @@ impl TextDescriptor {
             other => other.clone(),
         };
 
-        Ok(legacy_lossy(&str_replace(
+        Ok(str_replace(
             "\\\\",
             "\\",
             json_encode_ex(&default, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
                 .unwrap_or_default(),
         ))
-        .into_owned())
     }
 
     fn get_column_width(&self, commands: &[CommandOrString]) -> i64 {

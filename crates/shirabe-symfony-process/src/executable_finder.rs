@@ -1,10 +1,12 @@
 //! ref: composer/vendor/symfony/process/ExecutableFinder.php
 
+use bstr::BString;
 use shirabe_php_shim::{
     PATHINFO_EXTENSION, PHP_EOL, basename, bconcat, escapeshellarg, exec, getenv, is_dir,
-    is_executable, is_file, legacy_lossy, path_from_bytes, pathinfo, strcspn, strpos, strtolower,
+    is_executable, is_file, path_from_bytes, path_to_bytes, pathinfo, strcspn, strpos, strtolower,
     substr,
 };
+use std::path::PathBuf;
 
 const CMD_BUILTINS: &[&str] = &[
     "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del", "dir", "echo",
@@ -29,19 +31,23 @@ impl ExecutableFinder {
         Self { suffixes: vec![] }
     }
 
-    pub fn find(&self, name: &str, default: Option<&str>, extra_dirs: &[String]) -> Option<String> {
+    pub fn find(
+        &self,
+        name: impl AsRef<[u8]>,
+        default: Option<&str>,
+        extra_dirs: &[String],
+    ) -> Option<BString> {
+        let name = name.as_ref();
         // windows built-in commands that are present in cmd.exe should not be resolved using PATH as they do not exist as exes
         if cfg!(windows) && CMD_BUILTINS.iter().any(|b| strtolower(name) == *b) {
-            return Some(name.to_string());
+            return Some(name.into());
         }
 
         let path = getenv("PATH")
             .or_else(|| getenv("Path"))
             .unwrap_or_default();
-        let mut dirs: Vec<String> = std::env::split_paths(&path)
-            .map(|dir| dir.into_os_string().into_string().unwrap())
-            .collect();
-        dirs.extend_from_slice(extra_dirs);
+        let mut dirs: Vec<PathBuf> = std::env::split_paths(&path).collect();
+        dirs.extend(extra_dirs.iter().map(PathBuf::from));
 
         let mut suffixes: Vec<String> = vec![];
         if cfg!(windows) {
@@ -70,25 +76,25 @@ impl ExecutableFinder {
         };
         for suffix in &suffixes {
             for dir in &dirs {
-                let dir = if dir.is_empty() { "." } else { dir.as_str() };
-                let file = std::path::Path::new(dir)
-                    .join(format!("{name}{suffix}"))
-                    .into_os_string()
-                    .into_string()
-                    .unwrap();
+                let dir = if dir.as_os_str().is_empty() {
+                    std::path::Path::new(".")
+                } else {
+                    dir.as_path()
+                };
+                let file_name = bconcat!(name, suffix);
+                let file = dir.join(path_from_bytes(&file_name));
                 if is_file(&file) && (cfg!(windows) || is_executable(&file)) {
-                    return Some(file);
+                    return Some(path_to_bytes(&file).into());
                 }
 
-                if !is_dir(dir) && basename(dir) == format!("{name}{suffix}") && is_executable(dir)
-                {
-                    return Some(dir.to_string());
+                if !is_dir(dir) && basename(path_to_bytes(dir)) == file_name && is_executable(dir) {
+                    return Some(path_to_bytes(dir).into());
                 }
             }
         }
 
         if cfg!(windows) || name.len() != strcspn(name, format!("/{}", std::path::MAIN_SEPARATOR)) {
-            return default.map(ToString::to_string);
+            return default.map(BString::from);
         }
 
         let exec_result =
@@ -100,9 +106,9 @@ impl ExecutableFinder {
             strpos(&exec_result, PHP_EOL).map(|i| i as i64),
         );
         if !executable_path.is_empty() && is_executable(path_from_bytes(&executable_path)) {
-            return Some(legacy_lossy(&executable_path).into_owned());
+            return Some(executable_path);
         }
 
-        default.map(ToString::to_string)
+        default.map(BString::from)
     }
 }

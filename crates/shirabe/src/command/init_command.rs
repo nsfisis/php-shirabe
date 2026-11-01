@@ -15,17 +15,19 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
-    array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, empty, explode,
-    file, file_exists, file_get_contents, file_put_contents, filter_var_email, get_current_user,
-    impl_php_class, implode, is_dir, is_string, legacy_lossy, path_to_bytes, php_regex,
-    preg_is_match, preg_match, preg_match_all, preg_quote, preg_replace, realpath, str_replace,
-    strpos, strtolower, trim, ucwords, unlink,
+    array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, bconcat, empty,
+    explode, file, file_exists, file_get_contents, file_put_contents, filter_var_email,
+    get_current_user, impl_php_class, implode, is_dir, is_string, legacy_lossy, path_to_bytes,
+    php_regex, preg_is_match, preg_match, preg_match_all, preg_quote, preg_replace, realpath,
+    str_replace, strpos, strtolower, trim, ucwords, unlink,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::helper::FormatBlockMessages;
-use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::{
+    command::Command,
+    helper::FormatBlockMessages,
+    input::{ArrayInput, InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct InitCommand {
@@ -266,7 +268,7 @@ impl InitCommand {
             let application = self
                 .get_application()
                 .expect("a Composer command's application is always set");
-            let update_command = application.borrow_mut().find("update")?;
+            let update_command = application.borrow_mut().find(bstr::BStr::new("update"))?;
             self.reset_composer()?;
             let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
@@ -290,7 +292,9 @@ impl InitCommand {
             let application = self
                 .get_application()
                 .expect("a Composer command's application is always set");
-            let command = application.borrow_mut().find("dump-autoload")?;
+            let command = application
+                .borrow_mut()
+                .find(bstr::BStr::new("dump-autoload"))?;
             self.reset_composer()?;
             let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
@@ -688,7 +692,7 @@ impl Command for InitCommand {
             }
         } else {
             io.write_error3(
-                format!("Writing {}", file_obj.get_path()),
+                format!("Writing {}", file_obj.get_path().display()),
                 true,
                 io_interface::NORMAL,
             );
@@ -706,7 +710,7 @@ impl Command for InitCommand {
                 );
                 let errors = format!(
                     " - {}",
-                    legacy_lossy(&implode(format!("{} - ", PHP_EOL), json_err.get_errors()))
+                    (implode(format!("{} - ", PHP_EOL), json_err.get_errors())).display_lossy()
                 );
                 io.write_error3(
                     format!("{}:{}{}", json_err.get_message(), PHP_EOL, errors),
@@ -905,15 +909,16 @@ impl Command for InitCommand {
             }
 
             io.write_error3(
-                format!(
-                    "\n{}\n",
+                bconcat!(
+                    "\n",
                     formatter.borrow().format_block(
                         FormatBlockMessages::String(
                             "Welcome to the Shirabe config generator".to_string(),
                         ),
                         "bg=blue;fg=white",
                         true,
-                    )
+                    ),
+                    "\n"
                 ),
                 true,
                 io_interface::NORMAL,

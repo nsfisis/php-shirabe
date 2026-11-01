@@ -2,7 +2,6 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
-use shirabe_php_shim::{array_filter, implode, legacy_lossy, ltrim2, php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
@@ -80,23 +79,21 @@ impl InputOption {
     }
 
     fn normalize_shortcut(s: &str) -> anyhow::Result<Option<String>> {
-        let stripped = ltrim2(s, "-");
-        let parts = preg_split(php_regex!(r"{(\|)-?}"), &stripped);
-        let filtered: Vec<String> = array_filter(
-            &parts
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
-            |s: &String| !s.is_empty(),
-        );
-        let result = implode("|", &filtered);
+        let stripped = s.trim_start_matches('-');
+        // The shortcut is declared in code: `{(\|)-?}` is split without a regex to keep it a `String`.
+        let filtered: Vec<&str> = stripped
+            .split('|')
+            .map(|part| part.strip_prefix('-').unwrap_or(part))
+            .filter(|part| !part.is_empty())
+            .collect();
+        let result = filtered.join("|");
         if result.is_empty() {
             return Err(InvalidArgumentException::new(
                 "An option shortcut cannot be empty.".to_string(),
             )
             .into());
         }
-        Ok(Some(legacy_lossy(&result).into_owned()))
+        Ok(Some(result))
     }
 
     pub fn get_shortcut(&self) -> Option<&str> {

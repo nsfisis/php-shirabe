@@ -130,7 +130,7 @@ impl FilesystemRepository {
             Err(e) => {
                 return Err(InvalidRepositoryException::new(format!(
                     "Invalid repository data in {}, packages could not be loaded: [{}] {}",
-                    self.file.get_path(),
+                    self.file.get_path().display(),
                     AnyThrowable::of(&e)
                         .expect("PHP reaches this only with a caught \\Throwable")
                         .php_class_name(),
@@ -211,7 +211,7 @@ impl FilesystemRepository {
         // make sure the directory is created so we can realpath it
         // as realpath() does some additional normalizations with network paths that normalizePath does not
         // and we need to find shortest path correctly
-        let repo_dir = BString::from(&dirname(self.file.get_path())[..]);
+        let repo_dir = dirname(path_to_bytes(self.file.get_path()));
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(path_from_bytes(&repo_dir));
@@ -356,7 +356,7 @@ impl FilesystemRepository {
     }
 
     /// As we load the file from vendor dir during bootstrap, we need to make sure it contains only expected code before executing it
-    pub fn safely_load_installed_versions(_path: &str) -> bool {
+    pub fn safely_load_installed_versions(_path: &std::path::Path) -> bool {
         // TODO(php-runtime): call `InstalledVersions::reload()` in PHP runtime process, not in
         // Rust.
         true

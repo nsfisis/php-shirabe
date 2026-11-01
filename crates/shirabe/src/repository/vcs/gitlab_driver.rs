@@ -81,11 +81,7 @@ impl GitLabDriver {
             .filter(|s| !s.is_empty())
             .map(BString::from)
             .unwrap_or_else(|| BString::from(match_.name("domain2").unwrap_or_default()));
-        let configured_domains = self
-            .inner
-            .config
-            .borrow_mut()
-            .get(&legacy_lossy(b"gitlab-domains".as_slice()));
+        let configured_domains = self.inner.config.borrow_mut().get("gitlab-domains");
         let mut url_parts: Vec<BString> = explode("/", match_.name("parts").unwrap_or_default())
             .to_vec()
             .into_iter()
@@ -120,11 +116,7 @@ impl GitLabDriver {
         };
         self.inner.origin_url = origin;
 
-        let protocol_value = self
-            .inner
-            .config
-            .borrow_mut()
-            .get(&legacy_lossy(b"gitlab-protocol".as_slice()));
+        let protocol_value = self.inner.config.borrow_mut().get("gitlab-protocol");
         if let Some(protocol) = protocol_value
             .as_string()
             .filter(|_| is_string(&protocol_value))
@@ -167,7 +159,7 @@ impl GitLabDriver {
                         .inner
                         .config
                         .borrow_mut()
-                        .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
+                        .get("cache-repo-dir")
                         .as_string()
                         .unwrap_or_default()
                 ),
@@ -184,7 +176,7 @@ impl GitLabDriver {
                 self.inner
                     .config
                     .borrow_mut()
-                    .get(&legacy_lossy(b"cache-read-only".as_slice()))
+                    .get("cache-read-only")
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -980,9 +972,7 @@ impl GitLabDriver {
             .collect::<Vec<_>>();
 
         if Self::determine_origin(
-            &config
-                .borrow()
-                .get(&legacy_lossy(b"gitlab-domains".as_slice())),
+            &config.borrow().get("gitlab-domains"),
             guessed_domain,
             &mut url_parts,
             match_.name("port").map(bstr::BString::from),

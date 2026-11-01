@@ -183,7 +183,7 @@ impl GitLab {
             self.io.write_error3(msg, true, io_interface::NORMAL);
         }
 
-        let local_auth_config_name: Option<String> = self
+        let local_auth_config_name: Option<BString> = self
             .config
             .borrow()
             .get_local_auth_config_source()
@@ -204,9 +204,15 @@ impl GitLab {
                 "A token will be created and stored in \"{}\", your password will never be stored",
                 local_auth_config_name
                     .as_ref()
-                    .map(|name| format!("{} OR ", name))
+                    .map(|name| format!("{} OR ", name.display_lossy()))
                     .unwrap_or_default()
-                    + &self.config.borrow().get_auth_config_source().get_name()
+                    + &self
+                        .config
+                        .borrow()
+                        .get_auth_config_source()
+                        .get_name()
+                        .display_lossy()
+                        .to_string()
             ),
             true,
             io_interface::NORMAL,

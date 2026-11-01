@@ -261,7 +261,7 @@ impl RepositoryInterface for ArrayRepository {
                         &acceptable_stabilities,
                         &stability_flags,
                         &package.get_names(true).to_vec(),
-                        bstr::BStr::new(&*legacy_lossy(&package.get_stability())),
+                        bstr::BStr::new(&package.get_stability()),
                     )
                     && !already_loaded
                         .get(&package.get_name())

@@ -52,7 +52,7 @@ fn make_locker(
     }
 
     let io = null_io();
-    let json_file = JsonFile::new(lock_path.to_str().unwrap().to_string(), None, None).unwrap();
+    let json_file = JsonFile::new(lock_path.to_str().unwrap(), None, None).unwrap();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));

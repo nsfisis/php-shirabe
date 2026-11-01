@@ -315,11 +315,11 @@ impl Platform {
         cached.unwrap_or(false)
     }
 
-    pub fn get_dev_null() -> String {
+    pub fn get_dev_null() -> &'static str {
         if Self::is_windows() {
-            return "NUL".to_string();
+            return "NUL";
         }
 
-        "/dev/null".to_string()
+        "/dev/null"
     }
 }

@@ -59,7 +59,10 @@ impl BumpCommand {
 
         if !Filesystem::is_readable(&composer_json_path) {
             io.write_error3(
-                format!("<error>{} is not readable.</error>", composer_json_path),
+                format!(
+                    "<error>{} is not readable.</error>",
+                    composer_json_path.display()
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -71,7 +74,10 @@ impl BumpCommand {
             Ok(c) => c,
             Err(_) => {
                 io.write_error3(
-                    format!("<error>{} is not readable.</error>", composer_json_path),
+                    format!(
+                        "<error>{} is not readable.</error>",
+                        composer_json_path.display()
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -83,7 +89,10 @@ impl BumpCommand {
             && file_put_contents(&composer_json_path, &contents).is_none()
         {
             io.write_error3(
-                format!("<error>{} is not writable.</error>", composer_json_path),
+                format!(
+                    "<error>{} is not writable.</error>",
+                    composer_json_path.display()
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -200,7 +209,7 @@ impl BumpCommand {
                 let current_constraint = link.get_pretty_constraint();
 
                 let package_opt = repo.find_package(
-                    bstr::BStr::new(&*legacy_lossy(pkg_name)),
+                    bstr::BStr::new(pkg_name),
                     crate::repository::FindPackageConstraint::String(bstr::BString::from(
                         "*".to_string(),
                     )),
@@ -249,7 +258,7 @@ impl BumpCommand {
             if dry_run {
                 io.write(format!(
                     "<info>{} would be updated with:</info>",
-                    composer_json_path
+                    composer_json_path.display()
                 ));
                 for (require_type, packages) in &updates {
                     for (package, version) in packages {
@@ -262,13 +271,14 @@ impl BumpCommand {
             } else {
                 io.write(format!(
                     "<info>{} has been updated ({} changes).</info>",
-                    composer_json_path, change_count
+                    composer_json_path.display(),
+                    change_count
                 ));
             }
         } else {
             io.write(format!(
                 "<info>No requirements to update in {}.</info>",
-                composer_json_path
+                composer_json_path.display()
             ));
         }
 
@@ -305,7 +315,7 @@ impl BumpCommand {
             Err(_) => {
                 return Err(RuntimeException::new(format!(
                     "Unable to read {} contents.",
-                    json.get_path()
+                    json.get_path().display()
                 ))
                 .into());
             }
@@ -325,7 +335,7 @@ impl BumpCommand {
             Some(_) => Ok(true),
             None => Err(RuntimeException::new(format!(
                 "Unable to write new {} contents.",
-                json.get_path()
+                json.get_path().display()
             ))
             .into()),
         }

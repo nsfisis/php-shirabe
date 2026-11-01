@@ -2,7 +2,6 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::AliasPackageHandle;
-use shirabe_php_shim::legacy_lossy;
 
 #[derive(Debug, Clone)]
 pub struct MarkAliasInstalledOperation {
@@ -21,19 +20,18 @@ impl MarkAliasInstalledOperation {
     pub fn show(&self, _lock: bool) -> String {
         format!(
             "Marking <info>{}</info> (<comment>{}</comment>) as installed, alias of <info>{}</info> (<comment>{}</comment>)",
-            legacy_lossy(&self.package.get_pretty_name()),
-            legacy_lossy(
-                &self
-                    .package
-                    .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-            ),
-            legacy_lossy(&self.package.get_alias_of().get_pretty_name()),
-            legacy_lossy(
-                &self
-                    .package
-                    .get_alias_of()
-                    .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-            ),
+            self.package.get_pretty_name().display_lossy(),
+            self.package
+                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                .display_lossy(),
+            self.package
+                .get_alias_of()
+                .get_pretty_name()
+                .display_lossy(),
+            self.package
+                .get_alias_of()
+                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                .display_lossy(),
         )
     }
 }

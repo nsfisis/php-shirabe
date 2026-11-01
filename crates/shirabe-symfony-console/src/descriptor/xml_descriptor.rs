@@ -10,7 +10,7 @@ use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    DOMDocument, DOMNode, PhpMixed, legacy_lossy, php_to_string, php_truthy, str_replace, strpos,
+    DOMDocument, DOMNode, PhpMixed, bconcat, php_to_string, php_truthy, str_replace, strpos,
     substr, var_export,
 };
 
@@ -52,11 +52,11 @@ impl XmlDescriptor {
         let usages_xml = command_xml.append_child(dom.create_element("usages"));
 
         let description_xml = command_xml.append_child(dom.create_element("description"));
-        description_xml.append_child(dom.create_text_node(&legacy_lossy(&str_replace(
+        description_xml.append_child(dom.create_text_node(str_replace(
             "\n",
             "\n ",
             command.get_description(),
-        ))));
+        )));
 
         if short {
             for usage in command.get_aliases() {
@@ -73,11 +73,11 @@ impl XmlDescriptor {
             }
 
             let help_xml = command_xml.append_child(dom.create_element("help"));
-            help_xml.append_child(dom.create_text_node(&legacy_lossy(&str_replace(
+            help_xml.append_child(dom.create_text_node(str_replace(
                 "\n",
                 "\n ",
                 command.get_processed_help(),
-            ))));
+            )));
 
             let command_definition = command.get_definition().clone();
             let definition_xml = self.get_input_definition_document(&command_definition);
@@ -132,18 +132,18 @@ impl XmlDescriptor {
                 let namespace_array_xml =
                     namespaces_xml.append_child(dom.create_element("namespace"));
                 let id = match namespace_description.get(B("id")) {
-                    Some(PhpMixed::String(s)) => s.to_str_lossy(),
-                    _ => "".into(),
+                    Some(PhpMixed::String(s)) => s.as_slice(),
+                    _ => b"",
                 };
-                namespace_array_xml.set_attribute("id", &id);
+                namespace_array_xml.set_attribute("id", id);
 
                 if let Some(PhpMixed::List(names)) = namespace_description.get(B("commands")) {
                     for name in names {
                         let command_xml =
                             namespace_array_xml.append_child(dom.create_element("command"));
-                        command_xml.append_child(dom.create_text_node(
-                            &name.as_string().unwrap_or_default().to_str_lossy(),
-                        ));
+                        command_xml.append_child(
+                            dom.create_text_node(name.as_string().unwrap_or_default()),
+                        );
                     }
                 }
             }
@@ -235,13 +235,13 @@ impl XmlDescriptor {
 
         let defaults_xml = object_xml.append_child(dom.create_element("defaults"));
         let default_value = argument.get_default().to_php_mixed();
-        let defaults: Vec<String> = match &default_value {
+        let defaults: Vec<BString> = match &default_value {
             PhpMixed::List(_) | PhpMixed::Array(_) => {
                 self.default_values_as_strings(&default_value)
             }
-            PhpMixed::Bool(_) => vec![legacy_lossy(&var_export(&default_value, true)).into_owned()],
+            PhpMixed::Bool(_) => vec![var_export(&default_value, true)],
             d if php_truthy(d) => {
-                vec![legacy_lossy(&php_to_string(&default_value)).into_owned()]
+                vec![php_to_string(&default_value)]
             }
             _ => vec![],
         };
@@ -257,22 +257,19 @@ impl XmlDescriptor {
         let dom = DOMDocument::new("1.0", "UTF-8");
 
         let object_xml = dom.append_child(dom.create_element("option"));
-        object_xml.set_attribute("name", &format!("--{}", option.get_name()));
+        object_xml.set_attribute("name", format!("--{}", option.get_name()));
         let pos = strpos(option.get_shortcut().unwrap_or_default(), "|");
         if let Some(pos) = pos {
             object_xml.set_attribute(
                 "shortcut",
-                &format!(
-                    "-{}",
-                    legacy_lossy(&substr(option.get_shortcut().unwrap(), 0, Some(pos as i64)))
+                bconcat!(
+                    "-",
+                    substr(option.get_shortcut().unwrap(), 0, Some(pos as i64))
                 ),
             );
             object_xml.set_attribute(
                 "shortcuts",
-                &format!(
-                    "-{}",
-                    legacy_lossy(&str_replace("|", "|-", option.get_shortcut().unwrap()))
-                ),
+                bconcat!("-", str_replace("|", "|-", option.get_shortcut().unwrap())),
             );
         } else {
             object_xml.set_attribute(
@@ -297,15 +294,15 @@ impl XmlDescriptor {
 
         if option.accept_value() {
             let default_value = option.get_default().to_php_mixed();
-            let defaults: Vec<String> = match &default_value {
+            let defaults: Vec<BString> = match &default_value {
                 PhpMixed::List(_) | PhpMixed::Array(_) => {
                     self.default_values_as_strings(&default_value)
                 }
                 PhpMixed::Bool(_) => {
-                    vec![legacy_lossy(&var_export(&default_value, true)).into_owned()]
+                    vec![var_export(&default_value, true)]
                 }
                 d if php_truthy(d) => {
-                    vec![legacy_lossy(&php_to_string(&default_value)).into_owned()]
+                    vec![php_to_string(&default_value)]
                 }
                 _ => vec![],
             };
@@ -321,14 +318,14 @@ impl XmlDescriptor {
 
         if option.is_negatable() {
             let object_xml = dom.append_child(dom.create_element("option"));
-            object_xml.set_attribute("name", &format!("--no-{}", option.get_name()));
+            object_xml.set_attribute("name", format!("--no-{}", option.get_name()));
             object_xml.set_attribute("shortcut", "");
             object_xml.set_attribute("accept_value", "0");
             object_xml.set_attribute("is_value_required", "0");
             object_xml.set_attribute("is_multiple", "0");
             let description_xml = object_xml.append_child(dom.create_element("description"));
             description_xml.append_child(
-                dom.create_text_node(&format!("Negate the \"--{}\" option", option.get_name())),
+                dom.create_text_node(format!("Negate the \"--{}\" option", option.get_name())),
             );
         }
 
@@ -337,18 +334,10 @@ impl XmlDescriptor {
 
     /// Helper used by the default-value branches of getInputArgumentDocument /
     /// getInputOptionDocument when the default is an array (returns it verbatim).
-    fn default_values_as_strings(&self, default: &PhpMixed) -> Vec<String> {
+    fn default_values_as_strings(&self, default: &PhpMixed) -> Vec<BString> {
         match default {
-            PhpMixed::List(list) => list
-                .iter()
-                .map(php_to_string)
-                .map(|s| legacy_lossy(&s).into_owned())
-                .collect(),
-            PhpMixed::Array(arr) => arr
-                .values()
-                .map(php_to_string)
-                .map(|s| legacy_lossy(&s).into_owned())
-                .collect(),
+            PhpMixed::List(list) => list.iter().map(php_to_string).collect(),
+            PhpMixed::Array(arr) => arr.values().map(php_to_string).collect(),
             _ => vec![],
         }
     }

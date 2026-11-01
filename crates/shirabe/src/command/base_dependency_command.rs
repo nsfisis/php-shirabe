@@ -233,7 +233,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 self.get_io().write(format!(
                     "<comment>Package \"{}\" {} is already installed! To find out why, run `shirabe why {}`</comment>",
                     needle,
-                    legacy_lossy(&matched.get_pretty_version()),
+                    matched.get_pretty_version().display_lossy(),
                     needle
                 ));
 
@@ -312,9 +312,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .unwrap_or_default();
             self.get_io().write(format!(
                 "<info>{}</info> {} {}",
-                legacy_lossy(&root.get_pretty_name()),
-                legacy_lossy(&root.get_pretty_version()),
-                legacy_lossy(&description)
+                root.get_pretty_name().display_lossy(),
+                root.get_pretty_version().display_lossy(),
+                description.display_lossy()
             ));
             self.print_tree(&results, "", 1);
         } else {

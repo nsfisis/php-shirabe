@@ -387,13 +387,11 @@ impl VcsRepository {
             let mut tag = legacy_lossy(&tag).into_owned();
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
-                legacy_lossy(
-                    &self
-                        .package_name
-                        .borrow()
-                        .clone()
-                        .unwrap_or_else(|| self.url.clone())
-                ),
+                self.package_name
+                    .borrow()
+                    .clone()
+                    .unwrap_or_else(|| self.url.clone())
+                    .display_lossy(),
                 tag
             );
 
@@ -636,14 +634,12 @@ impl VcsRepository {
         for (branch, identifier) in branches {
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
-                legacy_lossy(
-                    &self
-                        .package_name
-                        .borrow()
-                        .clone()
-                        .unwrap_or_else(|| self.url.clone())
-                ),
-                legacy_lossy(&branch)
+                self.package_name
+                    .borrow()
+                    .clone()
+                    .unwrap_or_else(|| self.url.clone())
+                    .display_lossy(),
+                branch.display_lossy()
             );
             if is_very_verbose {
                 self.io.write_error(&msg);
@@ -976,13 +972,11 @@ impl VcsRepository {
         if let VersionCacheResult::Package(ref mut data) = cached_package {
             let msg = format!(
                 "Found cached composer.json of <info>{}</info> (<comment>{}</comment>)",
-                legacy_lossy(
-                    &self
-                        .package_name
-                        .borrow()
-                        .clone()
-                        .unwrap_or_else(|| self.url.clone())
-                ),
+                self.package_name
+                    .borrow()
+                    .clone()
+                    .unwrap_or_else(|| self.url.clone())
+                    .display_lossy(),
                 version
             );
             if is_very_verbose {

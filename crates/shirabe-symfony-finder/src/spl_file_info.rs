@@ -1,96 +1,93 @@
 //! ref: composer/vendor/symfony/finder/SplFileInfo.php
 
-use bstr::ByteSlice;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     RuntimeException, basename, basename_with_suffix, dirname, filesize, is_dir, is_file, is_link,
-    legacy_lossy, path_to_bytes, realpath,
+    path_from_bytes, realpath,
 };
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct SplFileInfo {
     // The path passed to the underlying \SplFileInfo constructor.
-    pathname: String,
-    relative_path: String,
-    relative_pathname: String,
-}
-
-impl std::fmt::Display for SplFileInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_pathname())
-    }
+    pathname: BString,
+    relative_path: BString,
+    relative_pathname: BString,
 }
 
 impl SplFileInfo {
-    pub fn new(file: &str, relative_path: &str, relative_pathname: &str) -> Self {
+    pub fn new(
+        file: impl AsRef<[u8]>,
+        relative_path: impl AsRef<[u8]>,
+        relative_pathname: impl AsRef<[u8]>,
+    ) -> Self {
         Self {
-            pathname: file.to_string(),
-            relative_path: relative_path.to_string(),
-            relative_pathname: relative_pathname.to_string(),
+            pathname: BString::from(file.as_ref()),
+            relative_path: BString::from(relative_path.as_ref()),
+            relative_pathname: BString::from(relative_pathname.as_ref()),
         }
     }
 
-    pub fn get_pathname(&self) -> String {
-        self.pathname.clone()
+    pub fn get_pathname(&self) -> &BStr {
+        self.pathname.as_ref()
     }
 
-    pub fn get_path(&self) -> String {
-        legacy_lossy(&dirname(&self.pathname)).into_owned()
+    pub fn get_path(&self) -> BString {
+        dirname(&self.pathname)
     }
 
-    pub fn get_filename(&self) -> String {
-        legacy_lossy(&basename(&self.pathname)).into_owned()
+    pub fn get_filename(&self) -> BString {
+        basename(&self.pathname)
     }
 
-    pub fn get_basename(&self, suffix: Option<&str>) -> String {
+    pub fn get_basename(&self, suffix: Option<&BStr>) -> BString {
         match suffix {
-            Some(suffix) => {
-                legacy_lossy(&basename_with_suffix(&self.pathname, suffix)).into_owned()
-            }
-            None => legacy_lossy(&basename(&self.pathname)).into_owned(),
+            Some(suffix) => basename_with_suffix(&self.pathname, suffix),
+            None => basename(&self.pathname),
         }
     }
 
-    pub fn get_extension(&self) -> String {
+    pub fn get_extension(&self) -> BString {
         // \SplFileInfo::getExtension() returns the extension (without the dot), or "" if none.
         let base = basename(&self.pathname);
         match base.rfind_byte(b'.') {
-            Some(index) => legacy_lossy(&base[index + 1..]).into_owned(),
-            None => String::new(),
+            Some(index) => base[index + 1..].into(),
+            None => BString::default(),
         }
     }
 
-    pub fn get_relative_path_name(&self) -> String {
-        self.relative_pathname.clone()
+    pub fn get_relative_path_name(&self) -> &BStr {
+        self.relative_pathname.as_ref()
     }
 
-    pub fn get_relative_path(&self) -> String {
-        self.relative_path.clone()
+    pub fn get_relative_path(&self) -> &BStr {
+        self.relative_path.as_ref()
     }
 
     pub fn is_dir(&self) -> bool {
-        is_dir(&self.pathname)
+        is_dir(path_from_bytes(&self.pathname))
     }
 
     pub fn is_file(&self) -> bool {
-        is_file(&self.pathname)
+        is_file(path_from_bytes(&self.pathname))
     }
 
     pub fn is_link(&self) -> bool {
-        is_link(&self.pathname)
+        is_link(path_from_bytes(&self.pathname))
     }
 
-    pub fn get_real_path(&self) -> Option<String> {
+    pub fn get_real_path(&self) -> Option<PathBuf> {
         // \SplFileInfo::getRealPath() returns the canonicalized absolute path, or false on failure.
-        realpath(&self.pathname).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+        realpath(path_from_bytes(&self.pathname))
     }
 
     pub fn get_size(&self) -> anyhow::Result<i64> {
         // Inherited from \SplFileInfo, whose failure message names the base class even for subclasses.
-        match filesize(&self.pathname) {
+        match filesize(path_from_bytes(&self.pathname)) {
             Some(size) => Ok(size),
             None => Err(RuntimeException::new(format!(
                 "SplFileInfo::getSize(): stat failed for {}",
-                self.pathname
+                self.pathname.display_lossy()
             ))
             .into()),
         }

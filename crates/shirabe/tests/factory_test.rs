@@ -5,7 +5,7 @@ use serial_test::serial;
 use shirabe::factory::Factory;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 
 #[path = "common/config_stub.rs"]
 mod config_stub;
@@ -56,7 +56,10 @@ fn test_default_values_are_as_expected() {
 fn test_get_composer_json_path() {
     let _tear_down = TearDown;
 
-    assert_eq!("./composer.json", Factory::get_composer_file().unwrap());
+    assert_eq!(
+        bstr::BStr::new("./composer.json"),
+        bstr::BStr::new(path_to_bytes(&Factory::get_composer_file().unwrap()))
+    );
 }
 
 #[test]
@@ -82,5 +85,8 @@ fn test_get_composer_json_path_from_env() {
     let _tear_down = TearDown;
 
     Platform::put_env("COMPOSER", " foo.json ");
-    assert_eq!("foo.json", Factory::get_composer_file().unwrap());
+    assert_eq!(
+        bstr::BStr::new("foo.json"),
+        bstr::BStr::new(path_to_bytes(&Factory::get_composer_file().unwrap()))
+    );
 }

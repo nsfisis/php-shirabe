@@ -74,7 +74,8 @@ impl JsonManipulator {
         let r#type = BStr::new(r#type.as_ref());
         let package = BStr::new(package.as_ref());
         let constraint = BStr::new(constraint.as_ref());
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no link of that type yet
         if decoded.as_array().and_then(|a| a.get(B(r#type))).is_none() {
@@ -301,7 +302,8 @@ impl JsonManipulator {
     ) -> anyhow::Result<bool> {
         let name = BStr::new(name.as_ref());
         let url = BStr::new(url.as_ref());
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let mut repository_index: Option<PhpMixed> = None;
 
         let repos_value = decoded
@@ -453,7 +455,8 @@ impl JsonManipulator {
         }
 
         let mut index_to_insert: Option<i64> = None;
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         let repos = decoded
             .as_array()
@@ -671,7 +674,8 @@ impl JsonManipulator {
     ) -> anyhow::Result<bool> {
         let main_node = BStr::new(main_node.as_ref());
         let name = name.as_ref();
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         let mut name_owned = BString::from(name);
         let mut sub_name: Option<BString> = None;
@@ -861,7 +865,8 @@ impl JsonManipulator {
     ) -> anyhow::Result<bool> {
         let main_node = BStr::new(main_node.as_ref());
         let name = name.as_ref();
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(B(main_node)));
@@ -1034,7 +1039,8 @@ impl JsonManipulator {
         value: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no main node yet
         if decoded
@@ -1158,7 +1164,8 @@ impl JsonManipulator {
             return self.add_list_item(main_node, value, false);
         }
 
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no main node yet
         if decoded
@@ -1236,7 +1243,8 @@ impl JsonManipulator {
             return Ok(true);
         }
 
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(B(main_node)));
@@ -1321,7 +1329,8 @@ impl JsonManipulator {
         content: PhpMixed,
     ) -> anyhow::Result<bool> {
         let key = key.as_ref();
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let content = self.format(&content, 0, false)?;
 
         // key exists already
@@ -1399,7 +1408,8 @@ impl JsonManipulator {
 
     pub fn remove_main_key(&mut self, key: impl AsRef<[u8]>) -> anyhow::Result<bool> {
         let key = key.as_ref();
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(B(key), &decoded_arr) {
@@ -1452,7 +1462,8 @@ impl JsonManipulator {
     }
 
     pub fn change_empty_main_key_from_assoc_to_list(&mut self, key: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(B(key), &decoded_arr) {
@@ -1489,7 +1500,8 @@ impl JsonManipulator {
 
     pub fn remove_main_key_if_empty(&mut self, key: impl AsRef<[u8]>) -> anyhow::Result<bool> {
         let key = key.as_ref();
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(B(key), &decoded_arr) {

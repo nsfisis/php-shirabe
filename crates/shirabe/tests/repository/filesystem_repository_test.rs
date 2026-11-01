@@ -80,7 +80,7 @@ fn test_unexistent_repository_file() {
             .unwrap()
             .as_nanos()
     ));
-    let json = JsonFile::new(path.to_str().unwrap().to_string(), None, None).unwrap();
+    let json = JsonFile::new(path.to_str().unwrap(), None, None).unwrap();
 
     let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
 
@@ -136,7 +136,7 @@ fn test_repository_write() {
     fs.remove_directory(&repo_dir).ok();
 
     let json_path = repo_dir.join("vendor/composer/installed.json");
-    let json = JsonFile::new(json_path.to_str().unwrap().to_string(), None, None).unwrap();
+    let json = JsonFile::new(json_path.to_str().unwrap(), None, None).unwrap();
     let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
 
     let mut im = MockInstallationManager::new();
@@ -232,12 +232,7 @@ fn test_repository_writes_installed_php() {
     let guard = CwdGuard::new();
     let dir = guard.path();
 
-    let json = JsonFile::new(
-        dir.join("installed.json").to_str().unwrap().to_string(),
-        None,
-        None,
-    )
-    .unwrap();
+    let json = JsonFile::new(dir.join("installed.json").to_str().unwrap(), None, None).unwrap();
 
     let root_package = RootPackageHandle::new(
         bstr::BString::from("__root__".to_string()),

@@ -223,7 +223,7 @@ impl PoolBuilder {
                     &self.acceptable_stabilities,
                     &self.stability_flags,
                     &package.get_names(true).to_vec(),
-                    bstr::BStr::new(&*legacy_lossy(&package.get_stability())),
+                    bstr::BStr::new(&package.get_stability()),
                 )
             {
                 self.load_package(request, &repositories, package.clone(), false)?;
@@ -999,7 +999,7 @@ impl PoolBuilder {
                             if let Some(req_link) = requires.get(&locked_package.get_name()) {
                                 self.mark_package_name_for_loading(
                                     request,
-                                    bstr::BStr::new(&*legacy_lossy(&locked_package.get_name())),
+                                    bstr::BStr::new(&locked_package.get_name()),
                                     req_link.get_constraint(),
                                 );
                             }
@@ -1011,12 +1011,12 @@ impl PoolBuilder {
                                     self.unlock_package(
                                         request,
                                         repositories,
-                                        bstr::BStr::new(&*legacy_lossy(replace.get_target())),
+                                        bstr::BStr::new(replace.get_target()),
                                     )?;
                                     // this package is in $requires so no need to call markPackageNameForLoadingIfRequired
                                     self.mark_package_name_for_loading(
                                         request,
-                                        bstr::BStr::new(&*legacy_lossy(replace.get_target())),
+                                        bstr::BStr::new(replace.get_target()),
                                         replace.get_constraint(),
                                     );
                                 }
@@ -1041,7 +1041,7 @@ impl PoolBuilder {
                 if name == link.get_target() {
                     self.mark_package_name_for_loading(
                         request,
-                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                        bstr::BStr::new(link.get_target()),
                         link.get_constraint(),
                     );
                 }
@@ -1120,8 +1120,8 @@ impl PoolBuilder {
         self.io.write3(
             format!(
                 "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were optimized away.</info>",
-                legacy_lossy(&number_format(total, 0, ".", ",")),
-                legacy_lossy(&number_format(filtered, 0, ".", ",")),
+                number_format(total, 0, ".", ",").display_lossy(),
+                number_format(filtered, 0, ".", ",").display_lossy(),
                 round(100.0 / total * filtered, 0),
             ),
             true,
@@ -1170,8 +1170,8 @@ impl PoolBuilder {
         self.io.write3(
             format!(
                 "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were filtered away.</info>",
-                legacy_lossy(&number_format(total, 0, ".", ",")),
-                legacy_lossy(&number_format(filtered, 0, ".", ",")),
+                number_format(total, 0, ".", ",").display_lossy(),
+                number_format(filtered, 0, ".", ",").display_lossy(),
                 round(100.0 / total * filtered, 0),
             ),
             true,

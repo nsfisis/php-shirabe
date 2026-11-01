@@ -69,7 +69,10 @@ impl Locker {
 
     /// Returns the md5 hash of the sorted content of the composer file.
     pub fn get_content_hash(composer_file_contents: impl AsRef<[u8]>) -> anyhow::Result<BString> {
-        let content = JsonFile::parse_json(Some(composer_file_contents), Some("composer.json"))?;
+        let content = JsonFile::parse_json(
+            Some(composer_file_contents),
+            Some(bstr::BStr::new("composer.json")),
+        )?;
         let content_map: IndexMap<BString, PhpMixed> = match &content {
             PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             _ => IndexMap::new(),
@@ -647,7 +650,7 @@ impl Locker {
             Err(_) => {
                 return Err(RuntimeException::new(format!(
                     "Unable to read {} contents to update the lock file hash.",
-                    composer_json.get_path()
+                    composer_json.get_path().display()
                 ))
                 .into());
             }

@@ -5,11 +5,8 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
-use shirabe_php_shim::legacy_lossy;
-use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class};
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class, legacy_lossy};
+use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
 pub struct DumpAutoloadCommand {

@@ -23,7 +23,7 @@ use crate::io::{
 };
 use crate::json::JsonValidationException;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
@@ -31,39 +31,38 @@ use shirabe_php_shim::{
     RuntimeException, STDIN, STR_PAD_RIGHT, basename, bconcat, bin2hex, chdir, defined, dirname,
     disk_free_space, exec, explode, explode_limit, extension_loaded, file_exists,
     file_get_contents, file_put_contents, function_exists, get_debug_type_obj, getcwd, getenv,
-    getmypid, glob, implode, ini_set, is_array, is_dir, is_file, is_numeric_string, is_string,
-    json_decode_assoc, legacy_lossy, levenshtein, ltrim2, mb_convert_encoding,
-    mb_convert_variables, mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage,
-    microtime, path_from_bytes, path_to_bytes, php_regex, php_to_string, php_truthy, php_uname,
-    posix_getuid, preg_grep, preg_match, preg_quote, preg_split, putenv, random_bytes, realpath,
+    getmypid, glob, ini_set, intval, is_array, is_dir, is_file, is_numeric_string, is_string,
+    json_decode_assoc, legacy_lossy, levenshtein, mb_convert_encoding, mb_convert_variables,
+    mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage, microtime,
+    path_from_bytes, path_to_bytes, php_regex, php_to_string, php_truthy, php_uname, posix_getuid,
+    preg_grep, preg_match, preg_quote, preg_split, putenv, random_bytes, realpath,
     restore_error_handler, round, sort_natural_flag_case, str_pad, str_repeat, str_replace,
     str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time,
     trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
-use shirabe_symfony_console::application::Application as BaseApplication;
-use shirabe_symfony_console::command::{Command as SymfonyCommand, HelpCommand};
-use shirabe_symfony_console::command_loader::CommandLoaderInterface;
-use shirabe_symfony_console::completion::{CompletionInput, CompletionSuggestions};
-use shirabe_symfony_console::exception::{
-    CommandNotFoundException, InvalidArgumentException as ConsoleInvalidArgumentException,
-    InvalidOptionException, LogicException as ConsoleLogicException, MissingInputException,
-    NamespaceNotFoundException, RuntimeException as ConsoleRuntimeException,
+use shirabe_symfony_console::{
+    application::Application as BaseApplication,
+    command::{Command as SymfonyCommand, HelpCommand},
+    command_loader::CommandLoaderInterface,
+    completion::{CompletionInput, CompletionSuggestions},
+    exception::{
+        CommandNotFoundException, InvalidArgumentException as ConsoleInvalidArgumentException,
+        InvalidOptionException, LogicException as ConsoleLogicException, MissingInputException,
+        NamespaceNotFoundException, RuntimeException as ConsoleRuntimeException,
+    },
+    formatter::OutputFormatter,
+    helper::{FormatBlockMessages, FormatterHelper, Helper, HelperSet, QuestionHelper},
+    input::{
+        ArgumentName, ArgvInput, ArrayInput, InputArgument, InputDefinition, InputInterface,
+        InputOption, InputValue, ParameterName,
+    },
+    output::{ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface},
+    style::{StyleInterface, SymfonyStyle},
+    terminal::Terminal,
 };
-use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::helper::{
-    FormatBlockMessages, FormatterHelper, Helper, HelperSet, QuestionHelper,
-};
-use shirabe_symfony_console::input::{
-    ArgumentName, ArgvInput, ArrayInput, InputArgument, InputDefinition, InputInterface,
-    InputOption, InputValue, ParameterName,
-};
-use shirabe_symfony_console::output::{
-    ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface,
-};
-use shirabe_symfony_console::style::{StyleInterface, SymfonyStyle};
-use shirabe_symfony_console::terminal::Terminal;
 use shirabe_symfony_process::exception::ProcessTimedOutException;
+use std::path::PathBuf;
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
 /// flattened into a single struct. Methods that are overridden by subclass and called via
@@ -171,18 +170,18 @@ impl Application {
     fn get_new_working_dir(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<PathBuf>> {
         let working_dir = input
             .borrow()
             .get_parameter_option(&["--working-dir", "-d"], InputValue::Null, true)
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(|s| path_from_bytes(s).to_path_buf());
         if let Some(ref wd) = working_dir
             && !is_dir(wd)
         {
             return Err(RuntimeException::new(format!(
                 "Invalid working directory specified, {} does not exist.",
-                wd
+                wd.display()
             ))
             .into());
         }
@@ -211,33 +210,29 @@ impl Application {
                 let config = composer.get_config();
 
                 let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
-                let mut dir = legacy_lossy(config
+                let mut dir = path_from_bytes(config
                     .borrow_mut()
                     .get("home")
                     .as_string()
-                    .unwrap_or_default()).into_owned();
+                    .unwrap_or_default()).to_path_buf();
                 let df = disk_free_space(&dir);
                 let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 if !hit {
-                    dir = legacy_lossy(config
+                    dir = path_from_bytes(config
                         .borrow_mut()
                         .get("vendor-dir")
                         .as_string()
-                        .unwrap_or_default()).into_owned();
+                        .unwrap_or_default()).to_path_buf();
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
                 if !hit {
-                    // TODO(bytes): the directory is kept as a String.
-                    dir = sys_get_temp_dir()
-                        .into_os_string()
-                        .into_string()
-                        .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
+                    dir = sys_get_temp_dir();
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
                 if hit {
-                    return Ok(Some(format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir)));
+                    return Ok(Some(format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir.display())));
                 }
             }
             Ok(None)
@@ -451,7 +446,7 @@ impl Application {
     fn get_command_name_before_binding(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<BString>> {
         let input = input.borrow().dup();
         // Makes ArgvInput::getFirstArgument() able to distinguish an option from an argument.
         match input.borrow_mut().bind(&self.get_definition().borrow()) {
@@ -464,10 +459,7 @@ impl Application {
             }
         }
 
-        Ok(input
-            .borrow()
-            .get_first_argument()
-            .map(|name| legacy_lossy(&name).into_owned()))
+        Ok(input.borrow().get_first_argument())
     }
 
     pub fn get_long_version(&self) -> String {
@@ -743,7 +735,7 @@ impl Application {
                     .filter(php_truthy)
                     .map(|n| {
                         shirabe_symfony_console::completion::StringOrSuggestion::String(
-                            legacy_lossy(&php_to_string(&n)).into_owned(),
+                            php_to_string(&n).display_lossy().to_string(),
                         )
                     })
                     .collect();
@@ -810,7 +802,7 @@ impl Application {
         &mut self,
         name: &str,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        if !self.has(name) {
+        if !self.has(name.as_bytes().as_bstr()) {
             return Err(CommandNotFoundException::new(
                 format!("The command \"{}\" does not exist.", name),
                 Vec::new(),
@@ -851,7 +843,10 @@ impl Application {
     }
 
     /// Returns true if the command exists, false otherwise.
-    pub fn has(&mut self, name: &str) -> bool {
+    pub fn has(&mut self, name: &BStr) -> bool {
+        // Command names are declared in code, so a name with other bytes matches none of them.
+        let name = name.display_lossy().to_string();
+        let name = name.as_str();
         if self.commands.contains_key(name) {
             return true;
         }
@@ -914,7 +909,7 @@ impl Application {
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = format!("{}{}", legacy_lossy(&implode("[^:]*:", &parts)), "[^:]*");
+        let expr = parts.join("[^:]*:") + "[^:]*";
         let namespaces: Vec<String> =
             preg_grep(format!("{{^{}}}", expr), all_namespaces.iter().cloned()).collect();
 
@@ -932,7 +927,7 @@ impl Application {
                     message.push_str("\n\nDid you mean one of these?\n    ");
                 }
 
-                message.push_str(&legacy_lossy(&implode("\n    ", &alternatives)));
+                message.push_str(&alternatives.join("\n    "));
             }
 
             return Err(NamespaceNotFoundException::new(message, alternatives, 0).into());
@@ -968,8 +963,11 @@ impl Application {
     /// Throws CommandNotFoundException when command name is incorrect or ambiguous.
     pub fn find(
         &mut self,
-        name: &str,
+        name: &BStr,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
+        // Command names are declared in code, so a name with other bytes matches none of them.
+        let name = name.display_lossy().to_string();
+        let name = name.as_str();
         let mut aliases: IndexMap<String, String> = IndexMap::new();
 
         let commands_snapshot: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> =
@@ -988,13 +986,13 @@ impl Application {
             let aliases = borrowed.get_aliases();
             drop(borrowed);
             for alias in aliases {
-                if !self.has(&alias) {
+                if !self.has(alias.as_bytes().as_bstr()) {
                     self.commands.insert(alias, command.clone());
                 }
             }
         }
 
-        if self.has(name) {
+        if self.has(name.as_bytes().as_bstr()) {
             return self.get(name);
         }
 
@@ -1012,7 +1010,7 @@ impl Application {
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = format!("{}{}", legacy_lossy(&implode("[^:]*:", &parts)), "[^:]*");
+        let expr = parts.join("[^:]*:") + "[^:]*";
         let mut commands: Vec<String> =
             preg_grep(format!("{{^{}}}", expr), all_commands.iter().cloned()).collect();
 
@@ -1049,7 +1047,7 @@ impl Application {
                 } else {
                     message.push_str("\n\nDid you mean one of these?\n    ");
                 }
-                message.push_str(&legacy_lossy(&implode("\n    ", &alternatives)));
+                message.push_str(&alternatives.join("\n    "));
             }
 
             return Err(CommandNotFoundException::new(message, alternatives, 0).into());
@@ -1112,7 +1110,7 @@ impl Application {
                     if Helper::width(&abbrev) > usable_width {
                         formatted_abbrevs.push(PhpMixed::from(format!(
                             "{}...",
-                            legacy_lossy(&Helper::substr(&abbrev, 0, Some(usable_width - 3)))
+                            Helper::substr(&abbrev, 0, Some(usable_width - 3)).display_lossy()
                         )));
                     } else {
                         formatted_abbrevs.push(PhpMixed::from(abbrev));
@@ -1171,7 +1169,7 @@ impl Application {
             let mut commands = self.commands.clone();
             let names = self.command_loader.as_ref().unwrap().get_names();
             for name in names {
-                if !commands.contains_key(&name) && self.has(&name) {
+                if !commands.contains_key(&name) && self.has(name.as_bytes().as_bstr()) {
                     commands.insert(name.clone(), self.get(&name)?);
                 }
             }
@@ -1199,7 +1197,7 @@ impl Application {
                 if !commands.contains_key(&name)
                     && namespace
                         == self.extract_namespace(&name, Some(substr_count(namespace, ":") + 1))
-                    && self.has(&name)
+                    && self.has(name.as_bytes().as_bstr())
                 {
                     commands.insert(name.clone(), self.get(&name)?);
                 }
@@ -1264,7 +1262,7 @@ impl Application {
         let mut current = Some(e);
         while let Some(e) = current {
             let exception = AnyThrowable::of(e);
-            let message = legacy_lossy(&trim(e.to_string())).into_owned();
+            let message = trim(e.to_string());
             let verbosity = output.borrow().get_verbosity();
 
             let mut len;
@@ -1296,14 +1294,14 @@ impl Application {
             } else {
                 i64::MAX
             };
-            let mut lines: Vec<(String, i64)> = Vec::new();
+            let mut lines: Vec<(BString, i64)> = Vec::new();
             let split = if !message.is_empty() {
                 preg_split(php_regex!(r"/\r?\n/"), &message)
             } else {
                 Vec::new()
             };
             for line in split {
-                for line in self.split_string_by_width(&legacy_lossy(&line), width - 4) {
+                for line in self.split_string_by_width(&line, width - 4) {
                     // pre-format lines to get the right string length
                     let line_length = Helper::width(&line) + 4;
                     lines.push((line, line_length));
@@ -1311,7 +1309,7 @@ impl Application {
                 }
             }
 
-            let mut messages: Vec<String> = Vec::new();
+            let mut messages: Vec<BString> = Vec::new();
             if !throwable_is_exception_interface(exception)
                 || output_interface::VERBOSITY_VERBOSE <= verbosity
             {
@@ -1326,50 +1324,37 @@ impl Application {
                     .map(AnyThrowable::get_line)
                     .filter(|line| *line != 0)
                     .map_or_else(|| "n/a".to_string(), |line| line.to_string());
-                messages.push(format!(
-                    "<comment>{}</comment>",
-                    legacy_lossy(
-                        &OutputFormatter::escape(format!(
-                            "In {} line {}:",
-                            legacy_lossy(&file),
-                            line
-                        ))
-                        .unwrap()
-                    )
+                messages.push(bconcat!(
+                    "<comment>",
+                    OutputFormatter::escape(bconcat!("In ", file, " line ", line, ":")).unwrap(),
+                    "</comment>"
                 ));
             }
-            let empty_line = format!(
-                "<error>{}</error>",
-                legacy_lossy(&str_repeat(" ", len as usize))
-            );
+            let empty_line = bconcat!("<error>", str_repeat(" ", len as usize), "</error>");
             messages.push(empty_line.clone());
             if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
-                messages.push(format!(
-                    "<error>{}{}</error>",
+                messages.push(bconcat!(
+                    "<error>",
                     title,
-                    legacy_lossy(&str_repeat(
-                        " ",
-                        (len - Helper::width(&title)).max(0) as usize
-                    ))
+                    str_repeat(" ", (len - Helper::width(&title)).max(0) as usize),
+                    "</error>"
                 ));
             }
             for (line, line_length) in &lines {
-                messages.push(format!(
-                    "<error>  {}  {}</error>",
-                    legacy_lossy(&OutputFormatter::escape(line).unwrap()),
-                    legacy_lossy(&str_repeat(" ", (len - line_length) as usize))
+                messages.push(bconcat!(
+                    "<error>  ",
+                    OutputFormatter::escape(line).unwrap(),
+                    "  ",
+                    str_repeat(" ", (len - line_length) as usize),
+                    "</error>"
                 ));
             }
             messages.push(empty_line);
-            messages.push(String::new());
+            messages.push(BString::default());
 
-            output.borrow().writeln(
-                &messages
-                    .iter()
-                    .map(|s| bstr::BString::from(s.as_str()))
-                    .collect::<Vec<_>>(),
-                output_interface::VERBOSITY_QUIET,
-            );
+            output
+                .borrow()
+                .writeln(&messages, output_interface::VERBOSITY_QUIET);
 
             // PHP renders the `Exception trace:` block (getTrace()) at -v or higher. A PHP backtrace
             // has no faithful Rust equivalent, so this block is intentionally never ported; verbose
@@ -1398,12 +1383,11 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        // TODO(bytes): the verbosity is parsed as a &str.
-        let shell_verbosity = getenv("SHELL_VERBOSITY")
+        let shell_verbosity_int: i64 = getenv("SHELL_VERBOSITY")
             .unwrap_or_default()
-            .into_string()
-            .unwrap_or_else(|value| panic!("SHELL_VERBOSITY is not valid UTF-8: {value:?}"));
-        let shell_verbosity_int: i64 = shell_verbosity.parse().unwrap_or(0);
+            .to_str()
+            .and_then(|verbosity| verbosity.parse().ok())
+            .unwrap_or(0);
         let mut shell_verbosity: i64 = shell_verbosity_int;
         match shell_verbosity_int {
             -1 => {
@@ -1491,13 +1475,11 @@ impl Application {
     }
 
     /// Gets the name of the command based on input.
-    pub fn get_command_name(&self, input: &dyn InputInterface) -> Option<String> {
+    pub fn get_command_name(&self, input: &dyn InputInterface) -> Option<BString> {
         if self.single_command {
-            Some(self.default_command.clone())
+            Some(self.default_command.clone().into())
         } else {
-            input
-                .get_first_argument()
-                .map(|name| legacy_lossy(&name).into_owned())
+            input.get_first_argument()
         }
     }
 
@@ -1611,7 +1593,7 @@ impl Application {
 
     /// Returns abbreviated suggestions in string format.
     fn get_abbreviation_suggestions(&self, abbrevs: &[String]) -> String {
-        format!("    {}", legacy_lossy(&implode("\n    ", abbrevs)))
+        format!("    {}", abbrevs.join("\n    "))
     }
 
     /// Returns the namespace part of the command name.
@@ -1619,14 +1601,15 @@ impl Application {
     /// This method is not part of public API and should not be used directly.
     pub fn extract_namespace(&self, name: &str, limit: Option<i64>) -> String {
         // $parts = explode(':', $name, -1);
-        let parts = explode_limit(":", name, -1);
+        let mut parts: Vec<&str> = name.split(':').collect();
+        parts.pop();
 
         // implode(':', null === $limit ? $parts : array_slice($parts, 0, $limit))
         match limit {
-            None => legacy_lossy(&implode(":", &parts)).into_owned(),
+            None => parts.join(":"),
             Some(limit) => {
-                let sliced: Vec<BString> = parts.into_iter().take(limit.max(0) as usize).collect();
-                legacy_lossy(&implode(":", &sliced)).into_owned()
+                let sliced: Vec<&str> = parts.into_iter().take(limit.max(0) as usize).collect();
+                sliced.join(":")
             }
         }
     }
@@ -1641,10 +1624,7 @@ impl Application {
         for item in collection {
             collection_parts.insert(
                 item.clone(),
-                explode(":", item)
-                    .iter()
-                    .map(|s| legacy_lossy(s).into_owned())
-                    .collect::<Vec<_>>(),
+                item.split(':').map(str::to_string).collect::<Vec<_>>(),
             );
         }
 
@@ -1660,7 +1640,7 @@ impl Application {
 
                 let lev = levenshtein(&subname, &parts[i]) as f64;
                 if lev <= strlen(&subname) as f64 / 3.0
-                    || (!subname.is_empty() && parts[i].contains(&*legacy_lossy(&subname)))
+                    || (!subname.is_empty() && parts[i].as_bytes().contains_str(&subname))
                 {
                     let v = if exists {
                         alternatives[collection_name] + lev
@@ -1702,18 +1682,15 @@ impl Application {
         is_single_command: bool,
     ) -> anyhow::Result<&mut Self> {
         // $this->defaultCommand = explode('|', ltrim($commandName, '|'))[0];
-        let trimmed = ltrim2(command_name, "|");
-        self.default_command = legacy_lossy(
-            &explode("|", &trimmed)
-                .into_iter()
-                .next()
-                .unwrap_or_default(),
-        )
-        .into_owned();
+        let trimmed = command_name.trim_start_matches('|');
+        self.default_command = trimmed
+            .split_once('|')
+            .map_or(trimmed, |(first, _)| first)
+            .to_string();
 
         if is_single_command {
             // Ensure the command exist
-            self.find(command_name)?;
+            self.find(command_name.as_bytes().as_bstr())?;
 
             self.single_command = true;
         }
@@ -1725,56 +1702,46 @@ impl Application {
         self.single_command
     }
 
-    fn split_string_by_width(&self, string: &str, width: i64) -> Vec<String> {
+    fn split_string_by_width(&self, string: &[u8], width: i64) -> Vec<BString> {
         // str_split is not suitable for multi-byte characters, we should use preg_split to get char array properly.
         let encoding = match mb_detect_encoding(string, None, true) {
             None => {
-                return str_split(string, width)
-                    .iter()
-                    .map(|s| legacy_lossy(s).into_owned())
-                    .collect::<Vec<_>>();
+                return str_split(string, width);
             }
             Some(encoding) => encoding,
         };
 
         let utf8_string = mb_convert_encoding(string, "utf8", &encoding);
-        let mut lines: Vec<String> = Vec::new();
-        let mut line = String::new();
+        let mut lines: Vec<BString> = Vec::new();
+        let mut line = BString::default();
 
         let mut offset = 0usize;
         while let Some(m) = preg_match(php_regex!(r"/.{1,10000}/u"), &utf8_string[offset..]) {
             let m0 = m.get(0).unwrap_or_default();
             offset += strlen(m0) as usize;
 
-            let chunk = legacy_lossy(m0);
-            for char in chunk
-                .char_indices()
-                .map(|(i, c)| &chunk[i..i + c.len_utf8()])
-            {
+            for (start, end, _) in m0.char_indices() {
+                let char = &m0[start..end];
                 // test if $char could be appended to current line
-                if mb_strwidth(format!("{}{}", line, char), Some(bstr::BStr::new("utf8"))) <= width
-                {
-                    line.push_str(char);
+                if mb_strwidth(bconcat!(line, char), Some(bstr::BStr::new("utf8"))) <= width {
+                    line.extend_from_slice(char);
                     continue;
                 }
                 // if not, push current line to array and make new line
-                lines.push(
-                    legacy_lossy(&str_pad(&line, width as usize, " ", STR_PAD_RIGHT)).into_owned(),
-                );
-                line = char.to_string();
+                lines.push(str_pad(&line, width as usize, " ", STR_PAD_RIGHT));
+                line = char.into();
             }
         }
 
         lines.push(if !lines.is_empty() {
-            legacy_lossy(&str_pad(&line, width as usize, " ", STR_PAD_RIGHT)).into_owned()
+            str_pad(&line, width as usize, " ", STR_PAD_RIGHT)
         } else {
             line.clone()
         });
 
-        let mut lines: Vec<BString> = lines.into_iter().map(BString::from).collect();
         mb_convert_variables(&encoding, "utf8", &mut lines);
 
-        lines.iter().map(|l| legacy_lossy(l).into_owned()).collect()
+        lines
     }
 
     /// Returns all namespaces of the command name.
@@ -1932,12 +1899,9 @@ impl ApplicationHandle {
 
         // switch working dir
         let new_work_dir = application.borrow().get_new_working_dir(input.clone())?;
-        let mut old_working_dir: Option<String> = None;
+        let mut old_working_dir: Option<PathBuf> = None;
         if let Some(ref nwd) = new_work_dir {
-            old_working_dir = Some(
-                legacy_lossy(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default()))
-                    .into_owned(),
-            );
+            old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
             chdir(nwd);
             application.borrow_mut().initial_working_directory = getcwd();
             let cwd = Platform::get_cwd(true).unwrap_or_default();
@@ -1947,7 +1911,7 @@ impl ApplicationHandle {
                     if !cwd.as_os_str().is_empty() {
                         cwd
                     } else {
-                        std::path::PathBuf::from(nwd.clone())
+                        nwd.clone()
                     }
                     .display()
                 ),
@@ -1957,15 +1921,15 @@ impl ApplicationHandle {
         }
 
         // determine command name to be executed without including plugin commands
-        let mut command_name: Option<String> = Some(String::new());
+        let mut command_name: Option<BString> = Some(BString::default());
         let raw_command_name = application
             .borrow_mut()
             .get_command_name_before_binding(input.clone())?;
         if let Some(ref raw) = raw_command_name {
-            let find_result = application.borrow_mut().find(raw);
+            let find_result = application.borrow_mut().find(raw.as_ref());
             match find_result {
                 Ok(cmd) => {
-                    command_name = cmd.borrow().get_name();
+                    command_name = cmd.borrow().get_name().map(BString::from);
                 }
                 Err(e) => {
                     if e.is_instanceof::<CommandNotFoundException>() {
@@ -1982,20 +1946,22 @@ impl ApplicationHandle {
             application.borrow().get_use_parent_dir_config_value();
         if new_work_dir.is_none()
             && !matches!(
-                command_name.as_deref().unwrap_or_default(),
-                "" | "list"
-                    | "init"
-                    | "about"
-                    | "help"
-                    | "diagnose"
-                    | "self-update"
-                    | "global"
-                    | "create-project"
-                    | "outdated"
+                command_name
+                    .as_ref()
+                    .map_or(&b""[..], |name| name.as_slice()),
+                b"" | b"list"
+                    | b"init"
+                    | b"about"
+                    | b"help"
+                    | b"diagnose"
+                    | b"self-update"
+                    | b"global"
+                    | b"create-project"
+                    | b"outdated"
             )
             && !file_exists(Factory::get_composer_file().unwrap_or_default())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
-            && (command_name.as_deref() != Some("config")
+            && (command_name.as_ref().is_none_or(|name| name != "config")
                 || (!input.borrow().has_parameter_option(&["--file"], true)
                     && !input.borrow().has_parameter_option(&["-f"], true)))
             && !input.borrow().has_parameter_option(&["--help"], true)
@@ -2006,7 +1972,7 @@ impl ApplicationHandle {
                 .or_else(|| Platform::get_env("USERPROFILE"))
                 .unwrap_or_else(|| "/".into());
             let home = realpath(path_from_bytes(&home_value))
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .map(|p| BString::from(path_to_bytes(&p)))
                 .unwrap_or_default();
 
             // abort when we reach the home dir or top of the filesystem
@@ -2014,7 +1980,7 @@ impl ApplicationHandle {
                 if file_exists(format!(
                     "{}/{}",
                     legacy_lossy(&dir),
-                    Factory::get_composer_file().unwrap_or_default()
+                    Factory::get_composer_file().unwrap_or_default().display()
                 )) {
                     if use_parent_dir_if_no_json_available.as_bool() != Some(true)
                         && !io.is_interactive()
@@ -2023,14 +1989,14 @@ impl ApplicationHandle {
                         break;
                     }
                     if use_parent_dir_if_no_json_available.as_bool() == Some(true)
-                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", legacy_lossy(&dir)), true)?
+                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir.display_lossy()), true)?
                     {
                         if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
                             io.write_error(format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir.display_lossy()));
                         } else {
                             io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
                         }
-                        old_working_dir = Some(legacy_lossy(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default())).into_owned());
+                        old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
                         chdir(path_from_bytes(&dir));
                     }
                     break;
@@ -2051,7 +2017,7 @@ impl ApplicationHandle {
 
             if is_non_allowed_root {
                 let uid: i64 = Platform::get_env("SUDO_UID")
-                    .map(|v| shirabe_php_shim::intval(&PhpMixed::string(v)))
+                    .map(|v| intval(&PhpMixed::string(v)))
                     .unwrap_or(0);
                 if uid != 0 {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on
@@ -2075,13 +2041,20 @@ impl ApplicationHandle {
             .has_parameter_option(&["--version", "-V"], false)
             && (command_name.is_none()
                 || matches!(
-                    command_name.as_deref().unwrap_or_default(),
-                    "" | "list" | "help"
+                    command_name
+                        .as_ref()
+                        .map_or(&b""[..], |name| name.as_slice()),
+                    b"" | b"list" | b"help"
                 )
-                || (command_name.as_deref() == Some("_complete") && !is_non_allowed_root));
+                || (command_name
+                    .as_ref()
+                    .is_some_and(|name| name == "_complete")
+                    && !is_non_allowed_root));
 
         let may_need_script_command = may_need_plugin_command
-            || command_name.as_deref() == Some("run-script")
+            || command_name
+                .as_ref()
+                .is_some_and(|name| name == "run-script")
             || raw_command_name != command_name;
 
         if may_need_plugin_command
@@ -2113,7 +2086,7 @@ impl ApplicationHandle {
                 let plugin_commands = application.borrow_mut().get_plugin_commands()?;
                 for command in plugin_commands {
                     let cmd_name = command.borrow().get_name().unwrap_or_default();
-                    if application.borrow_mut().has(&cmd_name) {
+                    if application.borrow_mut().has(cmd_name.as_bytes().as_bstr()) {
                         let cls = command.borrow().php_class_name();
                         io.write_error(format!("<warning>Plugin command {} ({}) would override a Shirabe command and has been skipped</warning>", cmd_name, cls));
                     } else {
@@ -2129,13 +2102,16 @@ impl ApplicationHandle {
                     } else if let Some(pe) = e.catch::<ParsingException>() {
                         let details = pe.get_details();
 
-                        let file = realpath(Factory::get_composer_file().unwrap_or_default())
-                            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+                        let file = realpath(Factory::get_composer_file().unwrap_or_default());
 
                         let line = details.line;
 
                         let mut ghe = GithubActionError::new(io.clone());
-                        ghe.emit(pe.get_message(), file.as_deref(), line);
+                        ghe.emit(
+                            pe.get_message(),
+                            file.as_deref().map(|file| path_to_bytes(file).as_bstr()),
+                            line,
+                        );
 
                         return Err(e);
                     } else {
@@ -2162,9 +2138,9 @@ impl ApplicationHandle {
             .borrow_mut()
             .get_command_name_before_binding(input.clone())?;
         if let Some(ref name) = resolved_command_name {
-            let find_result = application.borrow_mut().find(name);
+            let find_result = application.borrow_mut().find(name.as_ref());
             if let Ok(command) = find_result {
-                command_name = command.borrow().get_name();
+                command_name = command.borrow().get_name().map(BString::from);
                 // PHP: $command instanceof Command\BaseCommand && $command->isProxyCommand().
                 // The Symfony `Command` trait exposes `is_proxy_command` (default false) so the
                 // `dyn SymfonyCommand` registry can answer this; Composer proxy commands override it.
@@ -2199,8 +2175,12 @@ impl ApplicationHandle {
 
             let dev_warning_time = application.borrow().dev_warning_time;
             if let Some(dev_warning_time) = dev_warning_time
-                && command_name.as_deref() != Some("self-update")
-                && command_name.as_deref() != Some("selfupdate")
+                && command_name
+                    .as_ref()
+                    .is_none_or(|name| name != "self-update")
+                && command_name
+                    .as_ref()
+                    .is_none_or(|name| name != "selfupdate")
                 && time() > dev_warning_time
             {
                 io.write_error(format!(
@@ -2217,9 +2197,13 @@ impl ApplicationHandle {
             }
 
             if is_non_allowed_root
-                && command_name.as_deref() != Some("self-update")
-                && command_name.as_deref() != Some("selfupdate")
-                && command_name.as_deref() != Some("_complete")
+                && command_name
+                    .as_ref()
+                    .is_none_or(|name| name != "self-update")
+                && command_name
+                    .as_ref()
+                    .is_none_or(|name| name != "selfupdate")
+                && command_name.as_ref().is_none_or(|name| name != "_complete")
             {
                 io.write_error("<warning>Do not run Shirabe as root/super user! See https://getcomposer.org/root for details</warning>");
 
@@ -2236,16 +2220,11 @@ impl ApplicationHandle {
 
             // Check system temp folder for usability as it can cause weird runtime issues otherwise
             let pid = format!("{}-", getmypid());
-            // TODO(bytes): file_put_contents takes the path as a &str.
-            let tempfile = format!(
-                "{}/temp-{}{}",
-                sys_get_temp_dir()
-                    .into_os_string()
-                    .into_string()
-                    .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}")),
+            let tempfile = sys_get_temp_dir().join(format!(
+                "temp-{}{}",
                 pid,
-                legacy_lossy(&bin2hex(random_bytes(5)))
-            );
+                bin2hex(random_bytes(5)).display_lossy()
+            ));
             if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
                 && file_get_contents(&tempfile).as_deref().ok() == Some(file!().as_bytes())
                 && unlink(&tempfile).is_ok()
@@ -2264,19 +2243,18 @@ impl ApplicationHandle {
                     && let Some(scripts) = arr.get(B("scripts")).and_then(|v| v.as_array())
                 {
                     for (script, dummy) in scripts {
-                        // TODO(bytes): script names are Strings, so non-UTF-8 bytes are replaced.
-                        let script: &str = &script.to_str_lossy();
-                        let script_event_const = format!(
-                            "Composer\\Script\\ScriptEvents::{}",
-                            legacy_lossy(&str_replace("-", "_", strtoupper(script)))
+                        let script_event_const = bconcat!(
+                            "Composer\\Script\\ScriptEvents::",
+                            str_replace("-", "_", strtoupper(script))
                         );
-                        if !defined(&script_event_const) {
-                            if application.borrow_mut().has(script) {
-                                io.write_error(format!("<warning>A script named {} would override a Shirabe command and has been skipped</warning>", script));
+                        if !defined(&script_event_const.display_lossy().to_string()) {
+                            if application.borrow_mut().has(script.as_ref()) {
+                                io.write_error(bconcat!("<warning>A script named ", script, " would override a Shirabe command and has been skipped</warning>"));
                             } else {
-                                let mut description = format!(
-                                    "Runs the {} script as defined in composer.json",
-                                    script
+                                let mut description: BString = bconcat!(
+                                    "Runs the ",
+                                    script,
+                                    " script as defined in composer.json"
                                 );
 
                                 if let Some(desc) = arr
@@ -2285,19 +2263,17 @@ impl ApplicationHandle {
                                     .and_then(|a| a.get(B(script)))
                                     .and_then(|v| v.as_string())
                                 {
-                                    description = legacy_lossy(desc).into_owned();
+                                    description = desc.to_owned();
                                 }
 
-                                let aliases: Vec<String> = arr
+                                let aliases: Vec<BString> = arr
                                     .get(B("scripts-aliases"))
                                     .and_then(|v| v.as_array())
                                     .and_then(|a| a.get(B(script)))
                                     .and_then(|v| v.as_list())
                                     .map(|l| {
                                         l.iter()
-                                            .filter_map(|v| {
-                                                v.as_string().map(|s| legacy_lossy(s).into_owned())
-                                            })
+                                            .filter_map(|v| v.as_string().map(BStr::to_owned))
                                             .collect()
                                     })
                                     .unwrap_or_default();
@@ -2335,8 +2311,7 @@ impl ApplicationHandle {
                                 }
 
                                 // if the command is not an array of commands, and points to a valid SymfonyCommand subclass, import its details directly
-                                let dummy_str = legacy_lossy(dummy.as_string().unwrap_or_default())
-                                    .into_owned();
+                                let dummy_str = dummy.as_string().unwrap_or_default();
                                 // The class lives in the PHP worker, which cannot even declare
                                 // a subclass of Symfony's Command before the Composer PHP
                                 // runtime is loaded there. That load is skipped for a class the
@@ -2349,7 +2324,7 @@ impl ApplicationHandle {
                                 // `Composer\Command\AboutCommand`) is imported as a command by
                                 // PHP but falls through to ScriptAliasCommand here.
                                 let is_command_class = is_string(dummy)
-                                    && crate::plugin::find_file_in_registered_loaders(&dummy_str)
+                                    && crate::plugin::find_file_in_registered_loaders(dummy_str)
                                         .is_some()
                                     && {
                                         let cache_dir = match composer_opt {
@@ -2363,19 +2338,15 @@ impl ApplicationHandle {
                                                 .get_str("cache-dir")?,
                                         };
                                         EventDispatcher::ensure_composer_php_runtime(
-                                            std::path::Path::new(&cache_dir),
+                                            path_from_bytes(&cache_dir),
                                         )?;
                                         crate::plugin::php_class_query(
                                             "class_exists",
-                                            vec![shirabe_php_rpc::PluginValue::string(
-                                                dummy_str.clone(),
-                                            )],
+                                            vec![shirabe_php_rpc::PluginValue::string(dummy_str)],
                                         )? && crate::plugin::php_class_query(
                                             "is_subclass_of",
                                             vec![
-                                                shirabe_php_rpc::PluginValue::string(
-                                                    dummy_str.clone(),
-                                                ),
+                                                shirabe_php_rpc::PluginValue::string(dummy_str),
                                                 shirabe_php_rpc::PluginValue::string(
                                                     "Symfony\\Component\\Console\\Command\\Command",
                                                 ),
@@ -2388,21 +2359,21 @@ impl ApplicationHandle {
                                         if crate::plugin::php_class_query(
                                             "is_subclass_of",
                                             vec![
-                                                shirabe_php_rpc::PluginValue::string(
-                                                    dummy_str.clone(),
-                                                ),
+                                                shirabe_php_rpc::PluginValue::string(dummy_str),
                                                 shirabe_php_rpc::PluginValue::string(
                                                     "Symfony\\Component\\Console\\SingleCommandApplication",
                                                 ),
                                                 shirabe_php_rpc::PluginValue::Bool(true),
                                             ],
                                         )? {
-                                            io.write_error(format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
+                                            io.write_error(bconcat!("<warning>The script named ", script, " extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>"));
                                         }
 
                                         let handle = crate::plugin::new_php_object(
-                                            &dummy_str,
-                                            vec![shirabe_php_rpc::PluginValue::string(script)],
+                                            &dummy_str.display_lossy().to_string(),
+                                            vec![shirabe_php_rpc::PluginValue::string(
+                                                script.clone(),
+                                            )],
                                         )?;
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
@@ -2414,14 +2385,16 @@ impl ApplicationHandle {
                                         if let shirabe_php_rpc::PluginValue::String(ref bytes) =
                                             cmd_name
                                             && !bytes.is_empty()
-                                            && bytes.as_slice() != script.as_bytes()
+                                            && bytes != script
                                         {
-                                            io.write_error(format!("<warning>The script named {} in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>", script));
+                                            io.write_error(bconcat!("<warning>The script named ", script, " in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>"));
                                             // override it with the defined script name
                                             crate::plugin::call_php_entity_method(
                                                 &handle,
                                                 "setName",
-                                                vec![shirabe_php_rpc::PluginValue::string(script)],
+                                                vec![shirabe_php_rpc::PluginValue::string(
+                                                    script.clone(),
+                                                )],
                                             )?;
                                         }
 
@@ -2461,7 +2434,7 @@ impl ApplicationHandle {
                                         // fallback to usual aliasing behavior
                                         std::rc::Rc::new(std::cell::RefCell::new(
                                             ScriptAliasCommand::new(
-                                                script.to_string(),
+                                                script.as_ref(),
                                                 Some(description),
                                                 aliases,
                                             )?,
@@ -2504,7 +2477,7 @@ impl ApplicationHandle {
 
             // chdir back to oldWorkingDir if set
             if let Some(ref owd) = old_working_dir
-                && !owd.is_empty()
+                && !owd.as_os_str().is_empty()
             {
                 let _ = chdir(owd);
             }
@@ -2720,7 +2693,7 @@ impl ApplicationHandle {
         let mut name = application.borrow().get_command_name(&*input.borrow());
         if input.borrow().has_parameter_option(&["--help", "-h"], true) {
             if name.is_none() {
-                name = Some("help".to_string());
+                name = Some("help".into());
                 let default_command = application.borrow().default_command.clone();
                 input = std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(
                     vec![(
@@ -2737,7 +2710,7 @@ impl ApplicationHandle {
         let name = match name {
             Some(name) => name,
             None => {
-                let name = application.borrow().default_command.clone();
+                let name = BString::from(application.borrow().default_command.clone());
                 let definition = application.borrow_mut().get_definition();
                 let command_description = definition
                     .borrow()
@@ -2774,7 +2747,7 @@ impl ApplicationHandle {
         let command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>;
         application.borrow_mut().running_command = None;
         // the command name MUST be the first element of the input
-        let find_result = application.borrow_mut().find(&name);
+        let find_result = application.borrow_mut().find(name.as_ref());
 
         match find_result {
             Ok(c) => {
@@ -2807,15 +2780,14 @@ impl ApplicationHandle {
                 let formatted_block = FormatterHelper::default().format_block(
                     FormatBlockMessages::String(format!(
                         "Command \"{}\" is not defined.",
-                        name.clone(),
+                        name.display_lossy(),
                     )),
                     "error",
                     true,
                 );
-                output.borrow().writeln(
-                    &[bstr::BString::from(formatted_block)],
-                    output_interface::OUTPUT_NORMAL,
-                );
+                output
+                    .borrow()
+                    .writeln(&[formatted_block], output_interface::OUTPUT_NORMAL);
                 if !style.confirm(
                     &format!("Do you want to run \"{}\" instead? ", alternative.clone()),
                     false,
@@ -2823,7 +2795,9 @@ impl ApplicationHandle {
                     return Ok(1);
                 }
 
-                command = application.borrow_mut().find(&alternative)?;
+                command = application
+                    .borrow_mut()
+                    .find(alternative.as_bytes().as_bstr())?;
             }
         }
 
@@ -2913,7 +2887,7 @@ impl BaseApplication for Application {
 
     fn find(
         &mut self,
-        name: &str,
+        name: &BStr,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
         Application::find(self, name)
     }
@@ -3007,7 +2981,7 @@ pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow
             ))
             .into()
         })?;
-    let command = application.borrow_mut().find(name)?;
+    let command = application.borrow_mut().find(name.as_bytes().as_bstr())?;
     // PHP's `(string) $input` omits the command name when the input was built without an
     // explicit `command` entry, but the merged definition binds the first positional token to
     // the `command` argument, so the name is prepended when the first token is not this

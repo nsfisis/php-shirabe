@@ -198,7 +198,7 @@ impl Command for FundCommand {
                     }
                     io.write(format!(
                         "    <href={}>{}</>",
-                        legacy_lossy(&OutputFormatter::escape(url)?),
+                        OutputFormatter::escape(url)?.display_lossy(),
                         url
                     ));
                 }

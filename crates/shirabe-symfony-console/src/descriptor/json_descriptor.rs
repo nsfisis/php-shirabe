@@ -130,8 +130,7 @@ impl JsonDescriptor {
         };
 
         self.write(
-            &json_encode_ex(&PhpMixed::Array(data.into_iter().collect()), flags)
-                .unwrap_or_default(),
+            json_encode_ex(&PhpMixed::Array(data.into_iter().collect()), flags).unwrap_or_default(),
             false,
         );
         Ok(())

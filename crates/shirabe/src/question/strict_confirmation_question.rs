@@ -106,7 +106,7 @@ impl QuestionInterface for StrictConfirmationQuestion {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&bstr::BStr) -> Option<Vec<PhpMixed>>> {
         self.inner.get_autocompleter_callback()
     }
 

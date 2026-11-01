@@ -50,7 +50,7 @@ impl HgDriver {
                     self.inner
                         .config
                         .borrow_mut()
-                        .get(&legacy_lossy(b"cache-vcs-dir".as_slice()))
+                        .get("cache-vcs-dir")
                         .as_string()
                         .unwrap_or_default(),
                 )[..],

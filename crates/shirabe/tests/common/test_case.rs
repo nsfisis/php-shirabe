@@ -258,8 +258,7 @@ pub fn create_installed_json(
     dev_mode: bool,
 ) {
     std::fs::create_dir_all("vendor/composer").unwrap();
-    let json_file =
-        JsonFile::new("vendor/composer/installed.json".to_string(), None, None).unwrap();
+    let json_file = JsonFile::new("vendor/composer/installed.json", None, None).unwrap();
     let mut repo = InstalledFilesystemRepository::new(json_file, false, None, None).unwrap();
     repo.set_dev_package_names(
         dev_packages
@@ -286,7 +285,7 @@ pub fn create_composer_lock(
     dev_packages: &[PackageInterfaceHandle],
 ) {
     let io = null_io();
-    let json_file = JsonFile::new("./composer.lock".to_string(), None, None).unwrap();
+    let json_file = JsonFile::new("./composer.lock", None, None).unwrap();
     let composer_file_contents = std::fs::read_to_string("./composer.json").unwrap_or_default();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),

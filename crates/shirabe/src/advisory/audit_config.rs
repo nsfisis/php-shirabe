@@ -4,7 +4,7 @@ use crate::advisory::Auditor;
 use crate::config::Config;
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key, legacy_lossy};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key};
 
 #[derive(Debug, Clone)]
 pub struct AuditConfig {
@@ -133,7 +133,7 @@ impl AuditConfig {
         audit: bool,
         audit_format: &str,
     ) -> anyhow::Result<Self> {
-        let audit_config_raw = config.get(&legacy_lossy(b"audit".as_slice()));
+        let audit_config_raw = config.get("audit");
         let audit_config = audit_config_raw.as_array();
 
         let empty_array = PhpMixed::Array(IndexMap::new());

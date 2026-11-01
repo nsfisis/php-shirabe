@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Config/ConfigSourceInterface.php
 
-use bstr::BStr;
+use bstr::{BStr, BString};
 use shirabe_php_shim::PhpMixed;
 
 pub trait ConfigSourceInterface: std::fmt::Debug {
@@ -31,5 +31,5 @@ pub trait ConfigSourceInterface: std::fmt::Debug {
 
     fn remove_link(&mut self, r#type: &BStr, name: &BStr) -> anyhow::Result<()>;
 
-    fn get_name(&self) -> String;
+    fn get_name(&self) -> BString;
 }

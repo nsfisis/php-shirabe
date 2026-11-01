@@ -6,9 +6,10 @@ use crate::exception::InvalidArgumentException;
 use crate::helper::HelperSet;
 use crate::input::{InputArgument, InputDefinition, InputInterface, InputOption, InputValue};
 use crate::output::OutputInterface;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_SERVER, PhpClass, PhpMixed, is_numeric_to_int, legacy_lossy, php_regex,
+    AsAny, PHP_SERVER, PhpClass, PhpMixed, bconcat, is_numeric_to_int, path_to_bytes, php_regex,
     preg_is_match, str_replace_array,
 };
 use std::cell::{Cell, Ref};
@@ -273,7 +274,7 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn get_description(&self) -> String);
         $crate::delegate_to_inner!($field, fn set_help(&self, help: &str));
         $crate::delegate_to_inner!($field, fn get_help(&self) -> String);
-        $crate::delegate_to_inner!($field, fn get_processed_help(&self) -> String);
+        $crate::delegate_to_inner!($field, fn get_processed_help(&self) -> bstr::BString);
         $crate::delegate_to_inner!($field, fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()>);
         $crate::delegate_to_inner!($field, fn get_aliases(&self) -> Vec<String>);
         $crate::delegate_to_inner!($field, fn get_synopsis(&self, short: bool) -> String);
@@ -457,7 +458,7 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
 
     fn get_help(&self) -> String;
 
-    fn get_processed_help(&self) -> String;
+    fn get_processed_help(&self) -> bstr::BString;
 
     fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()>;
 
@@ -665,31 +666,22 @@ impl Command for CommandData {
         self.help.borrow().clone()
     }
 
-    fn get_processed_help(&self) -> String {
+    fn get_processed_help(&self) -> bstr::BString {
         let name = self.name.borrow().clone();
         let is_single_command = match &*self.application.borrow() {
             Some(application) => application.borrow().is_single_command(),
             None => false,
         };
 
-        let placeholders = [
-            "%command.name%".to_string(),
-            "%command.full_name%".to_string(),
-        ];
-        // TODO(bytes): the help text is built as a String.
-        let php_self = PHP_SERVER
-            .lock()
-            .unwrap()
-            .php_self()
-            .unwrap_or_default()
-            .into_string()
-            .unwrap_or_else(|php_self| panic!("PHP_SELF is not valid UTF-8: {php_self:?}"));
+        let placeholders = ["%command.name%", "%command.full_name%"];
+        let php_self = PHP_SERVER.lock().unwrap().php_self().unwrap_or_default();
+        let php_self = path_to_bytes(&php_self);
         let replacements = [
-            name.clone().unwrap_or_default(),
+            BString::from(name.clone().unwrap_or_default()),
             if is_single_command {
-                php_self
+                php_self.into()
             } else {
-                format!("{} {}", php_self, name.unwrap_or_default())
+                bconcat!(php_self, " ", name.unwrap_or_default())
             },
         ];
 
@@ -700,7 +692,7 @@ impl Command for CommandData {
             help
         };
 
-        legacy_lossy(&str_replace_array(&placeholders, &replacements, &subject)).into_owned()
+        str_replace_array(&placeholders, &replacements, &subject)
     }
 
     fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()> {

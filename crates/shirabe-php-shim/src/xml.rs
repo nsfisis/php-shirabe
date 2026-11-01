@@ -1,5 +1,6 @@
 //! Minimal, PHP-compatible subset of the DOM classes.
 
+use bstr::BString;
 use std::rc::Weak;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -15,9 +16,9 @@ struct NodeInner {
     /// Tag name for elements; unused otherwise.
     name: String,
     /// Ordered attributes for elements (matches setAttribute insertion order).
-    attributes: Vec<(String, String)>,
+    attributes: Vec<(String, BString)>,
     /// Character data for text nodes.
-    value: String,
+    value: BString,
     children: Vec<std::rc::Rc<std::cell::RefCell<NodeInner>>>,
     owner_document: Weak<std::cell::RefCell<NodeInner>>,
     /// Document-only fields.
@@ -44,7 +45,7 @@ impl DOMDocument {
             node_type: NodeType::Document,
             name: String::new(),
             attributes: Vec::new(),
-            value: String::new(),
+            value: BString::default(),
             children: Vec::new(),
             owner_document: Weak::new(),
             version: version.to_string(),
@@ -63,7 +64,7 @@ impl DOMDocument {
             node_type: NodeType::Element,
             name: name.to_string(),
             attributes: Vec::new(),
-            value: String::new(),
+            value: BString::default(),
             children: Vec::new(),
             owner_document: std::rc::Rc::downgrade(&self.0),
             version: String::new(),
@@ -72,19 +73,19 @@ impl DOMDocument {
         })))
     }
 
-    pub fn create_element_with_value(&self, name: &str, value: &str) -> DOMNode {
+    pub fn create_element_with_value(&self, name: &str, value: impl AsRef<[u8]>) -> DOMNode {
         let element = self.create_element(name);
         let text = self.create_text_node(value);
         element.0.borrow_mut().children.push(text.0);
         element
     }
 
-    pub fn create_text_node(&self, data: &str) -> DOMNode {
+    pub fn create_text_node(&self, data: impl AsRef<[u8]>) -> DOMNode {
         DOMNode(std::rc::Rc::new(std::cell::RefCell::new(NodeInner {
             node_type: NodeType::Text,
             name: String::new(),
             attributes: Vec::new(),
-            value: data.to_string(),
+            value: BString::from(data.as_ref()),
             children: Vec::new(),
             owner_document: std::rc::Rc::downgrade(&self.0),
             version: String::new(),
@@ -135,12 +136,13 @@ impl DOMNode {
         child
     }
 
-    pub fn set_attribute(&self, name: &str, value: &str) {
+    pub fn set_attribute(&self, name: &str, value: impl AsRef<[u8]>) {
+        let value = BString::from(value.as_ref());
         let mut node = self.0.borrow_mut();
         if let Some(attr) = node.attributes.iter_mut().find(|(k, _)| k == name) {
-            attr.1 = value.to_string();
+            attr.1 = value;
         } else {
-            node.attributes.push((name.to_string(), value.to_string()));
+            node.attributes.push((name.to_string(), value));
         }
     }
 
@@ -306,32 +308,30 @@ fn write_indent<W: std::io::Write>(out: &mut W, depth: usize) -> std::io::Result
     Ok(())
 }
 
-fn escape_text<W: std::io::Write>(s: &str, out: &mut W) -> std::io::Result<()> {
-    let mut buf = [0u8; 4];
-    for c in s.chars() {
-        match c {
-            '&' => out.write_all(b"&amp;")?,
-            '<' => out.write_all(b"&lt;")?,
-            '>' => out.write_all(b"&gt;")?,
-            '\r' => out.write_all(b"&#13;")?,
-            _ => out.write_all(c.encode_utf8(&mut buf).as_bytes())?,
+fn escape_text<W: std::io::Write>(s: &[u8], out: &mut W) -> std::io::Result<()> {
+    for &b in s {
+        match b {
+            b'&' => out.write_all(b"&amp;")?,
+            b'<' => out.write_all(b"&lt;")?,
+            b'>' => out.write_all(b"&gt;")?,
+            b'\r' => out.write_all(b"&#13;")?,
+            _ => out.write_all(&[b])?,
         }
     }
     Ok(())
 }
 
-fn escape_attribute<W: std::io::Write>(s: &str, out: &mut W) -> std::io::Result<()> {
-    let mut buf = [0u8; 4];
-    for c in s.chars() {
-        match c {
-            '&' => out.write_all(b"&amp;")?,
-            '<' => out.write_all(b"&lt;")?,
-            '>' => out.write_all(b"&gt;")?,
-            '"' => out.write_all(b"&quot;")?,
-            '\r' => out.write_all(b"&#13;")?,
-            '\n' => out.write_all(b"&#10;")?,
-            '\t' => out.write_all(b"&#9;")?,
-            _ => out.write_all(c.encode_utf8(&mut buf).as_bytes())?,
+fn escape_attribute<W: std::io::Write>(s: &[u8], out: &mut W) -> std::io::Result<()> {
+    for &b in s {
+        match b {
+            b'&' => out.write_all(b"&amp;")?,
+            b'<' => out.write_all(b"&lt;")?,
+            b'>' => out.write_all(b"&gt;")?,
+            b'"' => out.write_all(b"&quot;")?,
+            b'\r' => out.write_all(b"&#13;")?,
+            b'\n' => out.write_all(b"&#10;")?,
+            b'\t' => out.write_all(b"&#9;")?,
+            _ => out.write_all(&[b])?,
         }
     }
     Ok(())

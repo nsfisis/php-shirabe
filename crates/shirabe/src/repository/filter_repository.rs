@@ -7,7 +7,7 @@ use crate::repository::{
 };
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, legacy_lossy, preg_is_match};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, preg_is_match};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -139,7 +139,7 @@ impl RepositoryInterface for FilterRepository {
                 .repo
                 .get_packages()?
                 .iter()
-                .filter(|p| self.is_allowed(bstr::BStr::new(&*legacy_lossy(&p.get_name()))))
+                .filter(|p| self.is_allowed(bstr::BStr::new(&p.get_name())))
                 .count())
         } else {
             Ok(0)
@@ -223,7 +223,7 @@ impl RepositoryInterface for FilterRepository {
     fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         let mut result = Vec::new();
         for package in self.repo.get_packages()? {
-            if self.is_allowed(bstr::BStr::new(&*legacy_lossy(&package.get_name()))) {
+            if self.is_allowed(bstr::BStr::new(&package.get_name())) {
                 result.push(package);
             }
         }

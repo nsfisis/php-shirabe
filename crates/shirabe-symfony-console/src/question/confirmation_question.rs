@@ -2,6 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::question::{Question, QuestionInterface};
+use bstr::BStr;
 use shirabe_php_shim::{PhpMixed, empty, preg_is_match, strval};
 
 /// Represents a yes/no question.
@@ -77,7 +78,7 @@ impl QuestionInterface for ConfirmationQuestion {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
         self.inner.get_autocompleter_callback()
     }
 

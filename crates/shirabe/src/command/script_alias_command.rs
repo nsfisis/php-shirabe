@@ -4,13 +4,12 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
 use crate::util::Platform;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, impl_php_class, is_string, php_regex,
-    preg_replace2,
+    InvalidArgumentException, LogicException, PhpMixed, bconcat, impl_php_class, is_string,
+    php_regex, preg_replace2,
 };
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
 pub struct ScriptAliasCommand {
@@ -25,12 +24,13 @@ impl_php_class!(ScriptAliasCommand, r"Composer\Command\ScriptAliasCommand");
 
 impl ScriptAliasCommand {
     pub fn new(
-        script: String,
-        description: Option<String>,
-        aliases: Vec<String>,
+        script: &BStr,
+        description: Option<BString>,
+        aliases: Vec<BString>,
     ) -> anyhow::Result<Self> {
-        let description = description
-            .unwrap_or_else(|| format!("Runs the {} script as defined in composer.json", script));
+        let description = description.unwrap_or_else(|| {
+            bconcat!("Runs the ", script, " script as defined in composer.json")
+        });
 
         for alias in &aliases {
             if !is_string(&PhpMixed::string(alias.clone())) {
@@ -41,6 +41,14 @@ impl ScriptAliasCommand {
                 .into());
             }
         }
+
+        // These come from composer.json, whose JSON text is valid UTF-8.
+        let script = script.display_lossy().to_string();
+        let description = description.display_lossy().to_string();
+        let aliases = aliases
+            .iter()
+            .map(|alias| alias.display_lossy().to_string())
+            .collect();
 
         let command = Self {
             base_command_data: BaseCommandData::new(None),

@@ -9,11 +9,13 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, legacy_lossy, parse_url,
-    php_regex, php_to_string, preg_is_match, strtolower,
+    path_to_bytes, php_regex, php_to_string, preg_is_match, strtolower,
 };
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::{
+    command::Command,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct RepositoryCommand {
@@ -88,7 +90,7 @@ impl RepositoryCommand {
 
         for (key, repo) in &repos {
             if matches!(*repo, PhpMixed::Bool(false)) {
-                io.write(format!("[{}] <info>disabled</info>", legacy_lossy(&key)));
+                io.write(format!("[{}] <info>disabled</info>", key.display_lossy()));
                 continue;
             }
 
@@ -100,7 +102,7 @@ impl RepositoryCommand {
                     let first_key = repo_map.keys().next().unwrap();
                     io.write(format!(
                         "[{}] <info>disabled</info>",
-                        legacy_lossy(&first_key)
+                        first_key.display_lossy()
                     ));
                     continue;
                 }
@@ -123,8 +125,8 @@ impl RepositoryCommand {
                 };
                 io.write(format!(
                     "[{}] <info>{}</info> {}",
-                    legacy_lossy(&name),
-                    legacy_lossy(&r#type),
+                    name.display_lossy(),
+                    r#type.display_lossy(),
                     url
                 ));
             }
@@ -350,7 +352,7 @@ impl Command for RepositoryCommand {
 
         let config_file = self.config_file.borrow().as_ref().unwrap().clone();
         let config_data = config_file.borrow_mut().read()?;
-        let config_file_path = config_file.borrow().get_path().to_string();
+        let config_file_path = config_file.borrow().get_path().to_path_buf();
         let config_data_map: IndexMap<BString, PhpMixed> = match config_data {
             PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
@@ -358,7 +360,7 @@ impl Command for RepositoryCommand {
         let config = self.config.borrow().as_ref().unwrap().clone();
         config
             .borrow_mut()
-            .merge(&config_data_map, &config_file_path);
+            .merge(&config_data_map, path_to_bytes(&config_file_path));
         let repos = config.borrow().get_repositories();
 
         match action.as_slice() {

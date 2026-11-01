@@ -188,7 +188,7 @@ impl Bitbucket {
             self.io.write_error3(msg, true, io_interface::NORMAL);
         }
 
-        let local_auth_config_name: Option<String> = self
+        let local_auth_config_name: Option<BString> = self
             .config
             .borrow()
             .get_local_auth_config_source()
@@ -202,12 +202,12 @@ impl Bitbucket {
         self.io.write_error3(url, true, io_interface::NORMAL);
         let local_name_prefix = local_auth_config_name
             .as_ref()
-            .map(|name| format!("{} OR ", name))
+            .map(|name| format!("{} OR ", name.display_lossy()))
             .unwrap_or_default();
         self.io.write_error3(
             format!(
                 "to create a consumer. It will be stored in \"{}\" for future use by Composer.",
-                local_name_prefix + &auth_config_source_name
+                local_name_prefix + &auth_config_source_name.display_lossy().to_string()
             ),
             true,
             io_interface::NORMAL,

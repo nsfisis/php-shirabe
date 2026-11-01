@@ -15,12 +15,15 @@ use crate::repository::RepositoryInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, UnexpectedValueException, impl_php_class, legacy_lossy, preg_grep, strtolower,
+    PhpMixed, UnexpectedValueException, impl_php_class, implode, legacy_lossy, preg_grep,
+    strtolower,
 };
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::exception::InvalidArgumentException;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::{
+    command::Command,
+    exception::InvalidArgumentException,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct RemoveCommand {
@@ -470,7 +473,7 @@ impl Command for RemoveCommand {
             }
         }
 
-        io.write_error(format!("<info>{} has been updated</info>", file));
+        io.write_error(format!("<info>{} has been updated</info>", file.display()));
 
         if input
             .borrow()
@@ -659,7 +662,7 @@ impl Command for RemoveCommand {
 
         io.write_error(format!(
             "<info>Running shirabe update {}{}</info>",
-            shirabe_php_shim::implode(" ", &packages).display_lossy(),
+            implode(" ", &packages).display_lossy(),
             flags
         ));
 
@@ -701,7 +704,7 @@ impl Command for RemoveCommand {
         if status != 0 {
             io.write_error(format!(
                 "\n<error>Removal failed, reverting {} to its original content.</error>",
-                file
+                file.display()
             ));
             std::fs::write(json_file.get_path(), &composer_backup)?;
         }

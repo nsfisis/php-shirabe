@@ -207,7 +207,7 @@ fn test_preserve_indentation_after_read() {
     let dst = fixture_path("tabs2.json");
     std::fs::copy(&src, &dst).unwrap();
 
-    let json_file = JsonFile::new(dst.to_str().unwrap().to_string(), None, None).unwrap();
+    let json_file = JsonFile::new(dst.to_str().unwrap(), None, None).unwrap();
     let _data = json_file.read().unwrap();
     let mut hash: IndexMap<BString, PhpMixed> = IndexMap::new();
     hash.insert("foo".into(), PhpMixed::string("baz".to_string()));
@@ -229,7 +229,7 @@ fn test_overwrites_indentation_by_default() {
     let dst = fixture_path("tabs2.json");
     std::fs::copy(&src, &dst).unwrap();
 
-    let json_file = JsonFile::new(dst.to_str().unwrap().to_string(), None, None).unwrap();
+    let json_file = JsonFile::new(dst.to_str().unwrap(), None, None).unwrap();
     let mut hash: IndexMap<BString, PhpMixed> = IndexMap::new();
     hash.insert("foo".into(), PhpMixed::string("baz".to_string()));
     json_file.write(PhpMixed::Array(hash)).unwrap();
@@ -245,7 +245,7 @@ fn test_overwrites_indentation_by_default() {
 #[test]
 fn test_schema_validation() {
     let path = fixture_path("composer.json");
-    let json = JsonFile::new(path.to_str().unwrap().to_string(), None, None).unwrap();
+    let json = JsonFile::new(path.to_str().unwrap(), None, None).unwrap();
     json.validate_schema(JsonFile::STRICT_SCHEMA, None).unwrap();
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
 }
@@ -437,8 +437,13 @@ fn test_auth_schema_validation_with_custom_data_source() {
     let expected_message = "\"COMPOSER_AUTH\" does not match the expected JSON schema".to_string();
     let expected_error = "github-oauth : \"foo\" is not of type \"object\"".to_string();
 
-    let err = JsonFile::validate_json_schema("COMPOSER_AUTH", &json, JsonFile::AUTH_SCHEMA, None)
-        .unwrap_err();
+    let err = JsonFile::validate_json_schema(
+        bstr::BStr::new("COMPOSER_AUTH"),
+        &json,
+        JsonFile::AUTH_SCHEMA,
+        None,
+    )
+    .unwrap_err();
     let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     assert_eq!(&vec![expected_error], e.get_errors());
@@ -492,7 +497,7 @@ fn test_composer_lock_file_merge_conflict_simple() {
         std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-simple.txt")).unwrap();
     assert_eq!(
         data,
-        JsonFile::parse_json(Some(&json), Some("/path/to/composer.lock")).unwrap()
+        JsonFile::parse_json(Some(&json), Some(bstr::BStr::new("/path/to/composer.lock"))).unwrap()
     );
 }
 
@@ -503,7 +508,7 @@ fn test_composer_lock_file_merge_conflict_simple_crlf() {
         std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-simple.txt")).unwrap();
     assert_eq!(
         data,
-        JsonFile::parse_json(Some(&json), Some("/path/to/composer.lock")).unwrap()
+        JsonFile::parse_json(Some(&json), Some(bstr::BStr::new("/path/to/composer.lock"))).unwrap()
     );
 }
 
@@ -513,7 +518,8 @@ fn test_composer_lock_file_merge_conflict_complex() {
     let data =
         std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-complex.txt")).unwrap();
 
-    let err = JsonFile::parse_json(Some(&data), Some("/path/to/composer.lock")).unwrap_err();
+    let err = JsonFile::parse_json(Some(&data), Some(bstr::BStr::new("/path/to/composer.lock")))
+        .unwrap_err();
     assert!(err.is_instanceof::<ParsingException>());
 }
 
@@ -525,7 +531,8 @@ fn test_composer_lock_file_merge_conflict_complex_crlf() {
     ))
     .unwrap();
 
-    let err = JsonFile::parse_json(Some(&data), Some("/path/to/composer.lock")).unwrap_err();
+    let err = JsonFile::parse_json(Some(&data), Some(bstr::BStr::new("/path/to/composer.lock")))
+        .unwrap_err();
     assert!(err.is_instanceof::<ParsingException>());
 }
 
@@ -534,7 +541,8 @@ fn test_composer_lock_file_merge_conflict_extended() {
     let data =
         std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-extended.txt")).unwrap();
 
-    let json = JsonFile::parse_json(Some(&data), Some("/path/to/composer.lock")).unwrap();
+    let json =
+        JsonFile::parse_json(Some(&data), Some(bstr::BStr::new("/path/to/composer.lock"))).unwrap();
     assert_eq!(
         "VCS merge conflict detected. Please run `shirabe update --lock`.",
         json.as_array()

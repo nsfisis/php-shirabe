@@ -1,8 +1,9 @@
 //! ref: composer/vendor/symfony/console/Helper/DebugFormatterHelper.php
 
 use crate::helper::{Helper, HelperInterface, HelperSet};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{legacy_lossy, str_replace};
+use shirabe_php_shim::{bconcat, str_replace};
 
 const COLORS: [&str; 9] = [
     "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white", "default",
@@ -39,7 +40,7 @@ impl Default for DebugFormatterHelper {
 
 impl DebugFormatterHelper {
     /// Starts a debug formatting session.
-    pub fn start(&mut self, id: &str, message: &str, prefix: &str) -> String {
+    pub fn start(&mut self, id: &str, message: &BStr, prefix: &str) -> BString {
         self.count += 1;
         self.started.insert(
             id.to_string(),
@@ -50,11 +51,13 @@ impl DebugFormatterHelper {
             },
         );
 
-        format!(
-            "{}<bg=blue;fg=white> {} </> <fg=blue>{}</>\n",
+        bconcat!(
             self.get_border(id),
+            "<bg=blue;fg=white> ",
             prefix,
+            " </> <fg=blue>",
             message,
+            "</>\n"
         )
     }
 
@@ -62,28 +65,29 @@ impl DebugFormatterHelper {
     pub fn progress(
         &mut self,
         id: &str,
-        buffer: &str,
+        buffer: &BStr,
         error: bool,
         prefix: &str,
         error_prefix: &str,
-    ) -> String {
-        let mut message = String::new();
+    ) -> BString {
+        let mut message = BString::default();
 
         if error {
             if self.started[id].out {
-                message.push('\n');
+                message.push(b'\n');
                 self.started.get_mut(id).unwrap().out = false;
             }
             if !self.started[id].err {
-                message.push_str(&format!(
-                    "{}<bg=red;fg=white> {} </> ",
+                message.extend_from_slice(&bconcat!(
                     self.get_border(id),
+                    "<bg=red;fg=white> ",
                     error_prefix,
+                    " </> "
                 ));
                 self.started.get_mut(id).unwrap().err = true;
             }
 
-            message.push_str(&legacy_lossy(&str_replace(
+            message.extend_from_slice(&str_replace(
                 "\n",
                 format!(
                     "\n{}<bg=red;fg=white> {} </> ",
@@ -91,22 +95,23 @@ impl DebugFormatterHelper {
                     error_prefix,
                 ),
                 buffer,
-            )));
+            ));
         } else {
             if self.started[id].err {
-                message.push('\n');
+                message.push(b'\n');
                 self.started.get_mut(id).unwrap().err = false;
             }
             if !self.started[id].out {
-                message.push_str(&format!(
-                    "{}<bg=green;fg=white> {} </> ",
+                message.extend_from_slice(&bconcat!(
                     self.get_border(id),
+                    "<bg=green;fg=white> ",
                     prefix,
+                    " </> "
                 ));
                 self.started.get_mut(id).unwrap().out = true;
             }
 
-            message.push_str(&legacy_lossy(&str_replace(
+            message.extend_from_slice(&str_replace(
                 "\n",
                 format!(
                     "\n{}<bg=green;fg=white> {} </> ",
@@ -114,7 +119,7 @@ impl DebugFormatterHelper {
                     prefix,
                 ),
                 buffer,
-            )));
+            ));
         }
 
         message

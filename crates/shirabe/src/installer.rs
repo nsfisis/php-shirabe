@@ -1075,7 +1075,7 @@ impl Installer {
             for (_key, link) in root_requires.iter() {
                 if PlatformRepository::is_platform_package(link.get_target()) {
                     request.require_name(
-                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                        bstr::BStr::new(link.get_target()),
                         Some(link.get_constraint().clone()),
                     )?;
                 }
@@ -1089,7 +1089,7 @@ impl Installer {
             {
                 if !root_requires.contains_key(link.get_target()) {
                     request.require_name(
-                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                        bstr::BStr::new(link.get_target()),
                         Some(link.get_constraint().clone()),
                     )?;
                 }
@@ -1576,11 +1576,10 @@ impl Installer {
                 // exclude alias packages here as for root aliases, both alias and aliased are
                 // present in the lock repo and we only want to require the aliased version
                 if locked_package.as_alias().is_none()
-                    && !excluded_packages
-                        .contains(bstr::B(&*legacy_lossy(&locked_package.get_name())))
+                    && !excluded_packages.contains(bstr::B(&locked_package.get_name()))
                 {
                     request.require_name(
-                        bstr::BStr::new(&*legacy_lossy(&locked_package.get_name())),
+                        bstr::BStr::new(&locked_package.get_name()),
                         Some(
                             SimpleConstraint::new("==", locked_package.get_version(), None).into(),
                         ),
@@ -1596,7 +1595,7 @@ impl Installer {
             }
             for (_key, link) in links.iter() {
                 request.require_name(
-                    bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                    bstr::BStr::new(link.get_target()),
                     Some(link.get_constraint().clone()),
                 )?;
             }

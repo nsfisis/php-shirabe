@@ -710,7 +710,7 @@ impl EventDispatcher {
                             .get_config()
                             .borrow()
                             .get_str("cache-dir")?;
-                        Self::ensure_composer_php_runtime(std::path::Path::new(&cache_dir))?;
+                        Self::ensure_composer_php_runtime(path_from_bytes(&cache_dir))?;
                         if !self.php_runtime_bool(
                             "class_exists",
                             vec![PluginValue::string(class_name.clone())],
@@ -965,10 +965,8 @@ try {
                                 if !file_exists(path_from_bytes(m0)) {
                                     let finder = ExecutableFinder::new();
                                     // TODO(bytes): ExecutableFinder looks the name up as a &str.
-                                    if let Some(path_to_exec) =
-                                        finder.find(&legacy_lossy(m0), None, &[])
-                                    {
-                                        let mut path_to_exec = BString::from(path_to_exec);
+                                    if let Some(path_to_exec) = finder.find(m0, None, &[]) {
+                                        let mut path_to_exec = path_to_exec;
                                         if Platform::is_windows() {
                                             let exec_without_ext = preg_replace(
                                                 php_regex!("{\\.(exe|bat|cmd|com)$}i"),
@@ -1164,7 +1162,7 @@ try {
             .get_config()
             .borrow()
             .get_str("cache-dir")?;
-        Self::ensure_composer_php_runtime(std::path::Path::new(&cache_dir))?;
+        Self::ensure_composer_php_runtime(path_from_bytes(&cache_dir))?;
         Self::ensure_script_autoloader()?;
         let rhandle = shirabe_php_rpc::alloc_rhandle();
         let mut dispatcher = ScriptRpcDispatcher {

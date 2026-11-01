@@ -19,7 +19,8 @@ const VERSION_PATTERN: &str = r#"^[vV]?\d+(?:[.-]\d+){0,3}[._-]?(?:(?:[sS][tT][a
 /// strings, or an empty vec when the document is valid.
 fn check(json: &str) -> Vec<String> {
     let data = json_decode_obj(json).unwrap();
-    match JsonFile::validate_json_schema("test", &data, JsonFile::LAX_SCHEMA, None) {
+    match JsonFile::validate_json_schema(bstr::BStr::new("test"), &data, JsonFile::LAX_SCHEMA, None)
+    {
         Ok(_) => Vec::new(),
         Err(e) => e
             .catch::<JsonValidationException>()

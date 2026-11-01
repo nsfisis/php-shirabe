@@ -7,12 +7,12 @@ use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::installer::Installer;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
-use shirabe_php_shim::impl_php_class;
-use shirabe_php_shim::implode;
-use shirabe_php_shim::legacy_lossy;
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_php_shim::{impl_php_class, implode, legacy_lossy};
+use shirabe_symfony_console::{
+    command::Command,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct InstallCommand {

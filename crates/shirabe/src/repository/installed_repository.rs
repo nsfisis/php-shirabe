@@ -9,7 +9,7 @@ use crate::repository::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{array_merge_map, bconcat, implode, legacy_lossy, strtolower};
+use shirabe_php_shim::{array_merge_map, bconcat, implode, strtolower};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 
 pub enum NeedleInput {
@@ -211,9 +211,7 @@ impl InstalledRepository {
 
             if invert && needles.contains(&BString::from(&package.get_name()[..]).clone()) {
                 for link in package.get_conflicts().values() {
-                    for pkg in self
-                        .find_packages(bstr::BStr::new(&*legacy_lossy(link.get_target())), None)?
-                    {
+                    for pkg in self.find_packages(bstr::BStr::new(link.get_target()), None)? {
                         let version =
                             SimpleConstraint::new("=", BString::from(&pkg.get_version()[..]), None);
                         if link.get_constraint().matches(&version.into()) == invert {
@@ -225,9 +223,7 @@ impl InstalledRepository {
 
             for link in package.get_conflicts().values() {
                 if needles.contains(&BString::from(link.get_target()).clone()) {
-                    for pkg in self
-                        .find_packages(bstr::BStr::new(&*legacy_lossy(link.get_target())), None)?
-                    {
+                    for pkg in self.find_packages(bstr::BStr::new(link.get_target()), None)? {
                         let version =
                             SimpleConstraint::new("=", BString::from(&pkg.get_version()[..]), None);
                         if link.get_constraint().matches(&version.into()) == invert {
@@ -249,7 +245,7 @@ impl InstalledRepository {
                     if PlatformRepository::is_platform_package(link.get_target()) {
                         if self
                             .find_package(
-                                bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                                bstr::BStr::new(link.get_target()),
                                 FindPackageConstraint::Constraint(link.get_constraint().clone()),
                             )?
                             .is_some()
@@ -258,7 +254,7 @@ impl InstalledRepository {
                         }
 
                         let platform_pkg = self.find_package(
-                            bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                            bstr::BStr::new(link.get_target()),
                             FindPackageConstraint::String(bstr::BString::from("*".to_string())),
                         )?;
                         let description = platform_pkg

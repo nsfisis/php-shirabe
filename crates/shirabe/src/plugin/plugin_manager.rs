@@ -416,7 +416,7 @@ impl PluginManager {
             .get_config()
             .borrow()
             .get_str("cache-dir")?;
-        EventDispatcher::ensure_composer_php_runtime(std::path::Path::new(&cache_dir))?;
+        EventDispatcher::ensure_composer_php_runtime(path_from_bytes(&cache_dir))?;
         EventDispatcher::ensure_script_autoloader()?;
 
         if let Some(files) = map.get(B("files")).and_then(|v| v.as_array()) {
@@ -988,7 +988,7 @@ impl PluginManager {
         // TODO(plugin): used by registerPackage to assemble plugin dependency autoload map
         for (_k, require_link) in package.get_requires().iter() {
             for required_package in installed_repo.find_packages_with_replacers_and_providers(
-                bstr::BStr::new(&*legacy_lossy(require_link.get_target())),
+                bstr::BStr::new(require_link.get_target()),
                 None,
             )? {
                 if !collected.contains_key(&*legacy_lossy(&required_package.get_name())) {

@@ -109,7 +109,7 @@ impl VcsDriverBase {
 
         let parsed = JsonFile::parse_json(
             Some(&content),
-            Some(&*legacy_lossy(&bconcat!(identifier, ":composer.json"))),
+            Some(bconcat!(identifier, ":composer.json").as_ref()),
         )?;
 
         let array = match parsed {
@@ -276,7 +276,7 @@ pub trait VcsDriver: VcsDriverInterface {
 
         let composer = JsonFile::parse_json(
             Some(&composer_file_content),
-            Some(&*legacy_lossy(&bconcat!(identifier, ":composer.json"))),
+            Some(bconcat!(identifier, ":composer.json").as_ref()),
         )?;
 
         let mut composer: IndexMap<BString, PhpMixed> = match composer {

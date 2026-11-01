@@ -4,7 +4,7 @@ use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    AsAny, InvalidArgumentException, PhpMixed, bconcat, legacy_lossy, spl_object_hash, str_replace,
+    AsAny, InvalidArgumentException, PhpMixed, bconcat, spl_object_hash, str_replace,
 };
 use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;
@@ -102,13 +102,11 @@ impl ProcessHelper {
             let started = Self::formatter_start(
                 &formatter,
                 &spl_object_hash(&process),
-                &legacy_lossy(&Self::escape_string(process.get_command_line())),
+                Self::escape_string(process.get_command_line()).as_ref(),
             );
-            output.borrow().write(
-                &[bstr::BString::from(started)],
-                false,
-                output_interface::OUTPUT_NORMAL,
-            );
+            output
+                .borrow()
+                .write(&[started], false, output_interface::OUTPUT_NORMAL);
         }
 
         let callback = if output.borrow().is_debug() {
@@ -230,14 +228,12 @@ impl ProcessHelper {
             let progressed = Self::formatter_progress(
                 &formatter,
                 &object_hash,
-                &legacy_lossy(&Self::escape_string(buffer)),
+                Self::escape_string(buffer).as_ref(),
                 Process::ERR == r#type,
             );
-            output.borrow().write(
-                &[bstr::BString::from(progressed)],
-                false,
-                output_interface::OUTPUT_NORMAL,
-            );
+            output
+                .borrow()
+                .write(&[progressed], false, output_interface::OUTPUT_NORMAL);
 
             if let Some(callback) = callback.as_mut() {
                 callback(r#type, buffer);
@@ -252,8 +248,8 @@ impl ProcessHelper {
     fn formatter_start(
         formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
         id: &str,
-        message: &str,
-    ) -> String {
+        message: &BStr,
+    ) -> BString {
         formatter.borrow_mut().start(id, message, "RUN")
     }
 
@@ -269,9 +265,9 @@ impl ProcessHelper {
     fn formatter_progress(
         formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
         id: &str,
-        buffer: &str,
+        buffer: &BStr,
         error: bool,
-    ) -> String {
+    ) -> BString {
         formatter
             .borrow_mut()
             .progress(id, buffer, error, "OUT", "ERR")

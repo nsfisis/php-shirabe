@@ -83,7 +83,7 @@ impl SuggestedPackagesReporter {
         if mode & Self::MODE_LIST != 0 {
             for name in suggested.keys() {
                 self.io
-                    .write(format!("<info>{}</info>", legacy_lossy(&name)));
+                    .write(format!("<info>{}</info>", name.display_lossy()));
             }
 
             return Ok(());
@@ -94,13 +94,13 @@ impl SuggestedPackagesReporter {
             for (suggester, suggestions) in &suggesters {
                 self.io.write(format!(
                     "<comment>{}</comment> suggests:",
-                    legacy_lossy(&suggester)
+                    suggester.display_lossy()
                 ));
 
                 for (suggestion, reason) in suggestions {
                     self.io.write(format!(
                         " - <info>{}</info>{}",
-                        legacy_lossy(&suggestion),
+                        suggestion.display_lossy(),
                         if !reason.is_empty() {
                             format!(": {}", self.escape_output(&legacy_lossy(reason)))
                         } else {
@@ -121,13 +121,13 @@ impl SuggestedPackagesReporter {
             for (suggestion, suggesters) in &suggested {
                 self.io.write(format!(
                     "<comment>{}</comment> is suggested by:",
-                    legacy_lossy(&suggestion)
+                    suggestion.display_lossy()
                 ));
 
                 for (suggester, reason) in suggesters {
                     self.io.write(format!(
                         " - <info>{}</info>{}",
-                        legacy_lossy(&suggester),
+                        suggester.display_lossy(),
                         if !reason.is_empty() {
                             format!(": {}", self.escape_output(&legacy_lossy(reason)))
                         } else {

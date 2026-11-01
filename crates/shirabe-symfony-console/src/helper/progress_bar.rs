@@ -7,12 +7,12 @@ use crate::output::{
     ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
 };
 use crate::terminal::Terminal;
-use bstr::ByteSlice;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, legacy_lossy,
-    memory_get_usage, microtime, php_to_string, preg_replace_callback, round, rtrim2, sprintf,
-    str_pad, str_repeat, substr_count, time,
+    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, memory_get_usage,
+    microtime, php_to_string, preg_replace_callback, round, rtrim2, sprintf, str_pad, str_repeat,
+    substr_count, time,
 };
 
 pub const FORMAT_VERBOSE: &str = "verbose";
@@ -56,7 +56,7 @@ pub struct ProgressBar {
     messages: IndexMap<String, String>,
     overwrite: bool,
     terminal: Terminal,
-    previous_message: Option<String>,
+    previous_message: Option<BString>,
     cursor: Cursor,
 }
 
@@ -500,13 +500,14 @@ impl ProgressBar {
     }
 
     /// Overwrites a previous message to the output.
-    fn overwrite(&mut self, message: &str) {
-        if self.previous_message.as_deref() == Some(message) {
+    fn overwrite(&mut self, message: impl AsRef<[u8]>) {
+        let message = message.as_ref();
+        if self.previous_message.as_ref().map(|m| m.as_slice()) == Some(message) {
             return;
         }
 
-        let original_message = message.to_string();
-        let mut message = message.to_string();
+        let original_message = BString::from(message);
+        let mut message = BString::from(message);
 
         if self.overwrite {
             if let Some(previous_message) = self.previous_message.clone() {
@@ -545,17 +546,15 @@ impl ProgressBar {
                 }
             }
         } else if self.step > 0 {
-            message = format!("{}{}", PHP_EOL, message);
+            message = bconcat!(PHP_EOL, message);
         }
 
         self.previous_message = Some(original_message);
         self.last_write_time = microtime();
 
-        self.output.borrow().write(
-            &[bstr::BString::from(message)],
-            false,
-            output_interface::OUTPUT_NORMAL,
-        );
+        self.output
+            .borrow()
+            .write(&[message], false, output_interface::OUTPUT_NORMAL);
         self.write_count += 1;
     }
 
@@ -752,7 +751,7 @@ impl ProgressBar {
         formats
     }
 
-    fn build_line(&mut self) -> anyhow::Result<String> {
+    fn build_line(&mut self) -> anyhow::Result<BString> {
         let regex = "{%([a-z\\-_]+)(?:\\:([^%]+))?%}i";
 
         // The callback resolves a placeholder match into its replacement text.
@@ -784,12 +783,17 @@ impl ProgressBar {
 
     /// Applies the placeholder-resolving callback over `$this->format`, mirroring
     /// the `preg_replace_callback` invocation in PHP's `buildLine()`.
-    fn build_line_apply(&self, regex: &str) -> anyhow::Result<String> {
+    fn build_line_apply(&self, regex: &str) -> anyhow::Result<BString> {
         let format = self.format.clone().unwrap_or_default();
 
         // $callback in PHP, expressed as a closure over $this and the matches.
-        let callback = |matches: &PregMatches| -> anyhow::Result<String> {
-            let name = legacy_lossy(matches.get(1).unwrap_or_default()).into_owned();
+        let callback = |matches: &PregMatches| -> anyhow::Result<BString> {
+            // Placeholder names are declared in code; other bytes in the format match none of them.
+            let name = matches
+                .get(1)
+                .unwrap_or_default()
+                .display_lossy()
+                .to_string();
 
             let text: PhpMixed = if Self::get_placeholder_formatter_definition(&name).is_some() {
                 // $text = $formatter($this, $this->output);
@@ -802,24 +806,17 @@ impl ProgressBar {
             } else if let Some(message) = self.messages.get(&name) {
                 PhpMixed::string(message.clone())
             } else {
-                return Ok(legacy_lossy(matches.get(0).unwrap_or_default()).into_owned());
+                return Ok(matches.get(0).unwrap_or_default().into());
             };
 
             if let Some(modifier) = matches.get(2) {
-                return Ok(legacy_lossy(&sprintf(bconcat!("%", modifier), &[text])).into_owned());
+                return Ok(sprintf(bconcat!("%", modifier), &[text]));
             }
 
             // PHP implicitly casts the formatter result to string here.
-            Ok(match text {
-                PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-                PhpMixed::Int(i) => i.to_string(),
-                PhpMixed::Float(f) => {
-                    format!("{}", f)
-                }
-                other => legacy_lossy(&php_to_string(&other)).into_owned(),
-            })
+            Ok(php_to_string(&text))
         };
 
-        Ok(legacy_lossy(&preg_replace_callback(regex, callback, &format)?).into_owned())
+        preg_replace_callback(regex, callback, &format)
     }
 }

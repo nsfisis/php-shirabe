@@ -39,7 +39,7 @@ mockall::mock! {
         fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
         fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
         fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
-        fn get_name(&self) -> String;
+        fn get_name(&self) -> bstr::BString;
     }
 }
 
@@ -48,7 +48,7 @@ mockall::mock! {
 fn placeholder_auth_config_source() -> Box<MockConfigSource> {
     let mut mock = MockConfigSource::new();
     mock.expect_get_name()
-        .returning(|| "auth-config-source".to_string());
+        .returning(|| "auth-config-source".into());
     mock.expect_add_config_setting().returning(|_, _| Ok(()));
     mock.expect_remove_config_setting().returning(|_| Ok(()));
     Box::new(mock)
@@ -132,7 +132,7 @@ fn set_expectations_for_storing_access_token(
     let mut config_source = MockConfigSource::new();
     config_source
         .expect_get_name()
-        .returning(|| "config-source".to_string());
+        .returning(|| "config-source".into());
     let removed_key = format!("bitbucket-oauth.{}", ORIGIN);
     config_source
         .expect_remove_config_setting()
@@ -146,7 +146,7 @@ fn set_expectations_for_storing_access_token(
     let mut auth_config_source = MockConfigSource::new();
     auth_config_source
         .expect_get_name()
-        .returning(|| "auth-config-source".to_string());
+        .returning(|| "auth-config-source".into());
     let added_key = format!("bitbucket-oauth.{}", ORIGIN);
     let expected_value = expected_stored_token(time);
     auth_config_source

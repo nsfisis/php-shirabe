@@ -3,11 +3,13 @@
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe::advisory::Auditor;
-use shirabe::config::Config;
-use shirabe::io::{IOInterface, io_interface};
-use shirabe::util::Platform;
-use shirabe_php_shim::PhpMixed;
+use shirabe::{
+    advisory::Auditor,
+    config::Config,
+    io::{IOInterface, io_interface},
+    util::Platform,
+};
+use shirabe_php_shim::{PhpMixed, rtrim2};
 
 #[path = "common/io_mock.rs"]
 #[allow(dead_code)] // io_mock exposes more helpers than this binary uses
@@ -299,7 +301,7 @@ fn test_var_replacement() {
         .filter(|s| !s.is_empty())
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
-    let home = shirabe_php_shim::rtrim2(&home_raw, "\\/");
+    let home = rtrim2(&home_raw, "\\/");
     assert_eq!(PhpMixed::string("b".to_string()), config.get("c"));
     assert_eq!(PhpMixed::string(home.clone()), config.get("bin-dir"));
     assert_eq!(
@@ -310,7 +312,7 @@ fn test_var_replacement() {
 
 #[test]
 fn test_realpath_replacement() {
-    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    let mut config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![
             ("bin-dir", PhpMixed::string("$HOME/foo".to_string())),
@@ -324,7 +326,7 @@ fn test_realpath_replacement() {
         .filter(|s| !s.is_empty())
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
-    let home = shirabe_php_shim::rtrim2(&home_raw, "\\/");
+    let home = rtrim2(&home_raw, "\\/");
     assert_eq!(
         PhpMixed::string("/foo/bar/vendor".to_string()),
         config.get("vendor-dir")
@@ -341,7 +343,7 @@ fn test_realpath_replacement() {
 
 #[test]
 fn test_stream_wrapper_dirs() {
-    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    let mut config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![(
             "cache-dir",
@@ -358,7 +360,7 @@ fn test_stream_wrapper_dirs() {
 
 #[test]
 fn test_fetching_relative_paths() {
-    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    let mut config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![
             ("bin-dir", PhpMixed::string("{$vendor-dir}/foo".to_string())),
@@ -569,7 +571,7 @@ fn test_get_source_of_value() {
 
     assert_eq!(
         Config::SOURCE_DEFAULT,
-        config.get_source_of_value("process-timeout").as_str()
+        config.get_source_of_value("process-timeout")
     );
 
     config.merge(
@@ -579,7 +581,7 @@ fn test_get_source_of_value() {
 
     assert_eq!(
         "phpunit-test",
-        config.get_source_of_value("process-timeout").as_str()
+        config.get_source_of_value("process-timeout")
     );
 }
 
@@ -591,7 +593,7 @@ fn test_get_source_of_value_env_variables() {
     let result = config.get_source_of_value("htaccess-protect");
     Platform::clear_env("COMPOSER_HTACCESS_PROTECT");
 
-    assert_eq!("COMPOSER_HTACCESS_PROTECT", result.as_str());
+    assert_eq!("COMPOSER_HTACCESS_PROTECT", result);
 }
 
 #[test]

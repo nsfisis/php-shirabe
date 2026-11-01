@@ -51,7 +51,7 @@ impl ForgejoDriver {
             self.inner
                 .config
                 .borrow_mut()
-                .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
+                .get("cache-repo-dir")
                 .as_string()
                 .unwrap_or_default(),
             "/",
@@ -75,7 +75,7 @@ impl ForgejoDriver {
                 self.inner
                     .config
                     .borrow_mut()
-                    .get(&legacy_lossy(b"cache-read-only".as_slice()))
+                    .get("cache-read-only")
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -494,9 +494,7 @@ impl ForgejoDriver {
         }
         let forgejo_url = forgejo_url.unwrap();
 
-        let forgejo_domains = config
-            .borrow()
-            .get(&legacy_lossy(b"forgejo-domains".as_slice()));
+        let forgejo_domains = config.borrow().get("forgejo-domains");
         let in_domains = if let Some(list) = forgejo_domains.as_list() {
             list.iter().any(|d| {
                 d.as_string()

@@ -1320,7 +1320,7 @@ fn spawn_worker() -> anyhow::Result<Worker> {
     let (stream, child_end) = UnixStream::pair()?;
     let child_end = std::os::fd::OwnedFd::from(child_end);
 
-    let mut command = std::process::Command::new(&php);
+    let mut command = std::process::Command::new(path_from_bytes(&php));
     command
         // The Rust-side codec produces the byte representation of the default (and only
         // supported) serialize_precision; pin the child to it in case a distro php.ini overrides

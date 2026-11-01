@@ -190,7 +190,7 @@ impl Command for GlobalCommand {
                 .as_any_mut()
                 .downcast_mut::<Application>()
                 .expect("shirabe always installs its own Application");
-            app.has(&legacy_lossy(&command_name))
+            app.has(command_name.as_ref())
         };
         if has {
             let prepared = self.prepare_subcommand_input(
@@ -204,7 +204,7 @@ impl Command for GlobalCommand {
                     .as_any_mut()
                     .downcast_mut::<Application>()
                     .expect("shirabe always installs its own Application");
-                app.find(&legacy_lossy(&command_name))?
+                app.find(command_name.as_ref())?
             };
             command.borrow().merge_application_definition(true);
 

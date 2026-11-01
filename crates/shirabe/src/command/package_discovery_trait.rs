@@ -18,12 +18,11 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
-    array_slice, asort, bconcat, explode, file_get_contents, implode, in_array_strict, is_array,
-    is_file, is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match, preg_match,
-    strlen, strpos, trim,
+    array_slice, asort, bconcat, explode, file_get_contents, implode, in_array_strict, intval,
+    is_array, is_file, is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match,
+    preg_match, strlen, strpos, trim,
 };
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
 
 pub trait PackageDiscoveryTrait: BaseCommand {
     fn get_repos_mut(
@@ -321,9 +320,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             }
 
                             if is_numeric(&PhpMixed::string(selection.clone())) {
-                                let idx =
-                                    shirabe_php_shim::intval(&PhpMixed::string(selection.clone()))
-                                        as usize;
+                                let idx = intval(&PhpMixed::string(selection.clone())) as usize;
                                 if let Some(p) = matches_clone.get(idx) {
                                     return Ok(PhpMixed::string(p.name.clone()));
                                 }

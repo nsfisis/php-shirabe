@@ -27,7 +27,7 @@ impl JsonLoader {
             JsonLoaderInput::File(json_file) => json_file.read()?,
             JsonLoaderInput::String(ref s) if Path::new(s).exists() => {
                 let contents = std::fs::read_to_string(s)?;
-                JsonFile::parse_json(Some(&contents), Some(s))?
+                JsonFile::parse_json(Some(&contents), Some(bstr::BStr::new(s)))?
             }
             JsonLoaderInput::String(ref s) => JsonFile::parse_json(Some(s), None)?,
         };

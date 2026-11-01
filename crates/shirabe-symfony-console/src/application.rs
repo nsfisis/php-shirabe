@@ -4,6 +4,7 @@ use crate::command::Command;
 use crate::completion::{CompletionInput, CompletionSuggestions};
 use crate::helper::HelperSet;
 use crate::input::InputDefinition;
+use bstr::BStr;
 use indexmap::IndexMap;
 use shirabe_php_shim::AsAny;
 
@@ -28,7 +29,8 @@ pub trait Application: std::fmt::Debug + AsAny {
         namespace: Option<&str>,
     ) -> anyhow::Result<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>;
 
-    fn find(&mut self, name: &str) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn Command>>>;
+    fn find(&mut self, name: &BStr)
+    -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn Command>>>;
 
     fn get_definition(&mut self) -> std::rc::Rc<std::cell::RefCell<InputDefinition>>;
 

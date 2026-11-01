@@ -10,7 +10,7 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, legacy_lossy, preg_replace, str_replace, var_export};
+use shirabe_php_shim::{PhpMixed, preg_replace, str_replace, var_export};
 
 /// Markdown descriptor.
 #[derive(Debug, Default)]
@@ -45,28 +45,26 @@ impl MarkdownDescriptor {
             "<none>".to_string()
         };
         self.write(
-            &format!(
+            format!(
                 "#### `{}`\n\n{}* Is required: {}\n* Is array: {}\n* Default: `{}`",
                 name,
                 if !argument.get_description().is_empty() {
                     format!(
                         "{}\n\n",
-                        legacy_lossy(&preg_replace(
-                            "/\\s*[\\r\\n]\\s*/",
-                            "\n",
-                            argument.get_description()
-                        ))
+                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description())
+                            .display_lossy()
                     )
                 } else {
                     String::new()
                 },
                 if argument.is_required() { "yes" } else { "no" },
                 if argument.is_array() { "yes" } else { "no" },
-                legacy_lossy(&str_replace(
+                str_replace(
                     "\n",
                     "",
                     var_export(&argument.get_default().to_php_mixed(), true),
-                )),
+                )
+                .display_lossy(),
             ),
             true,
         );
@@ -83,17 +81,17 @@ impl MarkdownDescriptor {
             name += &format!("|--no-{}", option.get_name());
         }
         if let Some(shortcut) = option.get_shortcut() {
-            name += &format!("|-{}", legacy_lossy(&str_replace("|", "|-", shortcut)));
+            name += &format!("|-{}", shortcut.replace('|', "|-"));
         }
 
         self.write(
-            &format!(
+            format!(
                 "#### `{}`\n\n{}* Accept value: {}\n* Is value required: {}\n* Is multiple: {}\n* Is negatable: {}\n* Default: `{}`",
                 name,
                 if !option.get_description().is_empty() {
                     format!(
                         "{}\n\n",
-                        legacy_lossy(&preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description()))
+                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description()).display_lossy()
                     )
                 } else {
                     String::new()
@@ -102,11 +100,11 @@ impl MarkdownDescriptor {
                 if option.is_value_required() { "yes" } else { "no" },
                 if option.is_array() { "yes" } else { "no" },
                 if option.is_negatable() { "yes" } else { "no" },
-                legacy_lossy(&str_replace(
+                str_replace(
                     "\n",
                     "",
                     var_export(&option.get_default().to_php_mixed(), true),
-                )),
+                ).display_lossy(),
             ),
             true,
         );
@@ -150,7 +148,7 @@ impl MarkdownDescriptor {
     ) -> anyhow::Result<()> {
         if matches!(options.get(B("short")), Some(PhpMixed::Bool(true))) {
             self.write(
-                &format!(
+                format!(
                     "`{}`\n{}\n\n{}### Usage\n\n{}",
                     command.get_name().unwrap_or_default(),
                     "-".repeat(
@@ -181,7 +179,7 @@ impl MarkdownDescriptor {
         usages.extend(command.get_aliases());
         usages.extend(command.get_usages());
         self.write(
-            &format!(
+            format!(
                 "`{}`\n{}\n\n{}### Usage\n\n{}",
                 command.get_name().unwrap_or_default(),
                 "-".repeat(
@@ -227,7 +225,7 @@ impl MarkdownDescriptor {
         let title = self.get_application_title(&*application.borrow());
 
         self.write(
-            &format!("{}\n{}", title, "=".repeat(Helper::width(&title) as usize)),
+            format!("{}\n{}", title, "=".repeat(Helper::width(&title) as usize)),
             true,
         );
 
@@ -238,25 +236,25 @@ impl MarkdownDescriptor {
             };
             if ApplicationDescription::GLOBAL_NAMESPACE != namespace_id {
                 self.write("\n\n", true);
-                self.write(&format!("**{}:**", namespace_id), true);
+                self.write(format!("**{}:**", namespace_id), true);
             }
 
             self.write("\n\n", true);
             let command_names: Vec<String> = match namespace.get(B("commands")) {
                 Some(PhpMixed::List(names)) => names
                     .iter()
-                    .filter_map(|n| n.as_string().map(|s| legacy_lossy(s).into_owned()))
+                    .filter_map(|n| n.as_string().map(|s| s.display_lossy().to_string()))
                     .collect(),
                 _ => vec![],
             };
             self.write(
-                &command_names
+                command_names
                     .iter()
                     .map(|command_name| {
                         Ok(format!(
                             "* [`{}`](#{})",
                             command_name.clone(),
-                            legacy_lossy(&str_replace(
+                            str_replace(
                                 ":",
                                 "",
                                 description
@@ -264,7 +262,8 @@ impl MarkdownDescriptor {
                                     .borrow()
                                     .get_name()
                                     .unwrap_or_default(),
-                            )),
+                            )
+                            .display_lossy(),
                         ))
                     })
                     .collect::<anyhow::Result<Vec<String>>>()?
@@ -315,12 +314,12 @@ impl Descriptor for MarkdownDescriptor {
         self.output = Some(output);
     }
 
-    fn write(&self, content: &str, decorated: bool) {
+    fn write(&self, content: impl AsRef<[u8]>, decorated: bool) {
         // PHP overrides write() only to flip the default of $decorated to true;
         // it still delegates to parent::write.
         let _ = decorated;
         self.output().borrow().write(
-            &[bstr::BString::from(content.to_string())],
+            &[bstr::BString::from(content.as_ref())],
             false,
             if decorated {
                 crate::output::OUTPUT_NORMAL

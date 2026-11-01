@@ -10,13 +10,13 @@ use crate::output::{
 };
 use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::terminal::Terminal;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc,
-    fgets, fopen, fread, fseek, ftell, function_exists, legacy_lossy, mb_detect_encoding,
-    mb_strlen, ord, path_from_bytes, php_fopen_resource, php_to_string, rewind, rtrim,
-    sapi_windows_cp_conv, sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand,
-    str_repeat, stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
+    fgets, fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
+    path_from_bytes, php_fopen_resource, php_to_string, rewind, rtrim, sapi_windows_cp_conv,
+    sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat,
+    stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
     stream_set_blocking, strlen, substr, sys_get_temp_dir, trim, unlink,
 };
 use shirabe_symfony_string::s;
@@ -118,7 +118,7 @@ pub trait QuestionHelperInterface {
             let callback = autocomplete;
             // The autocompleter callback yields an iterable (Option here); PHP
             // treats a null result as an empty list of suggestions.
-            let callback = move |input: &str| callback(input).unwrap_or_default();
+            let callback = move |input: &BStr| callback(input).unwrap_or_default();
             let autocomplete = match self.inner().autocomplete(
                 std::rc::Rc::clone(&output),
                 question,
@@ -131,7 +131,7 @@ pub trait QuestionHelperInterface {
             ret = PhpMixed::string(if question.is_trimmable() {
                 trim(&autocomplete)
             } else {
-                bstr::BString::from(autocomplete)
+                autocomplete
             });
         } else {
             let mut r: PhpMixed = PhpMixed::Bool(false);
@@ -145,7 +145,7 @@ pub trait QuestionHelperInterface {
                         r = PhpMixed::string(if question.is_trimmable() {
                             trim(&hidden_response)
                         } else {
-                            bstr::BString::from(hidden_response)
+                            hidden_response
                         });
                     }
                     Err(e) => {
@@ -402,13 +402,12 @@ impl QuestionHelper {
                 false,
             )
         } else {
-            format!("<error>{}</error>", error.get_message())
+            bconcat!("<error>", error.get_message(), "</error>")
         };
 
-        output.borrow().writeln(
-            &[bstr::BString::from(message)],
-            output_interface::OUTPUT_NORMAL,
-        );
+        output
+            .borrow()
+            .writeln(&[message], output_interface::OUTPUT_NORMAL);
     }
 
     /// Autocompletes a question.
@@ -417,16 +416,16 @@ impl QuestionHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
         input_stream: &PhpResource,
-        autocomplete: &dyn Fn(&str) -> Vec<PhpMixed>,
-    ) -> Result<String, MissingInputException> {
+        autocomplete: &dyn Fn(&BStr) -> Vec<PhpMixed>,
+    ) -> Result<BString, MissingInputException> {
         let cursor = Cursor::new(std::rc::Rc::clone(&output), Some(input_stream.clone()));
 
-        let mut full_choice = String::new();
-        let mut ret = String::new();
+        let mut full_choice = BString::default();
+        let mut ret = BString::default();
 
         let mut i: i64 = 0;
         let mut ofs: i64 = -1;
-        let mut matches = autocomplete(&ret);
+        let mut matches = autocomplete(ret.as_ref());
         let mut num_matches = matches.len() as i64;
 
         let stty_mode = shell_exec("stty -g").unwrap_or_default();
@@ -473,19 +472,19 @@ impl QuestionHelper {
                     i -= 1;
                     cursor.move_left(s(&full_choice).slice(-1, None).width(false));
 
-                    full_choice = QuestionHelper::substr(Some(&full_choice), 0, Some(i));
+                    full_choice = Helper::substr(&full_choice, 0, Some(i));
                 }
 
                 if 0 == i {
                     ofs = -1;
-                    matches = autocomplete(&ret);
+                    matches = autocomplete(ret.as_ref());
                     num_matches = matches.len() as i64;
                 } else {
                     num_matches = 0;
                 }
 
                 // Pop the last character off the end of our string
-                ret = QuestionHelper::substr(Some(&ret), 0, Some(i));
+                ret = Helper::substr(&ret, 0, Some(i));
             } else if c.as_deref() == Some(b"\x1b".as_slice()) {
                 // Did we read an escape sequence?
                 let escape = fread(input_stream, 2).unwrap_or_default();
@@ -510,7 +509,7 @@ impl QuestionHelper {
                 if c.as_deref() == Some(b"\t".as_slice()) || c.as_deref() == Some(b"\n".as_slice())
                 {
                     if num_matches > 0 && -1 != ofs {
-                        ret = legacy_lossy(&php_to_string(&matches[ofs as usize])).into_owned();
+                        ret = php_to_string(&matches[ofs as usize]);
                         // Echo out remaining chars for current match
                         let remaining_characters = substr(
                             &ret,
@@ -518,24 +517,22 @@ impl QuestionHelper {
                             None,
                         );
                         output.borrow().write(
-                            std::slice::from_ref(&bstr::BString::from(
-                                legacy_lossy(&remaining_characters).into_owned().clone(),
-                            )),
+                            std::slice::from_ref(&remaining_characters),
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
-                        full_choice.push_str(&legacy_lossy(&remaining_characters));
+                        full_choice.extend_from_slice(&remaining_characters);
                         i = match mb_detect_encoding(&full_choice, None, true) {
                             None => strlen(&full_choice),
                             Some(encoding) => mb_strlen(&full_choice, &encoding),
                         };
 
                         let ret_for_filter = ret.clone();
-                        matches = autocomplete(&ret)
+                        matches = autocomplete(ret.as_ref())
                             .into_iter()
                             .filter(|m| {
                                 ret_for_filter.is_empty()
-                                    || php_to_string(m).starts_with(ret_for_filter.as_bytes())
+                                    || php_to_string(m).starts_with(ret_for_filter.as_slice())
                             })
                             .collect();
                         ofs = -1;
@@ -568,16 +565,14 @@ impl QuestionHelper {
                     c = Some([cur, extra].concat());
                 }
 
-                // TODO(bytes): the output, the answer and the autocomplete matching all work on
-                // Strings.
-                let cur = String::from_utf8_lossy(&c.clone().unwrap_or_default()).into_owned();
+                let cur = BString::from(c.clone().unwrap_or_default());
                 output.borrow().write(
-                    std::slice::from_ref(&bstr::BString::from(cur.clone())),
+                    std::slice::from_ref(&cur),
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );
-                ret.push_str(&cur);
-                full_choice.push_str(&cur);
+                ret.extend_from_slice(&cur);
+                full_choice.extend_from_slice(&cur);
                 i += 1;
 
                 let mut temp_ret = ret.clone();
@@ -591,9 +586,9 @@ impl QuestionHelper {
                 num_matches = 0;
                 ofs = 0;
 
-                for value in autocomplete(&ret) {
+                for value in autocomplete(ret.as_ref()) {
                     // If typed characters match the beginning chunk of value (e.g. [AcmeDe]moBundle)
-                    if php_to_string(&value).starts_with(temp_ret.as_bytes()) {
+                    if php_to_string(&value).starts_with(temp_ret.as_slice()) {
                         if (num_matches as usize) < matches.len() {
                             matches[num_matches as usize] = value;
                         } else {
@@ -634,19 +629,19 @@ impl QuestionHelper {
         Ok(full_choice)
     }
 
-    fn most_recently_entered_value(&self, entered: &str) -> String {
+    fn most_recently_entered_value(&self, entered: &[u8]) -> BString {
         // Determine the most recent value that the user entered
-        if !entered.contains(',') {
-            return entered.to_string();
+        if !entered.contains(&b',') {
+            return entered.into();
         }
 
         let choices = explode(",", entered);
         let last_choice = trim(&choices[choices.len() - 1]);
         if !last_choice.is_empty() {
-            return legacy_lossy(&last_choice).into_owned();
+            return last_choice;
         }
 
-        entered.to_string()
+        entered.into()
     }
 
     /// Gets a hidden response from user.
@@ -655,7 +650,7 @@ impl QuestionHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         input_stream: &PhpResource,
         trimmable: bool,
-    ) -> anyhow::Result<Result<String, RuntimeException>> {
+    ) -> anyhow::Result<Result<BString, RuntimeException>> {
         if cfg!(windows) {
             let mut exe = format!("{}/../Resources/bin/hiddeninput.exe", dir());
 
@@ -684,12 +679,12 @@ impl QuestionHelper {
                 unlink(&tmp);
             }
 
-            return Ok(Ok(legacy_lossy(&value).into_owned()));
+            return Ok(Ok(value));
         }
 
-        let mut stty_mode = String::new();
+        let mut stty_mode = BString::default();
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
-            stty_mode = legacy_lossy(&shell_exec("stty -g").unwrap_or_default()).into_owned();
+            stty_mode = shell_exec("stty -g").unwrap_or_default();
             shell_exec("stty -echo");
         } else if self.is_interactive_input(input_stream) {
             return Ok(Err(RuntimeException::new(
@@ -704,14 +699,13 @@ impl QuestionHelper {
         }
 
         let mut value = match value {
-            // TODO(bytes): the answer is returned as a String.
-            Some(value) => String::from_utf8_lossy(&value).into_owned(),
+            Some(value) => value,
             None => {
                 return Err(MissingInputException::new("Aborted.".to_string()).into());
             }
         };
         if trimmable {
-            value = legacy_lossy(&trim(&value)).into_owned();
+            value = trim(&value);
         }
         output.borrow().writeln(
             &[bstr::BString::from("".to_string())],
@@ -798,7 +792,7 @@ impl QuestionHelper {
                 input = PhpMixed::string(sapi_windows_cp_conv(
                     sapi_windows_cp_get(Some("oem")),
                     cp,
-                    &legacy_lossy(&php_to_string(&input)),
+                    php_to_string(&input).display_lossy().to_string().as_str(),
                 ));
             }
         }
@@ -829,11 +823,6 @@ impl QuestionHelper {
         }
 
         Some(clone_stream)
-    }
-
-    /// Helper::substr proxy (inherited static helper).
-    fn substr(string: Option<&str>, from: i64, length: Option<i64>) -> String {
-        legacy_lossy(&Helper::substr(string.unwrap_or_default(), from, length)).into_owned()
     }
 }
 

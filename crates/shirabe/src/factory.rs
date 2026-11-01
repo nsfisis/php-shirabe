@@ -29,22 +29,22 @@ use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::bconcat;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
-    PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, class_exists,
-    dirname, extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir,
-    is_file, json_decode_assoc, json_decode_obj, legacy_lossy, mkdir, path_from_bytes,
+    PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, bconcat,
+    class_exists, dirname, extension_loaded, file_exists, file_get_contents, file_put_contents,
+    implode, is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir, path_from_bytes,
     path_to_bytes, pathinfo, realpath, rename, rtrim2, strpos, strtr, substr, trim2,
 };
-use shirabe_symfony_console::formatter::{
-    OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface,
+use shirabe_symfony_console::{
+    formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
+    output::ConsoleOutput,
 };
-use shirabe_symfony_console::output::ConsoleOutput;
+use std::path::{Path, PathBuf};
 
 /// Either a configuration array or a filename to read from. PHP's `$localConfig` accepts both.
 pub enum LocalConfigInput {
-    Path(String),
+    Path(PathBuf),
     Data(IndexMap<BString, PhpMixed>),
 }
 
@@ -203,14 +203,14 @@ impl Factory {
 
     pub fn create_config(
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
     ) -> anyhow::Result<Config> {
         let cwd = match cwd {
-            Some(s) => s.to_string(),
-            None => legacy_lossy(path_to_bytes(&Platform::get_cwd(true)?)).into_owned(),
+            Some(cwd) => cwd.to_path_buf(),
+            None => Platform::get_cwd(true)?,
         };
 
-        let mut config = Config::new(true, Some(cwd));
+        let mut config = Config::new(true, Some(path_to_bytes(&cwd).into()));
 
         // determine and add main dirs to the config
         let home = Self::get_home_dir()?;
@@ -232,12 +232,12 @@ impl Factory {
         config.merge(&defaults, Config::SOURCE_DEFAULT);
 
         // load global config
-        let global_config_path = format!("{}/config.json", config.get_str("home")?);
+        let global_config_path = path_from_bytes(&config.get_str("home")?).join("config.json");
         let file = JsonFile::new(global_config_path, None, io.clone())?;
         if file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
-                    format!("Loading config file {}", file.get_path()),
+                    format!("Loading config file {}", file.get_path().display()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -252,8 +252,7 @@ impl Factory {
                 PhpMixed::Array(map) => map.into_iter().collect::<IndexMap<_, _>>(),
                 _ => IndexMap::new(),
             };
-            let file_path_owned = file.get_path().to_string();
-            config.merge(&read_data, &file_path_owned);
+            config.merge(&read_data, path_to_bytes(file.get_path()));
         }
         config.set_config_source(Box::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(file)),
@@ -271,23 +270,24 @@ impl Factory {
                 config.get_str("data-dir")?,
             ];
             for dir in &dirs {
-                if !file_exists(format!("{}/.htaccess", dir)) {
+                let dir = path_from_bytes(dir);
+                let path = dir.join(".htaccess");
+                if !file_exists(&path) {
                     if !is_dir(dir) {
                         let _ = mkdir(dir, 0o777, true);
                     }
-                    let path = format!("{}/.htaccess", dir);
                     let _ = file_put_contents(&path, b"Deny from all");
                 }
             }
         }
 
         // load global auth file
-        let auth_file_path = format!("{}/auth.json", config.get_str("home")?);
+        let auth_file_path = path_from_bytes(&config.get_str("home")?).join("auth.json");
         let auth_file = JsonFile::new(auth_file_path, None, io.clone())?;
         if auth_file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
-                    format!("Loading config file {}", auth_file.get_path()),
+                    format!("Loading config file {}", auth_file.get_path().display()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -307,8 +307,7 @@ impl Factory {
                 "config".into(),
                 PhpMixed::Array(read_data.into_iter().collect()),
             );
-            let auth_path_owned = auth_file.get_path().to_string();
-            config.merge(&wrapped, &auth_path_owned);
+            config.merge(&wrapped, path_to_bytes(auth_file.get_path()));
         }
         config.set_auth_config_source(Box::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(auth_file)),
@@ -320,39 +319,38 @@ impl Factory {
         Ok(config)
     }
 
-    pub fn get_composer_file() -> anyhow::Result<String> {
+    pub fn get_composer_file() -> anyhow::Result<PathBuf> {
         let env = Platform::get_env("COMPOSER");
         if let Some(env_str) = env {
-            let env_trimmed = legacy_lossy(&trim2(&env_str, " \t\n\r\0\u{0B}")).into_owned();
+            let env_trimmed = trim2(&env_str, " \t\n\r\0\u{0B}");
             if !env_trimmed.is_empty() {
-                if is_dir(&env_trimmed) {
+                let env_trimmed = path_from_bytes(&env_trimmed);
+                if is_dir(env_trimmed) {
                     return Err(RuntimeException::new(format!(
                         "The COMPOSER environment variable is set to {} which is a directory, this variable should point to a composer.json or be left unset.",
-                        env_trimmed
+                        env_trimmed.display()
                     )).into());
                 }
 
-                return Ok(env_trimmed);
+                return Ok(env_trimmed.to_path_buf());
             }
         }
 
-        Ok("./composer.json".to_string())
+        Ok(PathBuf::from("./composer.json"))
     }
 
-    pub fn get_lock_file(composer_file: &str) -> String {
+    pub fn get_lock_file(composer_file: &Path) -> PathBuf {
+        let composer_file = path_to_bytes(composer_file);
         let ext = pathinfo(composer_file, PATHINFO_EXTENSION);
-        if ext == "json" {
-            format!(
-                "{}lock",
-                legacy_lossy(&substr(
-                    composer_file,
-                    0,
-                    Some(composer_file.len() as i64 - 4)
-                ))
+        let lock_file = if ext == "json" {
+            bconcat!(
+                substr(composer_file, 0, Some(composer_file.len() as i64 - 4)),
+                "lock"
             )
         } else {
-            format!("{}.lock", composer_file)
-        }
+            bconcat!(composer_file, ".lock")
+        };
+        path_from_bytes(&lock_file).to_path_buf()
     }
 
     pub fn create_additional_styles()
@@ -393,23 +391,23 @@ impl Factory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         local_config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
         full_load: bool,
         disable_scripts: bool,
     ) -> anyhow::Result<PartialComposerHandle> {
         // if a custom composer.json path is given, we change the default cwd to be that file's directory
         let mut local_config = local_config;
-        let mut cwd = cwd.map(|s| s.to_string());
+        let mut cwd = cwd.map(Path::to_path_buf);
         if let Some(LocalConfigInput::Path(ref s)) = local_config
             && is_file(s)
             && cwd.is_none()
         {
-            cwd = Some(legacy_lossy(&dirname(s)).into_owned());
+            cwd = Some(path_from_bytes(&dirname(path_to_bytes(s))).to_path_buf());
         }
 
         let cwd = match cwd {
-            Some(s) => s,
-            None => legacy_lossy(path_to_bytes(&Platform::get_cwd(true)?)).into_owned(),
+            Some(cwd) => cwd,
+            None => Platform::get_cwd(true)?,
         };
 
         // load Composer configuration
@@ -417,8 +415,8 @@ impl Factory {
             local_config = Some(LocalConfigInput::Path(Self::get_composer_file()?));
         }
 
-        let mut local_config_source = Config::SOURCE_UNKNOWN.to_string();
-        let mut composer_file: Option<String> = None;
+        let mut local_config_source = BString::from(Config::SOURCE_UNKNOWN);
+        let mut composer_file: Option<PathBuf> = None;
         let mut local_config_data: IndexMap<BString, PhpMixed> = IndexMap::new();
         if let Some(LocalConfigInput::Path(path)) = &local_config {
             composer_file = Some(path.clone());
@@ -426,10 +424,15 @@ impl Factory {
             let file = JsonFile::new(path.clone(), None, Some(io.clone()))?;
 
             if !file.exists() {
-                let message = if path == "./composer.json" || path == "composer.json" {
-                    format!("Shirabe could not find a composer.json file in {}", cwd)
+                let message = if path.as_os_str() == "./composer.json"
+                    || path.as_os_str() == "composer.json"
+                {
+                    format!(
+                        "Shirabe could not find a composer.json file in {}",
+                        cwd.display()
+                    )
                 } else {
-                    format!("Shirabe could not find the config file: {}", path)
+                    format!("Shirabe could not find the config file: {}", path.display())
                 };
                 let instructions = if full_load {
                     "To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage"
@@ -449,7 +452,7 @@ impl Factory {
                 if let Some(jve) = e.catch::<JsonValidationException>() {
                     let errors = format!(
                         " - {}",
-                        legacy_lossy(&implode(format!("{} - ", PHP_EOL), jve.get_errors()))
+                        (implode(format!("{} - ", PHP_EOL), jve.get_errors())).display_lossy()
                     );
                     let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
                     return Err(
@@ -464,7 +467,7 @@ impl Factory {
                 .as_array()
                 .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default();
-            local_config_source = file.get_path().to_string();
+            local_config_source = path_to_bytes(file.get_path()).into();
         } else if let Some(LocalConfigInput::Data(data)) = local_config {
             local_config_data = data;
         }
@@ -476,29 +479,24 @@ impl Factory {
             Self::create_config(Some(io.clone()), Some(&cwd))?
         };
         let is_global = local_config_source != Config::SOURCE_UNKNOWN
-            && realpath(&config.get_str("home")?)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            && realpath(path_from_bytes(&config.get_str("home")?)).map(PathBuf::into_os_string)
                 == realpath(path_from_bytes(&dirname(&local_config_source)))
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+                    .map(PathBuf::into_os_string);
         config.merge(&local_config_data, &local_config_source);
 
         if let Some(ref composer_file_path) = composer_file {
             io.write_error3(
                 format!(
                     "Loading config file {} ({})",
-                    composer_file_path,
-                    realpath(composer_file_path)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default()
+                    composer_file_path.display(),
+                    realpath(composer_file_path).unwrap_or_default().display()
                 ),
                 true,
                 crate::io::DEBUG,
             );
             config.set_config_source(Box::new(JsonConfigSource::new(
                 std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
-                    realpath(composer_file_path)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default(),
+                    realpath(composer_file_path).unwrap_or_default(),
                     None,
                     Some(io.clone()),
                 )?)),
@@ -506,20 +504,19 @@ impl Factory {
             )));
 
             let local_auth_file = JsonFile::new(
-                format!(
-                    "{}/auth.json",
-                    legacy_lossy(&dirname(
-                        realpath(composer_file_path)
-                            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                            .unwrap_or_default()
-                    ))
-                ),
+                path_from_bytes(&dirname(path_to_bytes(
+                    &realpath(composer_file_path).unwrap_or_default(),
+                )))
+                .join("auth.json"),
                 None,
                 Some(io.clone()),
             )?;
             if local_auth_file.exists() {
                 io.write_error3(
-                    format!("Loading config file {}", local_auth_file.get_path()),
+                    format!(
+                        "Loading config file {}",
+                        local_auth_file.get_path().display()
+                    ),
                     true,
                     crate::io::DEBUG,
                 );
@@ -532,8 +529,7 @@ impl Factory {
                 let auth_read = local_auth_file.read()?;
                 let mut wrapped: IndexMap<BString, PhpMixed> = IndexMap::new();
                 wrapped.insert("config".into(), auth_read);
-                let auth_path = local_auth_file.get_path().to_string();
-                config.merge(&wrapped, &auth_path);
+                config.merge(&wrapped, path_to_bytes(local_auth_file.get_path()));
                 config.set_local_auth_config_source(Box::new(JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(local_auth_file)),
                     true,
@@ -572,10 +568,9 @@ impl Factory {
 
                         // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
                         // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
-                        let installed_versions_path = format!(
-                            "{}/composer/installed.php",
-                            config.borrow_mut().get_str("vendor-dir")?
-                        );
+                        let installed_versions_path =
+                            path_from_bytes(&config.borrow_mut().get_str("vendor-dir")?)
+                                .join("composer/installed.php");
                         if !disable_plugins.is_disabled_at_all()
                             && !disable_scripts
                             && !class_exists("Composer\\InstalledVersions")
@@ -677,7 +672,7 @@ impl Factory {
                     self.add_local_repository(
                         io.clone(),
                         &mut rm.borrow_mut(),
-                        &vendor_dir,
+                        vendor_dir.as_ref(),
                         composer.get_package().clone(),
                         Some(&process),
                     );
@@ -736,7 +731,7 @@ impl Factory {
                                 io.write_error3(
                                     format!(
                                         "<warning>{} is present but ignored as the \"lock\" config option is disabled.</warning>",
-                                        lock_file
+                                        lock_file.display()
                                     ),
                                     true,
                                     crate::io::NORMAL,
@@ -749,7 +744,7 @@ impl Factory {
                                     if lock_enabled {
                                         lock_file
                                     } else {
-                                        Platform::get_dev_null()
+                                        PathBuf::from(Platform::get_dev_null())
                                     },
                                     None,
                                     Some(io.clone()),
@@ -896,7 +891,7 @@ impl Factory {
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         rm: &mut RepositoryManager,
-        vendor_dir: &str,
+        vendor_dir: &BStr,
         root_package: RootPackageInterfaceHandle,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
@@ -915,7 +910,7 @@ impl Factory {
         rm.set_local_repository(crate::repository::RepositoryInterfaceHandle::new(
             InstalledFilesystemRepository::new(
                 JsonFile::new(
-                    format!("{}/composer/installed.json", vendor_dir),
+                    path_from_bytes(vendor_dir).join("composer/installed.json"),
                     None,
                     Some(io.clone()),
                 )
@@ -948,12 +943,11 @@ impl Factory {
 
         match self.create_composer(
             io.clone(),
-            Some(LocalConfigInput::Path(format!(
-                "{}/composer.json",
-                config.get_str("home").ok()?
-            ))),
+            Some(LocalConfigInput::Path(
+                path_from_bytes(&config.get_str("home").ok()?).join("composer.json"),
+            )),
             disable_plugins,
-            Some(&config.get_str("home").ok()?),
+            Some(path_from_bytes(&config.get_str("home").ok()?)),
             full_load,
             disable_scripts,
         ) {
@@ -985,7 +979,7 @@ impl Factory {
         let cache = if cache_files_ttl > 0 {
             let mut cache = Cache::new(
                 io.clone(),
-                &config.borrow_mut().get_str("cache-files-dir")?,
+                path_from_bytes(&config.borrow_mut().get_str("cache-files-dir")?),
                 Some("a-z0-9_./"),
                 None,
                 false,
@@ -1393,11 +1387,11 @@ impl Factory {
 
     /// For testing only: equivalent of `FactoryMock::createConfig`. Builds a `Config` with a unique
     /// temp home and packagist disabled, without loading the global config/auth files.
-    fn __create_config_mock(cwd: Option<&str>) -> anyhow::Result<Config> {
+    fn __create_config_mock(cwd: Option<&Path>) -> anyhow::Result<Config> {
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT: AtomicU64 = AtomicU64::new(0);
 
-        let mut config = Config::new(true, cwd.map(|s| s.to_string()));
+        let mut config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
 
         let home = std::env::temp_dir().join(format!(
             "shirabe-test-{}-{}",
@@ -1407,15 +1401,7 @@ impl Factory {
         let _ = std::fs::create_dir_all(&home);
 
         let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-        config_section.insert(
-            "home".into(),
-            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-            PhpMixed::string(
-                home.into_os_string()
-                    .into_string()
-                    .unwrap_or_else(|home| panic!("temp dir is not valid UTF-8: {home:?}")),
-            ),
-        );
+        config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home)));
         let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
         repositories.insert("packagist".into(), PhpMixed::Bool(false));
 
@@ -1554,7 +1540,7 @@ impl Factory {
             io,
             ValidateJsonInput::Data(auth_data),
             JsonFile::AUTH_SCHEMA,
-            Some("COMPOSER_AUTH"),
+            Some(BStr::new("COMPOSER_AUTH")),
         )?;
         let auth_data_assoc = json_decode_assoc(&composer_auth_env_str)?;
         if !matches!(auth_data_assoc, PhpMixed::Null) {
@@ -1595,7 +1581,7 @@ impl Factory {
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         file_or_data: ValidateJsonInput<'_>,
         schema: i64,
-        source: Option<&str>,
+        source: Option<&BStr>,
     ) -> anyhow::Result<()> {
         if Platform::is_input_completion_process() {
             return Ok(());
@@ -1621,7 +1607,7 @@ impl Factory {
                     "{}, this may result in errors and should be resolved:{} - {}",
                     jve.get_message(),
                     PHP_EOL,
-                    legacy_lossy(&implode(format!("{} - ", PHP_EOL), jve.get_errors()))
+                    (implode(format!("{} - ", PHP_EOL), jve.get_errors())).display_lossy()
                 );
                 if let Some(io_ref) = io {
                     io_ref.write_error3(format!("<warning>{}</>", msg), true, crate::io::NORMAL);

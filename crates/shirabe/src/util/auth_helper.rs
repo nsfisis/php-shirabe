@@ -56,7 +56,7 @@ impl AuthHelper {
                 format!(
                     "Do you want to store credentials for {} in {} ? [Yn] ",
                     origin.display_lossy(),
-                    config_source.get_name(),
+                    config_source.get_name().display_lossy(),
                 ),
                 Box::new(|value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     let input = strtolower(substr(

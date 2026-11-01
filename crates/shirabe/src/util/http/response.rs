@@ -2,7 +2,7 @@
 
 use crate::json::JsonFile;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{PhpMixed, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_match, preg_quote};
 
 #[derive(Debug)]
 pub struct Response {
@@ -63,7 +63,7 @@ impl Response {
     }
 
     pub fn decode_json(&self) -> anyhow::Result<PhpMixed> {
-        JsonFile::parse_json(self.body.as_deref(), Some(&legacy_lossy(&self.url)))
+        JsonFile::parse_json(self.body.as_deref(), Some(self.url.as_ref()))
     }
 
     pub fn collect(&mut self) {

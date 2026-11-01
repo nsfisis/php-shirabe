@@ -62,7 +62,7 @@ fn test_set_get_package() {
 fn test_set_get_locker() {
     let mut composer = Composer::new();
     let io = null_io();
-    let json_file = JsonFile::new("composer.lock".to_string(), None, None).unwrap();
+    let json_file = JsonFile::new("composer.lock", None, None).unwrap();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));

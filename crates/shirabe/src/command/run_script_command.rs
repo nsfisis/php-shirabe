@@ -95,7 +95,7 @@ impl RunScriptCommand {
         for (name, _script) in scripts {
             let mut description = String::new();
             if let Some(application) = self.get_application() {
-                match application.borrow_mut().find(&legacy_lossy(&name)) {
+                match application.borrow_mut().find(name.as_ref()) {
                     Ok(cmd) => description = cmd.borrow().get_description(),
                     Err(e)
                         if e.is_instanceof::<CommandNotFoundException>()

@@ -200,7 +200,8 @@ impl ArtifactRepository {
 
         let json_str = json.unwrap();
         let pathname_label = format!("{}#composer.json", pathname);
-        let mut package = JsonFile::parse_json(Some(&json_str), Some(&pathname_label))?;
+        let mut package =
+            JsonFile::parse_json(Some(&json_str), Some(bstr::BStr::new(&pathname_label)))?;
         let url_normalized = pathname.replace('\\', "/");
         let real_path = file
             .canonicalize()

@@ -15,7 +15,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
-    array_replace_recursive, bconcat, empty, extension_loaded, file_get_contents, implode,
+    array_replace_recursive, bconcat, empty, extension_loaded, file_get_contents, implode, intval,
     is_numeric, legacy_lossy, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
     rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
@@ -132,7 +132,7 @@ impl HttpDownloader {
             None => PhpMixed::Bool(false),
         };
         if is_numeric(&max_jobs_env_mixed) {
-            max_jobs = shirabe_php_shim::intval(&max_jobs_env_mixed).clamp(1, 50);
+            max_jobs = intval(&max_jobs_env_mixed).clamp(1, 50);
         }
 
         Self {

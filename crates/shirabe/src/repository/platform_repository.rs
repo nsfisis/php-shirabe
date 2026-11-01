@@ -436,7 +436,7 @@ impl PlatformRepository {
                                 &mut libraries,
                                 bstr::BStr::new(&format!(
                                     "{}-openssl{}",
-                                    legacy_lossy(&name),
+                                    name.display_lossy(),
                                     if is_fips { "-fips" } else { "" }
                                 )),
                                 Some(&parsed_version),
@@ -466,7 +466,7 @@ impl PlatformRepository {
                             }
                             self.add_library(
                                 &mut libraries,
-                                bstr::BStr::new(&format!("{}-{}", legacy_lossy(&name), shortlib)),
+                                bstr::BStr::new(&format!("{}-{}", name.display_lossy(), shortlib)),
                                 Some(&ssl_version),
                                 Some(&bconcat!("curl ", library, " version (", ssl_version, ")")),
                                 &[ssl_lib],
@@ -973,7 +973,7 @@ impl PlatformRepository {
                             &mut libraries,
                             bstr::BStr::new(&format!(
                                 "{}{}",
-                                legacy_lossy(&name),
+                                name.display_lossy(),
                                 if is_fips { "-fips" } else { "" }
                             )),
                             Some(&parsed_version),

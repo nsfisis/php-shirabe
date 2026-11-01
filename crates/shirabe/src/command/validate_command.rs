@@ -8,10 +8,8 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::ValidatingArrayLoader;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::util::{ConfigValidator, Filesystem};
-use shirabe_php_shim::{impl_php_class, legacy_lossy};
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_php_shim::{impl_php_class, path_from_bytes};
+use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
 pub struct ValidateCommand {
@@ -230,17 +228,19 @@ impl Command for ValidateCommand {
             .borrow()
             .get_argument("file")?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned())
-            .map(Ok)
+            .map(|s| Ok(path_from_bytes(s).to_path_buf()))
             .unwrap_or_else(Factory::get_composer_file)?;
         let io = self.get_io().clone();
 
-        if !std::path::Path::new(&file).exists() {
-            io.write_error(format!("<error>{} not found.</error>", file));
+        if !file.exists() {
+            io.write_error(format!("<error>{} not found.</error>", file.display()));
             return Ok(3);
         }
         if !Filesystem::is_readable(&file) {
-            io.write_error(format!("<error>{} is not readable.</error>", file));
+            io.write_error(format!(
+                "<error>{} is not readable.</error>",
+                file.display()
+            ));
             return Ok(3);
         }
 
@@ -312,7 +312,7 @@ impl Command for ValidateCommand {
 
         self.output_result(
             io.clone(),
-            &file,
+            &file.display().to_string(),
             &mut errors,
             &mut warnings,
             check_publish,
@@ -352,15 +352,14 @@ impl Command for ValidateCommand {
                     Some(p) => p,
                     None => continue,
                 };
-                let dep_file = format!("{}/composer.json", path.display());
-                if std::path::Path::new(&path).is_dir() && std::path::Path::new(&dep_file).exists()
-                {
+                let dep_file = path.join("composer.json");
+                if path.is_dir() && dep_file.exists() {
                     let (mut dep_errors, mut dep_publish_errors, mut dep_warnings) =
                         validator.validate(&dep_file, check_all, check_version);
 
                     self.output_result(
                         io.clone(),
-                        &legacy_lossy(&package.get_pretty_name()),
+                        &package.get_pretty_name().display_lossy().to_string(),
                         &mut dep_errors,
                         &mut dep_warnings,
                         check_publish,

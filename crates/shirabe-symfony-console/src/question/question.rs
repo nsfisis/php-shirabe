@@ -3,7 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::question::choice_question::ChoiceQuestion;
 use crate::question::confirmation_question::ConfirmationQuestion;
-use bstr::ByteSlice;
+use bstr::{BStr, ByteSlice};
 use shirabe_php_shim::PhpMixed;
 
 /// Polymorphic boundary for the Symfony Console Question hierarchy.
@@ -26,7 +26,7 @@ pub trait QuestionInterface: std::fmt::Debug {
 
     fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>>;
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>>;
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>;
 
     fn get_validator(
         &self,
@@ -55,7 +55,7 @@ pub struct Question {
     attempts: Option<i64>,
     hidden: bool,
     hidden_fallback: bool,
-    autocompleter_callback: Option<Box<dyn Fn(&str) -> Option<Vec<PhpMixed>>>>,
+    autocompleter_callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>>,
     validator: Option<Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>>,
     default: Option<PhpMixed>,
     normalizer: Option<Box<dyn Fn(PhpMixed) -> PhpMixed>>,
@@ -154,7 +154,7 @@ impl Question {
         let callback = self.get_autocompleter_callback();
 
         match callback {
-            Some(callback) => callback(""),
+            Some(callback) => callback(BStr::new("")),
             None => None,
         }
     }
@@ -166,7 +166,7 @@ impl Question {
         &mut self,
         values: Option<PhpMixed>,
     ) -> Result<&mut Self, LogicException> {
-        let callback: Option<Box<dyn Fn(&str) -> Option<Vec<PhpMixed>>>> = match values {
+        let callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>> = match values {
             // PHP: `if (\is_array($values))`. Both PhpMixed::List and ::Array model PHP arrays.
             Some(values) if matches!(values, PhpMixed::List(_) | PhpMixed::Array(_)) => {
                 let values = if Self::is_assoc(&values) {
@@ -188,7 +188,7 @@ impl Question {
                     }
                 };
 
-                Some(Box::new(move |_input: &str| Some(values.clone())))
+                Some(Box::new(move |_input: &BStr| Some(values.clone())))
             }
             // PHP: `elseif ($values instanceof \Traversable)`. In PHP this caches the
             // iterator result; here non-array iterables are not modeled, so treat any
@@ -202,7 +202,7 @@ impl Question {
                     PhpMixed::Array(array) => array.into_values().collect(),
                     _ => Vec::new(),
                 };
-                Some(Box::new(move |_input: &str| Some(cached.clone())))
+                Some(Box::new(move |_input: &BStr| Some(cached.clone())))
             }
             None => None,
         };
@@ -211,7 +211,7 @@ impl Question {
     }
 
     /// Gets the callback function used for the autocompleter.
-    pub fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    pub fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
         self.autocompleter_callback.as_deref()
     }
 
@@ -221,7 +221,7 @@ impl Question {
     /// corresponding suggestions.
     pub fn set_autocompleter_callback(
         &mut self,
-        callback: Option<Box<dyn Fn(&str) -> Option<Vec<PhpMixed>>>>,
+        callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>>,
     ) -> Result<&mut Self, LogicException> {
         if self.hidden && callback.is_some() {
             return Err(LogicException::new(
@@ -349,7 +349,7 @@ impl QuestionInterface for Question {
         self.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
         self.get_autocompleter_callback()
     }
 

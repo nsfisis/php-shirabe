@@ -483,7 +483,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                 {
                     commands.push(vec![
                         "7z".into(),
-                        BString::from(cmd),
+                        cmd,
                         "x".into(),
                         "-bb0".into(),
                         "-y".into(),
@@ -494,7 +494,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                 if let Some(cmd) = finder.find("unzip", None, &[]) {
                     commands.push(vec![
                         "unzip".into(),
-                        BString::from(cmd),
+                        cmd,
                         "-qq".into(),
                         "%file%".into(),
                         "-d".into(),
@@ -506,7 +506,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                         // 7z linux/macOS support is only used if unzip is not present
                         commands.push(vec![
                             "7z".into(),
-                            BString::from(cmd),
+                            cmd,
                             "x".into(),
                             "-bb0".into(),
                             "-y".into(),
@@ -517,7 +517,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                         // 7zz linux/macOS support is only used if unzip is not present
                         commands.push(vec![
                             "7zz".into(),
-                            BString::from(cmd),
+                            cmd,
                             "x".into(),
                             "-bb0".into(),
                             "-y".into(),
@@ -528,7 +528,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                         // 7za linux/macOS support is only used if unzip is not present
                         commands.push(vec![
                             "7za".into(),
-                            BString::from(cmd),
+                            cmd,
                             "x".into(),
                             "-bb0".into(),
                             "-y".into(),

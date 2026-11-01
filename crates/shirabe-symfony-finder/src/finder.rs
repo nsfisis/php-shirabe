@@ -7,11 +7,12 @@
 //! private `Entry` struct so the path/exclude filters keep their exact behavior.
 
 use crate::glob::Glob;
+use bstr::{BStr, BString};
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
-    file_exists, glob, is_dir, legacy_lossy, path_from_bytes, php_regex, preg_is_match, preg_match,
-    preg_quote, rtrim2,
+    bconcat, file_exists, glob, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_quote, rtrim2, str_replace,
 };
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -83,11 +84,11 @@ enum Sort {
 struct Entry {
     pathname: PathBuf,
     /// `getRelativePath()`: the directory of the entry relative to the search root.
-    relative_path: String,
+    relative_path: BString,
     /// `getRelativePathname()`: the full path of the entry relative to the search root.
-    relative_pathname: String,
+    relative_pathname: BString,
     /// `getFilename()`: the basename.
-    filename: String,
+    filename: BString,
     depth: i64,
     is_dir: bool,
     is_file: bool,
@@ -104,7 +105,7 @@ pub struct Finder {
     reverse_sorting: bool,
     sort: Sort,
     ignore: i64,
-    dirs: Vec<String>,
+    dirs: Vec<BString>,
     dates: Vec<(String, i64)>,
     paths: Vec<String>,
     not_paths: Vec<String>,
@@ -178,24 +179,18 @@ impl Finder {
     }
 
     pub fn r#in(&mut self, dirs: impl AsRef<Path>) -> &mut Self {
-        // TODO(bytes): the directories are resolved as Strings.
-        let dir = dirs
-            .as_ref()
-            .to_str()
-            .unwrap_or_else(|| panic!("path is not valid UTF-8: {}", dirs.as_ref().display()))
-            .to_string();
-        let mut resolved_dirs: Vec<String> = Vec::new();
+        let dir = path_to_bytes(&dirs);
+        let mut resolved_dirs: Vec<BString> = Vec::new();
 
-        if is_dir(&dir) {
-            resolved_dirs.push(self.normalize_dir(&dir));
+        if is_dir(dirs.as_ref()) {
+            resolved_dirs.push(self.normalize_dir(dir));
         } else {
             // GLOB_ONLYDIR is emulated by retaining directory matches only.
             // TODO(php-semantics): wildcard `in()` paths depend on `shirabe_php_shim::glob`, which is
             // still `todo!()`; only the real-directory branch above currently resolves.
-            let mut globbed: Vec<String> = glob(&dir)
+            let mut globbed: Vec<BString> = glob(dir)
                 .into_iter()
                 .filter(|path| is_dir(path_from_bytes(&path)))
-                .map(|s| legacy_lossy(&s).into_owned())
                 .collect();
             if !globbed.is_empty() {
                 globbed.sort();
@@ -203,7 +198,10 @@ impl Finder {
                     resolved_dirs.push(self.normalize_dir(g));
                 }
             } else {
-                panic!("The \"{dir}\" directory does not exist.");
+                panic!(
+                    "The \"{}\" directory does not exist.",
+                    dirs.as_ref().display()
+                );
             }
         }
 
@@ -314,9 +312,9 @@ impl Finder {
         self.len() == 0
     }
 
-    fn normalize_dir(&self, dir: &str) -> String {
-        if dir == "/" {
-            return dir.to_string();
+    fn normalize_dir(&self, dir: &[u8]) -> BString {
+        if dir == b"/" {
+            return dir.into();
         }
 
         let mut dir = rtrim2(dir, "/");
@@ -324,7 +322,7 @@ impl Finder {
         if preg_is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir) {
             dir.push(b'/');
         }
-        legacy_lossy(&dir).into_owned()
+        dir
     }
 
     fn collect_paths(&self) -> Vec<PathBuf> {
@@ -334,7 +332,7 @@ impl Finder {
 
         let mut entries: Vec<Entry> = Vec::new();
         for dir in &self.dirs {
-            self.search_in_directory(dir, &mut entries);
+            self.search_in_directory(dir.as_ref(), &mut entries);
         }
 
         if !matches!(self.sort, Sort::None) || self.reverse_sorting {
@@ -344,7 +342,7 @@ impl Finder {
         entries.into_iter().map(|entry| entry.pathname).collect()
     }
 
-    fn search_in_directory(&self, dir: &str, out: &mut Vec<Entry>) {
+    fn search_in_directory(&self, dir: &BStr, out: &mut Vec<Entry>) {
         let mut exclude = self.exclude.clone();
         let mut not_paths = self.not_paths.clone();
 
@@ -374,10 +372,10 @@ impl Finder {
         let (excluded_dirs, excluded_pattern) = build_exclude(&exclude);
 
         let mut raw: Vec<Entry> = Vec::new();
-        let root = Path::new(dir);
+        let root = path_from_bytes(dir);
         self.walk(
             root,
-            "",
+            b"",
             0,
             max_depth,
             &excluded_dirs,
@@ -411,7 +409,9 @@ impl Finder {
                 }
             }
 
-            if has_name_filter && !is_accepted(&entry.filename, &match_names, &nomatch_names) {
+            if has_name_filter
+                && !is_accepted(entry.filename.as_ref(), &match_names, &nomatch_names)
+            {
                 continue;
             }
 
@@ -439,7 +439,11 @@ impl Finder {
             }
 
             if has_path_filter
-                && !is_accepted(&entry.relative_pathname, &match_paths, &nomatch_paths)
+                && !is_accepted(
+                    entry.relative_pathname.as_ref(),
+                    &match_paths,
+                    &nomatch_paths,
+                )
             {
                 continue;
             }
@@ -452,7 +456,7 @@ impl Finder {
     fn walk(
         &self,
         dir: &Path,
-        relative_dir: &str,
+        relative_dir: &[u8],
         depth: i64,
         max_depth: i64,
         excluded_dirs: &IndexSet<String>,
@@ -471,16 +475,12 @@ impl Finder {
         for entry in read {
             let Ok(entry) = entry else { continue };
 
-            // TODO(bytes): Entry keeps the names as Strings.
-            let filename = entry
-                .file_name()
-                .into_string()
-                .unwrap_or_else(|name| panic!("file name is not valid UTF-8: {name:?}"));
+            let filename = BString::from(path_to_bytes(&entry.file_name()));
             let pathname = entry.path();
             let relative_pathname = if relative_dir.is_empty() {
                 filename.clone()
             } else {
-                format!("{relative_dir}/{filename}")
+                bconcat!(relative_dir, "/", filename)
             };
 
             let file_type = entry.file_type().ok();
@@ -499,7 +499,7 @@ impl Finder {
 
             let entry = Entry {
                 pathname: pathname.clone(),
-                relative_path: relative_dir.to_string(),
+                relative_path: relative_dir.into(),
                 relative_pathname: relative_pathname.clone(),
                 filename,
                 depth,
@@ -578,7 +578,7 @@ fn build_exclude(directories: &[String]) -> (IndexSet<String>, Option<String>) {
     let mut patterns: Vec<String> = Vec::new();
 
     for directory in directories {
-        let directory = legacy_lossy(&rtrim2(directory, "/")).into_owned();
+        let directory = directory.trim_end_matches('/').to_string();
         // The inner iterator is always recursive, so only `/`-containing names become patterns.
         if directory.contains('/') {
             patterns.push(preg_quote(&directory, Some('#')));
@@ -602,7 +602,11 @@ fn exclude_accept(
     excluded_dirs: &IndexSet<String>,
     excluded_pattern: &Option<String>,
 ) -> bool {
-    if excluded_dirs.contains(&entry.filename) && entry.is_dir {
+    if entry.is_dir
+        && excluded_dirs
+            .iter()
+            .any(|dir| dir.as_bytes() == entry.filename)
+    {
         return false;
     }
 
@@ -612,7 +616,7 @@ fn exclude_accept(
         } else {
             &entry.relative_path
         };
-        let path = path.replace('\\', "/");
+        let path = str_replace("\\", "/", path);
 
         return !preg_is_match(pattern, &path);
     }
@@ -639,7 +643,7 @@ fn to_regex_path(pattern: &str) -> String {
 }
 
 /// `MultiplePcreFilterIterator::isAccepted`.
-fn is_accepted(string: &str, match_regexps: &[String], nomatch_regexps: &[String]) -> bool {
+fn is_accepted(string: &BStr, match_regexps: &[String], nomatch_regexps: &[String]) -> bool {
     for regex in nomatch_regexps {
         if preg_is_match(regex, string) {
             return false;
@@ -709,19 +713,20 @@ fn parse_date_comparator(test: &str) -> (String, i64) {
         panic!("Don't understand \"{test}\" as a date test.");
     };
 
-    let date = legacy_lossy(matches.get(2).unwrap_or_default()).into_owned();
-    let target = parse_datetime_to_unix(&date);
+    let date = matches.get(2).unwrap_or_default();
+    let target = parse_datetime_to_unix(&date.display_lossy().to_string());
 
-    let mut operator = matches
-        .get(1)
-        .map(|s| legacy_lossy(s).into_owned())
-        .unwrap_or_else(|| "==".to_string());
-    if operator == "since" || operator == "after" {
-        operator = ">".to_string();
+    let operator = match matches.get(1).map(|s| &**s) {
+        Some(b"since" | b"after") => ">",
+        Some(b"until" | b"before") => "<",
+        Some(b"!=") => "!=",
+        Some(b">") => ">",
+        Some(b">=") => ">=",
+        Some(b"<") => "<",
+        Some(b"<=") => "<=",
+        _ => "==",
     }
-    if operator == "until" || operator == "before" {
-        operator = "<".to_string();
-    }
+    .to_string();
 
     (operator, target)
 }

@@ -627,7 +627,7 @@ impl DiagnoseCommand {
         let path = path.to_str().ok_or_else(|| {
             RuntimeException::new(format!("Path contains invalid UTF-8: {}", path.display()))
         })?;
-        let installed_json = JsonFile::new(path.to_string(), None, None)?;
+        let installed_json = JsonFile::new(path, None, None)?;
         if !installed_json.exists() {
             return Ok(CheckResult::Message(
                 "<warning>Could not find Composer's installed.json, this must be a non-standard Composer installation.</>".to_string(),
@@ -1273,7 +1273,7 @@ impl Command for DiagnoseCommand {
 
         io.write(format!(
             "PHP version: <comment>{}</comment>",
-            legacy_lossy(&php_version)
+            php_version.display_lossy()
         ));
 
         let diagnostics = shirabe_php_rpc::get_diagnostics();
@@ -1341,10 +1341,11 @@ impl Command for DiagnoseCommand {
             let c = crate::composer::composer_full(c);
             io.write(format!(
                 "Active plugins: {}",
-                legacy_lossy(&implode(
+                implode(
                     ", ",
                     &c.get_plugin_manager().borrow().get_registered_plugins()
-                ))
+                )
+                .display_lossy()
             ));
 
             io.write_no_newline("Checking composer.json: ");
@@ -1406,12 +1407,11 @@ impl Command for DiagnoseCommand {
                 }
                 io.write_no_newline(format!(
                     "Checking connectivity to {}: ",
-                    legacy_lossy(
-                        &repo_arr
-                            .get(B("url"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                    )
+                    repo_arr
+                        .get(B("url"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default()
+                        .display_lossy()
                 ));
                 let r = self.check_composer_repo(&url, &config)?;
                 self.output_result(r);
@@ -1461,7 +1461,10 @@ impl Command for DiagnoseCommand {
             .unwrap_or_default();
         if oauth.len() as i64 > 0 {
             for (domain, token) in &oauth {
-                io.write_no_newline(format!("Checking {} oauth access: ", legacy_lossy(&domain)));
+                io.write_no_newline(format!(
+                    "Checking {} oauth access: ",
+                    domain.display_lossy()
+                ));
                 let r = self.check_github_oauth(
                     // TODO(bytes): domains are Strings, so non-UTF-8 bytes are replaced.
                     &domain.to_str_lossy(),

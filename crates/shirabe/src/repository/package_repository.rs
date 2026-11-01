@@ -227,7 +227,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                     _ => continue,
                 };
                 let advisory = match PartialSecurityAdvisory::create(
-                    bstr::BStr::new(&*legacy_lossy(package_name)),
+                    bstr::BStr::new(package_name),
                     &data_map,
                     &parser,
                 ) {

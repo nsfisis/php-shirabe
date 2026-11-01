@@ -126,9 +126,9 @@ impl ShowCommand {
                 io.write_no_newline(format!(
                     "{}<href={}>{}</>{}",
                     indent,
-                    legacy_lossy(
-                        &OutputFormatter::escape(&link).expect("OutputFormatter::escape failed")
-                    ),
+                    OutputFormatter::escape(&link)
+                        .expect("OutputFormatter::escape failed")
+                        .display_lossy(),
                     name,
                     " ".repeat(pad)
                 ));
@@ -370,8 +370,8 @@ impl ShowCommand {
             for (suggested, reason) in package.get_suggests().iter() {
                 self.get_io().write(format!(
                     "{} <comment>{}</comment>",
-                    legacy_lossy(&suggested),
-                    legacy_lossy(&reason)
+                    suggested.display_lossy(),
+                    reason.display_lossy()
                 ));
             }
         }
@@ -395,11 +395,14 @@ impl ShowCommand {
 
         self.get_io().write(format!(
             "<info>name</info>     : {}",
-            legacy_lossy(&package.get_pretty_name())
+            package.get_pretty_name().display_lossy()
         ));
         self.get_io().write(format!(
             "<info>descrip.</info> : {}",
-            legacy_lossy(&package.get_description().unwrap_or_default())
+            package
+                .get_description()
+                .unwrap_or_default()
+                .display_lossy()
         ));
         let keywords = package.get_keywords();
         self.get_io().write(format!(
@@ -431,7 +434,7 @@ impl ShowCommand {
             self.get_io().write(format!(
                 "<info>latest</info>   : <{}>{}</{}>{}",
                 style,
-                legacy_lossy(&latest.get_pretty_version()),
+                latest.get_pretty_version().display_lossy(),
                 style,
                 released_time
             ));
@@ -441,24 +444,33 @@ impl ShowCommand {
         };
         self.get_io().write(format!(
             "<info>type</info>     : {}",
-            legacy_lossy(&package.get_type())
+            package.get_type().display_lossy()
         ));
         self.print_licenses(package.clone());
         self.get_io().write(format!(
             "<info>homepage</info> : {}",
-            legacy_lossy(&package.get_homepage().unwrap_or_default())
+            package.get_homepage().unwrap_or_default().display_lossy()
         ));
         self.get_io().write(format!(
             "<info>source</info>   : [{}] <comment>{}</comment> {}",
-            legacy_lossy(&package.get_source_type().unwrap_or_default()),
-            legacy_lossy(&package.get_source_url().unwrap_or_default()),
-            legacy_lossy(&package.get_source_reference().unwrap_or_default())
+            package
+                .get_source_type()
+                .unwrap_or_default()
+                .display_lossy(),
+            package.get_source_url().unwrap_or_default().display_lossy(),
+            package
+                .get_source_reference()
+                .unwrap_or_default()
+                .display_lossy()
         ));
         self.get_io().write(format!(
             "<info>dist</info>     : [{}] <comment>{}</comment> {}",
-            legacy_lossy(&package.get_dist_type().unwrap_or_default()),
-            legacy_lossy(&package.get_dist_url().unwrap_or_default()),
-            legacy_lossy(&package.get_dist_reference().unwrap_or_default())
+            package.get_dist_type().unwrap_or_default().display_lossy(),
+            package.get_dist_url().unwrap_or_default().display_lossy(),
+            package
+                .get_dist_reference()
+                .unwrap_or_default()
+                .display_lossy()
         ));
         if is_installed_package {
             let path: Option<String> = self
@@ -511,8 +523,8 @@ impl ShowCommand {
             for (r#type, value) in support.iter() {
                 self.get_io().write(format!(
                     "<comment>{}</comment> : {}",
-                    legacy_lossy(&r#type),
-                    legacy_lossy(&value)
+                    r#type.display_lossy(),
+                    value.display_lossy()
                 ));
             }
         }
@@ -522,7 +534,7 @@ impl ShowCommand {
             self.get_io().write("\n<info>autoload</info>");
             for (r#type, autoloads) in autoload_config.iter() {
                 self.get_io()
-                    .write(format!("<comment>{}</comment>", legacy_lossy(&r#type)));
+                    .write(format!("<comment>{}</comment>", r#type.display_lossy()));
 
                 if r#type == "psr-0" || r#type == "psr-4" {
                     if let PhpMixed::Array(map) = autoloads {
@@ -547,7 +559,7 @@ impl ShowCommand {
                             };
                             self.get_io().write(format!(
                                 "{} => {}",
-                                legacy_lossy(&name_disp),
+                                name_disp.display_lossy(),
                                 path_str
                             ));
                         }
@@ -583,8 +595,8 @@ impl ShowCommand {
         versions_keys = Semver::rsort(versions_keys)?;
 
         // highlight installed version
-        let installed_packages = installed_repo
-            .find_packages(bstr::BStr::new(&*legacy_lossy(&package.get_name())), None)?;
+        let installed_packages =
+            installed_repo.find_packages(bstr::BStr::new(&package.get_name()), None)?;
         if !installed_packages.is_empty() {
             for installed_package in installed_packages.iter() {
                 let installed_version = installed_package.get_pretty_version();
@@ -625,8 +637,8 @@ impl ShowCommand {
             for link in links.iter() {
                 io.write(format!(
                     "{} <comment>{}</comment>",
-                    legacy_lossy(&link.1.get_target()),
-                    legacy_lossy(&link.1.get_pretty_constraint()),
+                    link.1.get_target().display_lossy(),
+                    link.1.get_pretty_constraint().display_lossy(),
                 ));
             }
         }
@@ -661,7 +673,7 @@ impl ShowCommand {
                 }),
             };
 
-            io.write(format!("<info>license</info>  : {}", legacy_lossy(&out)));
+            io.write(format!("<info>license</info>  : {}", out.display_lossy()));
         }
     }
 

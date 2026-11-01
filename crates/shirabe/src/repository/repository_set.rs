@@ -558,7 +558,7 @@ impl RepositorySet {
                 .into());
             }
 
-            request.require_name(bstr::BStr::new(&*legacy_lossy(package_name)), None)?;
+            request.require_name(bstr::BStr::new(package_name), None)?;
             allowed_packages.push(BString::from(&strtolower(package_name)[..]));
         }
 

@@ -6,11 +6,12 @@ use crate::input::{InputArgument, InputInterface, InputOption, InputValue};
 use crate::output::{OutputInterface, output_interface};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, legacy_lossy, path_to_bytes,
-    realpath, str_replace_arrays, sys_get_temp_dir, touch,
+    PHP_SERVER, PhpMixed, basename, bconcat, file_exists, impl_php_class, path_from_bytes,
+    path_to_bytes, realpath, str_replace_arrays, sys_get_temp_dir, touch,
 };
 use shirabe_symfony_process::process::Process;
 use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
 
 /// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a
 /// single binary and does not install the Resources directory alongside it).
@@ -84,26 +85,19 @@ impl DumpCompletionCommand {
         Ok(())
     }
 
-    fn guess_shell() -> String {
-        // TODO(bytes): basename takes the path as a &str.
-        legacy_lossy(&basename(
-            PHP_SERVER
-                .lock()
-                .unwrap()
-                .get("SHELL")
-                .unwrap_or_default()
-                .into_string()
-                .unwrap_or_else(|shell| panic!("SHELL is not valid UTF-8: {shell:?}")),
+    fn guess_shell() -> BString {
+        basename(path_to_bytes(
+            &PHP_SERVER.lock().unwrap().get("SHELL").unwrap_or_default(),
         ))
-        .into_owned()
     }
 
     fn tail_debug_log(
         &self,
-        command_name: &str,
+        command_name: &BStr,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        let debug_file = sys_get_temp_dir().join(format!("sf_{}.log", command_name));
+        let debug_file =
+            sys_get_temp_dir().join(path_from_bytes(&bconcat!("sf_", command_name, ".log")));
         if !file_exists(&debug_file) {
             touch(&debug_file);
         }
@@ -145,20 +139,15 @@ impl DumpCompletionCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DumpCompletionCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(bytes): basename and the help text work on Strings.
-        let full_command = PHP_SERVER
-            .lock()
-            .unwrap()
-            .php_self()
-            .unwrap_or_default()
-            .into_string()
-            .unwrap_or_else(|php_self| panic!("PHP_SELF is not valid UTF-8: {php_self:?}"));
-        let command_name = legacy_lossy(&basename(&full_command)).into_owned();
+        let full_command = PHP_SERVER.lock().unwrap().php_self().unwrap_or_default();
+        let command_name = basename(path_to_bytes(&full_command));
+        let command_name = command_name.display_lossy();
         // @realpath($fullCommand) ?: $fullCommand
         let full_command = match realpath(&full_command) {
-            Some(p) if !p.as_os_str().is_empty() => legacy_lossy(path_to_bytes(&p)).into_owned(),
-            _ => full_command,
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => PathBuf::from(full_command),
         };
+        let full_command = full_command.display();
 
         self.inner.set_help(&format!(
             "The <info>%command.name%</> command dumps the shell completion script required\n\
@@ -210,33 +199,24 @@ impl Command for DumpCompletionCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        // TODO(bytes): basename takes the path as a &str.
-        let command_name = legacy_lossy(&basename(
-            PHP_SERVER
-                .lock()
-                .unwrap()
-                .argv()
-                .next()
-                .unwrap_or_default()
-                .into_string()
-                .unwrap_or_else(|arg| panic!("argv[0] is not valid UTF-8: {arg:?}")),
-        ))
-        .into_owned();
+        let command_name = basename(path_to_bytes(
+            &PHP_SERVER.lock().unwrap().argv().next().unwrap_or_default(),
+        ));
 
         if input.borrow().get_option("debug")?.to_bool() {
-            self.tail_debug_log(&command_name, output.clone())?;
+            self.tail_debug_log(command_name.as_ref(), output.clone())?;
 
             return Ok(0);
         }
 
         let shell = match input.borrow().get_argument("shell")?.as_string() {
-            Some(s) => legacy_lossy(s).into_owned(),
+            Some(s) => s.to_owned(),
             None => Self::guess_shell(),
         };
         // __DIR__.'/../Resources/completion.'.$shell — resolved against the embedded
         // resources; a shell without an embedded script is PHP's !file_exists() branch.
-        let completion_file = match shell.as_str() {
-            "bash" => Some(COMPLETION_BASH),
+        let completion_file = match shell.as_slice() {
+            b"bash" => Some(COMPLETION_BASH),
             _ => None,
         };
         let Some(completion_file) = completion_file else {
@@ -254,7 +234,7 @@ impl Command for DumpCompletionCommand {
                 output.borrow_mut().writeln(
                     &[bstr::BString::from(format!(
                         "<error>Detected shell \"{}\", which is not supported by Symfony shell completion (supported shells: \"{}\").</>",
-                        shell,
+                        shell.display_lossy(),
                         supported_shells.join("\", \"")
                     ))],
                     output_interface::OUTPUT_NORMAL,
@@ -275,16 +255,10 @@ impl Command for DumpCompletionCommand {
         let application = self.get_application().unwrap();
         let version = application.borrow().get_version();
         output.borrow_mut().write(
-            &[bstr::BString::from(
-                legacy_lossy(&str_replace_arrays(
-                    &[
-                        "{{ COMMAND_NAME }}".to_string(),
-                        "{{ VERSION }}".to_string(),
-                    ],
-                    &[command_name, legacy_lossy(&version).into_owned()],
-                    completion_file,
-                ))
-                .into_owned(),
+            &[str_replace_arrays(
+                &["{{ COMMAND_NAME }}", "{{ VERSION }}"],
+                &[command_name, BString::from(version)],
+                completion_file,
             )],
             false,
             output_interface::OUTPUT_NORMAL,

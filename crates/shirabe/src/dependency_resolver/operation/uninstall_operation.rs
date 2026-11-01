@@ -2,7 +2,6 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
-use shirabe_php_shim::legacy_lossy;
 
 #[derive(Debug, Clone)]
 pub struct UninstallOperation {
@@ -25,10 +24,10 @@ impl UninstallOperation {
     pub fn format(package: PackageInterfaceHandle, _lock: bool) -> String {
         format!(
             "Removing <info>{}</info> (<comment>{}</comment>)",
-            legacy_lossy(&package.get_pretty_name()),
-            legacy_lossy(
-                &package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-            ),
+            package.get_pretty_name().display_lossy(),
+            package
+                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                .display_lossy(),
         )
     }
 }

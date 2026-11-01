@@ -11,8 +11,8 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, basename, bconcat, ctype_digit,
-    date_utc, file_put_contents3, filter_var_boolean, getenv, impl_php_class, path_from_bytes,
-    sys_get_temp_dir,
+    date_utc, file_put_contents3, filter_var_boolean, getenv, impl_php_class, intval,
+    path_from_bytes, sys_get_temp_dir,
 };
 use std::ops::{Deref, DerefMut};
 
@@ -88,10 +88,8 @@ impl CompleteCommand {
             .as_array()
             .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
-        let mut completion_input = CompletionInput::from_tokens(
-            tokens,
-            shirabe_php_shim::intval(&current_index.to_php_mixed()),
-        )?;
+        let mut completion_input =
+            CompletionInput::from_tokens(tokens, intval(&current_index.to_php_mixed()))?;
 
         // try { $completionInput->bind(...); } catch (ExceptionInterface $e) {}
         let application = self.get_application().unwrap();
@@ -111,10 +109,7 @@ impl CompleteCommand {
 
         let application = self.get_application().unwrap();
         // CommandNotFoundException is caught and swallowed by returning None.
-        application
-            .borrow_mut()
-            .find(&shirabe_php_shim::legacy_lossy(&input_name))
-            .ok()
+        application.borrow_mut().find(input_name.as_ref()).ok()
     }
 
     fn log(&self, messages: &str) {

@@ -28,6 +28,7 @@ use shirabe_php_shim::{
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct RequireCommand {
@@ -36,10 +37,10 @@ pub struct RequireCommand {
     newly_created: std::cell::Cell<bool>,
     first_require: std::cell::Cell<bool>,
     json: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
-    file: std::cell::RefCell<String>,
+    file: std::cell::RefCell<PathBuf>,
     composer_backup: std::cell::RefCell<Vec<u8>>,
     /// file name
-    lock: std::cell::RefCell<String>,
+    lock: std::cell::RefCell<PathBuf>,
     /// contents before modification if the lock file exists
     lock_backup: std::cell::RefCell<Option<Vec<u8>>>,
     dependency_resolution_completed: std::rc::Rc<std::cell::Cell<bool>>,
@@ -63,9 +64,9 @@ impl RequireCommand {
             newly_created: std::cell::Cell::new(false),
             first_require: std::cell::Cell::new(false),
             json: std::cell::RefCell::new(None),
-            file: std::cell::RefCell::new(String::new()),
+            file: std::cell::RefCell::new(PathBuf::new()),
             composer_backup: std::cell::RefCell::new(Vec::new()),
-            lock: std::cell::RefCell::new(String::new()),
+            lock: std::cell::RefCell::new(PathBuf::new()),
             lock_backup: std::cell::RefCell::new(None),
             dependency_resolution_completed: std::rc::Rc::new(std::cell::Cell::new(false)),
             repos: std::cell::RefCell::new(None),
@@ -199,8 +200,8 @@ impl RequireCommand {
                 .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                 .collect();
             let new_links = loader.parse_links(
-                bstr::BStr::new(&*legacy_lossy(&root_package.get_name())),
-                bstr::BStr::new(&*legacy_lossy(&root_package.get_pretty_version())),
+                bstr::BStr::new(&root_package.get_name()),
+                bstr::BStr::new(&root_package.get_pretty_version()),
                 base_package::SUPPORTED_LINK_TYPES
                     .get(require_key)
                     .map(|t| t.method)
@@ -226,7 +227,7 @@ impl RequireCommand {
             root_package.set_references(references);
             let stability_flags = RootPackageLoader::extract_stability_flags(
                 requirements,
-                bstr::BStr::new(&*legacy_lossy(&root_package.get_minimum_stability())),
+                bstr::BStr::new(&root_package.get_minimum_stability()),
                 root_package.get_stability_flags(),
             );
             root_package.set_stability_flags(stability_flags);
@@ -562,9 +563,7 @@ impl RequireCommand {
             {
                 let stability_flags = RootPackageLoader::extract_stability_flags(
                     &(requirements),
-                    bstr::BStr::new(&*legacy_lossy(
-                        &composer.get_package().get_minimum_stability(),
-                    )),
+                    bstr::BStr::new(&composer.get_package().get_minimum_stability()),
                     IndexMap::new(),
                 );
                 composer.get_locker().borrow_mut().update_hash(
@@ -675,7 +674,7 @@ impl RequireCommand {
         if self.newly_created.get() {
             let msg = format!(
                 "\n<error>Installation failed, deleting {}.</error>",
-                self.file.borrow()
+                self.file.borrow().display()
             );
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
             unlink(json.borrow().get_path());
@@ -684,13 +683,13 @@ impl RequireCommand {
             }
         } else {
             let extra = if self.lock_backup.borrow().is_some() {
-                format!(" and {} to their ", lock)
+                format!(" and {} to their ", lock.display())
             } else {
                 " to its ".to_string()
             };
             let msg = format!(
                 "\n<error>Installation failed, reverting {}{}original content.</error>",
-                self.file.borrow(),
+                self.file.borrow().display(),
                 extra
             );
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
@@ -790,13 +789,13 @@ impl Command for RequireCommand {
         let write_failed =
             self.newly_created.get() && file_put_contents(&file, b"{\n}\n").is_none();
         if write_failed {
-            let msg = format!("<error>{} could not be created.</error>", file);
+            let msg = format!("<error>{} could not be created.</error>", file.display());
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
             return Ok(1);
         }
         if !Filesystem::is_readable(&file) {
-            let msg = format!("<error>{} is not readable.</error>", file);
+            let msg = format!("<error>{} is not readable.</error>", file.display());
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
             return Ok(1);
@@ -836,7 +835,7 @@ impl Command for RequireCommand {
         // see https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
         let backup_contents = self.composer_backup.borrow().clone();
         if !is_writable(&file) && file_put_contents(&file, &backup_contents).is_none() {
-            let msg = format!("<error>{} is not writable.</error>", file);
+            let msg = format!("<error>{} is not writable.</error>", file.display());
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
             return Ok(1);
@@ -944,7 +943,7 @@ impl Command for RequireCommand {
                     return Err(RuntimeException::with_code_and_previous(
                         format!(
                             "No composer.json present in the current directory ({}), this may be the cause of the following exception.",
-                            self.file.borrow()
+                            self.file.borrow().display()
                         ),
                         0,
                         Some(std::sync::Arc::new(e)),
@@ -1021,7 +1020,7 @@ impl Command for RequireCommand {
                     plural,
                     plural2,
                     plural3,
-                    legacy_lossy(&implode("\", \"", &pkg_dev_tags)),
+                    implode("\", \"", &pkg_dev_tags).display_lossy(),
                 );
                 self.get_io().warning(&warn_msg, &[]);
                 if self.get_io().ask_confirmation(
@@ -1169,7 +1168,7 @@ impl Command for RequireCommand {
 
         let updated_msg = format!(
             "<info>{} has been {}</info>",
-            file,
+            file.display(),
             if self.newly_created.get() {
                 "created"
             } else {

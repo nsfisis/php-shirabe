@@ -13,7 +13,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, path_to_bytes, php_regex, preg_match, utf8_text,
+    PhpMixed, RuntimeException, path_from_bytes, path_to_bytes, php_regex, preg_match, utf8_text,
 };
 
 const CLASS: &str = "Composer\\Util\\RemoteFilesystem";
@@ -161,9 +161,9 @@ impl RemoteFilesystem {
         }
 
         let cache_dir = self.config.borrow().get_str("cache-dir")?;
-        crate::event_dispatcher::EventDispatcher::ensure_composer_php_runtime(
-            std::path::Path::new(&cache_dir),
-        )?;
+        crate::event_dispatcher::EventDispatcher::ensure_composer_php_runtime(path_from_bytes(
+            &cache_dir,
+        ))?;
         let value = Self::php_result(shirabe_php_rpc::new_object(
             CLASS,
             vec![

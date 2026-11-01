@@ -2,6 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::helper::TableCellStyle;
+use bstr::BString;
 use indexmap::IndexMap;
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.
@@ -14,13 +15,13 @@ pub enum TableCellOption {
 
 #[derive(Debug, Clone)]
 pub struct TableCell {
-    value: String,
+    value: BString,
     options: IndexMap<String, TableCellOption>,
 }
 
 impl TableCell {
     pub fn new(
-        value: &str,
+        value: impl AsRef<[u8]>,
         options: IndexMap<String, TableCellOption>,
     ) -> Result<Self, InvalidArgumentException> {
         let mut this_options: IndexMap<String, TableCellOption> = IndexMap::new();
@@ -55,7 +56,7 @@ impl TableCell {
         }
 
         Ok(Self {
-            value: value.to_string(),
+            value: BString::from(value.as_ref()),
             options: this_options,
         })
     }
@@ -64,7 +65,7 @@ impl TableCell {
     ///
     /// The options used by the Table helper are internally controlled, so a malformed-option
     /// error here would be a programming bug rather than a recoverable condition.
-    pub fn new2(value: &str, options: IndexMap<String, TableCellOption>) -> Self {
+    pub fn new2(value: impl AsRef<[u8]>, options: IndexMap<String, TableCellOption>) -> Self {
         Self::new(value, options).expect("TableCell options built internally are always valid")
     }
 
@@ -84,16 +85,15 @@ impl TableCell {
         }
     }
 
+    /// PHP `__toString()`.
+    pub fn to_php_string(&self) -> BString {
+        self.value.clone()
+    }
+
     pub fn get_style(&self) -> Option<std::rc::Rc<TableCellStyle>> {
         match &self.options["style"] {
             TableCellOption::Style(style) => Some(style.clone()),
             _ => None,
         }
-    }
-}
-
-impl std::fmt::Display for TableCell {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
     }
 }

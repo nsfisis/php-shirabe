@@ -3,7 +3,6 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::{InputArgument, InputOption, InputValue};
 use indexmap::IndexMap;
-use shirabe_php_shim::{explode, legacy_lossy, strtoupper};
 
 /// A InputDefinition represents a set of valid command line arguments and options.
 ///
@@ -254,13 +253,13 @@ impl InputDefinition {
         }
 
         if let Some(shortcut) = option.get_shortcut() {
-            for shortcut in explode("|", shortcut) {
-                if let Some(existing_name) = self.shortcuts.get(&*legacy_lossy(&shortcut))
+            for shortcut in shortcut.split('|') {
+                if let Some(existing_name) = self.shortcuts.get(shortcut)
                     && !option.equals(&self.options[existing_name])
                 {
                     return Err(LogicException::new(format!(
                         "An option with shortcut \"{}\" already exists.",
-                        shortcut.display_lossy(),
+                        shortcut,
                     ))
                     .into());
                 }
@@ -270,11 +269,9 @@ impl InputDefinition {
         self.options
             .insert(option.get_name().to_string(), std::rc::Rc::clone(&option));
         if let Some(shortcut) = option.get_shortcut() {
-            for shortcut in explode("|", shortcut) {
-                self.shortcuts.insert(
-                    legacy_lossy(&shortcut).into_owned(),
-                    option.get_name().to_string(),
-                );
+            for shortcut in shortcut.split('|') {
+                self.shortcuts
+                    .insert(shortcut.to_string(), option.get_name().to_string());
             }
         }
 
@@ -388,7 +385,7 @@ impl InputDefinition {
                         } else {
                             String::new()
                         },
-                        legacy_lossy(&strtoupper(option.get_name())),
+                        option.get_name().to_ascii_uppercase(),
                         if option.is_value_optional() {
                             "]".to_string()
                         } else {

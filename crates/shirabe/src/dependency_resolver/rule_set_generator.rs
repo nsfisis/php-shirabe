@@ -201,10 +201,7 @@ impl RuleSetGenerator {
                 let possible_requires: Vec<PackageInterfaceHandle> = self
                     .pool
                     .borrow_mut()
-                    .what_provides(
-                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
-                        Some(&constraint),
-                    )
+                    .what_provides(bstr::BStr::new(link.get_target()), Some(&constraint))
                     .into_iter()
                     .collect();
 
@@ -252,10 +249,7 @@ impl RuleSetGenerator {
                 let conflicts: Vec<PackageInterfaceHandle> = self
                     .pool
                     .borrow_mut()
-                    .what_provides(
-                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
-                        Some(&constraint),
-                    )
+                    .what_provides(bstr::BStr::new(link.get_target()), Some(&constraint))
                     .into_iter()
                     .collect();
 

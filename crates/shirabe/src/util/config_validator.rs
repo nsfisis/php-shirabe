@@ -12,6 +12,7 @@ use shirabe_php_shim::{
     Catch as _, PhpMixed, file_get_contents, php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct ConfigValidator {
@@ -27,7 +28,7 @@ impl ConfigValidator {
 
     pub fn validate(
         &self,
-        file: &str,
+        file: &Path,
         array_loader_validation_flags: i64,
         flags: i64,
     ) -> (Vec<String>, Vec<String>, Vec<String>) {
@@ -39,7 +40,7 @@ impl ConfigValidator {
         let mut lax_valid = false;
         let mut manifest: Option<IndexMap<BString, PhpMixed>> = None;
 
-        let json = JsonFile::new(file.to_string(), None, Some(self.io.clone()))
+        let json = JsonFile::new(file, None, Some(self.io.clone()))
             .expect("config file path is always local");
         let schema_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             manifest = Some(match json.read()? {
@@ -76,7 +77,10 @@ impl ConfigValidator {
             let contents =
                 String::from_utf8_lossy(&file_get_contents(file).unwrap_or_default()).into_owned();
             if let Some((key, line)) = detect_duplicate_keys(&contents) {
-                warnings.push(format!("Key {key} is a duplicate in {file} at line {line}"));
+                warnings.push(format!(
+                    "Key {key} is a duplicate in {} at line {line}",
+                    file.display()
+                ));
             }
         }
 

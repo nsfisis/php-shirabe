@@ -765,7 +765,7 @@ impl Perforce {
         P4_EXECUTABLE
             .get_or_init(|| {
                 let finder = ExecutableFinder::new();
-                BString::from(finder.find("p4", None, &[]).unwrap_or("p4".to_string()))
+                finder.find("p4", None, &[]).unwrap_or_else(|| "p4".into())
             })
             .clone()
     }

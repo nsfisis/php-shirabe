@@ -19,7 +19,7 @@ fn validate(file: &str) -> Vec<String> {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let config_validator = ConfigValidator::new(io);
     let (_, _, warnings) = config_validator.validate(
-        file,
+        std::path::Path::new(file),
         ValidatingArrayLoader::CHECK_ALL,
         ConfigValidator::CHECK_VERSION,
     );

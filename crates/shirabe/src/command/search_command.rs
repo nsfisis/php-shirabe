@@ -244,8 +244,8 @@ impl Command for SearchCommand {
                 if let Some(link) = link {
                     io.write(format!(
                         "<href={}>{}</>{}{}{}",
-                        legacy_lossy(&OutputFormatter::escape(link)?),
-                        legacy_lossy(&result.name),
+                        OutputFormatter::escape(link)?.display_lossy(),
+                        result.name.display_lossy(),
                         " ".repeat(name_length as usize - result.name.len()),
                         warning,
                         description
@@ -253,7 +253,7 @@ impl Command for SearchCommand {
                 } else {
                     io.write(format!(
                         "{:<width$}{}{}",
-                        legacy_lossy(&result.name),
+                        result.name.display_lossy(),
                         warning,
                         description,
                         width = name_length as usize

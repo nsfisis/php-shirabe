@@ -18,11 +18,9 @@ use crate::util::{Filesystem, Platform, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     LogicException, PhpMixed, get_debug_type, impl_php_class, legacy_lossy, path_to_bytes,
-    php_regex, preg_match,
+    php_regex, preg_match, strtolower,
 };
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
 pub struct ArchiveCommand {
@@ -252,17 +250,13 @@ impl ArchiveCommand {
             Some(v) => Some(parser.parse_constraints(v)?),
             None => None,
         };
-        let packages = repo_set.find_packages(
-            shirabe_php_shim::strtolower(package_name).as_ref(),
-            constraint,
-            0,
-        )?;
+        let packages = repo_set.find_packages(strtolower(package_name).as_ref(), constraint, 0)?;
 
         let package = if packages.len() > 1 {
             let mut version_selector =
                 VersionSelector::new(std::rc::Rc::new(std::cell::RefCell::new(repo_set)), None)?;
             let best = version_selector.find_best_candidate(
-                shirabe_php_shim::strtolower(package_name).as_ref(),
+                strtolower(package_name).as_ref(),
                 version.as_deref(),
                 bstr::BStr::new(&min_stability),
                 None,

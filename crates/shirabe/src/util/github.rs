@@ -102,12 +102,12 @@ impl GitHub {
                 .execute(&["hostname".to_string()], &mut output, None)?
                 == 0
             {
-                note += &format!(" on {}", legacy_lossy(&trim(&output)));
+                note += &format!(" on {}", trim(&output).display_lossy());
             }
         }
         note += &format!(" {}", date_local("Y-m-d Hi", None));
 
-        let (local_name, auth_name): (Option<String>, String) = {
+        let (local_name, auth_name): (Option<BString>, BString) = {
             let cfg = self.config.borrow();
             (
                 cfg.get_local_auth_config_source().map(|c| c.get_name()),
@@ -116,13 +116,14 @@ impl GitHub {
         };
         let prefix = local_name
             .as_ref()
-            .map(|n| format!("{} OR ", n))
+            .map(|n| format!("{} OR ", n.display_lossy()))
             .unwrap_or_default();
         let lines = [
             "You need to provide a GitHub access token.".to_string(),
             format!(
                 "Tokens will be stored in plain text in \"{}{}\" for future use by Composer.",
-                prefix, auth_name
+                prefix,
+                auth_name.display_lossy()
             ),
             "Due to the security risk of tokens being exfiltrated, use tokens with short expiration times and only the minimum permissions necessary.".to_string(),
             String::new(),

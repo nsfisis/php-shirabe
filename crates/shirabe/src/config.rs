@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Config.php
 
+use shirabe_php_shim::bconcat;
 mod config_source_interface;
 mod json_config_source;
 
@@ -12,8 +13,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
     array_search_mixed, array_unique, canonical_int_key, empty, filter_var_url, implode,
-    in_array_loose, in_array_strict, intval, is_array, is_string, legacy_lossy, parse_url,
-    php_regex, php_to_string, preg_is_match, preg_match, preg_replace_callback, rtrim2, strtolower,
+    in_array_loose, in_array_strict, intval, is_array, is_string, parse_url, php_regex,
+    php_to_string, preg_is_match, preg_match, preg_replace_callback, rtrim2, strtolower,
     strtoupper, strtr, substr, trigger_error,
 };
 
@@ -24,7 +25,7 @@ use crate::util::{Platform, ProcessExecutor};
 #[derive(Debug)]
 pub struct Config {
     config: IndexMap<BString, PhpMixed>,
-    base_dir: Option<String>,
+    base_dir: Option<BString>,
     repositories: IndexMap<BString, PhpMixed>,
     config_source: Option<Box<dyn ConfigSourceInterface>>,
     auth_config_source: Option<Box<dyn ConfigSourceInterface>>,
@@ -32,7 +33,7 @@ pub struct Config {
     use_environment: bool,
     warned_hosts: IndexMap<BString, bool>,
     ssl_verify_warned_hosts: IndexMap<BString, bool>,
-    source_of_config_value: std::cell::RefCell<IndexMap<String, String>>,
+    source_of_config_value: std::cell::RefCell<IndexMap<BString, BString>>,
 }
 
 impl Config {
@@ -169,13 +170,13 @@ impl Config {
         r
     }
 
-    pub fn new(use_environment: bool, base_dir: Option<String>) -> Self {
+    pub fn new(use_environment: bool, base_dir: Option<BString>) -> Self {
         let this = Self {
             // load defaults
             config: Self::default_config(),
             repositories: Self::default_repositories(),
             use_environment,
-            base_dir: base_dir.filter(|s| is_string(&PhpMixed::string(s.clone())) && !s.is_empty()),
+            base_dir: base_dir.filter(|s| !s.is_empty()),
             config_source: None,
             auth_config_source: None,
             local_auth_config_source: None,
@@ -186,19 +187,14 @@ impl Config {
 
         let config_clone = this.config.clone();
         for (config_key, config_value) in &config_clone {
-            // TODO(bytes): config source paths are Strings, so non-UTF-8 bytes are replaced.
-            this.set_source_of_config_value(
-                config_value,
-                &config_key.to_str_lossy(),
-                Self::SOURCE_DEFAULT,
-            );
+            this.set_source_of_config_value(config_value, config_key, Self::SOURCE_DEFAULT);
         }
 
         let repositories_clone = this.repositories.clone();
         for (config_key, config_value) in &repositories_clone {
             this.set_source_of_config_value(
                 config_value,
-                &format!("repositories.{}", legacy_lossy(&config_key)),
+                &bconcat!("repositories.", config_key),
                 Self::SOURCE_DEFAULT,
             );
         }
@@ -209,7 +205,7 @@ impl Config {
     /// Changing this can break path resolution for relative config paths so do not call this without knowing what you are doing
     ///
     /// The $baseDir should be an absolute path and without trailing slash
-    pub fn set_base_dir(&mut self, base_dir: Option<String>) {
+    pub fn set_base_dir(&mut self, base_dir: Option<BString>) {
         self.base_dir = base_dir;
     }
 
@@ -254,7 +250,8 @@ impl Config {
     }
 
     /// Merges new config values with the existing ones (overriding)
-    pub fn merge(&mut self, config: &IndexMap<BString, PhpMixed>, source: &str) {
+    pub fn merge(&mut self, config: &IndexMap<BString, PhpMixed>, source: impl AsRef<[u8]>) {
+        let source = source.as_ref();
         // override defaults with given config
         let config_section = config.get(B("config")).cloned().unwrap_or(PhpMixed::Null);
         if !empty(&config_section) && is_array(&config_section) {
@@ -263,25 +260,24 @@ impl Config {
                 _ => IndexMap::new(),
             };
             for (key, val_box) in &config_section_map {
-                // TODO(bytes): config source paths are Strings, so non-UTF-8 bytes are replaced.
-                let key_str = key.to_str_lossy();
+                let key_str = key.as_slice();
                 let val = val_box.clone();
                 if matches!(
-                    key_str.as_ref(),
-                    "bitbucket-oauth"
-                        | "github-oauth"
-                        | "gitlab-oauth"
-                        | "gitlab-token"
-                        | "http-basic"
-                        | "bearer"
-                        | "client-certificate"
-                        | "forgejo-token"
+                    key_str,
+                    b"bitbucket-oauth"
+                        | b"github-oauth"
+                        | b"gitlab-oauth"
+                        | b"gitlab-token"
+                        | b"http-basic"
+                        | b"bearer"
+                        | b"client-certificate"
+                        | b"forgejo-token"
                 ) && self.config.contains_key(key)
                 {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                     self.config
                         .insert(key.clone(), array_merge(existing, val.clone()));
-                    self.set_source_of_config_value(&val, &key_str, source);
+                    self.set_source_of_config_value(&val, key_str, source);
                 } else if key == "allow-plugins"
                     && self.config.contains_key(key)
                     && is_array(self.config.get(key).unwrap_or(&PhpMixed::Null))
@@ -294,16 +290,16 @@ impl Config {
                         key.clone(),
                         array_merge(array_merge(val.clone(), existing), val.clone()),
                     );
-                    self.set_source_of_config_value(&val, &key_str, source);
-                } else if matches!(key_str.as_ref(), "gitlab-domains" | "github-domains")
+                    self.set_source_of_config_value(&val, key_str, source);
+                } else if matches!(key_str, b"gitlab-domains" | b"github-domains")
                     && self.config.contains_key(key)
                 {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                     let merged = array_merge(existing, val.clone());
-                    let unique_list: Vec<String> = match &merged {
+                    let unique_list: Vec<BString> = match &merged {
                         PhpMixed::List(l) => l
                             .iter()
-                            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                            .filter_map(|v| v.as_string().map(BStr::to_owned))
                             .collect(),
                         _ => vec![],
                     };
@@ -312,7 +308,7 @@ impl Config {
                         key.clone(),
                         PhpMixed::List(deduped.into_iter().map(PhpMixed::string).collect()),
                     );
-                    self.set_source_of_config_value(&val, &key_str, source);
+                    self.set_source_of_config_value(&val, key_str, source);
                 } else if key == "preferred-install" && self.config.contains_key(key) {
                     let mut val = val.clone();
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
@@ -329,12 +325,12 @@ impl Config {
                             self.config.insert(key.clone(), PhpMixed::Array(m));
                             self.source_of_config_value
                                 .borrow_mut()
-                                .insert(format!("{}*", legacy_lossy(&key)), source.to_string());
+                                .insert(bconcat!(key, "*"), source.into());
                         }
                         let cur = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                         self.config
                             .insert(key.clone(), array_merge(cur, val.clone()));
-                        self.set_source_of_config_value(&val, &key_str, source);
+                        self.set_source_of_config_value(&val, key_str, source);
                         // the full match pattern needs to be last
                         let has_wildcard = matches!(
                             self.config.get(key),
@@ -348,7 +344,7 @@ impl Config {
                         }
                     } else {
                         self.config.insert(key.clone(), val.clone());
-                        self.set_source_of_config_value(&val, &key_str, source);
+                        self.set_source_of_config_value(&val, key_str, source);
                     }
                 } else if key == "audit" {
                     let current_ignores = self
@@ -366,7 +362,7 @@ impl Config {
                         val.clone(),
                     );
                     self.config.insert(key.clone(), merged);
-                    self.set_source_of_config_value(&val, &key_str, source);
+                    self.set_source_of_config_value(&val, key_str, source);
                     let val_ignore = match &val {
                         PhpMixed::Array(m) => m
                             .get(B("ignore"))
@@ -380,7 +376,7 @@ impl Config {
                     }
                 } else {
                     self.config.insert(key.clone(), val.clone());
-                    self.set_source_of_config_value(&val, &key_str, source);
+                    self.set_source_of_config_value(&val, key_str, source);
                 }
             }
         }
@@ -412,9 +408,7 @@ impl Config {
                 // disable a repository by name
                 // this is a code path, that will be used less as the next check will be preferred
                 if matches!(repository, PhpMixed::Bool(false)) {
-                    // TODO(bytes): repository names are matched as UTF-8 text, so non-UTF-8 bytes
-                    // are replaced.
-                    self.disable_repo_by_name(&name.to_str_lossy());
+                    self.disable_repo_by_name(name.as_ref());
                     continue;
                 }
 
@@ -431,9 +425,7 @@ impl Config {
                         .and_then(|m| m.keys().next())
                         .cloned()
                         .unwrap_or_default();
-                    // TODO(bytes): repository names are matched as UTF-8 text, so non-UTF-8 bytes
-                    // are replaced.
-                    self.disable_repo_by_name(&name.to_str_lossy());
+                    self.disable_repo_by_name(name.as_ref());
                     continue;
                 }
 
@@ -443,21 +435,18 @@ impl Config {
                     .and_then(|m| m.get(B("type")))
                     .and_then(|v| v.as_string())
                     == Some("composer".into());
-                let repo_url = legacy_lossy(
-                    repository
-                        .as_array()
-                        .and_then(|m| m.get(B("url")))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default(),
-                )
-                .into_owned();
+                let repo_url = repository
+                    .as_array()
+                    .and_then(|m| m.get(B("url")))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default();
                 if is_composer
                     && preg_is_match(
                         php_regex!(r"{^https?://(?:[a-z0-9-.]+\.)?packagist.org(/|$)}"),
-                        &repo_url,
+                        repo_url,
                     )
                 {
-                    self.disable_repo_by_name("packagist.org");
+                    self.disable_repo_by_name(BStr::new("packagist.org"));
                 }
 
                 // store repo
@@ -477,29 +466,27 @@ impl Config {
                         &PhpMixed::Array(self.repositories.clone()),
                         true,
                     )
-                    .and_then(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                    .and_then(|v| v.as_string().map(BStr::to_owned))
                     .unwrap_or_default();
                     self.set_source_of_config_value(
                         repository,
-                        &format!("repositories.{}", found_key),
+                        &bconcat!("repositories.", found_key),
                         source,
                     );
                 } else if name == "packagist" {
                     // BC support for default "packagist" named repo
-                    self.repositories.insert(
-                        format!("{}.org", legacy_lossy(&name)).into(),
-                        repository.clone(),
-                    );
+                    self.repositories
+                        .insert(bconcat!(name, ".org"), repository.clone());
                     self.set_source_of_config_value(
                         repository,
-                        &format!("repositories.{}.org", legacy_lossy(&name)),
+                        &bconcat!("repositories.", name, ".org"),
                         source,
                     );
                 } else {
                     self.repositories.insert(name.clone(), repository.clone());
                     self.set_source_of_config_value(
                         repository,
-                        &format!("repositories.{}", legacy_lossy(&name)),
+                        &bconcat!("repositories.", name),
                         source,
                     );
                 }
@@ -518,32 +505,34 @@ impl Config {
     }
 
     /// Returns a setting
-    pub fn get(&self, key: &str) -> PhpMixed {
+    pub fn get(&self, key: impl AsRef<[u8]>) -> PhpMixed {
         self.get_with_flags(key, 0).unwrap_or(PhpMixed::Null)
     }
 
     /// Typed convenience accessor for keys whose `get()` value is always a string.
-    pub fn get_str(&self, key: &str) -> anyhow::Result<String> {
-        Ok(legacy_lossy(self.get_with_flags(key, 0)?.as_string().unwrap_or_default()).into_owned())
+    pub fn get_str(&self, key: impl AsRef<[u8]>) -> anyhow::Result<BString> {
+        Ok(self
+            .get_with_flags(key, 0)?
+            .as_string()
+            .unwrap_or_default()
+            .to_owned())
     }
 
-    pub fn get_with_flags(&self, key: &str, flags: i64) -> anyhow::Result<PhpMixed> {
+    pub fn get_with_flags(&self, key: impl AsRef<[u8]>, flags: i64) -> anyhow::Result<PhpMixed> {
+        let key = key.as_ref();
         match key {
             // strings/paths with env var and {$refs} support
-            "vendor-dir" | "bin-dir" | "process-timeout" | "data-dir" | "cache-dir"
-            | "cache-files-dir" | "cache-repo-dir" | "cache-vcs-dir" | "cafile" | "capath" => {
+            b"vendor-dir" | b"bin-dir" | b"process-timeout" | b"data-dir" | b"cache-dir"
+            | b"cache-files-dir" | b"cache-repo-dir" | b"cache-vcs-dir" | b"cafile" | b"capath" => {
                 // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
-                let env = format!(
-                    "COMPOSER_{}",
-                    legacy_lossy(&strtoupper(strtr(key, "-", "_")))
-                );
+                let env = bconcat!("COMPOSER_", strtoupper(strtr(key, "-", "_")));
 
                 let val = self.get_composer_env(&env);
                 if !matches!(val, PhpMixed::Bool(false)) {
                     self.set_source_of_config_value(&val, key, &env);
                 }
 
-                if key == "process-timeout" {
+                if key == b"process-timeout" {
                     let raw = if matches!(val, PhpMixed::Bool(false)) {
                         self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null)
                     } else {
@@ -558,9 +547,8 @@ impl Config {
                     val
                 };
                 let processed = self.process(raw_val, flags)?;
-                let mut val_str =
-                    legacy_lossy(&rtrim2(php_to_string(&processed), "/\\")).into_owned();
-                val_str = legacy_lossy(&Platform::expand_path(&val_str)).into_owned();
+                let mut val_str = rtrim2(php_to_string(&processed), "/\\");
+                val_str = Platform::expand_path(&val_str);
 
                 if substr(key, -4, None) != "-dir" {
                     return Ok(PhpMixed::string(val_str));
@@ -570,18 +558,15 @@ impl Config {
                     if (flags & Self::RELATIVE_PATHS) == Self::RELATIVE_PATHS {
                         val_str
                     } else {
-                        legacy_lossy(&self.realpath(&val_str)).into_owned()
+                        self.realpath(val_str.as_ref())
                     },
                 ))
             }
 
             // booleans with env var support
-            "cache-read-only" | "htaccess-protect" => {
+            b"cache-read-only" | b"htaccess-protect" => {
                 // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
-                let env = format!(
-                    "COMPOSER_{}",
-                    legacy_lossy(&strtoupper(strtr(key, "-", "_")))
-                );
+                let env = bconcat!("COMPOSER_", strtoupper(strtr(key, "-", "_")));
 
                 let val = self.get_composer_env(&env);
                 let val = if matches!(val, PhpMixed::Bool(false)) {
@@ -597,9 +582,9 @@ impl Config {
             }
 
             // booleans without env var support
-            "disable-tls" | "secure-http" | "use-github-api" | "lock" => {
+            b"disable-tls" | b"secure-http" | b"use-github-api" | b"lock" => {
                 // special case for secure-http
-                if key == "secure-http"
+                if key == b"secure-http"
                     && self.get_with_flags("disable-tls", 0)?.as_bool() == Some(true)
                 {
                     return Ok(PhpMixed::Bool(false));
@@ -612,12 +597,12 @@ impl Config {
             }
 
             // ints without env var support
-            "cache-ttl" => Ok(PhpMixed::Int(
+            b"cache-ttl" => Ok(PhpMixed::Int(
                 self.config.get(B(key)).map(intval).unwrap_or(0).max(0),
             )),
 
             // numbers with kb/mb/gb support, without env var support
-            "cache-files-maxsize" => {
+            b"cache-files-maxsize" => {
                 let raw = self
                     .config
                     .get(B(key))
@@ -629,18 +614,20 @@ impl Config {
                 ) else {
                     return Err(RuntimeException::new(format!(
                         "Could not parse the value of '{}': {}",
-                        key,
+                        key.as_bstr().display_lossy(),
                         raw.display_lossy()
                     ))
                     .into());
                 };
-                let mut size = legacy_lossy(matches.get(1).unwrap_or_default())
-                    .into_owned()
-                    .parse::<f64>()
+                let mut size = matches
+                    .get(1)
+                    .unwrap_or_default()
+                    .to_str()
+                    .ok()
+                    .and_then(|size| size.parse::<f64>().ok())
                     .unwrap_or(0.0);
-                let unit = matches.get(2).map(|s| legacy_lossy(s).into_owned());
-                if let Some(unit) = unit {
-                    match strtolower(&unit).as_slice() {
+                if let Some(unit) = matches.get(2) {
+                    match strtolower(unit).as_slice() {
                         b"g" => {
                             size *= 1024.0;
                             size *= 1024.0;
@@ -661,7 +648,7 @@ impl Config {
             }
 
             // special cases below
-            "cache-files-ttl" => {
+            b"cache-files-ttl" => {
                 let v = self.config.get(B(key)).cloned();
                 if let Some(v) = v
                     && !v.is_null()
@@ -672,7 +659,7 @@ impl Config {
                 self.get_with_flags("cache-ttl", 0)
             }
 
-            "home" => {
+            b"home" => {
                 let v = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
                 let expanded = Platform::expand_path(v.as_string().unwrap_or_default());
                 let processed = self.process(PhpMixed::string(expanded), flags)?;
@@ -682,17 +669,16 @@ impl Config {
                 )))
             }
 
-            "bin-compat" => {
+            b"bin-compat" => {
                 let env_val = self.get_composer_env("COMPOSER_BIN_COMPAT");
                 let value = match env_val {
-                    PhpMixed::Bool(false) | PhpMixed::Null => legacy_lossy(
-                        self.config
-                            .get(B(key))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default(),
-                    )
-                    .into_owned(),
-                    other => legacy_lossy(other.as_string().unwrap_or_default()).into_owned(),
+                    PhpMixed::Bool(false) | PhpMixed::Null => self
+                        .config
+                        .get(B(key))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default()
+                        .to_owned(),
+                    other => other.as_string().unwrap_or_default().to_owned(),
                 };
 
                 if !in_array_loose(
@@ -706,7 +692,7 @@ impl Config {
                 ) {
                     return Err(RuntimeException::new(format!(
                         "Invalid value for 'bin-compat': {}. Expected auto, full or proxy",
-                        value
+                        value.display_lossy()
                     ))
                     .into());
                 }
@@ -721,14 +707,17 @@ impl Config {
                 Ok(PhpMixed::string(value))
             }
 
-            "discard-changes" => {
+            b"discard-changes" => {
                 let env = self.get_composer_env("COMPOSER_DISCARD_CHANGES");
                 if !matches!(env, PhpMixed::Bool(false)) {
-                    let env_str = legacy_lossy(env.as_string().unwrap_or_default()).into_owned();
-                    if !matches!(env_str.as_str(), "stash" | "true" | "false" | "1" | "0") {
+                    let env_str = env.as_string().unwrap_or_default();
+                    if !matches!(
+                        env_str.as_bytes(),
+                        b"stash" | b"true" | b"false" | b"1" | b"0"
+                    ) {
                         return Err(RuntimeException::new(format!(
                             "Invalid value for COMPOSER_DISCARD_CHANGES: {}. Expected 1, 0, true, false or stash",
-                            env_str
+                            env_str.display_lossy()
                         ))
                         .into());
                     }
@@ -756,14 +745,14 @@ impl Config {
                 Ok(val)
             }
 
-            "github-protocols" => {
-                let mut protos: Vec<String> = self
+            b"github-protocols" => {
+                let mut protos: Vec<BString> = self
                     .config
                     .get(B("github-protocols"))
                     .and_then(|v| v.as_list())
                     .map(|l| {
                         l.iter()
-                            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                            .filter_map(|v| v.as_string().map(BStr::to_owned))
                             .collect()
                     })
                     .unwrap_or_default();
@@ -784,7 +773,7 @@ impl Config {
                     }
                 }
                 let first = protos.first().cloned();
-                if first.as_deref() == Some("http") {
+                if first.as_ref().is_some_and(|proto| proto == "http") {
                     return Err(RuntimeException::new("The http protocol for github is not available anymore, update your config's github-protocols to use \"https\", \"git\" or \"ssh\"".to_string())
                     .into());
                 }
@@ -794,7 +783,7 @@ impl Config {
                 ))
             }
 
-            "autoloader-suffix" => {
+            b"autoloader-suffix" => {
                 let v = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
                 if v.as_string() == Some("".into()) {
                     // we need to guarantee null or non-empty-string
@@ -804,12 +793,12 @@ impl Config {
                 self.process(v, flags)
             }
 
-            "audit" => {
+            b"audit" => {
                 let mut result = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
                 let abandoned_env = self.get_composer_env("COMPOSER_AUDIT_ABANDONED");
                 if !matches!(abandoned_env, PhpMixed::Bool(false)) {
                     let abandoned_env_str =
-                        legacy_lossy(abandoned_env.as_string().unwrap_or_default()).into_owned();
+                        abandoned_env.as_string().unwrap_or_default().to_owned();
                     let valid_choices: Vec<String> =
                         Auditor::ABANDONEDS.iter().map(|s| s.to_string()).collect();
                     if !in_array_strict(
@@ -821,7 +810,7 @@ impl Config {
                     ) {
                         return Err(RuntimeException::new(format!(
                             "Invalid value for COMPOSER_AUDIT_ABANDONED: {}. Expected one of {}.",
-                            abandoned_env_str,
+                            abandoned_env_str.display_lossy(),
                             implode(", ", &valid_choices).display_lossy(),
                         ))
                         .into());
@@ -834,17 +823,19 @@ impl Config {
                 let block_abandoned_env =
                     self.get_composer_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
                 if !matches!(block_abandoned_env, PhpMixed::Bool(false)) {
-                    let env_str = legacy_lossy(block_abandoned_env.as_string().unwrap_or_default())
-                        .into_owned();
-                    if !matches!(env_str.as_str(), "0" | "1") {
+                    let env_str = block_abandoned_env.as_string().unwrap_or_default();
+                    if !matches!(env_str.as_bytes(), b"0" | b"1") {
                         return Err(RuntimeException::new(format!(
                             "Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: {}. Expected 0 or 1.",
-                            env_str
+                            env_str.display_lossy()
                         ))
                         .into());
                     }
                     if let PhpMixed::Array(ref mut m) = result {
-                        m.insert("block-abandoned".into(), PhpMixed::Bool(env_str == "1"));
+                        m.insert(
+                            "block-abandoned".into(),
+                            PhpMixed::Bool(env_str.as_bytes() == b"1"),
+                        );
                     }
                 }
 
@@ -871,8 +862,7 @@ impl Config {
         let keys: Vec<BString> = self.config.keys().cloned().collect();
         let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
         for key in keys {
-            // TODO(bytes): get_with_flags takes UTF-8 text, so non-UTF-8 bytes are replaced.
-            let value = self.get_with_flags(&key.to_str_lossy(), flags)?;
+            let value = self.get_with_flags(&key, flags)?;
             config_section.insert(key, value);
         }
         all.insert("config".into(), PhpMixed::Array(config_section));
@@ -880,20 +870,28 @@ impl Config {
         Ok(all)
     }
 
-    pub fn get_source_of_value(&mut self, key: &str) -> String {
+    pub fn get_source_of_value(&mut self, key: impl AsRef<[u8]>) -> BString {
+        let key = key.as_ref();
         let _ = self.get(key);
 
         self.source_of_config_value
             .borrow()
-            .get(key)
+            .get(B(key))
             .cloned()
-            .unwrap_or_else(|| Self::SOURCE_UNKNOWN.to_string())
+            .unwrap_or_else(|| Self::SOURCE_UNKNOWN.into())
     }
 
-    fn set_source_of_config_value(&self, config_value: &PhpMixed, path: &str, source: &str) {
+    fn set_source_of_config_value(
+        &self,
+        config_value: &PhpMixed,
+        path: impl AsRef<[u8]>,
+        source: impl AsRef<[u8]>,
+    ) {
+        let path = path.as_ref();
+        let source = source.as_ref();
         self.source_of_config_value
             .borrow_mut()
-            .insert(path.to_string(), source.to_string());
+            .insert(path.into(), source.into());
 
         if is_array(config_value) {
             let map = match config_value {
@@ -904,11 +902,7 @@ impl Config {
                 _ => vec![],
             };
             for (key, value) in map {
-                self.set_source_of_config_value(
-                    &value,
-                    &format!("{}.{}", path, legacy_lossy(&key)),
-                    source,
-                );
+                self.set_source_of_config_value(&value, &bconcat!(path, ".", key), source);
             }
         }
     }
@@ -924,7 +918,8 @@ impl Config {
     }
 
     /// Checks whether a setting exists
-    pub fn has(&self, key: &str) -> bool {
+    pub fn has(&self, key: impl AsRef<[u8]>) -> bool {
+        let key = key.as_ref();
         array_key_exists(B(key), &self.config)
     }
 
@@ -934,17 +929,14 @@ impl Config {
             return Ok(value);
         }
 
-        let value_str = legacy_lossy(value.as_string().unwrap_or_default()).into_owned();
         let result = preg_replace_callback(
             php_regex!(r"#\{\$(.+)\}#"),
-            |m: &PregMatches| -> anyhow::Result<String> {
-                let key_match = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                Ok(
-                    legacy_lossy(&php_to_string(&self.get_with_flags(&key_match, flags)?))
-                        .into_owned(),
-                )
+            |m: &PregMatches| -> anyhow::Result<BString> {
+                Ok(php_to_string(
+                    &self.get_with_flags(m.get(1).unwrap_or_default(), flags)?,
+                ))
             },
-            &value_str,
+            value.as_string().unwrap_or_default(),
         )?;
         Ok(PhpMixed::string(result))
     }
@@ -952,14 +944,14 @@ impl Config {
     /// Turns relative paths in absolute paths without realpath()
     ///
     /// Since the dirs might not exist yet we can not call realpath or it will fail.
-    fn realpath(&self, path: &str) -> String {
+    fn realpath(&self, path: &BStr) -> BString {
         if preg_is_match(php_regex!(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i"), path) {
-            return path.to_string();
+            return path.into();
         }
 
         match &self.base_dir {
-            Some(base) => format!("{}/{}", base, path),
-            None => path.to_string(),
+            Some(base) => bconcat!(base, "/", path),
+            None => path.into(),
         }
     }
 
@@ -967,7 +959,7 @@ impl Config {
     ///
     /// This should be used to read COMPOSER_ environment variables
     /// that overload config values.
-    fn get_composer_env(&self, var: &str) -> PhpMixed {
+    fn get_composer_env(&self, var: impl AsRef<[u8]>) -> PhpMixed {
         if self.use_environment {
             return match Platform::get_env(var) {
                 Some(v) => PhpMixed::string(v),
@@ -978,7 +970,7 @@ impl Config {
         PhpMixed::Bool(false)
     }
 
-    fn disable_repo_by_name(&mut self, name: &str) {
+    fn disable_repo_by_name(&mut self, name: &BStr) {
         if self.repositories.contains_key(B(name)) {
             self.repositories.shift_remove(B(name));
         } else if name == "packagist" {

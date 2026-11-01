@@ -2889,11 +2889,7 @@ impl ComposerRepository {
                         self.degraded_mode.set(true);
                         let parsed = JsonFile::parse_json(
                             Some(&contents),
-                            Some(&format!(
-                                "{}{}",
-                                self.cache.borrow().get_root().display(),
-                                ck.display_lossy()
-                            )),
+                            Some(bconcat!(self.cache.borrow().get_root(), ck).as_ref()),
                         )?;
                         let map: IndexMap<BString, PhpMixed> = parsed
                             .as_array()

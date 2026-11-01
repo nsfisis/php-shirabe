@@ -78,7 +78,7 @@ mockall::mock! {
         fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
         fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
         fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
-        fn get_name(&self) -> String;
+        fn get_name(&self) -> bstr::BString;
     }
 }
 
@@ -96,7 +96,7 @@ fn null_config_source() -> MockConfigSource {
     m.expect_remove_property().returning(|_| Ok(()));
     m.expect_add_link().returning(|_, _, _| Ok(()));
     m.expect_remove_link().returning(|_, _| Ok(()));
-    m.expect_get_name().returning(String::new);
+    m.expect_get_name().returning(bstr::BString::default);
     m
 }
 

@@ -67,8 +67,8 @@ impl ConfigSourceInterface for NullConfigSource {
     fn remove_link(&mut self, _type: &bstr::BStr, _name: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn get_name(&self) -> String {
-        "null".to_string()
+    fn get_name(&self) -> bstr::BString {
+        "null".into()
     }
 }
 

@@ -447,7 +447,7 @@ fn test_installer() {
         // the installer falls back to an update; PHP uses an in-memory JsonFile mock instead).
         let lock_dir = tempfile::TempDir::new().unwrap();
         let lock_path = lock_dir.path().join("composer.lock");
-        let lock_json = JsonFile::new(lock_path.to_str().unwrap().to_string(), None, None).unwrap();
+        let lock_json = JsonFile::new(lock_path.to_str().unwrap(), None, None).unwrap();
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
@@ -929,8 +929,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         &installed_path,
         case.installed.as_ref().unwrap_or(&serde_json::json!([])),
     );
-    let installed_json =
-        JsonFile::new(installed_path.to_str().unwrap().to_string(), None, None).unwrap();
+    let installed_json = JsonFile::new(installed_path.to_str().unwrap(), None, None).unwrap();
     let local_repo = shirabe::repository::InstalledFilesystemRepository::__new_mock(
         installed_json,
         false,
@@ -950,7 +949,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         write_json(&lock_path, lock);
     }
     let lock_before = std::fs::read_to_string(&lock_path).ok();
-    let lock_json = JsonFile::new(lock_path.to_str().unwrap().to_string(), None, None).unwrap();
+    let lock_json = JsonFile::new(lock_path.to_str().unwrap(), None, None).unwrap();
 
     // The Locker needs a concrete InstallationManager; build a fresh recording mock just for it. The
     // asserted trace comes from the composer's own installation manager (read via as_any below).

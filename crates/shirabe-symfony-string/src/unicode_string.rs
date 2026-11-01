@@ -1,20 +1,20 @@
 //! ref: composer/vendor/symfony/string/UnicodeString.php
 
-use bstr::BStr;
-use shirabe_php_shim::{legacy_lossy, mb_strlen, mb_substr};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{mb_strlen, mb_substr, str_replace_array};
 
 #[derive(Debug, Clone)]
 pub struct UnicodeString {
-    string: String,
+    string: BString,
 }
 
 impl UnicodeString {
     // TODO(unicode): the real constructor runs `normalizer_normalize` (Unicode NFC normalization),
     // which has no Rust std equivalent and would need a dedicated normalization implementation.
     // Normalization is skipped here, which is only correct for already-NFC input such as ASCII.
-    pub fn new(string: &str) -> Self {
+    pub fn new(string: impl AsRef<[u8]>) -> Self {
         Self {
-            string: string.to_string(),
+            string: BString::from(string.as_ref()),
         }
     }
 
@@ -23,11 +23,11 @@ impl UnicodeString {
     // combining characters; here every character counts as width 1, correct only for ASCII. The
     // ANSI/control-character stripping driven by `ignore_ansi_decoration` is likewise not handled.
     pub fn width(&self, _ignore_ansi_decoration: bool) -> i64 {
-        let s = self.string.replace(['\x00', '\x05', '\x07'], "");
-        let s = s.replace("\r\n", "\n").replace('\r', "\n");
+        let s = str_replace_array(&["\x00", "\x05", "\x07"], &[""], &self.string);
+        let s = str_replace_array(&["\r\n", "\r"], &["\n"], &s);
 
         let mut width: i64 = 0;
-        for line in s.split('\n') {
+        for line in s.split_str("\n") {
             let line_width = line.chars().count() as i64;
             if line_width > width {
                 width = line_width;
@@ -49,11 +49,11 @@ impl UnicodeString {
     // needs Unicode segmentation tables with no std equivalent and no permitted crate. Approximated
     // with code-point offsets via `mb_substr`, exact only without combining/multi-code-point clusters.
     pub fn slice(&self, start: i64, length: Option<i64>) -> Self {
-        Self::new(&legacy_lossy(&mb_substr(
+        Self::new(mb_substr(
             &self.string,
             start,
             length,
             Some(BStr::new("UTF-8")),
-        )))
+        ))
     }
 }

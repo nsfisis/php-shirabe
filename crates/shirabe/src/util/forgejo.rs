@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::HttpDownloader;
-use bstr::BStr;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, legacy_lossy, trim};
 
 #[derive(Debug)]
@@ -47,21 +47,22 @@ impl Forgejo {
             io_interface::NORMAL,
         );
         self.io.write_error3(&url, true, io_interface::NORMAL);
-        let (local_auth_name, has_local_auth, auth_name): (String, bool, String) = {
+        let (local_auth_name, has_local_auth, auth_name): (BString, bool, BString) = {
             let cfg = self.config.borrow();
             let local = cfg.get_local_auth_config_source().map(|s| s.get_name());
             let auth = cfg.get_auth_config_source().get_name();
             (local.clone().unwrap_or_default(), local.is_some(), auth)
         };
         let local_prefix = if has_local_auth {
-            format!("{} OR ", local_auth_name)
+            format!("{} OR ", local_auth_name.display_lossy())
         } else {
             String::new()
         };
         self.io.write_error3(
             format!(
                 "Tokens will be stored in plain text in \"{}{}\" for future use by Composer.",
-                local_prefix, auth_name
+                local_prefix,
+                auth_name.display_lossy()
             ),
             true,
             io_interface::NORMAL,

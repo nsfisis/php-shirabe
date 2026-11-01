@@ -413,7 +413,7 @@ mockall::mock! {
         fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
         fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
         fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
-        fn get_name(&self) -> String;
+        fn get_name(&self) -> bstr::BString;
     }
 }
 
@@ -433,7 +433,7 @@ fn test_store_auth_automatically() {
     let mut source = MockConfigSource::new();
     source
         .expect_get_name()
-        .returning(|| "https://api.gitlab.com/source".to_string());
+        .returning(|| "https://api.gitlab.com/source".into());
     let expected = expected_auth_setting("my_username", "my_password");
     source
         .expect_add_config_setting()
@@ -473,7 +473,7 @@ fn test_store_auth_with_prompt_yes_answer() {
     source
         .expect_get_name()
         .times(1)
-        .returning(move || config_source_name.to_string());
+        .returning(move || config_source_name.into());
     let expected = expected_auth_setting("my_username", "my_password");
     source
         .expect_add_config_setting()
@@ -512,7 +512,7 @@ fn test_store_auth_with_prompt_no_answer() {
     source
         .expect_get_name()
         .times(1)
-        .returning(move || config_source_name.to_string());
+        .returning(move || config_source_name.into());
     source.expect_add_config_setting().times(0);
     f.config
         .borrow_mut()
@@ -544,7 +544,7 @@ fn test_store_auth_with_prompt_invalid_answer() {
     source
         .expect_get_name()
         .times(1)
-        .returning(|| "https://api.gitlab.com/source".to_string());
+        .returning(|| "https://api.gitlab.com/source".into());
     config.borrow_mut().set_auth_config_source(Box::new(source));
 
     let auth_helper = AuthHelper::new(

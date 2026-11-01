@@ -15,14 +15,12 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     array_values_mixed, bconcat, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class,
     implode, in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric,
-    is_object, is_string, json_encode, legacy_lossy, path_from_bytes, php_regex, php_to_string,
-    preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, system, touch, trim2,
-    var_export,
+    is_object, is_string, json_encode, legacy_lossy, path_from_bytes, path_to_bytes, php_regex,
+    php_to_string, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower,
+    system, touch, trim2, var_export,
 };
 use shirabe_semver::VersionParser;
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
 pub struct ConfigCommand {
@@ -252,17 +250,18 @@ impl ConfigCommand {
             }
 
             let source = if show_source {
-                format!(
-                    " ({})",
+                bconcat!(
+                    " (",
                     self.config
                         .borrow()
                         .as_ref()
                         .unwrap()
                         .borrow_mut()
-                        .get_source_of_value(&format!("{}{}", k.clone().unwrap_or_default(), key))
+                        .get_source_of_value(bconcat!(k.clone().unwrap_or_default(), key)),
+                    ")"
                 )
             } else {
-                String::new()
+                BString::default()
             };
 
             let link: String =
@@ -293,9 +292,9 @@ impl ConfigCommand {
                         link,
                         k.clone().unwrap_or_default(),
                         key,
-                        legacy_lossy(&raw_val.as_string().unwrap_or_default()),
-                        legacy_lossy(&php_to_string(&value_inner)),
-                        source
+                        raw_val.as_string().unwrap_or_default().display_lossy(),
+                        php_to_string(&value_inner).display_lossy(),
+                        source.display_lossy()
                     ),
                     true,
                     io_interface::QUIET,
@@ -307,8 +306,8 @@ impl ConfigCommand {
                         link,
                         k.clone().unwrap_or_default(),
                         key,
-                        legacy_lossy(&php_to_string(&value_inner)),
-                        source
+                        php_to_string(&value_inner).display_lossy(),
+                        source.display_lossy()
                     ),
                     true,
                     io_interface::QUIET,
@@ -347,9 +346,9 @@ impl ConfigCommand {
                 None,
             )?;
             if config_file.exists() {
-                let path = config_file.get_path().to_string();
+                let path = config_file.get_path().to_path_buf();
                 let data = config_file.read()?.as_array().cloned().unwrap_or_default();
-                config.merge(&data, &path);
+                config.merge(&data, path_to_bytes(&path));
             }
 
             // load auth-configuration
@@ -359,10 +358,10 @@ impl ConfigCommand {
                 None,
             )?;
             if auth_config_file.exists() {
-                let path = auth_config_file.get_path().to_string();
+                let path = auth_config_file.get_path().to_path_buf();
                 let mut data = IndexMap::new();
                 data.insert("config".into(), auth_config_file.read()?);
-                config.merge(&data, &path);
+                config.merge(&data, path_to_bytes(&path));
             }
 
             // collect all configuration setting-keys
@@ -386,8 +385,8 @@ impl ConfigCommand {
             if input.get_option("unset")?.to_bool() {
                 // … keep only the currently customized setting-keys …
                 let sources = [
-                    config_file.get_path().to_string(),
-                    auth_config_file.get_path().to_string(),
+                    BString::from(path_to_bytes(config_file.get_path())),
+                    BString::from(path_to_bytes(auth_config_file.get_path())),
                 ];
                 keys.retain(|key| sources.contains(&config.get_source_of_value(key)));
 
@@ -547,7 +546,7 @@ impl Command for ConfigCommand {
             auth_config_file
                 .borrow()
                 .write(PhpMixed::Array(empty_objs))?;
-            let path_clone = auth_config_file.borrow().get_path().to_string();
+            let path_clone = auth_config_file.borrow().get_path().to_path_buf();
             chmod(&path_clone, 0o600);
         }
         Ok(())
@@ -586,7 +585,7 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .borrow()
                     .get_path()
-                    .to_string()
+                    .to_path_buf()
             } else {
                 self.config_file
                     .borrow()
@@ -594,7 +593,7 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .borrow()
                     .get_path()
-                    .to_string()
+                    .to_path_buf()
             };
             system(
                 bconcat!(
@@ -622,8 +621,10 @@ impl Command for ConfigCommand {
                 PhpMixed::Array(m) => m,
                 _ => IndexMap::new(),
             };
-            let config_file_path = config_file.borrow().get_path().to_string();
-            config.borrow_mut().merge(&config_map, &config_file_path);
+            let config_file_path = config_file.borrow().get_path().to_path_buf();
+            config
+                .borrow_mut()
+                .merge(&config_map, path_to_bytes(&config_file_path));
             let auth_data: PhpMixed = if auth_config_file.borrow().exists() {
                 auth_config_file.borrow_mut().read()?
             } else {
@@ -631,8 +632,10 @@ impl Command for ConfigCommand {
             };
             let mut wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
             wrap.insert("config".into(), auth_data);
-            let auth_config_file_path = auth_config_file.borrow().get_path().to_string();
-            config.borrow_mut().merge(&wrap, &auth_config_file_path);
+            let auth_config_file_path = auth_config_file.borrow().get_path().to_path_buf();
+            config
+                .borrow_mut()
+                .merge(&wrap, path_to_bytes(&auth_config_file_path));
         }
 
         {
@@ -779,7 +782,7 @@ impl Command for ConfigCommand {
                 if value.as_array().map(|a| a.is_empty()).unwrap_or(false) {
                     let schema = JsonFile::parse_json(
                         Some(JsonFile::COMPOSER_SCHEMA_JSON),
-                        Some("composer.schema.json"),
+                        Some(bstr::BStr::new("composer.schema.json")),
                     )?;
                     let type_value = schema
                         .as_array()
@@ -831,10 +834,10 @@ impl Command for ConfigCommand {
                     .get(B(&setting_key))
                     .unwrap()
                     .clone();
-                source = config_file.borrow().get_path().to_string();
+                source = path_to_bytes(config_file.borrow().get_path()).into();
             } else if let Some(v) = properties_defaults.get(B(&setting_key)) {
                 value = v.clone();
-                source = "defaults".to_string();
+                source = "defaults".into();
             } else {
                 return Err(
                     RuntimeException::new(format!("{} is not defined", setting_key)).into(),
@@ -842,24 +845,24 @@ impl Command for ConfigCommand {
             }
 
             let value_str = if is_array(&value) || is_object(&value) || is_bool(&value) {
-                JsonFile::encode_with_options(
+                BString::from(JsonFile::encode_with_options(
                     &value,
                     JsonEncodeOptions {
                         pretty_print: false,
                         ..Default::default()
                     },
-                )?
+                )?)
             } else {
-                legacy_lossy(&php_to_string(&value)).into_owned()
+                php_to_string(&value)
             };
 
-            let mut source_of_config_value = String::new();
+            let mut source_of_config_value = BString::default();
             if input.borrow().get_option("source")?.as_bool() == Some(true) {
-                source_of_config_value = format!(" ({})", source);
+                source_of_config_value = bconcat!(" (", source, ")");
             }
 
             self.get_io().write3(
-                format!("{}{}", value_str, source_of_config_value),
+                bconcat!(value_str, source_of_config_value),
                 true,
                 io_interface::QUIET,
             );
@@ -1086,7 +1089,10 @@ impl Command for ConfigCommand {
                         return Ok(0);
                     }
                 } else {
-                    let value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
+                    let value = JsonFile::parse_json(
+                        Some(&values[0]),
+                        Some(bstr::BStr::new("composer.json")),
+                    )?;
                     self.config_source
                         .borrow_mut()
                         .as_mut()
@@ -1119,7 +1125,8 @@ impl Command for ConfigCommand {
 
             let mut value = PhpMixed::string(values[0].clone());
             if input.borrow().get_option("json")?.as_bool() == Some(true) {
-                value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
+                value =
+                    JsonFile::parse_json(Some(&values[0]), Some(bstr::BStr::new("composer.json")))?;
                 if input.borrow().get_option("merge")?.as_bool() == Some(true) {
                     let current_value_outer = config_file.borrow_mut().read()?;
                     let bits = explode(".", &setting_key);
@@ -1270,7 +1277,8 @@ impl Command for ConfigCommand {
             let mut value: PhpMixed =
                 PhpMixed::List(values.iter().map(|s| PhpMixed::string(s.clone())).collect());
             if input.borrow().get_option("json")?.as_bool() == Some(true) {
-                value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
+                value =
+                    JsonFile::parse_json(Some(&values[0]), Some(bstr::BStr::new("composer.json")))?;
                 if !is_array(&value) {
                     return Err(RuntimeException::new(format!(
                         "Expected an array or object for {}",
@@ -1345,8 +1353,8 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .remove_config_setting(bstr::BStr::new(&format!(
                         "{}.{}",
-                        legacy_lossy(&matches.get(1).unwrap()),
-                        legacy_lossy(&matches.get(2).unwrap())
+                        matches.get(1).unwrap().display_lossy(),
+                        matches.get(2).unwrap().display_lossy()
                     )));
                 self.config_source
                     .borrow_mut()
@@ -1354,8 +1362,8 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .remove_config_setting(bstr::BStr::new(&format!(
                         "{}.{}",
-                        legacy_lossy(&matches.get(1).unwrap()),
-                        legacy_lossy(&matches.get(2).unwrap())
+                        matches.get(1).unwrap().display_lossy(),
+                        matches.get(2).unwrap().display_lossy()
                     )));
 
                 return Ok(0);

@@ -210,9 +210,7 @@ impl Command for HomeCommand {
             let mut package_exists = false;
 
             'repos: for repo in &repos {
-                for package in
-                    repo.find_packages(bstr::BStr::new(&*legacy_lossy(package_name)), None)?
-                {
+                for package in repo.find_packages(bstr::BStr::new(package_name), None)? {
                     package_exists = true;
                     if let Some(complete_pkg) = package.as_complete()
                         && self.handle_package(complete_pkg, show_homepage, show_only)

@@ -12,6 +12,6 @@ pub fn b(string: impl AsRef<[u8]>) -> ByteString {
 }
 
 /// Mirror of Symfony's `u()` helper function.
-pub fn s(string: &str) -> UnicodeString {
+pub fn s(string: impl AsRef<[u8]>) -> UnicodeString {
     UnicodeString::new(string)
 }

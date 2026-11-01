@@ -178,14 +178,12 @@ impl Command for LicensesCommand {
                 };
                 io.write(format!(
                     "Name: <comment>{}</comment>",
-                    legacy_lossy(&root.get_pretty_name())
+                    root.get_pretty_name().display_lossy()
                 ));
                 io.write(format!(
                     "Version: <comment>{}</comment>",
-                    legacy_lossy(&root.get_full_pretty_version(
-                        true,
-                        crate::package::DisplayMode::SourceRefIfDev
-                    ))
+                    root.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                        .display_lossy()
                 ));
                 io.write(format!("Licenses: <comment>{}</comment>", licenses_str));
                 io.write("Dependencies:");

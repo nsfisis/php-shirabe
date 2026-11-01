@@ -5,6 +5,7 @@
 //! The generator needs a PHP interpreter, its composer vendor directory and the classifier
 //! report. A missing prerequisite fails the test; `just setup` prepares all of them.
 
+use shirabe_php_shim::path_from_bytes;
 use shirabe_symfony_process::PhpExecutableFinder;
 use std::path::Path;
 
@@ -27,7 +28,7 @@ fn generated_stubs_are_fresh() {
         report.display(),
     );
 
-    let output = std::process::Command::new(php)
+    let output = std::process::Command::new(path_from_bytes(&php))
         .arg(tool_dir.join("generate-stubs"))
         .arg("--check")
         .output()

@@ -7,7 +7,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents,
-    file_put_contents, implode, is_writable,
+    file_put_contents, implode, is_writable, path_to_bytes,
 };
 
 /// JSON Configuration Source
@@ -32,7 +32,7 @@ impl JsonConfigSource {
             if !is_writable(self.file.borrow().get_path()) {
                 return Err(RuntimeException::new(format!(
                     "The file \"{}\" is not writable.",
-                    self.file.borrow().get_path(),
+                    self.file.borrow().get_path().display(),
                 ))
                 .into());
             }
@@ -40,7 +40,7 @@ impl JsonConfigSource {
             if !Filesystem::is_readable(self.file.borrow().get_path()) {
                 return Err(RuntimeException::new(format!(
                     "The file \"{}\" is not readable.",
-                    self.file.borrow().get_path(),
+                    self.file.borrow().get_path().display(),
                 ))
                 .into());
             }
@@ -158,7 +158,7 @@ impl JsonConfigSource {
         }
 
         if new_file {
-            let path = self.file.borrow().get_path().to_string();
+            let path = self.file.borrow().get_path().to_path_buf();
             chmod(&path, 0o600);
         }
 
@@ -276,8 +276,8 @@ impl JsonConfigSource {
 }
 
 impl ConfigSourceInterface for JsonConfigSource {
-    fn get_name(&self) -> String {
-        self.file.borrow().get_path().to_string()
+    fn get_name(&self) -> BString {
+        path_to_bytes(self.file.borrow().get_path()).into()
     }
 
     fn add_repository(

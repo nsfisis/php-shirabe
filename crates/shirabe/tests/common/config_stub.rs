@@ -55,7 +55,7 @@ impl ConfigStubBuilder {
     }
 
     pub fn build(self) -> Config {
-        let mut config = Config::new(self.use_environment, self.base_dir);
+        let mut config = Config::new(self.use_environment, self.base_dir.map(bstr::BString::from));
         if !self.values.is_empty() {
             let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
             merge.insert("config".into(), PhpMixed::Array(self.values));

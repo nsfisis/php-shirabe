@@ -88,7 +88,7 @@ impl GitBitbucketDriver {
                         self.inner
                             .config
                             .borrow_mut()
-                            .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
+                            .get("cache-repo-dir")
                             .as_string()
                             .unwrap_or_default(),
                     ),
@@ -105,7 +105,7 @@ impl GitBitbucketDriver {
             self.inner
                 .config
                 .borrow_mut()
-                .get(&legacy_lossy(b"cache-read-only".as_slice()))
+                .get("cache-read-only")
                 .as_bool()
                 .unwrap_or(false),
         );
@@ -138,7 +138,7 @@ impl GitBitbucketDriver {
             return Ok(false);
         }
         let clone_links = repo_data
-            .get(&legacy_lossy(b"links".as_slice()))
+            .get("links")
             .and_then(|v| match v {
                 PhpMixed::Array(m) => m.get(B("clone")),
                 _ => None,
@@ -148,14 +148,14 @@ impl GitBitbucketDriver {
 
         self.has_issues = !empty(
             repo_data
-                .get(&legacy_lossy(b"has_issues".as_slice()))
+                .get("has_issues")
                 .cloned()
                 .as_ref()
                 .unwrap_or(&PhpMixed::Null),
         );
         self.branches_url = bstr::BString::from(
             repo_data
-                .get(&legacy_lossy(b"links".as_slice()))
+                .get("links")
                 .and_then(|v| match v {
                     PhpMixed::Array(m) => m.get(B("branches")),
                     _ => None,
@@ -168,7 +168,7 @@ impl GitBitbucketDriver {
         );
         self.tags_url = bstr::BString::from(
             repo_data
-                .get(&legacy_lossy(b"links".as_slice()))
+                .get("links")
                 .and_then(|v| match v {
                     PhpMixed::Array(m) => m.get(B("tags")),
                     _ => None,
@@ -181,7 +181,7 @@ impl GitBitbucketDriver {
         );
         self.home_url = bstr::BString::from(
             repo_data
-                .get(&legacy_lossy(b"links".as_slice()))
+                .get("links")
                 .and_then(|v| match v {
                     PhpMixed::Array(m) => m.get(B("html")),
                     _ => None,
@@ -194,12 +194,12 @@ impl GitBitbucketDriver {
         );
         self.website = bstr::BString::from(
             repo_data
-                .get(&legacy_lossy(b"website".as_slice()))
+                .get("website")
                 .and_then(|v| v.as_string())
                 .unwrap_or_default(),
         );
         self.vcs_type = repo_data
-            .get(&legacy_lossy(b"scm".as_slice()))
+            .get("scm")
             .and_then(|v| v.as_string())
             .map(bstr::BString::from);
 
@@ -462,7 +462,7 @@ impl GitBitbucketDriver {
             .decode_json()?;
 
         let date_str = commit
-            .get(&legacy_lossy(b"date".as_slice()))
+            .get("date")
             .and_then(|v| v.as_string())
             .unwrap_or_default();
         let date: DateTime<FixedOffset> = date_create(date_str)?;
@@ -540,7 +540,7 @@ impl GitBitbucketDriver {
                 let tags_data = self
                     .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
                     .decode_json()?;
-                let values = tags_data.get(&legacy_lossy(b"values".as_slice())).cloned();
+                let values = tags_data.get("values").cloned();
                 if let Some(PhpMixed::List(list)) = values {
                     for data in list {
                         if let PhpMixed::Array(m) = data {
@@ -564,7 +564,7 @@ impl GitBitbucketDriver {
                 }
                 if empty(
                     tags_data
-                        .get(&legacy_lossy(b"next".as_slice()))
+                        .get("next")
                         .cloned()
                         .as_ref()
                         .unwrap_or(&PhpMixed::Null),
@@ -573,7 +573,7 @@ impl GitBitbucketDriver {
                 } else {
                     resource = legacy_lossy(&BString::from(
                         tags_data
-                            .get(&legacy_lossy(b"next".as_slice()))
+                            .get("next")
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
                     ))
@@ -608,9 +608,7 @@ impl GitBitbucketDriver {
                 let branch_data = self
                     .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
                     .decode_json()?;
-                let values = branch_data
-                    .get(&legacy_lossy(b"values".as_slice()))
-                    .cloned();
+                let values = branch_data.get("values").cloned();
                 if let Some(PhpMixed::List(list)) = values {
                     for data in list {
                         if let PhpMixed::Array(m) = data {
@@ -634,7 +632,7 @@ impl GitBitbucketDriver {
                 }
                 if empty(
                     branch_data
-                        .get(&legacy_lossy(b"next".as_slice()))
+                        .get("next")
                         .cloned()
                         .as_ref()
                         .unwrap_or(&PhpMixed::Null),
@@ -643,7 +641,7 @@ impl GitBitbucketDriver {
                 } else {
                     resource = legacy_lossy(&BString::from(
                         branch_data
-                            .get(&legacy_lossy(b"next".as_slice()))
+                            .get("next")
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
                     ))

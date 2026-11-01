@@ -180,7 +180,7 @@ impl CreateProjectCommand {
                 .into_owned();
                 let mut config_source = JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
-                        "composer.json".to_string(),
+                        "composer.json",
                         None,
                         None,
                     )?)),
@@ -383,7 +383,7 @@ impl CreateProjectCommand {
             let package = composer.get_package();
             let mut config_source = JsonConfigSource::new(
                 std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
-                    "composer.json".to_string(),
+                    "composer.json",
                     None,
                     None,
                 )?)),
@@ -487,7 +487,9 @@ impl CreateProjectCommand {
         }
 
         // set the base dir to ensure $config->all() below resolves the correct absolute paths to vendor-dir etc
-        config.borrow_mut().set_base_dir(Some(directory.clone()));
+        config
+            .borrow_mut()
+            .set_base_dir(Some(BString::from(directory.clone())));
         if !secure_http {
             let mut merge_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             let mut inner_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
@@ -583,7 +585,9 @@ impl CreateProjectCommand {
         let composer = crate::composer::composer_full(&composer_handle);
         let config = composer.get_config();
         // set the base dir here again on the new config instance, as otherwise in case the vendor dir is defined in an env var for example it would still override the value set above by $config->all()
-        config.borrow_mut().set_base_dir(Some(directory.clone()));
+        config
+            .borrow_mut()
+            .set_base_dir(Some(BString::from(directory.clone())));
         let rm = composer.get_repository_manager();
 
         let mut repository_set = RepositorySet::new(
@@ -938,7 +942,7 @@ impl Command for CreateProjectCommand {
                 explode_with_limit("/", strtolower(package.as_string().unwrap_or_default()), 2);
             let prompt = format!(
                 "New project directory [<comment>{}</comment>]: ",
-                legacy_lossy(&array_pop(&mut parts).unwrap_or_default())
+                array_pop(&mut parts).unwrap_or_default().display_lossy()
             );
             input.borrow_mut().set_argument(
                 "directory",

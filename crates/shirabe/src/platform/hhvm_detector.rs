@@ -59,12 +59,12 @@ impl HhvmDetectorInterface for HhvmDetector {
                 });
                 let mut version_output = PhpMixed::Null;
                 let cmd = [
-                    hhvm_path.as_str(),
-                    "--php",
-                    "-d",
-                    "hhvm.jit=0",
-                    "-r",
-                    "echo HHVM_VERSION;",
+                    hhvm_path.clone(),
+                    "--php".into(),
+                    "-d".into(),
+                    "hhvm.jit=0".into(),
+                    "-r".into(),
+                    "echo HHVM_VERSION;".into(),
                 ];
                 let exit_code = executor
                     .borrow_mut()

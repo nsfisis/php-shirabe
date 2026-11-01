@@ -33,7 +33,7 @@ mockall::mock! {
         fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
         fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
         fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
-        fn get_name(&self) -> String;
+        fn get_name(&self) -> bstr::BString;
     }
 }
 
@@ -41,7 +41,7 @@ fn get_auth_json_mock() -> Box<MockAuthJson> {
     let mut mock = MockAuthJson::new();
     mock.expect_get_name()
         .times(1..)
-        .returning(|| "auth.json".to_string());
+        .returning(|| "auth.json".into());
     mock.expect_add_config_setting().returning(|_, _| Ok(()));
     mock.expect_remove_config_setting().returning(|_| Ok(()));
     Box::new(mock)

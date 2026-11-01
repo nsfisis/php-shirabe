@@ -99,7 +99,7 @@ impl GitHubDriver {
                         .inner
                         .config
                         .borrow_mut()
-                        .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
+                        .get("cache-repo-dir")
                         .as_string()
                         .unwrap_or_default()
                 ),
@@ -116,7 +116,7 @@ impl GitHubDriver {
                 self.inner
                     .config
                     .borrow_mut()
-                    .get(&legacy_lossy(b"cache-read-only".as_slice()))
+                    .get("cache-read-only")
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -136,7 +136,7 @@ impl GitHubDriver {
             .inner
             .config
             .borrow_mut()
-            .get(&legacy_lossy(b"use-github-api".as_slice()))
+            .get("use-github-api")
             .as_bool()
             == Some(false)
             || self
@@ -950,10 +950,7 @@ impl GitHubDriver {
             .unwrap_or_else(|| BString::from(matches.get(3).unwrap_or_default()));
         if !in_array_loose(
             strtolower(preg_replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
-            config
-                .borrow()
-                .get(&legacy_lossy(b"github-domains".as_slice()))
-                .values(),
+            config.borrow().get("github-domains").values(),
         ) {
             return Ok(false);
         }
