@@ -1,74 +1,6 @@
 use crate::{ErrorException, StreamBacking, StreamState};
 use bstr::BString;
-use std::io::{Seek as _, Write as _};
 use zip::write::SimpleFileOptions;
-
-/// Entry names of an archive being written. libzip and phar store any bytes, while `ZipWriter` only
-/// takes text, so a name that is not valid UTF-8 is written as a placeholder of the same length and
-/// patched into the finished file by [`ZipEntryNames::restore`].
-#[derive(Debug, Default)]
-pub(crate) struct ZipEntryNames {
-    placeholders: indexmap::IndexMap<String, BString>,
-    next_placeholder: u64,
-}
-
-impl ZipEntryNames {
-    /// The text to hand to `ZipWriter` for `name`. `None` when `name` is too short to number all
-    /// the placeholders of its length.
-    pub(crate) fn text_name(&mut self, name: &[u8]) -> Option<String> {
-        if let Some(name) = crate::utf8_text(name) {
-            return Some(name.to_string());
-        }
-
-        let is_dir = name.last() == Some(&b'/');
-        let width = name.len() - usize::from(is_dir);
-        // Control characters keep a placeholder from colliding with a name in an actual package.
-        const DIGITS: u64 = 0x1f;
-        let mut number = self.next_placeholder;
-        self.next_placeholder += 1;
-        let mut placeholder = String::with_capacity(name.len());
-        for _ in 0..width {
-            placeholder.push(char::from((number % DIGITS + 1) as u8));
-            number /= DIGITS;
-        }
-        if number != 0 {
-            return None;
-        }
-        if is_dir {
-            placeholder.push('/');
-        }
-        self.placeholders.insert(placeholder.clone(), name.into());
-
-        Some(placeholder)
-    }
-
-    /// Writes the original bytes over the placeholders in the finished archive at `path`.
-    pub(crate) fn restore(&self, path: &std::path::Path) -> zip::result::ZipResult<()> {
-        if self.placeholders.is_empty() {
-            return Ok(());
-        }
-
-        const LOCAL_HEADER_SIZE: u64 = 30;
-        const CENTRAL_HEADER_SIZE: u64 = 46;
-        let mut archive = zip::ZipArchive::new(std::fs::File::open(path)?)?;
-        let mut file = std::fs::OpenOptions::new().write(true).open(path)?;
-        for index in 0..archive.len() {
-            let entry = archive.by_index_raw(index)?;
-            let Some(name) = self.placeholders.get(entry.name()) else {
-                continue;
-            };
-            for offset in [
-                entry.header_start() + LOCAL_HEADER_SIZE,
-                entry.central_header_start() + CENTRAL_HEADER_SIZE,
-            ] {
-                file.seek(std::io::SeekFrom::Start(offset))?;
-                file.write_all(name)?;
-            }
-        }
-
-        Ok(())
-    }
-}
 
 /// Test-only behaviour mirroring PHPUnit's `getMockBuilder('ZipArchive')->getMock()`, where
 /// `open`/`extractTo`/`count` are stubbed via `->willReturn(...)`/`->willThrowException(...)`.
@@ -94,7 +26,6 @@ enum ZipState {
         writer: zip::ZipWriter<std::fs::File>,
         /// The destination path, retained so `close` can confirm the file exists.
         path: std::path::PathBuf,
-        names: ZipEntryNames,
         status: String,
     },
 }
@@ -153,7 +84,6 @@ impl ZipArchive {
             *self.state.borrow_mut() = ZipState::Writer {
                 writer: zip::ZipWriter::new(file),
                 path: filename.to_path_buf(),
-                names: ZipEntryNames::default(),
                 status: String::new(),
             };
             self.num_files = 0;
@@ -178,12 +108,7 @@ impl ZipArchive {
         match state {
             ZipState::Closed => false,
             ZipState::Reader(_) => true,
-            ZipState::Writer {
-                writer,
-                path,
-                names,
-                ..
-            } => writer.finish().is_ok() && names.restore(&path).is_ok(),
+            ZipState::Writer { writer, .. } => writer.finish().is_ok(),
         }
     }
 
@@ -283,12 +208,9 @@ impl ZipArchive {
         )))
     }
 
-    pub fn add_empty_dir(&self, local_name: impl AsRef<[u8]>, opsys: i64, attr: u32) -> bool {
+    pub fn add_empty_dir(&self, local_name: &str, opsys: i64, attr: u32) -> bool {
         let mut state = self.state.borrow_mut();
-        let ZipState::Writer { writer, names, .. } = &mut *state else {
-            return false;
-        };
-        let Some(local_name) = names.text_name(local_name.as_ref()) else {
+        let ZipState::Writer { writer, .. } = &mut *state else {
             return false;
         };
         writer
@@ -299,7 +221,7 @@ impl ZipArchive {
     pub fn add_file(
         &self,
         filepath: impl AsRef<std::path::Path>,
-        local_name: impl AsRef<[u8]>,
+        local_name: &str,
         opsys: i64,
         attr: u32,
     ) -> bool {
@@ -308,10 +230,7 @@ impl ZipArchive {
             Err(_) => return false,
         };
         let mut state = self.state.borrow_mut();
-        let ZipState::Writer { writer, names, .. } = &mut *state else {
-            return false;
-        };
-        let Some(local_name) = names.text_name(local_name.as_ref()) else {
+        let ZipState::Writer { writer, .. } = &mut *state else {
             return false;
         };
         let options =
@@ -357,40 +276,4 @@ impl ZipArchive {
     pub const ER_INVAL: i64 = 18;
     pub const ER_NOZIP: i64 = 19;
     pub const ER_INCONS: i64 = 21;
-}
-
-#[cfg(test)]
-mod zip_entry_names_tests {
-    use super::*;
-
-    #[test]
-    fn entry_names_keep_bytes_that_are_not_valid_utf8() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("a.zip");
-        let source = dir.path().join("source");
-        std::fs::write(&source, b"contents").unwrap();
-
-        let mut zip = ZipArchive::new();
-        zip.open(&path, ZipArchive::CREATE).unwrap();
-        assert!(zip.add_file(&source, b"caf\xE9.txt", ZipArchive::OPSYS_UNIX, 0o644 << 16));
-        assert!(zip.add_file(&source, "plain.txt", ZipArchive::OPSYS_UNIX, 0o644 << 16));
-        assert!(zip.add_empty_dir(b"dir\xE9/", ZipArchive::OPSYS_UNIX, 0o755 << 16));
-        assert!(zip.close());
-
-        let mut archive = zip::ZipArchive::new(std::fs::File::open(&path).unwrap()).unwrap();
-        let names: Vec<Vec<u8>> = (0..archive.len())
-            .map(|i| archive.by_index_raw(i).unwrap().name_raw().to_vec())
-            .collect();
-        assert_eq!(
-            names,
-            [
-                b"caf\xE9.txt".to_vec(),
-                b"plain.txt".to_vec(),
-                b"dir\xE9/".to_vec()
-            ]
-        );
-        let mut contents = Vec::new();
-        std::io::Read::read_to_end(&mut archive.by_index(0).unwrap(), &mut contents).unwrap();
-        assert_eq!(contents, b"contents");
-    }
 }

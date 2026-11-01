@@ -1,7 +1,7 @@
 //! The native phar binary layout implemented here follows the php.net manual
 //! (`https://www.php.net/manual/en/phar.fileformat.php`); no PHP C sources were referenced.
 
-use crate::{UnexpectedValueException, path_from_bytes, path_to_bytes, rtrim2, trim2};
+use crate::{UnexpectedValueException, path_from_bytes, path_to_bytes, rtrim2, trim2, utf8_text};
 use bstr::{BString, ByteSlice};
 use std::io::{Read as _, Write as _};
 
@@ -850,13 +850,14 @@ impl PharData {
         };
         let file = std::fs::File::create(&self.path).map_err(|e| write_error(e.to_string()))?;
         let mut writer = zip::ZipWriter::new(file);
-        let mut names = crate::zip::ZipEntryNames::default();
         for entry in self.entries.borrow().iter() {
             let options = zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated);
-            let localname = names.text_name(&entry.localname).ok_or_else(|| {
+            // TODO(bytes): the zip crate only writes entry names that are valid UTF-8, where phar
+            // stores any bytes.
+            let localname = utf8_text(&entry.localname).ok_or_else(|| {
                 write_error(format!(
-                    "the entry name {:?} is too short to be written",
+                    "the entry name {:?} is not valid UTF-8",
                     entry.localname
                 ))
             })?;
@@ -896,9 +897,6 @@ impl PharData {
             }
         }
         writer.finish().map_err(|e| write_error(e.to_string()))?;
-        names
-            .restore(&self.path)
-            .map_err(|e| write_error(e.to_string()))?;
         Ok(())
     }
 }

@@ -6,6 +6,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, ZipArchive, class_exists, fileperms, path_to_bytes, realpath, strtr,
+    utf8_text,
 };
 use std::path::{Path, PathBuf};
 
@@ -62,18 +63,25 @@ impl ArchiverInterface for ZipArchiver {
                     relative_path = strtr(&relative_path, "\\", "/");
                 }
 
+                // TODO(bytes): the zip crate only writes entry names that are valid UTF-8, where
+                // libzip stores any bytes.
+                let Some(local_name) = utf8_text(&relative_path) else {
+                    return Err(RuntimeException::new(format!(
+                        "Could not create archive '{}' from '{}': the entry name {:?} is not valid UTF-8",
+                        target.display(),
+                        sources.display(),
+                        relative_path.as_bstr()
+                    ))
+                    .into());
+                };
+
                 // Ensure to preserve the permission umasks for the filepath in the archive.
                 let perms = fileperms(&filepath)?;
 
                 if filepath.is_dir() {
-                    zip.add_empty_dir(&relative_path, ZipArchive::OPSYS_UNIX, perms << 16);
+                    zip.add_empty_dir(local_name, ZipArchive::OPSYS_UNIX, perms << 16);
                 } else {
-                    zip.add_file(
-                        &filepath,
-                        &relative_path,
-                        ZipArchive::OPSYS_UNIX,
-                        perms << 16,
-                    );
+                    zip.add_file(&filepath, local_name, ZipArchive::OPSYS_UNIX, perms << 16);
                 }
             }
             if zip.close() {
