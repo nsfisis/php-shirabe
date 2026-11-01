@@ -1028,7 +1028,7 @@ impl Application {
                 self.find_namespace(&name[..pos])?;
             }
 
-            let mut message = format!("SymfonyCommand \"{}\" is not defined.", name);
+            let mut message = format!("Command \"{}\" is not defined.", name);
 
             let mut alternatives = self.find_alternatives(name, &all_commands);
             if !alternatives.is_empty() {
@@ -1127,7 +1127,7 @@ impl Application {
 
                     return Err(CommandNotFoundException::new(
                         format!(
-                            "SymfonyCommand \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
+                            "Command \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
                             name, suggestions,
                         ),
                         commands.clone(),
