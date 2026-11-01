@@ -216,8 +216,7 @@ impl XmlDescriptor {
         let mut buf = Vec::new();
         dom.save_xml(&mut buf)
             .expect("serializing XML to an in-memory buffer cannot fail");
-        let xml = String::from_utf8(buf).expect("DOM serialization yields valid UTF-8");
-        self.write(&xml, false);
+        self.write(&buf, false);
     }
 
     fn get_input_argument_document(&self, argument: &InputArgument) -> DOMDocument {

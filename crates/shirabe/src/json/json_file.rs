@@ -501,11 +501,17 @@ impl JsonFile {
         // PHP's linter checks the syntax byte-wise and leaves the encoding to the json_decode()
         // that ran before. A lossy decode keeps the syntax and the line numbers intact, so it
         // stands in for the former, and the UTF-8 check below for the latter.
-        let lossy = String::from_utf8_lossy(json);
+        let mut lossy = Vec::with_capacity(json.len());
+        for chunk in json.utf8_chunks() {
+            lossy.extend_from_slice(chunk.valid().as_bytes());
+            if !chunk.invalid().is_empty() {
+                lossy.extend_from_slice("\u{FFFD}".as_bytes());
+            }
+        }
         // TODO(php-semantics): make json_decode() returns an error object with details.
-        let error = match serde_json::from_str::<serde_json::Value>(&lossy) {
+        let error = match serde_json::from_slice::<serde_json::Value>(&lossy) {
             Ok(_) => {
-                if std::str::from_utf8(json).is_err() {
+                if utf8_text(json).is_none() {
                     return Err(UnexpectedValueException::new(match file {
                         None => "The input is not UTF-8, could not parse as JSON".to_string(),
                         Some(file) => format!(

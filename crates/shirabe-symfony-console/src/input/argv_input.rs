@@ -347,8 +347,7 @@ impl ArgvInput {
 
     /// Adds a long option value.
     fn add_long_option(&mut self, name: &BStr, mut value: InputValue) -> anyhow::Result<()> {
-        // TODO(bytes): InputDefinition keeps option names as Strings, so a name that is not UTF-8
-        // cannot be defined.
+        // Option names are declared in code, so a name that is not UTF-8 cannot be defined.
         let Some(name) = utf8_text(name) else {
             return Err(RuntimeException::new(format!(
                 "The \"--{}\" option does not exist.",

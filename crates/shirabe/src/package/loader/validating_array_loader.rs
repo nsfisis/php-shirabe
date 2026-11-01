@@ -9,11 +9,14 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, date_create,
     explode, filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar,
-    is_string, json_encode, parse_url, php_regex, php_to_string, preg_is_match, preg_replace,
-    str_replace, strcasecmp, strtolower, strtotime, substr, trigger_error, trim2, var_export,
+    is_string, json_encode, parse_url, pcre_check_utf8_subject, php_regex, php_to_string,
+    preg_is_match, preg_replace, str_replace, strcasecmp, strtolower, strtotime, substr,
+    trigger_error, trim2, var_export,
 };
-use shirabe_semver::Intervals;
-use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
+use shirabe_semver::{
+    Intervals,
+    constraint::{AnyConstraint, SimpleConstraint},
+};
 use shirabe_spdx_licenses::SpdxLicenses;
 
 #[derive(Debug)]
@@ -131,9 +134,9 @@ impl ValidatingArrayLoader {
         None
     }
 
-    fn validate_regex(&self, property: &str, regex: &str, mandatory: bool) -> bool {
+    fn validate_regex(&self, property: &str, regex: &str, mandatory: bool) -> anyhow::Result<bool> {
         if !self.validate_string(property, mandatory) {
-            return false;
+            return Ok(false);
         }
 
         let value = BString::from(
@@ -141,7 +144,9 @@ impl ValidatingArrayLoader {
                 .as_string()
                 .unwrap_or_default(),
         );
-        if !preg_is_match(format!("{{^{}$}}u", regex), &value) {
+        let pattern = format!("{{^{}$}}u", regex);
+        pcre_check_utf8_subject("preg_match", &pattern, &value)?;
+        if !preg_is_match(pattern, &value) {
             let message = format!(
                 "{} : invalid value ({}), must match {}",
                 property,
@@ -155,10 +160,10 @@ impl ValidatingArrayLoader {
             }
             self.config.borrow_mut().shift_remove(B(property));
 
-            return false;
+            return Ok(false);
         }
 
-        true
+        Ok(true)
     }
 
     fn validate_string(&self, property: &str, mandatory: bool) -> bool {
@@ -233,9 +238,14 @@ impl ValidatingArrayLoader {
         true
     }
 
-    fn validate_flat_array(&self, property: &str, regex: Option<&str>, mandatory: bool) -> bool {
+    fn validate_flat_array(
+        &self,
+        property: &str,
+        regex: Option<&str>,
+        mandatory: bool,
+    ) -> anyhow::Result<bool> {
         if !self.validate_array(property, mandatory) {
-            return false;
+            return Ok(false);
         }
 
         let mut pass = true;
@@ -261,7 +271,9 @@ impl ValidatingArrayLoader {
 
             if let Some(regex_str) = regex {
                 let value_str = php_to_string(&value);
-                if !preg_is_match(format!("{{^{}$}}u", regex_str), &value_str) {
+                let pattern = format!("{{^{}$}}u", regex_str);
+                pcre_check_utf8_subject("preg_match", &pattern, &value_str)?;
+                if !preg_is_match(pattern, &value_str) {
                     self.warnings.borrow_mut().push(format!(
                         "{}.{} : invalid value ({}), must match {}",
                         property,
@@ -279,7 +291,7 @@ impl ValidatingArrayLoader {
             }
         }
 
-        pass
+        Ok(pass)
     }
 
     fn validate_url(&self, property: &str, mandatory: bool) -> bool {
@@ -439,7 +451,7 @@ impl LoaderInterface for ValidatingArrayLoader {
             }
         }
 
-        self.validate_regex("type", "[A-Za-z0-9-]+", false);
+        self.validate_regex("type", "[A-Za-z0-9-]+", false)?;
         self.validate_string("target-dir", false);
         self.validate_array("extra", false);
 
@@ -447,14 +459,14 @@ impl LoaderInterface for ValidatingArrayLoader {
             if is_string(&self.config.borrow()[B("bin")]) {
                 self.validate_string("bin", false);
             } else {
-                self.validate_flat_array("bin", None, false);
+                self.validate_flat_array("bin", None, false)?;
             }
         }
 
         self.validate_array("scripts", false); // TODO validate event names & listener syntax
         self.validate_string("description", false);
         self.validate_url("homepage", false);
-        self.validate_flat_array("keywords", Some("[\\p{N}\\p{L} ._-]+"), false);
+        self.validate_flat_array("keywords", Some("[\\p{N}\\p{L} ._-]+"), false)?;
 
         let mut release_date: Option<chrono::DateTime<chrono::Utc>> = None;
         self.validate_string("time", false);
@@ -1534,7 +1546,7 @@ impl LoaderInterface for ValidatingArrayLoader {
         // TODO validate repositories
         // TODO validate package repositories' packages using this recursively
 
-        self.validate_flat_array("include-path", None, false);
+        self.validate_flat_array("include-path", None, false)?;
         self.validate_array("transport-options", false);
 
         // branch alias validation

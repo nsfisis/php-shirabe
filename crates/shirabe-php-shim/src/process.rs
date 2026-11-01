@@ -618,7 +618,8 @@ mod tests {
     fn proc_open_redirects_stdout_to_file() {
         let path =
             std::env::temp_dir().join(format!("shirabe_proc_open_{}.txt", std::process::id()));
-        let path_str = path.to_str().unwrap();
+        let path_str = path.display().to_string();
+        let path_str = path_str.as_str();
 
         let mut pipes = IndexMap::new();
         let process = proc_open(

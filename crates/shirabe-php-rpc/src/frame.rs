@@ -350,8 +350,11 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
 
 fn expect_string(value: PluginValue) -> String {
     match value {
-        PluginValue::String(bytes) => String::from_utf8(bytes.into())
-            .unwrap_or_else(|e| panic!("PHP RPC: protocol violation — non-UTF-8 name field: {e}")),
+        PluginValue::String(bytes) => utf8_text(&bytes)
+            .unwrap_or_else(|| {
+                panic!("PHP RPC: protocol violation — non-UTF-8 name field: {bytes:?}")
+            })
+            .to_string(),
         other => panic!("PHP RPC: protocol violation — expected a string field: {other:?}"),
     }
 }

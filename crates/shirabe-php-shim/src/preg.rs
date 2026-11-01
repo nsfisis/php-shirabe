@@ -87,10 +87,30 @@ pub fn preg_quote(str: impl AsRef<[u8]>, delimiter: Option<char>) -> String {
     out
 }
 
+/// `Composer\Pcre\Preg`'s failure for a search whose pattern has the `u` modifier: PCRE refuses a
+/// `subject` that is not valid UTF-8 with `PREG_BAD_UTF8_ERROR`. The `preg_*` shims stand for PHP's
+/// own functions, which report that as no match, so a port of a `Preg::` call checks here first.
+pub fn pcre_check_utf8_subject(
+    function: &str,
+    pattern: &str,
+    subject: impl AsRef<[u8]>,
+) -> Result<(), crate::PcreException> {
+    const PREG_BAD_UTF8_ERROR: i64 = 4;
+    if subject.as_ref().is_utf8() {
+        return Ok(());
+    }
+
+    Err(crate::PcreException::with_code_and_previous(
+        format!(
+            "{function}(): failed executing \"{pattern}\": Malformed UTF-8 characters, possibly incorrectly encoded"
+        ),
+        PREG_BAD_UTF8_ERROR,
+        None,
+    ))
+}
+
 /// The subject a compiled pattern can search, or `None` when the pattern has the `u` modifier and
 /// `subject` is not valid UTF-8.
-// TODO(error-model): PCRE fails such a search with `PREG_BAD_UTF8_ERROR`, which
-// `Composer\Pcre\Preg` turns into a `PcreException`; here the search finds no match instead.
 fn searchable<'h>(pattern: &CompiledPattern, subject: &'h [u8]) -> Option<&'h [u8]> {
     (!pattern.utf8 || subject.is_utf8()).then_some(subject)
 }
@@ -583,5 +603,22 @@ mod tests {
             BString::from(b"{^[\xfe\xff]+$}".to_vec()),
             b"\xff\xfe"
         ));
+    }
+}
+
+#[cfg(test)]
+mod pcre_check_utf8_subject_tests {
+    use super::*;
+
+    #[test]
+    fn invalid_utf8_fails_like_composer_pcre() {
+        assert!(pcre_check_utf8_subject("preg_match", "{^a$}u", "caf\u{e9}").is_ok());
+
+        let error = pcre_check_utf8_subject("preg_match", "{^a$}u", b"caf\xE9").unwrap_err();
+        assert_eq!(
+            error.get_message(),
+            "preg_match(): failed executing \"{^a$}u\": Malformed UTF-8 characters, possibly incorrectly encoded"
+        );
+        assert_eq!(error.get_code(), 4);
     }
 }

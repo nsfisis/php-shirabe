@@ -93,7 +93,7 @@ fn write_guard_files(guards: &Path, out_dir: &Path) {
         code += &format!(
             "    ({:?}, include_str!({:?})),\n",
             relative_path(guards, &file),
-            file.to_str().unwrap()
+            file.display().to_string()
         );
     }
     code += "]\n";
@@ -108,7 +108,7 @@ fn collect_entries(composer: &Path) -> Vec<Entry> {
     // this pass only to add them back unstripped; nothing here strips whitespace, so they are
     // taken along with the rest.
     for file in find_files(&composer.join("src")) {
-        if file.extension().and_then(|e| e.to_str()) != Some("php")
+        if file.extension() != Some(std::ffi::OsStr::new("php"))
             || file_name(&file) == "Compiler.php"
         {
             continue;
@@ -218,15 +218,11 @@ fn walk(dir: &Path, files: &mut Vec<PathBuf>) {
 }
 
 fn file_name(path: &Path) -> String {
-    path.file_name().unwrap().to_str().unwrap().to_string()
+    path.file_name().unwrap().display().to_string()
 }
 
 fn relative_path(root: &Path, file: &Path) -> String {
-    file.strip_prefix(root)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string()
+    file.strip_prefix(root).unwrap().display().to_string()
 }
 
 /// The `notPath`/`exclude` rules `Compiler::compile` applies to the vendor tree, against a path

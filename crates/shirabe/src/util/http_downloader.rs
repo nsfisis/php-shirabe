@@ -16,8 +16,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
     array_replace_recursive, bconcat, empty, extension_loaded, file_get_contents, implode, intval,
-    is_numeric, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, rawurldecode,
-    stream_context_create, stripos, strpos, substr, ucfirst,
+    is_numeric, path_to_bytes, pcre_check_utf8_subject, php_regex, preg_is_match, preg_match,
+    preg_replace, rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -496,6 +496,7 @@ impl HttpDownloader {
         let url = url.as_ref();
         let clean_message = |msg: &BStr| -> anyhow::Result<BString> {
             if !io.is_decorated() {
+                pcre_check_utf8_subject("preg_replace", "{\x1b\\[[;\\d]*m}u", msg)?;
                 return Ok(preg_replace("{\x1b\\[[;\\d]*m}u", "", msg));
             }
 

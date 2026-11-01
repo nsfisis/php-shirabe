@@ -525,8 +525,9 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
         b"a:" => Ok(Lex::ContainerOpen(parse_entry_count(payload, pos)?, None)),
         b"O:" => {
             let class = parse_quoted(payload, pos, b':')?;
-            let class = String::from_utf8(class.into())
-                .map_err(|_| anyhow::anyhow!("object record with a non-UTF-8 class name"))?;
+            let class = utf8_text(&class)
+                .ok_or_else(|| anyhow::anyhow!("object record with a non-UTF-8 class name"))?
+                .to_string();
             Ok(Lex::ContainerOpen(
                 parse_entry_count(payload, pos)?,
                 Some(class),
@@ -715,8 +716,9 @@ fn descriptor_class(value: Option<&PluginValue>, what: &str) -> anyhow::Result<S
 }
 
 fn descriptor_utf8(bytes: &[u8], what: &str) -> anyhow::Result<String> {
-    String::from_utf8(bytes.to_vec())
-        .map_err(|_| anyhow::anyhow!("{what} descriptor holds a non-UTF-8 class name"))
+    utf8_text(bytes)
+        .map(str::to_string)
+        .ok_or_else(|| anyhow::anyhow!("{what} descriptor holds a non-UTF-8 class name"))
 }
 
 fn take_until<'a>(payload: &'a [u8], pos: &mut usize, terminator: u8) -> anyhow::Result<&'a [u8]> {

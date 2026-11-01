@@ -442,6 +442,11 @@ define_php_exception!(Error, ThrowableFields, r"Error");
 define_php_exception!(TypeError, Error, r"TypeError");
 define_php_exception!(RuntimeException, Exception, r"RuntimeException");
 define_php_exception!(
+    PcreException,
+    RuntimeException,
+    r"Composer\Pcre\PcreException"
+);
+define_php_exception!(
     UnexpectedValueException,
     RuntimeException,
     r"UnexpectedValueException"

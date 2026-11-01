@@ -1,6 +1,12 @@
 //! ref: composer/src/Composer/Config.php
 
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::{
+    E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
+    array_search_mixed, array_unique, bconcat, canonical_int_key, empty, filter_var_url, implode,
+    in_array_loose, in_array_strict, intval, is_array, is_string, parse_url, php_regex,
+    php_to_string, preg_is_match, preg_match, preg_replace_callback, rtrim2, strtolower,
+    strtoupper, strtr, substr, trigger_error, utf8_text,
+};
 mod config_source_interface;
 mod json_config_source;
 
@@ -10,13 +16,6 @@ pub use json_config_source::*;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
-    array_search_mixed, array_unique, canonical_int_key, empty, filter_var_url, implode,
-    in_array_loose, in_array_strict, intval, is_array, is_string, parse_url, php_regex,
-    php_to_string, preg_is_match, preg_match, preg_replace_callback, rtrim2, strtolower,
-    strtoupper, strtr, substr, trigger_error,
-};
 
 use crate::advisory::Auditor;
 use crate::downloader::TransportException;
@@ -619,11 +618,7 @@ impl Config {
                     ))
                     .into());
                 };
-                let mut size = matches
-                    .get(1)
-                    .unwrap_or_default()
-                    .to_str()
-                    .ok()
+                let mut size = utf8_text(matches.get(1).unwrap_or_default())
                     .and_then(|size| size.parse::<f64>().ok())
                     .unwrap_or(0.0);
                 if let Some(unit) = matches.get(2) {

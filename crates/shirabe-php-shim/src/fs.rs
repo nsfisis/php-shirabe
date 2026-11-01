@@ -1423,7 +1423,7 @@ mod tests {
         std::fs::write(dir.path().join("completion.bash"), b"").unwrap();
         std::fs::create_dir(dir.path().join("sub")).unwrap();
 
-        let entries = directory_iterator(dir.path().to_str().unwrap()).unwrap();
+        let entries = directory_iterator(dir.path()).unwrap();
         let basenames: Vec<std::ffi::OsString> = entries.iter().map(|e| e.get_basename()).collect();
         // PHP's DirectoryIterator includes the "." and ".." entries.
         assert!(basenames.contains(&".".into()));

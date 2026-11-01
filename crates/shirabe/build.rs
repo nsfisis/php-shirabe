@@ -23,7 +23,15 @@ fn git(repo_root: &std::path::Path, args: &[&str]) -> Option<String> {
     if !output.status.success() {
         return None;
     }
-    Some(String::from_utf8(output.stdout).ok()?.trim().to_string())
+    Some(
+        output
+            .stdout
+            .iter()
+            .map(|byte| char::from(*byte))
+            .collect::<String>()
+            .trim()
+            .to_string(),
+    )
 }
 
 fn from_env() -> Option<Commit> {

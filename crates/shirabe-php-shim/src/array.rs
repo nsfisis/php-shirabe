@@ -1,5 +1,5 @@
 use crate::{PhpMixed, canonical_int_key, php_to_string};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 
 pub fn array_values<K, V: Clone>(array: &IndexMap<K, V>) -> Vec<V> {
@@ -595,9 +595,9 @@ pub fn in_array_loose<'a>(
 }
 
 /// PHP numeric-string-aware conversion to a number, used by loose comparison.
-fn loose_to_number(s: &str) -> Option<f64> {
+fn loose_to_number(s: &[u8]) -> Option<f64> {
     if crate::var::is_numeric_string(s) {
-        s.trim().parse::<f64>().ok()
+        crate::utf8_text(s)?.trim().parse::<f64>().ok()
     } else {
         None
     }
@@ -631,18 +631,15 @@ pub fn loose_eq(a: &PhpMixed, b: &PhpMixed) -> bool {
         (other, Bool(y)) => crate::var::to_bool(other) == *y,
         (Int(x), Int(y)) => x == y,
         (Int(_) | Float(_), Int(_) | Float(_)) => loose_num_value(a) == loose_num_value(b),
-        (String(x), String(y)) => match (
-            loose_to_number(&x.to_str_lossy()),
-            loose_to_number(&y.to_str_lossy()),
-        ) {
+        (String(x), String(y)) => match (loose_to_number(x), loose_to_number(y)) {
             (Some(nx), Some(ny)) => nx == ny,
             _ => x == y,
         },
-        (Int(_) | Float(_), String(s)) => match loose_to_number(&s.to_str_lossy()) {
+        (Int(_) | Float(_), String(s)) => match loose_to_number(s) {
             Some(ns) => loose_num_value(a) == ns,
             None => loose_num_to_string(a) == *s,
         },
-        (String(s), Int(_) | Float(_)) => match loose_to_number(&s.to_str_lossy()) {
+        (String(s), Int(_) | Float(_)) => match loose_to_number(s) {
             Some(ns) => loose_num_value(b) == ns,
             None => *s == loose_num_to_string(b),
         },

@@ -18,8 +18,8 @@ use shirabe_php_shim::{
     array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, bconcat, empty,
     explode, file, file_exists, file_get_contents, file_put_contents, filter_var_email,
     get_current_user, impl_php_class, implode, is_dir, is_string, path_from_bytes, path_to_bytes,
-    php_regex, preg_is_match, preg_match, preg_match_all, preg_quote, preg_replace, realpath,
-    str_replace, strpos, strtolower, trim, ucwords, unlink,
+    pcre_check_utf8_subject, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
+    preg_replace, realpath, str_replace, strpos, strtolower, trim, ucwords, unlink,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use shirabe_symfony_console::{
@@ -84,6 +84,11 @@ impl InitCommand {
         &self,
         author: &BStr,
     ) -> anyhow::Result<IndexMap<String, Option<BString>>> {
+        pcre_check_utf8_subject(
+            "preg_match",
+            r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#,
+            author,
+        )?;
         if let Some(m) = preg_match(
             php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
             author,
@@ -330,23 +335,24 @@ impl InitCommand {
         !requires_arr_empty || !dev_requires_arr_empty
     }
 
-    fn sanitize_package_name_component(&self, name: &BStr) -> BString {
+    fn sanitize_package_name_component(&self, name: &BStr) -> anyhow::Result<BString> {
         let name = preg_replace(
             php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
             "$1$3-$2$4",
             name,
         );
         let name = strtolower(&name);
+        pcre_check_utf8_subject("preg_replace", r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u", &name)?;
         let name = preg_replace(php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"), "", &name);
 
-        preg_replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)
+        Ok(preg_replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name))
     }
 
     fn get_default_package_name(&self) -> anyhow::Result<BString> {
         let git = self.get_git_config()?;
         let cwd = realpath(".").unwrap_or_default();
         let name = basename(path_to_bytes(&cwd));
-        let name = self.sanitize_package_name_component(name.as_bstr());
+        let name = self.sanitize_package_name_component(name.as_bstr())?;
 
         let mut vendor = name.clone();
         let composer_default_vendor = server_value("COMPOSER_DEFAULT_VENDOR");
@@ -379,7 +385,7 @@ impl InitCommand {
             vendor = get_current_user().into();
         }
 
-        let vendor = self.sanitize_package_name_component(vendor.as_bstr());
+        let vendor = self.sanitize_package_name_component(vendor.as_bstr())?;
 
         Ok(bconcat!(vendor, "/", name))
     }

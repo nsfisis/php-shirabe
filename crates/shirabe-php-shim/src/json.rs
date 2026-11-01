@@ -40,7 +40,9 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
         value.serialize(&mut ser)?;
-        String::from_utf8(buf)?
+        crate::utf8_text(&buf)
+            .expect("serde_json writes valid UTF-8")
+            .to_string()
     } else {
         serde_json::to_string(value)?
     };

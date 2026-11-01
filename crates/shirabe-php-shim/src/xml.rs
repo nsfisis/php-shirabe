@@ -371,7 +371,7 @@ mod tests {
 </definition>\n";
         let mut out = Vec::new();
         dom.save_xml(&mut out).unwrap();
-        assert_eq!(String::from_utf8(out).unwrap(), expected);
+        assert_eq!(bstr::BStr::new(&out), bstr::BStr::new(expected));
     }
 
     #[test]
@@ -392,7 +392,7 @@ mod tests {
 </root>\n";
         let mut out = Vec::new();
         dom.save_xml(&mut out).unwrap();
-        assert_eq!(String::from_utf8(out).unwrap(), expected);
+        assert_eq!(bstr::BStr::new(&out), bstr::BStr::new(expected));
     }
 
     #[test]
@@ -424,6 +424,6 @@ mod tests {
 </command>\n";
         let mut out = Vec::new();
         target.save_xml(&mut out).unwrap();
-        assert_eq!(String::from_utf8(out).unwrap(), expected);
+        assert_eq!(bstr::BStr::new(&out), bstr::BStr::new(expected));
     }
 }

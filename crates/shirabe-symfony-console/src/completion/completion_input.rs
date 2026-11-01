@@ -233,8 +233,7 @@ impl CompletionInput {
             return None;
         }
 
-        // TODO(bytes): InputDefinition keeps option names as Strings, so a name that is not UTF-8
-        // cannot be defined.
+        // Option names are declared in code, so a name that is not UTF-8 cannot be defined.
         if option_token.get(1).copied().unwrap_or(b' ') == b'-' {
             // long option name
             let option_name = utf8_text(&option_name)?;
