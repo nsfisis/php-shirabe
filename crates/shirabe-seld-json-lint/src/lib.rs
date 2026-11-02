@@ -9,6 +9,7 @@
 //! matched (via downcast) across the codebase as an error-kind signal; it also carries detail
 //! such as the error line. Porting it keeps both the thrown exception class and the information
 //! it carries unchanged.
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 pub mod parsing_exception;
 

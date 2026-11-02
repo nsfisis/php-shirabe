@@ -13,17 +13,17 @@ pub struct ParsingExceptionLoc {
 
 #[derive(Debug, Clone)]
 pub enum ParsingExceptionToken {
-    Name(String),
+    Name(BString),
     Symbol(i64),
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct ParsingExceptionDetails {
-    pub text: Option<String>,
+    pub text: Option<BString>,
     pub token: Option<ParsingExceptionToken>,
     pub line: Option<i64>,
     pub loc: Option<ParsingExceptionLoc>,
-    pub expected: Option<Vec<String>>,
+    pub expected: Option<Vec<BString>>,
 }
 
 #[derive(Debug)]
