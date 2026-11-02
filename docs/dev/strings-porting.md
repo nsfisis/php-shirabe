@@ -41,6 +41,20 @@ a private helper that only wraps such an API, may spell it.
 
 Paths and binary data are not affected: they stay in the types below.
 
+### Recording a reason
+
+Clippy's `disallowed_types` and `disallowed_macros` lints flag every `String`, `str` and `format!`, so
+a value that stays UTF-8 says why, where it does. The set of `reason`s can be reviewed with one grep:
+
+```rust
+#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
+fn compile(pattern: &str) -> Result<regex::Regex, regex::Error> { ... }
+```
+
+Literals (`let x = "abc"`), `panic!("{n}")` and types inferred from an API are not flagged. A value
+that gets its type from `.into()`, `.collect()` or a `str` method that returns `String` is flagged
+only where it reaches a signature or a field.
+
 ## Types
 
 * `bstr::BString` / `&bstr::BStr` for a string, and `Vec<u8>` / `&[u8]` for binary data such as file
@@ -51,6 +65,8 @@ Paths and binary data are not affected: they stay in the types below.
   bytes back into a path. The semantics of `Path` methods such as `join()` or `==` differ from
   PHP's string operations in corner cases (absolute operands, trailing `/`, `.` components); using
   them is accepted.
+* `&'static BStr` for a string constant. `php_str()` builds one in a `const`:
+  `const NAME: &BStr = php_str(b"value");`.
 * A shim of a PHP function takes `impl AsRef<[u8]>` for a string parameter, so that `"literal"`,
   `b"literal"` and `BString` are all accepted, and returns `BString`. A trait method takes `&BStr`
   instead, to stay dyn-compatible.
@@ -73,7 +89,7 @@ Boundaries with Rust APIs:
 * HTTP header values: `HeaderValue::from_bytes()`.
 
 Text returned by a Rust API, such as the message of an `std::io::Error`, becomes a `BString` where it
-is received.
+is received, through `display_to_bytes()` when the API only offers `Display`.
 
 ## Replacing `str` methods
 
@@ -87,7 +103,8 @@ its behaviour. Use the shim of the PHP function:
 ## Building strings
 
 PHP's `.` operator and string interpolation map to `bconcat!`, and `sprintf()` to the shim's
-`sprintf()`. Both keep the bytes of their operands. This applies to every string PHP code could
+`sprintf()`. Both keep the bytes of their operands. `bconcat!` also takes integers, so `bconcat!(n)`
+is the string conversion of `n`. This applies to every string PHP code could
 observe, including messages read by people: errors, warnings, progress and exception messages. PHP
 writes those bytes unchanged, and so does Shirabe.
 

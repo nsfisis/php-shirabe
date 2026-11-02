@@ -1,8 +1,24 @@
 //! Conversions between PHP strings, which are byte strings, and Rust's text and path types.
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use std::ffi::OsStr;
 use std::path::Path;
+
+/// A PHP string constant: `const NAME: &'static BStr = php_str(b"value");`. `BStr::new` is not a
+/// `const fn`.
+pub const fn php_str(bytes: &[u8]) -> &BStr {
+    // SAFETY: `BStr` is a `#[repr(transparent)]` wrapper around `[u8]`.
+    unsafe { &*(bytes as *const [u8] as *const BStr) }
+}
+
+/// The text a Rust API produces through `Display`, such as the message of an `std::io::Error`, as
+/// the PHP string that holds it from there on.
+pub fn display_to_bytes(value: impl std::fmt::Display) -> BString {
+    use std::io::Write;
+    let mut out = Vec::new();
+    write!(out, "{value}").expect("writing to a Vec cannot fail");
+    BString::from(out)
+}
 
 /// `bytes` as UTF-8 text, or `None` if they are not valid UTF-8. Only for the shim of a PHP
 /// function that itself requires UTF-8, which reproduces how that function fails, and for a lookup
@@ -91,17 +107,20 @@ impl PhpConcat for std::path::PathBuf {
     }
 }
 
-impl PhpConcat for i64 {
-    fn php_concat_to(&self, out: &mut BString) {
-        out.extend_from_slice(self.to_string().as_bytes());
-    }
+macro_rules! impl_php_concat_for_integers {
+    ($($ty:ty),* $(,)?) => {
+        $(
+            impl PhpConcat for $ty {
+                fn php_concat_to(&self, out: &mut BString) {
+                    use std::io::Write;
+                    write!(out, "{self}").expect("writing to a Vec cannot fail");
+                }
+            }
+        )*
+    };
 }
 
-impl PhpConcat for usize {
-    fn php_concat_to(&self, out: &mut BString) {
-        out.extend_from_slice(self.to_string().as_bytes());
-    }
-}
+impl_php_concat_for_integers!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
 
 impl<T: PhpConcat + ?Sized> PhpConcat for &T {
     fn php_concat_to(&self, out: &mut BString) {
@@ -136,6 +155,23 @@ mod tests {
         let path = path_from_bytes(b"/tmp/\xfe");
         let out = bconcat!("a ", name, b" ".as_slice(), path, " ", 42i64);
         assert_eq!(out, BString::from(b"a \xffvendor /tmp/\xfe 42".to_vec()));
+    }
+
+    #[test]
+    fn bconcat_writes_integers_in_decimal() {
+        let out = bconcat!(-1i8, " ", 2u16, " ", 3u32, " ", 4usize);
+        assert_eq!(out, BString::from("-1 2 3 4"));
+    }
+
+    #[test]
+    fn php_str_holds_the_bytes() {
+        const NAME: &BStr = php_str(b"a\xffb");
+        assert_eq!(NAME, BStr::new(b"a\xffb"));
+    }
+
+    #[test]
+    fn display_to_bytes_keeps_the_text() {
+        assert_eq!(display_to_bytes(1.5f64), BString::from("1.5"));
     }
 
     #[test]
