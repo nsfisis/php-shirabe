@@ -1,8 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Bound.php
 
-use anyhow::bail;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, version_compare_ordering};
+use shirabe_php_shim::{InvalidArgumentException, bconcat, version_compare_ordering};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bound {
@@ -31,12 +30,16 @@ impl Bound {
     }
 
     pub fn is_positive_infinity(&self) -> bool {
-        self.get_version() == format!("{}.0.0.0", i64::MAX).as_str() && !self.is_inclusive()
+        self.get_version() == bconcat!(i64::MAX, ".0.0.0") && !self.is_inclusive()
     }
 
-    pub fn compare_to(&self, other: &Bound, operator: &str) -> anyhow::Result<bool> {
-        if operator != "<" && operator != ">" {
-            bail!("Does not support any other operator other than > or <.");
+    pub fn compare_to(&self, other: &Bound, operator: impl AsRef<[u8]>) -> anyhow::Result<bool> {
+        let operator = operator.as_ref();
+        if operator != b"<" && operator != b">" {
+            return Err(InvalidArgumentException::new(
+                "Does not support any other operator other than > or <.",
+            )
+            .into());
         }
 
         if self == other {
@@ -47,10 +50,10 @@ impl Bound {
             version_compare_ordering(self.get_version(), other.get_version()) as i8;
 
         if compare_result != 0 {
-            return Ok((if operator == ">" { 1 } else { -1 }) == compare_result);
+            return Ok((if operator == b">" { 1 } else { -1 }) == compare_result);
         }
 
-        Ok(if operator == ">" {
+        Ok(if operator == b">" {
             other.is_inclusive()
         } else {
             !other.is_inclusive()
@@ -73,6 +76,6 @@ impl Bound {
     }
 
     pub fn positive_infinity() -> Self {
-        Bound::new(format!("{}.0.0.0", i64::MAX), false)
+        Bound::new(bconcat!(i64::MAX, ".0.0.0"), false)
     }
 }

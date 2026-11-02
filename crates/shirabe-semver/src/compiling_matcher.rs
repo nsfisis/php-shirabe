@@ -14,7 +14,7 @@ thread_local! {
 // Rust does not support eval(), so the compiled checker path is always disabled.
 // The COMPILED_CHECKER_CACHE is retained structurally but never populated.
 static COMPILED_CHECKER_CACHE: OnceLock<
-    Mutex<IndexMap<String, Box<dyn Fn(String, bool) -> bool + Send + Sync>>>,
+    Mutex<IndexMap<BString, Box<dyn Fn(BString, bool) -> bool + Send + Sync>>>,
 > = OnceLock::new();
 static RESULT_CACHE: OnceLock<Mutex<IndexMap<BString, bool>>> = OnceLock::new();
 
@@ -22,7 +22,7 @@ pub struct CompilingMatcher;
 
 impl CompilingMatcher {
     fn compiled_checker_cache()
-    -> &'static Mutex<IndexMap<String, Box<dyn Fn(String, bool) -> bool + Send + Sync>>> {
+    -> &'static Mutex<IndexMap<BString, Box<dyn Fn(BString, bool) -> bool + Send + Sync>>> {
         COMPILED_CHECKER_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
     }
 

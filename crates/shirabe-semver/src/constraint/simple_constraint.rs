@@ -2,7 +2,7 @@
 
 use crate::constraint::Bound;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{CmpOp, bconcat, var_export_str, version_compare};
+use shirabe_php_shim::{CmpOp, bconcat, implode, str_replace, var_export_str, version_compare};
 
 /// Corresponds to PHP's `Constraint`.
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ impl SimpleConstraint {
             panic!(
                 "Invalid operator \"{}\" given, expected one of: {}",
                 operator.as_bstr().display_lossy(),
-                Self::get_supported_operators().join(", ")
+                implode(", ", &Self::get_supported_operators()).display_lossy()
             )
         });
 
@@ -58,8 +58,11 @@ impl SimpleConstraint {
         self.operator
     }
 
-    pub fn get_supported_operators() -> Vec<&'static str> {
-        vec!["=", "==", "<", "<=", ">", ">=", "<>", "!="]
+    pub fn get_supported_operators() -> Vec<&'static BStr> {
+        ["=", "==", "<", "<=", ">", ">=", "<>", "!="]
+            .into_iter()
+            .map(BStr::new)
+            .collect()
     }
 
     pub fn get_operator_constant(operator: CmpOp) -> i64 {
@@ -148,7 +151,7 @@ impl SimpleConstraint {
                 "!$b && \\version_compare(",
                 version,
                 ", $v, '",
-                other_operator.to_string(),
+                other_operator.as_str(),
                 "')"
             );
         }
@@ -179,7 +182,7 @@ impl SimpleConstraint {
             "\\version_compare($v, ",
             version,
             ", '",
-            self.operator.to_string(),
+            self.operator.as_str(),
             "')"
         );
 
@@ -205,8 +208,8 @@ impl SimpleConstraint {
     }
 
     pub fn match_specific(&self, provider: &SimpleConstraint, compare_branches: bool) -> bool {
-        let no_equal_op = self.operator.to_string().replace('=', "");
-        let provider_no_equal_op = provider.operator.to_string().replace('=', "");
+        let no_equal_op = str_replace("=", "", self.operator.as_str());
+        let provider_no_equal_op = str_replace("=", "", provider.operator.as_str());
 
         let is_equal_op = CmpOp::Eq == self.operator;
         let is_non_equal_op = CmpOp::Ne == self.operator;
@@ -252,8 +255,8 @@ impl SimpleConstraint {
         };
 
         if self.version_compare(version1, version2, operator, compare_branches) {
-            return !(provider.operator.to_string() == provider_no_equal_op
-                && self.operator.to_string() != no_equal_op
+            return !(provider.operator.as_str() == provider_no_equal_op
+                && self.operator.as_str() != no_equal_op
                 && version_compare(&provider.version, &self.version, CmpOp::Eq));
         }
 

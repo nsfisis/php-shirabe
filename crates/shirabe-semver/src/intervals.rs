@@ -6,7 +6,9 @@ use crate::constraint::{
 use crate::interval::{DevConstraintSet, Interval};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, array_unique, version_compare, version_compare_ordering};
+use shirabe_php_shim::{
+    CmpOp, UnexpectedValueException, array_unique, version_compare, version_compare_ordering,
+};
 use std::sync::{Arc, Mutex, OnceLock};
 
 #[derive(Debug, Clone)]
@@ -28,12 +30,12 @@ fn subset_cache() -> &'static Mutex<IndexMap<(BString, BString), bool>> {
     SUBSET_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
-fn op_sort_order(op: &str) -> i64 {
+fn op_sort_order(op: CmpOp) -> i64 {
     match op {
-        ">=" => -3,
-        "<" => -2,
-        ">" => 2,
-        "<=" => 3,
+        CmpOp::Ge => -3,
+        CmpOp::Lt => -2,
+        CmpOp::Gt => 2,
+        CmpOp::Le => 3,
         _ => 0,
     }
 }
@@ -362,9 +364,9 @@ impl Intervals {
         }
 
         let multi = constraint.as_multi_constraint().ok_or_else(|| {
-            anyhow::anyhow!(
+            UnexpectedValueException::new(
                 "The constraint passed in should be an MatchAllConstraint, Constraint or \
-                    MultiConstraint instance, got an unknown type."
+                    MultiConstraint instance, got an unknown type.",
             )
         })?;
 
@@ -454,17 +456,17 @@ impl Intervals {
         }
 
         // Each border is (version, operator, is_start).
-        let mut borders: Vec<(BString, String, bool)> = Vec::new();
+        let mut borders: Vec<(BString, CmpOp, bool)> = Vec::new();
         for group in &numeric_groups {
             for interval in group {
                 borders.push((
                     interval.get_start().get_version().to_owned(),
-                    interval.get_start().get_operator().to_string(),
+                    interval.get_start().get_operator(),
                     true,
                 ));
                 borders.push((
                     interval.get_end().get_version().to_owned(),
-                    interval.get_end().get_operator().to_string(),
+                    interval.get_end().get_operator(),
                     false,
                 ));
             }
@@ -473,7 +475,7 @@ impl Intervals {
         borders.sort_by(|a, b| {
             let order = version_compare_ordering(&a.0, &b.0);
             order.then_with(|| {
-                let diff = op_sort_order(&a.1) - op_sort_order(&b.1);
+                let diff = op_sort_order(a.1) - op_sort_order(b.1);
                 diff.cmp(&0)
             })
         });
@@ -496,7 +498,7 @@ impl Intervals {
 
             if start.is_none() && active_intervals >= activation_threshold {
                 start = Some(SimpleConstraint::new(
-                    operator.clone(),
+                    operator.as_str(),
                     version.clone(),
                     None,
                 ));
@@ -504,14 +506,14 @@ impl Intervals {
                 let start_c = start.take().unwrap();
                 // filter out invalid intervals like > x - <= x, or >= x - < x
                 if version_compare(start_c.get_version(), version, CmpOp::Eq)
-                    && ((start_c.get_operator() == CmpOp::Gt && operator == "<=")
-                        || (start_c.get_operator() == CmpOp::Ge && operator == "<"))
+                    && ((start_c.get_operator() == CmpOp::Gt && *operator == CmpOp::Le)
+                        || (start_c.get_operator() == CmpOp::Ge && *operator == CmpOp::Lt))
                 {
                     // skip invalid interval (equivalent to PHP's unset($intervals[$index]))
                 } else {
                     intervals.push(Interval::new(
                         start_c,
-                        SimpleConstraint::new(operator.clone(), version.clone(), None),
+                        SimpleConstraint::new(operator.as_str(), version.clone(), None),
                     ));
 
                     if stop_on_first_valid_interval {
@@ -558,7 +560,7 @@ impl Intervals {
             });
         }
 
-        if op.to_string().starts_with('>') {
+        if matches!(op, CmpOp::Gt | CmpOp::Ge) {
             // > & >=
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(
@@ -568,7 +570,7 @@ impl Intervals {
                 branches: Interval::no_dev(),
             });
         }
-        if op.to_string().starts_with('<') {
+        if matches!(op, CmpOp::Lt | CmpOp::Le) {
             // < & <=
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(Interval::from_zero(), constraint.clone())],

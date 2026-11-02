@@ -2,6 +2,7 @@
 
 use crate::constraint::SimpleConstraint;
 use bstr::BString;
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug, Clone)]
 pub struct DevConstraintSet {
@@ -29,11 +30,11 @@ impl Interval {
     }
 
     pub fn from_zero() -> SimpleConstraint {
-        SimpleConstraint::new(">=", "0.0.0.0-dev".to_string(), None)
+        SimpleConstraint::new(">=", "0.0.0.0-dev", None)
     }
 
     pub fn until_positive_infinity() -> SimpleConstraint {
-        SimpleConstraint::new("<", format!("{}.0.0.0", i64::MAX), None)
+        SimpleConstraint::new("<", bconcat!(i64::MAX, ".0.0.0"), None)
     }
 
     pub fn any() -> Self {
