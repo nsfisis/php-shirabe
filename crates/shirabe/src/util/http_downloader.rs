@@ -703,11 +703,11 @@ impl HttpDownloader {
             panic!(
                 "There are still {} expected HTTP requests which have not been consumed:{}{}{}{}Received calls:{}{}",
                 expectations.len(),
-                PHP_EOL,
-                urls.join(PHP_EOL),
-                PHP_EOL,
-                PHP_EOL,
-                PHP_EOL,
+                PHP_EOL.display_lossy(),
+                urls.join("\n"),
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
                 implode(PHP_EOL, &mock.log).display_lossy(),
             );
         }
@@ -777,10 +777,10 @@ impl HttpDownloader {
             "Received unexpected request for \"{}\" with options \"{}\"{}{}{}Received calls:{}{}",
             file_url.display_lossy(),
             serde_json::to_string(&PhpMixed::Array(options.clone())).unwrap_or_default(),
-            PHP_EOL,
+            PHP_EOL.display_lossy(),
             next_expected,
-            PHP_EOL,
-            PHP_EOL,
+            PHP_EOL.display_lossy(),
+            PHP_EOL.display_lossy(),
             prior_calls.display_lossy(),
         );
     }

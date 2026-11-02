@@ -8,7 +8,7 @@ use bstr::{BString, ByteSlice};
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{ConsoleIO, IOInterface};
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_php_shim::{PHP_EOL, trim};
+use shirabe_php_shim::{PHP_EOL, bconcat, trim};
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface};
 use shirabe_symfony_console::output::{
@@ -20,7 +20,7 @@ fn test_execute_captures_output() {
     let process = ProcessExecutor::new(None);
     let mut output = BString::default();
     process.execute("echo foo", &mut output, None).unwrap();
-    assert_eq!(format!("foo{}", PHP_EOL), output);
+    assert_eq!(bconcat!("foo", PHP_EOL), output);
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
         .unwrap();
 
     assert_eq!(
-        vec![(bstr::BString::from(format!("foo{}", PHP_EOL)), false)],
+        vec![(bconcat!("foo", PHP_EOL), false)],
         io.borrow().write_raw_calls()
     );
 }
@@ -170,7 +170,7 @@ fn test_console_io_does_not_format_symfony_console_style() {
         )
         .unwrap();
     assert_eq!(
-        format!("<error>foo</error>{}", PHP_EOL),
+        bconcat!("<error>foo</error>", PHP_EOL),
         output.borrow().fetch()
     );
 }

@@ -42,6 +42,10 @@ impl<'h> PregMatches<'h> {
     }
 
     /// The value of the capture group called `name`, under the same rules as `get`.
+    #[expect(
+        clippy::disallowed_types,
+        reason = "regex names capture groups with text"
+    )]
     pub fn name(&self, name: &str) -> Option<&'h BStr> {
         self.caps.name(name).map(|group| group.as_bytes().as_bstr())
     }
@@ -53,46 +57,43 @@ impl<'h> PregMatches<'h> {
     }
 
     /// The byte offset of the capture group called `name`, under the same rules as `get_offset`.
+    #[expect(
+        clippy::disallowed_types,
+        reason = "regex names capture groups with text"
+    )]
     pub fn name_offset(&self, name: &str) -> Option<usize> {
         self.caps.name(name).map(|group| group.start())
     }
 }
 
-/// Escapes `str` for a pattern. The result is a pattern fragment, which the `regex` crate takes as
-/// a `String`: a byte that is not part of a valid UTF-8 sequence is written as a `\xNN` escape,
-/// which matches that byte in a pattern without the `u` modifier.
-pub fn preg_quote(str: impl AsRef<[u8]>, delimiter: Option<char>) -> String {
+/// Escapes `str` for a pattern, keeping every other byte as it is.
+pub fn preg_quote(str: impl AsRef<[u8]>, delimiter: Option<u8>) -> BString {
     // Regex pattern compatibility:
     // PHP's preg_quote escapes `<` and `>` (PCRE treats `\<`/`\>` as literals), but the `regex`
     // crate reads `\<`/`\>` as start-of-word / end-of-word boundary assertions. `<` and `>` are
     // already literal in the `regex` crate, so they are emitted unescaped to preserve the intended
     // literal match.
-    const SPECIAL: &str = ".\\+*?[^]$(){}=!|:-#";
-    let mut out = String::new();
-    let bytes = str.as_ref();
-    for (start, end, c) in bytes.char_indices() {
-        if c == '\u{FFFD}' && &bytes[start..end] != "\u{FFFD}".as_bytes() {
-            for &b in &bytes[start..end] {
-                out.push_str(&format!("\\x{:02X}", b));
-            }
-        } else if c == '\0' {
-            out.push_str("\\000");
-        } else if SPECIAL.contains(c) || Some(c) == delimiter {
-            out.push('\\');
-            out.push(c);
+    const SPECIAL: &[u8] = b".\\+*?[^]$(){}=!|:-#";
+    let mut out = Vec::new();
+    for &b in str.as_ref() {
+        if b == 0 {
+            out.extend_from_slice(b"\\000");
+        } else if SPECIAL.contains(&b) || Some(b) == delimiter {
+            out.push(b'\\');
+            out.push(b);
         } else {
-            out.push(c);
+            out.push(b);
         }
     }
-    out
+    BString::from(out)
 }
 
 /// `Composer\Pcre\Preg`'s failure for a search whose pattern has the `u` modifier: PCRE refuses a
 /// `subject` that is not valid UTF-8 with `PREG_BAD_UTF8_ERROR`. The `preg_*` shims stand for PHP's
 /// own functions, which report that as no match, so a port of a `Preg::` call checks here first.
 pub fn pcre_check_utf8_subject(
-    function: &str,
-    pattern: &str,
+    function: impl AsRef<[u8]>,
+    pattern: impl AsRef<[u8]>,
     subject: impl AsRef<[u8]>,
 ) -> Result<(), crate::PcreException> {
     const PREG_BAD_UTF8_ERROR: i64 = 4;
@@ -101,8 +102,11 @@ pub fn pcre_check_utf8_subject(
     }
 
     Err(crate::PcreException::with_code_and_previous(
-        format!(
-            "{function}(): failed executing \"{pattern}\": Malformed UTF-8 characters, possibly incorrectly encoded"
+        crate::bconcat!(
+            function.as_ref(),
+            "(): failed executing \"",
+            pattern.as_ref(),
+            "\": Malformed UTF-8 characters, possibly incorrectly encoded"
         ),
         PREG_BAD_UTF8_ERROR,
         None,
@@ -293,6 +297,8 @@ where
 // escapes the following backslash, so `\\<` is left untouched. Without the `u` modifier PCRE reads
 // the pattern as bytes, so a non-ASCII character is written as the `\xNN` escapes of its UTF-8
 // bytes, which also keeps it valid inside a character class.
+#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
+#[expect(clippy::disallowed_macros, reason = "regex takes a text pattern")]
 fn translate_pcre_literals(inner: &str, utf8: bool) -> String {
     let mut out = String::with_capacity(inner.len());
     let mut chars = inner.chars().peekable();
@@ -337,22 +343,23 @@ pub struct CompiledPattern {
 // `Regex::clone()` does not share the underlying meta engine's search-cache pool, so handing out
 // fresh clones here would pay a ~10us per-clone cache warmup cost on every single `preg_*` call
 // (measured), defeating the point of this cache. `Arc::clone()` is a refcount bump.
-static PATTERN_CACHE: LazyLock<Mutex<IndexMap<String, Arc<CompiledPattern>>>> =
+static PATTERN_CACHE: LazyLock<Mutex<IndexMap<BString, Arc<CompiledPattern>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
-fn compile_php_pattern(pattern: &str) -> anyhow::Result<Arc<CompiledPattern>> {
+fn compile_php_pattern(pattern: &[u8]) -> anyhow::Result<Arc<CompiledPattern>> {
     if let Some(cached) = PATTERN_CACHE.lock().unwrap().get(pattern) {
         return Ok(Arc::clone(cached));
     }
 
-    let compiled = Arc::new(compile_php_pattern_uncached(pattern)?);
+    let compiled = Arc::new(compile_php_pattern_uncached(&byte_pattern_source(pattern))?);
     PATTERN_CACHE
         .lock()
         .unwrap()
-        .insert(pattern.to_string(), Arc::clone(&compiled));
+        .insert(BString::from(pattern), Arc::clone(&compiled));
     Ok(compiled)
 }
 
+#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
 fn compile_php_pattern_uncached(pattern: &str) -> anyhow::Result<CompiledPattern> {
     let (source, utf8) = translate_php_pattern(pattern)?;
     let regex = regex::bytes::RegexBuilder::new(&source)
@@ -365,6 +372,8 @@ fn compile_php_pattern_uncached(pattern: &str) -> anyhow::Result<CompiledPattern
 // Strips PHP-style delimiters and modifiers from `pattern` and translates the body into
 // `regex`-crate syntax, without compiling it. Returns the translated source and whether the
 // pattern has the `u` modifier.
+#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
+#[expect(clippy::disallowed_macros, reason = "regex takes a text pattern")]
 fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
     let delimiter = pattern
         .chars()
@@ -436,30 +445,39 @@ pub trait PregPattern {
     fn resolve(self) -> ResolvedPattern;
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl PregPattern for &str {
     fn resolve(self) -> ResolvedPattern {
-        ResolvedPattern::Cached(
-            compile_php_pattern(self).unwrap_or_else(|e| panic!("invalid regex: {e}")),
-        )
+        BStr::new(self).resolve()
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl PregPattern for &String {
     fn resolve(self) -> ResolvedPattern {
-        self.as_str().resolve()
+        BStr::new(self).resolve()
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl PregPattern for String {
     fn resolve(self) -> ResolvedPattern {
-        self.as_str().resolve()
+        BStr::new(&self).resolve()
     }
 }
 
 // A pattern built from PHP strings may hold bytes that are not valid UTF-8. They are written as
 // `\xNN` escapes, which without the `u` modifier match the same byte, as a non-ASCII literal does.
 // A backslash right before such a byte escapes it, so it is dropped in favour of the escape.
-fn byte_pattern_source(pattern: &BStr) -> std::borrow::Cow<'_, str> {
+#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
+#[expect(clippy::disallowed_macros, reason = "regex takes a text pattern")]
+fn byte_pattern_source(pattern: &[u8]) -> std::borrow::Cow<'_, str> {
     if let Some(text) = crate::utf8_text(pattern) {
         return std::borrow::Cow::Borrowed(text);
     }
@@ -479,7 +497,9 @@ fn byte_pattern_source(pattern: &BStr) -> std::borrow::Cow<'_, str> {
 
 impl PregPattern for &BStr {
     fn resolve(self) -> ResolvedPattern {
-        byte_pattern_source(self).as_ref().resolve()
+        ResolvedPattern::Cached(
+            compile_php_pattern(self).unwrap_or_else(|e| panic!("invalid regex: {e}")),
+        )
     }
 }
 
@@ -503,6 +523,7 @@ impl PregPattern for &'static CompiledPattern {
 
 // Used by the `php_regex!` macro to compile a PHP pattern.
 #[doc(hidden)]
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 pub fn __php_regex_compile(pattern: &str) -> CompiledPattern {
     compile_php_pattern_uncached(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"))
 }
@@ -593,6 +614,18 @@ fn php_replacement_group(bytes: &[u8]) -> (usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preg_quote_keeps_bytes_that_are_not_utf8() {
+        assert_eq!(preg_quote(b"a.\xff", None), BStr::new(b"a\\.\xff"));
+    }
+
+    #[test]
+    fn a_quoted_byte_that_is_not_utf8_matches_itself() {
+        let pattern = crate::bconcat!("/^", preg_quote(b"a.\xff", None), "$/");
+        assert!(preg_is_match(&pattern, b"a.\xff"));
+        assert!(!preg_is_match(&pattern, b"a.\xfe"));
+    }
 
     #[test]
     fn byte_pattern_matches_invalid_utf8_literally() {

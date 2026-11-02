@@ -3,7 +3,7 @@
 //! See `docs/dev/composer-runtime-bundle.md`.
 
 use crate::{PluginValue, call_function};
-use bstr::BString;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{Phar, RuntimeException, getenv, path_to_bytes};
 
 const BUNDLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/composer-runtime-bundle.phar"));
@@ -100,7 +100,7 @@ pub fn local_file(path: &str) -> anyhow::Result<LocalFile> {
     let archive = directory.path().join("bundle.phar");
     std::fs::write(&archive, BUNDLE)?;
     let unpacked = directory.path().join("unpacked");
-    Phar::new(&archive)?.extract_to(&unpacked, Some(&[path]), true)?;
+    Phar::new(&archive)?.extract_to(&unpacked, Some(&[BStr::new(path)]), true)?;
     std::fs::remove_file(&archive)?;
 
     Ok(LocalFile {

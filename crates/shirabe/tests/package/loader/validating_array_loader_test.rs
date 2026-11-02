@@ -5,7 +5,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
-use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed};
+use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, bconcat};
 
 fn s(v: &str) -> PhpMixed {
     PhpMixed::string(v.to_string())
@@ -934,10 +934,7 @@ fn warning_provider() -> Vec<(
         ),
         (
             config(vec![("name", s("a/b")), ("license", s("XXXXX"))]),
-            vec![format!(
-                "License \"XXXXX\" is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.{}If the software is closed-source, you may use \"proprietary\" as license.",
-                PHP_EOL
-            )],
+            vec![bconcat!("License \"XXXXX\" is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.", PHP_EOL, "If the software is closed-source, you may use \"proprietary\" as license.").display_lossy().to_string()],
             true,
             Some(config(vec![
                 ("name", s("a/b")),

@@ -7,12 +7,12 @@
 //! private `Entry` struct so the path/exclude filters keep their exact behavior.
 
 use crate::glob::Glob;
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice};
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
-    bconcat, file_exists, glob, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_quote, rtrim2, str_replace,
+    bconcat, file_exists, glob, implode, is_dir, path_from_bytes, path_to_bytes, php_regex,
+    php_str, preg_is_match, preg_match, preg_quote, rtrim2, str_replace, utf8_text,
 };
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -23,50 +23,50 @@ const IGNORE_DOT_FILES: i64 = 2;
 const ONLY_FILES: i64 = 1;
 const ONLY_DIRECTORIES: i64 = 2;
 
-const VCS_PATTERNS: [&str; 9] = [
-    ".svn",
-    "_svn",
-    "CVS",
-    "_darcs",
-    ".arch-params",
-    ".monotone",
-    ".bzr",
-    ".git",
-    ".hg",
+const VCS_PATTERNS: [&BStr; 9] = [
+    php_str(b".svn"),
+    php_str(b"_svn"),
+    php_str(b"CVS"),
+    php_str(b"_darcs"),
+    php_str(b".arch-params"),
+    php_str(b".monotone"),
+    php_str(b".bzr"),
+    php_str(b".git"),
+    php_str(b".hg"),
 ];
 
 /// Helper trait so `Finder::exclude` accepts both single strings and slices
 /// (PHP's variadic / array argument compatibility).
 pub trait IntoFinderExclude {
-    fn into_exclude(self) -> Vec<String>;
+    fn into_exclude(self) -> Vec<BString>;
 }
-impl IntoFinderExclude for &str {
-    fn into_exclude(self) -> Vec<String> {
-        vec![self.to_string()]
+impl IntoFinderExclude for &BStr {
+    fn into_exclude(self) -> Vec<BString> {
+        vec![self.to_owned()]
     }
 }
-impl IntoFinderExclude for String {
-    fn into_exclude(self) -> Vec<String> {
+impl IntoFinderExclude for BString {
+    fn into_exclude(self) -> Vec<BString> {
         vec![self]
     }
 }
-impl IntoFinderExclude for &String {
-    fn into_exclude(self) -> Vec<String> {
+impl IntoFinderExclude for &BString {
+    fn into_exclude(self) -> Vec<BString> {
         vec![self.clone()]
     }
 }
-impl IntoFinderExclude for &[String] {
-    fn into_exclude(self) -> Vec<String> {
+impl IntoFinderExclude for &[BString] {
+    fn into_exclude(self) -> Vec<BString> {
         self.to_vec()
     }
 }
-impl IntoFinderExclude for &Vec<String> {
-    fn into_exclude(self) -> Vec<String> {
+impl IntoFinderExclude for &Vec<BString> {
+    fn into_exclude(self) -> Vec<BString> {
         self.clone()
     }
 }
-impl IntoFinderExclude for Vec<String> {
-    fn into_exclude(self) -> Vec<String> {
+impl IntoFinderExclude for Vec<BString> {
+    fn into_exclude(self) -> Vec<BString> {
         self
     }
 }
@@ -96,19 +96,19 @@ struct Entry {
 
 pub struct Finder {
     mode: i64,
-    names: Vec<String>,
-    not_names: Vec<String>,
-    exclude: Vec<String>,
+    names: Vec<BString>,
+    not_names: Vec<BString>,
+    exclude: Vec<BString>,
     filters: Vec<std::cell::RefCell<Box<dyn FnMut(&Path) -> bool>>>,
-    depths: Vec<(String, i64)>,
+    depths: Vec<(BString, i64)>,
     follow_links: bool,
     reverse_sorting: bool,
     sort: Sort,
     ignore: i64,
     dirs: Vec<BString>,
-    dates: Vec<(String, i64)>,
-    paths: Vec<String>,
-    not_paths: Vec<String>,
+    dates: Vec<(BString, i64)>,
+    paths: Vec<BString>,
+    not_paths: Vec<BString>,
 }
 
 impl std::fmt::Debug for Finder {
@@ -173,7 +173,7 @@ impl Finder {
 
     pub fn depth(&mut self, level: i64) -> &mut Self {
         // `NumberComparator` over an integer always yields the `==` operator.
-        self.depths.push(("==".to_string(), level));
+        self.depths.push((BString::from("=="), level));
 
         self
     }
@@ -248,20 +248,20 @@ impl Finder {
         self
     }
 
-    pub fn not_name(&mut self, pattern: &str) -> &mut Self {
-        self.not_names.push(pattern.to_string());
+    pub fn not_name(&mut self, pattern: &BStr) -> &mut Self {
+        self.not_names.push(pattern.to_owned());
 
         self
     }
 
-    pub fn not_path(&mut self, pattern: &str) -> &mut Self {
-        self.not_paths.push(pattern.to_string());
+    pub fn not_path(&mut self, pattern: &BStr) -> &mut Self {
+        self.not_paths.push(pattern.to_owned());
 
         self
     }
 
-    pub fn name(&mut self, pattern: &str) -> &mut Self {
-        self.names.push(pattern.to_string());
+    pub fn name(&mut self, pattern: &BStr) -> &mut Self {
+        self.names.push(pattern.to_owned());
 
         self
     }
@@ -287,7 +287,7 @@ impl Finder {
         self
     }
 
-    pub fn date(&mut self, date: &str) -> &mut Self {
+    pub fn date(&mut self, date: &BStr) -> &mut Self {
         self.dates.push(parse_date_comparator(date));
 
         self
@@ -347,21 +347,21 @@ impl Finder {
         let mut not_paths = self.not_paths.clone();
 
         if IGNORE_VCS_FILES == (IGNORE_VCS_FILES & self.ignore) {
-            exclude.extend(VCS_PATTERNS.iter().map(|p| p.to_string()));
+            exclude.extend(VCS_PATTERNS.iter().map(|p| BString::from(*p)));
         }
 
         if IGNORE_DOT_FILES == (IGNORE_DOT_FILES & self.ignore) {
-            not_paths.push("#(^|/)\\..+(/|$)#".to_string());
+            not_paths.push(BString::from("#(^|/)\\..+(/|$)#"));
         }
 
         let mut min_depth = 0i64;
         let mut max_depth = i64::MAX;
         for (operator, target) in &self.depths {
-            match operator.as_str() {
-                ">" => min_depth = target + 1,
-                ">=" => min_depth = *target,
-                "<" => max_depth = target - 1,
-                "<=" => max_depth = *target,
+            match operator.as_bstr().as_bytes() {
+                b">" => min_depth = target + 1,
+                b">=" => min_depth = *target,
+                b"<" => max_depth = target - 1,
+                b"<=" => max_depth = *target,
                 _ => {
                     min_depth = *target;
                     max_depth = *target;
@@ -383,14 +383,25 @@ impl Finder {
             &mut raw,
         );
 
-        let match_names: Vec<String> = self.names.iter().map(|p| to_regex_filename(p)).collect();
-        let nomatch_names: Vec<String> = self
+        let match_names: Vec<BString> = self
+            .names
+            .iter()
+            .map(|p| to_regex_filename(p.as_bstr()))
+            .collect();
+        let nomatch_names: Vec<BString> = self
             .not_names
             .iter()
-            .map(|p| to_regex_filename(p))
+            .map(|p| to_regex_filename(p.as_bstr()))
             .collect();
-        let match_paths: Vec<String> = self.paths.iter().map(|p| to_regex_path(p)).collect();
-        let nomatch_paths: Vec<String> = not_paths.iter().map(|p| to_regex_path(p)).collect();
+        let match_paths: Vec<BString> = self
+            .paths
+            .iter()
+            .map(|p| to_regex_path(p.as_bstr()))
+            .collect();
+        let nomatch_paths: Vec<BString> = not_paths
+            .iter()
+            .map(|p| to_regex_path(p.as_bstr()))
+            .collect();
 
         let has_name_filter = !self.names.is_empty() || !self.not_names.is_empty();
         let has_path_filter = !self.paths.is_empty() || !not_paths.is_empty();
@@ -420,11 +431,9 @@ impl Finder {
                     continue;
                 }
                 let filedate = mtime(&entry.pathname);
-                if !self
-                    .dates
-                    .iter()
-                    .all(|(operator, target)| comparator_test(operator, filedate, *target))
-                {
+                if !self.dates.iter().all(|(operator, target)| {
+                    comparator_test(operator.as_bstr(), filedate, *target)
+                }) {
                     continue;
                 }
             }
@@ -459,8 +468,8 @@ impl Finder {
         relative_dir: &[u8],
         depth: i64,
         max_depth: i64,
-        excluded_dirs: &IndexSet<String>,
-        excluded_pattern: &Option<String>,
+        excluded_dirs: &IndexSet<BString>,
+        excluded_pattern: &Option<BString>,
         out: &mut Vec<Entry>,
     ) {
         // `RecursiveDirectoryIterator::SKIP_DOTS` is implicit: read_dir omits "." and "..".
@@ -573,15 +582,15 @@ impl Finder {
 
 /// Reproduces `ExcludeDirectoryFilterIterator`'s constructor split between simple
 /// directory names and `/`-containing path patterns.
-fn build_exclude(directories: &[String]) -> (IndexSet<String>, Option<String>) {
+fn build_exclude(directories: &[BString]) -> (IndexSet<BString>, Option<BString>) {
     let mut excluded_dirs = IndexSet::new();
-    let mut patterns: Vec<String> = Vec::new();
+    let mut patterns: Vec<BString> = Vec::new();
 
     for directory in directories {
-        let directory = directory.trim_end_matches('/').to_string();
+        let directory = rtrim2(directory, "/");
         // The inner iterator is always recursive, so only `/`-containing names become patterns.
-        if directory.contains('/') {
-            patterns.push(preg_quote(&directory, Some('#')));
+        if directory.contains_str("/") {
+            patterns.push(preg_quote(&directory, Some(b'#')));
         } else {
             excluded_dirs.insert(directory);
         }
@@ -590,7 +599,11 @@ fn build_exclude(directories: &[String]) -> (IndexSet<String>, Option<String>) {
     let excluded_pattern = if patterns.is_empty() {
         None
     } else {
-        Some(format!("#(?:^|/)(?:{})(?:/|$)#", patterns.join("|")))
+        Some(bconcat!(
+            "#(?:^|/)(?:",
+            implode("|", &patterns),
+            ")(?:/|$)#"
+        ))
     };
 
     (excluded_dirs, excluded_pattern)
@@ -599,8 +612,8 @@ fn build_exclude(directories: &[String]) -> (IndexSet<String>, Option<String>) {
 /// `ExcludeDirectoryFilterIterator::accept`.
 fn exclude_accept(
     entry: &Entry,
-    excluded_dirs: &IndexSet<String>,
-    excluded_pattern: &Option<String>,
+    excluded_dirs: &IndexSet<BString>,
+    excluded_pattern: &Option<BString>,
 ) -> bool {
     if entry.is_dir
         && excluded_dirs
@@ -625,25 +638,25 @@ fn exclude_accept(
 }
 
 /// `FilenameFilterIterator::toRegex`.
-fn to_regex_filename(pattern: &str) -> String {
+fn to_regex_filename(pattern: &BStr) -> BString {
     if is_regex(pattern) {
-        pattern.to_string()
+        pattern.to_owned()
     } else {
         Glob::to_regex(pattern, true, true)
     }
 }
 
 /// `PathFilterIterator::toRegex`.
-fn to_regex_path(pattern: &str) -> String {
+fn to_regex_path(pattern: &BStr) -> BString {
     if is_regex(pattern) {
-        pattern.to_string()
+        pattern.to_owned()
     } else {
-        format!("/{}/", preg_quote(pattern, Some('/')))
+        bconcat!("/", preg_quote(pattern, Some(b'/')), "/")
     }
 }
 
 /// `MultiplePcreFilterIterator::isAccepted`.
-fn is_accepted(string: &BStr, match_regexps: &[String], nomatch_regexps: &[String]) -> bool {
+fn is_accepted(string: &BStr, match_regexps: &[BString], nomatch_regexps: &[BString]) -> bool {
     for regex in nomatch_regexps {
         if preg_is_match(regex, string) {
             return false;
@@ -664,11 +677,11 @@ fn is_accepted(string: &BStr, match_regexps: &[String], nomatch_regexps: &[Strin
 }
 
 /// `MultiplePcreFilterIterator::isRegex`.
-fn is_regex(str: &str) -> bool {
+fn is_regex(str: &BStr) -> bool {
     // PHP 8.2+ available modifiers.
     let available_modifiers = "imsxuADUn";
 
-    let pattern = format!("/^(.{{3,}}?)[{available_modifiers}]*$/");
+    let pattern = bconcat!("/^(.{3,}?)[", available_modifiers, "]*$/");
     if let Some(matches) = preg_match(&pattern, str) {
         let bytes = matches.get(1).unwrap_or_default();
         let start = bytes
@@ -695,26 +708,29 @@ fn is_regex(str: &str) -> bool {
 }
 
 /// `Comparator::test`.
-fn comparator_test(operator: &str, test: i64, target: i64) -> bool {
-    match operator {
-        ">" => test > target,
-        ">=" => test >= target,
-        "<" => test < target,
-        "<=" => test <= target,
-        "!=" => test != target,
+fn comparator_test(operator: &BStr, test: i64, target: i64) -> bool {
+    match operator.as_bytes() {
+        b">" => test > target,
+        b">=" => test >= target,
+        b"<" => test < target,
+        b"<=" => test <= target,
+        b"!=" => test != target,
         _ => test == target,
     }
 }
 
 /// `DateComparator::__construct`, returning `(operator, target unix timestamp)`.
-fn parse_date_comparator(test: &str) -> (String, i64) {
+fn parse_date_comparator(test: &BStr) -> (BString, i64) {
     let pattern = "#^\\s*(==|!=|[<>]=?|after|since|before|until)?\\s*(.+?)\\s*$#i";
     let Some(matches) = preg_match(pattern, test) else {
-        panic!("Don't understand \"{test}\" as a date test.");
+        panic!(
+            "Don't understand \"{}\" as a date test.",
+            test.display_lossy()
+        );
     };
 
     let date = matches.get(2).unwrap_or_default();
-    let target = parse_datetime_to_unix(&date.display_lossy().to_string());
+    let target = parse_datetime_to_unix(date.to_owned().as_bstr());
 
     let operator = match matches.get(1).map(|s| &**s) {
         Some(b"since" | b"after") => ">",
@@ -725,8 +741,8 @@ fn parse_date_comparator(test: &str) -> (String, i64) {
         Some(b"<") => "<",
         Some(b"<=") => "<=",
         _ => "==",
-    }
-    .to_string();
+    };
+    let operator = BString::from(operator);
 
     (operator, target)
 }
@@ -737,11 +753,12 @@ fn parse_date_comparator(test: &str) -> (String, i64) {
 /// `Y-m-d H:i:s` / `Y-m-d` shapes produced by the callers are parsed here. The components are
 /// interpreted as UTC (not PHP's local timezone) so the timestamp round-trips with the
 /// `chrono::Utc`-derived thresholds the callers format from.
-fn parse_datetime_to_unix(s: &str) -> i64 {
-    if let Ok(datetime) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
+fn parse_datetime_to_unix(s: &BStr) -> i64 {
+    let text = utf8_text(s).unwrap_or_default();
+    if let Ok(datetime) = NaiveDateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S") {
         return datetime.and_utc().timestamp();
     }
-    if let Ok(date) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+    if let Ok(date) = NaiveDate::parse_from_str(text, "%Y-%m-%d") {
         return date
             .and_hms_opt(0, 0, 0)
             .expect("midnight is always valid")
@@ -749,7 +766,7 @@ fn parse_datetime_to_unix(s: &str) -> i64 {
             .timestamp();
     }
 
-    panic!("\"{s}\" is not a valid date.");
+    panic!("\"{}\" is not a valid date.", s.display_lossy());
 }
 
 fn apply_order(ordering: std::cmp::Ordering, order: i64) -> std::cmp::Ordering {

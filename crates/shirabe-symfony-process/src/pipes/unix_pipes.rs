@@ -4,7 +4,9 @@ use crate::pipes::abstract_pipes::AbstractPipes;
 use crate::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};
 use crate::process::Process;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource, fclose, feof, fread, stream_select};
+use shirabe_php_shim::{
+    Descriptor, PhpMixed, PhpResource, bconcat, fclose, feof, fread, stream_select,
+};
 
 /// UnixPipes implementation uses unix pipes as handles.
 #[derive(Debug)]
@@ -24,8 +26,8 @@ impl UnixPipes {
 
 fn descriptor(items: &[&str]) -> Descriptor {
     match items {
-        ["pipe", mode] => Descriptor::Pipe(mode.to_string()),
-        ["file", path, mode] => Descriptor::File(path.to_string(), mode.to_string()),
+        ["pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
+        ["file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
         _ => panic!("unsupported descriptor spec: {:?}", items),
     }
 }

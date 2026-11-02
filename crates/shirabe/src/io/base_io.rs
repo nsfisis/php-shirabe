@@ -347,7 +347,7 @@ pub trait BaseIO: IOInterface {
                     let json_str = json_encode_ex(&headers, 0).unwrap_or_default();
                     self.check_and_set_authentication(
                         domain,
-                        BString::from(json_str),
+                        json_str,
                         Some(BString::from("custom-headers")),
                     );
                 }
@@ -394,7 +394,7 @@ pub trait BaseIO: IOInterface {
                     self.check_and_set_authentication(
                         domain,
                         BString::from("client-certificate"),
-                        Some(BString::from(json_str)),
+                        Some(json_str),
                     );
                 }
             }

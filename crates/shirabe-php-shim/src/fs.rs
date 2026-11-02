@@ -2,10 +2,10 @@ use crate::{
     PhpResource, StreamBacking, StreamState, UnexpectedValueException, path_from_bytes,
     path_to_bytes,
 };
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use std::io::{Read as _, Write as _};
 
-pub const PHP_EOL: &str = "\n";
+pub const PHP_EOL: &BStr = crate::php_str(b"\n");
 
 pub const FILE_APPEND: i64 = 8;
 
@@ -62,9 +62,10 @@ pub fn filesystem_iterator(
     );
     let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| {
-        UnexpectedValueException::new(format!(
-            "FilesystemIterator::__construct({}): Failed to open directory",
-            base.display()
+        UnexpectedValueException::new(crate::bconcat!(
+            "FilesystemIterator::__construct(",
+            base,
+            "): Failed to open directory"
         ))
     })?;
     Ok(rd.flatten().map(|entry| entry.path()).collect())
@@ -205,9 +206,9 @@ impl RecursiveIteratorFileInfo {
     pub fn get_size(&self) -> anyhow::Result<i64> {
         match filesize(&self.path) {
             Some(size) => Ok(size),
-            None => Err(crate::RuntimeException::new(format!(
-                "SplFileInfo::getSize(): stat failed for {}",
-                self.path.display()
+            None => Err(crate::RuntimeException::new(crate::bconcat!(
+                "SplFileInfo::getSize(): stat failed for ",
+                self.path
             ))
             .into()),
         }
@@ -227,9 +228,10 @@ pub fn recursive_directory_iterator(
 ) -> Result<RecursiveDirectoryIterator, UnexpectedValueException> {
     let root = path.as_ref().to_path_buf();
     if !root.is_dir() {
-        return Err(UnexpectedValueException::new(format!(
-            "RecursiveDirectoryIterator::__construct({}): Failed to open directory",
-            root.display()
+        return Err(UnexpectedValueException::new(crate::bconcat!(
+            "RecursiveDirectoryIterator::__construct(",
+            root,
+            "): Failed to open directory"
         )));
     }
     Ok(RecursiveDirectoryIterator { root, flags })
@@ -293,9 +295,10 @@ pub fn directory_iterator(
 ) -> Result<Vec<DirectoryIteratorEntry>, UnexpectedValueException> {
     let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| {
-        UnexpectedValueException::new(format!(
-            "DirectoryIterator::__construct({}): Failed to open directory",
-            base.display()
+        UnexpectedValueException::new(crate::bconcat!(
+            "DirectoryIterator::__construct(",
+            base,
+            "): Failed to open directory"
         ))
     })?;
     // PHP's DirectoryIterator yields the "." and ".." entries before the real ones.
@@ -315,7 +318,11 @@ pub fn directory_iterator(
 
 /// PHP `fopen()`. Returns a stream resource, or an error mirroring PHP's `false`-on-failure
 /// (the I/O error carries the reason so callers that surface the warning text can use it).
-pub fn fopen(file: impl AsRef<std::path::Path>, mode: &str) -> Result<PhpResource, std::io::Error> {
+pub fn fopen(
+    file: impl AsRef<std::path::Path>,
+    mode: impl AsRef<[u8]>,
+) -> Result<PhpResource, std::io::Error> {
+    let mode = BStr::new(mode.as_ref());
     let path = file.as_ref();
     let file = crate::path_to_bytes(path);
     match file {
@@ -325,10 +332,14 @@ pub fn fopen(file: impl AsRef<std::path::Path>, mode: &str) -> Result<PhpResourc
         _ => {}
     }
     // Strip the binary/text flags PHP accepts as part of the mode.
-    let base_mode: String = mode.chars().filter(|c| *c != 'b' && *c != 't').collect();
-    let (readable, writable) = match base_mode.as_str() {
-        "r" => (true, false),
-        "w" | "a" | "x" | "c" => (false, true),
+    let base_mode: Vec<u8> = mode
+        .iter()
+        .copied()
+        .filter(|c| *c != b'b' && *c != b't')
+        .collect();
+    let (readable, writable) = match base_mode.as_slice().as_bytes() {
+        b"r" => (true, false),
+        b"w" | b"a" | b"x" | b"c" => (false, true),
         _ => (true, true), // r+, w+, a+, x+, c+, rw, ...
     };
     // php://memory and php://temp are in-memory streams. PHP's memory wrapper ignores the read /
@@ -341,25 +352,25 @@ pub fn fopen(file: impl AsRef<std::path::Path>, mode: &str) -> Result<PhpResourc
                 StreamBacking::Memory(std::io::Cursor::new(Vec::new())),
                 true,
                 true,
-                mode.to_string(),
+                BString::from(mode),
                 BString::from(file),
             )),
         )));
     }
     let uri = BString::from(file);
     let mut options = std::fs::OpenOptions::new();
-    match base_mode.as_str() {
-        "r" => options.read(true),
-        "r+" => options.read(true).write(true),
-        "w" => options.write(true).create(true).truncate(true),
-        "w+" => options.read(true).write(true).create(true).truncate(true),
-        "a" => options.append(true).create(true),
-        "a+" => options.read(true).append(true).create(true),
-        "x" => options.write(true).create_new(true),
-        "x+" => options.read(true).write(true).create_new(true),
+    match base_mode.as_slice() {
+        b"r" => options.read(true),
+        b"r+" => options.read(true).write(true),
+        b"w" => options.write(true).create(true).truncate(true),
+        b"w+" => options.read(true).write(true).create(true).truncate(true),
+        b"a" => options.append(true).create(true),
+        b"a+" => options.read(true).append(true).create(true),
+        b"x" => options.write(true).create_new(true),
+        b"x+" => options.read(true).write(true).create_new(true),
         // "c"/"c+": open or create without truncating, position at start.
-        "c" => options.write(true).create(true),
-        "c+" => options.read(true).write(true).create(true),
+        b"c" => options.write(true).create(true),
+        b"c+" => options.read(true).write(true).create(true),
         _ => options.read(true),
     };
     let file = options.open(path)?;
@@ -368,7 +379,7 @@ pub fn fopen(file: impl AsRef<std::path::Path>, mode: &str) -> Result<PhpResourc
             StreamBacking::File(file),
             readable,
             writable,
-            mode.to_string(),
+            BString::from(mode),
             uri,
         )),
     )))

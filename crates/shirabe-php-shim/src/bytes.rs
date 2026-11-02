@@ -14,7 +14,7 @@ pub const fn php_str(bytes: &[u8]) -> &BStr {
 /// The text a Rust API produces through `Display`, such as the message of an `std::io::Error`, as
 /// the PHP string that holds it from there on.
 pub fn display_to_bytes(value: impl std::fmt::Display) -> BString {
-    use std::io::Write;
+    use std::io::Write as _;
     let mut out = Vec::new();
     write!(out, "{value}").expect("writing to a Vec cannot fail");
     BString::from(out)
@@ -24,6 +24,10 @@ pub fn display_to_bytes(value: impl std::fmt::Display) -> BString {
 /// function that itself requires UTF-8, which reproduces how that function fails, and for a lookup
 /// in data that is valid UTF-8, which other bytes cannot match.
 #[allow(clippy::disallowed_methods)]
+#[expect(
+    clippy::disallowed_types,
+    reason = "the one conversion from bytes to text"
+)]
 pub fn utf8_text(bytes: &(impl AsRef<[u8]> + ?Sized)) -> Option<&str> {
     std::str::from_utf8(bytes.as_ref()).ok()
 }
@@ -83,12 +87,17 @@ impl PhpConcat for BString {
     }
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl PhpConcat for str {
     fn php_concat_to(&self, out: &mut BString) {
         out.extend_from_slice(self.as_bytes());
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl PhpConcat for String {
     fn php_concat_to(&self, out: &mut BString) {
         out.extend_from_slice(self.as_bytes());
@@ -112,7 +121,7 @@ macro_rules! impl_php_concat_for_integers {
         $(
             impl PhpConcat for $ty {
                 fn php_concat_to(&self, out: &mut BString) {
-                    use std::io::Write;
+                    use std::io::Write as _;
                     write!(out, "{self}").expect("writing to a Vec cannot fail");
                 }
             }
@@ -120,7 +129,8 @@ macro_rules! impl_php_concat_for_integers {
     };
 }
 
-impl_php_concat_for_integers!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
+// `u8` is left out: a Rust `u8` is usually a byte of a string, not a number PHP would print.
+impl_php_concat_for_integers!(i8, i16, i32, i64, isize, u16, u32, u64, usize);
 
 impl<T: PhpConcat + ?Sized> PhpConcat for &T {
     fn php_concat_to(&self, out: &mut BString) {

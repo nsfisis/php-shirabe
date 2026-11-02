@@ -125,7 +125,7 @@ impl JsonManipulator {
                 let groups_1 = BString::from(groups.get(1).unwrap_or_default());
                 // link missing but non empty links
                 links = preg_replace(
-                    format!("{{{}$}}", preg_quote(&groups_1, None)),
+                    bconcat!("{", preg_quote(&groups_1, None), "$}"),
                     addcslashes(
                         bconcat!(
                             ",",
@@ -943,7 +943,7 @@ impl JsonManipulator {
                 }
                 let mut count_out: usize = 0;
                 let cleaned = preg_replace2(
-                    format!("{{,\\s*{}}}i", preg_quote(&best_match, None)),
+                    bconcat!("{,\\s*", preg_quote(&best_match, None), "}i"),
                     "",
                     &children,
                     -1,
@@ -951,7 +951,7 @@ impl JsonManipulator {
                 );
                 if 1 != count_out {
                     let cleaned2 = preg_replace2(
-                        format!("{{{}\\s*,?\\s*}}i", preg_quote(&best_match, None)),
+                        bconcat!("{", preg_quote(&best_match, None), "\\s*,?\\s*}i"),
                         "",
                         &cleaned,
                         -1,
@@ -1578,11 +1578,11 @@ impl JsonManipulator {
             ));
         }
 
-        Ok(BString::from(JsonFile::encode(&data)?))
+        JsonFile::encode(&data)
     }
 
     fn detect_indenting(&mut self) {
-        self.indent = BString::from(JsonFile::detect_indenting(Some(&self.contents)));
+        self.indent = JsonFile::detect_indenting(Some(&self.contents));
     }
 }
 
@@ -1758,6 +1758,6 @@ impl ManipulatorFormatter {
             ));
         }
 
-        Ok(BString::from(JsonFile::encode(&data)?))
+        JsonFile::encode(&data)
     }
 }

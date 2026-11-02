@@ -758,7 +758,7 @@ impl QuestionHelper {
     fn set_io_codepage(&self) -> i64 {
         if function_exists("sapi_windows_cp_set") {
             let cp = sapi_windows_cp_get(None);
-            sapi_windows_cp_set(sapi_windows_cp_get(Some("oem")));
+            sapi_windows_cp_set(sapi_windows_cp_get(Some(BStr::new("oem"))));
 
             return cp;
         }
@@ -774,7 +774,7 @@ impl QuestionHelper {
 
             if !matches!(input, PhpMixed::Bool(false)) && !php_to_string(&input).is_empty() {
                 input = PhpMixed::string(sapi_windows_cp_conv(
-                    sapi_windows_cp_get(Some("oem")),
+                    sapi_windows_cp_get(Some(BStr::new("oem"))),
                     cp,
                     &php_to_string(&input),
                 ));
@@ -798,7 +798,7 @@ impl QuestionHelper {
 
         // For seekable and writable streams, add all the same data to the
         // cloned stream and then seek to the same offset.
-        if seekable && !["r", "rb", "rt"].contains(&mode.as_str()) {
+        if seekable && !matches!(mode.as_slice(), b"r" | b"rb" | b"rt") {
             let offset = ftell(input_stream).unwrap_or(0);
             rewind(input_stream);
             stream_copy_to_stream(input_stream, &clone_stream);

@@ -81,13 +81,13 @@ impl GitHub {
     pub fn authorize_oauth_interactively(
         &mut self,
         origin_url: &BStr,
-        message: Option<&str>,
+        message: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
             self.io.write_error3(msg, true, io_interface::NORMAL);
         }
 
-        let mut note = "Shirabe".to_string();
+        let mut note = BString::from("Shirabe");
         let expose_hostname = self
             .config
             .borrow_mut()
@@ -102,10 +102,10 @@ impl GitHub {
                 .execute(&["hostname".to_string()], &mut output, None)?
                 == 0
             {
-                note += &format!(" on {}", trim(&output).display_lossy());
+                note = bconcat!(note, " on ", trim(&output));
             }
         }
-        note += &format!(" {}", date_local("Y-m-d Hi", None));
+        note = bconcat!(note, " ", date_local("Y-m-d Hi", None));
 
         let (local_name, auth_name): (Option<BString>, BString) = {
             let cfg = self.config.borrow();

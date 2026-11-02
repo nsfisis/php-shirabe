@@ -9,7 +9,7 @@ use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::PlatformRepository;
-use shirabe_php_shim::{date_local, trim};
+use shirabe_php_shim::{bconcat, date_local, trim};
 
 /// Build a `Vec<(ParameterName, InputValue)>` command input from `(key, value)` pairs.
 fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
@@ -1049,7 +1049,7 @@ fn test_self() {
         Some(&serde_json::json!({
             "name": "vendor/package",
             "version": "1.2.3",
-            "time": today,
+            "time": today.display_lossy().to_string(),
         })),
         None,
         None,
@@ -1072,7 +1072,10 @@ fn test_self() {
         ("descrip.", "".to_string()),
         ("keywords", "".to_string()),
         ("versions", "* 1.2.3".to_string()),
-        ("released", format!("{}, today", today)),
+        (
+            "released",
+            bconcat!(today, ", today").display_lossy().to_string(),
+        ),
         ("type", "library".to_string()),
         ("homepage", "".to_string()),
         ("source", "[]  ".to_string()),

@@ -646,22 +646,27 @@ impl VersionGuesser {
             let trunk_path = package_config
                 .get(B("trunk-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(s, Some('#')))
-                .unwrap_or_else(|| "trunk".to_string());
+                .map(|s| preg_quote(s, Some(b'#')))
+                .unwrap_or_else(|| BString::from("trunk"));
             let branches_path = package_config
                 .get(B("branches-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(s, Some('#')))
-                .unwrap_or_else(|| "branches".to_string());
+                .map(|s| preg_quote(s, Some(b'#')))
+                .unwrap_or_else(|| BString::from("branches"));
             let tags_path = package_config
                 .get(B("tags-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(s, Some('#')))
-                .unwrap_or_else(|| "tags".to_string());
+                .map(|s| preg_quote(s, Some(b'#')))
+                .unwrap_or_else(|| BString::from("tags"));
 
-            let url_pattern = format!(
-                "#<url>.*/({}|({}|{})/(.*))</url>#",
-                trunk_path, branches_path, tags_path,
+            let url_pattern = bconcat!(
+                "#<url>.*/(",
+                trunk_path,
+                "|(",
+                branches_path,
+                "|",
+                tags_path,
+                ")/(.*))</url>#"
             );
 
             if let Some(matches) = preg_match(&url_pattern, &output) {

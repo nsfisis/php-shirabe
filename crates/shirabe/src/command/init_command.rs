@@ -206,7 +206,7 @@ impl InitCommand {
             return false;
         }
 
-        let pattern = format!("{{^/?{}(/\\*?)?$}}", preg_quote(vendor, None));
+        let pattern = bconcat!("{^/?", preg_quote(vendor, None), "(/\\*?)?$}");
 
         let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
         for line in &lines {
@@ -383,7 +383,7 @@ impl InitCommand {
         ) {
             vendor = server_user.unwrap_or_default();
         } else if !get_current_user().is_empty() {
-            vendor = get_current_user().into();
+            vendor = get_current_user();
         }
 
         let vendor = self.sanitize_package_name_component(vendor.as_bstr())?;
@@ -474,17 +474,17 @@ impl Command for InitCommand {
     ) -> anyhow::Result<i64> {
         let io = self.get_io();
 
-        let allowlist: Vec<String> = vec![
-            "name".to_string(),
-            "description".to_string(),
-            "author".to_string(),
-            "type".to_string(),
-            "homepage".to_string(),
-            "require".to_string(),
-            "require-dev".to_string(),
-            "stability".to_string(),
-            "license".to_string(),
-            "autoload".to_string(),
+        let allowlist: Vec<BString> = vec![
+            "name".into(),
+            "description".into(),
+            "author".into(),
+            "type".into(),
+            "homepage".into(),
+            "require".into(),
+            "require-dev".into(),
+            "stability".into(),
+            "license".into(),
+            "autoload".into(),
         ];
         let options: IndexMap<BString, PhpMixed> = input
             .borrow()
@@ -643,7 +643,7 @@ impl Command for InitCommand {
         let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()))?;
 
         if input.borrow().is_interactive() {
-            io.write_error3(format!("\n{}\n", json), true, io_interface::NORMAL);
+            io.write_error3(bconcat!("\n", json, "\n"), true, io_interface::NORMAL);
             if !io.ask_confirmation("Do you confirm generation [<comment>yes</comment>]? ", true)? {
                 io.write_error3("<error>Command aborted</error>", true, io_interface::NORMAL);
 
@@ -667,9 +667,9 @@ impl Command for InitCommand {
                     true,
                     io_interface::NORMAL,
                 );
-                let errors = format!(
-                    " - {}",
-                    (implode(format!("{} - ", PHP_EOL), json_err.get_errors())).display_lossy()
+                let errors = bconcat!(
+                    " - ",
+                    (implode(bconcat!(PHP_EOL, " - "), json_err.get_errors()))
                 );
                 io.write_error3(
                     bconcat!(json_err.get_message(), ":", PHP_EOL, errors),

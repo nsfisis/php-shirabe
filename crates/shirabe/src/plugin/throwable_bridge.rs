@@ -177,7 +177,7 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
             ScriptExecutionException::new(message, code).into()
         }
         br"Composer\Json\JsonValidationException" => {
-            JsonValidationException::new(message, strings("errors")).into()
+            JsonValidationException::new(message, byte_strings("errors")).into()
         }
         br"Composer\Package\Loader\InvalidPackageException" => InvalidPackageException::new(
             strings("errors"),
@@ -318,7 +318,7 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
         );
     }
     if let Some(exception) = error.catch::<JsonValidationException>() {
-        properties.insert("errors".into(), strings(exception.get_errors()));
+        properties.insert("errors".into(), byte_strings(exception.get_errors()));
     }
     if let Some(exception) =
         error.catch::<shirabe_symfony_console::exception::CommandNotFoundException>()

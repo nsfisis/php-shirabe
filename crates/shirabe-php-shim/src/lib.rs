@@ -1,3 +1,5 @@
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
+
 mod array;
 mod bytes;
 mod compress;
@@ -52,7 +54,7 @@ pub use var::*;
 pub use xml::*;
 pub use zip::*;
 
-use bstr::{B, BString, ByteSlice};
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, Default)]
@@ -73,6 +75,10 @@ pub enum PhpMixed {
 
 /// A string as JSON holds it. PHP's `json_encode()` fails with `JSON_ERROR_UTF8` on a string that
 /// is not valid UTF-8.
+#[expect(
+    clippy::disallowed_types,
+    reason = "serde serializes a JSON string as text"
+)]
 fn json_utf8<S: serde::Serializer>(s: &[u8]) -> Result<&str, S::Error> {
     utf8_text(s).ok_or_else(|| {
         serde::ser::Error::custom("Malformed UTF-8 characters, possibly incorrectly encoded")
@@ -336,8 +342,8 @@ impl PhpMixed {
         php_truthy(self)
     }
 
-    pub fn get(&self, key: &str) -> Option<&PhpMixed> {
-        self.as_array().and_then(|m| m.get(B(key)))
+    pub fn get(&self, key: impl AsRef<[u8]>) -> Option<&PhpMixed> {
+        self.as_array().and_then(|m| m.get(key.as_ref()))
     }
 
     /// Treats PhpMixed::Null as None, everything else as Some.
@@ -442,12 +448,17 @@ impl From<f64> for PhpMixed {
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl From<String> for PhpMixed {
     fn from(value: String) -> Self {
         PhpMixed::string(value)
     }
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for PhpMixed {
     fn from(value: &str) -> Self {
         PhpMixed::string(value)
@@ -466,6 +477,10 @@ impl From<&bstr::BStr> for PhpMixed {
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl<T> From<IndexMap<String, T>> for PhpMixed
 where
     T: Into<PhpMixed>,
@@ -655,7 +670,7 @@ pub struct StreamState {
     eof: bool,
     closed: bool,
     /// The mode string passed to `fopen`, reported back by `stream_get_meta_data`.
-    mode: String,
+    mode: BString,
     /// The path/URI the stream was opened from, reported back by `stream_get_meta_data`.
     uri: BString,
 }
@@ -665,7 +680,7 @@ impl StreamState {
         backing: StreamBacking,
         readable: bool,
         writable: bool,
-        mode: String,
+        mode: BString,
         uri: BString,
     ) -> StreamState {
         StreamState {

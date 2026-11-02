@@ -526,7 +526,7 @@ impl Package {
         source: &str,
     ) -> IndexMap<BString, Link> {
         trigger_error(
-            &format!(
+            format!(
                 "Package::{} must be called with a map of lowercased package name => Link object, got a indexed array, this is deprecated and you should fix your usage.",
                 source
             ),

@@ -208,7 +208,7 @@ impl Command for SearchCommand {
             .unwrap_or_default();
         let mut query = implode(" ", &token_strings);
         if mode != repository_interface::SEARCH_FULLTEXT {
-            query = BString::from(preg_quote(&query, None));
+            query = preg_quote(&query, None);
         }
 
         let results = repos.search(query, mode, r#type)?;

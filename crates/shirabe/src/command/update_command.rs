@@ -80,7 +80,11 @@ impl UpdateCommand {
         );
 
         let filter: Option<String> = if !packages.is_empty() {
-            Some(base_package::package_names_to_regexp(&packages, "%s"))
+            Some(
+                base_package::package_names_to_regexp(&packages, BStr::new("%s"))
+                    .display_lossy()
+                    .to_string(),
+            )
         } else {
             None
         };

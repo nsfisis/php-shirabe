@@ -60,9 +60,9 @@ impl ConfigValidator {
                 if let Some(validation_e) = e.catch::<JsonValidationException>() {
                     for message in validation_e.get_errors() {
                         if lax_valid {
-                            publish_errors.push(message.clone());
+                            publish_errors.push(message.clone().display_lossy().to_string());
                         } else {
-                            errors.push(message.clone());
+                            errors.push(message.clone().display_lossy().to_string());
                         }
                     }
                 } else {

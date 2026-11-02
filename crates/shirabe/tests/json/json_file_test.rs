@@ -28,7 +28,7 @@ fn unescaped_unicode_only() -> JsonEncodeOptions {
         unescaped_slashes: false,
         pretty_print: false,
         unescaped_unicode: true,
-        indent: JsonFile::INDENT_DEFAULT.to_string(),
+        indent: BString::from(JsonFile::INDENT_DEFAULT),
     }
 }
 
@@ -269,14 +269,20 @@ fn test_schema_validation_error() {
         .unwrap_err();
     let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
-    assert!(e.get_errors().contains(&expected_error));
+    assert!(
+        e.get_errors()
+            .contains(&BString::from(expected_error.as_str()))
+    );
 
     let err = json
         .validate_schema(JsonFile::LAX_SCHEMA, None)
         .unwrap_err();
     let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
-    assert!(e.get_errors().contains(&expected_error));
+    assert!(
+        e.get_errors()
+            .contains(&BString::from(expected_error.as_str()))
+    );
 }
 
 #[test]
@@ -334,8 +340,10 @@ fn test_schema_validation_lax_required() {
     let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
-    assert!(errors.contains(&"name : \"name\" is a required property".to_string()));
-    assert!(errors.contains(&"description : \"description\" is a required property".to_string()));
+    assert!(errors.contains(&BString::from("name : \"name\" is a required property")));
+    assert!(errors.contains(&BString::from(
+        "description : \"description\" is a required property"
+    )));
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
 
     std::fs::write(&file, b"{ \"name\": \"vendor/package\" }").unwrap();
@@ -369,8 +377,10 @@ fn test_schema_validation_lax_required() {
     let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
-    assert!(errors.contains(&"name : \"name\" is a required property".to_string()));
-    assert!(errors.contains(&"description : \"description\" is a required property".to_string()));
+    assert!(errors.contains(&BString::from("name : \"name\" is a required property")));
+    assert!(errors.contains(&BString::from(
+        "description : \"description\" is a required property"
+    )));
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
 
     std::fs::write(&file, b"{ \"type\": \"project\" }").unwrap();
@@ -380,8 +390,10 @@ fn test_schema_validation_lax_required() {
     let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(expected_message, e.get_message());
     let errors = e.get_errors();
-    assert!(errors.contains(&"name : \"name\" is a required property".to_string()));
-    assert!(errors.contains(&"description : \"description\" is a required property".to_string()));
+    assert!(errors.contains(&BString::from("name : \"name\" is a required property")));
+    assert!(errors.contains(&BString::from(
+        "description : \"description\" is a required property"
+    )));
     json.validate_schema(JsonFile::LAX_SCHEMA, None).unwrap();
 
     std::fs::write(

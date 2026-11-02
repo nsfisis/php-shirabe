@@ -1,5 +1,5 @@
 use crate::{PhpMixed, PhpResource, StreamBacking};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use std::io::{Read as _, Write as _};
 
@@ -96,7 +96,7 @@ pub fn stream_is_local(path: impl AsRef<[u8]>) -> bool {
     !path.starts_with(b"data:")
 }
 
-pub fn stream_get_wrappers() -> Vec<String> {
+pub fn stream_get_wrappers() -> Vec<BString> {
     // The full registered set depends on compiled-in extensions and runtime
     // `stream_wrapper_register` calls, which are not modeled. We return the wrappers always
     // registered by a stock PHP CLI build (the environment Composer's tests assume): the core
@@ -117,7 +117,7 @@ pub fn stream_get_wrappers() -> Vec<String> {
         "zip",
     ]
     .iter()
-    .map(|s| s.to_string())
+    .map(|s| BString::from(*s))
     .collect()
 }
 
@@ -176,9 +176,9 @@ pub struct StreamMetaData {
     pub timed_out: bool,
     pub blocked: bool,
     pub eof: bool,
-    pub wrapper_type: String,
-    pub stream_type: String,
-    pub mode: String,
+    pub wrapper_type: BString,
+    pub stream_type: BString,
+    pub mode: BString,
     pub unread_bytes: i64,
     pub seekable: bool,
     pub uri: Option<BString>,
@@ -186,12 +186,12 @@ pub struct StreamMetaData {
 
 pub fn stream_get_meta_data(resource: &PhpResource) -> StreamMetaData {
     let (eof, wrapper_type, stream_type, mode, seekable, uri) = match resource {
-        PhpResource::Process(_) => (false, "PHP", "STDIO", String::new(), false, None),
+        PhpResource::Process(_) => (false, "PHP", "STDIO", BString::default(), false, None),
         PhpResource::Stdin => (
             false,
             "PHP",
             "STDIO",
-            "r".to_string(),
+            BString::from("r"),
             false,
             Some("php://stdin".into()),
         ),
@@ -199,7 +199,7 @@ pub fn stream_get_meta_data(resource: &PhpResource) -> StreamMetaData {
             false,
             "PHP",
             "STDIO",
-            "w".to_string(),
+            BString::from("w"),
             false,
             Some("php://stdout".into()),
         ),
@@ -207,7 +207,7 @@ pub fn stream_get_meta_data(resource: &PhpResource) -> StreamMetaData {
             false,
             "PHP",
             "STDIO",
-            "w".to_string(),
+            BString::from("w"),
             false,
             Some("php://stderr".into()),
         ),
@@ -238,8 +238,8 @@ pub fn stream_get_meta_data(resource: &PhpResource) -> StreamMetaData {
         timed_out: false,
         blocked: true,
         eof,
-        wrapper_type: wrapper_type.to_string(),
-        stream_type: stream_type.to_string(),
+        wrapper_type: BString::from(wrapper_type),
+        stream_type: BString::from(stream_type),
         mode,
         unread_bytes: 0,
         seekable,
@@ -350,17 +350,19 @@ pub fn stream_get_contents3(stream: &PhpResource, max_length: i64, offset: i64) 
     stream_read_remaining(stream, max)
 }
 
-pub fn get_resource_type(resource: &PhpResource) -> String {
+pub fn get_resource_type(resource: &PhpResource) -> BString {
     match resource {
-        PhpResource::Process(_) => "process".to_string(),
-        _ => "stream".to_string(),
+        PhpResource::Process(_) => BString::from("process"),
+        _ => BString::from("stream"),
     }
 }
 
 /// Convenience wrapper over `fopen` for callers that open never-failing `php://` stdio streams and
 /// want an infallible `PhpResource`. Panics on failure, matching the previous behavior.
-pub fn php_fopen_resource(path: &str, mode: &str) -> PhpResource {
-    crate::fs::fopen(path, mode)
+pub fn php_fopen_resource(path: impl AsRef<[u8]>, mode: impl AsRef<[u8]>) -> PhpResource {
+    let path = BStr::new(path.as_ref());
+    let mode = BStr::new(mode.as_ref());
+    crate::fs::fopen(crate::path_from_bytes(path), mode)
         .unwrap_or_else(|e| panic!("php_fopen_resource failed to open {path:?}: {e}"))
 }
 

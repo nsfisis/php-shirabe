@@ -31,7 +31,10 @@ fn get_json_content(custom_data: &[(&str, &str)]) -> String {
     }
     data.sort_keys();
 
-    JsonFile::encode_with_options(&PhpMixed::Array(data), JsonEncodeOptions::none()).unwrap()
+    JsonFile::encode_with_options(&PhpMixed::Array(data), JsonEncodeOptions::none())
+        .unwrap()
+        .display_lossy()
+        .to_string()
 }
 
 /// Builds a `Locker` backed by a real `composer.lock` `JsonFile` inside a fresh temp dir,
@@ -242,7 +245,10 @@ fn test_is_fresh() {
         r#"{{"hash": "{}"}}"#,
         hash("md5", &json_content).display_lossy()
     );
-    let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
+    let (mut locker, _temp_dir, _io) = make_locker(
+        &json_content,
+        Some(&BString::from(lock).display_lossy().to_string()),
+    );
 
     assert!(locker.is_fresh().unwrap());
 }
@@ -262,7 +268,8 @@ fn test_is_fresh_false() {
         JsonEncodeOptions::none(),
     )
     .unwrap();
-    let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
+    let (mut locker, _temp_dir, _io) =
+        make_locker(&json_content, Some(&lock.display_lossy().to_string()));
 
     assert!(!locker.is_fresh().unwrap());
 }
@@ -275,7 +282,10 @@ fn test_is_fresh_with_content_hash() {
         hash("md5", format!("{}  ", json_content)).display_lossy(),
         hash("md5", &json_content).display_lossy(),
     );
-    let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
+    let (mut locker, _temp_dir, _io) = make_locker(
+        &json_content,
+        Some(&BString::from(lock).display_lossy().to_string()),
+    );
 
     assert!(locker.is_fresh().unwrap());
 }
@@ -287,7 +297,10 @@ fn test_is_fresh_with_content_hash_and_no_hash() {
         r#"{{"content-hash": "{}"}}"#,
         hash("md5", &json_content).display_lossy()
     );
-    let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
+    let (mut locker, _temp_dir, _io) = make_locker(
+        &json_content,
+        Some(&BString::from(lock).display_lossy().to_string()),
+    );
 
     assert!(locker.is_fresh().unwrap());
 }
@@ -301,7 +314,10 @@ fn test_is_fresh_false_with_content_hash() {
         different_hash.display_lossy(),
         different_hash.display_lossy(),
     );
-    let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
+    let (mut locker, _temp_dir, _io) = make_locker(
+        &json_content,
+        Some(&BString::from(lock).display_lossy().to_string()),
+    );
 
     assert!(!locker.is_fresh().unwrap());
 }

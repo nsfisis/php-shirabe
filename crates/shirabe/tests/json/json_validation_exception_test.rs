@@ -5,7 +5,13 @@ use shirabe::json::json_validation_exception::JsonValidationException;
 #[test]
 fn test_get_errors() {
     for (message, errors, expected_message, expected_errors) in error_provider() {
-        let object = JsonValidationException::new(message.to_string(), errors.clone());
+        let object = JsonValidationException::new(
+            message.to_string(),
+            errors
+                .iter()
+                .map(|e| bstr::BString::from(e.as_str()))
+                .collect(),
+        );
         assert_eq!(expected_message, object.get_message());
         assert_eq!(&expected_errors, object.get_errors());
     }

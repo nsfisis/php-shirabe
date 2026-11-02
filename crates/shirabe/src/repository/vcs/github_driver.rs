@@ -1063,7 +1063,7 @@ impl GitHubDriver {
                         {
                             git_hub_util.authorize_oauth_interactively(
                                 self.inner.origin_url.as_bstr(),
-                                Some(&format!("Your GitHub credentials are required to fetch private repository metadata (<info>{}</info>)", self.inner.url.display_lossy())),
+                                Some(bconcat!("Your GitHub credentials are required to fetch private repository metadata (<info>", self.inner.url, "</info>)").as_bstr()),
                             )?;
                         }
 
@@ -1112,7 +1112,7 @@ impl GitHubDriver {
 
                             git_hub_util.authorize_oauth_interactively(
                                 self.inner.origin_url.as_bstr(),
-                                Some(&format!("API limit exhausted. Enter your GitHub credentials to get a larger API limit (<info>{}</info>)", self.inner.url.display_lossy())),
+                                Some(bconcat!("API limit exhausted. Enter your GitHub credentials to get a larger API limit (<info>", self.inner.url, "</info>)").as_bstr()),
                             )?;
 
                             return self.inner.get_contents(url);

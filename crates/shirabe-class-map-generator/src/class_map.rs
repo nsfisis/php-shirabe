@@ -6,7 +6,7 @@ use shirabe_php_shim::{OutOfBoundsException, bconcat, preg_is_match, rtrim2, str
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
-    pub warning: String,
+    pub warning: BString,
     pub class_name: BString,
 }
 
@@ -38,7 +38,7 @@ impl ClassMap {
     }
 
     /// Returns warning strings containing details about PSR-0/4 violations that were detected
-    pub fn get_psr_violations(&self) -> Vec<String> {
+    pub fn get_psr_violations(&self) -> Vec<BString> {
         if self.psr_violations.is_empty() {
             return vec![];
         }
@@ -56,7 +56,7 @@ impl ClassMap {
     /// Pass `Some(pattern)` for a regex pattern to filter out matching paths.
     pub fn get_ambiguous_classes(
         &self,
-        duplicates_filter: Option<&str>,
+        duplicates_filter: Option<&BStr>,
     ) -> anyhow::Result<IndexMap<BString, Vec<BString>>> {
         let duplicates_filter = match duplicates_filter {
             None => return Ok(self.ambiguous_classes.clone()),
@@ -95,9 +95,10 @@ impl ClassMap {
         let class_name = class_name.as_ref().as_bstr();
         match self.map.get(class_name) {
             Some(path) => Ok(path.as_bstr()),
-            None => Err(OutOfBoundsException::new(format!(
-                "Class {} is not present in the map",
-                class_name.display_lossy()
+            None => Err(OutOfBoundsException::new(bconcat!(
+                "Class ",
+                class_name,
+                " is not present in the map"
             ))
             .into()),
         }
@@ -109,7 +110,7 @@ impl ClassMap {
 
     pub fn add_psr_violation(
         &mut self,
-        warning: String,
+        warning: BString,
         class_name: impl Into<BString>,
         path: impl AsRef<[u8]>,
     ) {

@@ -271,10 +271,12 @@ impl RepositoryFactory {
                 }
                 PhpMixed::Array(repo_arr) => {
                     if !repo_arr.contains_key(B("type")) {
-                        return Err(UnexpectedValueException::new(format!(
-                            "Repository \"{}\" ({}) must have a type defined",
+                        return Err(UnexpectedValueException::new(bconcat!(
+                            "Repository \"",
                             index,
-                            json_encode(&repo).unwrap_or_default()
+                            "\" (",
+                            json_encode(&repo).unwrap_or_default(),
+                            ") must have a type defined"
                         ))
                         .into());
                     }
@@ -316,11 +318,14 @@ impl RepositoryFactory {
                     }
                 }
                 _ => {
-                    return Err(UnexpectedValueException::new(format!(
-                        "Repository \"{}\" ({}) should be an array, {} given",
+                    return Err(UnexpectedValueException::new(bconcat!(
+                        "Repository \"",
                         index,
+                        "\" (",
                         json_encode(&repo).unwrap_or_default(),
-                        get_debug_type(&repo).display_lossy()
+                        ") should be an array, ",
+                        get_debug_type(&repo),
+                        " given"
                     ))
                     .into());
                 }

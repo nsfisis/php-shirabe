@@ -1,3 +1,5 @@
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
+
 pub mod class_map;
 pub mod class_map_generator;
 pub mod file_list;

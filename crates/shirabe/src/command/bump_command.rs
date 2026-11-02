@@ -10,7 +10,7 @@ use crate::package::base_package;
 use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, bconcat, file_get_contents, file_put_contents, impl_php_class,
     is_writable, php_regex, preg_is_match, preg_replace, strtolower,
@@ -186,7 +186,8 @@ impl BumpCommand {
                 .collect::<indexmap::IndexSet<_>>()
                 .into_iter()
                 .collect();
-            let pattern = base_package::package_names_to_regexp(&unique_lower, "{^(?:%s)$}iD");
+            let pattern =
+                base_package::package_names_to_regexp(&unique_lower, BStr::new("{^(?:%s)$}iD"));
             for (key, reqs) in tasks.iter_mut() {
                 reqs.retain(|pkg_name, _| preg_is_match(&pattern, pkg_name));
             }

@@ -239,7 +239,7 @@ fn test_zip_archive_extract_only_failed() {
     let zip_archive = ZipArchive::__mock(ZipArchiveMock {
         open: Ok(()),
         count: 0,
-        extract_to: Err("Not a directory".to_string()),
+        extract_to: Err(BString::from("Not a directory")),
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 

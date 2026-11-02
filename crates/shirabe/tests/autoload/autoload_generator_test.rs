@@ -20,7 +20,8 @@ use shirabe::script::ScriptEvents;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
-    PhpMixed, dirname, path_from_bytes, path_to_bytes, preg_quote, realpath, strtr, symlink,
+    PhpMixed, bconcat, dirname, path_from_bytes, path_to_bytes, preg_quote, realpath, strtr,
+    symlink,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -2394,8 +2395,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     let parsed = s
         .generator
         .parse_autoloads(map, package.into(), PhpMixed::Bool(false));
-    let excluded_root = format!(
-        "{}/excludedroot($|/)",
+    let excluded_root = bconcat!(
         preg_quote(
             strtr(
                 realpath(path_from_bytes(&dirname(path_to_bytes(&s.working_dir))))
@@ -2405,10 +2405,10 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
                 "/"
             ),
             None
-        )
+        ),
+        "/excludedroot($|/)"
     );
-    let root_excl = format!(
-        "{}/root/excl($|/)",
+    let root_excl = bconcat!(
         preg_quote(
             strtr(
                 realpath(&s.working_dir)
@@ -2418,10 +2418,14 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
                 "/"
             ),
             None
-        )
+        ),
+        "/root/excl($|/)"
     );
     assert_eq!(
-        str_map(&[("0", pstr(&excluded_root)), ("1", pstr(&root_excl))]),
+        str_map(&[
+            ("0", pstr(&excluded_root.display_lossy().to_string())),
+            ("1", pstr(&root_excl.display_lossy().to_string()))
+        ]),
         parsed[B("exclude-from-classmap")]
     );
 }

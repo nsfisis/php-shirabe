@@ -160,16 +160,16 @@ impl Bitbucket {
         let token_map = match token {
             PhpMixed::Array(ref m) => m.clone(),
             _ => {
-                return Err(LogicException::new(format!(
-                    "Expected a token configured with expires_in and access_token present, got {}",
+                return Err(LogicException::new(bconcat!(
+                    "Expected a token configured with expires_in and access_token present, got ",
                     json_encode(&token).unwrap_or_default()
                 ))
                 .into());
             }
         };
         if !token_map.contains_key(B("expires_in")) || !token_map.contains_key(B("access_token")) {
-            return Err(LogicException::new(format!(
-                "Expected a token configured with expires_in and access_token present, got {}",
+            return Err(LogicException::new(bconcat!(
+                "Expected a token configured with expires_in and access_token present, got ",
                 json_encode(&token).unwrap_or_default()
             ))
             .into());
@@ -361,8 +361,8 @@ impl Bitbucket {
             .ok_or_else(|| {
                 let token_mixed =
                     PhpMixed::Array(token.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                LogicException::new(format!(
-                    "Expected a token configured with expires_in present, got {}",
+                LogicException::new(bconcat!(
+                    "Expected a token configured with expires_in present, got ",
                     json_encode(&token_mixed).unwrap_or_default()
                 ))
             })?;

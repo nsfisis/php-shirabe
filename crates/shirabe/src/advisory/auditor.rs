@@ -277,10 +277,14 @@ impl Auditor {
     ) -> anyhow::Result<Vec<CompletePackageInterfaceHandle>> {
         let mut filter: Option<String> = None;
         if !ignore_abandoned.is_empty() {
-            filter = Some(base_package::package_names_to_regexp(
-                &array_keys(ignore_abandoned),
-                "{^(?:%s)$}iD",
-            ));
+            filter = Some(
+                base_package::package_names_to_regexp(
+                    &array_keys(ignore_abandoned),
+                    BStr::new("{^(?:%s)$}iD"),
+                )
+                .display_lossy()
+                .to_string(),
+            );
         }
 
         // PHP: array_filter($packages, fn(PackageInterface $pkg) => $pkg instanceof CompletePackageInterface && $pkg->isAbandoned() && ($filter === null || !Preg::isMatch($filter, $pkg->getName())))

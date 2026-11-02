@@ -205,6 +205,7 @@ impl<'a> ExpandedVersion<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bstr::B;
 
     fn version(fields: &[(impl AsRef<[u8]>, impl AsRef<[u8]>)]) -> IndexMap<BString, PhpMixed> {
         fields

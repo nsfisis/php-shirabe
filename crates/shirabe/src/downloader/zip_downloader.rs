@@ -278,8 +278,8 @@ impl ZipDownloader {
                             None => PhpMixed::List(vec![]),
                         }
                     };
-                    self.inner.io.borrow().write_error(format!(
-                        "Response Headers: {}",
+                    self.inner.io.borrow().write_error(bconcat!(
+                        "Response Headers: ",
                         json_encode(&headers).unwrap_or_default()
                     ));
                 }

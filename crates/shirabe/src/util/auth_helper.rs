@@ -220,7 +220,8 @@ impl AuthHelper {
 
             if !git_hub_util.authorize_oauth(origin)?
                 && (!self.io.is_interactive()
-                    || !git_hub_util.authorize_oauth_interactively(origin, Some(&message))?)
+                    || !git_hub_util
+                        .authorize_oauth_interactively(origin, Some(BStr::new(&message)))?)
             {
                 return Err(TransportException::new(
                     format!("Could not authenticate against {}", origin.display_lossy()),

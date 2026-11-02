@@ -101,9 +101,9 @@ pub struct ProcessState {
 #[derive(Debug)]
 pub enum Descriptor {
     /// `['pipe', mode]` — `mode` is `"r"`/`"w"` from the child's point of view.
-    Pipe(String),
+    Pipe(BString),
     /// `['file', path, mode]`.
-    File(String, String),
+    File(BString, BString),
     /// An already-opened stream resource used directly as the descriptor.
     Resource(PhpResource),
     /// A descriptor index left unspecified by a sparse PHP descriptorspec; the child inherits the
@@ -165,7 +165,7 @@ pub fn proc_open(
     }
 
     // Remember which fds requested a pipe so their ends can be taken after spawn.
-    let mut pipe_modes: Vec<(i64, String)> = Vec::new();
+    let mut pipe_modes: Vec<(i64, BString)> = Vec::new();
     // Descriptors beyond stderr, as (target fd, child-side end). `Command` cannot express them, so
     // the child installs them with dup2(2) between fork and exec.
     let mut extra_fds: Vec<(std::os::fd::RawFd, std::os::fd::OwnedFd)> = Vec::new();
@@ -180,7 +180,7 @@ pub fn proc_open(
                         .map_err(std::io::Error::from)?;
                     // The mode is the child's point of view, so "r" means the child reads and the
                     // parent writes.
-                    let child_reads = mode.starts_with('r');
+                    let child_reads = mode.starts_with(b"r");
                     let (child_end, parent_end) = if child_reads {
                         (read_end, write_end)
                     } else {
@@ -197,7 +197,7 @@ pub fn proc_open(
                                 !child_reads,
                                 child_reads,
                                 mode.clone(),
-                                format!("pipe:fd{}", fd).into(),
+                                crate::bconcat!("pipe:fd", fd),
                             ),
                         ))),
                     );
@@ -206,7 +206,8 @@ pub fn proc_open(
                     extra_fds.push((
                         fd as std::os::fd::RawFd,
                         std::os::fd::OwnedFd::from(resource_to_file(&crate::fs::fopen(
-                            path, mode,
+                            crate::path_from_bytes(path),
+                            mode,
                         )?)?),
                     ));
                 }
@@ -226,9 +227,9 @@ pub fn proc_open(
                 pipe_modes.push((fd, mode.clone()));
                 std::process::Stdio::piped()
             }
-            Descriptor::File(path, mode) => {
-                std::process::Stdio::from(resource_to_file(&crate::fs::fopen(path, mode)?)?)
-            }
+            Descriptor::File(path, mode) => std::process::Stdio::from(resource_to_file(
+                &crate::fs::fopen(crate::path_from_bytes(path), mode)?,
+            )?),
             Descriptor::Resource(resource) => {
                 std::process::Stdio::from(resource_to_file(resource)?)
             }
@@ -291,7 +292,7 @@ pub fn proc_open(
                 readable,
                 writable,
                 mode,
-                format!("pipe:fd{}", fd).into(),
+                crate::bconcat!("pipe:fd", fd),
             ))));
         pipes.insert(fd, resource);
     }
@@ -410,7 +411,7 @@ pub fn posix_geteuid() -> u32 {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PasswdEntry {
-    pub name: String,
+    pub name: BString,
     pub passwd: std::ffi::CString,
     pub uid: i64,
     pub gid: i64,
@@ -422,7 +423,7 @@ pub struct PasswdEntry {
 pub fn posix_getpwuid(uid: u32) -> Option<PasswdEntry> {
     let user = nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(uid)).ok()??;
     Some(PasswdEntry {
-        name: user.name,
+        name: user.name.into(),
         passwd: user.passwd,
         uid: user.uid.as_raw() as i64,
         gid: user.gid.as_raw() as i64,
@@ -445,17 +446,17 @@ pub fn posix_isatty(stream: PhpResource) -> bool {
 
 /// PHP `get_current_user()`: the name of the owner of the running script file. The Shirabe
 /// executable takes the place of the script; PHP returns an empty string when the lookup fails.
-pub fn get_current_user() -> String {
+pub fn get_current_user() -> BString {
     use std::os::unix::fs::MetadataExt as _;
     let Ok(executable) = std::env::current_exe() else {
-        return String::new();
+        return BString::default();
     };
     let Ok(metadata) = std::fs::metadata(&executable) else {
-        return String::new();
+        return BString::default();
     };
     match nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(metadata.uid())) {
-        Ok(Some(user)) => user.name,
-        _ => String::new(),
+        Ok(Some(user)) => user.name.into(),
+        _ => BString::default(),
     }
 }
 
@@ -472,7 +473,7 @@ mod tests {
             "echo hi",
             &[
                 Descriptor::Inherit,
-                Descriptor::Pipe("w".to_string()),
+                Descriptor::Pipe(BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,
@@ -510,8 +511,8 @@ mod tests {
         let process = proc_open(
             "cat",
             &[
-                Descriptor::Pipe("r".to_string()),
-                Descriptor::Pipe("w".to_string()),
+                Descriptor::Pipe(BString::from("r")),
+                Descriptor::Pipe(BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,
@@ -543,7 +544,7 @@ mod tests {
                 Descriptor::Inherit,
                 Descriptor::Inherit,
                 Descriptor::Inherit,
-                Descriptor::Pipe("w".to_string()),
+                Descriptor::Pipe(BString::from("w")),
             ],
             &mut pipes,
             None,
@@ -566,10 +567,10 @@ mod tests {
             "cat <&4",
             &[
                 Descriptor::Inherit,
-                Descriptor::Pipe("w".to_string()),
+                Descriptor::Pipe(BString::from("w")),
                 Descriptor::Inherit,
                 Descriptor::Inherit,
-                Descriptor::Pipe("r".to_string()),
+                Descriptor::Pipe(BString::from("r")),
             ],
             &mut pipes,
             None,
@@ -616,17 +617,19 @@ mod tests {
 
     #[test]
     fn proc_open_redirects_stdout_to_file() {
-        let path =
-            std::env::temp_dir().join(format!("shirabe_proc_open_{}.txt", std::process::id()));
-        let path_str = path.display().to_string();
-        let path_str = path_str.as_str();
+        let path = std::env::temp_dir().join(crate::path_from_bytes(&crate::bconcat!(
+            "shirabe_proc_open_",
+            std::process::id(),
+            ".txt"
+        )));
+        let path_str = crate::path_to_bytes(&path);
 
         let mut pipes = IndexMap::new();
         let process = proc_open(
             "echo filetest",
             &[
                 Descriptor::Inherit,
-                Descriptor::File(path_str.to_string(), "w".to_string()),
+                Descriptor::File(crate::bconcat!(path_str), BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,

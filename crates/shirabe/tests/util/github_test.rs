@@ -113,7 +113,7 @@ fn test_username_password_authentication_flow() {
 
     assert!(
         github
-            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
     // removeConfigSetting('github-oauth.<origin>') verified on the conf source mock drop.

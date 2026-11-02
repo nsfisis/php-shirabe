@@ -1,5 +1,5 @@
 use crate::PhpMixed;
-use bstr::{BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 
 pub fn empty(value: &PhpMixed) -> bool {
@@ -23,7 +23,7 @@ pub fn serialize(value: &PhpMixed) -> BString {
 
 fn serialize_string(out: &mut BString, s: &[u8]) {
     // PHP measures the string length in bytes.
-    out.push_str(format!("s:{}:\"", s.len()));
+    out.push_str(crate::bconcat!("s:", s.len(), ":\""));
     out.extend_from_slice(s);
     out.push_str("\";");
 }
@@ -32,7 +32,7 @@ fn serialize_into(out: &mut BString, value: &PhpMixed) {
     match value {
         PhpMixed::Null => out.push_str("N;"),
         PhpMixed::Bool(b) => out.push_str(if *b { "b:1;" } else { "b:0;" }),
-        PhpMixed::Int(i) => out.push_str(format!("i:{};", i)),
+        PhpMixed::Int(i) => out.push_str(crate::bconcat!("i:", i, ";")),
         PhpMixed::Float(f) => {
             out.push_str("d:");
             out.extend_from_slice(&serialize_float(*f));
@@ -40,19 +40,19 @@ fn serialize_into(out: &mut BString, value: &PhpMixed) {
         }
         PhpMixed::String(s) => serialize_string(out, s),
         PhpMixed::List(items) => {
-            out.push_str(format!("a:{}:{{", items.len()));
+            out.push_str(crate::bconcat!("a:", items.len(), ":{"));
             for (i, item) in items.iter().enumerate() {
-                out.push_str(format!("i:{};", i));
+                out.push_str(crate::bconcat!("i:", i, ";"));
                 serialize_into(out, item);
             }
             out.push(b'}');
         }
         PhpMixed::Array(entries) => {
-            out.push_str(format!("a:{}:{{", entries.len()));
+            out.push_str(crate::bconcat!("a:", entries.len(), ":{"));
             for (k, v) in entries {
                 // PHP normalizes canonical integer string keys to integer keys.
                 match canonical_int_key(k) {
-                    Some(i) => out.push_str(format!("i:{};", i)),
+                    Some(i) => out.push_str(crate::bconcat!("i:", i, ";")),
                     None => serialize_string(out, k),
                 }
                 serialize_into(out, v);
@@ -141,7 +141,8 @@ pub fn is_object(value: &PhpMixed) -> bool {
     matches!(value, PhpMixed::Object(_))
 }
 
-pub fn is_a(_object_or_class: &PhpMixed, _class: &str, _allow_string: bool) -> bool {
+pub fn is_a(_object_or_class: &PhpMixed, _class: impl AsRef<[u8]>, _allow_string: bool) -> bool {
+    let _class = BStr::new(_class.as_ref());
     // TODO(php-runtime): requires runtime class information (the object's class and its ancestry), which
     // PhpMixed::Object does not carry.
     todo!()
@@ -164,8 +165,10 @@ pub fn is_iterable(value: &PhpMixed) -> bool {
 
 /// The ASCII text of `s`, or `None` if `s` holds a byte that is not ASCII (which no numeric string
 /// does).
-fn ascii_text(s: &[u8]) -> Option<String> {
-    s.is_ascii().then(|| s.iter().map(|&b| b as char).collect())
+#[expect(clippy::disallowed_types, reason = "str::parse() takes text")]
+fn ascii_text(s: &[u8]) -> Option<&str> {
+    s.is_ascii()
+        .then(|| crate::utf8_text(s).expect("ASCII is valid UTF-8"))
 }
 
 pub fn is_numeric_string(s: impl AsRef<[u8]>) -> bool {
@@ -414,7 +417,7 @@ fn var_export_into(out: &mut BString, value: &PhpMixed, level: usize) {
             out.push_str("array (\n");
             for (i, item) in items.iter().enumerate() {
                 var_export_indent(out, level + 1);
-                out.push_str(format!("{} => ", i));
+                out.push_str(crate::bconcat!(i, " => "));
                 if matches!(
                     item,
                     PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)

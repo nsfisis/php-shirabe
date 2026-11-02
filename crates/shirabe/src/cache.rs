@@ -2,13 +2,14 @@
 
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Filesystem, Platform};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use chrono::Utc;
 use shirabe_php_shim::{
     bconcat, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
-    file_exists, file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable,
-    mkdir, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
-    random_bytes, random_int, rename, rtrim2, time, touch, touch3, unlink,
+    display_to_bytes, file_exists, file_get_contents, file_put_contents, filemtime, hash_file,
+    is_dir, is_writable, mkdir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_replace, random_bytes, random_int, rename, rtrim2, time, touch, touch3,
+    unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
@@ -367,7 +368,7 @@ impl Cache {
             let expire = Utc::now() - chrono::Duration::seconds(ttl);
             let expire_str = format!(
                 "until {}",
-                expire.format(date_format_to_strftime("Y-m-d H:i:s"))
+                expire.format(date_format_to_strftime(b"Y-m-d H:i:s"))
             );
 
             for file in self.gc_outdated_files(&expire_str) {
@@ -402,7 +403,7 @@ impl Cache {
         }
 
         let mut finder = self.get_finder();
-        finder.date(expire_str);
+        finder.date(BStr::new(&expire_str));
         finder.into_iter().collect()
     }
 
@@ -438,14 +439,13 @@ impl Cache {
             let expire = Utc::now() - chrono::Duration::seconds(ttl);
 
             let mut finder = Finder::create();
-            finder
-                .r#in(&self.root)
-                .directories()
-                .depth(0)
-                .date(&format!(
-                    "until {}",
-                    expire.format(date_format_to_strftime("Y-m-d H:i:s"))
-                ));
+            finder.r#in(&self.root).directories().depth(0).date(
+                bconcat!(
+                    "until ",
+                    display_to_bytes(expire.format(date_format_to_strftime(b"Y-m-d H:i:s")))
+                )
+                .as_bstr(),
+            );
             for file in &mut finder {
                 let _ = self.filesystem.borrow_mut().remove_directory(&file);
             }

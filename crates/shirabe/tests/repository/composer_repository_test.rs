@@ -59,7 +59,10 @@ fn repo_config(url: &str) -> IndexMap<BString, PhpMixed> {
 }
 
 fn json_encode(value: &PhpMixed) -> String {
-    shirabe::json::json_file::JsonFile::encode(value).unwrap()
+    shirabe::json::json_file::JsonFile::encode(value)
+        .unwrap()
+        .display_lossy()
+        .to_string()
 }
 
 fn str_kv(pairs: &[(&str, PhpMixed)]) -> PhpMixed {

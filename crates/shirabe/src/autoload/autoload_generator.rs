@@ -174,8 +174,11 @@ impl AutoloadGenerator {
             )?;
         }
 
-        let mut class_map_generator =
-            ClassMapGenerator::new(vec!["php".to_string(), "inc".to_string(), "hh".to_string()]);
+        let mut class_map_generator = ClassMapGenerator::new(vec![
+            BString::from("php"),
+            BString::from("inc"),
+            BString::from("hh"),
+        ]);
         class_map_generator.avoid_duplicate_scans(None);
 
         let mut filesystem = Filesystem::new(None);
@@ -407,7 +410,7 @@ impl AutoloadGenerator {
             class_map_generator.scan_paths(
                 dir_str,
                 self.build_exclusion_regex(dir_str, excluded.clone()),
-                "classmap",
+                BStr::new("classmap"),
                 None,
                 vec![],
             )?;
@@ -480,7 +483,7 @@ impl AutoloadGenerator {
                         class_map_generator.scan_paths(
                             path_to_bytes(&dir_str),
                             exclusion_regex,
-                            group_type,
+                            BStr::new(group_type),
                             Some(namespace.clone()),
                             vec![],
                         )?;
@@ -493,7 +496,8 @@ impl AutoloadGenerator {
         let ambiguous_classes = if strict_ambiguous {
             class_map.get_ambiguous_classes(None)?
         } else {
-            class_map.get_ambiguous_classes(Some(r"{/(test|fixture|example|stub)s?/}i"))?
+            class_map
+                .get_ambiguous_classes(Some(BStr::new(r"{/(test|fixture|example|stub)s?/}i")))?
         };
         for (class_name, ambiguous_paths) in &ambiguous_classes {
             if ambiguous_paths.len() > 1 {
@@ -523,7 +527,8 @@ impl AutoloadGenerator {
         // output PSR violations which are not coming from the vendor dir
         class_map.clear_psr_violations_by_path(path_to_bytes(&vendor_path));
         for msg in class_map.get_psr_violations() {
-            self.io.write_error(format!("<warning>{}</warning>", msg));
+            self.io
+                .write_error(bconcat!("<warning>", msg, "</warning>"));
         }
 
         class_map.add_class(
@@ -946,9 +951,9 @@ impl AutoloadGenerator {
             }
 
             let mut class_map_generator = ClassMapGenerator::new(vec![
-                "php".to_string(),
-                "inc".to_string(),
-                "hh".to_string(),
+                BString::from("php"),
+                BString::from("inc"),
+                BString::from("hh"),
             ]);
             class_map_generator.avoid_duplicate_scans(None);
 
@@ -957,7 +962,7 @@ impl AutoloadGenerator {
                 if let Err(e) = class_map_generator.scan_paths(
                     dir,
                     self.build_exclusion_regex(dir, excluded.clone()),
-                    "classmap",
+                    BStr::new("classmap"),
                     None,
                     vec![],
                 ) {
@@ -1835,7 +1840,7 @@ require_once "#,
                                     .unwrap_or_default()
                                     .split(|b| *b == b'/' || *b == b'\\')
                                     .map(|segment| preg_quote(segment, None))
-                                    .collect::<Vec<String>>(),
+                                    .collect::<Vec<BString>>(),
                             );
                             path_str = ltrim2(
                                 preg_replace(

@@ -90,9 +90,10 @@ fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<BS
         if !file.is_dir() {
             let real_path = file.canonicalize().unwrap();
             files.push(preg_replace(
-                format!(
-                    "#^{}#",
-                    preg_quote(path_to_bytes(&set_up.sources), Some('#'))
+                bconcat!(
+                    "#^",
+                    preg_quote(path_to_bytes(&set_up.sources), Some(b'#')),
+                    "#"
                 ),
                 "",
                 path_to_bytes(&set_up.fs.normalize_path(&real_path)),
@@ -199,9 +200,10 @@ fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<BString> {
     let mut archive = ZipArchive::new();
     archive.open(&zip_path, 0).unwrap();
 
-    let prefix = format!(
-        "#^phar://{}/archive\\.zip/archive#",
-        preg_quote(path_to_bytes(&set_up.sources), Some('#'))
+    let prefix = bconcat!(
+        "#^phar://",
+        preg_quote(path_to_bytes(&set_up.sources), Some(b'#')),
+        "/archive\\.zip/archive#"
     );
     let mut files: Vec<BString> = vec![];
     for index in 0..archive.count() {

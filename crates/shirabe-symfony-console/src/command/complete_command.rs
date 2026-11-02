@@ -7,12 +7,12 @@ use crate::completion::{
 };
 use crate::input::{InputInterface, InputInterfaceByName, InputOption, InputValue};
 use crate::output::OutputInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, basename, bconcat, ctype_digit,
-    date_utc, file_put_contents3, filter_var_boolean, getenv, impl_php_class, intval,
-    path_from_bytes, sys_get_temp_dir,
+    date_utc, error_message, file_put_contents3, filter_var_boolean, getenv, impl_php_class,
+    implode, intval, path_from_bytes, php_str, sys_get_temp_dir,
 };
 use std::ops::{Deref, DerefMut};
 
@@ -44,18 +44,18 @@ impl DerefMut for CompleteCommand {
 }
 
 impl CompleteCommand {
-    pub const DEFAULT_NAME: &'static str = "|_complete";
-    pub const DEFAULT_DESCRIPTION: &'static str =
-        "Internal command to provide shell completion suggestions";
+    pub const DEFAULT_NAME: &'static BStr = php_str(b"|_complete");
+    pub const DEFAULT_DESCRIPTION: &'static BStr =
+        php_str(b"Internal command to provide shell completion suggestions");
 
     pub fn new(completion_outputs: IndexMap<BString, PhpMixed>) -> anyhow::Result<Self> {
         // must be set before the parent constructor, as the property value is used in configure()
         let mut completion_outputs = completion_outputs;
         // $completionOutputs + ['bash' => BashCompletionOutput::class]
         completion_outputs.entry("bash".into()).or_insert_with(|| {
-            PhpMixed::from(
-                "Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput".to_string(),
-            )
+            PhpMixed::from(BString::from(
+                "Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput",
+            ))
         });
 
         let this = Self {
@@ -79,9 +79,9 @@ impl CompleteCommand {
     ) -> anyhow::Result<CompletionInput> {
         let current_index = input.get_option("current")?;
         if !current_index.to_bool() || !ctype_digit(current_index.as_string().unwrap_or_default()) {
-            anyhow::bail!(RuntimeException::new(
-                "The \"--current\" option must be set and it must be an integer.".to_string()
-            ));
+            anyhow::bail!(RuntimeException::new(BString::from(
+                "The \"--current\" option must be set and it must be an integer."
+            )));
         }
 
         let tokens: Vec<bstr::BString> = input
@@ -113,11 +113,11 @@ impl CompleteCommand {
         application.borrow_mut().find(input_name.as_ref()).ok()
     }
 
-    fn log(&self, messages: &str) {
-        self.log_many(vec![messages.to_string()]);
+    fn log(&self, messages: &BStr) {
+        self.log_many(vec![BString::from(messages)]);
     }
 
-    fn log_many(&self, messages: Vec<String>) {
+    fn log_many(&self, messages: Vec<BString>) {
         if !self.is_debug.get() {
             return;
         }
@@ -134,7 +134,7 @@ impl CompleteCommand {
         let tmp_dir = sys_get_temp_dir();
         file_put_contents3(
             path_from_bytes(&bconcat!(tmp_dir, "/sf_", command_name, ".log")),
-            &(messages.join(PHP_EOL) + PHP_EOL),
+            &bconcat!(implode(PHP_EOL, &messages), PHP_EOL),
             FILE_APPEND,
         );
     }
@@ -175,18 +175,20 @@ fn instantiate_completion_output(class: &PhpMixed) -> Box<dyn CompletionOutputIn
 #[async_trait::async_trait(?Send)]
 impl Command for CompleteCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        let shells = self
-            .completion_outputs
-            .keys()
-            .map(|shell| shell.display_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join("\", \"");
+        let shells = implode(
+            "\", \"",
+            &self
+                .completion_outputs
+                .keys()
+                .map(|shell| shell.to_owned())
+                .collect::<Vec<_>>(),
+        );
         self.inner
             .add_option(
                 "shell",
                 Some("s".into()),
                 Some(InputOption::VALUE_REQUIRED),
-                format!("The shell type (\"{}\")", shells),
+                bconcat!("The shell type (\"", shells, "\")"),
                 InputValue::Null,
             )?
             .add_option(
@@ -247,9 +249,9 @@ impl Command for CompleteCommand {
 
             let shell = input.borrow().get_option("shell")?;
             if !shell.to_bool() {
-                anyhow::bail!(RuntimeException::new(
-                    "The \"--shell\" option must be set.".to_string()
-                ));
+                anyhow::bail!(RuntimeException::new(BString::from(
+                    "The \"--shell\" option must be set."
+                )));
             }
 
             let completion_output = self
@@ -258,14 +260,19 @@ impl Command for CompleteCommand {
                 .cloned()
                 .unwrap_or(PhpMixed::Bool(false));
             if !completion_output.to_bool() {
-                anyhow::bail!(RuntimeException::new(format!(
-                    "Shell completion is not supported for your shell: \"{}\" (supported: \"{}\").",
-                    shell.as_string().unwrap_or_default().display_lossy(),
-                    self.completion_outputs
-                        .keys()
-                        .map(|shell| shell.display_lossy().to_string())
-                        .collect::<Vec<_>>()
-                        .join("\", \"")
+                anyhow::bail!(RuntimeException::new(bconcat!(
+                    "Shell completion is not supported for your shell: \"",
+                    shell.as_string().unwrap_or_default(),
+                    "\" (supported: \"",
+                    implode(
+                        "\", \"",
+                        &self
+                            .completion_outputs
+                            .keys()
+                            .map(|shell| shell.to_owned())
+                            .collect::<Vec<_>>()
+                    ),
+                    "\")."
                 )));
             }
 
@@ -273,28 +280,32 @@ impl Command for CompleteCommand {
             let mut suggestions = CompletionSuggestions::new();
 
             self.log_many(vec![
-                String::new(),
-                format!("<comment>{}</>", date_utc("Y-m-d H:i:s", None)),
-                "<info>Input:</> <comment>(\"|\" indicates the cursor position)</>".to_string(),
-                format!("  {}", completion_input.__to_string().display_lossy()),
-                "<info>Command:</>".to_string(),
-                format!(
-                    "  {}",
-                    PHP_SERVER
-                        .lock()
-                        .unwrap()
-                        .argv()
-                        .map(|a| a.as_encoded_bytes().as_bstr().display_lossy().to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ")
+                BString::default(),
+                bconcat!("<comment>", date_utc("Y-m-d H:i:s", None), "</>"),
+                BString::from("<info>Input:</> <comment>(\"|\" indicates the cursor position)</>"),
+                bconcat!("  ", completion_input.__to_string()),
+                BString::from("<info>Command:</>"),
+                bconcat!(
+                    "  ",
+                    implode(
+                        " ",
+                        &PHP_SERVER
+                            .lock()
+                            .unwrap()
+                            .argv()
+                            .map(|a| a.as_encoded_bytes().as_bstr().to_owned())
+                            .collect::<Vec<_>>()
+                    )
                 ),
-                "<info>Messages:</>".to_string(),
+                BString::from("<info>Messages:</>"),
             ]);
 
             let command = self.find_command(&completion_input, &*output.borrow());
             match command {
                 None => {
-                    self.log("  No command found, completing using the Application class.");
+                    self.log(BStr::new(
+                        "  No command found, completing using the Application class.",
+                    ));
 
                     let application = self.get_application().unwrap();
                     application
@@ -311,7 +322,9 @@ impl Command for CompleteCommand {
                             .iter()
                             .any(|a| completion_input.get_completion_value() == *a) =>
                 {
-                    self.log("  No command found, completing using the Application class.");
+                    self.log(BStr::new(
+                        "  No command found, completing using the Application class.",
+                    ));
 
                     // expand shortcut names ("cache:cl<TAB>") into their full name ("cache:clear")
                     let mut values = vec![command.borrow().get_name()];
@@ -331,33 +344,36 @@ impl Command for CompleteCommand {
                     completion_input.bind(&command.borrow().get_definition())?;
 
                     if CompletionInput::TYPE_OPTION_NAME == completion_input.get_completion_type() {
-                        self.log(&format!(
-                            "  Completing option names for the <comment>{}</> command.",
-                            get_class_of_command(&command).display_lossy()
-                        ));
+                        self.log(
+                            bconcat!(
+                                "  Completing option names for the <comment>",
+                                get_class_of_command(&command),
+                                "</> command."
+                            )
+                            .as_bstr(),
+                        );
 
                         suggestions.suggest_options(get_definition_options(&command));
                     } else {
                         self.log_many(vec![
-                            format!(
-                                "  Completing using the <comment>{}</> class.",
-                                get_class_of_command(&command).display_lossy()
+                            bconcat!(
+                                "  Completing using the <comment>",
+                                get_class_of_command(&command),
+                                "</> class."
                             ),
-                            format!(
-                                "  Completing <comment>{}</> for <comment>{}</>",
+                            bconcat!(
+                                "  Completing <comment>",
                                 completion_input.get_completion_type(),
-                                completion_input
-                                    .get_completion_name()
-                                    .unwrap_or_default()
-                                    .display_lossy()
+                                "</> for <comment>",
+                                completion_input.get_completion_name().unwrap_or_default(),
+                                "</>"
                             ),
                         ]);
                         let compval = completion_input.get_completion_value();
                         if !compval.is_empty() {
-                            self.log(&format!(
-                                "  Current value: <comment>{}</>",
-                                compval.display_lossy()
-                            ));
+                            self.log(
+                                bconcat!("  Current value: <comment>", compval, "</>").as_bstr(),
+                            );
                         }
 
                         command
@@ -371,27 +387,32 @@ impl Command for CompleteCommand {
             let completion_output: Box<dyn CompletionOutputInterface> =
                 instantiate_completion_output(&completion_output);
 
-            self.log("<info>Suggestions:</>");
+            self.log(BStr::new("<info>Suggestions:</>"));
             let option_suggestions = suggestions.get_option_suggestions();
             if !option_suggestions.is_empty() {
-                self.log(&format!(
-                    "  --{}",
-                    option_suggestions
-                        .iter()
-                        .map(|o| o.get_name().display_lossy().to_string())
-                        .collect::<Vec<_>>()
-                        .join(" --")
-                ));
+                self.log(
+                    bconcat!(
+                        "  --",
+                        implode(
+                            " --",
+                            &option_suggestions
+                                .iter()
+                                .map(|o| o.get_name().to_owned())
+                                .collect::<Vec<_>>()
+                        )
+                    )
+                    .as_bstr(),
+                );
             } else {
-                let value_suggestions: Vec<String> = suggestions
+                let value_suggestions: Vec<BString> = suggestions
                     .get_value_suggestions()
                     .iter()
-                    .map(|s| s.get_value().display_lossy().to_string())
+                    .map(|s| s.get_value().to_owned())
                     .collect();
                 if !value_suggestions.is_empty() {
-                    self.log(&format!("  {}", value_suggestions.join(" ")));
+                    self.log(bconcat!("  ", implode(" ", &value_suggestions)).as_bstr());
                 } else {
-                    self.log("  <comment>No suggestions were provided</>");
+                    self.log(BStr::new("  <comment>No suggestions were provided</>"));
                 }
             }
 
@@ -403,7 +424,10 @@ impl Command for CompleteCommand {
         match result {
             Ok(code) => Ok(code),
             Err(e) => {
-                self.log_many(vec!["<error>Error!</error>".to_string(), format!("{}", e)]);
+                self.log_many(vec![
+                    BString::from("<error>Error!</error>"),
+                    error_message(&e),
+                ]);
 
                 if output.borrow().is_debug() {
                     return Err(e);

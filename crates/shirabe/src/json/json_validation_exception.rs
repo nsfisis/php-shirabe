@@ -6,19 +6,19 @@ use shirabe_php_shim::Exception;
 #[derive(Debug)]
 pub struct JsonValidationException {
     inner: Exception,
-    errors: Vec<String>,
+    errors: Vec<BString>,
 }
 
 impl JsonValidationException {
     #[track_caller]
-    pub fn new(message: impl Into<BString>, errors: Vec<String>) -> Self {
+    pub fn new(message: impl Into<BString>, errors: Vec<BString>) -> Self {
         Self {
             inner: Exception::new(message),
             errors,
         }
     }
 
-    pub fn get_errors(&self) -> &Vec<String> {
+    pub fn get_errors(&self) -> &Vec<BString> {
         &self.errors
     }
 }

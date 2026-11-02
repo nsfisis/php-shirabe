@@ -350,7 +350,7 @@ impl CreateProjectCommand {
             ]
             .iter()
             {
-                finder.name(vcs_name);
+                finder.name(BStr::new(vcs_name));
             }
 
             // PHP: try { $dirs = iterator_to_array($finder); ... } catch (\Exception $e) { ... }

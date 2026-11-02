@@ -160,9 +160,9 @@ impl ConfigCommand {
             } else {
                 String::new()
             };
-            return Err(RuntimeException::new(format!(
-                "{} is an invalid value{}",
+            return Err(RuntimeException::new(bconcat!(
                 json_encode(&values_mixed).ok().unwrap_or_default(),
+                " is an invalid value",
                 suffix
             ))
             .into());
@@ -235,7 +235,7 @@ impl ConfigCommand {
                     .iter()
                     .map(|val| {
                         if is_array(val) {
-                            json_encode(val).unwrap_or_default().into()
+                            json_encode(val).unwrap_or_default()
                         } else {
                             php_to_string(val)
                         }
@@ -844,13 +844,13 @@ impl Command for ConfigCommand {
             }
 
             let value_str = if is_array(&value) || is_object(&value) || is_bool(&value) {
-                BString::from(JsonFile::encode_with_options(
+                JsonFile::encode_with_options(
                     &value,
                     JsonEncodeOptions {
                         pretty_print: false,
                         ..Default::default()
                     },
-                )?)
+                )?
             } else {
                 php_to_string(&value)
             };

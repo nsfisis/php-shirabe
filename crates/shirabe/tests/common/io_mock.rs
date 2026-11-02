@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Mock/IOMock.php
 
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use shirabe::config::Config;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
@@ -118,10 +118,7 @@ impl IOMock {
         let output = self.inner.get_output();
 
         if Platform::get_env("DEBUG_OUTPUT").is_some_and(|v| v == "1") {
-            println!(
-                "{PHP_EOL}Collected output: {}{PHP_EOL}",
-                output.display_lossy()
-            );
+            println!("\nCollected output: {}\n", output.display_lossy());
         }
 
         // Not configured to expect anything, so there is nothing to verify.
@@ -155,7 +152,7 @@ impl IOMock {
 
                         if self.strict {
                             panic!(
-                                "IO authentication mismatch. Expected:{PHP_EOL}{expected:?}{PHP_EOL}Got:{PHP_EOL}{auth:?}"
+                                "IO authentication mismatch. Expected:\n{expected:?}\nGot:\n{auth:?}"
                             );
                         }
                     }
@@ -167,11 +164,13 @@ impl IOMock {
 
                 let (pattern, label) = match expect {
                     Expectation::Ask { ask, .. } => {
-                        (format!("{{^{}$}}", preg_quote(ask, None)), ask.clone())
+                        (bconcat!("{^", preg_quote(ask, None), "$}"), ask.clone())
                     }
-                    Expectation::Text { text, regex: true } => (text.clone(), text.clone()),
+                    Expectation::Text { text, regex: true } => {
+                        (BString::from(text.as_str()), text.clone())
+                    }
                     Expectation::Text { text, regex: false } => {
-                        (format!("{{^{}$}}", preg_quote(text, None)), text.clone())
+                        (bconcat!("{^", preg_quote(text, None), "$}"), text.clone())
                     }
                     Expectation::Auth { .. } => unreachable!("handled above"),
                 };
@@ -183,14 +182,14 @@ impl IOMock {
 
                     if self.strict {
                         panic!(
-                            "IO output mismatch. Expected:{PHP_EOL}{label}{PHP_EOL}Got:{PHP_EOL}{}",
+                            "IO output mismatch. Expected:\n{label}\nGot:\n{}",
                             line.display_lossy()
                         );
                     }
                 }
 
                 panic!(
-                    "Expected \"{label}\" to be output still but there is no output left to consume. Complete output:{PHP_EOL}{}",
+                    "Expected \"{label}\" to be output still but there is no output left to consume. Complete output:\n{}",
                     output.display_lossy()
                 );
             }

@@ -2,8 +2,8 @@
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    RuntimeException, basename, basename_with_suffix, dirname, filesize, is_dir, is_file, is_link,
-    path_from_bytes, realpath,
+    RuntimeException, basename, basename_with_suffix, bconcat, dirname, filesize, is_dir, is_file,
+    is_link, path_from_bytes, realpath,
 };
 use std::path::PathBuf;
 
@@ -85,9 +85,9 @@ impl SplFileInfo {
         // Inherited from \SplFileInfo, whose failure message names the base class even for subclasses.
         match filesize(path_from_bytes(&self.pathname)) {
             Some(size) => Ok(size),
-            None => Err(RuntimeException::new(format!(
-                "SplFileInfo::getSize(): stat failed for {}",
-                self.pathname.display_lossy()
+            None => Err(RuntimeException::new(bconcat!(
+                "SplFileInfo::getSize(): stat failed for ",
+                self.pathname
             ))
             .into()),
         }

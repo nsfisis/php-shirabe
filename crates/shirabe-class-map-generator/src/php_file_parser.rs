@@ -1,11 +1,11 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php
 
 use crate::php_file_cleaner::PhpFileCleaner;
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
-    PHP_EOL, RuntimeException, bconcat, file_exists, file_get_contents, is_file, is_readable,
-    ltrim2, path_from_bytes, php_strip_whitespace, preg_match_all, str_replace_array, strrpos,
-    strtolower, substr, trim,
+    PHP_EOL, RuntimeException, bconcat, display_to_bytes, file_exists, file_get_contents, is_file,
+    is_readable, ltrim2, path_from_bytes, php_strip_whitespace, preg_match_all, str_replace_array,
+    strrpos, strtolower, substr, trim,
 };
 use std::sync::OnceLock;
 
@@ -20,31 +20,37 @@ impl PhpFileParser {
         let contents = match php_strip_whitespace(fs_path) {
             Ok(contents) if !contents.is_empty() => contents,
             stripped => {
-                let mut message: String;
+                let mut message: BString;
                 if !file_exists(fs_path) {
-                    message = format!(
-                        "File at \"{}\" does not exist, check your classmap definitions",
-                        path.display_lossy()
+                    message = bconcat!(
+                        "File at \"",
+                        path,
+                        "\" does not exist, check your classmap definitions"
                     );
                 } else if !Self::is_readable(fs_path) {
-                    message = format!(
-                        "File at \"{}\" is not readable, check its permissions",
-                        path.display_lossy()
+                    message = bconcat!(
+                        "File at \"",
+                        path,
+                        "\" is not readable, check its permissions"
                     );
                 } else if trim(file_get_contents(fs_path).unwrap_or_default()).is_empty() {
                     // The input file was really empty and thus contains no classes
                     return Ok(vec![]);
                 } else {
-                    message = format!(
-                        "File at \"{}\" could not be parsed as PHP, it may be binary or corrupted",
-                        path.display_lossy()
+                    message = bconcat!(
+                        "File at \"",
+                        path,
+                        "\" could not be parsed as PHP, it may be binary or corrupted"
                     );
                 }
 
                 if let Err(error) = stripped {
-                    message = format!(
-                        "{}{}{}{}{}",
-                        message, PHP_EOL, "The following message may be helpful:", PHP_EOL, error
+                    message = bconcat!(
+                        message,
+                        PHP_EOL,
+                        "The following message may be helpful:",
+                        PHP_EOL,
+                        display_to_bytes(error)
                     );
                 }
 
@@ -53,7 +59,7 @@ impl PhpFileParser {
         };
 
         // return early if there is no chance of matching anything in this file
-        let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);
+        let pattern = bconcat!("{\\b(?:class|interface|trait", extra_types, ")\\s}i");
         let max_matches = preg_match_all(&pattern, &contents).count();
         if max_matches == 0 {
             return Ok(vec![]);
@@ -71,14 +77,15 @@ impl PhpFileParser {
         // identifier characters (reproducing `\b`) and the four operator characters. The consumed
         // separator lands in match group 0 only; the named groups are unaffected. The PCRE
         // possessive quantifiers (`++`, `*+`) are performance-only and become plain `+`/`*`.
-        let pattern2 = format!(
-            r"{{
+        let pattern2 = bconcat!(
+            r"{
             (?:
-                 (?:^|[^\\$:>a-zA-Z0-9_\x7f-\xff])(?P<type>class|interface|trait{et}) \s+ (?P<name>[a-zA-Z_\x7f-\xff:][a-zA-Z0-9_\x7f-\xff:\-]*)
-               | (?:^|[^\\$:>a-zA-Z0-9_\x7f-\xff])(?P<ns>namespace) (?P<nsname>\s+[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(?:\s*\\\s*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)*)? \s* [\{{;]
+                 (?:^|[^\\$:>a-zA-Z0-9_\x7f-\xff])(?P<type>class|interface|trait",
+            extra_types,
+            r") \s+ (?P<name>[a-zA-Z_\x7f-\xff:][a-zA-Z0-9_\x7f-\xff:\-]*)
+               | (?:^|[^\\$:>a-zA-Z0-9_\x7f-\xff])(?P<ns>namespace) (?P<nsname>\s+[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(?:\s*\\\s*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)*)? \s* [\{;]
             )
-        }}ix",
-            et = extra_types
+        }ix"
         );
         let matches = preg_match_all(&pattern2, &contents);
 
@@ -136,28 +143,30 @@ impl PhpFileParser {
         Ok(classes)
     }
 
-    fn get_extra_types() -> &'static str {
-        static EXTRA_TYPES: OnceLock<String> = OnceLock::new();
-        EXTRA_TYPES.get_or_init(|| {
-            let mut extra_types = String::new();
-            let mut extra_types_array: Vec<String> = vec![];
-            // TODO(port): PHP also scans for enums on HHVM 3.3 and above
-            // (`defined('HHVM_VERSION') && version_compare(HHVM_VERSION, '3.3', '>=')`).
-            if shirabe_php_rpc::get_php_version().version_id >= 80100 {
-                extra_types += "|enum";
-                extra_types_array = vec!["enum".to_string()];
-            }
+    fn get_extra_types() -> &'static BStr {
+        static EXTRA_TYPES: OnceLock<BString> = OnceLock::new();
+        EXTRA_TYPES
+            .get_or_init(|| {
+                let mut extra_types = BString::default();
+                let mut extra_types_array: Vec<BString> = vec![];
+                // TODO(port): PHP also scans for enums on HHVM 3.3 and above
+                // (`defined('HHVM_VERSION') && version_compare(HHVM_VERSION, '3.3', '>=')`).
+                if shirabe_php_rpc::get_php_version().version_id >= 80100 {
+                    extra_types.push_str("|enum");
+                    extra_types_array = vec![BString::from("enum")];
+                }
 
-            let mut type_config = vec![
-                "class".to_string(),
-                "interface".to_string(),
-                "trait".to_string(),
-            ];
-            type_config.extend(extra_types_array);
-            PhpFileCleaner::set_type_config(type_config);
+                let mut type_config = vec![
+                    BString::from("class"),
+                    BString::from("interface"),
+                    BString::from("trait"),
+                ];
+                type_config.extend(extra_types_array);
+                PhpFileCleaner::set_type_config(type_config);
 
-            extra_types
-        })
+                extra_types
+            })
+            .as_bstr()
     }
 
     /// Cross-platform safe version of is_readable()

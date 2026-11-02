@@ -202,7 +202,12 @@ fn test_add_authentication_options_for_client_certificate() {
         PhpMixed::string("passphrase value".to_string()),
     );
     let password = json_encode(&PhpMixed::Array(certificate_configuration.clone())).unwrap();
-    expects_authentication(&f.io, origin, "client-certificate", &password);
+    expects_authentication(
+        &f.io,
+        origin,
+        "client-certificate",
+        &password.display_lossy().to_string(),
+    );
 
     let options = f
         .auth_helper
@@ -785,7 +790,12 @@ fn test_add_authentication_header_with_custom_headers() {
     ))
     .unwrap();
 
-    expects_authentication(&f.io, origin, &headers_json, "custom-headers");
+    expects_authentication(
+        &f.io,
+        origin,
+        &headers_json.display_lossy().to_string(),
+        "custom-headers",
+    );
 
     f.io.borrow_mut()
         .expects(

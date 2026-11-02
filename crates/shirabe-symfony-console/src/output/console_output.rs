@@ -103,7 +103,7 @@ impl ConsoleOutput {
         let checks = [
             php_uname("s"),
             bstr::BString::from(getenv("OSTYPE").unwrap_or_default().as_encoded_bytes()),
-            bstr::BString::from(PHP_OS.to_string()),
+            bstr::BString::from(PHP_OS),
         ];
 
         stripos(implode(";", &checks), "OS400").is_some()

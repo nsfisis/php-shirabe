@@ -387,7 +387,7 @@ impl Solver {
             self.rules.add(new_rule.clone(), RuleSet::TYPE_LEARNED)?;
 
             self.learned_why
-                .insert(bstr::BString::from(spl_object_hash(new_rule.clone())), why);
+                .insert(spl_object_hash(new_rule.clone()), why);
 
             let rule_node = std::rc::Rc::new(std::cell::RefCell::new(RuleWatchNode::new(
                 new_rule.clone(),
@@ -602,7 +602,7 @@ impl Solver {
         rule_seen: &mut IndexMap<BString, bool>,
     ) {
         let why = spl_object_hash(conflict_rule.clone());
-        rule_seen.insert(bstr::BString::from(why.clone()), true);
+        rule_seen.insert(why.clone(), true);
 
         if conflict_rule.borrow().get_type() == RuleSet::TYPE_LEARNED {
             let learned_why = self.learned_why[why.as_bytes()];

@@ -411,7 +411,7 @@ impl ShowCommand {
             let rel = self.get_relative_time(&rd);
             self.get_io().write(format!(
                 "<info>released</info> : {}, {}",
-                rd.format(date_format_to_strftime("Y-m-d")),
+                rd.format(date_format_to_strftime(b"Y-m-d")),
                 rel
             ));
         }
@@ -423,7 +423,7 @@ impl ShowCommand {
                     let rel = self.get_relative_time(&rd);
                     format!(
                         " released {}, {}",
-                        rd.format(date_format_to_strftime("Y-m-d")),
+                        rd.format(date_format_to_strftime(b"Y-m-d")),
                         rel
                     )
                 }
@@ -1312,7 +1312,7 @@ impl ShowCommand {
 
     fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::Utc>) -> String {
         if release_date
-            .format(date_format_to_strftime("Ymd"))
+            .format(date_format_to_strftime(b"Ymd"))
             .to_string()
             == date_local("Ymd", None)
         {
@@ -2100,7 +2100,10 @@ impl Command for ShowCommand {
         let mut package_filter_regex: Option<String> = None;
         if let Some(ref pf) = package_filter {
             let escaped = preg_quote(pf, None);
-            package_filter_regex = Some(format!("{{^{}$}}i", escaped.replace("\\*", ".*?")));
+            package_filter_regex = Some(format!(
+                "{{^{}$}}i",
+                bconcat!(escaped.replace("\\*", ".*?")).display_lossy()
+            ));
         }
 
         let mut package_list_filter: Option<Vec<BString>> = None;
@@ -2213,7 +2216,7 @@ impl Command for ShowCommand {
                 .as_array()
                 .map(|l| l.iter().map(strtolower).collect::<Vec<_>>())
                 .unwrap_or_default(),
-            "{^(?:%s)$}iD",
+            BStr::new("{^(?:%s)$}iD"),
         );
         let indent = if show_all_types { "  " } else { "" };
         let mut latest_packages: IndexMap<BString, crate::package::PackageInterfaceHandle> =

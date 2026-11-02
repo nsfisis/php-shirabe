@@ -9,7 +9,7 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::Perforce;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-use shirabe_php_shim::{PHP_EOL, PhpMixed, path_to_bytes};
+use shirabe_php_shim::{PHP_EOL, PhpMixed, bconcat, path_to_bytes};
 
 const TEST_DEPOT: &str = "depot";
 const TEST_BRANCH: &str = "branch";
@@ -182,7 +182,9 @@ fn test_query_p4_user_with_user_set_in_p4_variables_with_windows_os() {
         vec![cmd_full(
             "p4 set",
             0,
-            format!("P4USER=TEST_P4VARIABLE_USER{}", PHP_EOL),
+            bconcat!("P4USER=TEST_P4VARIABLE_USER", PHP_EOL)
+                .display_lossy()
+                .to_string(),
             "",
         )],
         true,
@@ -206,7 +208,9 @@ fn test_query_p4_user_with_user_set_in_p4_variables_not_windows_os() {
         vec![cmd_full(
             "echo $P4USER",
             0,
-            format!("TEST_P4VARIABLE_USER{}", PHP_EOL),
+            bconcat!("TEST_P4VARIABLE_USER", PHP_EOL)
+                .display_lossy()
+                .to_string(),
             "",
         )],
         true,
@@ -355,7 +359,9 @@ fn test_query_p4_password_with_password_set_in_p4_variables_with_windows_os() {
         vec![cmd_full(
             "p4 set",
             0,
-            format!("P4PASSWD=TEST_P4VARIABLE_PASSWORD{}", PHP_EOL),
+            bconcat!("P4PASSWD=TEST_P4VARIABLE_PASSWORD", PHP_EOL)
+                .display_lossy()
+                .to_string(),
             "",
         )],
         true,
@@ -375,7 +381,9 @@ fn test_query_p4_password_with_password_set_in_p4_variables_not_windows_os() {
         vec![cmd_full(
             "echo $P4PASSWD",
             0,
-            format!("TEST_P4VARIABLE_PASSWORD{}", PHP_EOL),
+            bconcat!("TEST_P4VARIABLE_PASSWORD", PHP_EOL)
+                .display_lossy()
+                .to_string(),
             "",
         )],
         true,
@@ -435,7 +443,9 @@ fn test_get_branches_with_stream() {
                     "//depot/...",
                 ],
                 0,
-                format!("Stream //depot/branch mainline none 'branch'{}", PHP_EOL),
+                bconcat!("Stream //depot/branch mainline none 'branch'", PHP_EOL)
+                    .display_lossy()
+                    .to_string(),
                 "",
             ),
             cmd_full(
@@ -500,10 +510,14 @@ fn test_get_tags_without_stream() {
                 "labels",
             ],
             0,
-            format!(
-                "Label 0.0.1 2013/07/31 'First Label!'{}Label 0.0.2 2013/08/01 'Second Label!'{}",
-                PHP_EOL, PHP_EOL
-            ),
+            bconcat!(
+                "Label 0.0.1 2013/07/31 'First Label!'",
+                PHP_EOL,
+                "Label 0.0.2 2013/08/01 'Second Label!'",
+                PHP_EOL
+            )
+            .display_lossy()
+            .to_string(),
             "",
         )],
         true,
@@ -533,10 +547,14 @@ fn test_get_tags_with_stream() {
                 "labels",
             ],
             0,
-            format!(
-                "Label 0.0.1 2013/07/31 'First Label!'{}Label 0.0.2 2013/08/01 'Second Label!'{}",
-                PHP_EOL, PHP_EOL
-            ),
+            bconcat!(
+                "Label 0.0.1 2013/07/31 'First Label!'",
+                PHP_EOL,
+                "Label 0.0.2 2013/08/01 'Second Label!'",
+                PHP_EOL
+            )
+            .display_lossy()
+            .to_string(),
             "",
         )],
         true,

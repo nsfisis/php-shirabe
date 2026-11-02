@@ -526,10 +526,15 @@ impl LoaderInterface for ValidatingArrayLoader {
                 for index in &license_keys {
                     let license = licenses[index].clone();
                     if !is_string(&license) {
-                        self.warnings.borrow_mut().push(format!(
-                            "License {} should be a string.",
-                            json_encode(&license).unwrap_or_default(),
-                        ));
+                        self.warnings.borrow_mut().push(
+                            bconcat!(
+                                "License ",
+                                json_encode(&license).unwrap_or_default(),
+                                " should be a string."
+                            )
+                            .display_lossy()
+                            .to_string(),
+                        );
                         licenses.shift_remove(index);
                     }
                 }
@@ -549,19 +554,19 @@ impl LoaderInterface for ValidatingArrayLoader {
                             if license_validator
                                 .validate(trim2(&license_to_validate, " \t\n\r\0\u{0B}"))
                             {
-                                self.warnings.borrow_mut().push(format!(
-                                    "License {} must not contain extra spaces, make sure to trim it.",
+                                self.warnings.borrow_mut().push(
+                                    bconcat!(
+                                        "License ",
                                         json_encode(&PhpMixed::string(license_str.clone()))
                                             .unwrap_or_default(),
-                                ));
+                                        " must not contain extra spaces, make sure to trim it."
+                                    )
+                                    .display_lossy()
+                                    .to_string(),
+                                );
                             } else {
-                                self.warnings.borrow_mut().push(format!(
-                                    "License {} is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.{}If the software is closed-source, you may use \"proprietary\" as license.",
-
-                                        json_encode(&PhpMixed::string(license_str.clone()))
-                                            .unwrap_or_default(),
-                                    PHP_EOL
-                                ));
+                                self.warnings.borrow_mut().push(bconcat!("License ", json_encode(&PhpMixed::string(license_str.clone()))
+                                            .unwrap_or_default(), " is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.", PHP_EOL, "If the software is closed-source, you may use \"proprietary\" as license.").display_lossy().to_string());
                             }
                         }
                     }
@@ -576,10 +581,15 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .borrow_mut()
                     .insert("license".into(), PhpMixed::Array(reindexed_map));
             } else {
-                self.warnings.borrow_mut().push(format!(
-                    "License must be a string or array of strings, got {}.",
-                    json_encode(&license_val).unwrap_or_default(),
-                ));
+                self.warnings.borrow_mut().push(
+                    bconcat!(
+                        "License must be a string or array of strings, got ",
+                        json_encode(&license_val).unwrap_or_default(),
+                        "."
+                    )
+                    .display_lossy()
+                    .to_string(),
+                );
                 self.config.borrow_mut().shift_remove(B("license"));
             }
         }
@@ -1585,12 +1595,19 @@ impl LoaderInterface for ValidatingArrayLoader {
                 let branch_alias_map = branch_alias_val.as_array().cloned().unwrap_or_default();
                 for (source_branch, target_branch) in &branch_alias_map {
                     if !is_string(target_branch) {
-                        self.warnings.borrow_mut().push(format!(
-                            "extra.branch-alias.{} : the target branch ({}) must be a string, \"{}\" received.",
-                            source_branch.display_lossy(),
-                            json_encode(target_branch).unwrap_or_default(),
-                            get_debug_type(target_branch).display_lossy()
-                        ));
+                        self.warnings.borrow_mut().push(
+                            bconcat!(
+                                "extra.branch-alias.",
+                                source_branch,
+                                " : the target branch (",
+                                json_encode(target_branch).unwrap_or_default(),
+                                ") must be a string, \"",
+                                get_debug_type(target_branch),
+                                "\" received."
+                            )
+                            .display_lossy()
+                            .to_string(),
+                        );
                         if let Some(PhpMixed::Array(extra)) =
                             self.config.borrow_mut().get_mut(B("extra"))
                             && let Some(ba) = extra.get_mut(B("branch-alias"))

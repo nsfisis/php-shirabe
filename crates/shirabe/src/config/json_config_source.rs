@@ -6,7 +6,7 @@ use crate::util::Filesystem;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents,
+    Catch as _, PHP_EOL, PhpMixed, RuntimeException, bconcat, chmod, explode, file_get_contents,
     file_put_contents, implode, is_writable, path_to_bytes,
 };
 
@@ -143,10 +143,10 @@ impl JsonConfigSource {
                 };
                 // restore contents to the original state
                 file_put_contents(self.file.borrow().get_path(), &contents);
-                let message = format!(
-                    "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). {}{}",
+                let message = bconcat!(
+                    "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). ",
                     PHP_EOL,
-                    implode(PHP_EOL, jve.get_errors()).display_lossy(),
+                    implode(PHP_EOL, jve.get_errors())
                 );
                 return Err(RuntimeException::with_code_and_previous(
                     message,

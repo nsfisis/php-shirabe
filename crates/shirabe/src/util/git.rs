@@ -51,12 +51,13 @@ impl Git {
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<()> {
         if output.contains_str("fatal: detected dubious ownership") {
-            let msg = format!(
-                "The repository at \"{}\" does not have the correct ownership and git refuses to use it:{}{}{}",
-                path.display(),
+            let msg = bconcat!(
+                "The repository at \"",
+                path,
+                "\" does not have the correct ownership and git refuses to use it:",
                 PHP_EOL,
                 PHP_EOL,
-                output.display_lossy()
+                output
             );
             match io {
                 None => {
@@ -64,7 +65,7 @@ impl Git {
                 }
                 Some(io) => {
                     io.write_error3(
-                        format!("<warning>{}</warning>", msg),
+                        bconcat!("<warning>", msg, "</warning>"),
                         true,
                         io_interface::NORMAL,
                     );
@@ -341,7 +342,8 @@ impl Git {
                     let message = "Cloning failed using an ssh key for authentication, enter your GitHub credentials to access private repos";
 
                     if !git_hub_util.authorize_oauth(origin)? && self.io.is_interactive() {
-                        git_hub_util.authorize_oauth_interactively(origin, Some(message))?;
+                        git_hub_util
+                            .authorize_oauth_interactively(origin, Some(BStr::new(message)))?;
                     }
                 }
 
@@ -948,12 +950,12 @@ impl Git {
                 // see https://github.com/composer/composer/discussions/11002
                 if branches.is_some()
                     && !preg_is_match(
-                        format!(r"{{^[\s*]*v?{}$}}m", preg_quote(&branch, None)),
+                        bconcat!(r"{^[\s*]*v?", preg_quote(&branch, None), r"$}m"),
                         branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
                     )
                     && tags.is_some()
                     && !preg_is_match(
-                        format!(r"{{^[\s*]*{}$}}m", preg_quote(&branch, None)),
+                        bconcat!(r"{^[\s*]*", preg_quote(&branch, None), r"$}m"),
                         tags.as_deref().map(Vec::as_slice).unwrap_or_default(),
                     )
                 {
@@ -1240,8 +1242,10 @@ impl Git {
                 .collect(),
             _ => vec![],
         };
-        let escaped: Vec<String> = array_map(|s: &BString| preg_quote(s, None), &domains);
-        format!("({})", escaped.join("|"))
+        let escaped: Vec<BString> = array_map(|s: &BString| preg_quote(s, None), &domains);
+        bconcat!("(", implode("|", &escaped), ")")
+            .display_lossy()
+            .to_string()
     }
 
     fn throw_exception(&mut self, message: &BStr, url: &BStr) -> anyhow::Result<()> {

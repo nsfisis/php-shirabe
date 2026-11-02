@@ -958,14 +958,14 @@ try {
                         if !possible_local_binaries.is_empty() {
                             for local_exec in &possible_local_binaries {
                                 if preg_is_match(
-                                    format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
+                                    bconcat!("{\\b", preg_quote(&callable_str, None), "$}"),
                                     local_exec,
                                 ) {
                                     let caller = BinaryInstaller::determine_binary_caller(
                                         path_from_bytes(local_exec),
                                     );
                                     exec = preg_replace(
-                                        format!("{{^{}}}", preg_quote(&callable_str, None)),
+                                        bconcat!("{^", preg_quote(&callable_str, None), "}"),
                                         bconcat!(caller, " ", local_exec),
                                         &exec,
                                     );

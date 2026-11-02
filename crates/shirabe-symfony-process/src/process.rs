@@ -93,8 +93,8 @@ impl std::fmt::Debug for Process {
 
 fn descriptor(items: &[&str]) -> Descriptor {
     match items {
-        ["pipe", mode] => Descriptor::Pipe(mode.to_string()),
-        ["file", path, mode] => Descriptor::File(path.to_string(), mode.to_string()),
+        ["pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
+        ["file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
         _ => panic!("unsupported descriptor spec: {:?}", items),
     }
 }

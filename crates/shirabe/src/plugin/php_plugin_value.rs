@@ -16,7 +16,7 @@
 use crate::package::Link;
 use crate::plugin::php_plugin_proxy::ToPluginValue;
 use crate::util::http::Response;
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_rpc::{PhpObject, PhpThrow, PluginValue};
@@ -265,7 +265,7 @@ pub(crate) fn class_map_to_wire(class_map: &ClassMap) -> PluginValue {
                     PluginValue::Array(indexmap::IndexMap::from([
                         (
                             "warning".into(),
-                            PluginValue::string(violation.warning.as_str()),
+                            PluginValue::string(violation.warning.as_bstr()),
                         ),
                         (
                             "className".into(),
@@ -370,8 +370,7 @@ pub(crate) fn date_time_from_wire(value: &PluginValue) -> Result<DateTime<Utc>, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bstr::BStr;
-    use bstr::ByteSlice;
+    use bstr::{BStr, ByteSlice};
     use chrono::Timelike;
     use shirabe_php_rpc::value::serialize;
 

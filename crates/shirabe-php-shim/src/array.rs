@@ -1,5 +1,5 @@
-use crate::{PhpMixed, canonical_int_key, php_to_string};
-use bstr::{B, BString};
+use crate::{PhpMixed, bconcat, canonical_int_key, php_to_string};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 
 pub fn array_values<K, V: Clone>(array: &IndexMap<K, V>) -> Vec<V> {
@@ -30,8 +30,8 @@ pub fn array_search_in_vec(
     haystack.iter().position(|s| s.as_ref() == needle.as_ref())
 }
 
-pub fn array_map_str_fn<F: Fn(&str) -> String>(_callback: F, _array: &[String]) -> Vec<String> {
-    _array.iter().map(|s| _callback(s)).collect()
+pub fn array_map_str_fn<F: Fn(&BStr) -> BString>(_callback: F, _array: &[BString]) -> Vec<BString> {
+    _array.iter().map(|s| _callback(s.as_bstr())).collect()
 }
 
 pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
@@ -91,14 +91,14 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
         match array {
             PhpMixed::List(items) => {
                 for value in items {
-                    result.insert(next_int.to_string().into(), value);
+                    result.insert(crate::bconcat!(next_int), value);
                     next_int += 1;
                 }
             }
             PhpMixed::Array(map) => {
                 for (key, value) in map {
                     if canonical_int_key(&key).is_some() {
-                        result.insert(next_int.to_string().into(), value);
+                        result.insert(crate::bconcat!(next_int), value);
                         next_int += 1;
                         continue;
                     }
@@ -129,14 +129,14 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
 /// per entry is INCORRECT because it would collide on shared integer keys.
 pub fn array_merge_map<K, V>(array1: IndexMap<K, V>, array2: IndexMap<K, V>) -> IndexMap<K, V>
 where
-    K: std::hash::Hash + Eq + AsRef<[u8]> + From<String>,
+    K: std::hash::Hash + Eq + AsRef<[u8]> + From<BString>,
 {
     let mut result: IndexMap<K, V> = IndexMap::new();
     let mut next_int: i64 = 0;
     for array in [array1, array2] {
         for (key, value) in array {
             if canonical_int_key(key.as_ref()).is_some() {
-                result.insert(next_int.to_string().into(), value);
+                result.insert(crate::bconcat!(next_int).into(), value);
                 next_int += 1;
                 continue;
             }
@@ -378,11 +378,11 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
     PhpMixed::Array(result)
 }
 
-pub fn array_flip_strings(array: &[String]) -> IndexMap<BString, PhpMixed> {
+pub fn array_flip_strings(array: &[BString]) -> IndexMap<BString, PhpMixed> {
     array
         .iter()
         .enumerate()
-        .map(|(i, s)| (s.as_str().into(), PhpMixed::Int(i as i64)))
+        .map(|(i, s)| (s.as_bstr().into(), PhpMixed::Int(i as i64)))
         .collect()
 }
 
@@ -603,11 +603,11 @@ fn loose_to_number(s: &[u8]) -> Option<f64> {
     }
 }
 
-fn loose_num_to_string(value: &PhpMixed) -> String {
+fn loose_num_to_string(value: &PhpMixed) -> BString {
     match value {
-        PhpMixed::Int(i) => i.to_string(),
-        PhpMixed::Float(f) => f.to_string(),
-        _ => String::new(),
+        PhpMixed::Int(i) => bconcat!(i),
+        PhpMixed::Float(f) => crate::display_to_bytes(f),
+        _ => BString::default(),
     }
 }
 

@@ -262,9 +262,17 @@ fn test_dispatcher_can_execute_composer_script_groups() {
         .dispatch(Some("root".into()), Some(&mut event))
         .unwrap();
 
-    let expected = format!(
-        "> root: @group{eol}> group: echo -n foo{eol}> group: @subgroup{eol}> subgroup: echo -n baz{eol}> group: echo -n bar{eol}",
-        eol = PHP_EOL
+    let expected = bconcat!(
+        "> root: @group",
+        PHP_EOL,
+        "> group: echo -n foo",
+        PHP_EOL,
+        "> group: @subgroup",
+        PHP_EOL,
+        "> subgroup: echo -n baz",
+        PHP_EOL,
+        "> group: echo -n bar",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -697,14 +705,24 @@ fn test_dispatcher_remove_listener() {
     dispatcher.dispatch(Some("ev1".into()), None).unwrap();
     dispatcher.dispatch(Some("ev2".into()), None).unwrap();
 
-    let mut expected = format!(
-        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{eol}\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod2{eol}\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{eol}\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{eol}",
-        eol = PHP_EOL
+    let mut expected = bconcat!(
+        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
+        PHP_EOL,
+        "\
+         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod2",
+        PHP_EOL,
+        "\
+         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
+        PHP_EOL,
+        "\
+         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL,
+        "\
+         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL,
+        "\
+         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 
@@ -712,10 +730,13 @@ fn test_dispatcher_remove_listener() {
     dispatcher.dispatch(Some("ev1".into()), None).unwrap();
     dispatcher.dispatch(Some("ev2".into()), None).unwrap();
 
-    expected += &format!(
-        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}",
-        eol = PHP_EOL
+    expected = bconcat!(
+        expected,
+        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL,
+        "\
+         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -759,9 +780,13 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
         )
         .unwrap();
 
-    let expected = format!(
-        "> post-install-cmd: echo -n foo{eol}> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}> post-install-cmd: echo -n bar{eol}",
-        eol = PHP_EOL
+    let expected = bconcat!(
+        "> post-install-cmd: echo -n foo",
+        PHP_EOL,
+        "> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL,
+        "> post-install-cmd: echo -n bar",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -801,9 +826,11 @@ fn test_dispatcher_can_put_env() {
         )
         .unwrap();
 
-    let expected = format!(
-        "> post-install-cmd: @putenv ABC=123{eol}> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv{eol}",
-        eol = PHP_EOL
+    let expected = bconcat!(
+        "> post-install-cmd: @putenv ABC=123",
+        PHP_EOL,
+        "> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -974,7 +1001,7 @@ fn test_dispatcher_outputs_command() {
     // ref: $io->expects($this->once())->method('writeRaw')->with('foo'.PHP_EOL, false)
     assert_eq!(
         io.borrow().write_raw_calls(),
-        vec![(bstr::BString::from(format!("foo{PHP_EOL}")), false)]
+        vec![(bconcat!("foo", PHP_EOL), false)]
     );
 }
 
@@ -1004,9 +1031,11 @@ fn test_dispatcher_outputs_error_on_failed_command() {
     let e = result.expect_err("expected ScriptExecutionException");
     assert!(e.to_string().contains("Error Output: "), "got: {e}");
 
-    let expected = format!(
-        "> exit 1{eol}Script exit 1 handling the post-install-cmd event returned with error code 1{eol}",
-        eol = PHP_EOL
+    let expected = bconcat!(
+        "> exit 1",
+        PHP_EOL,
+        "Script exit 1 handling the post-install-cmd event returned with error code 1",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -1051,9 +1080,11 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
         )
         .unwrap();
 
-    let expected = format!(
-        "> post-install-cmd: @composer install --no-dev{eol}> post-install-cmd: composer update{eol}",
-        eol = PHP_EOL,
+    let expected = bconcat!(
+        "> post-install-cmd: @composer install --no-dev",
+        PHP_EOL,
+        "> post-install-cmd: composer update",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }

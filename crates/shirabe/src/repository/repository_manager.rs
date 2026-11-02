@@ -8,7 +8,9 @@ use crate::repository::{FilterRepository, RepositoryInterfaceHandle};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException, json_encode};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, RuntimeException, bconcat, json_encode,
+};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -110,7 +112,13 @@ impl RepositoryManager {
                 config.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             ))
             .unwrap_or_default();
-            self.io.write_error(format!("<warning>Repository \"{}\" ({}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or_default(), config_json));
+            self.io.write_error(bconcat!(
+                "<warning>Repository \"",
+                name.unwrap_or_default(),
+                "\" (",
+                config_json,
+                ") has a packagist key which should be in its own repository definition</warning>"
+            ));
         }
 
         let class = self.repository_classes[r#type].clone();

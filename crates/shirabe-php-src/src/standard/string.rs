@@ -1,5 +1,5 @@
 use bstr::BString;
-use std::io::Write;
+use std::io::Write as _;
 
 /// php-src: ext/standard/string.c `php_charmask` (PHP 8.5.2)
 ///

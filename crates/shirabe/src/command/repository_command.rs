@@ -115,7 +115,7 @@ impl RepositoryCommand {
                     .unwrap_or("unknown".into());
                 let url = match repo_map.get(B("url")).and_then(|v| v.as_string()) {
                     Some(url) => BString::from(url),
-                    None => BString::from(JsonFile::encode(repo)?),
+                    None => JsonFile::encode(repo)?,
                 };
                 io.write(bconcat!("[", name, "] <info>", r#type, "</info> ", url));
             }

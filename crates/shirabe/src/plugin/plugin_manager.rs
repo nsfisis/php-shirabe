@@ -448,9 +448,10 @@ impl PluginManager {
                     class_name = substr(&class, (separator_pos + 1) as i64, None);
                 }
                 let code = preg_replace2(
-                    format!(
-                        "{{^((?:(?:final|readonly)\\s+)*(?:\\s*))class\\s+({})}}mi",
-                        preg_quote(&class_name, None)
+                    bconcat!(
+                        "{^((?:(?:final|readonly)\\s+)*(?:\\s*))class\\s+(",
+                        preg_quote(&class_name, None),
+                        ")}mi"
                     ),
                     format!("$1class $2_composer_tmp{}", class_counter),
                     &code,
@@ -1178,7 +1179,9 @@ impl PluginManager {
         if let Some(arr) = allow_plugins_config.as_array() {
             for (pattern, allow) in arr {
                 rules.insert(
-                    base_package::package_name_to_regexp(pattern),
+                    base_package::package_name_to_regexp(pattern)
+                        .display_lossy()
+                        .to_string(),
                     allow.as_bool().unwrap_or(false),
                 );
             }
@@ -1285,10 +1288,12 @@ impl PluginManager {
                         let allow = answer_str == b"y";
 
                         // persist answer in current rules to avoid prompting again if the package gets reloaded
-                        rules
-                            .as_mut()
-                            .unwrap()
-                            .insert(base_package::package_name_to_regexp(package), allow);
+                        rules.as_mut().unwrap().insert(
+                            base_package::package_name_to_regexp(package)
+                                .display_lossy()
+                                .to_string(),
+                            allow,
+                        );
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == b"y" || answer_str == b"n" {

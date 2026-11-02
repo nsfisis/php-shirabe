@@ -263,7 +263,7 @@ impl ClassLoader {
     pub fn register(&self, prepend: bool) {
         spl_autoload_register(
             // PHP: array($this, 'loadClass')
-            Box::new(|_class: &str| -> PhpMixed { PhpMixed::Null }),
+            Box::new(|_class: &BStr| -> PhpMixed { PhpMixed::Null }),
             true,
             prepend,
         );
@@ -291,7 +291,7 @@ impl ClassLoader {
 
     /// Unregisters this instance as an autoloader.
     pub fn unregister(&self) {
-        spl_autoload_unregister(Box::new(|_class: &str| -> PhpMixed { PhpMixed::Null }));
+        spl_autoload_unregister(Box::new(|_class: &BStr| -> PhpMixed { PhpMixed::Null }));
 
         if let Some(vendor_dir) = &self.vendor_dir {
             REGISTERED_LOADERS.lock().unwrap().shift_remove(vendor_dir);

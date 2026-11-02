@@ -204,10 +204,12 @@ impl VersionParser {
         }
 
         let extra_message = if preg_is_match(
-            format!(
-                "{{ +as +{}(?:@(?:{}))?$}}",
+            bconcat!(
+                "{ +as +",
                 preg_quote(&version, None),
-                STABILITIES_REGEX
+                "(?:@(?:",
+                STABILITIES_REGEX,
+                "))?$}"
             ),
             &full_version,
         ) {
@@ -216,10 +218,12 @@ impl VersionParser {
                 full_version.display_lossy()
             )
         } else if preg_is_match(
-            format!(
-                "{{^{}(?:@(?:{}))?  +as +}}",
+            bconcat!(
+                "{^",
                 preg_quote(&version, None),
-                STABILITIES_REGEX
+                "(?:@(?:",
+                STABILITIES_REGEX,
+                "))?  +as +}"
             ),
             &full_version,
         ) {

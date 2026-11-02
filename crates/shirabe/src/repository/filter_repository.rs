@@ -40,10 +40,11 @@ impl FilterRepository {
                             }
                         })
                         .collect();
-                    only = Some(base_package::package_names_to_regexp(
-                        &names,
-                        "{^(?:%s)$}iD",
-                    ));
+                    only = Some(
+                        base_package::package_names_to_regexp(&names, BStr::new("{^(?:%s)$}iD"))
+                            .display_lossy()
+                            .to_string(),
+                    );
                 }
                 _ => {
                     return Err(InvalidArgumentException::new(format!(
@@ -67,10 +68,11 @@ impl FilterRepository {
                             }
                         })
                         .collect();
-                    exclude = Some(base_package::package_names_to_regexp(
-                        &names,
-                        "{^(?:%s)$}iD",
-                    ));
+                    exclude = Some(
+                        base_package::package_names_to_regexp(&names, BStr::new("{^(?:%s)$}iD"))
+                            .display_lossy()
+                            .to_string(),
+                    );
                 }
                 _ => {
                     return Err(InvalidArgumentException::new(format!(

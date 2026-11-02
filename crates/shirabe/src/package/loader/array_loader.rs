@@ -81,9 +81,10 @@ impl ArrayLoader {
         class: &str,
     ) -> anyhow::Result<CompleteOrRootPackage> {
         if !config.contains_key(B("name")) {
-            return Err(UnexpectedValueException::new(format!(
-                "Unknown package has no name defined ({}).",
-                json_encode(&PhpMixed::Array(config.clone())).unwrap_or_default()
+            return Err(UnexpectedValueException::new(bconcat!(
+                "Unknown package has no name defined (",
+                json_encode(&PhpMixed::Array(config.clone())).unwrap_or_default(),
+                ")."
             ))
             .into());
         }
@@ -247,14 +248,10 @@ impl ArrayLoader {
                 })
                 .unwrap_or(false);
             if !has_required {
-                return Err(UnexpectedValueException::new(format!(
-                    "Package {}'s source key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ...}},\n{} given.",
-                    config
+                return Err(UnexpectedValueException::new(bconcat!("Package ", config
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default().display_lossy(),
-                    json_encode(&source).unwrap_or_default(),
-                ))
+                        .unwrap_or_default(), "'s source key should be specified as {\"type\": ..., \"url\": ..., \"reference\": ...},\n", json_encode(&source).unwrap_or_default(), " given."))
                 .into());
             }
             let source_map = source_map.unwrap();
@@ -287,14 +284,10 @@ impl ArrayLoader {
                 .map(|m| m.contains_key(B("type")) && m.contains_key(B("url")))
                 .unwrap_or(false);
             if !has_required {
-                return Err(UnexpectedValueException::new(format!(
-                    "Package {}'s dist key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ..., \"shasum\": ...}},\n{} given.",
-                    config
+                return Err(UnexpectedValueException::new(bconcat!("Package ", config
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default().display_lossy(),
-                    json_encode(&dist).unwrap_or_default(),
-                ))
+                        .unwrap_or_default(), "'s dist key should be specified as {\"type\": ..., \"url\": ..., \"reference\": ..., \"shasum\": ...},\n", json_encode(&dist).unwrap_or_default(), " given."))
                 .into());
             }
             let dist_map = dist_map.unwrap();
@@ -413,7 +406,7 @@ impl ArrayLoader {
             for reserved in ["composer", "php", "putenv"].iter() {
                 if scripts_map.contains_key(B(reserved)) {
                     trigger_error(
-                        &format!(
+                        format!(
                             "The `{}` script name is reserved for internal use, please avoid defining it",
                             reserved
                         ),

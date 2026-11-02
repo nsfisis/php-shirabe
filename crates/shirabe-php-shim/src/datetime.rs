@@ -1,8 +1,11 @@
+use bstr::{BStr, BString};
+
 /// Parse the subset of the strtotime()/date_create() grammar that Composer actually emits.
 ///
 /// Supported: ISO8601/RFC3339 (`2023-01-15T12:34:56Z`, `...+00:00`), `Y-m-d H:i:s`, `Y-m-d`,
 /// and `@<unixtime>`. Inputs without an explicit offset are interpreted as UTC. Anything else
 /// returns `None` rather than guessing, mirroring PHP returning `false` on unrecognized input.
+#[expect(clippy::disallowed_types, reason = "chrono parses text")]
 fn parse_to_fixed(s: &str) -> Option<chrono::DateTime<chrono::FixedOffset>> {
     let s = s.trim();
     if s.is_empty() {
@@ -53,21 +56,24 @@ where
 }
 
 /// PHP: \DATE_RFC3339 ("Y-m-d\TH:i:sP").
+#[expect(clippy::disallowed_types, reason = "chrono takes a text format")]
 pub const DATE_RFC3339: &str = "%Y-%m-%dT%H:%M:%S%:z";
 
 /// PHP: \DATE_ATOM (equivalent to \DATE_RFC3339).
+#[expect(clippy::disallowed_types, reason = "chrono takes a text format")]
 pub const DATE_ATOM: &str = DATE_RFC3339;
 
 /// Convert PHP-compatible date time format to strftime-compatible format.
 /// Only the patterns Composer actually passes are supported; anything else panics.
-pub fn date_format_to_strftime(format: &str) -> &'static str {
+#[expect(clippy::disallowed_types, reason = "chrono takes a text format")]
+pub fn date_format_to_strftime(format: &[u8]) -> &'static str {
     match format {
-        "Y-m-d H:i:s" => "%Y-%m-%d %H:%M:%S",
-        "Y/m/d H:i:s" => "%Y/%m/%d %H:%M:%S",
-        "Y-m-d Hi" => "%Y-%m-%d %H%M",
-        "Y-m-d" => "%Y-%m-%d",
-        "Ymd" => "%Y%m%d",
-        other => panic!("Unsupported PHP date format: {other:?}"),
+        b"Y-m-d H:i:s" => "%Y-%m-%d %H:%M:%S",
+        b"Y/m/d H:i:s" => "%Y/%m/%d %H:%M:%S",
+        b"Y-m-d Hi" => "%Y-%m-%d %H%M",
+        b"Y-m-d" => "%Y-%m-%d",
+        b"Ymd" => "%Y%m%d",
+        other => panic!("Unsupported PHP date format: {:?}", BStr::new(other)),
     }
 }
 
@@ -76,8 +82,9 @@ pub fn date_format_to_strftime(format: &str) -> &'static str {
 ///
 /// Returns `None` for anything else, matching PHP `strtotime()` returning `false`, rather than
 /// silently mis-handling an unsupported expression.
-pub fn strtotime(time: &str) -> Option<i64> {
-    let trimmed = time.trim();
+pub fn strtotime(time: impl AsRef<[u8]>) -> Option<i64> {
+    // Every format this accepts is ASCII, so bytes that are not UTF-8 cannot parse.
+    let trimmed = crate::utf8_text(time.as_ref())?.trim();
 
     if trimmed.eq_ignore_ascii_case("now") {
         return Some(self::time());
@@ -92,6 +99,7 @@ pub fn strtotime(time: &str) -> Option<i64> {
 
 /// Parse a single-unit relative offset like `-8 days`, `+3hours`, `1 week`, returning the signed
 /// number of seconds. Whitespace between the count and unit is optional, as PHP accepts both.
+#[expect(clippy::disallowed_types, reason = "str::parse() takes text")]
 fn parse_relative(s: &str) -> Option<i64> {
     let s = s.trim();
     let split = s
@@ -127,22 +135,23 @@ pub fn microtime() -> f64 {
 }
 
 /// PHP: `date()`, rendering in UTC.
-pub fn date_utc(format: &str, timestamp: Option<i64>) -> String {
+pub fn date_utc(format: impl AsRef<[u8]>, timestamp: Option<i64>) -> BString {
     let timestamp = timestamp.unwrap_or_else(time);
     let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
         .expect("date() timestamp out of range");
-    dt.format(date_format_to_strftime(format)).to_string()
+    crate::display_to_bytes(dt.format(date_format_to_strftime(format.as_ref())))
 }
 
 /// PHP: `date()`, rendering in the system's local timezone.
-pub fn date_local(format: &str, timestamp: Option<i64>) -> String {
+pub fn date_local(format: impl AsRef<[u8]>, timestamp: Option<i64>) -> BString {
     let timestamp = timestamp.unwrap_or_else(time);
     let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
         .expect("date() timestamp out of range");
     let tz = local_timezone();
-    dt.with_timezone(&&tz)
-        .format(date_format_to_strftime(format))
-        .to_string()
+    crate::display_to_bytes(
+        dt.with_timezone(&&tz)
+            .format(date_format_to_strftime(format.as_ref())),
+    )
 }
 
 /// The zone `$TZ` names, or the one `/etc/localtime` describes. Falls back to UTC when no tz

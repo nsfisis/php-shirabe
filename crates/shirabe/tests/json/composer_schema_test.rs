@@ -26,7 +26,9 @@ fn check(json: &str) -> Vec<String> {
             .catch::<JsonValidationException>()
             .unwrap()
             .get_errors()
-            .clone(),
+            .iter()
+            .map(|e| e.display_lossy().to_string())
+            .collect(),
     }
 }
 

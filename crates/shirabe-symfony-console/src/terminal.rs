@@ -1,5 +1,6 @@
 //! ref: composer/vendor/symfony/console/Terminal.php
 
+use bstr::BString;
 use shirabe_php_shim::{
     Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, path_to_bytes,
     php_fopen_resource, php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get,
@@ -183,8 +184,8 @@ impl Terminal {
         // Sparse PHP descriptorspec `[1 => ['pipe', 'w'], 2 => ['pipe', 'w']]`: fd 0 is inherited.
         let descriptorspec = [
             Descriptor::Inherit,
-            Descriptor::Pipe("w".to_string()),
-            Descriptor::Pipe("w".to_string()),
+            Descriptor::Pipe(BString::from("w")),
+            Descriptor::Pipe(BString::from("w")),
         ];
 
         let cp = if function_exists("sapi_windows_cp_set") {

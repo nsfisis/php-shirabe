@@ -30,7 +30,7 @@ fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
 fn read_json_file(path: &str) -> serde_json::Value {
     let json = JsonFile::new(path, None, None).unwrap();
     let read = json.read().unwrap();
-    serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap()
+    serde_json::from_slice(&JsonFile::encode(&read).unwrap()).unwrap()
 }
 
 /// Mirrors PHPUnit's assertEmpty for a decoded JSON document (empty object/array/null).

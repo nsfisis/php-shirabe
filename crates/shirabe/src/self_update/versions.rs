@@ -106,7 +106,7 @@ impl Versions {
         } else {
             None
         };
-        std::fs::write(channel_file, format!("{}{}", stored_channel, PHP_EOL))?;
+        std::fs::write(channel_file, bconcat!(stored_channel, PHP_EOL))?;
 
         if let Some(io) = io
             && previously_stored

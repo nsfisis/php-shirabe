@@ -53,7 +53,11 @@ fn test_successful_update() {
     }
 
     let mut app_tester = Process::new(
-        vec![PHP_BINARY.to_string(), phar, "self-update".to_string()],
+        vec![
+            PHP_BINARY.display_lossy().to_string(),
+            phar,
+            "self-update".to_string(),
+        ],
         None,
         None,
         PhpMixed::Null,
@@ -84,7 +88,7 @@ fn test_update_to_specific_version() {
 
     let mut app_tester = Process::new(
         vec![
-            PHP_BINARY.to_string(),
+            PHP_BINARY.display_lossy().to_string(),
             phar,
             "self-update".to_string(),
             "2.4.0".to_string(),
@@ -156,7 +160,7 @@ fn test_update_to_different_channel() {
 
         let mut app_tester = Process::new(
             vec![
-                PHP_BINARY.to_string(),
+                PHP_BINARY.display_lossy().to_string(),
                 phar,
                 "self-update".to_string(),
                 option.to_string(),

@@ -1,4 +1,4 @@
-use crate::PhpMixed;
+use crate::{PhpMixed, bconcat};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
@@ -822,18 +822,27 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
         let arg = arg.cloned().unwrap_or(PhpMixed::Null);
 
         let (core, numeric): (BString, bool) = match spec {
-            b'd' => (
-                sprintf_signed_int(crate::intval(&arg), plus, space).into(),
+            b'd' => (sprintf_signed_int(crate::intval(&arg), plus, space), true),
+            b'u' => (crate::bconcat!(crate::intval(&arg) as u64), true),
+            b'b' => (
+                crate::display_to_bytes(format_args!("{:b}", crate::intval(&arg) as u64)),
                 true,
             ),
-            b'u' => ((crate::intval(&arg) as u64).to_string().into(), true),
-            b'b' => (format!("{:b}", crate::intval(&arg) as u64).into(), true),
-            b'o' => (format!("{:o}", crate::intval(&arg) as u64).into(), true),
-            b'x' => (format!("{:x}", crate::intval(&arg) as u64).into(), true),
-            b'X' => (format!("{:X}", crate::intval(&arg) as u64).into(), true),
+            b'o' => (
+                crate::display_to_bytes(format_args!("{:o}", crate::intval(&arg) as u64)),
+                true,
+            ),
+            b'x' => (
+                crate::display_to_bytes(format_args!("{:x}", crate::intval(&arg) as u64)),
+                true,
+            ),
+            b'X' => (
+                crate::display_to_bytes(format_args!("{:X}", crate::intval(&arg) as u64)),
+                true,
+            ),
             b'c' => (BString::from(vec![crate::intval(&arg) as u8]), false),
             b'f' | b'F' => (
-                sprintf_float(php_to_float(&arg), precision.unwrap_or(6), plus, space).into(),
+                sprintf_float(php_to_float(&arg), precision.unwrap_or(6), plus, space),
                 true,
             ),
             b's' => {
@@ -855,27 +864,27 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
     out
 }
 
-fn sprintf_signed_int(n: i64, plus: bool, space: bool) -> String {
+fn sprintf_signed_int(n: i64, plus: bool, space: bool) -> BString {
     if n < 0 {
-        n.to_string()
+        bconcat!(n)
     } else if plus {
-        format!("+{}", n)
+        crate::bconcat!("+", n)
     } else if space {
-        format!(" {}", n)
+        crate::bconcat!(" ", n)
     } else {
-        n.to_string()
+        bconcat!(n)
     }
 }
 
-fn sprintf_float(v: f64, precision: usize, plus: bool, space: bool) -> String {
+fn sprintf_float(v: f64, precision: usize, plus: bool, space: bool) -> BString {
     let negative = v.is_sign_negative() && !v.is_nan();
-    let magnitude = format!("{:.*}", precision, v.abs());
+    let magnitude = crate::display_to_bytes(format_args!("{:.*}", precision, v.abs()));
     if negative {
-        format!("-{}", magnitude)
+        crate::bconcat!("-", magnitude)
     } else if plus {
-        format!("+{}", magnitude)
+        crate::bconcat!("+", magnitude)
     } else if space {
-        format!(" {}", magnitude)
+        crate::bconcat!(" ", magnitude)
     } else {
         magnitude
     }
@@ -950,10 +959,8 @@ fn php_to_float(v: &PhpMixed) -> f64 {
                 }
             }
             // The numeric prefix is ASCII.
-            bytes[..end]
-                .iter()
-                .map(|&b| b as char)
-                .collect::<String>()
+            crate::utf8_text(&bytes[..end])
+                .expect("the numeric prefix is ASCII")
                 .parse::<f64>()
                 .unwrap_or(0.0)
         }
@@ -1183,12 +1190,12 @@ pub fn number_format(
     // to a whole number before formatting to avoid the round-half-to-even of `{:.*}`.
     let factor = 10f64.powi(decimals as i32);
     let scaled = (magnitude * factor).round();
-    let mut digits = format!("{:.0}", scaled);
+    let mut digits = crate::display_to_bytes(format_args!("{:.0}", scaled));
     while digits.len() <= decimals {
-        digits.insert(0, '0');
+        digits.insert(0, b'0');
     }
     let split = digits.len() - decimals;
-    let int_part = &digits.as_bytes()[..split];
+    let int_part = &digits[..split];
     let frac_part = &digits.as_bytes()[split..];
 
     let mut result = BString::default();
@@ -1217,11 +1224,18 @@ pub fn uniqid(prefix: impl AsRef<[u8]>, more_entropy: bool) -> BString {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
     let mut out = BString::from(prefix.as_ref());
-    out.push_str(format!("{:08x}{:05x}", now.as_secs(), now.subsec_micros()));
+    out.push_str(crate::display_to_bytes(format_args!(
+        "{:08x}{:05x}",
+        now.as_secs(),
+        now.subsec_micros()
+    )));
     if more_entropy {
         // TODO(php-semantics): PHP uses its combined LCG; this uses `fastrand`, so the random suffix is
         // not reproducible against PHP (it is non-deterministic in PHP too).
-        out.push_str(format!(".{:.8}", fastrand::f64() * 10.0));
+        out.push_str(crate::display_to_bytes(format_args!(
+            ".{:.8}",
+            fastrand::f64() * 10.0
+        )));
     }
     out
 }

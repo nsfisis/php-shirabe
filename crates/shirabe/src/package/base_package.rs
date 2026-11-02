@@ -4,7 +4,7 @@ use crate::package::{DisplayMode, Link, PackageInterface};
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, preg_quote};
+use shirabe_php_shim::{bconcat, implode, preg_quote, str_replace};
 use std::sync::LazyLock;
 
 pub struct SupportedLinkType {
@@ -139,19 +139,22 @@ pub trait BasePackage: PackageInterface {
     }
 }
 
-pub fn package_name_to_regexp(allow_pattern: impl AsRef<[u8]>) -> String {
+pub fn package_name_to_regexp(allow_pattern: impl AsRef<[u8]>) -> BString {
     package_name_to_regexp2(allow_pattern, "{^%s$}i")
 }
 
-pub fn package_name_to_regexp2(allow_pattern: impl AsRef<[u8]>, wrap: &str) -> String {
-    let cleaned = preg_quote(allow_pattern, None).replace("\\*", ".*");
-    wrap.replace("%s", &cleaned)
+pub fn package_name_to_regexp2(allow_pattern: impl AsRef<[u8]>, wrap: impl AsRef<[u8]>) -> BString {
+    let cleaned = str_replace("\\*", ".*", preg_quote(allow_pattern, None));
+    str_replace("%s", cleaned, wrap)
 }
 
-pub fn package_names_to_regexp(package_names: &[impl AsRef<[u8]>], wrap: &str) -> String {
-    let patterns: Vec<String> = package_names
+pub fn package_names_to_regexp(
+    package_names: &[impl AsRef<[u8]>],
+    wrap: impl AsRef<[u8]>,
+) -> BString {
+    let patterns: Vec<BString> = package_names
         .iter()
         .map(|name| package_name_to_regexp2(name, "%s"))
         .collect();
-    wrap.replace("%s", &patterns.join("|"))
+    str_replace("%s", implode("|", &patterns), wrap)
 }

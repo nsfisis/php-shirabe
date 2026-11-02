@@ -122,6 +122,8 @@ fn repo_body() -> String {
         m
     }))
     .unwrap()
+    .display_lossy()
+    .to_string()
 }
 
 #[test]
@@ -189,7 +191,7 @@ fn test_get_branches() {
             "https://codeberg.org/api/v1/repos/acme/repo/branches?per_page=100",
             None,
             200,
-            branches_body,
+            branches_body.display_lossy().to_string(),
             vec![String::new()],
         ),
     ]);
@@ -241,7 +243,7 @@ fn test_get_tags() {
             "https://codeberg.org/api/v1/repos/acme/repo/tags?per_page=100",
             None,
             200,
-            tags_body,
+            tags_body.display_lossy().to_string(),
             vec![String::new()],
         ),
     ]);

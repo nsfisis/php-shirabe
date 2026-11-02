@@ -380,7 +380,7 @@ fn test_inconsistent_require_keys() {
         let composer_content = JsonFile::new(dir.join("composer.json"), None, None).unwrap();
         let content = composer_content.read().unwrap();
         let content: serde_json::Value =
-            serde_json::from_str(&JsonFile::encode(&content).unwrap()).unwrap();
+            serde_json::from_slice(&JsonFile::encode(&content).unwrap()).unwrap();
         assert!(
             content.get(other_key).is_some(),
             "expected key {other_key} present"

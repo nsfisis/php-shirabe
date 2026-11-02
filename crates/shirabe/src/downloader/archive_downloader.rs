@@ -5,7 +5,7 @@ use crate::downloader::{DownloaderInterface, FileDownloader};
 use crate::io::IOInterfaceWrite;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bconcat, bin2hex, file_exists, is_dir, path_from_bytes,
@@ -248,7 +248,7 @@ fn get_folder_content(dir: impl AsRef<Path>) -> Vec<PathBuf> {
     finder
         .ignore_vcs(false)
         .ignore_dot_files(false)
-        .not_name(".DS_Store")
+        .not_name(BStr::new(".DS_Store"))
         .depth(0)
         .r#in(dir.as_ref());
 

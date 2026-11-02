@@ -5,7 +5,7 @@ use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, ZipArchive, class_exists, fileperms, path_to_bytes, realpath, strtr,
+    RuntimeException, ZipArchive, bconcat, class_exists, fileperms, path_to_bytes, realpath, strtr,
 };
 use std::path::{Path, PathBuf};
 
@@ -94,10 +94,12 @@ impl ArchiverInterface for ZipArchiver {
                 return Ok(target.to_path_buf());
             }
         }
-        let message = format!(
-            "Could not create archive '{}' from '{}': {}",
-            target.display(),
-            sources.display(),
+        let message = bconcat!(
+            "Could not create archive '",
+            target,
+            "' from '",
+            sources,
+            "': ",
             zip.get_status_string()
         );
         Err(RuntimeException::new(message).into())

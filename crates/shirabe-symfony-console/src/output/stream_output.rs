@@ -3,7 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface, VERBOSITY_NORMAL};
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     PHP_EOL, PhpResource, fflush_resource, fwrite_resource, get_resource_type, getenv, php_regex,
     preg_is_match, sapi_windows_vt100_support, stream_isatty_resource,

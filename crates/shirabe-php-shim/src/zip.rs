@@ -33,7 +33,7 @@ pub struct ZipArchiveMock {
     pub open: Result<(), i64>,
     pub count: i64,
     /// `Ok(bool)` for `extractTo` returning a bool, `Err(..)` to throw an `\ErrorException`.
-    pub extract_to: Result<bool, String>,
+    pub extract_to: Result<bool, BString>,
 }
 
 /// Internal backing of an opened `ZipArchive`. PHP's `ZipArchive` multiplexes
@@ -49,7 +49,7 @@ enum ZipState {
         writer: zip::ZipWriter<std::fs::File>,
         /// The destination path, retained so `close` can confirm the file exists.
         path: std::path::PathBuf,
-        status: String,
+        status: BString,
     },
 }
 
@@ -107,7 +107,7 @@ impl ZipArchive {
             *self.state.borrow_mut() = ZipState::Writer {
                 writer: zip::ZipWriter::new(file),
                 path: filename.to_path_buf(),
-                status: String::new(),
+                status: BString::default(),
             };
             self.num_files = 0;
             Ok(())
@@ -156,10 +156,9 @@ impl ZipArchive {
 
     pub fn extract_to(&self, path: impl AsRef<std::path::Path>) -> Result<bool, ErrorException> {
         if let Some(mock) = &self.mock {
-            return mock
-                .extract_to
-                .clone()
-                .map_err(|message| ErrorException::new(message, 0, 1, String::new(), 0, None));
+            return mock.extract_to.clone().map_err(|message| {
+                ErrorException::new(message, 0, 1, BString::default(), 0, None)
+            });
         }
         let mut state = self.state.borrow_mut();
         let ZipState::Reader(archive) = &mut *state else {
@@ -220,7 +219,7 @@ impl ZipArchive {
                 StreamBacking::Memory(std::io::Cursor::new(buf)),
                 true,
                 false,
-                "r".to_string(),
+                BString::from("r"),
                 crate::bconcat!("zip://", name),
             )),
         )))
@@ -276,11 +275,11 @@ impl ZipArchive {
             .external_attributes(attr)
     }
 
-    pub fn get_status_string(&self) -> String {
+    pub fn get_status_string(&self) -> BString {
         let state = self.state.borrow();
         match &*state {
             ZipState::Writer { status, .. } => status.clone(),
-            _ => String::new(),
+            _ => BString::default(),
         }
     }
 

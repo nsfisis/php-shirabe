@@ -1,5 +1,5 @@
 use bstr::BString;
-use std::io::Write;
+use std::io::Write as _;
 
 /// php-src: main/snprintf.c `php_gcvt` (PHP 8.5.8)
 ///

@@ -27,12 +27,13 @@ impl IgnoreListPlatformRequirementFilter {
                 ignore_all.push(req);
             }
         }
-        let ignore_regex = base_package::package_names_to_regexp(&ignore_all, "{^(?:%s)$}iD");
+        let ignore_regex =
+            base_package::package_names_to_regexp(&ignore_all, BStr::new("{^(?:%s)$}iD"));
         let ignore_upper_bound_regex =
-            base_package::package_names_to_regexp(&ignore_upper_bound, "{^(?:%s)$}iD");
+            base_package::package_names_to_regexp(&ignore_upper_bound, BStr::new("{^(?:%s)$}iD"));
         Ok(Self {
-            ignore_regex,
-            ignore_upper_bound_regex,
+            ignore_regex: ignore_regex.display_lossy().to_string(),
+            ignore_upper_bound_regex: ignore_upper_bound_regex.display_lossy().to_string(),
         })
     }
 

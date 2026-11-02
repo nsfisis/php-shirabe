@@ -700,9 +700,10 @@ impl NativeHttpDownloader {
                 let url_host = parse_url(url).and_then(|parsed| parsed.host);
                 let url_host_str = url_host.unwrap_or_default();
                 target_url = preg_replace(
-                    format!(
-                        r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",
-                        preg_quote(url_host_str, None)
+                    bconcat!(
+                        r"{^(.+(?://|@)",
+                        preg_quote(url_host_str, None),
+                        r"(?::\d+)?)(?:[/\?].*)?$}"
                     ),
                     bconcat!("\\1", location_header),
                     url,
@@ -874,7 +875,7 @@ impl NativeHttpDownloader {
             unlink_silent(Self::temp_file(filename));
         }
 
-        let mut details = String::new();
+        let mut details = BString::default();
         if matches!(
             strtolower(
                 response
@@ -886,19 +887,21 @@ impl NativeHttpDownloader {
             b"application/json" | b"application/json; charset=utf-8"
         ) {
             let body = response.inner.get_body().unwrap_or_default();
-            details = format!(
-                ":{}{}{}",
+            details = bconcat!(
+                ":",
                 PHP_EOL,
-                substr(body, 0, Some(200)).display_lossy(),
+                substr(body, 0, Some(200)),
                 if strlen(body) > 200 { "..." } else { "" }
             );
         }
 
         Box::new(TransportException::new(
-            format!(
-                "The \"{}\" file could not be downloaded ({}){}",
-                url.display_lossy(),
-                error_message.as_bstr().display_lossy(),
+            bconcat!(
+                "The \"",
+                url,
+                "\" file could not be downloaded (",
+                error_message.as_bstr(),
+                ")",
                 details
             ),
             response.inner.get_status_code(),

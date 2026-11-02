@@ -10,7 +10,7 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, php_regex,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, php_regex,
     preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error, trim,
 };
 
@@ -72,7 +72,7 @@ impl RootPackageLoader {
             config[B("name")].as_string().unwrap_or_default(),
             false,
         ) {
-            return Err(RuntimeException::new(format!("Your package name {}", err)).into());
+            return Err(RuntimeException::new(bconcat!("Your package name ", err)).into());
         }
 
         let mut auto_versioned = false;
@@ -207,7 +207,7 @@ impl RootPackageLoader {
                     if let Some(err) =
                         ValidatingArrayLoader::has_package_naming_error(link_name.as_bstr(), true)
                     {
-                        return Err(RuntimeException::new(format!("{}.{}", link_type, err)).into());
+                        return Err(RuntimeException::new(bconcat!(link_type, ".", err)).into());
                     }
                 }
             }

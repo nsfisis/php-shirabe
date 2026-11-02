@@ -440,9 +440,10 @@ impl Factory {
                 } else {
                     ""
                 };
-                return Err(InvalidArgumentException::new(format!(
-                    "{}{}{}",
-                    message, PHP_EOL, instructions
+                return Err(InvalidArgumentException::new(bconcat!(
+                    message,
+                    PHP_EOL,
+                    instructions
                 ))
                 .into());
             }
@@ -451,10 +452,8 @@ impl Factory {
                 && let Err(e) = file.validate_schema(JsonFile::LAX_SCHEMA, None)
             {
                 if let Some(jve) = e.catch::<JsonValidationException>() {
-                    let errors = format!(
-                        " - {}",
-                        (implode(format!("{} - ", PHP_EOL), jve.get_errors())).display_lossy()
-                    );
+                    let errors =
+                        bconcat!(" - ", (implode(bconcat!(PHP_EOL, " - "), jve.get_errors())));
                     let message = bconcat!(jve.get_message(), ":", PHP_EOL, errors);
                     return Err(
                         JsonValidationException::new(message, jve.get_errors().clone()).into(),
@@ -1609,7 +1608,7 @@ impl Factory {
                     ", this may result in errors and should be resolved:",
                     PHP_EOL,
                     " - ",
-                    (implode(format!("{} - ", PHP_EOL), jve.get_errors()))
+                    (implode(bconcat!(PHP_EOL, " - "), jve.get_errors()))
                 );
                 if let Some(io_ref) = io {
                     io_ref.write_error3(bconcat!("<warning>", msg, "</>"), true, crate::io::NORMAL);

@@ -602,13 +602,17 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         ShowWarnings::Always,
                     )?;
                     if no_match.is_none() {
-                        additional = format!(
-                            "{}{}Additionally, the package was only found with a stability of \"{}\" while your minimum stability is \"{}\".",
+                        additional = bconcat!(
                             PHP_EOL,
                             PHP_EOL,
-                            candidate.get_stability().display_lossy(),
-                            effective_minimum_stability.display_lossy(),
-                        );
+                            "Additionally, the package was only found with a stability of \"",
+                            candidate.get_stability(),
+                            "\" while your minimum stability is \"",
+                            effective_minimum_stability,
+                            "\"."
+                        )
+                        .display_lossy()
+                        .to_string();
                     }
 
                     return Err(InvalidArgumentException::new(format!(
@@ -844,10 +848,13 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             return Ok(String::new());
         }
 
-        Ok(format!(
-            ":{}  - {}",
+        Ok(bconcat!(
+            ":",
             PHP_EOL,
-            details.join(&format!("{}  - ", PHP_EOL))
-        ))
+            "  - ",
+            implode(bconcat!(PHP_EOL, "  - "), &details)
+        )
+        .display_lossy()
+        .to_string())
     }
 }

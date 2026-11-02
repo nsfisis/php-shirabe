@@ -10,7 +10,7 @@ use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::Platform;
 use shirabe::util::http_downloader::HttpDownloader;
-use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed};
+use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, bconcat};
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
 // PHP performs a live HTTP get to assert the URL's user:pass is captured via
@@ -124,12 +124,18 @@ fn test_output_warnings() {
 
     // the <info> tag are consumed by the OutputFormatter, but not <warning> as that is not a default output format
     assert_eq!(
-        format!(
-            "<warning>Warning from $URL: old warning msg</warning>{eol}\
-             Info from $URL: old info msg{eol}\
-             <warning>Warning from $URL: visible warning</warning>{eol}\
-             Info from $URL: visible info{eol}",
-            eol = PHP_EOL
+        bconcat!(
+            "<warning>Warning from $URL: old warning msg</warning>",
+            PHP_EOL,
+            "\
+             Info from $URL: old info msg",
+            PHP_EOL,
+            "\
+             <warning>Warning from $URL: visible warning</warning>",
+            PHP_EOL,
+            "\
+             Info from $URL: visible info",
+            PHP_EOL
         ),
         io.borrow().get_output()
     );

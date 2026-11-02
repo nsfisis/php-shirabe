@@ -89,7 +89,7 @@ pub struct ComposerRepository {
     list_url: Option<BString>,
     has_available_package_list: bool,
     available_packages: Option<IndexMap<BString, BString>>,
-    available_package_patterns: Option<Vec<String>>,
+    available_package_patterns: Option<Vec<BString>>,
     lazy_providers_url: Option<BString>,
     provider_listing: Option<IndexMap<BString, ProviderListingEntry>>,
     loader: ArrayLoader,
@@ -482,7 +482,11 @@ impl ComposerRepository {
         let has_providers = self.has_providers()?;
 
         let package_filter_regex: Option<String> = match package_filter {
-            Some(p) if !p.is_empty() => Some(base_package::package_name_to_regexp(p)),
+            Some(p) if !p.is_empty() => Some(
+                base_package::package_name_to_regexp(p)
+                    .display_lossy()
+                    .to_string(),
+            ),
             _ => None,
         };
         let filter_results = |results: Vec<BString>| -> anyhow::Result<Vec<BString>> {
@@ -968,12 +972,13 @@ impl ComposerRepository {
             if !allow_partial_advisories && !is_full {
                 let data_mixed =
                     PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                return Err(RuntimeException::new(format!(
-                    "Advisory for {} could not be loaded as a full advisory from {}{}{}",
-                    name.display_lossy(),
-                    repo_name.display_lossy(),
+                return Err(RuntimeException::new(bconcat!(
+                    "Advisory for ",
+                    name,
+                    " could not be loaded as a full advisory from ",
+                    repo_name,
                     PHP_EOL,
-                    var_export(&data_mixed, true).display_lossy(),
+                    var_export(&data_mixed, true)
                 ))
                 .into());
             }
@@ -2340,7 +2345,7 @@ impl ComposerRepository {
                 .cloned()
                 && !patterns.is_empty()
             {
-                let mapped: Vec<String> = patterns
+                let mapped: Vec<BString> = patterns
                     .iter()
                     .filter_map(|v| v.as_string())
                     .map(base_package::package_name_to_regexp)
@@ -2847,8 +2852,10 @@ impl ComposerRepository {
                                 .map(|(k, v)| (k.clone(), v.clone()))
                                 .collect(),
                         );
-                        json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none())?
-                            .into_bytes();
+                        json = Vec::from(JsonFile::encode_with_options(
+                            &as_mixed,
+                            JsonEncodeOptions::none(),
+                        )?);
                     }
                     self.cache.borrow_mut().write(ck, &json);
                 }
@@ -3011,8 +3018,10 @@ impl ComposerRepository {
                 data.insert("last-modified".into(), PhpMixed::string(lmd.clone()));
                 let as_mixed =
                     PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none())?
-                    .into_bytes();
+                json = Vec::from(JsonFile::encode_with_options(
+                    &as_mixed,
+                    JsonEncodeOptions::none(),
+                )?);
             }
             if !self.cache.borrow().is_read_only() {
                 self.cache.borrow_mut().write(cache_key, &json);
@@ -3195,7 +3204,7 @@ impl ComposerRepository {
                     ..Default::default()
                 },
             )?
-            .into_bytes();
+            .into();
         }
         if !self.cache.borrow().is_read_only() {
             self.cache.borrow_mut().write(cache_key, &json);

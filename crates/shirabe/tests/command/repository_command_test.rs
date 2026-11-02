@@ -10,7 +10,7 @@ use shirabe_symfony_console::input::{InputValue, ParameterName};
 fn read_composer_json() -> serde_json::Value {
     let json = JsonFile::new("./composer.json", None, None).unwrap();
     let read = json.read().unwrap();
-    serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap()
+    serde_json::from_slice(&JsonFile::encode(&read).unwrap()).unwrap()
 }
 
 #[test]

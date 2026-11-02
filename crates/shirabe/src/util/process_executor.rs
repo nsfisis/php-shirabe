@@ -404,10 +404,10 @@ impl ProcessExecutor {
                 "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
                 command,
                 cwd.unwrap_or(Path::new("")).display(),
-                PHP_EOL,
+                PHP_EOL.display_lossy(),
                 expected,
-                PHP_EOL,
-                PHP_EOL,
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
                 received.display_lossy()
             ))
             .into());
@@ -517,11 +517,11 @@ impl ProcessExecutor {
             panic!(
                 "There are still {} expected process calls which have not been consumed:{}{}{}{}Received calls:{}{}",
                 expectations.len(),
-                PHP_EOL,
+                PHP_EOL.display_lossy(),
                 implode(PHP_EOL, &remaining).display_lossy(),
-                PHP_EOL,
-                PHP_EOL,
-                PHP_EOL,
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
                 implode(PHP_EOL, &mock.log).display_lossy()
             );
         }

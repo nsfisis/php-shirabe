@@ -910,13 +910,13 @@ impl Application {
     pub fn find_namespace(&mut self, namespace: &BStr) -> anyhow::Result<BString> {
         let all_namespaces = self.get_namespaces()?;
         // implode('[^:]*:', array_map('preg_quote', explode(':', $namespace))).'[^:]*'
-        let parts: Vec<String> = explode(":", namespace)
+        let parts: Vec<BString> = explode(":", namespace)
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = parts.join("[^:]*:") + "[^:]*";
+        let expr = bconcat!(implode("[^:]*:", &parts), "[^:]*");
         let namespaces: Vec<BString> =
-            preg_grep(format!("{{^{}}}", expr), all_namespaces.iter().cloned()).collect();
+            preg_grep(bconcat!("{^", expr, "}"), all_namespaces.iter().cloned()).collect();
 
         if namespaces.is_empty() {
             let mut message = format!(
@@ -1009,21 +1009,22 @@ impl Application {
             None => self.commands.keys().cloned().collect(),
         };
 
-        let parts: Vec<String> = explode(":", name)
+        let parts: Vec<BString> = explode(":", name)
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = parts.join("[^:]*:") + "[^:]*";
+        let expr = bconcat!(implode("[^:]*:", &parts), "[^:]*");
         let mut commands: Vec<BString> =
-            preg_grep(format!("{{^{}}}", expr), all_commands.iter().cloned()).collect();
+            preg_grep(bconcat!("{^", expr, "}"), all_commands.iter().cloned()).collect();
 
         if commands.is_empty() {
-            commands = preg_grep(format!("{{^{}}}i", expr), all_commands.iter().cloned()).collect();
+            commands =
+                preg_grep(bconcat!("{^", expr, "}i"), all_commands.iter().cloned()).collect();
         }
 
         // if no commands matched or we just matched namespaces
         if commands.is_empty()
-            || preg_grep(format!("{{^{}$}}i", expr), commands.iter())
+            || preg_grep(bconcat!("{^", expr, "$}i"), commands.iter())
                 .next()
                 .is_none()
         {
@@ -2258,7 +2259,7 @@ impl ApplicationHandle {
                             "Composer\\Script\\ScriptEvents::",
                             str_replace("-", "_", strtoupper(script))
                         );
-                        if !defined(&script_event_const.display_lossy().to_string()) {
+                        if !defined(script_event_const.display_lossy().to_string()) {
                             if application.borrow_mut().has(script.as_ref()) {
                                 io.write_error(bconcat!("<warning>A script named ", script, " would override a Shirabe command and has been skipped</warning>"));
                             } else {
