@@ -19,7 +19,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     LogicException, PhpMixed, bconcat, get_debug_type, impl_php_class, implode, path_from_bytes,
-    path_to_bytes, php_regex, preg_match, strtolower,
+    path_to_bytes, php_regex, php_str, preg_match, strtolower,
 };
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
@@ -60,7 +60,12 @@ impl Default for ArchiveCommand {
 }
 
 impl ArchiveCommand {
-    const FORMATS: &'static [&'static str] = &["tar", "tar.gz", "tar.bz2", "zip"];
+    const FORMATS: &'static [&'static BStr] = &[
+        php_str(b"tar"),
+        php_str(b"tar.gz"),
+        php_str(b"tar.bz2"),
+        php_str(b"zip"),
+    ];
 
     pub fn new() -> Self {
         let command = ArchiveCommand {
@@ -225,7 +230,7 @@ impl ArchiveCommand {
                 implode(", ", &repo_names)
             ));
             repo = CompositeRepository::new(default_repos.into_values().collect());
-            min_stability = bstr::BString::from("stable".to_string());
+            min_stability = BString::from("stable");
         }
 
         if let Some(version_str) = &version
@@ -269,32 +274,35 @@ impl ArchiveCommand {
             )?;
             let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
 
-            io.write_error(format!(
-                "<info>Found multiple matches, selected {}.</info>",
-                p.get_pretty_string().display_lossy()
+            io.write_error(bconcat!(
+                "<info>Found multiple matches, selected ",
+                p.get_pretty_string(),
+                ".</info>"
             ));
             // alternatives message omitted for brevity (already logged via p being selected)
             io.write_error("<comment>Please use a more specific constraint to pick a different package.</comment>");
             p
         } else if packages.len() == 1 {
             let p: crate::package::PackageInterfaceHandle = packages.into_iter().next().unwrap();
-            io.write_error(format!(
-                "<info>Found an exact match {}.</info>",
-                p.get_pretty_string().display_lossy()
+            io.write_error(bconcat!(
+                "<info>Found an exact match ",
+                p.get_pretty_string(),
+                ".</info>"
             ));
             p
         } else {
-            io.write_error(format!(
-                "<error>Could not find a package matching {}.</error>",
-                package_name.display_lossy()
+            io.write_error(bconcat!(
+                "<error>Could not find a package matching ",
+                package_name,
+                ".</error>"
             ));
             return Ok(None);
         };
 
         let Some(complete) = package.as_complete() else {
-            return Err(LogicException::new(format!(
-                "Expected a CompletePackageInterface instance but found {}",
-                get_debug_type(&PhpMixed::Null).display_lossy()
+            return Err(LogicException::new(bconcat!(
+                "Expected a CompletePackageInterface instance but found ",
+                get_debug_type(&PhpMixed::Null)
             ))
             .into());
         };
@@ -343,7 +351,7 @@ impl Command for ArchiveCommand {
                 .borrow_mut()
                 .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
             event_dispatcher.borrow_mut().dispatch_script(
-                ScriptEvents::PRE_ARCHIVE_CMD.into(),
+                ScriptEvents::PRE_ARCHIVE_CMD,
                 true,
                 vec![],
                 indexmap::IndexMap::new(),
@@ -422,7 +430,7 @@ impl Command for ArchiveCommand {
                 .get_event_dispatcher()
                 .borrow_mut()
                 .dispatch_script(
-                    ScriptEvents::POST_ARCHIVE_CMD.into(),
+                    ScriptEvents::POST_ARCHIVE_CMD,
                     true,
                     vec![],
                     indexmap::IndexMap::new(),

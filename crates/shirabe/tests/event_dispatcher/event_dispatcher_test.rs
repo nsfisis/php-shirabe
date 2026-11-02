@@ -210,7 +210,7 @@ fn test_dispatcher_can_execute_single_command_line_script() {
 
         dispatcher
             .dispatch_script(
-                ScriptEvents::POST_INSTALL_CMD.into(),
+                ScriptEvents::POST_INSTALL_CMD,
                 false,
                 vec![],
                 IndexMap::new(),
@@ -461,7 +461,7 @@ fn test_listener_exceptions_are_caught() {
         .unwrap();
 
     let result = dispatcher.dispatch_script(
-        ScriptEvents::POST_INSTALL_CMD.into(),
+        ScriptEvents::POST_INSTALL_CMD,
         false,
         vec![],
         IndexMap::new(),
@@ -773,7 +773,7 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
 
     dispatcher
         .dispatch_script(
-            ScriptEvents::POST_INSTALL_CMD.into(),
+            ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
             IndexMap::new(),
@@ -819,7 +819,7 @@ fn test_dispatcher_can_put_env() {
 
     dispatcher
         .dispatch_script(
-            ScriptEvents::POST_INSTALL_CMD.into(),
+            ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
             IndexMap::new(),
@@ -873,7 +873,7 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
 
     dispatcher
         .dispatch_script(
-            ScriptEvents::POST_INSTALL_CMD.into(),
+            ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
             IndexMap::new(),
@@ -940,7 +940,7 @@ fn test_dispatcher_support_for_additional_args() {
 
     dispatcher
         .dispatch_script(
-            ScriptEvents::POST_INSTALL_CMD.into(),
+            ScriptEvents::POST_INSTALL_CMD,
             false,
             vec!["ARG".into(), "ARG2".into(), "--arg".into()],
             IndexMap::new(),
@@ -982,7 +982,7 @@ fn test_dispatcher_outputs_command() {
 
     dispatcher
         .dispatch_script(
-            ScriptEvents::POST_INSTALL_CMD.into(),
+            ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
             IndexMap::new(),
@@ -1022,7 +1022,7 @@ fn test_dispatcher_outputs_error_on_failed_command() {
         dispatcher_with_listeners(&composer, io_dyn, process, listeners_const(vec![code]));
 
     let result = dispatcher.dispatch_script(
-        ScriptEvents::POST_INSTALL_CMD.into(),
+        ScriptEvents::POST_INSTALL_CMD,
         false,
         vec![],
         IndexMap::new(),
@@ -1073,7 +1073,7 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
 
     dispatcher
         .dispatch_script(
-            ScriptEvents::POST_INSTALL_CMD.into(),
+            ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
             IndexMap::new(),

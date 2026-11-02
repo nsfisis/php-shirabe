@@ -8,7 +8,7 @@ use crate::installer::Installer;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use bstr::BStr;
-use shirabe_php_shim::{impl_php_class, implode};
+use shirabe_php_shim::{bconcat, impl_php_class, implode};
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{
     command::Command,
@@ -108,10 +108,12 @@ impl Command for InstallCommand {
             .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         if !args_vec.is_empty() {
-            io.write_error(format!(
-                "<error>Invalid argument {}. Use \"shirabe require {}\" instead to add packages to your composer.json.</error>",
-                implode(" ", &args_vec).display_lossy(),
-                implode(" ", &args_vec).display_lossy()
+            io.write_error(bconcat!(
+                "<error>Invalid argument ",
+                implode(" ", &args_vec),
+                ". Use \"shirabe require ",
+                implode(" ", &args_vec),
+                "\" instead to add packages to your composer.json.</error>"
             ));
             return Ok(1);
         }

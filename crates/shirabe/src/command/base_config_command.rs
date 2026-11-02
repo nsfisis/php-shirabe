@@ -6,8 +6,11 @@ use crate::config::{Config, JsonConfigSource};
 use crate::factory::Factory;
 use crate::json::JsonFile;
 use crate::util::Platform;
+use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat, chmod, path_from_bytes, php_to_string, touch};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, bconcat, chmod, path_from_bytes, php_to_string, touch,
+};
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
 use std::path::PathBuf;
@@ -36,7 +39,10 @@ pub trait BaseConfigCommand: BaseCommand {
             .unwrap_or(false)
             && !input.borrow().get_option("file")?.is_null()
         {
-            return Err(anyhow::anyhow!("--file and --global can not be combined"));
+            return Err(RuntimeException::new(BString::from(
+                "--file and --global can not be combined",
+            ))
+            .into());
         }
 
         let io = self.get_io();
@@ -105,10 +111,12 @@ pub trait BaseConfigCommand: BaseCommand {
         }
 
         if !self.config_file().unwrap().borrow().exists() {
-            return Err(anyhow::anyhow!(
-                "File \"{}\" cannot be found in the current directory",
-                config_file.display()
-            ));
+            return Err(RuntimeException::new(bconcat!(
+                "File \"",
+                config_file,
+                "\" cannot be found in the current directory"
+            ))
+            .into());
         }
 
         Ok(())

@@ -122,7 +122,7 @@ pub trait BaseCommand: Command {
         &self,
         name: impl AsRef<[u8]>,
         mode: Option<i64>,
-        description: &str,
+        description: &BStr,
         default: InputValue,
     ) -> &Self
     where
@@ -139,7 +139,7 @@ pub trait BaseCommand: Command {
         name: impl AsRef<[u8]>,
         shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
-        description: &str,
+        description: &BStr,
         default: InputValue,
     ) -> &Self
     where
@@ -290,7 +290,7 @@ impl BaseCommand for BaseCommandData {
         if self.composer.borrow().is_none() {
             let application = self.get_application();
             let Some(application) = application else {
-                return Err(RuntimeException::new("Could not create a Composer\\Composer instance, you must inject one if this command is not used with a Composer\\Console\\Application instance".to_string())
+                return Err(RuntimeException::new(BString::from("Could not create a Composer\\Composer instance, you must inject one if this command is not used with a Composer\\Console\\Application instance"))
                 .into());
             };
             let composer = {
@@ -460,9 +460,9 @@ impl BaseCommand for BaseCommandData {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException::new(
-                    "--prefer-source can not be used together with --prefer-install".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "--prefer-source can not be used together with --prefer-install",
+                ))
                 .into());
             }
             if input
@@ -471,9 +471,9 @@ impl BaseCommand for BaseCommandData {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException::new(
-                    "--prefer-dist can not be used together with --prefer-install".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "--prefer-dist can not be used together with --prefer-install",
+                ))
                 .into());
             }
             let prefer_install = input.borrow().get_option("prefer-install")?;
@@ -494,9 +494,9 @@ impl BaseCommand for BaseCommandData {
                     prefer_source = false;
                 }
                 other => {
-                    return Err(UnexpectedValueException::new(format!(
-                        "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got {}",
-                        bstr::BStr::new(other).display_lossy()
+                    return Err(UnexpectedValueException::new(bconcat!(
+                        "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got ",
+                        bstr::BStr::new(other)
                     ))
                     .into());
                 }
@@ -550,8 +550,7 @@ impl BaseCommand for BaseCommandData {
         if !input.borrow().has_option("ignore-platform-reqs")
             || !input.borrow().has_option("ignore-platform-req")
         {
-            return Err(LogicException::new("Calling getPlatformRequirementFilter from a command which does not define the --ignore-platform-req[s] flags is not permitted."
-                .to_string())
+            return Err(LogicException::new(BString::from("Calling getPlatformRequirementFilter from a command which does not define the --ignore-platform-req[s] flags is not permitted."))
             .into());
         }
 
@@ -580,18 +579,12 @@ impl BaseCommand for BaseCommandData {
         let requirements = self.normalize_requirements(requirements)?;
         for requirement in requirements {
             if !requirement.contains_key(B("version")) {
-                return Err(UnexpectedValueException::new(format!(
-                    "Option {} is missing a version constraint, use e.g. {}:^1.0",
-                    requirement
-                        .get(B("name"))
-                        .cloned()
-                        .unwrap_or_default()
-                        .display_lossy(),
-                    requirement
-                        .get(B("name"))
-                        .cloned()
-                        .unwrap_or_default()
-                        .display_lossy(),
+                return Err(UnexpectedValueException::new(bconcat!(
+                    "Option ",
+                    requirement.get(B("name")).cloned().unwrap_or_default(),
+                    " is missing a version constraint, use e.g. ",
+                    requirement.get(B("name")).cloned().unwrap_or_default(),
+                    ":^1.0"
                 ))
                 .into());
             }
@@ -842,7 +835,7 @@ pub fn base_command_initialize(
     if let Some(composer) = composer.as_ref() {
         let command_name = cmd.get_name().unwrap_or_default();
         let mut pre_command_run_event = PreCommandRunEvent::new(
-            PluginEvents::PRE_COMMAND_RUN.to_string(),
+            bconcat!(PluginEvents::PRE_COMMAND_RUN),
             input.clone(),
             command_name,
         );
@@ -862,20 +855,35 @@ pub fn base_command_initialize(
             .set_option("no-progress", InputValue::Bool(true));
     }
 
-    let env_options: IndexMap<&str, Vec<&str>> = [
-        ("COMPOSER_NO_AUDIT", vec!["no-audit"]),
-        ("COMPOSER_NO_DEV", vec!["no-dev", "update-no-dev"]),
-        ("COMPOSER_PREFER_STABLE", vec!["prefer-stable"]),
-        ("COMPOSER_PREFER_LOWEST", vec!["prefer-lowest"]),
-        ("COMPOSER_MINIMAL_CHANGES", vec!["minimal-changes"]),
-        ("COMPOSER_WITH_DEPENDENCIES", vec!["with-dependencies"]),
+    let env_options: IndexMap<&BStr, Vec<&BStr>> = [
+        (BStr::new("COMPOSER_NO_AUDIT"), vec![BStr::new("no-audit")]),
         (
-            "COMPOSER_WITH_ALL_DEPENDENCIES",
-            vec!["with-all-dependencies"],
+            BStr::new("COMPOSER_NO_DEV"),
+            vec![BStr::new("no-dev"), BStr::new("update-no-dev")],
         ),
         (
-            "COMPOSER_NO_SECURITY_BLOCKING",
-            vec!["no-security-blocking"],
+            BStr::new("COMPOSER_PREFER_STABLE"),
+            vec![BStr::new("prefer-stable")],
+        ),
+        (
+            BStr::new("COMPOSER_PREFER_LOWEST"),
+            vec![BStr::new("prefer-lowest")],
+        ),
+        (
+            BStr::new("COMPOSER_MINIMAL_CHANGES"),
+            vec![BStr::new("minimal-changes")],
+        ),
+        (
+            BStr::new("COMPOSER_WITH_DEPENDENCIES"),
+            vec![BStr::new("with-dependencies")],
+        ),
+        (
+            BStr::new("COMPOSER_WITH_ALL_DEPENDENCIES"),
+            vec![BStr::new("with-all-dependencies")],
+        ),
+        (
+            BStr::new("COMPOSER_NO_SECURITY_BLOCKING"),
+            vec![BStr::new("no-security-blocking")],
         ),
     ]
     .into_iter()
@@ -933,9 +941,10 @@ pub fn base_command_initialize(
                 InputValue::Array(explode(",", &ignore_str)),
             );
 
-            io.write_error(format!(
-                "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore {}. You may experience unexpected errors.</warning>",
-                ignore_str.display_lossy()
+            io.write_error(bconcat!(
+                "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore ",
+                ignore_str,
+                ". You may experience unexpected errors.</warning>"
             ));
         }
     }

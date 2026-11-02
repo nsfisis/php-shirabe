@@ -98,9 +98,9 @@ impl HomeCommand {
         } else if osx == 0 {
             let _ = process.execute(&[BString::from("open"), url_arg], (), None);
         } else {
-            self.get_io().write_error(format!(
-                "No suitable browser opening command found, open yourself: {}",
-                url.display_lossy()
+            self.get_io().write_error(bconcat!(
+                "No suitable browser opening command found, open yourself: ",
+                url
             ));
         }
     }
@@ -234,9 +234,10 @@ impl Command for HomeCommand {
 
             if !package_exists {
                 return_code = 1;
-                io.write_error(format!(
-                    "<warning>Package {} not found</warning>",
-                    package_name.display_lossy()
+                io.write_error(bconcat!(
+                    "<warning>Package ",
+                    package_name,
+                    " not found</warning>"
                 ));
             }
 
@@ -247,10 +248,12 @@ impl Command for HomeCommand {
                 } else {
                     "Invalid or missing repository URL"
                 };
-                io.write_error(format!(
-                    "<warning>{} for {}</warning>",
+                io.write_error(bconcat!(
+                    "<warning>",
                     msg,
-                    package_name.display_lossy()
+                    " for ",
+                    package_name,
+                    "</warning>"
                 ));
             }
         }

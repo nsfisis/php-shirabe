@@ -9,7 +9,7 @@ use crate::io::IOInterfaceWrite;
 use crate::repository::{InstalledRepository, RepositoryInterface, RepositorySet, RepositoryUtils};
 use bstr::BString;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, impl_php_class, implode,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, bconcat, impl_php_class, implode,
     in_array_strict,
 };
 use shirabe_symfony_console::command::Command;
@@ -55,7 +55,7 @@ impl AuditCommand {
             let locker = composer.get_locker().clone();
             let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
-                return Err(UnexpectedValueException::new("Valid composer.json and composer.lock files are required to run this command with --locked".to_string()).into());
+                return Err(UnexpectedValueException::new(BString::from("Valid composer.json and composer.lock files are required to run this command with --locked")).into());
             }
             let locked_repo = locker.get_locked_repository(
                 !input
@@ -224,20 +224,20 @@ impl Command for AuditCommand {
                 abandoned.clone().unwrap(),
                 &Auditor::ABANDONEDS
                     .iter()
-                    .map(|s| PhpMixed::string(s.to_string()))
+                    .map(|s| PhpMixed::string(bconcat!(s)))
                     .collect::<Vec<_>>(),
             )
         {
-            return Err(InvalidArgumentException::new(format!(
-                "--abandoned must be one of {}.",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "--abandoned must be one of ",
                 implode(
                     ", ",
                     &Auditor::ABANDONEDS
                         .iter()
-                        .map(|s| s.to_string())
+                        .map(|s| bconcat!(s))
                         .collect::<Vec<_>>()
-                )
-                .display_lossy()
+                ),
+                "."
             ))
             .into());
         }

@@ -77,9 +77,9 @@ impl Command for OutdatedCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let mut args: IndexMap<String, InputValue> = IndexMap::new();
-        args.insert("command".to_string(), InputValue::from("show"));
-        args.insert("--latest".to_string(), InputValue::Bool(true));
+        let mut args: IndexMap<BString, InputValue> = IndexMap::new();
+        args.insert(BString::from("command"), InputValue::from("show"));
+        args.insert(BString::from("--latest"), InputValue::Bool(true));
 
         if input
             .borrow()
@@ -87,7 +87,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-interaction".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--no-interaction"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -95,7 +95,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-plugins".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--no-plugins"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -103,7 +103,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-scripts".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--no-scripts"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -111,10 +111,10 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-cache".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--no-cache"), InputValue::Bool(true));
         }
         if !input.borrow().get_option("all")?.as_bool().unwrap_or(false) {
-            args.insert("--outdated".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--outdated"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -122,11 +122,11 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--direct".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--direct"), InputValue::Bool(true));
         }
         let package_arg = input.borrow().get_argument("package")?;
         if !package_arg.is_null() {
-            args.insert("package".to_string(), package_arg);
+            args.insert(BString::from("package"), package_arg);
         }
         if input
             .borrow()
@@ -134,7 +134,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--strict".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--strict"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -142,7 +142,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--major-only".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--major-only"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -150,7 +150,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--minor-only".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--minor-only"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -158,7 +158,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--patch-only".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--patch-only"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -166,7 +166,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--locked".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--locked"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -174,7 +174,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-dev".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--no-dev"), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -182,10 +182,10 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--sort-by-age".to_string(), InputValue::Bool(true));
+            args.insert(BString::from("--sort-by-age"), InputValue::Bool(true));
         }
         args.insert(
-            "--ignore-platform-req".to_string(),
+            BString::from("--ignore-platform-req"),
             input.borrow().get_option("ignore-platform-req")?,
         );
         if input
@@ -194,10 +194,19 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--ignore-platform-reqs".to_string(), InputValue::Bool(true));
+            args.insert(
+                BString::from("--ignore-platform-reqs"),
+                InputValue::Bool(true),
+            );
         }
-        args.insert("--format".to_string(), input.borrow().get_option("format")?);
-        args.insert("--ignore".to_string(), input.borrow().get_option("ignore")?);
+        args.insert(
+            BString::from("--format"),
+            input.borrow().get_option("format")?,
+        );
+        args.insert(
+            BString::from("--ignore"),
+            input.borrow().get_option("ignore")?,
+        );
 
         let input = ArrayInput::new(
             args.into_iter()

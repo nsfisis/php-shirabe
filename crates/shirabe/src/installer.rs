@@ -250,7 +250,7 @@ impl Installer {
                 ScriptEvents::PRE_INSTALL_CMD
             };
             self.event_dispatcher.borrow_mut().dispatch_script(
-                event_name.into(),
+                event_name,
                 self.dev_mode,
                 vec![],
                 IndexMap::new(),
@@ -448,7 +448,7 @@ impl Installer {
                 ScriptEvents::POST_INSTALL_CMD
             };
             self.event_dispatcher.borrow_mut().dispatch_script(
-                event_name.into(),
+                event_name,
                 self.dev_mode,
                 vec![],
                 IndexMap::new(),

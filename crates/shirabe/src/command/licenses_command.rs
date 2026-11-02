@@ -126,7 +126,7 @@ impl Command for LicensesCommand {
             let locker = composer.get_locker().clone();
             let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
-                return Err(UnexpectedValueException::new("Valid composer.json and composer.lock files are required to run this command with --locked".to_string()).into());
+                return Err(UnexpectedValueException::new(BString::from("Valid composer.json and composer.lock files are required to run this command with --locked")).into());
             }
             let no_dev = input
                 .borrow()
@@ -294,7 +294,7 @@ impl Command for LicensesCommand {
                 let rows: Vec<Row> = entries
                     .iter()
                     .map(|(license, count)| {
-                        Row::Cells(vec![license.clone().into(), count.to_string().into()])
+                        Row::Cells(vec![license.clone().into(), bconcat!(count).into()])
                     })
                     .collect();
 
@@ -305,9 +305,10 @@ impl Command for LicensesCommand {
                 )?;
             }
             _ => {
-                return Err(RuntimeException::new(format!(
-                    "Unsupported format \"{}\".  See help for supported formats.",
-                    format.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "Unsupported format \"",
+                    format,
+                    "\".  See help for supported formats."
                 ))
                 .into());
             }

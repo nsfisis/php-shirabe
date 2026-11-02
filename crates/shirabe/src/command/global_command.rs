@@ -7,8 +7,9 @@ use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
+use bstr::BString;
 use shirabe_php_shim::{
-    LogicException, RuntimeException, chdir, impl_php_class, path_from_bytes, php_regex,
+    LogicException, RuntimeException, bconcat, chdir, impl_php_class, path_from_bytes, php_regex,
     preg_replace2, preg_split,
 };
 use shirabe_symfony_console::command::Command;
@@ -59,10 +60,10 @@ impl GlobalCommand {
         } else if let Some(completion_input) = input_any.downcast_ref::<CompletionInput>() {
             Ok(completion_input.__to_string())
         } else {
-            Err(
-                LogicException::new("Expected an Input instance that is stringable".to_string())
-                    .into(),
-            )
+            Err(LogicException::new(BString::from(
+                "Expected an Input instance that is stringable",
+            ))
+            .into())
         }
     }
 
@@ -83,24 +84,26 @@ impl GlobalCommand {
             let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(home)?;
             if !home.is_dir() {
-                return Err(
-                    RuntimeException::new("Could not create home directory".to_string()).into(),
-                );
+                return Err(RuntimeException::new(BString::from(
+                    "Could not create home directory",
+                ))
+                .into());
             }
         }
 
         chdir(home).map_err(|e| {
             RuntimeException::with_code_and_previous(
-                format!("Could not switch to home directory \"{}\"", home.display()),
+                bconcat!("Could not switch to home directory \"", home, "\""),
                 0,
                 Some(std::sync::Arc::new(e)),
             )
         })?;
 
         if !quiet {
-            self.get_io().borrow().write_error(format!(
-                "<info>Changed current directory to {}</info>",
-                home.display()
+            self.get_io().borrow().write_error(bconcat!(
+                "<info>Changed current directory to ",
+                home,
+                "</info>"
             ));
         }
 

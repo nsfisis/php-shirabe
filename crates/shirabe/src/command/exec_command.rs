@@ -138,7 +138,7 @@ impl Command for ExecCommand {
                         .map(|b| PhpMixed::string(b.clone()))
                         .collect(),
                 ),
-                PhpMixed::string(String::new()),
+                PhpMixed::string(BString::default()),
                 PhpMixed::Int(1),
                 "Invalid binary name \"%s\"",
                 false,
@@ -178,9 +178,10 @@ impl Command for ExecCommand {
                         .as_string()
                         .unwrap_or_default(),
                 );
-                return Err(RuntimeException::new(format!(
-                    "No binaries found in composer.json or in bin-dir ({})",
-                    bin_dir.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "No binaries found in composer.json or in bin-dir (",
+                    bin_dir,
+                    ")"
                 ))
                 .into());
             }
@@ -225,10 +226,7 @@ impl Command for ExecCommand {
         {
             chdir(iwd).map_err(|e| {
                 RuntimeException::with_code_and_previous(
-                    format!(
-                        "Could not switch back to working directory \"{}\"",
-                        iwd.display()
-                    ),
+                    bconcat!("Could not switch back to working directory \"", iwd, "\""),
                     0,
                     Some(std::sync::Arc::new(e)),
                 )

@@ -9,7 +9,7 @@ use crate::package::version::{VersionGuesser, VersionParser};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::ProcessExecutor;
-use bstr::{BStr, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{bconcat, explode, impl_php_class, implode, ltrim, path_to_bytes};
 use shirabe_symfony_console::command::Command;
@@ -64,7 +64,7 @@ impl StatusCommand {
         let mut unpushed_changes: IndexMap<BString, BString> = IndexMap::new();
         let mut vcs_version_changes: IndexMap<
             BString,
-            IndexMap<String, IndexMap<String, BString>>,
+            IndexMap<BString, IndexMap<BString, BString>>,
         > = IndexMap::new();
 
         let parser = VersionParser::new();
@@ -147,22 +147,22 @@ impl StatusCommand {
                     && cur_version.pretty_version.as_ref() != Some(prev_ref)
                 {
                     let mut previous = IndexMap::new();
-                    previous.insert("version".to_string(), package.get_pretty_version());
-                    previous.insert("ref".to_string(), prev_ref.clone());
+                    previous.insert(BString::from("version"), package.get_pretty_version());
+                    previous.insert(BString::from("ref"), prev_ref.clone());
 
                     let mut current = IndexMap::new();
                     current.insert(
-                        "version".to_string(),
+                        BString::from("version"),
                         cur_version.pretty_version.clone().unwrap_or_default(),
                     );
                     current.insert(
-                        "ref".to_string(),
+                        BString::from("ref"),
                         cur_version.commit.clone().unwrap_or_default(),
                     );
 
                     let mut change = IndexMap::new();
-                    change.insert("previous".to_string(), previous);
-                    change.insert("current".to_string(), current);
+                    change.insert(BString::from("previous"), previous);
+                    change.insert(BString::from("current"), current);
 
                     vcs_version_changes.insert(target_dir.clone(), change);
                 }
@@ -231,21 +231,26 @@ impl StatusCommand {
                     .as_bool()
                     .unwrap_or(false)
                 {
-                    let current_version = if changes["current"]["version"].is_empty() {
-                        changes["current"]["ref"].clone()
+                    let current_version = if changes[B("current")][B("version")].is_empty() {
+                        changes[B("current")][B("ref")].clone()
                     } else {
-                        changes["current"]["version"].clone()
+                        changes[B("current")][B("version")].clone()
                     };
-                    let previous_version = if changes["previous"]["version"].is_empty() {
-                        changes["previous"]["ref"].clone()
+                    let previous_version = if changes[B("previous")][B("version")].is_empty() {
+                        changes[B("previous")][B("ref")].clone()
                     } else {
-                        changes["previous"]["version"].clone()
+                        changes[B("previous")][B("version")].clone()
                     };
 
                     let (current_display, previous_display) = if io.is_very_verbose() {
                         (
-                            bconcat!(current_version, " (", changes["current"]["ref"], ")"),
-                            bconcat!(previous_version, " (", changes["previous"]["ref"], ")"),
+                            bconcat!(current_version, " (", changes[B("current")][B("ref")], ")"),
+                            bconcat!(
+                                previous_version,
+                                " (",
+                                changes[B("previous")][B("ref")],
+                                ")"
+                            ),
                         )
                     } else {
                         (current_version, previous_version)
@@ -334,7 +339,7 @@ impl Command for StatusCommand {
                 .get_event_dispatcher()
                 .borrow_mut()
                 .dispatch_script(
-                    ScriptEvents::PRE_STATUS_CMD.into(),
+                    ScriptEvents::PRE_STATUS_CMD,
                     true,
                     vec![],
                     indexmap::IndexMap::new(),
@@ -349,7 +354,7 @@ impl Command for StatusCommand {
                 .get_event_dispatcher()
                 .borrow_mut()
                 .dispatch_script(
-                    ScriptEvents::POST_STATUS_CMD.into(),
+                    ScriptEvents::POST_STATUS_CMD,
                     true,
                     vec![],
                     indexmap::IndexMap::new(),

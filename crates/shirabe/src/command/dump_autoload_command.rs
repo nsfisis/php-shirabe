@@ -5,8 +5,8 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
-use bstr::BStr;
-use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{InvalidArgumentException, bconcat, file_exists, impl_php_class};
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
@@ -148,7 +148,7 @@ impl Command for DumpAutoloadCommand {
             && !optimize
             && !authoritative
         {
-            return Err(InvalidArgumentException::new("--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string())
+            return Err(InvalidArgumentException::new(BString::from("--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value."))
             .into());
         }
         if input
@@ -159,7 +159,7 @@ impl Command for DumpAutoloadCommand {
             && !optimize
             && !authoritative
         {
-            return Err(InvalidArgumentException::new("--strict-ambiguous mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string())
+            return Err(InvalidArgumentException::new(BString::from("--strict-ambiguous mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value."))
             .into());
         }
 
@@ -201,10 +201,9 @@ impl Command for DumpAutoloadCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException::new(
-                    "You can not use both --no-dev and --dev as they conflict with each other."
-                        .to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "You can not use both --no-dev and --dev as they conflict with each other.",
+                ))
                 .into());
             }
             composer
@@ -258,11 +257,16 @@ impl Command for DumpAutoloadCommand {
         let number_of_classes = class_map.map.len();
 
         if authoritative {
-            self.get_io().write(format!("<info>Generated optimized autoload files (authoritative) containing {} classes</info>", number_of_classes));
+            self.get_io().write(bconcat!(
+                "<info>Generated optimized autoload files (authoritative) containing ",
+                number_of_classes,
+                " classes</info>"
+            ));
         } else if optimize {
-            self.get_io().write(format!(
-                "<info>Generated optimized autoload files containing {} classes</info>",
-                number_of_classes
+            self.get_io().write(bconcat!(
+                "<info>Generated optimized autoload files containing ",
+                number_of_classes,
+                " classes</info>"
             ));
         } else {
             self.get_io().write("<info>Generated autoload files</info>");

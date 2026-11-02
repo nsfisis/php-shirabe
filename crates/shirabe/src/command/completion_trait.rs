@@ -89,18 +89,18 @@ pub trait CompletionTrait: BaseCommand {
                 };
                 if input.get_completion_value().is_empty() {
                     // to reduce noise, when no text is yet entered we list only two entries for ext- and lib- prefixes
-                    let mut hints_to_find: IndexMap<String, i64> = IndexMap::from([
-                        ("ext-".to_string(), 0),
-                        ("lib-".to_string(), 0),
-                        ("php".to_string(), 99),
-                        ("composer".to_string(), 99),
+                    let mut hints_to_find: IndexMap<BString, i64> = IndexMap::from([
+                        (BString::from("ext-"), 0),
+                        (BString::from("lib-"), 0),
+                        (BString::from("php"), 99),
+                        (BString::from("composer"), 99),
                     ]);
                     // PHP: continue 2
                     'pkgs: for pkg in platform_repo.get_packages()? {
                         // PHP's inner foreach iterates a by-value copy of $hintsToFind while
                         // mutating the original.
                         for (hint_prefix, hint_count) in hints_to_find.clone() {
-                            if pkg.get_name().starts_with(hint_prefix.as_bytes()) {
+                            if pkg.get_name().starts_with(hint_prefix.as_slice()) {
                                 if hint_count == 0 || hint_count >= 99 {
                                     platform_hint.push(pkg.get_name());
                                     *hints_to_find.get_mut(&hint_prefix).unwrap() += 1;

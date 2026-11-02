@@ -122,13 +122,14 @@ impl Command for SearchCommand {
         if !in_array_loose(
             format.clone(),
             &[
-                PhpMixed::string("text".to_string()),
-                PhpMixed::string("json".to_string()),
+                PhpMixed::string(BString::from("text")),
+                PhpMixed::string(BString::from("json")),
             ],
         ) {
-            io.write_error(format!(
-                "Unsupported format \"{}\". See help for supported formats.",
-                format.display_lossy()
+            io.write_error(bconcat!(
+                "Unsupported format \"",
+                format,
+                "\". See help for supported formats."
             ));
             return Ok(1);
         }
@@ -180,9 +181,9 @@ impl Command for SearchCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException::new(
-                    "--only-name and --only-vendor cannot be used together".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "--only-name and --only-vendor cannot be used together",
+                ))
                 .into());
             }
             mode = repository_interface::SEARCH_NAME;

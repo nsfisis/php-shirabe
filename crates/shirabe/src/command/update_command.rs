@@ -65,9 +65,9 @@ impl UpdateCommand {
         packages: Vec<BString>,
     ) -> anyhow::Result<Vec<BString>> {
         if !input.borrow().is_interactive() {
-            return Err(InvalidArgumentException::new(
-                "--interactive cannot be used in non-interactive terminals.".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "--interactive cannot be used in non-interactive terminals.",
+            ))
             .into());
         }
 
@@ -162,9 +162,9 @@ impl UpdateCommand {
         }
 
         if autocompleter_values.is_empty() {
-            return Err(RuntimeException::new(
-                "Could not find any package with new versions available".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "Could not find any package with new versions available",
+            ))
             .into());
         }
 
@@ -197,16 +197,17 @@ impl UpdateCommand {
         table.render()?;
 
         if io.ask_confirmation(
-            format!(
-                "Would you like to continue and update the above package{} [<comment>yes</comment>]? ",
+            bconcat!(
+                "Would you like to continue and update the above package",
                 if 1 == packages.len() { "" } else { "s" },
+                " [<comment>yes</comment>]? "
             ),
             true,
         )? {
             return Ok(packages);
         }
 
-        Err(RuntimeException::new("Installation aborted.".to_string()).into())
+        Err(RuntimeException::new(BString::from("Installation aborted.")).into())
     }
 
     fn create_version_selector(
@@ -409,19 +410,27 @@ impl Command for UpdateCommand {
                 && !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())?
             {
                 io.write_error3(
-                        format!(
-                            "<error>The temporary constraint \"{}\" for \"{}\" must be a subset of the constraint in your composer.json ({})</error>",
-                            constraint.display_lossy(),
-                            package.display_lossy(),
-                            root_req.get_pretty_constraint().display_lossy(),
-                        ),
-                        true,
-                        io_interface::NORMAL,
-                    );
-                io.write(format!(
-                        "<info>Run `shirabe require {}` or `shirabe require {}:{}` instead to replace the constraint</info>",
-                        package.display_lossy(), package.display_lossy(), constraint.display_lossy(),
-                    ));
+                    bconcat!(
+                        "<error>The temporary constraint \"",
+                        constraint,
+                        "\" for \"",
+                        package,
+                        "\" must be a subset of the constraint in your composer.json (",
+                        root_req.get_pretty_constraint(),
+                        ")</error>"
+                    ),
+                    true,
+                    io_interface::NORMAL,
+                );
+                io.write(bconcat!(
+                    "<info>Run `shirabe require ",
+                    package,
+                    "` or `shirabe require ",
+                    package,
+                    ":",
+                    constraint,
+                    "` instead to replace the constraint</info>"
+                ));
 
                 return Ok(crate::command::FAILURE);
             }
@@ -434,9 +443,9 @@ impl Command for UpdateCommand {
             .unwrap_or(false)
         {
             if !composer.get_locker().borrow_mut().is_locked() {
-                return Err(InvalidArgumentException::new(
-                    "patch-only can only be used with a lock file present".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "patch-only can only be used with a lock file present",
+                ))
                 .into());
             }
             for package in composer
@@ -730,7 +739,7 @@ impl Command for UpdateCommand {
                         .as_array()
                         .map(<[bstr::BString]>::to_vec)
                         .unwrap_or_default(),
-                    "--bump-after-update=dev".to_string(),
+                    BString::from("--bump-after-update=dev"),
                 )?;
             }
         }

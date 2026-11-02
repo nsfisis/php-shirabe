@@ -14,23 +14,23 @@ use crate::util::PackageInfo;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, bconcat, rtrim,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, bconcat, php_str, rtrim,
 };
 use shirabe_semver::constraint::{AnyConstraint, Bound};
 use shirabe_symfony_console::formatter::{OutputFormatter, OutputFormatterStyle};
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
-pub const ARGUMENT_PACKAGE: &str = "package";
-pub const ARGUMENT_CONSTRAINT: &str = "version";
-pub const OPTION_RECURSIVE: &str = "recursive";
-pub const OPTION_TREE: &str = "tree";
+pub const ARGUMENT_PACKAGE: &BStr = php_str(b"package");
+pub const ARGUMENT_CONSTRAINT: &BStr = php_str(b"version");
+pub const OPTION_RECURSIVE: &BStr = php_str(b"recursive");
+pub const OPTION_TREE: &BStr = php_str(b"tree");
 
 pub trait BaseDependencyCommand: BaseCommand {
-    const ARGUMENT_PACKAGE: &'static str = ARGUMENT_PACKAGE;
-    const ARGUMENT_CONSTRAINT: &'static str = ARGUMENT_CONSTRAINT;
-    const OPTION_RECURSIVE: &'static str = OPTION_RECURSIVE;
-    const OPTION_TREE: &'static str = OPTION_TREE;
+    const ARGUMENT_PACKAGE: &'static BStr = ARGUMENT_PACKAGE;
+    const ARGUMENT_CONSTRAINT: &'static BStr = ARGUMENT_CONSTRAINT;
+    const OPTION_RECURSIVE: &'static BStr = OPTION_RECURSIVE;
+    const OPTION_TREE: &'static BStr = OPTION_TREE;
 
     fn colors(&self) -> std::cell::Ref<'_, Vec<BString>>;
     fn set_colors(&self, colors: Vec<BString>);
@@ -73,10 +73,9 @@ pub trait BaseDependencyCommand: BaseCommand {
             let mut locker = locker.borrow_mut();
 
             if !locker.is_locked() {
-                return Err(UnexpectedValueException::new(
-                    "A valid composer.lock file is required to run this command with --locked"
-                        .to_string(),
-                )
+                return Err(UnexpectedValueException::new(BString::from(
+                    "A valid composer.lock file is required to run this command with --locked",
+                ))
                 .into());
             }
 
@@ -99,7 +98,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 && (!root_pkg.get_requires().is_empty() || !root_pkg.get_dev_requires().is_empty())
             {
                 output.borrow().writeln(
-                    &[bstr::BString::from("<warning>No dependencies installed. Try running shirabe install or update, or use --locked.</warning>".to_string())],
+                    &[BString::from("<warning>No dependencies installed. Try running shirabe install or update, or use --locked.</warning>")],
                     shirabe_symfony_console::output::OUTPUT_NORMAL,
                 );
 
@@ -146,9 +145,10 @@ pub trait BaseDependencyCommand: BaseCommand {
         let packages =
             installed_repo.find_packages_with_replacers_and_providers(BStr::new(&needle), None)?;
         if packages.is_empty() {
-            return Err(InvalidArgumentException::new(format!(
-                "Could not find package \"{}\" in your project",
-                needle.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Could not find package \"",
+                needle,
+                "\" in your project"
             ))
             .into());
         }
@@ -198,10 +198,12 @@ pub trait BaseDependencyCommand: BaseCommand {
                         );
                     }
                 } else {
-                    self.get_io().write_error(format!(
-                        "<error>Package \"{}\" could not be found with constraint \"{}\", results below will most likely be incomplete.</error>",
-                        needle.display_lossy(),
-                        text_constraint.display_lossy()
+                    self.get_io().write_error(bconcat!(
+                        "<error>Package \"",
+                        needle,
+                        "\" could not be found with constraint \"",
+                        text_constraint,
+                        "\", results below will most likely be incomplete.</error>"
                     ));
                 }
             }
@@ -216,20 +218,27 @@ pub trait BaseDependencyCommand: BaseCommand {
                 } else {
                     ""
                 };
-                self.get_io().write_error(format!(
-                    "<info>Package \"{} {}\" found in version \"{}\"{}.</info>",
-                    needle.display_lossy(),
-                    text_constraint.display_lossy(),
-                    matched.get_pretty_version().display_lossy(),
-                    extra_notice
+                self.get_io().write_error(bconcat!(
+                    "<info>Package \"",
+                    needle,
+                    " ",
+                    text_constraint,
+                    "\" found in version \"",
+                    matched.get_pretty_version(),
+                    "\"",
+                    extra_notice,
+                    ".</info>"
                 ));
             }
             Some(matched) if inverted => {
-                self.get_io().write(format!(
-                    "<comment>Package \"{}\" {} is already installed! To find out why, run `shirabe why {}`</comment>",
-                    needle.display_lossy(),
-                    matched.get_pretty_version().display_lossy(),
-                    needle.display_lossy()
+                self.get_io().write(bconcat!(
+                    "<comment>Package \"",
+                    needle,
+                    "\" ",
+                    matched.get_pretty_version(),
+                    " is already installed! To find out why, run `shirabe why ",
+                    needle,
+                    "`</comment>"
                 ));
 
                 return Ok(0);
@@ -280,17 +289,19 @@ pub trait BaseDependencyCommand: BaseCommand {
         )?;
         if results.is_empty() {
             let extra = if has_constraint {
-                format!(
-                    " in versions {}matching {}",
+                bconcat!(
+                    " in versions ",
                     if inverted { "not " } else { "" },
-                    text_constraint.display_lossy()
+                    "matching ",
+                    text_constraint
                 )
             } else {
-                String::new()
+                BString::default()
             };
-            self.get_io().write_error(format!(
-                "<info>There is no installed package depending on \"{}\"{}",
-                needle.display_lossy(),
+            self.get_io().write_error(bconcat!(
+                "<info>There is no installed package depending on \"",
+                needle,
+                "\"",
                 extra
             ));
             r#return = if inverted { 0 } else { 1 };
@@ -301,13 +312,15 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .as_complete()
                 .and_then(|c| c.get_description())
                 .unwrap_or_default();
-            self.get_io().write(format!(
-                "<info>{}</info> {} {}",
-                root.get_pretty_name().display_lossy(),
-                root.get_pretty_version().display_lossy(),
-                description.display_lossy()
+            self.get_io().write(bconcat!(
+                "<info>",
+                root.get_pretty_name(),
+                "</info> ",
+                root.get_pretty_version(),
+                " ",
+                description
             ));
-            self.print_tree(&results, "", 1);
+            self.print_tree(&results, BStr::new(""), 1);
         } else {
             self.print_table(output, results)?;
         }
@@ -332,11 +345,14 @@ pub trait BaseDependencyCommand: BaseCommand {
                 }
             }
 
-            self.get_io().write_error(format!(
-                "Not finding what you were looking for? Try calling `shirabe {} \"{}:{}\" --dry-run` to get another view on the problem.",
+            self.get_io().write_error(bconcat!(
+                "Not finding what you were looking for? Try calling `shirabe ",
                 composer_command,
-                needle.display_lossy(),
-                text_constraint.display_lossy()
+                " \"",
+                needle,
+                ":",
+                text_constraint,
+                "\" --dry-run` to get another view on the problem."
             ));
         }
 
@@ -420,7 +436,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
     }
 
-    fn print_tree(&self, results: &[DependentsEntry], prefix: &str, level: i64) {
+    fn print_tree(&self, results: &[DependentsEntry], prefix: &BStr, level: i64) {
         let count = results.len() as i64;
         let mut idx: i64 = 0;
         let colors = self.colors();
@@ -486,7 +502,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             if let Some(children_vec) = children {
                 self.print_tree(
                     children_vec,
-                    &format!("{}{}", prefix, if is_last { "   " } else { "│  " }),
+                    bconcat!(prefix, if is_last { "   " } else { "│  " }).as_bstr(),
                     level + 1,
                 );
             }

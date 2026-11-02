@@ -119,7 +119,7 @@ impl CheckPlatformReqsCommand {
                         PhpMixed::string(result.version.clone()),
                         match &result.link {
                             Some(link) => PhpMixed::string(link.to_php_string()),
-                            None => PhpMixed::string(String::new()),
+                            None => PhpMixed::string(BString::default()),
                         },
                         if let Some(link) = &result.link {
                             PhpMixed::string(bconcat!(
@@ -133,7 +133,7 @@ impl CheckPlatformReqsCommand {
                                 ")"
                             ))
                         } else {
-                            PhpMixed::string(String::new())
+                            PhpMixed::string(BString::default())
                         },
                         PhpMixed::string(rtrim(bconcat!(result.status, " ", result.provider))),
                     ])
@@ -214,9 +214,10 @@ impl Command for CheckPlatformReqsCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            io.write_error(format!(
-                "<info>Checking {}platform requirements using the lock file</info>",
-                if no_dev { "non-dev " } else { "" }
+            io.write_error(bconcat!(
+                "<info>Checking ",
+                if no_dev { "non-dev " } else { "" },
+                "platform requirements using the lock file</info>"
             ));
             composer
                 .get_locker()
@@ -228,9 +229,10 @@ impl Command for CheckPlatformReqsCommand {
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
             if local_repo.get_packages()?.is_empty() {
-                io.write_error(format!(
-                    "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
-                    if no_dev { "non-dev " } else { "" }
+                io.write_error(bconcat!(
+                    "<warning>No vendor dir present, checking ",
+                    if no_dev { "non-dev " } else { "" },
+                    "platform requirements from the lock file</warning>"
                 ));
                 composer
                     .get_locker()
@@ -241,9 +243,10 @@ impl Command for CheckPlatformReqsCommand {
                 if no_dev {
                     remove_packages = local_repo.get_dev_package_names();
                 }
-                io.write_error(format!(
-                    "<info>Checking {}platform requirements for packages in the vendor dir</info>",
-                    if no_dev { "non-dev " } else { "" }
+                io.write_error(bconcat!(
+                    "<info>Checking ",
+                    if no_dev { "non-dev " } else { "" },
+                    "platform requirements for packages in the vendor dir</info>"
                 ));
                 local_repo
             }

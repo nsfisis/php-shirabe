@@ -6,11 +6,11 @@ use crate::console::input::{InputArgument, InputOption};
 use crate::io::IOInterfaceWrite;
 use crate::script::{Event as ScriptEvent, ScriptEvents};
 use crate::util::{Platform, ProcessExecutor};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class,
-    str_replace, strtoupper,
+    str_replace, strtoupper, utf8_text,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::{CommandNotFoundException, NamespaceNotFoundException};
@@ -21,7 +21,7 @@ use shirabe_symfony_console::output::OutputInterface;
 pub struct RunScriptCommand {
     base_command_data: BaseCommandData,
 
-    script_events: Vec<&'static str>,
+    script_events: Vec<&'static BStr>,
 }
 
 impl_php_class!(RunScriptCommand, r"Composer\Command\RunScriptCommand");
@@ -227,7 +227,7 @@ impl Command for RunScriptCommand {
             let script = io.select(
                 "Script to run: ",
                 PhpMixed::Array(options),
-                PhpMixed::string(String::new()),
+                PhpMixed::string(BString::default()),
                 PhpMixed::Int(1),
                 "Invalid script name \"%s\"",
                 false,
@@ -257,9 +257,9 @@ impl Command for RunScriptCommand {
 
         let script = match input.borrow().get_argument("script")?.as_string() {
             None => {
-                return Err(RuntimeException::new(
-                    "Missing required argument \"script\"".to_string(),
-                )
+                return Err(RuntimeException::new(BString::from(
+                    "Missing required argument \"script\"",
+                ))
                 .into());
             }
             Some(s) => s.to_owned(),
@@ -268,9 +268,10 @@ impl Command for RunScriptCommand {
         if !self.script_events.iter().any(|event| script == *event) {
             let const_name = str_replace("-", "_", strtoupper(&script));
             if ScriptEvents::is_defined(&const_name) {
-                return Err(InvalidArgumentException::new(format!(
-                    "Script \"{}\" cannot be run with this command",
-                    script.display_lossy()
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Script \"",
+                    script,
+                    "\" cannot be run with this command"
                 ))
                 .into());
             }
@@ -300,9 +301,10 @@ impl Command for RunScriptCommand {
         );
         let has_listeners = dispatcher.borrow_mut().has_event_listeners(&event);
         if !has_listeners {
-            return Err(InvalidArgumentException::new(format!(
-                "Script \"{}\" is not defined in this package",
-                script.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Script \"",
+                script,
+                "\" is not defined in this package"
             ))
             .into());
         }
@@ -316,13 +318,14 @@ impl Command for RunScriptCommand {
 
         if let Some(timeout_val) = input.borrow().get_option("timeout")?.as_string() {
             if !timeout_val.iter().all(u8::is_ascii_digit) {
-                return Err(RuntimeException::new(
-                    "Timeout value must be numeric and positive if defined, or 0 for forever"
-                        .to_string(),
-                )
+                return Err(RuntimeException::new(BString::from(
+                    "Timeout value must be numeric and positive if defined, or 0 for forever",
+                ))
                 .into());
             }
-            let timeout: i64 = timeout_val.display_lossy().to_string().parse().unwrap_or(0);
+            let timeout: i64 = utf8_text(timeout_val)
+                .and_then(|text| text.parse().ok())
+                .unwrap_or(0);
             ProcessExecutor::set_timeout(timeout);
         }
 

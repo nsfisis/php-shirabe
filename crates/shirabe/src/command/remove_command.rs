@@ -12,10 +12,10 @@ use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, UnexpectedValueException, impl_php_class, implode, preg_grep, strtolower,
+    PhpMixed, UnexpectedValueException, bconcat, impl_php_class, implode, preg_grep, strtolower,
 };
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{
@@ -196,9 +196,9 @@ impl Command for RemoveCommand {
                 .as_bool()
                 .unwrap_or(false)
         {
-            return Err(InvalidArgumentException::new(
-                "Not enough arguments (missing: \"packages\").".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "Not enough arguments (missing: \"packages\").",
+            ))
             .into());
         }
 
@@ -221,10 +221,9 @@ impl Command for RemoveCommand {
                 let locker = composer.get_locker().clone();
                 let mut locker = locker.borrow_mut();
                 if !locker.is_locked() {
-                    return Err(UnexpectedValueException::new(
-                        "A valid composer.lock file is required to run this command with --unused"
-                            .to_string(),
-                    )
+                    return Err(UnexpectedValueException::new(BString::from(
+                        "A valid composer.lock file is required to run this command with --unused",
+                    ))
                     .into());
                 }
             }
@@ -335,7 +334,7 @@ impl Command for RemoveCommand {
             .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false);
-        let mut to_remove: IndexMap<String, Vec<BString>> = IndexMap::new();
+        let mut to_remove: IndexMap<BString, Vec<BString>> = IndexMap::new();
         for package in &packages {
             let in_type = composer_data
                 .as_array()
@@ -356,31 +355,35 @@ impl Command for RemoveCommand {
             if let Some(canonical_name) = in_type {
                 if dry_run {
                     to_remove
-                        .entry(r#type.to_string())
+                        .entry(bconcat!(r#type))
                         .or_default()
                         .push(canonical_name.clone());
                 } else {
                     json.remove_link(bstr::BStr::new(r#type), bstr::BStr::new(&canonical_name));
                 }
             } else if let Some(canonical_name) = in_alt_type {
-                io.write_error(format!(
-                    "<warning>{} could not be found in {} but it is present in {}</warning>",
-                    canonical_name.display_lossy(),
+                io.write_error(bconcat!(
+                    "<warning>",
+                    canonical_name,
+                    " could not be found in ",
                     r#type,
-                    alt_type
+                    " but it is present in ",
+                    alt_type,
+                    "</warning>"
                 ));
                 if io.is_interactive()
                     && io.ask_confirmation(
-                        format!(
-                            "Do you want to remove it from {} [<comment>yes</comment>]? ",
-                            alt_type
+                        bconcat!(
+                            "Do you want to remove it from ",
+                            alt_type,
+                            " [<comment>yes</comment>]? "
                         ),
                         true,
                     )?
                 {
                     if dry_run {
                         to_remove
-                            .entry(alt_type.to_string())
+                            .entry(bconcat!(alt_type))
                             .or_default()
                             .push(canonical_name.clone());
                     } else {
@@ -419,7 +422,7 @@ impl Command for RemoveCommand {
                     for matched_package in matches_in_type {
                         if dry_run {
                             to_remove
-                                .entry(r#type.to_string())
+                                .entry(bconcat!(r#type))
                                 .or_default()
                                 .push(matched_package.clone());
                         } else {
@@ -431,24 +434,28 @@ impl Command for RemoveCommand {
                     }
                 } else if !alt_type_keys.is_empty() && !matches_in_alt_type.is_empty() {
                     for matched_package in matches_in_alt_type {
-                        io.write_error(format!(
-                            "<warning>{} could not be found in {} but it is present in {}</warning>",
-                            matched_package.display_lossy(),
+                        io.write_error(bconcat!(
+                            "<warning>",
+                            matched_package,
+                            " could not be found in ",
                             r#type,
-                            alt_type
+                            " but it is present in ",
+                            alt_type,
+                            "</warning>"
                         ));
                         if io.is_interactive()
                             && io.ask_confirmation(
-                                format!(
-                                    "Do you want to remove it from {} [<comment>yes</comment>]? ",
-                                    alt_type
+                                bconcat!(
+                                    "Do you want to remove it from ",
+                                    alt_type,
+                                    " [<comment>yes</comment>]? "
                                 ),
                                 true,
                             )?
                         {
                             if dry_run {
                                 to_remove
-                                    .entry(alt_type.to_string())
+                                    .entry(bconcat!(alt_type))
                                     .or_default()
                                     .push(matched_package.clone());
                             } else {
@@ -460,15 +467,16 @@ impl Command for RemoveCommand {
                         }
                     }
                 } else {
-                    io.write_error(format!(
-                        "<warning>{} is not required in your composer.json and has not been removed</warning>",
-                        package.display_lossy()
+                    io.write_error(bconcat!(
+                        "<warning>",
+                        package,
+                        " is not required in your composer.json and has not been removed</warning>"
                     ));
                 }
             }
         }
 
-        io.write_error(format!("<info>{} has been updated</info>", file.display()));
+        io.write_error(bconcat!("<info>", file, " has been updated</info>"));
 
         if input
             .borrow()
@@ -494,24 +502,24 @@ impl Command for RemoveCommand {
 
         if dry_run {
             let root_package = composer.get_package();
-            let mut links: IndexMap<String, IndexMap<BString, _>> = IndexMap::new();
+            let mut links: IndexMap<BString, IndexMap<BString, _>> = IndexMap::new();
             links.insert(
-                "require".to_string(),
+                BString::from("require"),
                 (*root_package.get_requires()).clone(),
             );
             links.insert(
-                "require-dev".to_string(),
+                BString::from("require-dev"),
                 (*root_package.get_dev_requires()).clone(),
             );
             for (link_type, names) in &to_remove {
                 for name in names {
-                    if let Some(section) = links.get_mut(link_type.as_str()) {
+                    if let Some(section) = links.get_mut(link_type.as_bstr()) {
                         section.shift_remove(name.as_bytes());
                     }
                 }
             }
-            root_package.set_requires(links.shift_remove("require").unwrap_or_default());
-            root_package.set_dev_requires(links.shift_remove("require-dev").unwrap_or_default());
+            root_package.set_requires(links.shift_remove(B("require")).unwrap_or_default());
+            root_package.set_dev_requires(links.shift_remove(B("require-dev")).unwrap_or_default());
         }
 
         let mut command_event = crate::plugin::CommandEvent::new(
@@ -551,9 +559,9 @@ impl Command for RemoveCommand {
                 json.remove_config_setting(bstr::BStr::new("allow-plugins"));
             } else {
                 for plugin in &removed_plugins {
-                    json.remove_config_setting(bstr::BStr::new(&format!(
-                        "allow-plugins.{}",
-                        plugin.display_lossy()
+                    json.remove_config_setting(bstr::BStr::new(&bconcat!(
+                        "allow-plugins.",
+                        plugin
                     )));
                 }
             }
@@ -630,7 +638,7 @@ impl Command for RemoveCommand {
 
         let mut update_allow_transitive_dependencies =
             UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire;
-        let mut flags = String::new();
+        let mut flags = BString::default();
         if input
             .borrow()
             .get_option("update-with-all-dependencies")?
@@ -644,7 +652,7 @@ impl Command for RemoveCommand {
         {
             update_allow_transitive_dependencies =
                 UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps;
-            flags += " --with-all-dependencies";
+            flags.push_str(" --with-all-dependencies");
         } else if input
             .borrow()
             .get_option("no-update-with-dependencies")?
@@ -652,13 +660,14 @@ impl Command for RemoveCommand {
             .unwrap_or(false)
         {
             update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
-            flags += " --with-dependencies";
+            flags.push_str(" --with-dependencies");
         }
 
-        io.write_error(format!(
-            "<info>Running shirabe update {}{}</info>",
-            implode(" ", &packages).display_lossy(),
-            flags
+        io.write_error(bconcat!(
+            "<info>Running shirabe update ",
+            implode(" ", &packages),
+            flags,
+            "</info>"
         ));
 
         install.set_verbose(
@@ -697,9 +706,10 @@ impl Command for RemoveCommand {
 
         let status = install.run().await?;
         if status != 0 {
-            io.write_error(format!(
-                "\n<error>Removal failed, reverting {} to its original content.</error>",
-                file.display()
+            io.write_error(bconcat!(
+                "\n<error>Removal failed, reverting ",
+                file,
+                " to its original content.</error>"
             ));
             std::fs::write(json_file.get_path(), &composer_backup)?;
         }
@@ -713,10 +723,7 @@ impl Command for RemoveCommand {
                     .find_packages(bstr::BStr::new(package), None)?
                     .is_empty()
                 {
-                    io.write_error(format!(
-                        "<error>Removal failed, {} is still present, it may be required by another package. See `shirabe why {}`.</error>",
-                        package.display_lossy(), package.display_lossy()
-                    ));
+                    io.write_error(bconcat!("<error>Removal failed, ", package, " is still present, it may be required by another package. See `shirabe why ", package, "`.</error>"));
                     return Ok(2);
                 }
             }

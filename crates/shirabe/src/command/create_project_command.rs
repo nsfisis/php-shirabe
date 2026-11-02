@@ -236,7 +236,7 @@ impl CreateProjectCommand {
             .get_event_dispatcher()
             .borrow_mut()
             .dispatch_script(
-                ScriptEvents::POST_ROOT_PACKAGE_INSTALL.into(),
+                ScriptEvents::POST_ROOT_PACKAGE_INSTALL,
                 install_dev_packages,
                 vec![],
                 IndexMap::new(),
@@ -308,10 +308,7 @@ impl CreateProjectCommand {
                 Err(e) => {
                     if e.is_instanceof::<PluginBlockedException>() {
                         io.write_error("<error>Hint: To allow running the config command recommended below before dependencies are installed, run create-project with --no-install.</error>");
-                        io.write_error(format!(
-                            "<error>You can then cd into {}, configure allow-plugins, and finally run a shirabe install to complete the process.</error>",
-                            getcwd().unwrap_or_default().display()
-                        ));
+                        io.write_error(bconcat!("<error>You can then cd into ", getcwd().unwrap_or_default(), ", configure allow-plugins, and finally run a shirabe install to complete the process.</error>"));
                     }
                     return Err(e);
                 }
@@ -359,9 +356,8 @@ impl CreateProjectCommand {
             let mut had_error: Option<anyhow::Error> = None;
             for dir in &dirs {
                 if !fs.remove_directory(dir)? {
-                    had_error = Some(
-                        RuntimeException::new(format!("Could not remove {}", dir.display())).into(),
-                    );
+                    had_error =
+                        Some(RuntimeException::new(bconcat!("Could not remove ", dir)).into());
                     break;
                 }
             }
@@ -405,7 +401,7 @@ impl CreateProjectCommand {
             .get_event_dispatcher()
             .borrow_mut()
             .dispatch_script(
-                ScriptEvents::POST_CREATE_PROJECT_CMD.into(),
+                ScriptEvents::POST_CREATE_PROJECT_CMD,
                 install_dev_packages,
                 vec![],
                 indexmap::IndexMap::new(),
@@ -467,9 +463,9 @@ impl CreateProjectCommand {
             directory = Platform::get_cwd(false)?.join(&directory);
         }
         if directory.as_os_str().is_empty() {
-            return Err(UnexpectedValueException::new(
-                "Got an empty target directory, something went wrong".to_string(),
-            )
+            return Err(UnexpectedValueException::new(BString::from(
+                "Got an empty target directory, something went wrong",
+            ))
             .into());
         }
 
@@ -487,26 +483,29 @@ impl CreateProjectCommand {
                 .merge(&merge_map, Config::SOURCE_COMMAND);
         }
 
-        io.write_error(format!(
-            "<info>Creating a \"{}\" project at \"{}\"</info>",
-            package_name.display_lossy(),
+        io.write_error(bconcat!(
+            "<info>Creating a \"",
+            package_name,
+            "\" project at \"",
             fs.borrow()
-                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?
-                .display()
+                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?,
+            "\"</info>"
         ));
 
         if file_exists(&directory) {
             if !is_dir(&directory) {
-                return Err(InvalidArgumentException::new(format!(
-                    "Cannot create project directory at \"{}\", it exists as a file.",
-                    directory.display()
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Cannot create project directory at \"",
+                    directory,
+                    "\", it exists as a file."
                 ))
                 .into());
             }
             if !fs.borrow().is_dir_empty(&directory) {
-                return Err(InvalidArgumentException::new(format!(
-                    "Project directory \"{}\" is not empty.",
-                    directory.display()
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Project directory \"",
+                    directory,
+                    "\" is not empty."
                 ))
                 .into());
             }
@@ -517,10 +516,10 @@ impl CreateProjectCommand {
                 stability = Some("stable".into());
             } else {
                 let matched = preg_match(
-                    format!(
-                        "{{^[^,\\s]*?@({})$}}i",
-                        implode("|", &STABILITIES.keys().copied().collect::<Vec<_>>())
-                            .display_lossy()
+                    bconcat!(
+                        "{^[^,\\s]*?@(",
+                        implode("|", &STABILITIES.keys().copied().collect::<Vec<_>>()),
+                        ")$}i"
                     ),
                     package_version
                         .as_ref()
@@ -541,10 +540,11 @@ impl CreateProjectCommand {
             VersionParser::normalize_stability(stability.unwrap_or_default()).unwrap_or_default();
 
         if crate::package::stability_priority(&stability).is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Invalid stability provided ({}), must be one of: {}",
-                stability.display_lossy(),
-                implode(", ", &STABILITIES.keys().copied().collect::<Vec<_>>()).display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Invalid stability provided (",
+                stability,
+                "), must be one of: ",
+                implode(", ", &STABILITIES.keys().copied().collect::<Vec<_>>())
             ))
             .into());
         }
@@ -657,13 +657,14 @@ impl CreateProjectCommand {
         )?;
 
         if package.is_none() {
-            let error_message = format!(
-                "Could not find package {} with {}",
-                name.display_lossy(),
+            let error_message = bconcat!(
+                "Could not find package ",
+                name,
+                " with ",
                 if let Some(v) = package_version.as_ref() {
-                    format!("version {}", v.display_lossy())
+                    bconcat!("version ", v)
                 } else {
-                    format!("stability {}", stability.display_lossy())
+                    bconcat!("stability ", stability)
                 }
             );
             let is_ignore_all = platform_requirement_filter
@@ -683,14 +684,11 @@ impl CreateProjectCommand {
                     )?
                     .is_some()
             {
-                return Err(InvalidArgumentException::new(format!(
-                    "{} in a version installable using your PHP version, PHP extensions and Composer version.",
-                    error_message
-                ))
+                return Err(InvalidArgumentException::new(bconcat!(error_message, " in a version installable using your PHP version, PHP extensions and Composer version."))
                 .into());
             }
 
-            return Err(InvalidArgumentException::new(format!("{}.", error_message)).into());
+            return Err(InvalidArgumentException::new(bconcat!(error_message, ".")).into());
         }
         let mut package = package.unwrap();
 
@@ -700,7 +698,7 @@ impl CreateProjectCommand {
         let signals = real_dir.as_ref().map(|_| SignalSubscription::new());
         let abort_on_signal = |signals: &SignalSubscription| {
             io.write_error3(
-                format!("Received {}, aborting", signals.last_signal().as_str()),
+                bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
                 true,
                 crate::io::DEBUG,
             );
@@ -721,12 +719,12 @@ impl CreateProjectCommand {
             package = alias.get_alias_of().into();
         }
 
-        io.write_error(format!(
-            "<info>Installing {} ({})</info>",
-            package.get_name().display_lossy(),
-            package
-                .get_full_pretty_version(false, crate::package::DisplayMode::SourceRefIfDev)
-                .display_lossy()
+        io.write_error(bconcat!(
+            "<info>Installing ",
+            package.get_name(),
+            " (",
+            package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRefIfDev),
+            ")</info>"
         ));
 
         if disable_plugins {
@@ -786,10 +784,7 @@ impl CreateProjectCommand {
             .get_installation_source()
             .is_some_and(|s| s == "source");
 
-        io.write_error(format!(
-            "<info>Created project in {}</info>",
-            directory.display()
-        ));
+        io.write_error(bconcat!("<info>Created project in ", directory, "</info>"));
         chdir(&directory);
 
         // ensure that the env var being set does not interfere with create-project
@@ -899,16 +894,17 @@ impl Command for CreateProjectCommand {
         {
             let package = input.borrow().get_argument("package")?;
             if package.is_null() {
-                return Err(RuntimeException::new(
-                    "Not enough arguments (missing: \"package\").".to_string(),
-                )
+                return Err(RuntimeException::new(BString::from(
+                    "Not enough arguments (missing: \"package\").",
+                ))
                 .into());
             }
             let mut parts =
                 explode_with_limit("/", strtolower(package.as_string().unwrap_or_default()), 2);
-            let prompt = format!(
-                "New project directory [<comment>{}</comment>]: ",
-                array_pop(&mut parts).unwrap_or_default().display_lossy()
+            let prompt = bconcat!(
+                "New project directory [<comment>",
+                array_pop(&mut parts).unwrap_or_default(),
+                "</comment>]: "
             );
             input.borrow_mut().set_argument(
                 "directory",

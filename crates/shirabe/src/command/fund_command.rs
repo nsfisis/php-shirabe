@@ -175,9 +175,10 @@ impl Command for FundCommand {
                 .unwrap_or(bstr::BStr::new("text")),
         );
         if !matches!(format.as_slice(), b"text" | b"json") {
-            io.write_error(format!(
-                "Unsupported format \"{}\". See help for supported formats.",
-                format.display_lossy()
+            io.write_error(bconcat!(
+                "Unsupported format \"",
+                format,
+                "\". See help for supported formats."
             ));
             return Ok(1);
         }

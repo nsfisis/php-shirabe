@@ -10,8 +10,8 @@ use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use bstr::BStr;
-use shirabe_php_shim::{InvalidArgumentException, impl_php_class, preg_is_match};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{InvalidArgumentException, bconcat, impl_php_class, preg_is_match};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
@@ -95,10 +95,9 @@ impl Command for ReinstallCommand {
 
         if type_count > 0 {
             if packages_count > 0 {
-                return Err(InvalidArgumentException::new(
-                    "You cannot specify package names and filter by type at the same time."
-                        .to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "You cannot specify package names and filter by type at the same time.",
+                ))
                 .into());
             }
             let filter_types: Vec<bstr::BString> = type_option
@@ -113,9 +112,9 @@ impl Command for ReinstallCommand {
             }
         } else {
             if packages_count == 0 {
-                return Err(InvalidArgumentException::new(
-                    "You must pass one or more package names to be reinstalled.".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "You must pass one or more package names to be reinstalled.",
+                ))
                 .into());
             }
             let patterns: Vec<bstr::BString> = packages_arg
@@ -133,7 +132,11 @@ impl Command for ReinstallCommand {
                     }
                 }
                 if !matched {
-                    io.write_error(format!("<warning>Pattern \"{}\" does not match any currently installed packages.</warning>", pattern.display_lossy()));
+                    io.write_error(bconcat!(
+                        "<warning>Pattern \"",
+                        pattern,
+                        "\" does not match any currently installed packages.</warning>"
+                    ));
                 }
             }
         }
@@ -223,7 +226,7 @@ impl Command for ReinstallCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
         event_dispatcher.borrow_mut().dispatch_script(
-            ScriptEvents::PRE_INSTALL_CMD.into(),
+            ScriptEvents::PRE_INSTALL_CMD,
             dev_mode,
             vec![],
             indexmap::IndexMap::new(),
@@ -312,7 +315,7 @@ impl Command for ReinstallCommand {
         }
 
         event_dispatcher.borrow_mut().dispatch_script(
-            ScriptEvents::POST_INSTALL_CMD.into(),
+            ScriptEvents::POST_INSTALL_CMD,
             dev_mode,
             vec![],
             indexmap::IndexMap::new(),

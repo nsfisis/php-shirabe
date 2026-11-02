@@ -35,10 +35,9 @@ impl ScriptAliasCommand {
 
         for alias in &aliases {
             if !is_string(&PhpMixed::string(alias.clone())) {
-                return Err(InvalidArgumentException::new(
-                    r#""scripts-aliases" element array values should contain only strings"#
-                        .to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    r#""scripts-aliases" element array values should contain only strings"#,
+                ))
                 .into());
             }
         }
@@ -115,9 +114,9 @@ impl Command for ScriptAliasCommand {
         // TODO(symfony): InputInterface has_to_string/get_class_name not modeled in Rust
         // TODO remove for Symfony 6+ as it is then in the interface
         if false {
-            return Err(LogicException::new(
-                "Expected an Input instance that is stringable".to_string(),
-            )
+            return Err(LogicException::new(BString::from(
+                "Expected an Input instance that is stringable",
+            ))
             .into());
         }
 
@@ -131,7 +130,7 @@ impl Command for ScriptAliasCommand {
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
         // TODO(symfony): InputInterface lacks to_string; use a placeholder until it is modeled.
-        let input_as_string = String::new();
+        let input_as_string = BString::default();
         let _ = input;
         let script_alias_input =
             preg_replace2(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1, None);

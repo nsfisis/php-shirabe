@@ -78,10 +78,7 @@ impl RepositoryCommand {
         if !packagist_present {
             let mut packagist_entry = IndexMap::new();
             packagist_entry.insert("packagist.org".into(), PhpMixed::Bool(false));
-            repos.insert(
-                repos.len().to_string().into(),
-                PhpMixed::Array(packagist_entry),
-            );
+            repos.insert(bconcat!(repos.len()), PhpMixed::Array(packagist_entry));
         }
 
         if repos.is_empty() {
@@ -91,7 +88,7 @@ impl RepositoryCommand {
 
         for (key, repo) in &repos {
             if matches!(*repo, PhpMixed::Bool(false)) {
-                io.write(format!("[{}] <info>disabled</info>", key.display_lossy()));
+                io.write(bconcat!("[", key, "] <info>disabled</info>"));
                 continue;
             }
 
@@ -360,12 +357,12 @@ impl Command for RepositoryCommand {
             }
             b"add" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new("You must pass a repository name. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
+                    return Err(RuntimeException::new(BString::from("You must pass a repository name. Example: shirabe repo add foo vcs https://example.org")).into());
                 }
                 if arg1.is_none() {
-                    return Err(RuntimeException::new(
-                        "You must pass the type and a url, or a JSON string.".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "You must pass the type and a url, or a JSON string.",
+                    ))
                     .into());
                 }
                 let arg1_str = arg1.as_ref().unwrap();
@@ -373,7 +370,7 @@ impl Command for RepositoryCommand {
                     JsonFile::parse_json(Some(arg1_str), None)?
                 } else {
                     if arg2.is_none() {
-                        return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
+                        return Err(RuntimeException::new(BString::from("You must pass the type and a url. Example: shirabe repo add foo vcs https://example.org")).into());
                     }
                     let mut m = IndexMap::new();
                     m.insert("type".into(), PhpMixed::string(arg1_str.clone()));
@@ -392,18 +389,17 @@ impl Command for RepositoryCommand {
                     .as_string()
                     .map(BString::from);
                 if before.is_some() && after.is_some() {
-                    return Err(RuntimeException::new(
-                        "You can not combine --before and --after".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "You can not combine --before and --after",
+                    ))
                     .into());
                 }
 
                 if before.is_some() || after.is_some() {
                     if matches!(repo_config, PhpMixed::Bool(false)) {
-                        return Err(RuntimeException::new(
-                            "Cannot use --before/--after with boolean repository values"
-                                .to_string(),
-                        )
+                        return Err(RuntimeException::new(BString::from(
+                            "Cannot use --before/--after with boolean repository values",
+                        ))
                         .into());
                     }
                     let reference_name = before.as_ref().or(after.as_ref()).unwrap();
@@ -435,9 +431,9 @@ impl Command for RepositoryCommand {
             }
             b"remove" | b"rm" | b"delete" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new(
-                        "You must pass the repository name to remove.".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "You must pass the repository name to remove.",
+                    ))
                     .into());
                 }
                 let name_str = name.as_ref().unwrap();
@@ -457,9 +453,9 @@ impl Command for RepositoryCommand {
             }
             b"set-url" | b"seturl" => {
                 if name.is_none() || arg1.is_none() {
-                    return Err(RuntimeException::new(
-                        "Usage: shirabe repo set-url <name> <new-url>".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Usage: shirabe repo set-url <name> <new-url>",
+                    ))
                     .into());
                 }
                 self.config_source
@@ -474,9 +470,9 @@ impl Command for RepositoryCommand {
             }
             b"get-url" | b"geturl" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new(
-                        "Usage: shirabe repo get-url <name>".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Usage: shirabe repo get-url <name>",
+                    ))
                     .into());
                 }
                 let name_str = name.as_ref().unwrap();
@@ -488,9 +484,10 @@ impl Command for RepositoryCommand {
                         self.get_io().write(url);
                         return Ok(0);
                     }
-                    return Err(InvalidArgumentException::new(format!(
-                        "The {} repository does not have a URL",
-                        name_str.display_lossy()
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        "The ",
+                        name_str,
+                        " repository does not have a URL"
                     ))
                     .into());
                 }
@@ -504,24 +501,26 @@ impl Command for RepositoryCommand {
                             self.get_io().write(url);
                             return Ok(0);
                         }
-                        return Err(InvalidArgumentException::new(format!(
-                            "The {} repository does not have a URL",
-                            name_str.display_lossy()
+                        return Err(InvalidArgumentException::new(bconcat!(
+                            "The ",
+                            name_str,
+                            " repository does not have a URL"
                         ))
                         .into());
                     }
                 }
-                Err(InvalidArgumentException::new(format!(
-                    "There is no {} repository defined",
-                    name_str.display_lossy()
+                Err(InvalidArgumentException::new(bconcat!(
+                    "There is no ",
+                    name_str,
+                    " repository defined"
                 ))
                 .into())
             }
             b"disable" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new(
-                        "Usage: shirabe repo disable packagist.org".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Usage: shirabe repo disable packagist.org",
+                    ))
                     .into());
                 }
                 let name_str = name.as_ref().unwrap();
@@ -542,13 +541,13 @@ impl Command for RepositoryCommand {
                         );
                     return Ok(0);
                 }
-                Err(RuntimeException::new("Only packagist.org can be enabled/disabled using this command. Use add/remove for other repositories.".to_string()).into())
+                Err(RuntimeException::new(BString::from("Only packagist.org can be enabled/disabled using this command. Use add/remove for other repositories.")).into())
             }
             b"enable" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new(
-                        "Usage: shirabe repo enable packagist.org".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Usage: shirabe repo enable packagist.org",
+                    ))
                     .into());
                 }
                 let name_str = name.as_ref().unwrap();
@@ -560,14 +559,15 @@ impl Command for RepositoryCommand {
                         .remove_repository(bstr::BStr::new("packagist.org"));
                     return Ok(0);
                 }
-                Err(RuntimeException::new(
-                    "Only packagist.org can be enabled/disabled using this command.".to_string(),
-                )
+                Err(RuntimeException::new(BString::from(
+                    "Only packagist.org can be enabled/disabled using this command.",
+                ))
                 .into())
             }
-            _ => Err(InvalidArgumentException::new(format!(
-                "Unknown action \"{}\". Use list, add, remove, set-url, get-url, enable, disable",
-                action.display_lossy()
+            _ => Err(InvalidArgumentException::new(bconcat!(
+                "Unknown action \"",
+                action,
+                "\". Use list, add, remove, set-url, get-url, enable, disable"
             ))
             .into()),
         }
