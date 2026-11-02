@@ -206,7 +206,7 @@ impl Command for ExecCommand {
             .get_event_dispatcher()
             .clone();
         dispatcher.borrow_mut().add_listener(
-            "__exec_command",
+            "__exec_command".into(),
             crate::event_dispatcher::Callable::String(binary),
             0,
         );
@@ -243,7 +243,7 @@ impl Command for ExecCommand {
             .unwrap_or_default();
 
         dispatcher.borrow_mut().dispatch_script(
-            "__exec_command",
+            "__exec_command".into(),
             true,
             args,
             indexmap::IndexMap::new(),

@@ -324,17 +324,17 @@ impl Command for StatusCommand {
 
             let mut command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "status", input.clone(), output);
-            let command_event_name = command_event.get_name().to_string();
+            let command_event_name = command_event.get_name().to_owned();
             composer
                 .get_event_dispatcher()
                 .borrow_mut()
-                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+                .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
             composer
                 .get_event_dispatcher()
                 .borrow_mut()
                 .dispatch_script(
-                    ScriptEvents::PRE_STATUS_CMD,
+                    ScriptEvents::PRE_STATUS_CMD.into(),
                     true,
                     vec![],
                     indexmap::IndexMap::new(),
@@ -349,7 +349,7 @@ impl Command for StatusCommand {
                 .get_event_dispatcher()
                 .borrow_mut()
                 .dispatch_script(
-                    ScriptEvents::POST_STATUS_CMD,
+                    ScriptEvents::POST_STATUS_CMD.into(),
                     true,
                     vec![],
                     indexmap::IndexMap::new(),

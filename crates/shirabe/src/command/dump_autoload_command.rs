@@ -76,11 +76,11 @@ impl Command for DumpAutoloadCommand {
             input.clone(),
             output,
         );
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let config = composer.get_config();
 

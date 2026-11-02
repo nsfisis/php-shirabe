@@ -67,24 +67,24 @@ mockall::mock! {
     impl EventDispatcherInterface for EventDispatcher {
         fn dispatch<'a, 'b>(
             &mut self,
-            event_name: Option<&'a str>,
+            event_name: Option<&'a bstr::BStr>,
             event: Option<&'b mut dyn EventInterface>,
         ) -> anyhow::Result<i64>;
         fn dispatch_script(
             &mut self,
-            event_name: &str,
+            event_name: &bstr::BStr,
             dev_mode: bool,
             additional_args: Vec<bstr::BString>,
             flags: IndexMap<BString, PhpMixed>,
         ) -> anyhow::Result<i64>;
         fn dispatch_installer_event(
             &mut self,
-            event_name: &str,
+            event_name: &bstr::BStr,
             dev_mode: bool,
             execute_operations: bool,
             transaction: std::rc::Rc<AnyTransaction>,
         ) -> anyhow::Result<i64>;
-        fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64);
+        fn add_listener(&mut self, event_name: &bstr::BStr, listener: Callable, priority: i64);
         fn add_subscriber<'a>(
             &mut self,
             subscriber: &'a dyn shirabe::event_dispatcher::EventSubscriberInterface,

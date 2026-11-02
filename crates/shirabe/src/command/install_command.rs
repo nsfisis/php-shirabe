@@ -134,11 +134,11 @@ impl Command for InstallCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "install", input.clone(), output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 

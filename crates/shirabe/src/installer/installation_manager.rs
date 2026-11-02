@@ -606,7 +606,7 @@ impl InstallationManager {
 
             if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
                 event_dispatcher.borrow_mut().dispatch_package_event(
-                    event_name,
+                    event_name.into(),
                     dev_mode,
                     repo.clone(),
                     all_operations.to_vec(),
@@ -684,7 +684,7 @@ impl InstallationManager {
                 let all_operations = all_operations.to_vec();
                 post_exec_callbacks.push(Box::new(move || {
                     event_dispatcher.borrow_mut().dispatch_package_event(
-                        event_name,
+                        event_name.into(),
                         dev_mode,
                         repo.clone(),
                         all_operations.clone(),

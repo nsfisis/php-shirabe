@@ -63,7 +63,7 @@ fn test_non_utf8_command_metadata_matches_upstream_composer() {
         ("php", vec![composer_bin.as_os_str()]),
         (env!("CARGO_BIN_EXE_shirabe"), vec![]),
     ];
-    let cases: [&[&[u8]]; 12] = [
+    let cases: [&[&[u8]]; 13] = [
         &[b"list"],
         &[b"list", b"--raw"],
         &[b"list", b"--format=md"],
@@ -76,6 +76,7 @@ fn test_non_utf8_command_metadata_matches_upstream_composer() {
         &[b"alias\xE9"],
         &[b"namespace\xE9:sub"],
         &[b"namespace\xE9:su"],
+        &[b"run-script", b"undefined\xE9"],
     ];
 
     let mut results: Vec<Vec<(i32, BString)>> = Vec::new();

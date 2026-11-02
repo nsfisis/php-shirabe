@@ -186,11 +186,11 @@ impl Command for ReinstallCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "reinstall", input.clone(), output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         let event_dispatcher = composer.get_event_dispatcher();
         event_dispatcher
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
@@ -223,7 +223,7 @@ impl Command for ReinstallCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
         event_dispatcher.borrow_mut().dispatch_script(
-            ScriptEvents::PRE_INSTALL_CMD,
+            ScriptEvents::PRE_INSTALL_CMD.into(),
             dev_mode,
             vec![],
             indexmap::IndexMap::new(),
@@ -312,7 +312,7 @@ impl Command for ReinstallCommand {
         }
 
         event_dispatcher.borrow_mut().dispatch_script(
-            ScriptEvents::POST_INSTALL_CMD,
+            ScriptEvents::POST_INSTALL_CMD.into(),
             dev_mode,
             vec![],
             indexmap::IndexMap::new(),

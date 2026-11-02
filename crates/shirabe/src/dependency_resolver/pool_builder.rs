@@ -318,9 +318,9 @@ impl PoolBuilder {
                 packages,
                 unacceptable_fixed_or_locked_packages,
             );
-            let pre_pool_create_event_name = pre_pool_create_event.get_name().to_string();
+            let pre_pool_create_event_name = pre_pool_create_event.get_name().to_owned();
             let dispatched = event_dispatcher.borrow_mut().dispatch(
-                Some(&pre_pool_create_event_name),
+                Some(pre_pool_create_event_name.as_ref()),
                 Some(&mut pre_pool_create_event),
             );
             let (lent_request, event_packages, event_unacceptable_fixed_packages) =

@@ -2064,8 +2064,8 @@ fn test_pre_and_post_events_are_dispatched_during_autoload_dump() {
     let mut s = set_up();
 
     let series = std::rc::Rc::new(std::cell::RefCell::new(vec![
-        (ScriptEvents::PRE_AUTOLOAD_DUMP, false),
-        (ScriptEvents::POST_AUTOLOAD_DUMP, false),
+        (bstr::BStr::new(ScriptEvents::PRE_AUTOLOAD_DUMP), false),
+        (bstr::BStr::new(ScriptEvents::POST_AUTOLOAD_DUMP), false),
     ]));
     let dispatched = std::rc::Rc::new(std::cell::Cell::new(0));
     let series_for_cb = series.clone();

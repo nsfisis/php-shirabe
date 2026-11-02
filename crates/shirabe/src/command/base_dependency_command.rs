@@ -49,11 +49,11 @@ pub trait BaseDependencyCommand: BaseCommand {
             input.clone(),
             output.clone(),
         );
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
         event_dispatcher
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
         let composer = crate::composer::composer_full(&composer);
 
         let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =

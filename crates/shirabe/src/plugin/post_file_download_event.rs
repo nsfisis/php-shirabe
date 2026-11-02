@@ -20,7 +20,7 @@ pub struct PostFileDownloadEvent {
 
 impl PostFileDownloadEvent {
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         file_name: Option<PathBuf>,
         checksum: Option<BString>,
         url: BString,
@@ -37,7 +37,7 @@ impl PostFileDownloadEvent {
         }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
@@ -81,7 +81,7 @@ impl EventInterface for PostFileDownloadEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 

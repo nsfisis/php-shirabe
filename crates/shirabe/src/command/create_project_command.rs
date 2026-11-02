@@ -236,7 +236,7 @@ impl CreateProjectCommand {
             .get_event_dispatcher()
             .borrow_mut()
             .dispatch_script(
-                ScriptEvents::POST_ROOT_PACKAGE_INSTALL,
+                ScriptEvents::POST_ROOT_PACKAGE_INSTALL.into(),
                 install_dev_packages,
                 vec![],
                 IndexMap::new(),
@@ -404,7 +404,7 @@ impl CreateProjectCommand {
             .get_event_dispatcher()
             .borrow_mut()
             .dispatch_script(
-                ScriptEvents::POST_CREATE_PROJECT_CMD,
+                ScriptEvents::POST_CREATE_PROJECT_CMD.into(),
                 install_dev_packages,
                 vec![],
                 indexmap::IndexMap::new(),

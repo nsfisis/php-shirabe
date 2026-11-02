@@ -24,13 +24,13 @@ pub struct PrePoolCreateEvent {
 }
 
 impl PrePoolCreateEvent {
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         repositories: Vec<RepositoryInterfaceHandle>,
         request: Request,
         acceptable_stabilities: IndexMap<BString, i64>,
@@ -117,7 +117,7 @@ impl EventInterface for PrePoolCreateEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 

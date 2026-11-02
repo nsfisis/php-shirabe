@@ -17,7 +17,7 @@ pub struct CommandEvent {
 
 impl CommandEvent {
     pub fn new(
-        name: &str,
+        name: impl Into<BString>,
         command_name: impl AsRef<[u8]>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -26,14 +26,14 @@ impl CommandEvent {
     }
 
     pub fn new6(
-        name: &str,
+        name: impl Into<BString>,
         command_name: impl AsRef<[u8]>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
     ) -> Self {
-        let inner = Event::new(name.to_string(), args, flags);
+        let inner = Event::new(name, args, flags);
         Self {
             inner,
             command_name: BString::from(command_name.as_ref()),
@@ -50,7 +50,7 @@ impl CommandEvent {
         self.output.clone()
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
@@ -68,7 +68,7 @@ impl EventInterface for CommandEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 

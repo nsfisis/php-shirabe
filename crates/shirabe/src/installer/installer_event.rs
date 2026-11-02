@@ -20,7 +20,7 @@ pub struct InstallerEvent {
 
 impl InstallerEvent {
     pub fn new(
-        event_name: String,
+        event_name: impl Into<BString>,
         composer: ComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
@@ -68,7 +68,7 @@ impl EventInterface for InstallerEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 

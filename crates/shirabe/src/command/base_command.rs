@@ -845,10 +845,10 @@ pub fn base_command_initialize(
             input.clone(),
             command_name,
         );
-        let pre_command_run_event_name = pre_command_run_event.get_name().to_string();
+        let pre_command_run_event_name = pre_command_run_event.get_name().to_owned();
         let dispatcher = composer.borrow_partial().get_event_dispatcher();
         dispatcher.borrow_mut().dispatch(
-            Some(&pre_command_run_event_name),
+            Some(pre_command_run_event_name.as_ref()),
             Some(&mut pre_command_run_event),
         )?;
     }

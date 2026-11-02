@@ -1185,10 +1185,10 @@ impl Command for DiagnoseCommand {
                 vec![],
                 IndexMap::new(),
             );
-            let command_event_name = command_event.get_name().to_string();
+            let command_event_name = command_event.get_name().to_owned();
             c.get_event_dispatcher()
                 .borrow_mut()
-                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+                .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
             *self.process.borrow_mut() = Some(
                 c.get_loop()
                     .borrow()

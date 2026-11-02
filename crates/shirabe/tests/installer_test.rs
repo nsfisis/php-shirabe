@@ -163,14 +163,14 @@ struct StubEventDispatcher;
 impl EventDispatcherInterface for StubEventDispatcher {
     fn dispatch(
         &mut self,
-        _event_name: Option<&str>,
+        _event_name: Option<&bstr::BStr>,
         _event: Option<&mut dyn EventInterface>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
     fn dispatch_script(
         &mut self,
-        _event_name: &str,
+        _event_name: &bstr::BStr,
         _dev_mode: bool,
         _additional_args: Vec<bstr::BString>,
         _flags: IndexMap<BString, PhpMixed>,
@@ -179,14 +179,14 @@ impl EventDispatcherInterface for StubEventDispatcher {
     }
     fn dispatch_installer_event(
         &mut self,
-        _event_name: &str,
+        _event_name: &bstr::BStr,
         _dev_mode: bool,
         _execute_operations: bool,
         _transaction: std::rc::Rc<AnyTransaction>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
-    fn add_listener(&mut self, _event_name: &str, _listener: Callable, _priority: i64) {}
+    fn add_listener(&mut self, _event_name: &bstr::BStr, _listener: Callable, _priority: i64) {}
     fn add_subscriber(
         &mut self,
         _subscriber: &dyn shirabe::event_dispatcher::EventSubscriberInterface,

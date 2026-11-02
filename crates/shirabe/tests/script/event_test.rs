@@ -54,7 +54,7 @@ fn test_event_sets_originating_event() {
         script_event
             .get_originating_event()
             .map(EventInterface::get_name),
-        Some("originatingEvent"),
+        Some("originatingEvent".into()),
         "getOriginatingEvent() SHOULD return test event"
     );
 }
@@ -94,12 +94,12 @@ fn test_event_calculates_nested_originating_event() {
         .map(EventInterface::get_name);
     assert_ne!(
         name,
-        Some("intermediate"),
+        Some("intermediate".into()),
         "getOriginatingEvent() SHOULD NOT return intermediate events"
     );
     assert_eq!(
         name,
-        Some("upperOriginatingEvent"),
+        Some("upperOriginatingEvent".into()),
         "getOriginatingEvent() SHOULD return upper-most event"
     );
 }

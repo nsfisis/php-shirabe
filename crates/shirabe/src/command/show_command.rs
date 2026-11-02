@@ -1869,11 +1869,11 @@ impl Command for ShowCommand {
                 vec![],
                 IndexMap::new(),
             );
-            let command_event_name = command_event.get_name().to_string();
+            let command_event_name = command_event.get_name().to_owned();
             composer
                 .get_event_dispatcher()
                 .borrow_mut()
-                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+                .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
         }
 
         if input.borrow().get_option("latest")?.as_bool() == Some(true) && composer.is_none() {

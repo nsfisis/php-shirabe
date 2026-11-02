@@ -31,7 +31,7 @@ use shirabe_php_shim::{
     os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
     preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
     spl_autoload_register, spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos,
-    strtoupper, substr, trim2, utf8_text,
+    strtoupper, substr, trim2,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -46,7 +46,7 @@ pub enum Callable {
     ///
     /// TODO(plugin): only listeners whose object half lives in the PHP child (`PhpMethod`) are
     /// invocable; an `ArrayCallable` carrying a `PhpMixed` object still has no invocation path.
-    ArrayCallable(Box<PhpMixed>, String),
+    ArrayCallable(Box<PhpMixed>, BString),
     /// PHP `\Closure`, invoked with the event exactly like `$callable($event)` in
     /// `EventDispatcher::doDispatch`. Today this is only produced by Composer's own commands
     /// registering an inline listener on themselves (e.g. `RequireCommand`'s
@@ -89,9 +89,9 @@ pub struct EventDispatcher {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     loader: Option<ClassLoader>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    listeners: IndexMap<String, IndexMap<i64, Vec<Callable>>>,
+    listeners: IndexMap<BString, IndexMap<i64, Vec<Callable>>>,
     run_scripts: bool,
-    event_stack: Vec<String>,
+    event_stack: Vec<BString>,
     skip_scripts: Vec<BString>,
     previous_hash: Option<BString>,
     previous_listeners: IndexMap<BString, bool>,
@@ -116,7 +116,7 @@ impl std::fmt::Debug for GetListenersOverride {
 
 /// For testing only. Holds a closure standing in for an overridden `dispatchScript` method.
 pub struct DispatchScriptOverride(
-    pub Box<dyn Fn(&str, bool, &[BString], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>>,
+    pub Box<dyn Fn(&BStr, bool, &[BString], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>>,
 );
 
 impl std::fmt::Debug for DispatchScriptOverride {
@@ -136,7 +136,7 @@ impl EventDispatcher {
                 io.clone(),
             ))))
         });
-        let event_stack: Vec<String> = Vec::new();
+        let event_stack: Vec<BString> = Vec::new();
         let skip_scripts_env = Platform::get_env("COMPOSER_SKIP_SCRIPTS").unwrap_or_default();
         let skip_scripts: Vec<BString> = explode(",", &skip_scripts_env)
             .iter()
@@ -174,7 +174,7 @@ impl EventDispatcher {
     pub fn __set_dispatch_script_override(
         &mut self,
         callback: Box<
-            dyn Fn(&str, bool, &[BString], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>,
+            dyn Fn(&BStr, bool, &[BString], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>,
         >,
     ) {
         self.dispatch_script_override = Some(DispatchScriptOverride(callback));
@@ -194,7 +194,7 @@ impl EventDispatcher {
     /// Dispatch an event
     pub fn dispatch(
         &mut self,
-        event_name: Option<&str>,
+        event_name: Option<&BStr>,
         event: Option<&mut dyn EventInterface>,
     ) -> anyhow::Result<i64> {
         match event {
@@ -203,7 +203,7 @@ impl EventDispatcher {
                     InvalidArgumentException::new("If no $event is passed in to Composer\\EventDispatcher\\EventDispatcher::dispatch you have to pass in an $eventName, got null."
                                 .to_string()).into()
                 })?;
-                let mut event = Event::new(name.to_string(), Vec::new(), IndexMap::new());
+                let mut event = Event::new(name, Vec::new(), IndexMap::new());
                 self.do_dispatch(&mut event)
             }
             Some(event) => self.do_dispatch(event),
@@ -213,7 +213,7 @@ impl EventDispatcher {
     /// Dispatch a script event.
     pub fn dispatch_script(
         &mut self,
-        event_name: &str,
+        event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
@@ -229,7 +229,7 @@ impl EventDispatcher {
         );
 
         let event = ScriptEvent::new(
-            event_name.to_string(),
+            event_name,
             composer.as_full().expect("checked above").downgrade(),
             self.io_clone(),
             dev_mode,
@@ -242,7 +242,7 @@ impl EventDispatcher {
     /// Dispatch a package event.
     pub fn dispatch_package_event(
         &mut self,
-        event_name: &str,
+        event_name: &BStr,
         dev_mode: bool,
         local_repo: InstalledRepositoryInterfaceHandle,
         operations: Vec<std::rc::Rc<AnyOperation>>,
@@ -255,7 +255,7 @@ impl EventDispatcher {
         );
 
         let event = PackageEvent::new(
-            event_name.to_string(),
+            event_name,
             composer.as_full().expect("checked above").downgrade(),
             self.io_clone(),
             dev_mode,
@@ -269,7 +269,7 @@ impl EventDispatcher {
     /// Dispatch a installer event.
     pub fn dispatch_installer_event(
         &mut self,
-        event_name: &str,
+        event_name: &BStr,
         dev_mode: bool,
         execute_operations: bool,
         transaction: std::rc::Rc<AnyTransaction>,
@@ -281,7 +281,7 @@ impl EventDispatcher {
         );
 
         let event = InstallerEvent::new(
-            event_name.to_string(),
+            event_name,
             composer.as_full().expect("checked above").downgrade(),
             self.io_clone(),
             dev_mode,
@@ -298,13 +298,15 @@ impl EventDispatcher {
             // requires polymorphic dispatch; the simple Event branch is sufficient for now.
             let details: Option<String> = None;
             self.io.write_error3(
-                format!(
-                    "Dispatching <info>{}</info>{} event",
+                bconcat!(
+                    "Dispatching <info>",
                     event.get_name(),
+                    "</info>",
                     details
                         .as_ref()
                         .map(|d| format!(" ({})", d))
-                        .unwrap_or_default()
+                        .unwrap_or_default(),
+                    " event"
                 ),
                 true,
                 crate::io::NORMAL,
@@ -374,13 +376,12 @@ impl EventDispatcher {
                 callable = Callable::String(replaced);
                 additional_args = Vec::new();
             }
-            let formatted_event_name_with_args = format!(
-                "{}{}",
+            let formatted_event_name_with_args = bconcat!(
                 event.get_name(),
                 if !additional_args.is_empty() {
-                    format!(" ({})", implode(", ", &additional_args).display_lossy())
+                    bconcat!(" (", implode(", ", &additional_args), ")")
                 } else {
-                    "".to_string()
+                    BString::default()
                 }
             );
             let is_string_callable = matches!(callable, Callable::String(_));
@@ -409,15 +410,17 @@ impl EventDispatcher {
                         "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
                         handle.class,
                         method_name.display_lossy(),
-                        event.get_name()
+                        event.get_name().display_lossy()
                     )).into());
                 }
                 self.io.write_error3(
-                    format!(
-                        "> {}: {}->{}",
-                        formatted_event_name_with_args.clone(),
+                    bconcat!(
+                        "> ",
+                        formatted_event_name_with_args,
+                        ": ",
                         handle.class,
-                        method_name.display_lossy(),
+                        "->",
+                        method_name,
                     ),
                     true,
                     crate::io::VERBOSE,
@@ -427,7 +430,7 @@ impl EventDispatcher {
                         // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
                         RuntimeException::new(format!(
                         "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
-                        event.get_name(),
+                        event.get_name().display_lossy(),
                         handle.class,
                         method_name.display_lossy(),
                     ))
@@ -475,13 +478,13 @@ impl EventDispatcher {
                             };
                             (cls, m.clone())
                         }
-                        _ => (BString::from("?"), "?".to_string()),
+                        _ => (BString::from("?"), BString::from("?")),
                     };
                     return Err(RuntimeException::new(format!(
                         "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
                         class_name.display_lossy(),
-                        method,
-                        event.get_name()
+                        method.display_lossy(),
+                        event.get_name().display_lossy()
                     )).into());
                 }
                 if let Callable::ArrayCallable(first, method_name) = &callable {
@@ -513,11 +516,7 @@ impl EventDispatcher {
                         if self.is_composer_script(callable_str.as_ref()) =>
                     {
                         self.io.write_error3(
-                            format!(
-                                "> {}: {}",
-                                formatted_event_name_with_args.clone(),
-                                callable_str.display_lossy(),
-                            ),
+                            bconcat!("> ", formatted_event_name_with_args, ": ", callable_str),
                             true,
                             crate::io::VERBOSE,
                         );
@@ -571,12 +570,19 @@ impl EventDispatcher {
                             );
                             let exit_code = self.execute_tty(&exec)?;
                             if exit_code != 0 {
-                                self.io.write_error3(format!(
-                                    "<error>Script {} handling the {} event returned with error code {}</error>",
-                                    callable_str.display_lossy(),
-                                    event.get_name(),
-                                    exit_code
-                                ), true, crate::io::QUIET);
+                                self.io.write_error3(
+                                    bconcat!(
+                                        "<error>Script ",
+                                        callable_str,
+                                        " handling the ",
+                                        event.get_name(),
+                                        " event returned with error code ",
+                                        exit_code.to_string(),
+                                        "</error>"
+                                    ),
+                                    true,
+                                    crate::io::QUIET,
+                                );
 
                                 return Err(ScriptExecutionException::new(
                                     format!(
@@ -588,25 +594,24 @@ impl EventDispatcher {
                                 .into());
                             }
                         } else {
-                            // Event names are text, so a script name that is not valid UTF-8 has
-                            // no listeners, and dispatching it would do nothing.
-                            let script_name = utf8_text(&script_name).map(str::to_owned);
-                            if script_name.as_ref().is_none_or(|script_name| {
-                                self.get_listeners(&Event::new(
+                            if self
+                                .get_listeners(&Event::new(
                                     script_name.clone(),
                                     Vec::new(),
                                     IndexMap::new(),
                                 ))
                                 .is_empty()
-                            }) {
-                                self.io.write_error3(format!(
-                                    "<warning>You made a reference to a non-existent script {}</warning>",
-                                    callable_str.display_lossy(),
-                                ), true, crate::io::QUIET);
+                            {
+                                self.io.write_error3(
+                                    bconcat!(
+                                        "<warning>You made a reference to a non-existent script ",
+                                        callable_str,
+                                        "</warning>"
+                                    ),
+                                    true,
+                                    crate::io::QUIET,
+                                );
                             }
-                            let Some(script_name) = script_name else {
-                                continue;
-                            };
 
                             // TODO(plugin): reached only with a fully loaded Composer (script dispatch asserts full upstream).
                             let composer = self.composer();
@@ -624,15 +629,18 @@ impl EventDispatcher {
                                 flags,
                             );
                             // TODO(plugin): script_event.set_originating_event(event.clone())
-                            match self.dispatch(Some(&script_name), Some(&mut script_event)) {
+                            match self.dispatch(Some(script_name.as_ref()), Some(&mut script_event))
+                            {
                                 Ok(v) => r#return = v,
                                 Err(e) => {
                                     if e.is_instanceof::<ScriptExecutionException>() {
                                         self.io.write_error3(
-                                            format!(
-                                                "<error>Script {} was called via {}</error>",
-                                                callable_str.display_lossy(),
+                                            bconcat!(
+                                                "<error>Script ",
+                                                callable_str,
+                                                " was called via ",
                                                 event.get_name(),
+                                                "</error>"
                                             ),
                                             true,
                                             crate::io::QUIET,
@@ -655,22 +663,34 @@ impl EventDispatcher {
                             "class_exists",
                             vec![PluginValue::string(class_name.clone())],
                         )? {
-                            self.io.write_error3(format!(
-                                "<warning>Class {} is not autoloadable, can not call {} script</warning>",
-                                class_name.display_lossy(),
-                                event.get_name()
-                            ), true, crate::io::QUIET);
+                            self.io.write_error3(
+                                bconcat!(
+                                    "<warning>Class ",
+                                    class_name,
+                                    " is not autoloadable, can not call ",
+                                    event.get_name(),
+                                    " script</warning>"
+                                ),
+                                true,
+                                crate::io::QUIET,
+                            );
                             continue;
                         }
                         if !self.php_runtime_bool(
                             "is_callable",
                             vec![PluginValue::string(callable_str.clone())],
                         )? {
-                            self.io.write_error3(format!(
-                                "<warning>Method {} is not callable, can not call {} script</warning>",
-                                callable_str.display_lossy(),
-                                event.get_name()
-                            ), true, crate::io::QUIET);
+                            self.io.write_error3(
+                                bconcat!(
+                                    "<warning>Method ",
+                                    callable_str,
+                                    " is not callable, can not call ",
+                                    event.get_name(),
+                                    " script</warning>"
+                                ),
+                                true,
+                                crate::io::QUIET,
+                            );
                             continue;
                         }
 
@@ -684,10 +704,12 @@ impl EventDispatcher {
                             }
                             Err(e) => {
                                 self.io.write_error3(
-                                    format!(
-                                        "<error>Script {} handling the {} event terminated with an exception</error>",
-                                        callable_str.display_lossy(),
+                                    bconcat!(
+                                        "<error>Script ",
+                                        callable_str,
+                                        " handling the ",
                                         event.get_name(),
+                                        " event terminated with an exception</error>"
                                     ),
                                     true,
                                     crate::io::QUIET,
@@ -705,7 +727,7 @@ impl EventDispatcher {
                             event,
                             &Callable::ArrayCallable(
                                 Box::new(PhpMixed::string(callable_str.clone())),
-                                "run".to_string(),
+                                BString::from("run"),
                             ),
                         )?;
                         // The user's command class extends Symfony's Command, so the child
@@ -722,11 +744,17 @@ impl EventDispatcher {
                             "class_exists",
                             vec![PluginValue::string(class_name.clone())],
                         )? {
-                            self.io.write_error3(format!(
-                                "<warning>Class {} is not autoloadable, can not call {} script</warning>",
-                                class_name.display_lossy(),
-                                event.get_name()
-                            ), true, crate::io::QUIET);
+                            self.io.write_error3(
+                                bconcat!(
+                                    "<warning>Class ",
+                                    class_name,
+                                    " is not autoloadable, can not call ",
+                                    event.get_name(),
+                                    " script</warning>"
+                                ),
+                                true,
+                                crate::io::QUIET,
+                            );
                             continue;
                         }
                         if !self.php_runtime_bool(
@@ -739,11 +767,7 @@ impl EventDispatcher {
                                 PluginValue::Bool(true),
                             ],
                         )? {
-                            self.io.write_error3(format!(
-                                "<warning>Class {} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>",
-                                class_name.display_lossy(),
-                                event.get_name()
-                            ), true, crate::io::QUIET);
+                            self.io.write_error3(bconcat!("<warning>Class ", class_name, " does not extend Symfony\\Component\\Console\\Command\\Command, can not call ", event.get_name(), " script</warning>"), true, crate::io::QUIET);
                             continue;
                         }
                         if self.php_runtime_bool(
@@ -753,10 +777,15 @@ impl EventDispatcher {
                                 str_replace("-", "_", strtoupper(event.get_name()))
                             ))],
                         )? {
-                            self.io.write_error3(format!(
-                                "<warning>You cannot bind {} to a Command class, use a non-reserved name</warning>",
-                                event.get_name()
-                            ), true, crate::io::QUIET);
+                            self.io.write_error3(
+                                bconcat!(
+                                    "<warning>You cannot bind ",
+                                    event.get_name(),
+                                    " to a Command class, use a non-reserved name</warning>"
+                                ),
+                                true,
+                                crate::io::QUIET,
+                            );
                             continue;
                         }
 
@@ -800,7 +829,7 @@ if (method_exists($app, 'setCatchErrors')) {
 }
 $app->setAutoExit(false);
 $cmd = new $className("#,
-                            php_single_quote(bstr::BStr::new(event.get_name())),
+                            php_single_quote(event.get_name()),
                             r#");
 if (method_exists($app, 'addCommand')) {
     $app->addCommand($cmd);
@@ -863,10 +892,12 @@ try {
                                 .is_some_and(|caught| matches!(caught, PhpMixed::Bool(true)));
                             if caught {
                                 self.io.write_error3(
-                                    format!(
-                                        "<error>Script {} handling the {} event terminated with an exception</error>",
-                                        callable_str.display_lossy(),
+                                    bconcat!(
+                                        "<error>Script ",
+                                        callable_str,
+                                        " handling the ",
                                         event.get_name(),
+                                        " event terminated with an exception</error>"
                                     ),
                                     true,
                                     crate::io::QUIET,
@@ -1025,12 +1056,19 @@ try {
 
                         let exit_code = self.execute_tty(&exec)?;
                         if exit_code != 0 {
-                            self.io.write_error3(format!(
-                                "<error>Script {} handling the {} event returned with error code {}</error>",
-                                callable_str.display_lossy(),
-                                event.get_name(),
-                                exit_code
-                            ), true, crate::io::QUIET);
+                            self.io.write_error3(
+                                bconcat!(
+                                    "<error>Script ",
+                                    callable_str,
+                                    " handling the ",
+                                    event.get_name(),
+                                    " event returned with error code ",
+                                    exit_code.to_string(),
+                                    "</error>"
+                                ),
+                                true,
+                                crate::io::QUIET,
+                            );
 
                             return Err(ScriptExecutionException::new(
                                 format!(
@@ -1127,12 +1165,7 @@ try {
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
             self.io.write_error3(
-                format!(
-                    "> {}: {}::{}",
-                    event.get_name(),
-                    class_name.display_lossy(),
-                    method_name.display_lossy()
-                ),
+                bconcat!("> ", event.get_name(), ": ", class_name, "::", method_name),
                 true,
                 crate::io::NORMAL,
             );
@@ -1152,7 +1185,7 @@ try {
             // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
             RuntimeException::new(format!(
                 "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
-                event.get_name(),
+                event.get_name().display_lossy(),
                 class_name.display_lossy(),
                 method_name.display_lossy(),
             ))
@@ -1254,9 +1287,9 @@ try {
     }
 
     /// Add a listener for a particular event
-    pub fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64) {
+    pub fn add_listener(&mut self, event_name: &BStr, listener: Callable, priority: i64) {
         self.listeners
-            .entry(event_name.to_string())
+            .entry(event_name.to_owned())
             .or_default()
             .entry(priority)
             .or_default()
@@ -1291,14 +1324,14 @@ try {
             match params {
                 SubscribedEventEntry::Method(method) => {
                     self.add_listener(
-                        &event_name,
+                        event_name.as_ref(),
                         Callable::PhpMethod(subscriber.subscriber_handle(), method),
                         0,
                     );
                 }
                 SubscribedEventEntry::MethodWithPriority(method, priority) => {
                     self.add_listener(
-                        &event_name,
+                        event_name.as_ref(),
                         Callable::PhpMethod(subscriber.subscriber_handle(), method),
                         priority.unwrap_or(0),
                     );
@@ -1306,7 +1339,7 @@ try {
                 SubscribedEventEntry::Methods(listeners) => {
                     for (method, priority) in listeners {
                         self.add_listener(
-                            &event_name,
+                            event_name.as_ref(),
                             Callable::PhpMethod(subscriber.subscriber_handle(), method),
                             priority.unwrap_or(0),
                         );
@@ -1331,7 +1364,7 @@ try {
             Vec::new()
         };
 
-        let name = event.get_name().to_string();
+        let name = event.get_name().to_owned();
         if !self
             .listeners
             .get(&name)
@@ -1377,16 +1410,17 @@ try {
         let package = composer.get_package();
         let scripts = package.get_scripts();
 
-        let event_scripts: Vec<BString> = match scripts.get(bstr::B(event.get_name())) {
+        let event_scripts: Vec<BString> = match scripts.get(event.get_name()) {
             Some(v) if !v.is_empty() => v.clone(),
             _ => return Vec::new(),
         };
 
         if self.skip_scripts.iter().any(|s| s == event.get_name()) {
             self.io.write_error3(
-                format!(
-                    "Skipped script listeners for <info>{}</info> because of COMPOSER_SKIP_SCRIPTS",
-                    event.get_name()
+                bconcat!(
+                    "Skipped script listeners for <info>",
+                    event.get_name(),
+                    "</info> because of COMPOSER_SKIP_SCRIPTS"
                 ),
                 true,
                 crate::io::VERBOSE,
@@ -1420,11 +1454,11 @@ try {
 
     /// Push an event to the stack of active event
     fn push_event(&mut self, event: &dyn EventInterface) -> anyhow::Result<i64> {
-        let event_name = event.get_name().to_string();
+        let event_name = event.get_name().to_owned();
         if self.event_stack.iter().any(|n| n == &event_name) {
             return Err(RuntimeException::new(format!(
                 "Circular call to script handler '{}' detected",
-                event_name,
+                event_name.display_lossy(),
             ))
             .into());
         }
@@ -1433,7 +1467,7 @@ try {
     }
 
     /// Pops the active event from the stack
-    fn pop_event(&mut self) -> Option<String> {
+    fn pop_event(&mut self) -> Option<BString> {
         array_pop(&mut self.event_stack)
     }
 
@@ -1982,24 +2016,24 @@ fn php_single_quote(value: &BStr) -> BString {
 pub trait EventDispatcherInterface: std::fmt::Debug {
     fn dispatch(
         &mut self,
-        event_name: Option<&str>,
+        event_name: Option<&BStr>,
         event: Option<&mut dyn EventInterface>,
     ) -> anyhow::Result<i64>;
     fn dispatch_script(
         &mut self,
-        event_name: &str,
+        event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64>;
     fn dispatch_installer_event(
         &mut self,
-        event_name: &str,
+        event_name: &BStr,
         dev_mode: bool,
         execute_operations: bool,
         transaction: std::rc::Rc<AnyTransaction>,
     ) -> anyhow::Result<i64>;
-    fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64);
+    fn add_listener(&mut self, event_name: &BStr, listener: Callable, priority: i64);
     fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()>;
     fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle);
     fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
@@ -2008,7 +2042,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
 impl EventDispatcherInterface for EventDispatcher {
     fn dispatch(
         &mut self,
-        event_name: Option<&str>,
+        event_name: Option<&BStr>,
         event: Option<&mut dyn EventInterface>,
     ) -> anyhow::Result<i64> {
         self.dispatch(event_name, event)
@@ -2016,7 +2050,7 @@ impl EventDispatcherInterface for EventDispatcher {
 
     fn dispatch_script(
         &mut self,
-        event_name: &str,
+        event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
@@ -2026,7 +2060,7 @@ impl EventDispatcherInterface for EventDispatcher {
 
     fn dispatch_installer_event(
         &mut self,
-        event_name: &str,
+        event_name: &BStr,
         dev_mode: bool,
         execute_operations: bool,
         transaction: std::rc::Rc<AnyTransaction>,
@@ -2034,7 +2068,7 @@ impl EventDispatcherInterface for EventDispatcher {
         self.dispatch_installer_event(event_name, dev_mode, execute_operations, transaction)
     }
 
-    fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64) {
+    fn add_listener(&mut self, event_name: &BStr, listener: Callable, priority: i64) {
         self.add_listener(event_name, listener, priority);
     }
 

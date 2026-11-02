@@ -10,6 +10,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class,
+    str_replace, strtoupper,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::{CommandNotFoundException, NamespaceNotFoundException};
@@ -261,17 +262,15 @@ impl Command for RunScriptCommand {
                 )
                 .into());
             }
-            // Scripts are keys of composer.json, which is UTF-8, so a name that is not UTF-8 stays
-            // undefined after this conversion.
-            Some(s) => s.display_lossy().to_string(),
+            Some(s) => s.to_owned(),
         };
 
-        if !self.script_events.contains(&script.as_str()) {
-            let const_name = script.to_uppercase().replace('-', "_");
+        if !self.script_events.iter().any(|event| script == *event) {
+            let const_name = str_replace("-", "_", strtoupper(&script));
             if ScriptEvents::is_defined(&const_name) {
                 return Err(InvalidArgumentException::new(format!(
                     "Script \"{}\" cannot be run with this command",
-                    script
+                    script.display_lossy()
                 ))
                 .into());
             }
@@ -303,7 +302,7 @@ impl Command for RunScriptCommand {
         if !has_listeners {
             return Err(InvalidArgumentException::new(format!(
                 "Script \"{}\" is not defined in this package",
-                script
+                script.display_lossy()
             ))
             .into());
         }
@@ -331,7 +330,7 @@ impl Command for RunScriptCommand {
 
         dispatcher
             .borrow_mut()
-            .dispatch_script(&script, dev_mode, args, IndexMap::new())
+            .dispatch_script(script.as_ref(), dev_mode, args, IndexMap::new())
     }
 
     fn initialize(

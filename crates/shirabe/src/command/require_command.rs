@@ -172,7 +172,7 @@ impl RequireCommand {
         //   function () use (&$dependencyResolutionCompleted) { $dependencyResolutionCompleted = true; }, 10000);
         let dependency_resolution_completed = self.dependency_resolution_completed.clone();
         composer.get_event_dispatcher().borrow_mut().add_listener(
-            InstallerEvents::PRE_OPERATIONS_EXEC,
+            InstallerEvents::PRE_OPERATIONS_EXEC.into(),
             crate::event_dispatcher::Callable::Closure(std::rc::Rc::new(move |_event| {
                 dependency_resolution_completed.set(true);
                 PhpMixed::Null
@@ -336,11 +336,11 @@ impl RequireCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "require", input.clone(), output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         composer
             .get_installation_manager()

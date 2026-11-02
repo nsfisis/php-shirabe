@@ -384,11 +384,11 @@ impl Command for ValidateCommand {
         }
 
         let mut command_event = CommandEvent::new(PluginEvents::COMMAND, "validate", input, output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         let event_code = composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         Ok(exit_code.max(event_code))
     }

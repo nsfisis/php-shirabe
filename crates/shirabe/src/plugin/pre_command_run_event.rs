@@ -15,7 +15,7 @@ pub struct PreCommandRunEvent {
 
 impl PreCommandRunEvent {
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         command: BString,
     ) -> Self {
@@ -31,7 +31,7 @@ impl PreCommandRunEvent {
         self.input.clone()
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
@@ -49,7 +49,7 @@ impl EventInterface for PreCommandRunEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 

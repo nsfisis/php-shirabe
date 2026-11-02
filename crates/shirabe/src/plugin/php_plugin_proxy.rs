@@ -2040,14 +2040,15 @@ fn dispatch_event_dispatcher_method(
 ) -> Result<PluginValue, PhpThrow> {
     match method_name {
         "dispatch" => {
-            let name = arg::<String>(method_name, args, 0)?;
+            let name = arg::<BString>(method_name, args, 0)?;
             let probe = crate::event_dispatcher::Event::from_name(name.clone());
             if dispatcher.borrow_mut().has_event_listeners(&probe) {
                 // TODO(plugin): dispatching a worker-constructed event through the Rust-side
                 // dispatcher needs the event object (and the console input it carries) proxied
                 // back into this process, so only the no-listener case is answered here.
                 return Err(runtime_throw(format!(
-                    "dispatching `{name}` from the plugin process is not supported yet while listeners are registered for it"
+                    "dispatching `{}` from the plugin process is not supported yet while listeners are registered for it",
+                    name.display_lossy()
                 )));
             }
             // TODO(plugin): answering 0 here skips what `do_dispatch` does before it reaches the
@@ -3707,7 +3708,7 @@ impl PluginInterface for PhpPluginProxy {
 }
 
 impl EventSubscriberInterface for PhpPluginProxy {
-    fn get_subscribed_events(&self) -> anyhow::Result<IndexMap<String, SubscribedEventEntry>> {
+    fn get_subscribed_events(&self) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>> {
         // PHP: `$subscriber->getSubscribedEvents()` (an instance call of the static method).
         let outcome = call_php_method(
             self.phandle,
@@ -3769,7 +3770,7 @@ impl Capable for PhpPluginProxy {
 fn decode_subscribed_events(
     class: &str,
     value: PluginValue,
-) -> anyhow::Result<IndexMap<String, SubscribedEventEntry>> {
+) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>> {
     let entries = match value {
         PluginValue::Array(entries) => entries,
         PluginValue::List(items) => {
@@ -3786,15 +3787,8 @@ fn decode_subscribed_events(
         }
         other => return Err(subscribed_events_shape_error(class, &other)),
     };
-    let mut events: IndexMap<String, SubscribedEventEntry> = IndexMap::new();
+    let mut events: IndexMap<BString, SubscribedEventEntry> = IndexMap::new();
     for (event_name, params) in entries {
-        // The dispatcher keys its listeners by event names, which are text.
-        let Some(event_name) = utf8_text(&event_name).map(str::to_owned) else {
-            return Err(subscribed_events_shape_error(
-                class,
-                &PluginValue::String(event_name),
-            ));
-        };
         let entry = match &params {
             PluginValue::String(method) => SubscribedEventEntry::Method(method.clone()),
             PluginValue::List(items) => match items.first() {
@@ -4837,11 +4831,27 @@ mod tests {
             ])),
         )
         .unwrap();
-        assert!(matches!(&events["a"], SubscribedEventEntry::Method(m) if *m == method));
+        assert!(matches!(&events[bstr::B("a")], SubscribedEventEntry::Method(m) if *m == method));
         assert!(
-            matches!(&events["b"], SubscribedEventEntry::MethodWithPriority(m, Some(1)) if *m == method)
+            matches!(&events[bstr::B("b")], SubscribedEventEntry::MethodWithPriority(m, Some(1)) if *m == method)
         );
-        assert!(matches!(&events["c"], SubscribedEventEntry::Methods(l) if l[0].0 == method));
+        assert!(
+            matches!(&events[bstr::B("c")], SubscribedEventEntry::Methods(l) if l[0].0 == method)
+        );
+    }
+
+    #[test]
+    fn an_event_name_that_is_not_utf8_keeps_its_bytes() {
+        let name = BString::from(b"event\xE9".as_slice());
+        let events = decode_subscribed_events(
+            "Vendor\\Plugin",
+            PluginValue::Array(IndexMap::from([(
+                name.clone(),
+                PluginValue::String(BString::from("method")),
+            )])),
+        )
+        .unwrap();
+        assert!(events.contains_key(&name));
     }
 
     #[test]

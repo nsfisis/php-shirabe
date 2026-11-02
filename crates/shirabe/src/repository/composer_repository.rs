@@ -2768,9 +2768,9 @@ impl ComposerRepository {
                     pre_file_download_event
                         .set_transport_options(self.options.clone().into_iter().collect());
                     let pre_file_download_event_name =
-                        pre_file_download_event.get_name().to_string();
+                        pre_file_download_event.get_name().to_owned();
                     dispatcher.dispatch(
-                        Some(&pre_file_download_event_name),
+                        Some(pre_file_download_event_name.as_ref()),
                         Some(&mut pre_file_download_event),
                     )?;
                     filename = BString::from(pre_file_download_event.get_processed_url());
@@ -2816,9 +2816,9 @@ impl ComposerRepository {
                         Some(FileDownloadContext::Repository),
                     );
                     let post_file_download_event_name =
-                        post_file_download_event.get_name().to_string();
+                        post_file_download_event.get_name().to_owned();
                     dispatcher.dispatch(
-                        Some(&post_file_download_event_name),
+                        Some(post_file_download_event_name.as_ref()),
                         Some(&mut post_file_download_event),
                     )?;
                 }
@@ -2938,9 +2938,9 @@ impl ComposerRepository {
                 );
                 pre_file_download_event
                     .set_transport_options(self.options.clone().into_iter().collect());
-                let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
+                let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
                 dispatcher.dispatch(
-                    Some(&pre_file_download_event_name),
+                    Some(pre_file_download_event_name.as_ref()),
                     Some(&mut pre_file_download_event),
                 )?;
                 filename = BString::from(pre_file_download_event.get_processed_url());
@@ -2993,9 +2993,9 @@ impl ComposerRepository {
                     "metadata".into(),
                     Some(FileDownloadContext::Repository),
                 );
-                let post_file_download_event_name = post_file_download_event.get_name().to_string();
+                let post_file_download_event_name = post_file_download_event.get_name().to_owned();
                 dispatcher.dispatch(
-                    Some(&post_file_download_event_name),
+                    Some(post_file_download_event_name.as_ref()),
                     Some(&mut post_file_download_event),
                 )?;
             }
@@ -3091,9 +3091,9 @@ impl ComposerRepository {
             );
             pre_file_download_event
                 .set_transport_options(self.options.clone().into_iter().collect());
-            let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
+            let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
             dispatcher.dispatch(
-                Some(&pre_file_download_event_name),
+                Some(pre_file_download_event_name.as_ref()),
                 Some(&mut pre_file_download_event),
             )?;
             filename = BString::from(pre_file_download_event.get_processed_url());
@@ -3174,9 +3174,9 @@ impl ComposerRepository {
                 "metadata".into(),
                 Some(FileDownloadContext::Repository),
             );
-            let post_file_download_event_name = post_file_download_event.get_name().to_string();
+            let post_file_download_event_name = post_file_download_event.get_name().to_owned();
             dispatcher.borrow_mut().dispatch(
-                Some(&post_file_download_event_name),
+                Some(post_file_download_event_name.as_ref()),
                 Some(&mut post_file_download_event),
             )?;
         }

@@ -24,7 +24,7 @@ pub struct PackageEvent {
 
 impl PackageEvent {
     pub fn new(
-        event_name: String,
+        event_name: impl Into<BString>,
         composer: ComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
@@ -43,7 +43,7 @@ impl PackageEvent {
         }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
@@ -81,7 +81,7 @@ impl EventInterface for PackageEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 

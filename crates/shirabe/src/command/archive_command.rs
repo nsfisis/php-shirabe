@@ -337,13 +337,13 @@ impl Command for ArchiveCommand {
             let config = composer.borrow_partial().get_config();
             let mut command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
-            let command_event_name = command_event.get_name().to_string();
+            let command_event_name = command_event.get_name().to_owned();
             let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
             event_dispatcher
                 .borrow_mut()
-                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+                .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
             event_dispatcher.borrow_mut().dispatch_script(
-                ScriptEvents::PRE_ARCHIVE_CMD,
+                ScriptEvents::PRE_ARCHIVE_CMD.into(),
                 true,
                 vec![],
                 indexmap::IndexMap::new(),
@@ -422,7 +422,7 @@ impl Command for ArchiveCommand {
                 .get_event_dispatcher()
                 .borrow_mut()
                 .dispatch_script(
-                    ScriptEvents::POST_ARCHIVE_CMD,
+                    ScriptEvents::POST_ARCHIVE_CMD.into(),
                     true,
                     vec![],
                     indexmap::IndexMap::new(),

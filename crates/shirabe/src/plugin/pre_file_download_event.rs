@@ -32,7 +32,7 @@ pub struct PreFileDownloadEvent {
 
 impl PreFileDownloadEvent {
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         processed_url: BString,
         r#type: BString,
@@ -49,7 +49,7 @@ impl PreFileDownloadEvent {
         }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
@@ -99,7 +99,7 @@ impl EventInterface for PreFileDownloadEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 

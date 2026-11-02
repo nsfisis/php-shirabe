@@ -160,12 +160,12 @@ impl Command for SearchCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "search", input.clone(), output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         let dispatcher = composer_ref.get_event_dispatcher().clone();
         drop(composer_ref);
         dispatcher
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let mut mode: i64 = repository_interface::SEARCH_FULLTEXT;
         if input

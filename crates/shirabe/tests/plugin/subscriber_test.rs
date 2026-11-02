@@ -32,7 +32,9 @@ fn install_subscriber_plugin(set_up: &crate::plugin_installer_test::SetUp) {
 
 fn dispatch(set_up: &crate::plugin_installer_test::SetUp, event_name: &str) -> i64 {
     let dispatcher = set_up.composer.borrow().get_event_dispatcher();
-    let result = dispatcher.borrow_mut().dispatch(Some(event_name), None);
+    let result = dispatcher
+        .borrow_mut()
+        .dispatch(Some(event_name.into()), None);
     result.unwrap()
 }
 

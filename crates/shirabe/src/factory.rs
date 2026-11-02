@@ -854,11 +854,11 @@ impl Factory {
             // The back-reference is now upgradeable, so dispatching the INIT event (which may read
             // the Composer through the dispatcher) is safe only after the Rc has been constructed.
             let mut init_event = Event::from_name(PluginEvents::INIT.to_string());
-            let init_event_name = init_event.get_name().to_string();
+            let init_event_name = init_event.get_name().to_owned();
             let dispatcher = composer.borrow().get_event_dispatcher();
             dispatcher
                 .borrow_mut()
-                .dispatch(Some(&init_event_name), Some(&mut init_event))?;
+                .dispatch(Some(init_event_name.as_ref()), Some(&mut init_event))?;
 
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem

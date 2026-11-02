@@ -24,7 +24,7 @@ pub enum OriginatingEvent {
 
 impl Event {
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         composer: ComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
@@ -83,7 +83,7 @@ impl EventInterface for Event {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
@@ -113,7 +113,7 @@ impl EventInterface for OriginatingEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         match self {
             OriginatingEvent::Base(e) => e.get_name(),
             OriginatingEvent::Script(e) => e.get_name(),

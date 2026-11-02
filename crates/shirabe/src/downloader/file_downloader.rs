@@ -415,9 +415,9 @@ impl DownloaderInterface for FileDownloader {
                     "package".into(),
                     Some(FileDownloadContext::Package(package.clone())),
                 );
-                let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
+                let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
                 event_dispatcher.borrow_mut().dispatch(
-                    Some(&pre_file_download_event_name),
+                    Some(pre_file_download_event_name.as_ref()),
                     Some(&mut pre_file_download_event),
                 )?;
                 if let Some(custom_cache_key) = pre_file_download_event.get_custom_cache_key() {
@@ -641,9 +641,9 @@ impl DownloaderInterface for FileDownloader {
                     "package".into(),
                     Some(FileDownloadContext::Package(package.clone())),
                 );
-                let post_file_download_event_name = post_file_download_event.get_name().to_string();
+                let post_file_download_event_name = post_file_download_event.get_name().to_owned();
                 event_dispatcher.borrow_mut().dispatch(
-                    Some(&post_file_download_event_name),
+                    Some(post_file_download_event_name.as_ref()),
                     Some(&mut post_file_download_event),
                 )?;
             }

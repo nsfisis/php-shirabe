@@ -149,13 +149,7 @@ impl Command for ScriptAliasCommand {
 
         dispatcher
             .borrow_mut()
-            // TODO(bytes): event names are text, so a non-UTF-8 script name is dispatched lossily.
-            .dispatch_script(
-                &self.script.display_lossy().to_string(),
-                dev_mode,
-                args_value,
-                flags,
-            )
+            .dispatch_script(self.script.as_ref(), dev_mode, args_value, flags)
     }
 
     fn initialize(
