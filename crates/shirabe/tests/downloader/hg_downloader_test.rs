@@ -3,6 +3,7 @@
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, get_process_executor_mock};
+use bstr::BStr;
 use shirabe::config::Config;
 use shirabe::downloader::VcsDownloader;
 use shirabe::downloader::hg_downloader::HgDownloader;
@@ -143,7 +144,7 @@ fn test_updatefor_package_without_source_reference() {
     let result = run(async {
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 source_package.clone(),
                 std::path::Path::new("/path"),
                 Some(initial_package.clone()),
@@ -158,7 +159,7 @@ fn test_updatefor_package_without_source_reference() {
             .await?;
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 source_package,
                 std::path::Path::new("/path"),
                 Some(initial_package),
@@ -197,7 +198,7 @@ fn test_update() {
     run(async {
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
@@ -214,7 +215,7 @@ fn test_update() {
             .unwrap();
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package),
@@ -250,7 +251,7 @@ fn test_remove() {
     run(async {
         downloader
             .prepare(
-                "uninstall",
+                BStr::new("uninstall"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 None,
@@ -263,7 +264,7 @@ fn test_remove() {
             .unwrap();
         downloader
             .cleanup(
-                "uninstall",
+                BStr::new("uninstall"),
                 package,
                 std::path::Path::new(&working_dir_str),
                 None,

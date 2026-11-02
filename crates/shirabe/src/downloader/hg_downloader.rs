@@ -8,7 +8,7 @@ use crate::downloader::{
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Hg as HgUtils, ProcessExecutor};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, bconcat, impl_php_class, implode, path_from_bytes, path_to_bytes,
@@ -65,9 +65,9 @@ impl VcsDownloader for HgDownloader {
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if HgUtils::get_version(&self.inner.process)?.is_none() {
-            return Err(RuntimeException::new(
-                "hg was not found in your PATH, skipping source download".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "hg was not found in your PATH, skipping source download",
+            ))
             .into());
         }
 
@@ -111,14 +111,11 @@ impl VcsDownloader for HgDownloader {
             realpath(path).as_deref(),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                implode(" ", &command).display_lossy(),
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
+                self.inner.process.borrow().get_error_output()
             ))
             .into());
         }
@@ -140,19 +137,18 @@ impl VcsDownloader for HgDownloader {
         );
 
         let ref_ = target.get_source_reference().unwrap_or_default();
-        self.inner.io.write_error(format!(
-            " Updating to {}",
-            target
-                .get_source_reference()
-                .unwrap_or_default()
-                .display_lossy()
+        self.inner.io.write_error(bconcat!(
+            " Updating to ",
+            target.get_source_reference().unwrap_or_default()
         ));
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException::new(format!(
-                "The .hg directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                path.display()
-            )).into());
+            return Err(RuntimeException::new(bconcat!(
+                "The .hg directory is missing from ",
+                path,
+                ", see https://getcomposer.org/commit-deps for more information"
+            ))
+            .into());
         }
 
         let pull_command =
@@ -189,14 +185,11 @@ impl VcsDownloader for HgDownloader {
             realpath(path).as_deref(),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                implode(" ", &command).display_lossy(),
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
+                self.inner.process.borrow().get_error_output()
             ))
             .into());
         }
@@ -275,7 +268,7 @@ impl DownloaderInterface for HgDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -312,7 +305,7 @@ impl DownloaderInterface for HgDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,

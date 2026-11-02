@@ -5,6 +5,7 @@ use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
+use bstr::BStr;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, bconcat, path_from_bytes, path_to_bytes, rtrim2, strtr,
 };
@@ -80,7 +81,7 @@ impl InstallerInterface for ProjectInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
-            .prepare(r#type, package, &self.install_path, prev_package)
+            .prepare(BStr::new(r#type), package, &self.install_path, prev_package)
             .await
     }
 
@@ -92,7 +93,7 @@ impl InstallerInterface for ProjectInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
-            .cleanup(r#type, package, &self.install_path, prev_package)
+            .cleanup(BStr::new(r#type), package, &self.install_path, prev_package)
             .await
     }
 

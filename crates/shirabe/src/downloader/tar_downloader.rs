@@ -9,7 +9,7 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PharData, PhpMixed, impl_php_class};
 
@@ -103,7 +103,7 @@ impl DownloaderInterface for TarDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -143,7 +143,7 @@ impl DownloaderInterface for TarDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,

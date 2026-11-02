@@ -4,7 +4,7 @@ use crate::downloader::{ArchiveDownloader, ChangeReportInterface, FileDownloader
 use crate::io::IOInterfaceWrite;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{IniHelper, Platform};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
@@ -76,15 +76,15 @@ impl ZipDownloader {
 
         let command_spec = UNZIP_COMMANDS.lock().unwrap().as_ref().unwrap()[0].clone();
         let executable = command_spec[0].clone();
-        let map: IndexMap<&str, BString> = [
+        let map: IndexMap<&BStr, BString> = [
             // normalize separators to backslashes to avoid problems with 7-zip on windows
             // see https://github.com/composer/composer/issues/10058
             (
-                "%file%",
+                BStr::new("%file%"),
                 str_replace("/", std::path::MAIN_SEPARATOR_STR, path_to_bytes(file)),
             ),
             (
-                "%path%",
+                BStr::new("%path%"),
                 str_replace("/", std::path::MAIN_SEPARATOR_STR, path_to_bytes(path)),
             ),
         ]
@@ -111,11 +111,7 @@ impl ZipDownloader {
                 .inner
                 .process
                 .borrow_mut()
-                .execute(
-                    &[command_spec[1].clone()],
-                    &mut output,
-                    None::<&str>.map(std::path::Path::new),
-                )
+                .execute(&[command_spec[1].clone()], &mut output, None)
                 .unwrap_or(1)
                 == 0
                 && let Some(m) =
@@ -123,11 +119,14 @@ impl ZipDownloader {
             {
                 let m1 = m.get(1).unwrap_or_default();
                 if version_compare(m1, "21.01", CmpOp::Lt) {
-                    self.inner.io.borrow().write_error(format!(
-                        "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
-                        executable.display_lossy(),
-                        m1.display_lossy(),
-                        executable.display_lossy(),
+                    self.inner.io.borrow().write_error(bconcat!(
+                        "    <warning>Unzipping using ",
+                        executable,
+                        " ",
+                        m1,
+                        " may result in incorrect file permissions. Install ",
+                        executable,
+                        " 21.01+ or unzip to ensure you get correct permissions.</warning>"
                     ));
                 }
             }
@@ -147,9 +146,10 @@ impl ZipDownloader {
                         .borrow()
                         .contains_key(package.get_name().as_bstr())
                     {
-                        return Err(RuntimeException::new(format!(
-                            "Failed to extract {} as the installation was aborted by another package operation.",
-                            package.get_name().display_lossy()
+                        return Err(RuntimeException::new(bconcat!(
+                            "Failed to extract ",
+                            package.get_name(),
+                            " as the installation was aborted by another package operation."
                         ))
                         .into());
                     }
@@ -160,15 +160,18 @@ impl ZipDownloader {
 
                     return self
                         .try_fallback(
-                            RuntimeException::new(format!(
-                                "Failed to extract {}: ({}) {}\n\n{}",
-                                package.get_name().display_lossy(),
+                            RuntimeException::new(bconcat!(
+                                "Failed to extract ",
+                                package.get_name(),
+                                ": (",
                                 process
                                     .get_exit_code()
-                                    .map(|c| c.to_string())
+                                    .map(|c| bconcat!(c))
                                     .unwrap_or_default(),
-                                implode(" ", &command).display_lossy(),
-                                output.display_lossy()
+                                ") ",
+                                implode(" ", &command),
+                                "\n\n",
+                                output
                             ))
                             .into(),
                             is_last_chance,
@@ -221,9 +224,10 @@ impl ZipDownloader {
                 "</warning>"
             ));
             self.inner.io.borrow().write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
-            self.inner.io.borrow().write_error(format!(
-                "    Unzip with {} command failed, falling back to ZipArchive class",
-                executable.display_lossy()
+            self.inner.io.borrow().write_error(bconcat!(
+                "    Unzip with ",
+                executable,
+                " command failed, falling back to ZipArchive class"
             ));
 
             // additional debug data to try to figure out GH actions issues https://github.com/composer/composer/issues/11148
@@ -231,41 +235,37 @@ impl ZipDownloader {
                 && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
             {
                 self.inner.io.borrow().write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
-                self.inner.io.borrow().write_error(format!(
-                    "File size: {}",
-                    filesize(file).map(|s| s.to_string()).unwrap_or_default()
+                self.inner.io.borrow().write_error(bconcat!(
+                    "File size: ",
+                    filesize(file).map(|s| bconcat!(s)).unwrap_or_default()
                 ));
-                self.inner.io.borrow().write_error(format!(
-                    "File SHA1: {}",
-                    hash_file("sha1", file).unwrap_or_default().display_lossy()
+                self.inner.io.borrow().write_error(bconcat!(
+                    "File SHA1: ",
+                    hash_file("sha1", file).unwrap_or_default()
                 ));
-                self.inner.io.borrow().write_error(format!(
-                    "First 100 bytes (hex): {}",
+                self.inner.io.borrow().write_error(bconcat!(
+                    "First 100 bytes (hex): ",
                     bin2hex(substr(
                         file_get_contents(file).unwrap_or_default(),
                         0,
                         Some(100)
                     ))
-                    .display_lossy()
                 ));
-                self.inner.io.borrow().write_error(format!(
-                    "Last 100 bytes (hex): {}",
+                self.inner.io.borrow().write_error(bconcat!(
+                    "Last 100 bytes (hex): ",
                     bin2hex(substr(
                         file_get_contents(file).unwrap_or_default(),
                         -100,
                         None
                     ))
-                    .display_lossy()
                 ));
                 if strlen(package.get_dist_url().unwrap_or_default()) > 0 {
-                    self.inner.io.borrow().write_error(format!(
-                        "Origin URL: {}",
-                        self.inner
-                            .process_url(
-                                package.clone(),
-                                package.get_dist_url().unwrap_or_default()
-                            )?
-                            .display_lossy()
+                    self.inner.io.borrow().write_error(bconcat!(
+                        "Origin URL: ",
+                        self.inner.process_url(
+                            package.clone(),
+                            package.get_dist_url().unwrap_or_default()
+                        )?
                     ));
                     let headers = {
                         let response_headers = crate::downloader::file_downloader::RESPONSE_HEADERS
@@ -338,10 +338,12 @@ impl ZipDownloader {
                             && total_size > archive_sz * 100
                             && total_size > 50 * 1024 * 1024
                         {
-                            return Err(RuntimeException::new(format!(
-                                "Invalid zip file for \"{}\" with compression ratio >99% (possible zip bomb)",
-                                package.get_name().display_lossy(),
-                            )).into());
+                            return Err(RuntimeException::new(bconcat!(
+                                "Invalid zip file for \"",
+                                package.get_name(),
+                                "\" with compression ratio >99% (possible zip bomb)"
+                            ))
+                            .into());
                         }
                     }
 
@@ -352,13 +354,15 @@ impl ZipDownloader {
                         return Ok(None);
                     }
 
-                    Err(RuntimeException::new(format!(
-                        "There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.",
-                        package.get_name().display_lossy(),
-                    )).into())
+                    Err(RuntimeException::new(bconcat!(
+                        "There was an error extracting the ZIP file for \"",
+                        package.get_name(),
+                        "\", it is either corrupted or using an invalid format."
+                    ))
+                    .into())
                 }
                 Err(code) => Err(UnexpectedValueException::with_code(
-                    self.get_error_message(code, file).trim_end().to_string(),
+                    bconcat!(self.get_error_message(code, file).trim_end()),
                     code,
                 )
                 .into()),
@@ -376,24 +380,26 @@ impl ZipDownloader {
         })
     }
 
-    pub fn get_error_message(&self, retval: i64, file: &std::path::Path) -> String {
+    pub fn get_error_message(&self, retval: i64, file: &std::path::Path) -> BString {
         match retval {
-            ZipArchive::ER_EXISTS => format!("File '{}' already exists.", file.display()),
-            ZipArchive::ER_INCONS => format!("Zip archive '{}' is inconsistent.", file.display()),
-            ZipArchive::ER_INVAL => format!("Invalid argument ({})", file.display()),
-            ZipArchive::ER_MEMORY => format!("Malloc failure ({})", file.display()),
-            ZipArchive::ER_NOENT => format!("No such zip file: '{}'", file.display()),
-            ZipArchive::ER_NOZIP => format!("'{}' is not a zip archive.", file.display()),
-            ZipArchive::ER_OPEN => format!("Can't open zip file: {}", file.display()),
-            ZipArchive::ER_READ => format!("Zip read error ({})", file.display()),
-            ZipArchive::ER_SEEK => format!("Zip seek error ({})", file.display()),
-            -1 => format!(
-                "'{}' is a corrupted zip archive (0 bytes), try again.",
-                file.display()
+            ZipArchive::ER_EXISTS => bconcat!("File '", file, "' already exists."),
+            ZipArchive::ER_INCONS => bconcat!("Zip archive '", file, "' is inconsistent."),
+            ZipArchive::ER_INVAL => bconcat!("Invalid argument (", file, ")"),
+            ZipArchive::ER_MEMORY => bconcat!("Malloc failure (", file, ")"),
+            ZipArchive::ER_NOENT => bconcat!("No such zip file: '", file, "'"),
+            ZipArchive::ER_NOZIP => bconcat!("'", file, "' is not a zip archive."),
+            ZipArchive::ER_OPEN => bconcat!("Can't open zip file: ", file),
+            ZipArchive::ER_READ => bconcat!("Zip read error (", file, ")"),
+            ZipArchive::ER_SEEK => bconcat!("Zip seek error (", file, ")"),
+            -1 => bconcat!(
+                "'",
+                file,
+                "' is a corrupted zip archive (0 bytes), try again."
             ),
-            _ => format!(
-                "'{}' is not a valid zip archive, got error code: {}",
-                file.display(),
+            _ => bconcat!(
+                "'",
+                file,
+                "' is not a valid zip archive, got error code: ",
                 retval
             ),
         }
@@ -554,8 +560,8 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
         if !has_zip_archive && unzip_commands_empty {
             let ini_message = IniHelper::get_message();
-            let error = format!(
-                "The zip extension and unzip/7z commands are both missing, skipping.\n{}",
+            let error = bconcat!(
+                "The zip extension and unzip/7z commands are both missing, skipping.\n",
                 ini_message
             );
             return Err(RuntimeException::new(error).into());
@@ -581,7 +587,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -621,7 +627,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,

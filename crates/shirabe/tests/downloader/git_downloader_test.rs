@@ -5,7 +5,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -131,7 +131,7 @@ fn test_download_for_package_without_source_reference() {
             .await?;
         downloader
             .prepare(
-                "install",
+                BStr::new("install"),
                 package.clone(),
                 std::path::Path::new("/path"),
                 None,
@@ -141,7 +141,12 @@ fn test_download_for_package_without_source_reference() {
             .install(package.clone(), std::path::Path::new("/path"))
             .await?;
         downloader
-            .cleanup("install", package, std::path::Path::new("/path"), None)
+            .cleanup(
+                BStr::new("install"),
+                package,
+                std::path::Path::new("/path"),
+                None,
+            )
             .await
     });
 
@@ -206,7 +211,7 @@ fn test_download() {
             .unwrap();
         downloader
             .prepare(
-                "install",
+                BStr::new("install"),
                 package.clone(),
                 std::path::Path::new(&expected_path),
                 None,
@@ -219,7 +224,7 @@ fn test_download() {
             .unwrap();
         downloader
             .cleanup(
-                "install",
+                BStr::new("install"),
                 package,
                 std::path::Path::new(&expected_path),
                 None,
@@ -336,7 +341,7 @@ fn test_download_with_cache() {
             .unwrap();
         downloader
             .prepare(
-                "install",
+                BStr::new("install"),
                 package.clone(),
                 std::path::Path::new(&expected_path),
                 None,
@@ -349,7 +354,7 @@ fn test_download_with_cache() {
             .unwrap();
         downloader
             .cleanup(
-                "install",
+                BStr::new("install"),
                 package,
                 std::path::Path::new(&expected_path),
                 None,
@@ -471,7 +476,7 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
             .unwrap();
         downloader
             .prepare(
-                "install",
+                BStr::new("install"),
                 package.clone(),
                 std::path::Path::new(&expected_path),
                 None,
@@ -484,7 +489,7 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
             .unwrap();
         downloader
             .cleanup(
-                "install",
+                BStr::new("install"),
                 package,
                 std::path::Path::new(&expected_path),
                 None,
@@ -582,7 +587,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
                 .unwrap();
             downloader
                 .prepare(
-                    "install",
+                    BStr::new("install"),
                     package.clone(),
                     std::path::Path::new(&expected_path),
                     None,
@@ -595,7 +600,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
                 .unwrap();
             downloader
                 .cleanup(
-                    "install",
+                    BStr::new("install"),
                     package,
                     std::path::Path::new(&expected_path),
                     None,
@@ -640,7 +645,7 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
             .await?;
         downloader
             .prepare(
-                "install",
+                BStr::new("install"),
                 package.clone(),
                 std::path::Path::new(&expected_path),
                 None,
@@ -651,7 +656,7 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
             .await?;
         downloader
             .cleanup(
-                "install",
+                BStr::new("install"),
                 package,
                 std::path::Path::new(&expected_path),
                 None,
@@ -688,7 +693,7 @@ fn test_updatefor_package_without_source_reference() {
             .await?;
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 source_package.clone(),
                 std::path::Path::new("/path"),
                 Some(initial_package.clone()),
@@ -703,7 +708,7 @@ fn test_updatefor_package_without_source_reference() {
             .await?;
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 source_package,
                 std::path::Path::new("/path"),
                 Some(initial_package),
@@ -768,7 +773,7 @@ fn test_update() {
             .unwrap();
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
@@ -785,7 +790,7 @@ fn test_update() {
             .unwrap();
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package),
@@ -861,7 +866,7 @@ fn test_update_with_new_repo_url() {
             .unwrap();
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
@@ -878,7 +883,7 @@ fn test_update_with_new_repo_url() {
             .unwrap();
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package),
@@ -947,7 +952,7 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
             .await?;
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
@@ -962,7 +967,7 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
             .await?;
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package),
@@ -1064,7 +1069,7 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
             .unwrap();
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
@@ -1081,7 +1086,7 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
             .unwrap();
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(package),
@@ -1133,7 +1138,7 @@ fn test_downgrade_shows_appropriate_message() {
             .unwrap();
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 new_package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
@@ -1150,7 +1155,7 @@ fn test_downgrade_shows_appropriate_message() {
             .unwrap();
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 new_package,
                 std::path::Path::new(&working_dir_str),
                 Some(old_package),
@@ -1220,7 +1225,7 @@ fn test_not_using_downgrading_with_references() {
             .unwrap();
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 new_package.clone(),
                 std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
@@ -1237,7 +1242,7 @@ fn test_not_using_downgrading_with_references() {
             .unwrap();
         downloader
             .cleanup(
-                "update",
+                BStr::new("update"),
                 new_package,
                 std::path::Path::new(&working_dir_str),
                 Some(old_package),
@@ -1279,7 +1284,7 @@ fn test_remove() {
     run(async {
         downloader
             .prepare(
-                "uninstall",
+                BStr::new("uninstall"),
                 package.clone(),
                 std::path::Path::new(&working_dir_str),
                 None,
@@ -1292,7 +1297,7 @@ fn test_remove() {
             .unwrap();
         downloader
             .cleanup(
-                "uninstall",
+                BStr::new("uninstall"),
                 package,
                 std::path::Path::new(&working_dir_str),
                 None,

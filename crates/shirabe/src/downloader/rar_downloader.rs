@@ -7,11 +7,11 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, IniHelper, Platform, ProcessExecutor};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, class_exists, impl_php_class,
-    implode, path_to_bytes,
+    PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, bconcat, class_exists,
+    impl_php_class, implode, path_to_bytes,
 };
 
 #[derive(Debug)]
@@ -62,7 +62,7 @@ impl ArchiveDownloader for RarDownloader {
         file: &std::path::Path,
         path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let mut process_error: Option<String> = None;
+        let mut process_error: Option<BString> = None;
 
         if !Platform::is_windows() {
             let command: Vec<BString> = vec![
@@ -84,29 +84,27 @@ impl ArchiveDownloader for RarDownloader {
                 return Ok(None);
             }
 
-            process_error = Some(format!(
-                "Failed to execute {}\n\n{}",
-                implode(" ", &command).display_lossy(),
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy(),
+            process_error = Some(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
+                self.inner.process.borrow().get_error_output()
             ));
         }
 
         if !class_exists("RarArchive") {
             let ini_message = IniHelper::get_message();
             let error = if !Platform::is_windows() {
-                format!(
-                    "Could not decompress the archive, enable the PHP rar extension.\n{}",
+                bconcat!(
+                    "Could not decompress the archive, enable the PHP rar extension.\n",
                     ini_message
                 )
             } else {
-                format!(
-                    "Could not decompress the archive, enable the PHP rar extension or install unrar.\n{}\n{}",
+                bconcat!(
+                    "Could not decompress the archive, enable the PHP rar extension or install unrar.\n",
                     ini_message,
-                    process_error.as_deref().unwrap_or_default(),
+                    "\n",
+                    process_error.clone().unwrap_or_default()
                 )
             };
             return Err(RuntimeException::new(error).into());
@@ -114,9 +112,9 @@ impl ArchiveDownloader for RarDownloader {
 
         let rar_archive = RarArchive::open(file);
         if rar_archive.is_none() {
-            return Err(UnexpectedValueException::new(format!(
-                "Could not open RAR archive: {}",
-                file.display()
+            return Err(UnexpectedValueException::new(bconcat!(
+                "Could not open RAR archive: ",
+                file
             ))
             .into());
         }
@@ -124,15 +122,15 @@ impl ArchiveDownloader for RarDownloader {
 
         let entries = rar_archive.get_entries();
         if entries.is_none() {
-            return Err(RuntimeException::new(
-                "Could not retrieve RAR archive entries".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "Could not retrieve RAR archive entries",
+            ))
             .into());
         }
 
         for entry in entries.unwrap() {
             if !entry.extract(path) {
-                return Err(RuntimeException::new("Could not extract entry".to_string()).into());
+                return Err(RuntimeException::new(BString::from("Could not extract entry")).into());
             }
         }
 
@@ -177,7 +175,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -217,7 +215,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,

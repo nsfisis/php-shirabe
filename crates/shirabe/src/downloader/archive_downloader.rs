@@ -27,7 +27,7 @@ pub trait ArchiveDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -42,7 +42,7 @@ pub trait ArchiveDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -62,9 +62,9 @@ pub trait ArchiveDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.inner().io.borrow().write_error(format!(
-                "  - {}{}",
-                InstallOperation::format(package.clone(), false).display_lossy(),
+            self.inner().io.borrow().write_error(bconcat!(
+                "  - ",
+                InstallOperation::format(package.clone(), false),
                 self.get_install_operation_appendix(package.clone(), path)
             ));
         }
@@ -208,8 +208,8 @@ pub trait ArchiveDownloader {
         &self,
         _package: PackageInterfaceHandle,
         _path: &Path,
-    ) -> &str {
-        ": Extracting archive"
+    ) -> &BStr {
+        BStr::new(": Extracting archive")
     }
 }
 
@@ -276,10 +276,12 @@ fn rename_recursively(
         );
         if is_dir(&target) {
             if !is_dir(file) {
-                return Err(RuntimeException::new(format!(
-                    "Installing {} would lead to overwriting the {} directory with a file from the package, invalid operation.",
-                    package.to_php_string().display_lossy(),
-                    target.display()
+                return Err(RuntimeException::new(bconcat!(
+                    "Installing ",
+                    package.to_php_string(),
+                    " would lead to overwriting the ",
+                    target,
+                    " directory with a file from the package, invalid operation."
                 ))
                 .into());
             }

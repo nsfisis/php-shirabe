@@ -7,12 +7,12 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PATHINFO_FILENAME, PhpMixed, RuntimeException, extension_loaded, fclose, fopen, fwrite,
-    gzclose, gzopen, gzread, impl_php_class, implode, parse_url, path_from_bytes, path_to_bytes,
-    pathinfo, strtr,
+    PATHINFO_FILENAME, PhpMixed, RuntimeException, bconcat, extension_loaded, fclose, fopen,
+    fwrite, gzclose, gzopen, gzread, impl_php_class, implode, parse_url, path_from_bytes,
+    path_to_bytes, pathinfo, strtr,
 };
 
 #[derive(Debug)]
@@ -111,14 +111,11 @@ impl ArchiveDownloader for GzipDownloader {
                 return Ok(None);
             }
 
-            let process_error = format!(
-                "Failed to execute {}\n\n{}",
-                implode(" ", &command).display_lossy(),
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy(),
+            let process_error = bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
+                self.inner.process.borrow().get_error_output()
             );
             return Err(RuntimeException::new(process_error).into());
         }
@@ -164,7 +161,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -204,7 +201,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,

@@ -5,7 +5,7 @@ use crate::exception::IrrecoverableDownloadException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
@@ -76,10 +76,12 @@ impl DownloadManager {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
         let r#type = strtolower(r#type);
         if !self.downloaders.contains_key(r#type.as_bstr()) {
-            return Err(InvalidArgumentException::new(format!(
-                "Unknown downloader type: {}. Available types: {}.",
-                r#type.display_lossy(),
-                implode(", ", &array_keys(&self.downloaders)).display_lossy(),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Unknown downloader type: ",
+                r#type,
+                ". Available types: ",
+                implode(", ", &array_keys(&self.downloaders)),
+                "."
             ))
             .into());
         }
@@ -103,9 +105,10 @@ impl DownloadManager {
         } else if installation_source.as_ref().is_some_and(|s| s == "source") {
             self.get_downloader(package.get_source_type().unwrap_or_default())?
         } else {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} does not have an installation source set",
-                package.to_php_string().display_lossy(),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
+                package.to_php_string(),
+                " does not have an installation source set"
             ))
             .into());
         };
@@ -168,9 +171,10 @@ impl DownloadManager {
             };
             if retry {
                 self.io.write_error3(
-                    format!(
-                        "    <warning>Now trying to download from {}</warning>",
-                        source.display_lossy(),
+                    bconcat!(
+                        "    <warning>Now trying to download from ",
+                        source,
+                        "</warning>"
                     ),
                     true,
                     io_interface::NORMAL,
@@ -230,7 +234,7 @@ impl DownloadManager {
     /// Prepares an operation execution
     pub async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -354,7 +358,7 @@ impl DownloadManager {
     /// Cleans up a failed operation
     pub async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -371,7 +375,7 @@ impl DownloadManager {
     }
 
     /// Determines the install preference of a package
-    fn resolve_package_install_preference(&self, package: PackageInterfaceHandle) -> &'static str {
+    fn resolve_package_install_preference(&self, package: PackageInterfaceHandle) -> &'static BStr {
         for (pattern, preference) in &self.package_preferences {
             let pattern_regex = bconcat!(
                 "{^",
@@ -380,14 +384,18 @@ impl DownloadManager {
             );
             if preg_is_match(&pattern_regex, package.get_name()) {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
-                    return "dist";
+                    return BStr::new("dist");
                 }
 
-                return "source";
+                return BStr::new("source");
             }
         }
 
-        if package.is_dev() { "source" } else { "dist" }
+        if package.is_dev() {
+            BStr::new("source")
+        } else {
+            BStr::new("dist")
+        }
     }
 
     fn get_available_sources(
@@ -408,9 +416,10 @@ impl DownloadManager {
         }
 
         if sources.is_empty() {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} must have a source or dist specified",
-                package.to_php_string().display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
+                package.to_php_string(),
+                " must have a source or dist specified"
             ))
             .into());
         }
@@ -493,7 +502,7 @@ pub trait DownloadManagerInterface: std::fmt::Debug {
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -516,7 +525,7 @@ pub trait DownloadManagerInterface: std::fmt::Debug {
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -551,7 +560,7 @@ impl DownloadManagerInterface for DownloadManager {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -587,7 +596,7 @@ impl DownloadManagerInterface for DownloadManager {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,

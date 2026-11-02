@@ -287,7 +287,7 @@ impl InstallerInterface for LibraryInstaller {
 
         self.get_download_manager()
             .borrow()
-            .prepare(r#type, package, &download_path, prev_package)
+            .prepare(BStr::new(r#type), package, &download_path, prev_package)
             .await
     }
 
@@ -302,7 +302,7 @@ impl InstallerInterface for LibraryInstaller {
 
         self.get_download_manager()
             .borrow()
-            .cleanup(r#type, package, &download_path, prev_package)
+            .cleanup(BStr::new(r#type), package, &download_path, prev_package)
             .await
     }
 

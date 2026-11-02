@@ -8,7 +8,7 @@ use crate::downloader::{
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, ProcessExecutor};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, bconcat, impl_php_class, implode, path_from_bytes, php_regex,
@@ -48,14 +48,11 @@ impl FossilDownloader {
             .execute(&command, output, cwd)?
             != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                implode(" ", &command).display_lossy(),
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
+                self.inner.process.borrow().get_error_output()
             ))
             .into());
         }
@@ -109,12 +106,9 @@ impl VcsDownloader for FossilDownloader {
         let repo_file = bconcat!(path, ".fossil");
         let real_path: Option<PathBuf> = realpath(path);
 
-        self.inner.io.write_error(format!(
-            "Cloning {}",
-            package
-                .get_source_reference()
-                .unwrap_or_default()
-                .display_lossy()
+        self.inner.io.write_error(bconcat!(
+            "Cloning ",
+            package.get_source_reference().unwrap_or_default()
         ));
 
         let mut output = BString::default();
@@ -167,19 +161,18 @@ impl VcsDownloader for FossilDownloader {
             &indexmap::IndexMap::new(),
         )?;
 
-        self.inner.io.write_error(format!(
-            " Updating to {}",
-            target
-                .get_source_reference()
-                .unwrap_or_default()
-                .display_lossy()
+        self.inner.io.write_error(bconcat!(
+            " Updating to ",
+            target.get_source_reference().unwrap_or_default()
         ));
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException::new(format!(
-                "The .fslckout file is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                path.display()
-            )).into());
+            return Err(RuntimeException::new(bconcat!(
+                "The .fslckout file is missing from ",
+                path,
+                ", see https://getcomposer.org/commit-deps for more information"
+            ))
+            .into());
         }
 
         let real_path: Option<PathBuf> = realpath(path);
@@ -319,7 +312,7 @@ impl DownloaderInterface for FossilDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -356,7 +349,7 @@ impl DownloaderInterface for FossilDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,

@@ -12,7 +12,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, ProcessExecutor};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
@@ -132,9 +132,10 @@ pub trait VcsDownloader:
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} is missing reference information",
-                package.get_pretty_name().display_lossy(),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
+                package.get_pretty_name(),
+                " is missing reference information"
             ))
             .into());
         }
@@ -187,7 +188,7 @@ pub trait VcsDownloader:
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -209,7 +210,7 @@ pub trait VcsDownloader:
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         _package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -239,17 +240,19 @@ pub trait VcsDownloader:
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} is missing reference information",
-                package.get_pretty_name().display_lossy(),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
+                package.get_pretty_name(),
+                " is missing reference information"
             ))
             .into());
         }
 
         self.io().write_error3(
-            format!(
-                "  - {}: ",
-                InstallOperation::format(package.clone(), false).display_lossy()
+            bconcat!(
+                "  - ",
+                InstallOperation::format(package.clone(), false),
+                ": "
             ),
             false,
             io_interface::NORMAL,
@@ -306,17 +309,19 @@ pub trait VcsDownloader:
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} is missing reference information",
-                target.get_pretty_name().display_lossy(),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
+                target.get_pretty_name(),
+                " is missing reference information"
             ))
             .into());
         }
 
         self.io().write_error3(
-            format!(
-                "  - {}: ",
-                UpdateOperation::format(initial.clone(), target.clone(), false).display_lossy(),
+            bconcat!(
+                "  - ",
+                UpdateOperation::format(initial.clone(), target.clone(), false),
+                ": "
             ),
             false,
             io_interface::NORMAL,
@@ -392,12 +397,8 @@ pub trait VcsDownloader:
                 logs = str_replace("<", "\\<", &logs);
 
                 self.io()
-                    .write_error3(format!("    {}", message), true, io_interface::NORMAL);
-                self.io().write_error3(
-                    logs.display_lossy().to_string(),
-                    true,
-                    io_interface::NORMAL,
-                );
+                    .write_error3(bconcat!("    ", message), true, io_interface::NORMAL);
+                self.io().write_error3(&logs, true, io_interface::NORMAL);
             }
         }
 
@@ -416,19 +417,17 @@ pub trait VcsDownloader:
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io().write_error3(
-            format!(
-                "  - {}",
-                UninstallOperation::format(package, false).display_lossy()
-            ),
+            bconcat!("  - ", UninstallOperation::format(package, false)),
             true,
             io_interface::NORMAL,
         );
 
         let result = Filesystem::remove_directory_async_via(self.filesystem(), path).await?;
         if !result {
-            return Err(RuntimeException::new(format!(
-                "Could not completely delete {}, aborting.",
-                path.display()
+            return Err(RuntimeException::new(bconcat!(
+                "Could not completely delete ",
+                path,
+                ", aborting."
             ))
             .into());
         }
@@ -468,9 +467,10 @@ pub trait VcsDownloader:
     ) -> anyhow::Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
         if self.get_local_changes(package, path).await?.is_some() {
-            return Err(RuntimeException::new(format!(
-                "Source directory {} has uncommitted changes.",
-                path.display()
+            return Err(RuntimeException::new(bconcat!(
+                "Source directory ",
+                path,
+                " has uncommitted changes."
             ))
             .into());
         }

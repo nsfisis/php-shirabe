@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Downloader/DownloaderInterface.php
 
 use crate::package::PackageInterfaceHandle;
-use bstr::BString;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{PhpClass, PhpMixed};
 
 #[async_trait::async_trait(?Send)]
@@ -28,7 +28,7 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -75,7 +75,7 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,

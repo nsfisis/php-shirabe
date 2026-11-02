@@ -3,6 +3,7 @@
 use crate::downloader::{DownloadManagerInterface, DownloaderInterface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::r#loop::Loop;
+use bstr::BStr;
 use shirabe_php_shim::PhpMixed;
 
 pub enum DownloaderOrManager<'a> {
@@ -33,12 +34,12 @@ impl<'a> DownloaderOrManager<'a> {
         match self {
             Self::Interface(d) => {
                 d.borrow_mut()
-                    .prepare(r#type, package, path, prev_package)
+                    .prepare(BStr::new(r#type), package, path, prev_package)
                     .await
             }
             Self::Manager(d) => {
                 d.borrow()
-                    .prepare(r#type, package, path, prev_package)
+                    .prepare(BStr::new(r#type), package, path, prev_package)
                     .await
             }
         }
@@ -77,12 +78,12 @@ impl<'a> DownloaderOrManager<'a> {
         match self {
             Self::Interface(d) => {
                 d.borrow_mut()
-                    .cleanup(r#type, package, path, prev_package)
+                    .cleanup(BStr::new(r#type), package, path, prev_package)
                     .await
             }
             Self::Manager(d) => {
                 d.borrow()
-                    .cleanup(r#type, package, path, prev_package)
+                    .cleanup(BStr::new(r#type), package, path, prev_package)
                     .await
             }
         }

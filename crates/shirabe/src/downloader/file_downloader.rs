@@ -204,14 +204,14 @@ impl FileDownloader {
     pub(crate) async fn base_update(
         &self,
         this: &dyn DownloaderInterface,
-        install_operation_appendix: &str,
+        install_operation_appendix: &BStr,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.borrow().write_error(format!(
-            "  - {}{}",
-            UpdateOperation::format(initial.clone(), target.clone(), false).display_lossy(),
+        self.io.borrow().write_error(bconcat!(
+            "  - ",
+            UpdateOperation::format(initial.clone(), target.clone(), false),
             install_operation_appendix
         ));
 
@@ -298,8 +298,8 @@ impl FileDownloader {
         &self,
         _package: PackageInterfaceHandle,
         _path: &Path,
-    ) -> String {
-        String::new()
+    ) -> BString {
+        BString::default()
     }
 
     /// For testing only: invoke the crate-private `get_file_name`.
@@ -324,9 +324,9 @@ impl FileDownloader {
     ) -> anyhow::Result<BString> {
         let url = url.as_ref();
         if !extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
-            return Err(RuntimeException::new(
-                "You must enable the openssl extension to download files via https".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "You must enable the openssl extension to download files via https",
+            ))
             .into());
         }
 
@@ -357,9 +357,9 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_dist_url().is_none() {
-            return Err(InvalidArgumentException::new(
-                "The given package is missing url information".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "The given package is missing url information",
+            ))
             .into());
         }
 
@@ -410,7 +410,7 @@ impl DownloaderInterface for FileDownloader {
 
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
-                    PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
+                    bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
                     self.http_downloader.clone(),
                     url.processed.clone(),
                     "package".into(),
@@ -453,15 +453,15 @@ impl DownloaderInterface for FileDownloader {
             if from_cache {
                 if output {
                     self.io.borrow().write_error3(
-                        format!(
-                            "  - Loading <info>{}</info> (<comment>{}</comment>) from cache",
-                            package.get_name().display_lossy(),
-                            package
-                                .get_full_pretty_version(
-                                    true,
-                                    crate::package::DisplayMode::SourceRefIfDev
-                                )
-                                .display_lossy()
+                        bconcat!(
+                            "  - Loading <info>",
+                            package.get_name(),
+                            "</info> (<comment>",
+                            package.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev
+                            ),
+                            "</comment>) from cache"
                         ),
                         true,
                         io_interface::VERY_VERBOSE,
@@ -480,15 +480,15 @@ impl DownloaderInterface for FileDownloader {
                 }
             } else {
                 if output {
-                    self.io.borrow().write_error(format!(
-                        "  - Downloading <info>{}</info> (<comment>{}</comment>)",
-                        package.get_name().display_lossy(),
-                        package
-                            .get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev
-                            )
-                            .display_lossy()
+                    self.io.borrow().write_error(bconcat!(
+                        "  - Downloading <info>",
+                        package.get_name(),
+                        "</info> (<comment>",
+                        package.get_full_pretty_version(
+                            true,
+                            crate::package::DisplayMode::SourceRefIfDev
+                        ),
+                        "</comment>)"
                     ));
                 }
 
@@ -590,9 +590,9 @@ impl DownloaderInterface for FileDownloader {
                                     ": ",
                                     error_message(&e)
                                 ));
-                                self.io.borrow().write_error(format!(
-                                    "    Trying the next URL for {}",
-                                    package.get_name().display_lossy()
+                                self.io.borrow().write_error(bconcat!(
+                                    "    Trying the next URL for ",
+                                    package.get_name()
                                 ));
                             } else {
                                 self.io.borrow().write_error(bconcat!(
@@ -619,10 +619,11 @@ impl DownloaderInterface for FileDownloader {
 
             // === $result->then(verify) ===
             if !file_exists(&file_name) {
-                return Err(UnexpectedValueException::new(format!(
-                    "{} could not be saved to {}, make sure the directory is writable and you have internet connectivity",
-                    url.base.display_lossy(),
-                    file_name.display()
+                return Err(UnexpectedValueException::new(bconcat!(
+                    url.base,
+                    " could not be saved to ",
+                    file_name,
+                    ", make sure the directory is writable and you have internet connectivity"
                 ))
                 .into());
             }
@@ -632,16 +633,17 @@ impl DownloaderInterface for FileDownloader {
                 && hash_file("sha1", &file_name).as_ref().map(|h| h.as_slice())
                     != Some(checksum.as_bytes())
             {
-                return Err(UnexpectedValueException::new(format!(
-                    "The checksum verification of the file failed (downloaded from {})",
-                    url.base.display_lossy()
+                return Err(UnexpectedValueException::new(bconcat!(
+                    "The checksum verification of the file failed (downloaded from ",
+                    url.base,
+                    ")"
                 ))
                 .into());
             }
 
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let mut post_file_download_event = PostFileDownloadEvent::new(
-                    PluginEvents::POST_FILE_DOWNLOAD.to_string(),
+                    bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                     Some(file_name.clone()),
                     checksum.clone(),
                     url.processed.clone(),
@@ -661,7 +663,7 @@ impl DownloaderInterface for FileDownloader {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -671,7 +673,7 @@ impl DownloaderInterface for FileDownloader {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -730,9 +732,9 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.borrow().write_error(format!(
-                "  - {}",
-                InstallOperation::format(package.clone(), false).display_lossy()
+            self.io.borrow().write_error(bconcat!(
+                "  - ",
+                InstallOperation::format(package.clone(), false)
             ));
         }
 
@@ -796,7 +798,7 @@ impl DownloaderInterface for FileDownloader {
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
-        self.base_update(self, &appendix, initial, target, path)
+        self.base_update(self, appendix.as_bstr(), initial, target, path)
             .await
     }
 
@@ -807,16 +809,16 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.borrow().write_error(format!(
-                "  - {}",
-                UninstallOperation::format(package, false).display_lossy()
-            ));
+            self.io
+                .borrow()
+                .write_error(bconcat!("  - ", UninstallOperation::format(package, false)));
         }
         let result = Filesystem::remove_directory_async_via(&self.filesystem, path).await?;
         if !result {
-            return Err(RuntimeException::new(format!(
-                "Could not completely delete {}, aborting.",
-                path.display()
+            return Err(RuntimeException::new(bconcat!(
+                "Could not completely delete ",
+                path,
+                ", aborting."
             ))
             .into());
         }

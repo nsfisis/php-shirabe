@@ -7,10 +7,11 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
-use anyhow::bail;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class, implode, path_to_bytes};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, bconcat, impl_php_class, implode, path_to_bytes,
+};
 
 #[derive(Debug)]
 pub struct XzDownloader {
@@ -79,17 +80,14 @@ impl ArchiveDownloader for XzDownloader {
             return Ok(None);
         }
 
-        let process_error = format!(
-            "Failed to execute {}\n\n{}",
-            implode(" ", &command).display_lossy(),
-            self.inner
-                .process
-                .borrow()
-                .get_error_output()
-                .display_lossy()
+        let process_error = bconcat!(
+            "Failed to execute ",
+            implode(" ", &command),
+            "\n\n",
+            self.inner.process.borrow().get_error_output()
         );
 
-        bail!(process_error);
+        Err(RuntimeException::new(process_error).into())
     }
 }
 
@@ -128,7 +126,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -168,7 +166,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,

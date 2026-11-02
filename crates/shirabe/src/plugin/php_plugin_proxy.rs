@@ -1243,7 +1243,11 @@ fn dispatch_download_manager_method(
                 path_arg(2)?,
                 optional_package_arg(3)?,
             );
-            Box::pin(async move { dm.borrow().prepare(&r#type, package, &path, prev).await })
+            Box::pin(async move {
+                dm.borrow()
+                    .prepare(BStr::new(&r#type), package, &path, prev)
+                    .await
+            })
         }
         "install" => {
             let (dm, package, path) = (dm.clone(), package_arg(0)?, path_arg(1)?);
@@ -1266,7 +1270,11 @@ fn dispatch_download_manager_method(
                 path_arg(2)?,
                 optional_package_arg(3)?,
             );
-            Box::pin(async move { dm.borrow().cleanup(&r#type, package, &path, prev).await })
+            Box::pin(async move {
+                dm.borrow()
+                    .cleanup(BStr::new(&r#type), package, &path, prev)
+                    .await
+            })
         }
         // TODO(plugin): the downloader-facing surface (getDownloader / setDownloader /
         // getDownloaderForPackage / getDownloaderType) needs proxy stubs for

@@ -78,14 +78,11 @@ impl GitDownloader {
             .execute(&command, &mut output, Some(&path))?
             != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                implode(" ", &command).display_lossy(),
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy(),
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
+                self.inner.process.borrow().get_error_output()
             ))
             .into());
         }
@@ -180,14 +177,11 @@ impl GitDownloader {
                         Some(&path),
                     )? != 0
                     {
-                        return Err(RuntimeException::new(format!(
-                            "Failed to execute {}\n\n{}",
-                            implode(" ", &command).display_lossy(),
-                            self.inner
-                                .process
-                                .borrow()
-                                .get_error_output()
-                                .display_lossy(),
+                        return Err(RuntimeException::new(bconcat!(
+                            "Failed to execute ",
+                            implode(" ", &command),
+                            "\n\n",
+                            self.inner.process.borrow().get_error_output()
                         ))
                         .into());
                     }
@@ -233,14 +227,11 @@ impl GitDownloader {
                     .execute(&command, &mut output, Some(&path))?
                     != 0
                 {
-                    return Err(RuntimeException::new(format!(
-                        "Failed to execute {}\n\n{}",
-                        implode(" ", &command).display_lossy(),
-                        self.inner
-                            .process
-                            .borrow()
-                            .get_error_output()
-                            .display_lossy(),
+                    return Err(RuntimeException::new(bconcat!(
+                        "Failed to execute ",
+                        implode(" ", &command),
+                        "\n\n",
+                        self.inner.process.borrow().get_error_output()
                     ))
                     .into());
                 }
@@ -462,9 +453,10 @@ impl GitDownloader {
         // reference was not found (prints "fatal: reference is not a tree: $ref")
         if strpos(self.inner.process.borrow().get_error_output(), reference).is_some() {
             self.inner.io.write_error3(
-                format!(
-                    "    <warning>{} is gone (history was rewritten?)</warning>",
-                    reference.display_lossy()
+                bconcat!(
+                    "    <warning>",
+                    reference,
+                    " is gone (history was rewritten?)</warning>"
                 ),
                 true,
                 io_interface::NORMAL,
@@ -492,8 +484,7 @@ impl GitDownloader {
                 self.inner.process.borrow().get_error_output(),
                 exception_extra,
             ))
-            .display_lossy()
-            .to_string(),
+            .to_owned(),
         )
         .into())
     }
@@ -530,7 +521,7 @@ impl GitDownloader {
             let m2 = match_.get(2).unwrap_or_default();
             let m3 = match_.get(3).unwrap_or_default();
             let mut push_url = bconcat!("git@", m1, ":", m2, "/", m3, ".git");
-            if !in_array_strict("ssh".to_string(), protocols.values()) {
+            if !in_array_strict(BString::from("ssh"), protocols.values()) {
                 push_url = bconcat!("https://", m1, "/", m2, "/", m3, ".git");
             }
             let cmd: Vec<BString> = vec![
@@ -561,11 +552,9 @@ impl GitDownloader {
             Some(&path),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Could not reset changes\n\n:{}",
-                output.display_lossy()
-            ))
-            .into());
+            return Err(
+                RuntimeException::new(bconcat!("Could not reset changes\n\n:", output)).into(),
+            );
         }
         let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
@@ -574,11 +563,9 @@ impl GitDownloader {
             Some(&path),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Could not reset changes\n\n:{}",
-                output.display_lossy()
-            ))
-            .into());
+            return Err(
+                RuntimeException::new(bconcat!("Could not reset changes\n\n:", output)).into(),
+            );
         }
 
         self.has_discarded_changes
@@ -597,11 +584,9 @@ impl GitDownloader {
             Some(&path),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Could not stash changes\n\n:{}",
-                output.display_lossy()
-            ))
-            .into());
+            return Err(
+                RuntimeException::new(bconcat!("Could not stash changes\n\n:", output)).into(),
+            );
         }
 
         self.has_stashed_changes
@@ -620,18 +605,12 @@ impl GitDownloader {
             Some(&path),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Could not view diff\n\n:{}",
-                output.display_lossy()
-            ))
-            .into());
+            return Err(RuntimeException::new(bconcat!("Could not view diff\n\n:", output)).into());
         }
 
-        self.inner.io.write_error3(
-            output.display_lossy().to_string(),
-            true,
-            io_interface::NORMAL,
-        );
+        self.inner
+            .io
+            .write_error3(&output, true, io_interface::NORMAL);
 
         Ok(())
     }
@@ -695,9 +674,10 @@ impl GitDownloader {
         path: &Path,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path).await?.is_some() {
-            return Err(RuntimeException::new(format!(
-                "Source directory {} has uncommitted changes.",
-                path.display()
+            return Err(RuntimeException::new(bconcat!(
+                "Source directory ",
+                path,
+                " has uncommitted changes."
             ))
             .into());
         }
@@ -742,14 +722,11 @@ impl ChangeReportInterface for GitDownloader {
             .execute(&command, &mut output, Some(path))?
             != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                implode(" ", &command).display_lossy(),
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy(),
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
+                self.inner.process.borrow().get_error_output()
             ))
             .into());
         }
@@ -835,18 +812,19 @@ impl VcsDownloader for GitDownloader {
             && Cache::is_usable(&cache_path)
         {
             self.inner.io.write_error3(
-                format!(
-                    "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
-                    package.get_name().display_lossy(),
+                bconcat!(
+                    "  - Syncing <info>",
+                    package.get_name(),
+                    "</info> (<comment>",
                     package
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-                        .display_lossy(),
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                    "</comment>) into cache"
                 ),
                 true,
                 io_interface::NORMAL,
             );
             self.inner.io.write_error3(
-                format!("    Cloning to cache at {}", cache_path.display()),
+                bconcat!("    Cloning to cache at ", cache_path),
                 true,
                 io_interface::DEBUG,
             );
@@ -865,9 +843,9 @@ impl VcsDownloader for GitDownloader {
                     .insert(r#ref, true);
             }
         } else if git_version.is_none() {
-            return Err(RuntimeException::new(
-                "git was not found in your PATH, skipping source download".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "git was not found in your PATH, skipping source download",
+            ))
             .into());
         }
 
@@ -905,9 +883,10 @@ impl VcsDownloader for GitDownloader {
             .copied()
             .unwrap_or(false);
         if has_cached {
-            msg = format!(
-                "Cloning {} from cache",
-                self.get_short_hash(r#ref.as_bstr()).display_lossy()
+            msg = bconcat!(
+                "Cloning ",
+                self.get_short_hash(r#ref.as_bstr()),
+                " from cache"
             );
 
             let mut clone_flags: Vec<BString> = vec![
@@ -954,10 +933,7 @@ impl VcsDownloader for GitDownloader {
                 ],
             ];
         } else {
-            msg = format!(
-                "Cloning {}",
-                self.get_short_hash(r#ref.as_bstr()).display_lossy()
-            );
+            msg = bconcat!("Cloning ", self.get_short_hash(r#ref.as_bstr()));
             commands = vec![
                 vec![
                     "git".into(),
@@ -994,9 +970,10 @@ impl VcsDownloader for GitDownloader {
                 ],
             ];
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
-                return Err(RuntimeException::new(format!(
-                    "The required git reference for {} is not in cache and network is disabled, aborting",
-                    package.get_name().display_lossy(),
+                return Err(RuntimeException::new(bconcat!(
+                    "The required git reference for ",
+                    package.get_name(),
+                    " is not in cache and network is disabled, aborting"
                 ))
                 .into());
             }
@@ -1038,9 +1015,10 @@ impl VcsDownloader for GitDownloader {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         if !self.has_metadata_repository(&path) {
-            return Err(RuntimeException::new(format!(
-                "The .git directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                path.display()
+            return Err(RuntimeException::new(bconcat!(
+                "The .git directory is missing from ",
+                path,
+                ", see https://getcomposer.org/commit-deps for more information"
             ))
             .into());
         }
@@ -1068,21 +1046,20 @@ impl VcsDownloader for GitDownloader {
             .copied()
             .unwrap_or(false);
         if has_cached {
-            msg = format!(
-                "Checking out {} from cache",
-                self.get_short_hash(r#ref.as_bstr()).display_lossy()
+            msg = bconcat!(
+                "Checking out ",
+                self.get_short_hash(r#ref.as_bstr()),
+                " from cache"
             );
             remote_url = cache_path;
         } else {
-            msg = format!(
-                "Checking out {}",
-                self.get_short_hash(r#ref.as_bstr()).display_lossy()
-            );
+            msg = bconcat!("Checking out ", self.get_short_hash(r#ref.as_bstr()));
             remote_url = "%url%".into();
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
-                return Err(RuntimeException::new(format!(
-                    "The required git reference for {} is not in cache and network is disabled, aborting",
-                    target.get_name().display_lossy(),
+                return Err(RuntimeException::new(bconcat!(
+                    "The required git reference for ",
+                    target.get_name(),
+                    " is not in cache and network is disabled, aborting"
                 ))
                 .into());
             }
@@ -1195,10 +1172,11 @@ impl VcsDownloader for GitDownloader {
                     .as_bool()
                     != Some(true))
         {
-            return Err(RuntimeException::new(format!(
-                "Source directory {} has unpushed changes on the current branch: \n{}",
-                path.display(),
-                unpushed.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Source directory ",
+                path,
+                " has unpushed changes on the current branch: \n",
+                unpushed
             ))
             .into());
         }
@@ -1231,26 +1209,26 @@ impl VcsDownloader for GitDownloader {
             &preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes),
         );
         self.inner.io.write_error3(
-            format!(
-                "    <error>{} has modified files:</error>",
-                package.get_pretty_name().display_lossy()
+            bconcat!(
+                "    <error>",
+                package.get_pretty_name(),
+                " has modified files:</error>"
             ),
             true,
             io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
         self.inner.io.write_error3(
-            implode("\n", &changes[..slice_end])
-                .display_lossy()
-                .to_string(),
+            implode("\n", &changes[..slice_end]),
             true,
             io_interface::NORMAL,
         );
         if (changes.len() as i64) > 10 {
             self.inner.io.write_error3(
-                format!(
-                    "    <info>{} more files modified, choose \"v\" to view the full list</info>",
-                    changes.len() as i64 - 10
+                bconcat!(
+                    "    <info>",
+                    changes.len() as i64 - 10,
+                    " more files modified, choose \"v\" to view the full list</info>"
                 ),
                 true,
                 io_interface::NORMAL,
@@ -1262,11 +1240,12 @@ impl VcsDownloader for GitDownloader {
                 .inner
                 .io
                 .ask(
-                    format!(
-                        "    <info>Discard changes [y,n,v,{}?]?</info> ",
-                        if update { "s," } else { "" }
+                    bconcat!(
+                        "    <info>Discard changes [y,n,v,",
+                        if update { "s," } else { "" },
+                        "?]?</info> "
                     ),
-                    PhpMixed::string("?".to_string()),
+                    PhpMixed::string(BString::from("?")),
                 )?
                 .as_string()
                 .map(|answer| answer.to_vec());
@@ -1286,14 +1265,12 @@ impl VcsDownloader for GitDownloader {
                     }
                 }
                 Some(b"n") => {
-                    return Err(RuntimeException::new("Update aborted".to_string()).into());
+                    return Err(RuntimeException::new(BString::from("Update aborted")).into());
                 }
                 Some(b"v") => {
-                    self.inner.io.write_error3(
-                        implode("\n", &changes).display_lossy().to_string(),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    self.inner
+                        .io
+                        .write_error3(implode("\n", &changes), true, io_interface::NORMAL);
                 }
                 Some(b"d") => {
                     self.view_diff(&path)?;
@@ -1307,19 +1284,22 @@ impl VcsDownloader for GitDownloader {
             if do_help {
                 // help:
                 self.inner.io.write_error3(
-                    [
-                        format!(
-                            "    y - discard changes and apply the {}",
-                            if update { "update" } else { "uninstall" }
-                        ),
-                        format!(
-                            "    n - abort the {} and let you manually clean things up",
-                            if update { "update" } else { "uninstall" }
-                        ),
-                        "    v - view modified files".to_string(),
-                        "    d - view local modifications (diff)".to_string(),
-                    ]
-                    .join("\n"),
+                    implode(
+                        "\n",
+                        &[
+                            bconcat!(
+                                "    y - discard changes and apply the ",
+                                if update { "update" } else { "uninstall" }
+                            ),
+                            bconcat!(
+                                "    n - abort the ",
+                                if update { "update" } else { "uninstall" },
+                                " and let you manually clean things up"
+                            ),
+                            BString::from("    v - view modified files"),
+                            BString::from("    d - view local modifications (diff)"),
+                        ],
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -1362,13 +1342,9 @@ impl VcsDownloader for GitDownloader {
                 Some(&path),
             )? != 0
             {
-                return Err(RuntimeException::new(format!(
-                    "Failed to apply stashed changes:\n\n{}",
-                    self.inner
-                        .process
-                        .borrow()
-                        .get_error_output()
-                        .display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "Failed to apply stashed changes:\n\n",
+                    self.inner.process.borrow().get_error_output()
                 ))
                 .into());
             }
@@ -1402,14 +1378,11 @@ impl VcsDownloader for GitDownloader {
             .execute(&command, &mut output, Some(&path))?
             != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                implode(" ", &command).display_lossy(),
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy(),
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
+                self.inner.process.borrow().get_error_output()
             ))
             .into());
         }
@@ -1458,7 +1431,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -1495,7 +1468,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &Path,
         prev_package: Option<PackageInterfaceHandle>,

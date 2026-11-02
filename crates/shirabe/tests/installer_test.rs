@@ -115,7 +115,7 @@ impl DownloadManagerInterface for StubDownloadManager {
     }
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _target_dir: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -146,7 +146,7 @@ impl DownloadManagerInterface for StubDownloadManager {
     }
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _target_dir: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,

@@ -78,7 +78,7 @@ mockall::mock! {
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn prepare(
             &self,
-            r#type: &str,
+            r#type: &bstr::BStr,
             package: PackageInterfaceHandle,
             target_dir: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
@@ -101,7 +101,7 @@ mockall::mock! {
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn cleanup(
             &self,
-            r#type: &str,
+            r#type: &bstr::BStr,
             package: PackageInterfaceHandle,
             target_dir: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
