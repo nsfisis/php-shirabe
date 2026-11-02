@@ -1,8 +1,45 @@
 # String porting
 
 A PHP string is a sequence of bytes. PHP attaches no encoding to it, and only a few functions
-interpret it as UTF-8. Shirabe therefore holds PHP strings as bytes, and never decodes them as UTF-8
-on its own.
+interpret it as UTF-8. Shirabe therefore holds strings as bytes.
+
+## The default is bytes
+
+Every string is a `BString`/`&BStr` unless it has a reason to be UTF-8. The question to ask of a
+value is why it must be UTF-8, not why it should be bytes. If none of the reasons below applies, it
+is a `BString`, whatever the value happens to contain and wherever it comes from.
+
+### Reasons a value may be `String`/`&str`
+
+1. **A Rust API has no byte form.** The API takes or returns text and nothing else: compiling a
+   pattern with `regex`, `str::parse()`, `chrono`, `reqwest::Url::parse()`, `jsonschema`, the method
+   signatures of a `serde` visitor or serializer.
+2. **The PHP function itself interprets its input as UTF-8.** `json_encode()`, `json_decode()`,
+   `preg_*()` with the `u` modifier, `mb_*()`, `htmlspecialchars()`, Symfony's `UnicodeString`, ...
+   Such a shim takes bytes, and fails on invalid UTF-8 the way the PHP function does
+   (`JSON_ERROR_UTF8`, `PREG_BAD_UTF8_ERROR`, ...).
+3. **The destination is `core::fmt`, and PHP cannot observe the text.** `Display` and `Debug`
+   implementations, `panic!`, `tracing`, and an `anyhow` error raised by the port itself that holds
+   no PHP string and corresponds to no PHP `throw`.
+4. **The output is Rust source.** A build script generating code that `rustc` reads.
+
+Under reasons 1 and 2 the text stays inside one function, between the API call and the conversion
+to or from bytes, and does not appear in a signature or a field. A signature imposed by a trait, and
+a private helper that only wraps such an API, may spell it.
+
+### What is not a reason
+
+* The value is always ASCII: a status name, a format name, a hash, digits, a fixed map key.
+* The value is valid UTF-8 by construction, or was read from JSON or embedded at compile time.
+* The value is produced by Rust code rather than read from outside.
+* The value is a class, function or constant name. PHP allows bytes above `0x7f` in these.
+* The value is a regular expression. A pattern is a PHP string up to the point where it is compiled.
+* The value is a message for people. See [Building strings](#building-strings).
+* Bytes that are not valid UTF-8 "cannot match" the data being searched. Search the data as bytes.
+* The callee or a neighbouring field currently takes `String`. Change it.
+* The code is shorter that way.
+
+Paths and binary data are not affected: they stay in the types below.
 
 ## Types
 
@@ -15,22 +52,17 @@ on its own.
   PHP's string operations in corner cases (absolute operands, trailing `/`, `.` components); using
   them is accepted.
 * A shim of a PHP function takes `impl AsRef<[u8]>` for a string parameter, so that `"literal"`,
-  `b"literal"` and `BString` are all accepted. A trait method takes `&BStr` instead, to stay
-  dyn-compatible.
+  `b"literal"` and `BString` are all accepted, and returns `BString`. A trait method takes `&BStr`
+  instead, to stay dyn-compatible.
 
-## Where bytes are decoded as UTF-8
+## Decoding bytes as UTF-8
 
-Only inside the shim of a PHP function that itself interprets its input as UTF-8 (`json_encode()`,
-`json_decode()`, `preg_*()` with the `u` modifier, `mb_*()`, `htmlspecialchars()`, Symfony's
-`UnicodeString`, ...). Such a shim takes bytes, and fails on invalid UTF-8 the way the PHP function
-does (`JSON_ERROR_UTF8`, `PREG_BAD_UTF8_ERROR`, ...).
+Do not call `from_utf8()`, `from_utf8_lossy()`, `to_str()`, `to_str_lossy()`, `to_string_lossy()` or
+`into_string()`: a lossy conversion corrupts bytes that are not valid UTF-8, and a strict one fails
+where PHP does not. Clippy's `disallowed_methods` lint enforces this; the methods are listed in
+`clippy.toml`. `utf8_text()` is the one exemption, for reasons 1 and 2 above.
 
-Everywhere else, do not call `from_utf8()`, `from_utf8_lossy()`, `to_str()`, `to_str_lossy()`,
-`to_string_lossy()` or `into_string()`: a lossy conversion corrupts bytes that are not valid UTF-8,
-and a strict one fails where PHP does not. Clippy's `disallowed_methods` lint enforces this; the
-methods are listed in `clippy.toml`. `utf8_text()` is the one exemption, for such a shim.
-
-Boundaries with Rust APIs that take text:
+Boundaries with Rust APIs:
 
 * Regular expressions: `regex::bytes`.
 * JSON: `serde_json::from_slice()`. bstr's `serde` feature is disabled, so a `BString` field cannot
@@ -40,23 +72,37 @@ Boundaries with Rust APIs that take text:
 * Process arguments and environment variables: `OsStr`/`OsString`, which hold bytes on Unix.
 * HTTP header values: `HeaderValue::from_bytes()`.
 
+Text returned by a Rust API, such as the message of an `std::io::Error`, becomes a `BString` where it
+is received.
+
+## Replacing `str` methods
+
+Methods of `str` and of `bstr::ByteSlice` that share a name with a PHP function often do not share
+its behaviour. Use the shim of the PHP function:
+
+* `to_lowercase()`/`to_uppercase()` map Unicode; `strtolower()`/`strtoupper()` map ASCII only.
+* `trim()` strips Unicode whitespace; PHP's `trim()` strips `" \t\n\r\0\x0B"`.
+* `chars()` decodes UTF-8; PHP's string functions work on bytes.
+
 ## Building strings
 
 PHP's `.` operator and string interpolation map to `bconcat!`, and `sprintf()` to the shim's
-`sprintf()`. Both keep the bytes of their operands.
+`sprintf()`. Both keep the bytes of their operands. This applies to every string PHP code could
+observe, including messages read by people: errors, warnings, progress and exception messages. PHP
+writes those bytes unchanged, and so does Shirabe.
 
-`format!` produces a `String`, so formatting bytes into it replaces invalid UTF-8 with U+FFFD. That
-is acceptable for messages read by people (errors, warnings, progress), but not for text read by
-machines: `composer.json` and `composer.lock`, the files generated under `vendor/composer/`
-(`installed.json`, `installed.php`, `autoload_*.php`, ...), caches, subprocess arguments and input,
-HTTP requests, values passed to plugins, and values printed to stdout for other programs
-(`--format=json`, `config <key>`, paths). Build those with `bconcat!` or `sprintf()`.
+`format!` produces a `String`, so formatting bytes into it replaces invalid UTF-8 with U+FFFD. Use it
+only under the reasons above.
+
+Exceptions hold their message as a `BString`. A `Throwable` also implements `Display`, as `anyhow`
+requires, and that output is lossy, so read a message with `get_message()` and not with
+`to_string()`.
 
 The workspace patches bstr with a fork that removes `Display` from `BStr` and `BString`, so that
-`format!("{}", bstr)` and `.to_string()` cannot convert lossily without a trace. Format a string
-explicitly instead:
+`format!("{}", bstr)` and `.to_string()` cannot convert lossily without a trace. Where the destination
+is `core::fmt` (reason 3), format a string explicitly:
 
-* `display_lossy()` for a message read by people, as `Path::display()` does for a path.
+* `display_lossy()` for a `BStr`, as `Path::display()` does for a path.
 * `{:?}` for an error about malformed data, where the exact bytes matter.
 
 `PhpMixed` and the semver constraints do not implement `Display` either: convert them with

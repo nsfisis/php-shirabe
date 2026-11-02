@@ -67,8 +67,8 @@ Map PHP types to Rust types as follows:
   [strings-porting.md](strings-porting.md).
     * `PathBuf`, `OsString`: for the same purposes as in Rust.
     * `Vec<u8>`: for what is best described as binary data or a blob.
-    * `BString`: for what is best described as a string.
-    * `String`: do not use for a PHP string.
+    * `BString`: for everything else that is a string. This is the default.
+    * `String`: only for the reasons listed in [strings-porting.md](strings-porting.md).
 * `array`: `Vec` or `indexmap::IndexMap`, depending on whether the array is used as a list or as a
   map.
     * PHP arrays preserve insertion order, and `IndexMap` emulates this. Use `IndexMap` even where
@@ -94,7 +94,7 @@ Map PHP types to Rust types as follows:
 * Define exception classes as follows:
     * Define PHP's built-in exception classes (`\Exception`, `\RuntimeException`,
       `\UnexpectedValueException`, etc.) in `crates/shirabe-php-shim/src/lib.rs` as flat structs
-      with `message: String` and `code: i64` fields. The PHP exception hierarchy is not reproduced.
+      with `message: BString` and `code: i64` fields. The PHP exception hierarchy is not reproduced.
     * Define Composer's exception classes (including empty classes that only extend another
       exception) as newtypes, e.g. `pub struct MaxFileSizeExceededException(pub TransportException);`.
 
