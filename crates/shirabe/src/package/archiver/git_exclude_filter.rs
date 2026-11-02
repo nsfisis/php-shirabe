@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php
 
 use crate::package::archiver::{BaseExcludeFilter, BaseExcludeFilterBase};
-use bstr::{BStr, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{bconcat, file, file_exists, path_from_bytes, php_regex, preg_split};
 use std::path::{Path, PathBuf};
 
@@ -31,11 +31,11 @@ impl GitExcludeFilter {
     pub fn parse_git_attributes_line(
         &self,
         line: impl AsRef<[u8]>,
-    ) -> Option<(String, bool, bool)> {
+    ) -> Option<(BString, bool, bool)> {
         Self::parse_git_attributes_line_static(line.as_ref().as_bstr())
     }
 
-    fn parse_git_attributes_line_static(line: &BStr) -> Option<(String, bool, bool)> {
+    fn parse_git_attributes_line_static(line: &BStr) -> Option<(BString, bool, bool)> {
         let parts = preg_split(php_regex!(r"#\s+#"), line);
 
         if parts.len() == 2 && parts[1] == "export-ignore" {
@@ -57,11 +57,11 @@ impl BaseExcludeFilter for GitExcludeFilter {
         &self.inner.source_path
     }
 
-    fn exclude_patterns(&self) -> &[(String, bool, bool)] {
+    fn exclude_patterns(&self) -> &[(BString, bool, bool)] {
         &self.inner.exclude_patterns
     }
 
-    fn exclude_patterns_mut(&mut self) -> &mut Vec<(String, bool, bool)> {
+    fn exclude_patterns_mut(&mut self) -> &mut Vec<(BString, bool, bool)> {
         &mut self.inner.exclude_patterns
     }
 }

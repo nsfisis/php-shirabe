@@ -22,11 +22,11 @@ impl BaseExcludeFilter for ComposerExcludeFilter {
         &self.inner.source_path
     }
 
-    fn exclude_patterns(&self) -> &[(String, bool, bool)] {
+    fn exclude_patterns(&self) -> &[(BString, bool, bool)] {
         &self.inner.exclude_patterns
     }
 
-    fn exclude_patterns_mut(&mut self) -> &mut Vec<(String, bool, bool)> {
+    fn exclude_patterns_mut(&mut self) -> &mut Vec<(BString, bool, bool)> {
         &mut self.inner.exclude_patterns
     }
 }

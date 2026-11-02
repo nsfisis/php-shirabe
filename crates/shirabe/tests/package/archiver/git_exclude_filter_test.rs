@@ -11,12 +11,12 @@ fn test_pattern_escape() {
     }
 }
 
-fn provide_patterns() -> Vec<(&'static str, Option<(String, bool, bool)>)> {
+fn provide_patterns() -> Vec<(&'static str, Option<(bstr::BString, bool, bool)>)> {
     vec![
         (
             "app/config/parameters.yml export-ignore",
             Some((
-                r"{app/config/parameters\.yml(?:$|/)}".to_string(),
+                bstr::BString::from(r"{app/config/parameters\.yml(?:$|/)}"),
                 false,
                 false,
             )),
@@ -24,7 +24,7 @@ fn provide_patterns() -> Vec<(&'static str, Option<(String, bool, bool)>)> {
         (
             "app/config/parameters.yml -export-ignore",
             Some((
-                r"{app/config/parameters\.yml(?:$|/)}".to_string(),
+                bstr::BString::from(r"{app/config/parameters\.yml(?:$|/)}"),
                 true,
                 false,
             )),

@@ -518,9 +518,10 @@ impl GitDownloader {
     fn set_push_url(&self, path: &Path, url: &BStr) -> anyhow::Result<()> {
         // set push url for github projects
         if let Some(match_) = preg_match(
-            format!(
-                "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
-                GitUtil::get_github_domains_regex(&self.inner.config.borrow())
+            bconcat!(
+                "{^(?:https?|git)://",
+                GitUtil::get_github_domains_regex(&self.inner.config.borrow()),
+                "/([^/]+)/([^/]+?)(?:\\.git)?$}"
             ),
             url,
         ) {

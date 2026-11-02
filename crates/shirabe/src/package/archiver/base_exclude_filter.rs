@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub struct BaseExcludeFilterBase {
     pub source_path: PathBuf,
-    pub exclude_patterns: Vec<(String, bool, bool)>,
+    pub exclude_patterns: Vec<(BString, bool, bool)>,
 }
 
 impl BaseExcludeFilterBase {
@@ -19,9 +19,9 @@ impl BaseExcludeFilterBase {
         }
     }
 
-    pub fn parse_lines<F>(&self, lines: Vec<BString>, line_parser: F) -> Vec<(String, bool, bool)>
+    pub fn parse_lines<F>(&self, lines: Vec<BString>, line_parser: F) -> Vec<(BString, bool, bool)>
     where
-        F: Fn(&BStr) -> Option<(String, bool, bool)>,
+        F: Fn(&BStr) -> Option<(BString, bool, bool)>,
     {
         lines
             .into_iter()
@@ -35,16 +35,16 @@ impl BaseExcludeFilterBase {
             .collect()
     }
 
-    pub fn generate_patterns(&self, rules: Vec<BString>) -> Vec<(String, bool, bool)> {
+    pub fn generate_patterns(&self, rules: Vec<BString>) -> Vec<(BString, bool, bool)> {
         rules
             .into_iter()
             .map(|rule| Self::generate_pattern(rule.as_bstr()))
             .collect()
     }
 
-    pub fn generate_pattern(rule: &BStr) -> (String, bool, bool) {
+    pub fn generate_pattern(rule: &BStr) -> (BString, bool, bool) {
         let mut negate = false;
-        let mut pattern = String::new();
+        let mut pattern = BString::default();
 
         let mut rule = BString::from(rule);
         if rule.starts_with(b"!") {
@@ -54,9 +54,9 @@ impl BaseExcludeFilterBase {
 
         let first_slash_position = rule.find_byte(b'/');
         if first_slash_position == Some(0) {
-            pattern = "^/".to_string();
+            pattern = BString::from("^/");
         } else if first_slash_position.is_none() || first_slash_position == Some(rule.len() - 1) {
-            pattern = "/".to_string();
+            pattern = BString::from("/");
         }
 
         let rule = trim2(&rule, "/");
@@ -68,20 +68,14 @@ impl BaseExcludeFilterBase {
         // body by to_regex_dir_boundary instead of being appended here.
         let rule_regex = Glob::to_regex_dir_boundary(&rule, true, true);
 
-        (
-            bconcat!("{", pattern, rule_regex, "}")
-                .display_lossy()
-                .to_string(),
-            negate,
-            false,
-        )
+        (bconcat!("{", pattern, rule_regex, "}"), negate, false)
     }
 }
 
 pub trait BaseExcludeFilter {
     fn source_path(&self) -> &Path;
-    fn exclude_patterns(&self) -> &[(String, bool, bool)];
-    fn exclude_patterns_mut(&mut self) -> &mut Vec<(String, bool, bool)>;
+    fn exclude_patterns(&self) -> &[(BString, bool, bool)];
+    fn exclude_patterns_mut(&mut self) -> &mut Vec<(BString, bool, bool)>;
 
     /// Checks the given path against all exclude patterns in this filter
     ///

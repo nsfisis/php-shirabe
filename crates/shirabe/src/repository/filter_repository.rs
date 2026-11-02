@@ -12,8 +12,8 @@ use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct FilterRepository {
-    only: Option<String>,
-    exclude: Option<String>,
+    only: Option<BString>,
+    exclude: Option<BString>,
     canonical: bool,
     repo: RepositoryInterfaceHandle,
 }
@@ -23,8 +23,8 @@ impl FilterRepository {
         repo: RepositoryInterfaceHandle,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Self> {
-        let mut only: Option<String> = None;
-        let mut exclude: Option<String> = None;
+        let mut only: Option<BString> = None;
+        let mut exclude: Option<BString> = None;
         let mut canonical = true;
 
         if let Some(only_val) = options.get(B("only")) {
@@ -40,11 +40,10 @@ impl FilterRepository {
                             }
                         })
                         .collect();
-                    only = Some(
-                        base_package::package_names_to_regexp(&names, BStr::new("{^(?:%s)$}iD"))
-                            .display_lossy()
-                            .to_string(),
-                    );
+                    only = Some(base_package::package_names_to_regexp(
+                        &names,
+                        BStr::new("{^(?:%s)$}iD"),
+                    ));
                 }
                 _ => {
                     return Err(InvalidArgumentException::new(format!(
@@ -68,11 +67,10 @@ impl FilterRepository {
                             }
                         })
                         .collect();
-                    exclude = Some(
-                        base_package::package_names_to_regexp(&names, BStr::new("{^(?:%s)$}iD"))
-                            .display_lossy()
-                            .to_string(),
-                    );
+                    exclude = Some(base_package::package_names_to_regexp(
+                        &names,
+                        BStr::new("{^(?:%s)$}iD"),
+                    ));
                 }
                 _ => {
                     return Err(InvalidArgumentException::new(format!(
@@ -299,5 +297,28 @@ impl AdvisoryProviderInterface for FilterRepository {
                 advisories: IndexMap::new(),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repository::ArrayRepository;
+
+    #[test]
+    fn only_matches_the_bytes_of_a_non_utf8_name() {
+        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
+        options.insert(
+            "only".into(),
+            PhpMixed::List(vec![PhpMixed::string(b"caf\xE9/*".as_slice())]),
+        );
+        let repository = FilterRepository::new(
+            RepositoryInterfaceHandle::new(ArrayRepository::new(vec![]).unwrap()),
+            options,
+        )
+        .unwrap();
+
+        assert!(repository.is_allowed(BStr::new(b"caf\xE9/pkg")));
+        assert!(!repository.is_allowed(BStr::new("caf\u{FFFD}/pkg")));
     }
 }

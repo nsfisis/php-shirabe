@@ -228,9 +228,10 @@ impl Git {
         let protocols = self.config.borrow_mut().get("github-protocols");
         // public github, autoswitch protocols
         if let Some(m) = preg_match(
-            format!(
-                "{{^(?:https?|git)://{}/(.*)}}",
-                Self::get_github_domains_regex(&self.config.borrow())
+            bconcat!(
+                "{^(?:https?|git)://",
+                Self::get_github_domains_regex(&self.config.borrow()),
+                "/(.*)}"
             ),
             url,
         ) {
@@ -293,9 +294,10 @@ impl Git {
         // if we have a private github url and the ssh protocol is disabled then we skip it and directly fallback to https
         let protocols = self.config.borrow_mut().get("github-protocols");
         let bypass_ssh_for_github = preg_is_match(
-            format!(
-                "{{^git@{}:(.+?)\\.git$}}i",
-                Self::get_github_domains_regex(&self.config.borrow())
+            bconcat!(
+                "{^git@",
+                Self::get_github_domains_regex(&self.config.borrow()),
+                ":(.+?)\\.git$}i"
             ),
             url,
         ) && !in_array_strict("ssh".to_string(), protocols.values());
@@ -313,17 +315,19 @@ impl Git {
             let mut error_msg = self.process.borrow().get_error_output();
             // private github repository without ssh key access, try https with auth
             let github_matched = preg_match(
-                format!(
-                    "{{^git@{}:(.+?)\\.git$}}i",
-                    Self::get_github_domains_regex(&self.config.borrow())
+                bconcat!(
+                    "{^git@",
+                    Self::get_github_domains_regex(&self.config.borrow()),
+                    ":(.+?)\\.git$}i"
                 ),
                 url,
             )
             .or_else(|| {
                 preg_match(
-                    format!(
-                        "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
-                        Self::get_github_domains_regex(&self.config.borrow())
+                    bconcat!(
+                        "{^https?://",
+                        Self::get_github_domains_regex(&self.config.borrow()),
+                        "/(.*?)(?:\\.git)?$}i"
                     ),
                     url,
                 )
@@ -537,17 +541,19 @@ impl Git {
 
                 error_msg = self.process.borrow().get_error_output();
             } else if let Some(m) = preg_match(
-                format!(
-                    "{{^(git)@{}:(.+?\\.git)$}}i",
-                    Self::get_gitlab_domains_regex(&self.config.borrow())
+                bconcat!(
+                    "{^(git)@",
+                    Self::get_gitlab_domains_regex(&self.config.borrow()),
+                    ":(.+?\\.git)$}i"
                 ),
                 url,
             )
             .or_else(|| {
                 preg_match(
-                    format!(
-                        "{{^(https?)://{}/(.*)}}i",
-                        Self::get_gitlab_domains_regex(&self.config.borrow())
+                    bconcat!(
+                        "{^(https?)://",
+                        Self::get_gitlab_domains_regex(&self.config.borrow()),
+                        "/(.*)}i"
                     ),
                     url,
                 )
@@ -1226,15 +1232,16 @@ impl Git {
         Ok(())
     }
 
-    pub fn get_github_domains_regex(config: &Config) -> String {
+    pub fn get_github_domains_regex(config: &Config) -> BString {
         Self::get_domains_regex(config, "github-domains")
     }
 
-    pub fn get_gitlab_domains_regex(config: &Config) -> String {
+    pub fn get_gitlab_domains_regex(config: &Config) -> BString {
         Self::get_domains_regex(config, "gitlab-domains")
     }
 
-    fn get_domains_regex(config: &Config, key: &str) -> String {
+    #[expect(clippy::disallowed_types, reason = "Config::get takes a text key")]
+    fn get_domains_regex(config: &Config, key: &str) -> BString {
         let domains: Vec<BString> = match config.get(key) {
             PhpMixed::List(l) => l
                 .iter()
@@ -1244,8 +1251,6 @@ impl Git {
         };
         let escaped: Vec<BString> = array_map(|s: &BString| preg_quote(s, None), &domains);
         bconcat!("(", implode("|", &escaped), ")")
-            .display_lossy()
-            .to_string()
     }
 
     fn throw_exception(&mut self, message: &BStr, url: &BStr) -> anyhow::Result<()> {
@@ -1272,7 +1277,7 @@ impl Git {
             .into());
         }
 
-        Err(RuntimeException::new(Url::sanitize(message).display_lossy().to_string()).into())
+        Err(RuntimeException::new(Url::sanitize(message)).into())
     }
 
     /// Retrieves the current git version.

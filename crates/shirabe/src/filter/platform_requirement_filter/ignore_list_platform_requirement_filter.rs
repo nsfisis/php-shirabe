@@ -12,8 +12,8 @@ use shirabe_semver::{Interval, Intervals};
 
 #[derive(Debug)]
 pub struct IgnoreListPlatformRequirementFilter {
-    ignore_regex: String,
-    ignore_upper_bound_regex: String,
+    ignore_regex: BString,
+    ignore_upper_bound_regex: BString,
 }
 
 impl IgnoreListPlatformRequirementFilter {
@@ -32,8 +32,8 @@ impl IgnoreListPlatformRequirementFilter {
         let ignore_upper_bound_regex =
             base_package::package_names_to_regexp(&ignore_upper_bound, BStr::new("{^(?:%s)$}iD"));
         Ok(Self {
-            ignore_regex: ignore_regex.display_lossy().to_string(),
-            ignore_upper_bound_regex: ignore_upper_bound_regex.display_lossy().to_string(),
+            ignore_regex,
+            ignore_upper_bound_regex,
         })
     }
 

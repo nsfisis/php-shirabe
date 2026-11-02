@@ -481,12 +481,8 @@ impl ComposerRepository {
     ) -> anyhow::Result<Vec<BString>> {
         let has_providers = self.has_providers()?;
 
-        let package_filter_regex: Option<String> = match package_filter {
-            Some(p) if !p.is_empty() => Some(
-                base_package::package_name_to_regexp(p)
-                    .display_lossy()
-                    .to_string(),
-            ),
+        let package_filter_regex: Option<BString> = match package_filter {
+            Some(p) if !p.is_empty() => Some(base_package::package_name_to_regexp(p)),
             _ => None,
         };
         let filter_results = |results: Vec<BString>| -> anyhow::Result<Vec<BString>> {
