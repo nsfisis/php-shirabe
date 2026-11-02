@@ -4,9 +4,10 @@ use crate::exception::IOException;
 use bstr::BString;
 use shirabe_php_shim::{
     Catch as _, FilesystemIterator, PHP_MAXPATHLEN, base64_encode, bconcat, chmod, copy, dirname,
-    file_exists, filemtime, fileperms, filesize, filesystem_iterator, is_dir, is_file, is_link,
-    mkdir, parse_url, path_from_bytes, path_to_bytes, random_bytes, readlink, realpath, rename,
-    rmdir, rtrim2, stream_is_local, stripos, strrev, strtr, symlink, touch2, umask, unlink,
+    display_to_bytes, file_exists, filemtime, fileperms, filesize, filesystem_iterator, is_dir,
+    is_file, is_link, mkdir, parse_url, path_from_bytes, path_to_bytes, random_bytes, readlink,
+    realpath, rename, rmdir, rtrim2, stream_is_local, stripos, strpos, strrev, strtr, symlink,
+    touch2, umask, unlink,
 };
 use std::path::{Path, PathBuf};
 
@@ -35,9 +36,10 @@ impl Filesystem {
 
         if origin_is_local && !is_file(origin_file) {
             return Err(IOException::new(
-                format!(
-                    "Failed to copy \"{}\" because file does not exist.",
-                    origin_file.display()
+                bconcat!(
+                    "Failed to copy \"",
+                    origin_file,
+                    "\" because file does not exist."
                 ),
                 0,
                 None,
@@ -68,10 +70,12 @@ impl Filesystem {
 
             if copy(origin_file, target_file).is_err() {
                 return Err(IOException::new(
-                    format!(
-                        "Failed to copy \"{}\" to \"{}\".",
-                        origin_file.display(),
-                        target_file.display()
+                    bconcat!(
+                        "Failed to copy \"",
+                        origin_file,
+                        "\" to \"",
+                        target_file,
+                        "\"."
                     ),
                     0,
                     None,
@@ -83,10 +87,12 @@ impl Filesystem {
 
             if !is_file(target_file) {
                 return Err(IOException::new(
-                    format!(
-                        "Failed to copy \"{}\" to \"{}\".",
-                        origin_file.display(),
-                        target_file.display()
+                    bconcat!(
+                        "Failed to copy \"",
+                        origin_file,
+                        "\" to \"",
+                        target_file,
+                        "\"."
                     ),
                     0,
                     None,
@@ -108,12 +114,16 @@ impl Filesystem {
                 let bytes_origin = filesize(origin_file);
                 if bytes_copied != bytes_origin {
                     return Err(IOException::new(
-                        format!(
-                            "Failed to copy the whole content of \"{}\" to \"{}\" ({} of {} bytes copied).",
-                            origin_file.display(),
-                            target_file.display(),
+                        bconcat!(
+                            "Failed to copy the whole content of \"",
+                            origin_file,
+                            "\" to \"",
+                            target_file,
+                            "\" (",
                             bytes_copied.unwrap_or(0),
-                            bytes_origin.unwrap_or(0)
+                            " of ",
+                            bytes_origin.unwrap_or(0),
+                            " bytes copied)."
                         ),
                         0,
                         None,
@@ -134,7 +144,7 @@ impl Filesystem {
 
         if mkdir(dir, mode, true).is_err() && !is_dir(dir) {
             return Err(IOException::new(
-                format!("Failed to create \"{}\".", dir.display()),
+                bconcat!("Failed to create \"", dir, "\"."),
                 0,
                 None,
                 Some(dir.to_path_buf()),
@@ -149,9 +159,10 @@ impl Filesystem {
 
         if path_to_bytes(file).len() as i64 > max_path_length {
             return Err(IOException::new(
-                format!(
-                    "Could not check if file exist because path length exceeds {} characters.",
-                    max_path_length
+                bconcat!(
+                    "Could not check if file exist because path length exceeds ",
+                    max_path_length,
+                    " characters."
                 ),
                 0,
                 None,
@@ -177,7 +188,7 @@ impl Filesystem {
                 let removed = unlink(&file).is_ok() || !cfg!(windows) || rmdir(&file).is_ok();
                 if !removed && file_exists(&file) {
                     return Err(IOException::new(
-                        format!("Failed to remove symlink \"{}\".", file.display()),
+                        bconcat!("Failed to remove symlink \"", file, "\"."),
                         0,
                         None,
                         None,
@@ -223,10 +234,11 @@ impl Filesystem {
                         let _ = rename(&file, &orig_file);
                     }
                     return Err(IOException::new(
-                        format!(
-                            "Failed to remove directory \"{}\": {}",
-                            file.display(),
-                            last_error
+                        bconcat!(
+                            "Failed to remove directory \"",
+                            file,
+                            "\": ",
+                            display_to_bytes(last_error)
                         ),
                         0,
                         None,
@@ -235,14 +247,10 @@ impl Filesystem {
                     .into());
                 }
             } else if let Err(last_error) = unlink(&file) {
-                let last_error = last_error.to_string();
-                if last_error.contains("Permission denied") || file_exists(&file) {
+                let last_error = display_to_bytes(last_error);
+                if strpos(&last_error, "Permission denied").is_some() || file_exists(&file) {
                     return Err(IOException::new(
-                        format!(
-                            "Failed to remove file \"{}\": {}",
-                            file.display(),
-                            last_error
-                        ),
+                        bconcat!("Failed to remove file \"", file, "\": ", last_error),
                         0,
                         None,
                         None,
@@ -280,11 +288,13 @@ impl Filesystem {
 
         if let Err(last_error) = symlink(&origin_dir, &target_dir) {
             return Err(IOException::new(
-                format!(
-                    "Failed to create \"symbolic\" link from \"{}\" to \"{}\": {}",
-                    origin_dir.display(),
-                    target_dir.display(),
-                    last_error
+                bconcat!(
+                    "Failed to create \"symbolic\" link from \"",
+                    origin_dir,
+                    "\" to \"",
+                    target_dir,
+                    "\": ",
+                    display_to_bytes(last_error)
                 ),
                 0,
                 None,
@@ -307,9 +317,10 @@ impl Filesystem {
 
         if !self.exists(path_from_bytes(&origin_dir))? {
             return Err(IOException::new(
-                format!(
-                    "The origin directory specified \"{}\" was not found.",
-                    origin_dir.display_lossy()
+                bconcat!(
+                    "The origin directory specified \"",
+                    origin_dir,
+                    "\" was not found."
                 ),
                 0,
                 None,
@@ -350,7 +361,7 @@ impl Filesystem {
                 self.copy(&pathname, &target)?;
             } else {
                 return Err(IOException::new(
-                    format!("Unable to guess \"{}\" file type.", pathname.display()),
+                    bconcat!("Unable to guess \"", pathname, "\" file type."),
                     0,
                     None,
                     Some(pathname.to_path_buf()),
