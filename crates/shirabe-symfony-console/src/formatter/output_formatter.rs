@@ -10,7 +10,7 @@ use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     PregMatches, bconcat, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,
     preg_match, preg_match_all, preg_replace, rtrim2, str_repeat, str_replace, strlen, strtolower,
-    strtr_array, substr, utf8_text,
+    strtr_array, substr,
 };
 use shirabe_symfony_string::b;
 
@@ -226,13 +226,11 @@ impl OutputFormatter {
         let encoding = mb_detect_encoding(text, None, true)
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| BString::from("UTF-8"));
-        let encoding =
-            utf8_text(&encoding).expect("mb_detect_encoding() returns an ASCII encoding name");
 
         b(text)
-            .to_code_point_string(encoding)
-            .wordwrap(width, "\n", true)
-            .to_byte_string(encoding)
+            .to_code_point_string(encoding.as_bstr())
+            .wordwrap(width, BStr::new("\n"), true)
+            .to_byte_string(encoding.as_bstr())
     }
 }
 
