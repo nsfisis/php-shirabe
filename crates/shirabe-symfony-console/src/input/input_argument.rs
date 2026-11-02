@@ -3,6 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
 use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug, Clone)]
 pub struct InputArgument {
@@ -26,9 +27,10 @@ impl InputArgument {
         let mode = match mode {
             None => Self::OPTIONAL,
             Some(m) if !(1..=7).contains(&m) => {
-                return Err(InvalidArgumentException::new(format!(
-                    "Argument mode \"{}\" is not valid.",
-                    m
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Argument mode \"",
+                    m,
+                    "\" is not valid."
                 ))
                 .into());
             }
@@ -62,7 +64,7 @@ impl InputArgument {
     pub fn set_default(&mut self, default: InputValue) -> anyhow::Result<()> {
         if self.is_required() && !default.is_null() {
             return Err(LogicException::new(
-                "Cannot set a default value except for InputArgument::OPTIONAL mode.".to_string(),
+                "Cannot set a default value except for InputArgument::OPTIONAL mode.",
             )
             .into());
         }
@@ -73,7 +75,7 @@ impl InputArgument {
                 InputValue::Array(_) => default,
                 _ => {
                     return Err(LogicException::new(
-                        "A default value for an array argument must be an array.".to_string(),
+                        "A default value for an array argument must be an array.",
                     )
                     .into());
                 }

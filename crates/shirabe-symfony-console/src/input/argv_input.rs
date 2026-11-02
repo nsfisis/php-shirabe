@@ -173,9 +173,10 @@ impl ArgvInput {
                     None => name_i,
                     Some(encoding) => mb_substr(name, i, Some(1), Some(encoding.as_bstr())),
                 };
-                return Err(RuntimeException::new(format!(
-                    "The \"-{}\" option does not exist.",
-                    bad.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "The \"-",
+                    bad,
+                    "\" option does not exist."
                 ))
                 .into());
             }
@@ -282,15 +283,18 @@ impl ArgvInput {
                 let names: Vec<BString> = all.keys().cloned().collect();
                 match &symfony_command_name {
                     Some(symfony_command_name) if !symfony_command_name.is_null() => {
-                        format!(
-                            "Too many arguments to \"{}\" command, expected arguments \"{}\".",
-                            symfony_command_name.to_php_string().display_lossy(),
-                            implode("\" \"", &names).display_lossy(),
+                        bconcat!(
+                            "Too many arguments to \"",
+                            symfony_command_name.to_php_string(),
+                            "\" command, expected arguments \"",
+                            implode("\" \"", &names),
+                            "\"."
                         )
                     }
-                    _ => format!(
-                        "Too many arguments, expected arguments \"{}\".",
-                        implode("\" \"", &names).display_lossy(),
+                    _ => bconcat!(
+                        "Too many arguments, expected arguments \"",
+                        implode("\" \"", &names),
+                        "\"."
                     ),
                 }
             } else if symfony_command_name
@@ -298,16 +302,15 @@ impl ArgvInput {
                 .map(|n| !n.is_null())
                 .unwrap_or(false)
             {
-                format!(
-                    "No arguments expected for \"{}\" command, got \"{}\".",
-                    symfony_command_name
-                        .unwrap()
-                        .to_php_string()
-                        .display_lossy(),
-                    token.display_lossy(),
+                bconcat!(
+                    "No arguments expected for \"",
+                    symfony_command_name.unwrap().to_php_string(),
+                    "\" command, got \"",
+                    token,
+                    "\"."
                 )
             } else {
-                format!("No arguments expected, got \"{}\".", token.display_lossy())
+                bconcat!("No arguments expected, got \"", token, "\".")
             };
 
             return Err(RuntimeException::new(message).into());
@@ -319,9 +322,10 @@ impl ArgvInput {
     /// Adds a short option value.
     fn add_short_option(&mut self, shortcut: &BStr, value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
-            return Err(RuntimeException::new(format!(
-                "The \"-{}\" option does not exist.",
-                shortcut.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "The \"-",
+                shortcut,
+                "\" option does not exist."
             ))
             .into());
         }
@@ -339,18 +343,20 @@ impl ArgvInput {
     fn add_long_option(&mut self, name: &BStr, mut value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
-                return Err(RuntimeException::new(format!(
-                    "The \"--{}\" option does not exist.",
-                    name.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "The \"--",
+                    name,
+                    "\" option does not exist."
                 ))
                 .into());
             }
 
             let option_name = self.inner.definition.negation_to_name(name)?;
             if !value.is_null() {
-                return Err(RuntimeException::new(format!(
-                    "The \"--{}\" option does not accept a value.",
-                    name.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "The \"--",
+                    name,
+                    "\" option does not accept a value."
                 ))
                 .into());
             }
@@ -364,9 +370,10 @@ impl ArgvInput {
         let option = self.inner.definition.get_option(name)?;
 
         if !value.is_null() && !option.accept_value() {
-            return Err(RuntimeException::new(format!(
-                "The \"--{}\" option does not accept a value.",
-                name.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "The \"--",
+                name,
+                "\" option does not accept a value."
             ))
             .into());
         }
@@ -389,9 +396,10 @@ impl ArgvInput {
 
         if value.is_null() {
             if option.is_value_required() {
-                return Err(RuntimeException::new(format!(
-                    "The \"--{}\" option requires a value.",
-                    name.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "The \"--",
+                    name,
+                    "\" option requires a value."
                 ))
                 .into());
             }
@@ -664,9 +672,9 @@ mod tests {
         InputDefinition::new(vec![
             DefinitionItem::InputArgument(
                 InputArgument::new(
-                    "name".to_string(),
+                    BString::from("name"),
                     Some(InputArgument::OPTIONAL),
-                    String::new(),
+                    BString::default(),
                     InputValue::Null,
                 )
                 .unwrap(),
@@ -676,7 +684,7 @@ mod tests {
                     "foo",
                     Some("f".into()),
                     Some(InputOption::VALUE_REQUIRED),
-                    String::new(),
+                    BString::default(),
                     InputValue::Null,
                 )
                 .unwrap(),
@@ -721,7 +729,7 @@ mod tests {
                 InputArgument::new(
                     b"\xfename".as_slice(),
                     None,
-                    String::new(),
+                    BString::default(),
                     InputValue::Null,
                 )
                 .unwrap(),
@@ -731,7 +739,7 @@ mod tests {
                     b"caf\xe9",
                     Some(BStr::new(b"\xff")),
                     Some(InputOption::VALUE_REQUIRED),
-                    String::new(),
+                    BString::default(),
                     InputValue::Null,
                 )
                 .unwrap(),

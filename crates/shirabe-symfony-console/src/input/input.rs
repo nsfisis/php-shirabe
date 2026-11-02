@@ -5,8 +5,8 @@ use crate::input::{ArgumentName, InputDefinition, InputValue};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, implode, php_regex,
-    preg_is_match,
+    PhpResource, array_filter, array_keys, array_merge_map, bconcat, escapeshellarg, implode,
+    php_regex, preg_is_match,
 };
 
 /// Input is the base class for all concrete Input classes.
@@ -83,9 +83,10 @@ impl Input {
         );
 
         if !missing_arguments.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Not enough arguments (missing: \"{}\").",
-                implode(", ", &missing_arguments).display_lossy(),
+            return Err(RuntimeException::new(bconcat!(
+                "Not enough arguments (missing: \"",
+                implode(", ", &missing_arguments),
+                "\")."
             ))
             .into());
         }
@@ -111,9 +112,10 @@ impl Input {
     pub fn get_argument(&self, name: impl AsRef<[u8]>) -> anyhow::Result<InputValue> {
         let name = BStr::new(name.as_ref());
         if !self.definition.has_argument(&ArgumentName::of(name)) {
-            return Err(InvalidArgumentException::new(format!(
-                "The \"{}\" argument does not exist.",
-                name.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The \"",
+                name,
+                "\" argument does not exist."
             ))
             .into());
         }
@@ -135,9 +137,10 @@ impl Input {
     ) -> anyhow::Result<()> {
         let name = BStr::new(name.as_ref());
         if !self.definition.has_argument(&ArgumentName::of(name)) {
-            return Err(InvalidArgumentException::new(format!(
-                "The \"{}\" argument does not exist.",
-                name.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The \"",
+                name,
+                "\" argument does not exist."
             ))
             .into());
         }
@@ -167,9 +170,10 @@ impl Input {
         }
 
         if !self.definition.has_option(name) {
-            return Err(InvalidArgumentException::new(format!(
-                "The \"{}\" option does not exist.",
-                name.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The \"",
+                name,
+                "\" option does not exist."
             ))
             .into());
         }
@@ -190,9 +194,10 @@ impl Input {
 
             return Ok(());
         } else if !self.definition.has_option(name) {
-            return Err(InvalidArgumentException::new(format!(
-                "The \"{}\" option does not exist.",
-                name.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The \"",
+                name,
+                "\" option does not exist."
             ))
             .into());
         }

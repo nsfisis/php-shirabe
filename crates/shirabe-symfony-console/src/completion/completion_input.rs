@@ -3,7 +3,7 @@
 use crate::input::{ArgvInput, InputDefinition, InputOption, InputValue};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    explode_with_limit, ltrim2, php_regex, preg_match_all, rtrim, substr, trim2,
+    explode_with_limit, ltrim2, php_regex, php_str, preg_match_all, rtrim, substr, trim2,
 };
 
 /// An input specialized for shell completion.
@@ -15,16 +15,16 @@ pub struct CompletionInput {
     inner: ArgvInput,
     tokens: Vec<BString>,
     current_index: i64,
-    completion_type: String,
+    completion_type: BString,
     completion_name: Option<BString>,
     completion_value: BString,
 }
 
 impl CompletionInput {
-    pub const TYPE_ARGUMENT_VALUE: &'static str = "argument_value";
-    pub const TYPE_OPTION_VALUE: &'static str = "option_value";
-    pub const TYPE_OPTION_NAME: &'static str = "option_name";
-    pub const TYPE_NONE: &'static str = "none";
+    pub const TYPE_ARGUMENT_VALUE: &'static BStr = php_str(b"argument_value");
+    pub const TYPE_OPTION_VALUE: &'static BStr = php_str(b"option_value");
+    pub const TYPE_OPTION_NAME: &'static BStr = php_str(b"option_name");
+    pub const TYPE_NONE: &'static BStr = php_str(b"none");
 
     /// Converts a terminal string into tokens.
     ///
@@ -58,7 +58,7 @@ impl CompletionInput {
             inner: ArgvInput::new(Some(tokens.clone()), None)?,
             tokens: vec![],
             current_index: 0,
-            completion_type: String::new(),
+            completion_type: BString::default(),
             completion_name: None,
             completion_value: BString::default(),
         };
@@ -83,7 +83,7 @@ impl CompletionInput {
 
             let option = self.get_option_from_token(option_token.as_ref());
             if option.is_none() && !self.is_cursor_free() {
-                self.completion_type = Self::TYPE_OPTION_NAME.to_string();
+                self.completion_type = Self::TYPE_OPTION_NAME.to_owned();
                 self.completion_value = relevant_token;
 
                 return Ok(());
@@ -92,7 +92,7 @@ impl CompletionInput {
             if let Some(option) = &option
                 && option.accept_value()
             {
-                self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
+                self.completion_type = Self::TYPE_OPTION_VALUE.to_owned();
                 self.completion_name = Some(option.get_name().to_owned());
                 self.completion_value = if !option_value.is_empty() {
                     option_value
@@ -113,7 +113,7 @@ impl CompletionInput {
             if let Some(previous_option) = &previous_option
                 && previous_option.accept_value()
             {
-                self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
+                self.completion_type = Self::TYPE_OPTION_VALUE.to_owned();
                 self.completion_name = Some(previous_option.get_name().to_owned());
                 self.completion_value = relevant_token;
 
@@ -122,7 +122,7 @@ impl CompletionInput {
         }
 
         // complete argument value
-        self.completion_type = Self::TYPE_ARGUMENT_VALUE.to_string();
+        self.completion_type = Self::TYPE_ARGUMENT_VALUE.to_owned();
 
         let mut argument_name: Option<BString> = None;
         let argument_names: Vec<BString> = self
@@ -175,7 +175,7 @@ impl CompletionInput {
                 self.completion_value = BString::default();
             } else {
                 // we've reached the end
-                self.completion_type = Self::TYPE_NONE.to_string();
+                self.completion_type = Self::TYPE_NONE.to_owned();
                 self.completion_name = None;
                 self.completion_value = BString::default();
             }
@@ -190,7 +190,7 @@ impl CompletionInput {
     /// TYPE_OPTION_VALUE   when completing the value of an input option
     /// TYPE_OPTION_NAME    when completing the name of an input option
     /// TYPE_NONE           when nothing should be completed
-    pub fn get_completion_type(&self) -> String {
+    pub fn get_completion_type(&self) -> BString {
         self.completion_type.clone()
     }
 

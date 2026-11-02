@@ -59,7 +59,7 @@ impl OutputFormatterStyleStack {
         }
 
         Ok(Err(InvalidArgumentException::new(
-            "Incorrectly nested style tag found.".to_string(),
+            "Incorrectly nested style tag found.",
         )))
     }
 

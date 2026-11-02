@@ -4,7 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface};
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{PHP_EOL, substr};
+use shirabe_php_shim::{PHP_EOL, bconcat, substr};
 
 /// A BufferedOutput that keeps only the last N chars.
 #[derive(Debug)]
@@ -22,9 +22,12 @@ impl TrimmedBufferOutput {
         formatter: Option<std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>>,
     ) -> Result<Self, InvalidArgumentException> {
         if max_length <= 0 {
-            return Err(InvalidArgumentException::new(format!(
-                "\"{}()\" expects a strictly positive maxLength. Got {}.",
-                "Symfony\\Component\\Console\\Output\\TrimmedBufferOutput::__construct", max_length,
+            return Err(InvalidArgumentException::new(bconcat!(
+                "\"",
+                "Symfony\\Component\\Console\\Output\\TrimmedBufferOutput::__construct",
+                "()\" expects a strictly positive maxLength. Got ",
+                max_length,
+                "."
             )));
         }
 

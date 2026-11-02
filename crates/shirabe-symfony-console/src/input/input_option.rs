@@ -3,7 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{implode, ltrim2, php_regex, preg_split};
+use shirabe_php_shim::{bconcat, implode, ltrim2, php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
@@ -32,10 +32,7 @@ impl InputOption {
         let name = BString::from(name.strip_prefix(b"--").unwrap_or(name));
 
         if name.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "An option name cannot be empty.".to_string(),
-            )
-            .into());
+            return Err(InvalidArgumentException::new("An option name cannot be empty.").into());
         }
 
         let shortcut = match shortcut {
@@ -47,9 +44,10 @@ impl InputOption {
         let mode = match mode {
             None => Self::VALUE_NONE,
             Some(m) if !(1..(Self::VALUE_NEGATABLE << 1)).contains(&m) => {
-                return Err(InvalidArgumentException::new(format!(
-                    "Option mode \"{}\" is not valid.",
-                    m
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Option mode \"",
+                    m,
+                    "\" is not valid."
                 ))
                 .into());
             }
@@ -65,11 +63,11 @@ impl InputOption {
         };
 
         if option.is_array() && !option.accept_value() {
-            return Err(InvalidArgumentException::new("Impossible to have an option mode VALUE_IS_ARRAY if the option does not accept a value.".to_string())
+            return Err(InvalidArgumentException::new("Impossible to have an option mode VALUE_IS_ARRAY if the option does not accept a value.")
             .into());
         }
         if option.is_negatable() && option.accept_value() {
-            return Err(InvalidArgumentException::new("Impossible to have an option mode VALUE_NEGATABLE if the option also accepts a value.".to_string())
+            return Err(InvalidArgumentException::new("Impossible to have an option mode VALUE_NEGATABLE if the option also accepts a value.")
             .into());
         }
 
@@ -85,10 +83,9 @@ impl InputOption {
             .collect();
         let result = implode("|", &shortcuts);
         if result.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "An option shortcut cannot be empty.".to_string(),
-            )
-            .into());
+            return Err(
+                InvalidArgumentException::new("An option shortcut cannot be empty.").into(),
+            );
         }
         Ok(Some(result))
     }
@@ -124,7 +121,7 @@ impl InputOption {
     pub fn set_default(&mut self, default: InputValue) -> anyhow::Result<()> {
         if Self::VALUE_NONE == (Self::VALUE_NONE & self.mode) && !default.is_null() {
             return Err(LogicException::new(
-                "Cannot set a default value when using InputOption::VALUE_NONE mode.".to_string(),
+                "Cannot set a default value when using InputOption::VALUE_NONE mode.",
             )
             .into());
         }
@@ -135,7 +132,7 @@ impl InputOption {
                 InputValue::Array(_) => default,
                 _ => {
                     return Err(LogicException::new(
-                        "A default value for an array option must be an array.".to_string(),
+                        "A default value for an array option must be an array.",
                     )
                     .into());
                 }

@@ -128,7 +128,7 @@ impl Question {
     pub fn set_hidden(&mut self, hidden: bool) -> Result<&mut Self, LogicException> {
         if self.autocompleter_callback.is_some() {
             return Err(LogicException::new(
-                "A hidden question cannot use the autocompleter.".to_string(),
+                "A hidden question cannot use the autocompleter.",
             ));
         }
 
@@ -225,7 +225,7 @@ impl Question {
     ) -> Result<&mut Self, LogicException> {
         if self.hidden && callback.is_some() {
             return Err(LogicException::new(
-                "A hidden question cannot use the autocompleter.".to_string(),
+                "A hidden question cannot use the autocompleter.",
             ));
         }
 
@@ -266,7 +266,7 @@ impl Question {
             && attempts < 1
         {
             return Err(InvalidArgumentException::new(
-                "Maximum number of attempts must be a positive value.".to_string(),
+                "Maximum number of attempts must be a positive value.",
             ));
         }
 

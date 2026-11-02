@@ -6,7 +6,7 @@ use crate::output::{DoWrite, OutputInterface, StreamOutput};
 use crate::terminal::Terminal;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PHP_EOL, PhpResource, array_reverse, array_splice, array_unshift, explode, str_replace,
+    PHP_EOL, PhpResource, array_reverse, array_splice, array_unshift, bconcat, explode, str_replace,
 };
 
 type Sections =
@@ -126,7 +126,7 @@ impl ConsoleSectionOutput {
         if number_of_lines_to_clear > 0 {
             // move cursor up n lines
             self.inner.do_write(
-                format!("\x1b[{}A", number_of_lines_to_clear)
+                bconcat!("\x1b[", number_of_lines_to_clear, "A")
                     .as_bytes()
                     .as_bstr(),
                 false,

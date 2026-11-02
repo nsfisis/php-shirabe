@@ -260,9 +260,10 @@ impl OutputFormatterInterface for OutputFormatter {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>>
     {
         if !self.has_style(name) {
-            return Err(InvalidArgumentException::new(format!(
-                "Undefined style: \"{}\".",
-                name.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Undefined style: \"",
+                name,
+                "\"."
             ))
             .into());
         }
@@ -292,7 +293,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
         let matches = preg_match_all(
-            format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
+            bconcat!("#<((", open_tag_regex, ") | /(", close_tag_regex, ")?)>#ix"),
             message,
         );
         for match_ in matches {

@@ -5,7 +5,7 @@ use crate::question::{Question, QuestionInterface};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
+    PhpMixed, bconcat, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
 };
 
 /// Represents a choice question.
@@ -29,7 +29,7 @@ impl ChoiceQuestion {
     ) -> Result<Self, LogicException> {
         if choices.is_empty() {
             return Err(LogicException::new(
-                "Choice question must have at least 1 choice available.".to_string(),
+                "Choice question must have at least 1 choice available.",
             ));
         }
 
@@ -124,11 +124,10 @@ impl ChoiceQuestion {
             let selected_choices: Vec<PhpMixed> = if multiselect {
                 // Check for a separated comma values
                 if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), strval(&selected)) {
-                    return Err(InvalidArgumentException::new(
-                        sprintf(&error_message, std::slice::from_ref(&selected))
-                            .display_lossy()
-                            .to_string(),
-                    ));
+                    return Err(InvalidArgumentException::new(sprintf(
+                        &error_message,
+                        std::slice::from_ref(&selected),
+                    )));
                 }
 
                 explode(",", strval(&selected))
@@ -156,9 +155,10 @@ impl ChoiceQuestion {
                 }
 
                 if results.len() > 1 {
-                    return Err(InvalidArgumentException::new(format!(
-                        "The provided answer is ambiguous. Value should be one of \"{}\".",
-                        implode("\" or \"", &results).display_lossy(),
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        "The provided answer is ambiguous. Value should be one of \"",
+                        implode("\" or \"", &results),
+                        "\"."
                     )));
                 }
 
@@ -194,11 +194,10 @@ impl ChoiceQuestion {
 
                 // false === $result
                 if matches!(result, PhpMixed::Bool(false)) {
-                    return Err(InvalidArgumentException::new(
-                        sprintf(&error_message, std::slice::from_ref(value))
-                            .display_lossy()
-                            .to_string(),
-                    ));
+                    return Err(InvalidArgumentException::new(sprintf(
+                        &error_message,
+                        std::slice::from_ref(value),
+                    )));
                 }
 
                 // For associative choices, consistently return the key as string:

@@ -151,9 +151,10 @@ impl ArrayInput {
     /// Adds a short option value.
     fn add_short_option(&mut self, shortcut: &BStr, value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
-            return Err(InvalidOptionException::new(format!(
-                "The \"-{}\" option does not exist.",
-                shortcut.display_lossy()
+            return Err(InvalidOptionException::new(bconcat!(
+                "The \"-",
+                shortcut,
+                "\" option does not exist."
             ))
             .into());
         }
@@ -171,9 +172,10 @@ impl ArrayInput {
     fn add_long_option(&mut self, name: &BStr, mut value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
-                return Err(InvalidOptionException::new(format!(
-                    "The \"--{}\" option does not exist.",
-                    name.display_lossy()
+                return Err(InvalidOptionException::new(bconcat!(
+                    "The \"--",
+                    name,
+                    "\" option does not exist."
                 ))
                 .into());
             }
@@ -190,9 +192,10 @@ impl ArrayInput {
 
         if value.is_null() {
             if option.is_value_required() {
-                return Err(InvalidOptionException::new(format!(
-                    "The \"--{}\" option requires a value.",
-                    name.display_lossy()
+                return Err(InvalidOptionException::new(bconcat!(
+                    "The \"--",
+                    name,
+                    "\" option requires a value."
                 ))
                 .into());
             }
@@ -210,11 +213,11 @@ impl ArrayInput {
     /// Adds an argument value.
     fn add_argument(&mut self, name: &ParameterName, value: InputValue) -> anyhow::Result<()> {
         let key = name.to_key();
-        let name = &name.to_argument_name();
-        if !self.inner.definition.has_argument(name) {
-            return Err(InvalidArgumentException::new(format!(
-                "The \"{}\" argument does not exist.",
-                name
+        if !self.inner.definition.has_argument(&name.to_argument_name()) {
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The \"",
+                key,
+                "\" argument does not exist."
             ))
             .into());
         }
@@ -381,7 +384,7 @@ impl ParameterName {
     fn to_key(&self) -> BString {
         match self {
             Self::Name(name) => name.clone(),
-            Self::Index(index) => index.to_string().into(),
+            Self::Index(index) => bconcat!(*index),
         }
     }
 

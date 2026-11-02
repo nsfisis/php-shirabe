@@ -8,7 +8,8 @@ use crate::input::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, bconcat, php_regex, preg_match, str_replace_arr, stripcslashes, strlen, substr,
+    PhpResource, bconcat, php_regex, php_str, preg_match, str_replace_arr, stripcslashes, strlen,
+    substr,
 };
 
 /// StringInput represents an input provided as a string.
@@ -24,10 +25,10 @@ pub struct StringInput {
 }
 
 impl StringInput {
-    pub const REGEX_STRING: &'static str = r#"([^\s]+?)(?:\s|(?<!\\)"|(?<!\\)'|$)"#;
-    pub const REGEX_UNQUOTED_STRING: &'static str = r#"([^\s\\]+?)"#;
-    pub const REGEX_QUOTED_STRING: &'static str =
-        r#"(?:"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)')"#;
+    pub const REGEX_STRING: &'static BStr = php_str(br#"([^\s]+?)(?:\s|(?<!\\)"|(?<!\\)'|$)"#);
+    pub const REGEX_UNQUOTED_STRING: &'static BStr = php_str(br#"([^\s\\]+?)"#);
+    pub const REGEX_QUOTED_STRING: &'static BStr =
+        php_str(br#"(?:"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)')"#);
 
     pub fn new(input: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         // parent::__construct([])
@@ -73,7 +74,11 @@ impl StringInput {
                 }
                 cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(
-                format!(r#"/^([^="'\s]+?)(=?)({}+)/"#, Self::REGEX_QUOTED_STRING),
+                bconcat!(
+                    r#"/^([^="'\s]+?)(=?)("#,
+                    Self::REGEX_QUOTED_STRING,
+                    r#"+)/"#
+                ),
                 rest,
             ) {
                 let inner = substr(m.get(3).unwrap_or_default(), 1, Some(-1));
@@ -85,13 +90,16 @@ impl StringInput {
                     stripcslashes(&replaced)
                 ));
                 cursor += strlen(m.get(0).unwrap_or_default());
-            } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_QUOTED_STRING), rest) {
+            } else if let Some(m) =
+                preg_match(bconcat!(r"/^", Self::REGEX_QUOTED_STRING, r"/"), rest)
+            {
                 token = Some(bconcat!(
                     token.unwrap_or_default(),
                     stripcslashes(substr(m.get(0).unwrap_or_default(), 1, Some(-1)))
                 ));
                 cursor += strlen(m.get(0).unwrap_or_default());
-            } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_UNQUOTED_STRING), rest)
+            } else if let Some(m) =
+                preg_match(bconcat!(r"/^", Self::REGEX_UNQUOTED_STRING, r"/"), rest)
             {
                 token = Some(bconcat!(
                     token.unwrap_or_default(),
@@ -100,9 +108,10 @@ impl StringInput {
                 cursor += strlen(m.get(0).unwrap_or_default());
             } else {
                 // should never happen
-                return Err(InvalidArgumentException::new(format!(
-                    "Unable to parse input near \"... {} ...\".",
-                    substr(input, cursor, Some(10)).display_lossy(),
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Unable to parse input near \"... ",
+                    substr(input, cursor, Some(10)),
+                    " ...\"."
                 ))
                 .into());
             }

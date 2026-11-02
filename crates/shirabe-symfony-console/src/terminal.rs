@@ -2,9 +2,10 @@
 
 use bstr::BString;
 use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, path_to_bytes,
-    php_fopen_resource, php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get,
-    sapi_windows_cp_set, sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
+    Descriptor, PhpMixed, PhpResource, bconcat, fclose, function_exists, getenv, intval,
+    path_to_bytes, php_fopen_resource, php_regex, preg_match, proc_close, proc_open,
+    sapi_windows_cp_get, sapi_windows_cp_set, sapi_windows_vt100_support, shell_exec,
+    stream_get_contents, trim,
 };
 use std::cell::Cell;
 
@@ -61,8 +62,8 @@ impl Terminal {
             return stty;
         }
 
-        let result = shell_exec(format!(
-            "stty 2> {}",
+        let result = shell_exec(bconcat!(
+            "stty 2> ",
             if cfg!(windows) { "NUL" } else { "/dev/null" }
         ))
         .is_some();
@@ -180,7 +181,7 @@ impl Terminal {
         Self::read_from_process("stty -a | grep columns")
     }
 
-    fn read_from_process(command: &str) -> Option<Vec<u8>> {
+    fn read_from_process(command: impl AsRef<[u8]>) -> Option<Vec<u8>> {
         // Sparse PHP descriptorspec `[1 => ['pipe', 'w'], 2 => ['pipe', 'w']]`: fd 0 is inherited.
         let descriptorspec = [
             Descriptor::Inherit,
@@ -195,7 +196,14 @@ impl Terminal {
         };
 
         let mut pipes: indexmap::IndexMap<i64, PhpResource> = indexmap::IndexMap::new();
-        let process = match proc_open(command, &descriptorspec, &mut pipes, None, None, None) {
+        let process = match proc_open(
+            command.as_ref(),
+            &descriptorspec,
+            &mut pipes,
+            None,
+            None,
+            None,
+        ) {
             Ok(process) => process,
             Err(_) => return None,
         };

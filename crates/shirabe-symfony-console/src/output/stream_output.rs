@@ -40,7 +40,7 @@ impl StreamOutput {
 
         if get_resource_type(&stream) != "stream" {
             return Ok(Err(InvalidArgumentException::new(
-                "The StreamOutput class needs a stream as its first argument.".to_string(),
+                "The StreamOutput class needs a stream as its first argument.",
             )));
         }
 
