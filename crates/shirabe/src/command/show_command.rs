@@ -796,9 +796,9 @@ impl ShowCommand {
                             None => LicenseJson::Id(license_id),
                             // The 'osi' key holds the license id string, not the OSI-approved flag.
                             Some(l) => LicenseJson::Detail {
-                                name: l.name,
+                                name: l.name.display_lossy().to_string(),
                                 osi: license_id,
-                                url: l.url,
+                                url: l.url.display_lossy().to_string(),
                             },
                         }
                     })
