@@ -217,13 +217,13 @@ fn test_get_proxy_for_request() {
     ];
 
     let http_options =
-        |pairs: &[(&str, PhpMixed)]| -> Option<IndexMap<String, IndexMap<BString, PhpMixed>>> {
+        |pairs: &[(&str, PhpMixed)]| -> Option<IndexMap<BString, IndexMap<BString, PhpMixed>>> {
             let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
             for (k, v) in pairs {
                 http.insert((*k).to_string().into(), v.clone());
             }
-            let mut options: IndexMap<String, IndexMap<BString, PhpMixed>> = IndexMap::new();
-            options.insert("http".to_string(), http);
+            let mut options: IndexMap<BString, IndexMap<BString, PhpMixed>> = IndexMap::new();
+            options.insert(BString::from("http"), http);
             Some(options)
         };
 
@@ -231,7 +231,7 @@ fn test_get_proxy_for_request() {
     let cases: Vec<(
         Vec<(&str, &str)>,
         &str,
-        Option<IndexMap<String, IndexMap<BString, PhpMixed>>>,
+        Option<IndexMap<BString, IndexMap<BString, PhpMixed>>>,
         &str,
         bool,
     )> = vec![

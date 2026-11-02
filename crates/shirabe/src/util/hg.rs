@@ -88,13 +88,13 @@ impl Hg {
                     matches.name("proto").unwrap_or_default(),
                     "://",
                     rawurlencode(
-                        auth.get("username")
+                        auth.get(bstr::B("username"))
                             .and_then(|s| s.as_ref().map(|s| s.as_slice()))
                             .unwrap_or_default()
                     ),
                     ":",
                     rawurlencode(
-                        auth.get("password")
+                        auth.get(bstr::B("password"))
                             .and_then(|s| s.as_ref().map(|s| s.as_slice()))
                             .unwrap_or_default()
                     ),

@@ -61,7 +61,7 @@ impl Command for InstallCommand {
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Do not use, only defined here to catch misuse of the install command.", None).unwrap().into(),
             InputOption::new("audit", None, Some(InputOption::VALUE_NONE), "Run an audit after installation is complete.", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
             InputOption::new("verbose", Some("v|vv|vvv".into()), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
             InputOption::new("optimize-autoloader", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
             InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),

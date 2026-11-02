@@ -303,7 +303,7 @@ impl DownloaderInterface for FossilDownloader {
         Some(self)
     }
 
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         <Self as VcsDownloader>::get_installation_source(self)
     }
 

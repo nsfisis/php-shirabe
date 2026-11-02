@@ -3,6 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
+use bstr::BString;
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -12,7 +13,7 @@ use shirabe_symfony_console::output::OutputInterface;
 pub struct ProhibitsCommand {
     base_command_data: BaseCommandData,
 
-    colors: std::cell::RefCell<Vec<String>>,
+    colors: std::cell::RefCell<Vec<BString>>,
 }
 
 impl_php_class!(ProhibitsCommand, r"Composer\Command\ProhibitsCommand");
@@ -37,11 +38,11 @@ impl ProhibitsCommand {
 }
 
 impl BaseDependencyCommand for ProhibitsCommand {
-    fn colors(&self) -> std::cell::Ref<'_, Vec<String>> {
+    fn colors(&self) -> std::cell::Ref<'_, Vec<BString>> {
         self.colors.borrow()
     }
 
-    fn set_colors(&self, colors: Vec<String>) {
+    fn set_colors(&self, colors: Vec<BString>) {
         *self.colors.borrow_mut() = colors;
     }
 }

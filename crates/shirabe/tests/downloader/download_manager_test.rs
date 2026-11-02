@@ -16,7 +16,7 @@ mockall::mock! {
     pub Downloader {}
     #[async_trait::async_trait(?Send)]
     impl DownloaderInterface for Downloader {
-        fn get_installation_source(&self) -> String;
+        fn get_installation_source(&self) -> bstr::BString;
         async fn download(
             &self,
             package: PackageInterfaceHandle,
@@ -101,7 +101,7 @@ fn create_downloader_mock() -> std::rc::Rc<std::cell::RefCell<dyn DownloaderInte
 /// real `getDownloaderForPackage` dispatch resolves to it.
 fn downloader_mock(installation_source: &str) -> MockDownloader {
     let mut downloader = MockDownloader::new();
-    let source = installation_source.to_string();
+    let source = bstr::BString::from(installation_source);
     downloader
         .expect_get_installation_source()
         .returning(move || source.clone());

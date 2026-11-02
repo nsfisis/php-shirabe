@@ -32,8 +32,8 @@ pub trait BaseDependencyCommand: BaseCommand {
     const OPTION_RECURSIVE: &'static str = OPTION_RECURSIVE;
     const OPTION_TREE: &'static str = OPTION_TREE;
 
-    fn colors(&self) -> std::cell::Ref<'_, Vec<String>>;
-    fn set_colors(&self, colors: Vec<String>);
+    fn colors(&self) -> std::cell::Ref<'_, Vec<BString>>;
+    fn set_colors(&self, colors: Vec<BString>);
 
     fn do_execute(
         &self,
@@ -404,11 +404,11 @@ pub trait BaseDependencyCommand: BaseCommand {
 
     fn init_styles(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
         self.set_colors(vec![
-            "green".to_string(),
-            "yellow".to_string(),
-            "cyan".to_string(),
-            "magenta".to_string(),
-            "blue".to_string(),
+            BString::from("green"),
+            BString::from("yellow"),
+            BString::from("cyan"),
+            BString::from("magenta"),
+            BString::from("blue"),
         ]);
         for color in self.colors().iter() {
             let style = OutputFormatterStyle::new(Some(bstr::BStr::new(color)), None, vec![]);

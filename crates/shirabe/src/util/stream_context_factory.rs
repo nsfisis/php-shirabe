@@ -122,7 +122,7 @@ impl StreamContextFactory {
                 }
 
                 // Header will be a Proxy-Authorization string or not set
-                let proxy_http = proxy_options.get("http");
+                let proxy_http = proxy_options.get(bstr::B("http"));
                 if let Some(proxy_header) = proxy_http.and_then(|h| h.get(B("header")))
                     && let Some(PhpMixed::Array(http)) = options.get_mut(B("http"))
                     && let Some(PhpMixed::List(headers)) = http.get_mut(B("header"))
@@ -138,7 +138,7 @@ impl StreamContextFactory {
                             .filter(|(ik, _)| *ik != "header")
                             .map(|(ik, iv)| (ik.clone(), iv.clone()))
                             .collect();
-                        (k.as_str().into(), PhpMixed::Array(inner))
+                        (k.as_bstr().into(), PhpMixed::Array(inner))
                     })
                     .collect();
                 options = array_replace_recursive(options, proxy_options_flat);

@@ -58,9 +58,9 @@ impl Command for LicensesCommand {
                 "Format of the output: text, json or summary",
                 Some(InputValue::from("text")),
                 SuggestedValues::List(vec![
-                    "text".to_string(),
-                    "json".to_string(),
-                    "summary".to_string(),
+                    BString::from("text"),
+                    BString::from("json"),
+                    BString::from("summary"),
                 ]),
             )
             .unwrap()

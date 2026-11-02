@@ -401,7 +401,7 @@ fn test_audit() {
         packages: Vec<PackageInterfaceHandle>,
         warning_only: bool,
         abandoned: &'static str,
-        format: &'static str,
+        format: &'static BStr,
         ignore_abandoned: IndexMap<BString, Option<BString>>,
         expected: i64,
         output: &'static str,

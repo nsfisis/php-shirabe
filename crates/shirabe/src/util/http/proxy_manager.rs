@@ -3,8 +3,10 @@
 use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;
 use crate::util::http::{ProxyItem, RequestProxy};
-use bstr::BString;
-use shirabe_php_shim::{PHP_SERVER, bconcat, error_message, parse_url};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{
+    PHP_SERVER, bconcat, error_message, parse_url, path_from_bytes, strtolower, strtoupper,
+};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -110,24 +112,24 @@ impl ProxyManager {
     fn get_proxy_data(&mut self) -> anyhow::Result<()> {
         // handle http_proxy/HTTP_PROXY on CLI only for security reasons
         // PHP_SAPI is always 'cli' for this application
-        let (env, name) = Self::get_proxy_env("http_proxy");
+        let (env, name) = Self::get_proxy_env(BStr::new("http_proxy"));
         if let Some(env) = env {
             self.http_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
         }
 
         if self.http_proxy.is_none() {
-            let (env, name) = Self::get_proxy_env("cgi_http_proxy");
+            let (env, name) = Self::get_proxy_env(BStr::new("cgi_http_proxy"));
             if let Some(env) = env {
                 self.http_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
             }
         }
 
-        let (env, name) = Self::get_proxy_env("https_proxy");
+        let (env, name) = Self::get_proxy_env(BStr::new("https_proxy"));
         if let Some(env) = env {
             self.https_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
         }
 
-        let (env, _name) = Self::get_proxy_env("no_proxy");
+        let (env, _name) = Self::get_proxy_env(BStr::new("no_proxy"));
         if let Some(env) = env {
             *self.no_proxy_handler.borrow_mut() = Some(NoProxyPattern::new(env.as_encoded_bytes()));
         }
@@ -135,15 +137,15 @@ impl ProxyManager {
         Ok(())
     }
 
-    fn get_proxy_env(env_name: &str) -> (Option<std::ffi::OsString>, String) {
-        for name in [env_name.to_lowercase(), env_name.to_uppercase()] {
-            if let Some(val) = PHP_SERVER.lock().unwrap().get(&name)
+    fn get_proxy_env(env_name: &BStr) -> (Option<std::ffi::OsString>, BString) {
+        for name in [strtolower(env_name), strtoupper(env_name)] {
+            if let Some(val) = PHP_SERVER.lock().unwrap().get(path_from_bytes(&name))
                 && !val.is_empty()
             {
                 return (Some(val), name);
             }
         }
-        (None, String::new())
+        (None, BString::default())
     }
 
     fn no_proxy(&self, request_url: &[u8]) -> bool {

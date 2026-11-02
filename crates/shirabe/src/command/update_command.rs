@@ -273,7 +273,7 @@ impl Command for UpdateCommand {
             InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Overwrites the lock file hash to suppress warning about the lock file being out of date without updating package versions. Package metadata like mirrors and URLs are updated if they changed.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
             InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
             InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
@@ -293,7 +293,7 @@ impl Command for UpdateCommand {
             InputOption::new("patch-only", None, Some(InputOption::VALUE_NONE), "Only allow patch version updates for currently installed dependencies.", None).unwrap().into(),
             InputOption::new("interactive", Some("i".into()), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
             InputOption::new("root-reqs", None, Some(InputOption::VALUE_NONE), "Restricts the update to your first degree dependencies.", None).unwrap().into(),
-            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), crate::console::input::SuggestedValues::List(vec!["dev".to_string(), "no-dev".to_string(), "all".to_string()])).unwrap().into(),
+            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), crate::console::input::SuggestedValues::List(vec![BString::from("dev"), BString::from("no-dev"), BString::from("all")])).unwrap().into(),
         ]);
         self.set_help(
             "The <info>update</info> command reads the composer.json file from the\n\

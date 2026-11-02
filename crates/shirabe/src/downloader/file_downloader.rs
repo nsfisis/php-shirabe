@@ -341,8 +341,8 @@ impl FileDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for FileDownloader {
-    fn get_installation_source(&self) -> String {
-        "dist".to_owned()
+    fn get_installation_source(&self) -> BString {
+        BString::from("dist")
     }
 
     fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {

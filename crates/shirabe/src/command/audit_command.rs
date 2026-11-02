@@ -115,7 +115,7 @@ impl Command for AuditCommand {
                 Some(InputOption::VALUE_REQUIRED),
                 "Output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
                 Some(InputValue::from(Auditor::FORMAT_TABLE)),
-                SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect()),
+                SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect()),
             )
             .unwrap()
             .into(),
@@ -134,7 +134,12 @@ impl Command for AuditCommand {
                 Some(InputOption::VALUE_REQUIRED),
                 "Behavior on abandoned packages. Must be \"ignore\", \"report\", or \"fail\".",
                 None,
-                SuggestedValues::List(Auditor::ABANDONEDS.iter().map(|s| s.to_string()).collect()),
+                SuggestedValues::List(
+                    Auditor::ABANDONEDS
+                        .iter()
+                        .map(|s| BString::from(*s))
+                        .collect(),
+                ),
             )
             .unwrap()
             .into(),
@@ -145,10 +150,10 @@ impl Command for AuditCommand {
                 "Ignore advisories of a certain severity level.",
                 Some(InputValue::Array(vec![])),
                 SuggestedValues::List(vec![
-                    "low".to_string(),
-                    "medium".to_string(),
-                    "high".to_string(),
-                    "critical".to_string(),
+                    BString::from("low"),
+                    BString::from("medium"),
+                    BString::from("high"),
+                    BString::from("critical"),
                 ]),
             )
             .unwrap()
@@ -255,7 +260,7 @@ impl Command for AuditCommand {
             .unwrap_or(false)
             || audit_config.ignore_unreachable;
 
-        let audit_format = self.get_audit_format(input, "format")?;
+        let audit_format = self.get_audit_format(input, bstr::BStr::new("format"))?;
         Ok(auditor
             .audit(
                 &self.get_io(),

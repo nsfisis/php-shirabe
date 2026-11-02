@@ -103,11 +103,11 @@ fn test_parse_valid_author_string() {
         let author = command.__parse_author_string(input).unwrap();
         assert_eq!(
             Some(BString::from(name)),
-            author.get("name").cloned().flatten()
+            author.get(bstr::B("name")).cloned().flatten()
         );
         assert_eq!(
             email.map(BString::from),
-            author.get("email").cloned().flatten()
+            author.get(bstr::B("email")).cloned().flatten()
         );
     }
 }

@@ -84,7 +84,7 @@ impl InitCommand {
     fn parse_author_string(
         &self,
         author: &BStr,
-    ) -> anyhow::Result<IndexMap<String, Option<BString>>> {
+    ) -> anyhow::Result<IndexMap<BString, Option<BString>>> {
         pcre_check_utf8_subject(
             "preg_match",
             r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#,
@@ -105,12 +105,12 @@ impl InitCommand {
                 .into());
             }
 
-            let mut result: IndexMap<String, Option<BString>> = IndexMap::new();
+            let mut result: IndexMap<BString, Option<BString>> = IndexMap::new();
             result.insert(
-                "name".to_string(),
+                BString::from("name"),
                 Some(trim(m.name("name").unwrap_or_default())),
             );
-            result.insert("email".to_string(), email);
+            result.insert(BString::from("email"), email);
 
             return Ok(result);
         }
@@ -123,8 +123,8 @@ impl InitCommand {
     fn format_authors(&self, author: &BStr) -> anyhow::Result<Vec<IndexMap<BString, PhpMixed>>> {
         let parsed = self.parse_author_string(author)?;
         let mut author_map: IndexMap<BString, PhpMixed> = IndexMap::new();
-        let name = parsed.get("name").cloned().unwrap_or(None);
-        let email = parsed.get("email").cloned().unwrap_or(None);
+        let name = parsed.get(bstr::B("name")).cloned().unwrap_or(None);
+        let email = parsed.get(bstr::B("email")).cloned().unwrap_or(None);
         if let Some(name) = name {
             author_map.insert("name".into(), PhpMixed::string(name));
         }
@@ -236,7 +236,7 @@ impl InitCommand {
     pub fn __parse_author_string(
         &self,
         author: &str,
-    ) -> anyhow::Result<IndexMap<String, Option<BString>>> {
+    ) -> anyhow::Result<IndexMap<BString, Option<BString>>> {
         self.parse_author_string(author.into())
     }
 
@@ -977,8 +977,12 @@ impl Command for InitCommand {
                         _ => author_for_validate.as_bstr(),
                     };
                     let parsed = InitCommand::new().parse_author_string(value)?;
-                    let name = parsed.get("name").cloned().flatten().unwrap_or_default();
-                    match parsed.get("email").cloned().flatten() {
+                    let name = parsed
+                        .get(bstr::B("name"))
+                        .cloned()
+                        .flatten()
+                        .unwrap_or_default();
+                    match parsed.get(bstr::B("email")).cloned().flatten() {
                         None => Ok(PhpMixed::string(name)),
                         Some(email) => Ok(PhpMixed::string(bconcat!(name, " <", email, ">"))),
                     }

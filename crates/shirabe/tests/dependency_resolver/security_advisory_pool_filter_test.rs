@@ -20,7 +20,7 @@ use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 fn test_filter_packages_by_advisories() {
     let audit_config = AuditConfig::new(
         true,
-        bstr::BString::from(Auditor::FORMAT_SUMMARY.to_string()),
+        bstr::BString::from(Auditor::FORMAT_SUMMARY),
         bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
         true,
         true,
@@ -129,7 +129,7 @@ fn test_dont_filter_packages_by_ignored_advisories() {
     ignore_list.insert(BString::from("CVE-2024-1234"), None);
     let audit_config = AuditConfig::new(
         true,
-        bstr::BString::from(Auditor::FORMAT_SUMMARY.to_string()),
+        bstr::BString::from(Auditor::FORMAT_SUMMARY),
         bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
         true,
         true,
@@ -207,7 +207,7 @@ fn test_dont_filter_packages_by_ignored_advisories() {
 fn test_dont_filter_packages_with_block_insecure_disabled() {
     let audit_config = AuditConfig::new(
         true,
-        bstr::BString::from(Auditor::FORMAT_SUMMARY.to_string()),
+        bstr::BString::from(Auditor::FORMAT_SUMMARY),
         bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
         false,
         true,
@@ -288,7 +288,7 @@ fn test_dont_filter_packages_with_abandoned_package() {
     ignore_abandoned.insert(BString::from(package_name_ignore_abandoned), None);
     let audit_config = AuditConfig::new(
         true,
-        bstr::BString::from(Auditor::FORMAT_SUMMARY.to_string()),
+        bstr::BString::from(Auditor::FORMAT_SUMMARY),
         bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
         true,
         true,

@@ -8,6 +8,7 @@ use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use anyhow::bail;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class, implode, path_to_bytes};
 
@@ -105,7 +106,7 @@ impl ChangeReportInterface for XzDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl crate::downloader::DownloaderInterface for XzDownloader {
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         self.inner.get_installation_source()
     }
 

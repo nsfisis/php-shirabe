@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/CacheTest.php
 
+use bstr::BStr;
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
@@ -114,7 +115,7 @@ fn test_clear_cache() {
     let root = TempDir::new().unwrap();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let mut cache = Cache::new(io, root.path(), Some("a-z0-9."), None, false);
+    let mut cache = Cache::new(io, root.path(), Some(BStr::new("a-z0-9.")), None, false);
 
     assert!(cache.clear());
 }

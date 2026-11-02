@@ -200,17 +200,12 @@ impl NativeHttpDownloader {
             .as_ref()
             .map(|pm| pm.get_proxy_for_request(url))
             .transpose()?
-            .and_then(|p| p.get_status(Some(" using proxy (%s)")).ok())
+            .and_then(|p| p.get_status(Some(BStr::new(" using proxy (%s)"))).ok())
             .unwrap_or_default();
         // `attributes.redirects == 0 && attributes.retries == 0` in PHP is always true here since
         // this runs exactly once, before the retry loop below has a chance to advance either.
         self.io.write_error3(
-            format!(
-                "Downloading {}{}{}",
-                Url::sanitize(url).display_lossy(),
-                using_proxy,
-                if_modified
-            ),
+            bconcat!("Downloading ", Url::sanitize(url), using_proxy, if_modified),
             true,
             crate::io::DEBUG,
         );

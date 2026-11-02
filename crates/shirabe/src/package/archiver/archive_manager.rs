@@ -54,33 +54,33 @@ impl ArchiveManager {
     pub fn get_package_filename_parts(
         &self,
         package: CompletePackageInterfaceHandle,
-    ) -> anyhow::Result<IndexMap<String, BString>> {
+    ) -> anyhow::Result<IndexMap<BString, BString>> {
         let base_name = match package.get_archive_name() {
             Some(name) => name,
             None => preg_replace(php_regex!("#[^a-z0-9-_]#i"), "-", package.get_name()),
         };
 
-        let mut parts: IndexMap<String, BString> = IndexMap::new();
-        parts.insert("base".to_string(), base_name);
+        let mut parts: IndexMap<BString, BString> = IndexMap::new();
+        parts.insert(BString::from("base"), base_name);
 
         let dist_reference = package.get_dist_reference();
         if let Some(ref dist_ref) = dist_reference {
             if preg_is_match(php_regex!("{^[a-f0-9]{40}$}"), dist_ref) {
-                parts.insert("dist_reference".to_string(), dist_ref.clone());
+                parts.insert(BString::from("dist_reference"), dist_ref.clone());
                 if let Some(dist_type) = package.get_dist_type() {
-                    parts.insert("dist_type".to_string(), dist_type);
+                    parts.insert(BString::from("dist_type"), dist_type);
                 }
             } else {
-                parts.insert("version".to_string(), package.get_pretty_version());
-                parts.insert("dist_reference".to_string(), dist_ref.clone());
+                parts.insert(BString::from("version"), package.get_pretty_version());
+                parts.insert(BString::from("dist_reference"), dist_ref.clone());
             }
         } else {
-            parts.insert("version".to_string(), package.get_pretty_version());
+            parts.insert(BString::from("version"), package.get_pretty_version());
         }
 
         if let Some(source_reference) = package.get_source_reference() {
             let hash = hash("sha1", &source_reference);
-            parts.insert("source_reference".to_string(), BString::from(&hash[..6]));
+            parts.insert(BString::from("source_reference"), BString::from(&hash[..6]));
         }
 
         // array_filter removed null values; replace '/' with '-' in each value
@@ -91,7 +91,7 @@ impl ArchiveManager {
         Ok(parts)
     }
 
-    pub fn get_package_filename_from_parts(&self, parts: &IndexMap<String, BString>) -> BString {
+    pub fn get_package_filename_from_parts(&self, parts: &IndexMap<BString, BString>) -> BString {
         let values: Vec<&BString> = parts.values().collect();
         implode("-", &values)
     }
@@ -114,7 +114,7 @@ impl ArchiveManager {
     ) -> anyhow::Result<PathBuf> {
         if format.is_empty() {
             return Err(
-                InvalidArgumentException::new("Format must be specified".to_string()).into(),
+                InvalidArgumentException::new(BString::from("Format must be specified")).into(),
             );
         }
 
@@ -132,9 +132,10 @@ impl ArchiveManager {
         let usable_archiver_idx = match usable_archiver_idx {
             Some(i) => i,
             None => {
-                return Err(RuntimeException::new(format!(
-                    "No archiver found to support {} format",
-                    format.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "No archiver found to support ",
+                    format,
+                    " format"
                 ))
                 .into());
             }
@@ -220,7 +221,7 @@ impl ArchiveManager {
             None => self.get_package_filename_parts(package.clone())?,
             Some(f) => {
                 let mut parts = IndexMap::new();
-                parts.insert("base".to_string(), f);
+                parts.insert(BString::from("base"), f);
                 parts
             }
         };
@@ -279,10 +280,10 @@ impl ArchiveManager {
 
     fn build_exclude_patterns(
         &self,
-        parts: &IndexMap<String, BString>,
-        formats: &[String],
+        parts: &IndexMap<BString, BString>,
+        formats: &[BString],
     ) -> Vec<BString> {
-        let mut base = parts["base"].clone();
+        let mut base = parts[bstr::B("base")].clone();
         if parts.len() > 1 {
             base = bconcat!(&base, "-*");
         }
@@ -295,17 +296,17 @@ impl ArchiveManager {
         patterns
     }
 
-    fn get_supported_formats(&self) -> Vec<String> {
-        let mut formats: Vec<String> = vec![];
+    fn get_supported_formats(&self) -> Vec<BString> {
+        let mut formats: Vec<BString> = vec![];
         for archiver in &self.archivers {
-            let items: Vec<String> = if archiver.as_any().is::<ZipArchiver>() {
-                vec!["zip".to_string()]
+            let items: Vec<BString> = if archiver.as_any().is::<ZipArchiver>() {
+                vec![BString::from("zip")]
             } else if archiver.as_any().is::<PharArchiver>() {
                 vec![
-                    "zip".to_string(),
-                    "tar".to_string(),
-                    "tar.gz".to_string(),
-                    "tar.bz2".to_string(),
+                    BString::from("zip"),
+                    BString::from("tar"),
+                    BString::from("tar.gz"),
+                    BString::from("tar.bz2"),
                 ]
             } else {
                 vec![]

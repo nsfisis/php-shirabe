@@ -21,9 +21,9 @@ pub trait CompletionTrait: BaseCommand {
     /// Suggestion values for "prefer-install" option
     fn suggest_prefer_install(&self) -> SuggestedValues {
         SuggestedValues::List(vec![
-            "dist".to_string(),
-            "source".to_string(),
-            "auto".to_string(),
+            BString::from("dist"),
+            BString::from("source"),
+            BString::from("auto"),
         ])
     }
 

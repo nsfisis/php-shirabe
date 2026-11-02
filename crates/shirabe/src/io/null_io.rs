@@ -6,7 +6,7 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug)]
 pub struct NullIO {
     authentications:
-        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>,
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 }
 
 impl Default for NullIO {
@@ -113,7 +113,8 @@ impl IOInterfaceImmutable for NullIO {
 
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         <Self as BaseIO>::get_authentications(self)
     }
 
@@ -124,7 +125,7 @@ impl IOInterfaceImmutable for NullIO {
     fn get_authentication(
         &self,
         repository_name: &bstr::BStr,
-    ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
+    ) -> indexmap::IndexMap<bstr::BString, Option<bstr::BString>> {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
@@ -169,14 +170,17 @@ impl IOInterface for NullIO {
 impl BaseIO for NullIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         &self.authentications
     }
 
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
-    {
+    ) -> &mut indexmap::IndexMap<
+        bstr::BString,
+        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    > {
         &mut self.authentications
     }
 }

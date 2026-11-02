@@ -94,7 +94,7 @@ impl Command for FundCommand {
             Some(InputOption::VALUE_REQUIRED),
             "Format of the output: text or json",
             Some(InputValue::from("text")),
-            SuggestedValues::List(vec!["text".to_string(), "json".to_string()]),
+            SuggestedValues::List(vec![BString::from("text"), BString::from("json")]),
         )
         .unwrap()
         .into()]);

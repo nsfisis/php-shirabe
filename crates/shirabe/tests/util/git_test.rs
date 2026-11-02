@@ -4,6 +4,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
@@ -228,10 +229,13 @@ fn run_command_private_github_with_authentication(
 
     let (process, _guard) = get_process_executor_mock(expected_calls, true, MockHandler::default());
 
-    let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
-    auth.insert("username".to_string(), Some(bstr::BString::from("token")));
+    let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
     auth.insert(
-        "password".to_string(),
+        BString::from("username"),
+        Some(bstr::BString::from("token")),
+    );
+    auth.insert(
+        BString::from("password"),
         Some(bstr::BString::from(git_hub_token)),
     );
 
@@ -318,9 +322,12 @@ fn run_command_private_bitbucket_with_authentication(
 
     let mut io = IOStub::new().with_is_interactive(false);
     if let Some(token) = bitbucket_token {
-        let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
-        auth.insert("username".to_string(), Some(bstr::BString::from("token")));
-        auth.insert("password".to_string(), Some(bstr::BString::from(token)));
+        let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
+        auth.insert(
+            BString::from("username"),
+            Some(bstr::BString::from("token")),
+        );
+        auth.insert(BString::from("password"), Some(bstr::BString::from(token)));
         io = io
             .with_has_authentication(true)
             .with_get_authentication(auth);

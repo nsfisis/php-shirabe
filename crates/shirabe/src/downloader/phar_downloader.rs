@@ -9,6 +9,7 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Phar, PhpMixed, impl_php_class};
 
@@ -85,7 +86,7 @@ impl ChangeReportInterface for PharDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for PharDownloader {
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         self.inner.get_installation_source()
     }
 

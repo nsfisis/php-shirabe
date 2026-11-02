@@ -121,8 +121,8 @@ pub trait VcsDownloader:
     /// repository example: .git|.svn|.hg
     fn has_metadata_repository(&self, path: &Path) -> bool;
 
-    fn get_installation_source(&self) -> String {
-        "source".to_string()
+    fn get_installation_source(&self) -> BString {
+        BString::from("source")
     }
 
     async fn download(

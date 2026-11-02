@@ -1,11 +1,12 @@
 //! ref: composer/tests/Composer/Test/Util/Http/ProxyItemTest.php
 
+use bstr::BString;
 use shirabe::util::http::proxy_item::ProxyItem;
 
 #[test]
 fn test_throws_on_malformed_url() {
     for url in data_malformed() {
-        assert!(ProxyItem::new(url, "http_proxy".to_string()).is_err());
+        assert!(ProxyItem::new(url, BString::from("http_proxy")).is_err());
     }
 }
 
@@ -31,7 +32,7 @@ fn data_malformed() -> Vec<&'static str> {
 #[test]
 fn test_url_formatting() {
     for (url, expected) in data_formatting() {
-        let proxy_item = ProxyItem::new(url, "http_proxy".to_string()).unwrap();
+        let proxy_item = ProxyItem::new(url, BString::from("http_proxy")).unwrap();
         let proxy = proxy_item.to_request_proxy("http");
 
         assert_eq!(expected, proxy.get_status(None).unwrap());

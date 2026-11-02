@@ -156,7 +156,7 @@ impl PlatformRepository {
             }
         }
 
-        let mut pretty_version = BString::from(composer::get_version());
+        let mut pretty_version = composer::get_version();
         let mut version = BString::from(
             &self
                 .version_parser

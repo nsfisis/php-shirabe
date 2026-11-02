@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/Util/Http/RequestProxy.php
 
 use crate::downloader::TransportException;
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CURLAUTH_BASIC, CURLOPT_NOPROXY, CURLOPT_PROXY, CURLOPT_PROXY_CAINFO, CURLOPT_PROXY_CAPATH,
-    CURLOPT_PROXYAUTH, CURLOPT_PROXYUSERPWD, InvalidArgumentException, PhpMixed,
+    CURLOPT_PROXYAUTH, CURLOPT_PROXYUSERPWD, InvalidArgumentException, PhpMixed, str_replace,
 };
 
 // contextOptions = array{http: array{proxy: string, header?: string, request_fulluri?: bool}}
-type ContextOptions = IndexMap<String, IndexMap<BString, PhpMixed>>;
+type ContextOptions = IndexMap<BString, IndexMap<BString, PhpMixed>>;
 
 #[derive(Debug)]
 pub struct RequestProxy {
@@ -61,7 +61,7 @@ impl RequestProxy {
         );
 
         if self.url.is_some() {
-            options.insert(CURLOPT_NOPROXY, PhpMixed::string(String::new()));
+            options.insert(CURLOPT_NOPROXY, PhpMixed::string(BString::default()));
         }
 
         if let Some(auth) = &self.auth {
@@ -81,19 +81,19 @@ impl RequestProxy {
         Ok(options)
     }
 
-    pub fn get_status(&self, format: Option<&str>) -> Result<String, InvalidArgumentException> {
+    pub fn get_status(&self, format: Option<&BStr>) -> Result<BString, InvalidArgumentException> {
         if self.status.is_none() {
-            return Ok(String::new());
+            return Ok(BString::default());
         }
 
-        let format = format.unwrap_or("%s");
-        if format.contains("%s") {
-            let status = self.status.as_ref().unwrap().display_lossy().to_string();
-            return Ok(format.replace("%s", &status));
+        let format = format.unwrap_or(BStr::new("%s"));
+        if format.contains_str("%s") {
+            let status = self.status.as_ref().unwrap();
+            return Ok(str_replace("%s", status, format));
         }
 
         Err(InvalidArgumentException::new(
-            "String format specifier is missing".to_string(),
+            "String format specifier is missing",
         ))
     }
 

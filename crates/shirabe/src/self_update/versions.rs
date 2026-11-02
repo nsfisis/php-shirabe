@@ -3,17 +3,17 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::HttpDownloader;
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, bconcat,
-    path_from_bytes, php_regex, preg_is_match, trim,
+    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, bconcat, implode,
+    path_from_bytes, php_regex, php_str, preg_is_match, trim,
 };
 
 pub struct Versions {
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    channel: Option<String>,
+    channel: Option<BString>,
     versions_data: Option<PhpMixed>,
 }
 
@@ -26,8 +26,14 @@ impl std::fmt::Debug for Versions {
 }
 
 impl Versions {
-    pub const CHANNELS: &'static [&'static str] =
-        &["stable", "preview", "snapshot", "1", "2", "2.2"];
+    pub const CHANNELS: &'static [&'static BStr] = &[
+        php_str(b"stable"),
+        php_str(b"preview"),
+        php_str(b"snapshot"),
+        php_str(b"1"),
+        php_str(b"2"),
+        php_str(b"2.2"),
+    ];
 
     pub fn new(
         config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -41,7 +47,7 @@ impl Versions {
         }
     }
 
-    pub fn get_channel(&mut self) -> anyhow::Result<String> {
+    pub fn get_channel(&mut self) -> anyhow::Result<BString> {
         if let Some(ref ch) = self.channel {
             return Ok(ch.clone());
         }
@@ -61,25 +67,26 @@ impl Versions {
                 .into_iter()
                 .find(|known| channel == *known)
             {
-                self.channel = Some(channel.to_string());
-                return Ok(channel.to_string());
+                self.channel = Some(bconcat!(channel));
+                return Ok(bconcat!(channel));
             }
         }
 
-        self.channel = Some("stable".to_string());
-        Ok("stable".to_string())
+        self.channel = Some(BString::from("stable"));
+        Ok(BString::from("stable"))
     }
 
     pub fn set_channel(
         &mut self,
-        channel: String,
+        channel: BString,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Result<(), InvalidArgumentException>> {
-        if !Self::CHANNELS.contains(&channel.as_str()) {
-            return Ok(Err(InvalidArgumentException::new(format!(
-                "Invalid channel {}, must be one of: {}",
+        if !Self::CHANNELS.contains(&channel.as_bstr()) {
+            return Ok(Err(InvalidArgumentException::new(bconcat!(
+                "Invalid channel ",
                 channel,
-                Self::CHANNELS.join(", ")
+                ", must be one of: ",
+                implode(", ", Self::CHANNELS)
             ))));
         }
 
@@ -96,7 +103,7 @@ impl Versions {
 
         // rewrite '2' and '1' channels to stable for future self-updates, but LTS ones like '2.2' remain pinned
         let stored_channel = if preg_is_match(php_regex!(r"{^\d+$}D"), &channel) {
-            "stable".to_string()
+            BString::from("stable")
         } else {
             channel
         };
@@ -113,10 +120,11 @@ impl Versions {
                 .as_ref()
                 .is_none_or(|stored| *stored != stored_channel)
         {
-            io.write_error(format!(
-                    "Storing \"<info>{}</info>\" as default update channel for the next self-update run.",
-                    stored_channel
-                ));
+            io.write_error(bconcat!(
+                "Storing \"<info>",
+                stored_channel,
+                "</info>\" as default update channel for the next self-update run."
+            ));
         }
 
         Ok(Ok(()))
@@ -124,11 +132,11 @@ impl Versions {
 
     pub fn get_latest(
         &mut self,
-        channel: Option<&str>,
+        channel: Option<&BStr>,
     ) -> anyhow::Result<Result<IndexMap<BString, PhpMixed>, UnexpectedValueException>> {
         let versions = self.get_versions_data()?;
         let effective_channel = match channel {
-            Some(c) => c.to_string(),
+            Some(c) => c.to_owned(),
             None => self.get_channel()?,
         };
 
@@ -149,9 +157,10 @@ impl Versions {
             }
         }
 
-        Ok(Err(UnexpectedValueException::new(format!(
-            "There is no version of Composer available for your PHP version ({})",
-            shirabe_php_rpc::get_php_version().version.display_lossy()
+        Ok(Err(UnexpectedValueException::new(bconcat!(
+            "There is no version of Composer available for your PHP version (",
+            shirabe_php_rpc::get_php_version().version,
+            ")"
         ))))
     }
 
@@ -167,7 +176,7 @@ impl Versions {
                 self.http_downloader
                     .borrow_mut()
                     .get(
-                        format!("{}://getcomposer.org/versions", protocol),
+                        bconcat!(protocol, "://getcomposer.org/versions"),
                         IndexMap::new(),
                     )?
                     .decode_json()?,

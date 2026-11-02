@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Util/Http/RequestProxyTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::util::http::request_proxy::RequestProxy;
 use shirabe_php_shim::{
@@ -55,7 +55,7 @@ fn test_get_status_throws_on_bad_format_specifier() {
         None,
         Some("http://proxy.com:80".into()),
     );
-    assert!(proxy.get_status(Some("using proxy")).is_err());
+    assert!(proxy.get_status(Some(BStr::new("using proxy"))).is_err());
 }
 
 #[test]
@@ -73,6 +73,7 @@ fn test_get_status() {
     ];
 
     for (url, format, expected) in cases {
+        let format = format.map(bstr::BStr::new);
         let proxy = RequestProxy::new(url.map(BString::from), None, None, url.map(BString::from));
 
         if format.is_none() {
@@ -185,4 +186,18 @@ fn test_get_curl_options_with_ssl() {
         let proxy = RequestProxy::new(Some(url.into()), auth.map(BString::from), None, None);
         assert_eq!(expected, proxy.get_curl_options(&ssl_options).unwrap());
     }
+}
+
+#[test]
+fn test_get_status_keeps_non_utf8_bytes() {
+    let url = BString::from(b"http://caf\xE9:80".as_slice());
+    let proxy = RequestProxy::new(Some(url.clone()), None, None, Some(url));
+
+    assert_eq!(
+        b"proxy (http://caf\xE9:80)".as_slice(),
+        proxy
+            .get_status(Some(bstr::BStr::new("proxy (%s)")))
+            .unwrap()
+            .as_slice()
+    );
 }

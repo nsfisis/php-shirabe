@@ -79,11 +79,11 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed>;
 
-    fn get_authentications(&self) -> IndexMap<BString, IndexMap<String, Option<BString>>>;
+    fn get_authentications(&self) -> IndexMap<BString, IndexMap<BString, Option<BString>>>;
 
     fn has_authentication(&self, repository_name: &BStr) -> bool;
 
-    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<String, Option<BString>>;
+    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<BString, Option<BString>>;
 
     // From PHP `LoggerInterface` (which `IOInterface` extends). Only the
     // variants Composer actually calls through an IO are kept.
@@ -348,7 +348,7 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         )
     }
 
-    fn get_authentications(&self) -> IndexMap<BString, IndexMap<String, Option<BString>>> {
+    fn get_authentications(&self) -> IndexMap<BString, IndexMap<BString, Option<BString>>> {
         self.borrow().get_authentications()
     }
 
@@ -356,7 +356,7 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         self.borrow().has_authentication(repository_name)
     }
 
-    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<String, Option<BString>> {
+    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<BString, Option<BString>> {
         self.borrow().get_authentication(repository_name)
     }
 

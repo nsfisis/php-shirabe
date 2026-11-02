@@ -107,7 +107,7 @@ pub struct Installer {
     execute_operations: bool,
     audit: bool,
     error_on_audit: bool,
-    audit_format: String,
+    audit_format: BString,
     audit_config: Option<AuditConfig>,
     ignored_types: Vec<BString>,
     allowed_types: Option<Vec<BString>>,
@@ -181,7 +181,7 @@ impl Installer {
             execute_operations: true,
             audit: true,
             error_on_audit: false,
-            audit_format: Auditor::FORMAT_SUMMARY.to_string(),
+            audit_format: Auditor::FORMAT_SUMMARY.to_owned(),
             audit_config: None,
             ignored_types: vec!["php-ext".into(), "php-ext-zend".into()],
             allowed_types: None,
@@ -1686,7 +1686,7 @@ impl Installer {
             self.audit_config = Some(AuditConfig::from_config(
                 &mut self.config.borrow_mut(),
                 self.audit,
-                &self.audit_format,
+                self.audit_format.as_bstr(),
             )?);
         }
 

@@ -1426,7 +1426,7 @@ impl VcsDownloader for GitDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl crate::downloader::DownloaderInterface for GitDownloader {
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         <Self as VcsDownloader>::get_installation_source(self)
     }
 

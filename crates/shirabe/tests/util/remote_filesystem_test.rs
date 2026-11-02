@@ -78,10 +78,13 @@ fn test_get_options_for_url_with_authorization() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
-    auth.insert("username".to_string(), Some(bstr::BString::from("login")));
+    let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
     auth.insert(
-        "password".to_string(),
+        BString::from("username"),
+        Some(bstr::BString::from("login")),
+    );
+    auth.insert(
+        BString::from("password"),
         Some(bstr::BString::from("password")),
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -114,9 +117,9 @@ fn test_get_options_for_url_with_stream_options() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
-    auth.insert("username".to_string(), None);
-    auth.insert("password".to_string(), None);
+    let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
+    auth.insert(BString::from("username"), None);
+    auth.insert(BString::from("password"), None);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             IOStub::new()
@@ -155,9 +158,9 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
-    auth.insert("username".to_string(), None);
-    auth.insert("password".to_string(), None);
+    let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
+    auth.insert(BString::from("username"), None);
+    auth.insert(BString::from("password"), None);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             IOStub::new()

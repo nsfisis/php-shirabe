@@ -666,7 +666,7 @@ impl DiagnoseCommand {
             let root_pkg = RootPackage::new(
                 BString::from("composer/composer"),
                 normalized_version,
-                bstr::BString::from(version),
+                version,
             );
             packages.push(crate::package::RootPackageHandle::from_root_package(root_pkg).into());
         }

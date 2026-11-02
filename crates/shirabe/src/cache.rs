@@ -21,7 +21,7 @@ pub struct Cache {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     root: PathBuf,
     enabled: Option<bool>,
-    allowlist: String,
+    allowlist: BString,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     read_only: bool,
     /// Test-only seam. Always `None` in production; configured via [`Cache::__set_mock`].
@@ -55,12 +55,12 @@ impl Cache {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         cache_dir: impl AsRef<Path>,
-        allowlist: Option<&str>,
+        allowlist: Option<&BStr>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         read_only: bool,
     ) -> Self {
         let cache_dir = cache_dir.as_ref();
-        let allowlist = allowlist.unwrap_or("a-z0-9._").to_string();
+        let allowlist = allowlist.unwrap_or(BStr::new("a-z0-9._")).to_owned();
         let root =
             path_from_bytes(&bconcat!(rtrim2(path_to_bytes(cache_dir), "/\\"), "/")).to_path_buf();
         let filesystem = filesystem
@@ -122,7 +122,7 @@ impl Cache {
 
     /// `$this->root . Preg::replace('{[^'.$this->allowlist.']}i', '-', $file)`
     fn full_path(&self, file: impl AsRef<[u8]>) -> PathBuf {
-        let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
+        let file = preg_replace(bconcat!("{[^", self.allowlist, "]}i"), "-", file);
         path_from_bytes(&bconcat!(path_to_bytes(&self.root), file)).to_path_buf()
     }
 

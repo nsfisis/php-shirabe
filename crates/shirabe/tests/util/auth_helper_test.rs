@@ -595,11 +595,11 @@ fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
 
     let mut auth = IndexMap::new();
     auth.insert(
-        "username".to_string(),
+        bstr::BString::from("username"),
         Some(bstr::BString::from("gitlab-user")),
     );
     auth.insert(
-        "password".to_string(),
+        bstr::BString::from("password"),
         Some(bstr::BString::from("gitlab-password")),
     );
     let io = std::rc::Rc::new(std::cell::RefCell::new(
@@ -688,11 +688,11 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
 
     let mut first_auth = IndexMap::new();
     first_auth.insert(
-        "username".to_string(),
+        bstr::BString::from("username"),
         Some(BString::from("bitbucket_client_id")),
     );
     first_auth.insert(
-        "password".to_string(),
+        bstr::BString::from("password"),
         Some(BString::from("bitbucket_client_secret")),
     );
     let io = std::rc::Rc::new(std::cell::RefCell::new(
@@ -720,11 +720,11 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
 
     let mut second_auth = IndexMap::new();
     second_auth.insert(
-        "username".to_string(),
+        bstr::BString::from("username"),
         Some(bstr::BString::from("x-token-auth")),
     );
     second_auth.insert(
-        "password".to_string(),
+        bstr::BString::from("password"),
         Some(BString::from("bitbucket_access_token")),
     );
     io.borrow_mut().set_get_authentication(second_auth);

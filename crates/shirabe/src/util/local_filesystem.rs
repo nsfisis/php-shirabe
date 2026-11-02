@@ -124,18 +124,17 @@ impl LocalFilesystem {
                 .get_proxy_for_request(&file_url)
                 .map_err(|e| anyhow::anyhow!(e))?;
             proxy
-                .get_status(Some(" using proxy (%s)"))
+                .get_status(Some(BStr::new(" using proxy (%s)")))
                 .unwrap_or_default()
         };
         self.io.write_error3(
-            format!(
-                "{}{}{}",
+            bconcat!(
                 if strpos(&orig_file_url, "http") == Some(0) {
                     "Downloading "
                 } else {
                     "Reading "
                 },
-                Url::sanitize(orig_file_url.clone()).display_lossy(),
+                Url::sanitize(orig_file_url.clone()),
                 using_proxy
             ),
             true,

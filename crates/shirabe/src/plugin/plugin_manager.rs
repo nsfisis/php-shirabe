@@ -40,8 +40,8 @@ pub struct PluginManager {
     disable_plugins: DisablePlugins,
     plugins: Vec<std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>>,
     registered_plugins: IndexMap<BString, Vec<PluginOrInstaller>>,
-    allow_plugin_rules: Option<IndexMap<String, bool>>,
-    allow_global_plugin_rules: Option<IndexMap<String, bool>>,
+    allow_plugin_rules: Option<IndexMap<BString, bool>>,
+    allow_global_plugin_rules: Option<IndexMap<BString, bool>>,
     running_in_global_dir: bool,
     plugin_api_version_override: Option<String>,
 }
@@ -1138,7 +1138,7 @@ impl PluginManager {
     fn parse_allowed_plugins(
         allow_plugins_config: PhpMixed,
         mut locker: Option<&mut dyn LockerInterface>,
-    ) -> Option<IndexMap<String, bool>> {
+    ) -> Option<IndexMap<BString, bool>> {
         // PHP: [] === $allowPluginsConfig && $locker !== null && $locker->isLocked() && version_compare($locker->getPluginApi(), '2.2.0', '<')
         let is_empty_array = allow_plugins_config
             .as_array()
@@ -1164,24 +1164,22 @@ impl PluginManager {
         }
 
         if allow_plugins_config.as_bool() == Some(true) {
-            let mut m: IndexMap<String, bool> = IndexMap::new();
-            m.insert("{}".to_string(), true);
+            let mut m: IndexMap<BString, bool> = IndexMap::new();
+            m.insert(BString::from("{}"), true);
             return Some(m);
         }
 
         if allow_plugins_config.as_bool() == Some(false) {
-            let mut m: IndexMap<String, bool> = IndexMap::new();
-            m.insert("{}".to_string(), false);
+            let mut m: IndexMap<BString, bool> = IndexMap::new();
+            m.insert(BString::from("{}"), false);
             return Some(m);
         }
 
-        let mut rules: IndexMap<String, bool> = IndexMap::new();
+        let mut rules: IndexMap<BString, bool> = IndexMap::new();
         if let Some(arr) = allow_plugins_config.as_array() {
             for (pattern, allow) in arr {
                 rules.insert(
-                    base_package::package_name_to_regexp(pattern)
-                        .display_lossy()
-                        .to_string(),
+                    base_package::package_name_to_regexp(pattern),
                     allow.as_bool().unwrap_or(false),
                 );
             }
@@ -1212,7 +1210,7 @@ impl PluginManager {
     ) -> anyhow::Result<bool> {
         let package = BStr::new(package.as_ref());
         // TODO(plugin): allow-plugins authorization flow with interactive prompt
-        let rules: &mut Option<IndexMap<String, bool>> = if is_global_plugin {
+        let rules: &mut Option<IndexMap<BString, bool>> = if is_global_plugin {
             &mut self.allow_global_plugin_rules
         } else {
             &mut self.allow_plugin_rules
@@ -1225,8 +1223,8 @@ impl PluginManager {
                 self.io.write_error("<warning>For additional security you should declare the allow-plugins config with a list of packages names that are allowed to run code. See https://getcomposer.org/allow-plugins</warning>");
                 self.io.write_error("<warning>This warning will become an exception once you run shirabe update!</warning>");
 
-                let mut m: IndexMap<String, bool> = IndexMap::new();
-                m.insert("{}".to_string(), true);
+                let mut m: IndexMap<BString, bool> = IndexMap::new();
+                m.insert(BString::from("{}"), true);
                 *rules = Some(m);
 
                 // if no config is defined we allow all plugins for BC
@@ -1237,7 +1235,7 @@ impl PluginManager {
             *rules = Some(IndexMap::new());
         }
 
-        let rules_snapshot: Vec<(String, bool)> = rules
+        let rules_snapshot: Vec<(BString, bool)> = rules
             .as_ref()
             .unwrap()
             .iter()
@@ -1288,12 +1286,10 @@ impl PluginManager {
                         let allow = answer_str == b"y";
 
                         // persist answer in current rules to avoid prompting again if the package gets reloaded
-                        rules.as_mut().unwrap().insert(
-                            base_package::package_name_to_regexp(package)
-                                .display_lossy()
-                                .to_string(),
-                            allow,
-                        );
+                        rules
+                            .as_mut()
+                            .unwrap()
+                            .insert(base_package::package_name_to_regexp(package), allow);
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == b"y" || answer_str == b"n" {

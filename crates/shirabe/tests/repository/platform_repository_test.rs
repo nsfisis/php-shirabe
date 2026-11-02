@@ -8,7 +8,7 @@ use shirabe::repository::{
     FindPackageConstraint, PlatformRepository, RepositoryInterface, SEARCH_NAME,
 };
 use shirabe_php_rpc::PlatformInfo;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 use shirabe_semver::constraint::SimpleConstraint;
 
 mockall::mock! {
@@ -1754,10 +1754,7 @@ fn test_composer_platform_version() {
     let package = platform_repository
         .find_package(
             bstr::BStr::new("composer"),
-            FindPackageConstraint::String(BString::from(format!(
-                "={}",
-                shirabe::composer::get_version()
-            ))),
+            FindPackageConstraint::String(bconcat!("=", shirabe::composer::get_version())),
         )
         .unwrap();
     assert!(package.is_some(), "Composer package exists");

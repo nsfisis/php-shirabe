@@ -10,7 +10,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, bconcat, get_class, json_bytes, preg_is_match,
+    array_keys, array_reduce, bconcat, get_class, json_bytes, php_str, preg_is_match,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::helper::Cell;
@@ -76,15 +76,15 @@ where
 pub struct Auditor;
 
 impl Auditor {
-    pub const FORMAT_TABLE: &'static str = "table";
+    pub const FORMAT_TABLE: &'static BStr = php_str(b"table");
 
-    pub const FORMAT_PLAIN: &'static str = "plain";
+    pub const FORMAT_PLAIN: &'static BStr = php_str(b"plain");
 
-    pub const FORMAT_JSON: &'static str = "json";
+    pub const FORMAT_JSON: &'static BStr = php_str(b"json");
 
-    pub const FORMAT_SUMMARY: &'static str = "summary";
+    pub const FORMAT_SUMMARY: &'static BStr = php_str(b"summary");
 
-    pub const FORMATS: [&'static str; 4] = [
+    pub const FORMATS: [&'static BStr; 4] = [
         Self::FORMAT_TABLE,
         Self::FORMAT_PLAIN,
         Self::FORMAT_JSON,

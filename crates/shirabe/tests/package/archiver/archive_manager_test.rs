@@ -252,10 +252,10 @@ fn test_get_package_filename_parts() {
     let test_case = TestCase::set_up();
     let package = test_case.setup_package();
 
-    let mut expected: IndexMap<String, bstr::BString> = IndexMap::new();
-    expected.insert("base".to_string(), "archivertest-archivertest".into());
-    expected.insert("version".to_string(), "master".into());
-    expected.insert("source_reference".to_string(), "4f26ae".into());
+    let mut expected: IndexMap<bstr::BString, bstr::BString> = IndexMap::new();
+    expected.insert("base".into(), "archivertest-archivertest".into());
+    expected.insert("version".into(), "master".into());
+    expected.insert("source_reference".into(), "4f26ae".into());
 
     assert_eq!(
         expected,

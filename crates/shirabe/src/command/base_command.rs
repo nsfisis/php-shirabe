@@ -18,7 +18,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, count, explode, in_array_strict,
+    UnexpectedValueException, bconcat, count, explode, implode, in_array_strict,
 };
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
@@ -228,8 +228,8 @@ pub trait BaseCommand: Command {
     fn get_audit_format(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        opt_name: &str,
-    ) -> anyhow::Result<String>;
+        opt_name: &BStr,
+    ) -> anyhow::Result<BString>;
 
     /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
     fn create_audit_config(
@@ -259,7 +259,7 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
         shirabe_symfony_console::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<bstr::BString>) -> anyhow::Result<Vec<indexmap::IndexMap<bstr::BString, bstr::BString>>>);
         shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>) -> anyhow::Result<()>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
-        shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &str) -> anyhow::Result<String>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &bstr::BStr) -> anyhow::Result<bstr::BString>);
         shirabe_symfony_console::delegate_to_inner!($field, fn create_audit_config(&self, config: &mut $crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
     };
 }
@@ -647,12 +647,13 @@ impl BaseCommand for BaseCommandData {
     fn get_audit_format(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        opt_name: &str,
-    ) -> anyhow::Result<String> {
+        opt_name: &BStr,
+    ) -> anyhow::Result<BString> {
         if !input.borrow().has_option(opt_name) {
-            return Err(LogicException::new(format!(
-                "This should not be called on a Command which has no {} option defined.",
-                opt_name
+            return Err(LogicException::new(bconcat!(
+                "This should not be called on a Command which has no ",
+                opt_name,
+                " option defined."
             ))
             .into());
         }
@@ -660,22 +661,20 @@ impl BaseCommand for BaseCommandData {
         let val = input.borrow().get_option(opt_name)?;
         let formats: Vec<PhpMixed> = Auditor::FORMATS
             .iter()
-            .map(|s| PhpMixed::string(s.to_string()))
+            .map(|s| PhpMixed::string(*s))
             .collect();
         if !in_array_strict(val.clone(), &formats) {
-            return Err(InvalidArgumentException::new(format!(
-                "--{} must be one of {}.",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "--",
                 opt_name,
-                Auditor::FORMATS.join(", ")
+                " must be one of ",
+                implode(", ", &Auditor::FORMATS),
+                "."
             ))
             .into());
         }
 
-        Ok(val
-            .as_string()
-            .unwrap_or_default()
-            .display_lossy()
-            .to_string())
+        Ok(val.as_string().unwrap_or_default().to_owned())
     }
 
     fn create_audit_config(
@@ -699,12 +698,12 @@ impl BaseCommand for BaseCommandData {
                     .unwrap_or(false))
         };
         let audit_format = if input.borrow().has_option("audit-format") {
-            self.get_audit_format(input.clone(), "audit-format")?
+            self.get_audit_format(input.clone(), BStr::new("audit-format"))?
         } else {
-            Auditor::FORMAT_SUMMARY.to_string()
+            Auditor::FORMAT_SUMMARY.to_owned()
         };
 
-        let audit_config = AuditConfig::from_config(config, audit, &audit_format)?;
+        let audit_config = AuditConfig::from_config(config, audit, audit_format.as_bstr())?;
 
         if Platform::get_env("COMPOSER_NO_SECURITY_BLOCKING")
             .is_some_and(|s| !s.is_empty() && s != "0")

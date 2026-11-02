@@ -23,7 +23,7 @@ use shirabe_symfony_console::question::{ChoiceQuestion, Question, QuestionInterf
 #[derive(Debug)]
 pub struct ConsoleIO {
     authentications:
-        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>,
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 
     pub(crate) input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     pub(crate) output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -518,7 +518,7 @@ impl IOInterfaceImmutable for ConsoleIO {
 
     fn get_authentications(
         &self,
-    ) -> IndexMap<bstr::BString, IndexMap<String, Option<bstr::BString>>> {
+    ) -> IndexMap<bstr::BString, IndexMap<bstr::BString, Option<bstr::BString>>> {
         <Self as BaseIO>::get_authentications(self)
     }
 
@@ -529,7 +529,7 @@ impl IOInterfaceImmutable for ConsoleIO {
     fn get_authentication(
         &self,
         repository_name: &bstr::BStr,
-    ) -> IndexMap<String, Option<bstr::BString>> {
+    ) -> IndexMap<bstr::BString, Option<bstr::BString>> {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
@@ -578,14 +578,17 @@ impl IOInterface for ConsoleIO {
 impl BaseIO for ConsoleIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         &self.authentications
     }
 
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
-    {
+    ) -> &mut indexmap::IndexMap<
+        bstr::BString,
+        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    > {
         &mut self.authentications
     }
 }

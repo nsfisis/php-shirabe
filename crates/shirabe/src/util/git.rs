@@ -302,7 +302,7 @@ impl Git {
             url,
         ) && !in_array_strict("ssh".to_string(), protocols.values());
 
-        let mut auth: Option<IndexMap<String, Option<BString>>> = None;
+        let mut auth: Option<IndexMap<BString, Option<BString>>> = None;
         let mut credentials: Vec<BString> = vec![];
         if bypass_ssh_for_github
             || 0 != run_commands_inline(
@@ -355,12 +355,12 @@ impl Git {
                     auth = Some(self.io.get_authentication(origin));
                     let auth_inner = auth.as_ref().unwrap();
                     let username = auth_inner
-                        .get("username")
+                        .get(bstr::B("username"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
                     let password = auth_inner
-                        .get("password")
+                        .get(bstr::B("password"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
@@ -429,14 +429,14 @@ impl Git {
                     let mut username = auth
                         .as_ref()
                         .unwrap()
-                        .get("username")
+                        .get(bstr::B("username"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
                     let password = auth
                         .as_ref()
                         .unwrap()
-                        .get("password")
+                        .get(bstr::B("password"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
@@ -489,14 +489,14 @@ impl Git {
                     let username = auth
                         .as_ref()
                         .unwrap()
-                        .get("username")
+                        .get(bstr::B("username"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
                     let password = auth
                         .as_ref()
                         .unwrap()
-                        .get("password")
+                        .get(bstr::B("password"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
@@ -590,14 +590,14 @@ impl Git {
                     let username = auth
                         .as_ref()
                         .unwrap()
-                        .get("username")
+                        .get(bstr::B("username"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
                     let password = auth
                         .as_ref()
                         .unwrap()
-                        .get("password")
+                        .get(bstr::B("password"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
@@ -684,9 +684,9 @@ impl Git {
                         true,
                         io_interface::VERBOSE,
                     );
-                    let mut auth_map: IndexMap<String, Option<BString>> = IndexMap::new();
+                    let mut auth_map: IndexMap<BString, Option<BString>> = IndexMap::new();
                     auth_map.insert(
-                        "username".to_string(),
+                        BString::from("username"),
                         self.io
                             .ask(
                                 "      Username: ",
@@ -698,7 +698,7 @@ impl Git {
                             .map(BString::from),
                     );
                     auth_map.insert(
-                        "password".to_string(),
+                        BString::from("password"),
                         self.io.ask_and_hide_answer("      Password: ")?,
                     );
                     auth = Some(auth_map);
@@ -707,12 +707,12 @@ impl Git {
 
                 if let Some(auth_inner) = auth.as_ref() {
                     let username = auth_inner
-                        .get("username")
+                        .get(bstr::B("username"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
                     let password = auth_inner
-                        .get("password")
+                        .get(bstr::B("password"))
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();

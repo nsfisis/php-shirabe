@@ -2,7 +2,7 @@
 
 use crate::advisory::Auditor;
 use crate::config::Config;
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key};
 
@@ -131,7 +131,7 @@ impl AuditConfig {
     pub fn from_config(
         config: &mut Config,
         audit: bool,
-        audit_format: &str,
+        audit_format: &BStr,
     ) -> anyhow::Result<Self> {
         let audit_config_raw = config.get("audit");
         let audit_config = audit_config_raw.as_array();
@@ -186,7 +186,7 @@ impl AuditConfig {
 
         Ok(Self::new(
             audit,
-            bstr::BString::from(audit_format.to_string()),
+            audit_format.to_owned(),
             audit_abandoned,
             block_insecure,
             block_abandoned,

@@ -24,9 +24,10 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, STR_PAD_RIGHT,
     UnexpectedValueException, array_search, bconcat, date_format_to_strftime, date_local,
-    extension_loaded, get_class, impl_php_class, implode, in_array_loose, in_array_strict, intval,
-    json_bytes, ltrim2, path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote,
-    preg_replace, realpath, rtrim, str_pad, strtolower, version_compare,
+    display_to_bytes, extension_loaded, get_class, impl_php_class, implode, in_array_loose,
+    in_array_strict, intval, json_bytes, ltrim2, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, realpath, rtrim, str_pad, str_replace, strtolower,
+    version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -41,7 +42,7 @@ pub struct ShowCommand {
     base_command_data: BaseCommandData,
 
     version_parser: std::cell::RefCell<VersionParser>,
-    colors: std::cell::RefCell<Vec<String>>,
+    colors: std::cell::RefCell<Vec<BString>>,
     repository_set: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
 }
 
@@ -153,7 +154,7 @@ impl ShowCommand {
                 && write_latest
             {
                 let mut latest_version = latest_version.clone();
-                let style = Self::update_status_to_version_style(update_status);
+                let style = Self::update_status_to_version_style(update_status.as_bstr());
                 if !io.is_decorated() {
                     let marker = update_status
                         .replace("up-to-date", "=")
@@ -177,7 +178,7 @@ impl ShowCommand {
                     } else {
                         0
                     };
-                    io.write_no_newline(format!(" {:<width$}", age, width = width_pad));
+                    io.write_no_newline(bconcat!(" ", str_pad(age, width_pad, " ", STR_PAD_RIGHT)));
                 }
             }
             if let Some(Some(description)) = &package.description
@@ -259,14 +260,11 @@ impl ShowCommand {
         &self,
         latest_package: PackageInterfaceHandle,
         package: PackageInterfaceHandle,
-    ) -> anyhow::Result<String> {
-        Ok(
-            Self::update_status_to_version_style(&Self::get_update_status(
-                latest_package,
-                package,
-            )?)
-            .to_string(),
+    ) -> anyhow::Result<BString> {
+        Ok(Self::update_status_to_version_style(
+            Self::get_update_status(latest_package, package)?.as_bstr(),
         )
+        .to_owned())
     }
 
     /// finds a package by name and version if provided
@@ -409,30 +407,35 @@ impl ShowCommand {
         self.print_versions(package.clone(), versions, installed_repo)?;
         if is_installed_package && let Some(rd) = package.get_release_date() {
             let rel = self.get_relative_time(&rd);
-            self.get_io().write(format!(
-                "<info>released</info> : {}, {}",
-                rd.format(date_format_to_strftime(b"Y-m-d")),
+            self.get_io().write(bconcat!(
+                "<info>released</info> : ",
+                display_to_bytes(rd.format(date_format_to_strftime(b"Y-m-d"))),
+                ", ",
                 rel
             ));
         }
         let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
             let style = self.get_version_style(latest.clone(), package.clone().into())?;
             let released_time = match latest.get_release_date() {
-                None => String::new(),
+                None => BString::default(),
                 Some(rd) => {
                     let rel = self.get_relative_time(&rd);
-                    format!(
-                        " released {}, {}",
-                        rd.format(date_format_to_strftime(b"Y-m-d")),
+                    bconcat!(
+                        " released ",
+                        display_to_bytes(rd.format(date_format_to_strftime(b"Y-m-d"))),
+                        ", ",
                         rel
                     )
                 }
             };
-            self.get_io().write(format!(
-                "<info>latest</info>   : <{}>{}</{}>{}",
+            self.get_io().write(bconcat!(
+                "<info>latest</info>   : <",
                 style,
-                latest.get_pretty_version().display_lossy(),
+                ">",
+                latest.get_pretty_version(),
+                "</",
                 style,
+                ">",
                 released_time
             ));
             latest
@@ -733,7 +736,7 @@ impl ShowCommand {
             }
 
             if let Some(rd) = package.get_release_date() {
-                json.released = Some(rd.format(DATE_ATOM).to_string());
+                json.released = Some(display_to_bytes(rd.format(DATE_ATOM)));
             }
         }
 
@@ -796,9 +799,9 @@ impl ShowCommand {
                             None => LicenseJson::Id(license_id),
                             // The 'osi' key holds the license id string, not the OSI-approved flag.
                             Some(l) => LicenseJson::Detail {
-                                name: l.name.display_lossy().to_string(),
+                                name: l.name,
                                 osi: license_id,
-                                url: l.url.display_lossy().to_string(),
+                                url: l.url,
                             },
                         }
                     })
@@ -883,16 +886,16 @@ impl ShowCommand {
     /// Init styles for tree
     fn init_styles(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
         *self.colors.borrow_mut() = vec![
-            "green".to_string(),
-            "yellow".to_string(),
-            "cyan".to_string(),
-            "magenta".to_string(),
-            "blue".to_string(),
+            BString::from("green"),
+            BString::from("yellow"),
+            BString::from("cyan"),
+            BString::from("magenta"),
+            BString::from("blue"),
         ];
 
         for color in self.colors.borrow().iter() {
             let style =
-                OutputFormatterStyle::new(Some(bstr::BStr::new(color.as_str())), None, vec![]);
+                OutputFormatterStyle::new(Some(bstr::BStr::new(color.as_bstr())), None, vec![]);
             output
                 .borrow()
                 .get_formatter()
@@ -1111,26 +1114,26 @@ impl ShowCommand {
         Ok(children)
     }
 
-    fn update_status_to_version_style(update_status: &str) -> &'static str {
+    fn update_status_to_version_style(update_status: &BStr) -> &'static BStr {
         // 'up-to-date' is printed green
         // 'semver-safe-update' is printed red
         // 'update-possible' is printed yellow
-        match update_status {
-            "up-to-date" => "info",
-            "semver-safe-update" => "highlight",
-            "update-possible" => "comment",
+        BStr::new(match update_status.as_bytes() {
+            b"up-to-date" => "info",
+            b"semver-safe-update" => "highlight",
+            b"update-possible" => "comment",
             _ => "comment",
-        }
+        })
     }
 
     fn get_update_status(
         latest_package: PackageInterfaceHandle,
         package: PackageInterfaceHandle,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         if latest_package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
             == package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
         {
-            return Ok("up-to-date".to_string());
+            return Ok(BString::from("up-to-date"));
         }
 
         let mut constraint = package.get_version();
@@ -1141,11 +1144,11 @@ impl ShowCommand {
             && Semver::satisfies(latest_package.get_version(), constraint)?
         {
             // it needs an immediate semver-compliant upgrade
-            return Ok("semver-safe-update".to_string());
+            return Ok(BString::from("semver-safe-update"));
         }
 
         // it needs an upgrade but has potential BC breaks so is not urgent
-        Ok("update-possible".to_string())
+        Ok(BString::from("update-possible"))
     }
 
     fn write_tree_line(&self, line: &BStr) {
@@ -1310,36 +1313,36 @@ impl ShowCommand {
         Ok(self.repository_set.borrow().as_ref().unwrap().clone())
     }
 
-    fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::Utc>) -> String {
+    fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::Utc>) -> BString {
         if release_date
             .format(date_format_to_strftime(b"Ymd"))
             .to_string()
             == date_local("Ymd", None)
         {
-            return "today".to_string();
+            return BString::from("today");
         }
 
         let diff = chrono::Utc::now().signed_duration_since(*release_date);
         let days = diff.num_days();
         if days < 7 {
-            return "this week".to_string();
+            return BString::from("this week");
         }
 
         if days < 14 {
-            return "last week".to_string();
+            return BString::from("last week");
         }
 
         let months = days / 30;
         if months < 1 && days < 31 {
-            return format!("{} weeks ago", days / 7);
+            return bconcat!(days / 7, " weeks ago");
         }
 
         let years = days / 365;
         if years < 1 {
-            return format!("{} month{} ago", months, if months > 1 { "s" } else { "" });
+            return bconcat!(months, " month", if months > 1 { "s" } else { "" }, " ago");
         }
 
-        format!("{} year{} ago", years, if years > 1 { "s" } else { "" })
+        bconcat!(years, " year", if years > 1 { "s" } else { "" }, " ago")
     }
 
     fn same_repository<T, U>(a: &T, b: &U) -> bool
@@ -1460,7 +1463,7 @@ impl Command for ShowCommand {
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
                 Some(InputValue::from("text")),
-                SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
+                SuggestedValues::List(vec![BString::from("json"), BString::from("text")]),
             )
             .unwrap()
             .into(),
@@ -2096,14 +2099,11 @@ impl Command for ShowCommand {
         }
 
         // list packages
-        let mut packages: IndexMap<String, IndexMap<BString, PackageOrName>> = IndexMap::new();
-        let mut package_filter_regex: Option<String> = None;
+        let mut packages: IndexMap<BString, IndexMap<BString, PackageOrName>> = IndexMap::new();
+        let mut package_filter_regex: Option<BString> = None;
         if let Some(ref pf) = package_filter {
             let escaped = preg_quote(pf, None);
-            package_filter_regex = Some(format!(
-                "{{^{}$}}i",
-                bconcat!(escaped.replace("\\*", ".*?")).display_lossy()
-            ));
+            package_filter_regex = Some(bconcat!("{^", str_replace("\\*", ".*?", escaped), "$}i"));
         }
 
         let mut package_list_filter: Option<Vec<BString>> = None;
@@ -2139,7 +2139,7 @@ impl Command for ShowCommand {
             } else {
                 "available"
             };
-            let type_owned = r#type.to_string();
+            let type_owned = BString::from(r#type);
             if let Some(cr_rc) = repo.downcast_rc::<ComposerRepository>() {
                 let names = cr_rc
                     .borrow_mut()
@@ -2222,17 +2222,17 @@ impl Command for ShowCommand {
         let mut latest_packages: IndexMap<BString, crate::package::PackageInterfaceHandle> =
             IndexMap::new();
         let mut exit_code: i64 = 0;
-        let mut view_data: IndexMap<String, Vec<PackageViewData>> = IndexMap::new();
-        let mut view_meta_data: IndexMap<String, ViewMetaData> = IndexMap::new();
+        let mut view_data: IndexMap<BString, Vec<PackageViewData>> = IndexMap::new();
+        let mut view_meta_data: IndexMap<BString, ViewMetaData> = IndexMap::new();
 
         let mut write_version = false;
         let mut write_description = false;
 
-        let type_order: Vec<(&str, bool)> = vec![
-            ("platform", true),
-            ("locked", true),
-            ("available", false),
-            ("installed", true),
+        let type_order: Vec<(&BStr, bool)> = vec![
+            (BStr::new("platform"), true),
+            (BStr::new("locked"), true),
+            (BStr::new("available"), false),
+            (BStr::new("installed"), true),
         ];
         for (r#type, show_version) in type_order.iter() {
             if let Some(type_packages) = packages.get_mut(*r#type) {
@@ -2361,19 +2361,21 @@ impl Command for ShowCommand {
                         }
                         if write_release_date {
                             if let Some(release_date) = package.get_release_date() {
-                                let mut age = self
-                                    .get_relative_time(&release_date)
-                                    .replace(" ago", " old");
-                                if !age.contains(" old") {
-                                    age = format!("from {}", age);
+                                let mut age = str_replace(
+                                    " ago",
+                                    " old",
+                                    self.get_relative_time(&release_date),
+                                );
+                                if !age.contains_str(" old") {
+                                    age = bconcat!("from ", age);
                                 }
                                 release_date_length = release_date_length.max(age.len());
                                 package_view_data.release_age = Some(age);
                                 package_view_data.release_date =
-                                    Some(release_date.format(DATE_ATOM).to_string());
+                                    Some(display_to_bytes(release_date.format(DATE_ATOM)));
                             } else {
-                                package_view_data.release_age = Some(String::new());
-                                package_view_data.release_date = Some(String::new());
+                                package_view_data.release_age = Some(BString::default());
+                                package_view_data.release_date = Some(BString::default());
                             }
                         }
                         if write_latest && let Some(latest) = latest_package {
@@ -2392,13 +2394,13 @@ impl Command for ShowCommand {
 
                             if let Some(rd) = latest.get_release_date() {
                                 package_view_data.latest_release_date =
-                                    Some(rd.format(DATE_ATOM).to_string());
+                                    Some(display_to_bytes(rd.format(DATE_ATOM)));
                             } else {
-                                package_view_data.latest_release_date = Some(String::new());
+                                package_view_data.latest_release_date = Some(BString::default());
                             }
                         } else if write_latest {
                             package_view_data.latest = Some(BString::from("[none matched]"));
-                            package_view_data.latest_status = Some("up-to-date".to_string());
+                            package_view_data.latest_status = Some(BString::from("up-to-date"));
                             latest_length = latest_length.max("[none matched]".len());
                         }
                         if write_description && let Some(c) = package.as_complete() {
@@ -2454,9 +2456,9 @@ impl Command for ShowCommand {
                     }
                     view_type.push(package_view_data);
                 }
-                view_data.insert(r#type.to_string(), view_type);
+                view_data.insert((*r#type).to_owned(), view_type);
                 view_meta_data.insert(
-                    r#type.to_string(),
+                    (*r#type).to_owned(),
                     ViewMetaData {
                         name_length,
                         version_length,
@@ -2533,9 +2535,9 @@ impl Command for ShowCommand {
                 if show_all_types {
                     if r#type == "available" {
                         self.get_io()
-                            .write(format!("<comment>{}</comment>:", r#type));
+                            .write(bconcat!("<comment>", r#type, "</comment>:"));
                     } else {
-                        self.get_io().write(format!("<info>{}</info>:", r#type));
+                        self.get_io().write(bconcat!("<info>", r#type, "</info>:"));
                     }
                 }
 
@@ -2688,8 +2690,11 @@ struct PackageInfoJson {
         serialize_with = "nested_option_str"
     )]
     path: Option<Option<BString>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    released: Option<String>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    released: Option<BString>,
     #[serde(
         skip_serializing_if = "Option::is_none",
         serialize_with = "nested_option_str"
@@ -2755,10 +2760,12 @@ struct PackageReferenceJson {
 enum LicenseJson {
     Id(#[serde(serialize_with = "json_bytes::str")] BString),
     Detail {
-        name: String,
+        #[serde(serialize_with = "json_bytes::str")]
+        name: BString,
         #[serde(serialize_with = "json_bytes::str")]
         osi: BString,
-        url: String,
+        #[serde(serialize_with = "json_bytes::str")]
+        url: BString,
     },
 }
 
@@ -2793,7 +2800,19 @@ struct PackageTreeChild {
 /// Shape of the package list `--format=json` output. PHP `json_encode` emits an empty
 /// associative array as `[]`, not `{}`; mirror that for the top-level map.
 #[derive(Debug)]
-struct ViewDataJson<'a>(&'a IndexMap<String, Vec<PackageViewData>>);
+struct ViewDataJson<'a>(&'a IndexMap<BString, Vec<PackageViewData>>);
+
+#[derive(Debug)]
+struct ViewDataKey<'a>(&'a BString);
+
+impl serde::Serialize for ViewDataKey<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        json_bytes::str(self.0, serializer)
+    }
+}
 
 impl serde::Serialize for ViewDataJson<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -2804,7 +2823,7 @@ impl serde::Serialize for ViewDataJson<'_> {
             use serde::ser::SerializeSeq;
             return serializer.serialize_seq(Some(0))?.end();
         }
-        serializer.collect_map(self.0.iter())
+        serializer.collect_map(self.0.iter().map(|(key, value)| (ViewDataKey(key), value)))
     }
 }
 
@@ -2832,22 +2851,35 @@ struct PackageViewData {
         serialize_with = "json_bytes::option_str"
     )]
     version: Option<BString>,
-    #[serde(rename = "release-age", skip_serializing_if = "Option::is_none")]
-    release_age: Option<String>,
-    #[serde(rename = "release-date", skip_serializing_if = "Option::is_none")]
-    release_date: Option<String>,
+    #[serde(
+        rename = "release-age",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    release_age: Option<BString>,
+    #[serde(
+        rename = "release-date",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    release_date: Option<BString>,
     #[serde(
         skip_serializing_if = "Option::is_none",
         serialize_with = "json_bytes::option_str"
     )]
     latest: Option<BString>,
-    #[serde(rename = "latest-status", skip_serializing_if = "Option::is_none")]
-    latest_status: Option<String>,
+    #[serde(
+        rename = "latest-status",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    latest_status: Option<BString>,
     #[serde(
         rename = "latest-release-date",
-        skip_serializing_if = "Option::is_none"
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
     )]
-    latest_release_date: Option<String>,
+    latest_release_date: Option<BString>,
     #[serde(
         skip_serializing_if = "Option::is_none",
         serialize_with = "nested_option_str"

@@ -34,10 +34,11 @@ fn log_context(context: &[(&BStr, &BStr)]) -> IndexMap<BString, PhpMixed> {
 }
 
 pub trait BaseIO: IOInterface {
-    fn authentications(&self) -> &IndexMap<BString, IndexMap<String, Option<BString>>>;
-    fn authentications_mut(&mut self) -> &mut IndexMap<BString, IndexMap<String, Option<BString>>>;
+    fn authentications(&self) -> &IndexMap<BString, IndexMap<BString, Option<BString>>>;
+    fn authentications_mut(&mut self)
+    -> &mut IndexMap<BString, IndexMap<BString, Option<BString>>>;
 
-    fn get_authentications(&self) -> IndexMap<BString, IndexMap<String, Option<BString>>> {
+    fn get_authentications(&self) -> IndexMap<BString, IndexMap<BString, Option<BString>>> {
         self.authentications().clone()
     }
 
@@ -49,13 +50,13 @@ pub trait BaseIO: IOInterface {
         self.authentications().contains_key(repository_name)
     }
 
-    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<String, Option<BString>> {
+    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<BString, Option<BString>> {
         if let Some(auth) = self.authentications().get(repository_name) {
             return auth.clone();
         }
         let mut result = IndexMap::new();
-        result.insert("username".to_string(), None);
-        result.insert("password".to_string(), None);
+        result.insert(BString::from("username"), None);
+        result.insert(BString::from("password"), None);
         result
     }
 
@@ -66,8 +67,8 @@ pub trait BaseIO: IOInterface {
         password: Option<BString>,
     ) {
         let mut auth = IndexMap::new();
-        auth.insert("username".to_string(), Some(username));
-        auth.insert("password".to_string(), password);
+        auth.insert(BString::from("username"), Some(username));
+        auth.insert(BString::from("password"), password);
         self.authentications_mut().insert(repository_name, auth);
     }
 
@@ -79,8 +80,8 @@ pub trait BaseIO: IOInterface {
     ) {
         if BaseIO::has_authentication(self, repository_name.as_ref()) {
             let auth = BaseIO::get_authentication(self, repository_name.as_ref());
-            if *auth.get("username").unwrap_or(&None) == Some(username.clone())
-                && *auth.get("password").unwrap_or(&None) == password
+            if *auth.get(bstr::B("username")).unwrap_or(&None) == Some(username.clone())
+                && *auth.get(bstr::B("password")).unwrap_or(&None) == password
             {
                 return;
             }

@@ -18,9 +18,9 @@ pub struct ProxyItem {
 }
 
 impl ProxyItem {
-    pub fn new(proxy_url: impl AsRef<[u8]>, env_name: String) -> Result<Self, RuntimeException> {
+    pub fn new(proxy_url: impl AsRef<[u8]>, env_name: BString) -> Result<Self, RuntimeException> {
         let proxy_url = proxy_url.as_ref();
-        let syntax_error = format!("unsupported `{}` syntax", env_name);
+        let syntax_error = bconcat!("unsupported `", env_name, "` syntax");
 
         if strpbrk(proxy_url, "\r\n\t").is_some() {
             return Err(RuntimeException::new(syntax_error));
@@ -31,8 +31,8 @@ impl ProxyItem {
         };
 
         let Some(host) = proxy.host else {
-            return Err(RuntimeException::new(format!(
-                "unable to find proxy host in {}",
+            return Err(RuntimeException::new(bconcat!(
+                "unable to find proxy host in ",
                 env_name
             )));
         };
@@ -84,14 +84,14 @@ impl ProxyItem {
         // but is considered valid depending on the PHP or Curl version.
         let port = match port {
             None => {
-                return Err(RuntimeException::new(format!(
-                    "unable to find proxy port in {}",
+                return Err(RuntimeException::new(bconcat!(
+                    "unable to find proxy port in ",
                     env_name
                 )));
             }
             Some(0) => {
-                return Err(RuntimeException::new(format!(
-                    "port 0 is reserved in {}",
+                return Err(RuntimeException::new(bconcat!(
+                    "port 0 is reserved in ",
                     env_name
                 )));
             }
@@ -129,8 +129,8 @@ impl ProxyItem {
             http_options.insert("request_fulluri".into(), PhpMixed::Bool(true));
         }
 
-        let mut options: IndexMap<String, IndexMap<BString, PhpMixed>> = IndexMap::new();
-        options.insert("http".to_string(), http_options);
+        let mut options: IndexMap<BString, IndexMap<BString, PhpMixed>> = IndexMap::new();
+        options.insert(BString::from("http"), http_options);
 
         RequestProxy::new(
             Some(self.url.clone()),

@@ -11,6 +11,7 @@
 //     `php://memory` input stream (exactly as StrictConfirmationQuestionTest does) and asserting on
 //     the returned value.
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::io::io_interface::NORMAL;
 use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable, IOInterfaceWrite};
@@ -257,9 +258,12 @@ fn test_set_and_get_authentication() {
         Some(bstr::BString::from("passwd")),
     );
 
-    let mut expected: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
-    expected.insert("username".to_string(), Some(bstr::BString::from("l3l0")));
-    expected.insert("password".to_string(), Some(bstr::BString::from("passwd")));
+    let mut expected: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
+    expected.insert(BString::from("username"), Some(bstr::BString::from("l3l0")));
+    expected.insert(
+        BString::from("password"),
+        Some(bstr::BString::from("passwd")),
+    );
     assert_eq!(
         expected,
         console_io.get_authentication(bstr::BStr::new("repoName"))
@@ -270,9 +274,9 @@ fn test_set_and_get_authentication() {
 fn test_get_authentication_when_did_not_set() {
     let console_io = make_console_io();
 
-    let mut expected: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
-    expected.insert("username".to_string(), None);
-    expected.insert("password".to_string(), None);
+    let mut expected: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
+    expected.insert(BString::from("username"), None);
+    expected.insert(BString::from("password"), None);
     assert_eq!(
         expected,
         console_io.get_authentication(bstr::BStr::new("repoName"))

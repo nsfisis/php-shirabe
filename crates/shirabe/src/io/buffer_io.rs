@@ -225,7 +225,8 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     }
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         self.inner.get_authentications()
     }
     fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
@@ -234,7 +235,7 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     fn get_authentication(
         &self,
         repository_name: &bstr::BStr,
-    ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
+    ) -> indexmap::IndexMap<bstr::BString, Option<bstr::BString>> {
         self.inner.get_authentication(repository_name)
     }
     fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
@@ -282,13 +283,16 @@ impl crate::io::IOInterface for BufferIO {
 impl crate::io::BaseIO for BufferIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         self.inner.authentications()
     }
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
-    {
+    ) -> &mut indexmap::IndexMap<
+        bstr::BString,
+        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    > {
         self.inner.authentications_mut()
     }
 }

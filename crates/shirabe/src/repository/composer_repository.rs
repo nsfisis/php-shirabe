@@ -327,7 +327,13 @@ impl ComposerRepository {
             preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&url)),
         );
         let cache_dir = path_from_bytes(&cache_dir);
-        let cache = Cache::new(io.clone(), cache_dir, Some("a-z0-9.$~_"), None, false);
+        let cache = Cache::new(
+            io.clone(),
+            cache_dir,
+            Some(BStr::new("a-z0-9.$~_")),
+            None,
+            false,
+        );
         let version_parser = VersionParser::new();
         let loader = ArrayLoader::new(Some(version_parser.clone()), true);
 

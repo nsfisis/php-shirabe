@@ -11,7 +11,8 @@ use crate::package::{LockerInterface, RootPackageInterfaceHandle};
 use crate::plugin::PluginManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
-use shirabe_php_shim::{php_regex, preg_is_match};
+use bstr::BString;
+use shirabe_php_shim::{bconcat, php_regex, preg_is_match};
 
 /// The Composer version this port tracks. Kept as-is so `Composer::VERSION`, the `composer`
 /// platform package and the HTTP User-Agent keep reporting a value plugins and servers can
@@ -46,14 +47,14 @@ pub const SHIRABE_RELEASE_DATE: &str = include!(concat!(env!("OUT_DIR"), "/relea
 pub const COMPOSER_DEV_WARNING_TIME: Option<i64> =
     include!(concat!(env!("OUT_DIR"), "/dev_warning_time.rs"));
 
-pub fn get_version() -> String {
+pub fn get_version() -> BString {
     if VERSION == "@package_version@" {
-        return SOURCE_VERSION.to_string();
+        return BString::from(SOURCE_VERSION);
     }
     if !BRANCH_ALIAS_VERSION.is_empty() && preg_is_match(php_regex!("{^[a-f0-9]{40}$}"), VERSION) {
-        return format!("{}+{}", BRANCH_ALIAS_VERSION, VERSION);
+        return bconcat!(BRANCH_ALIAS_VERSION, "+", VERSION);
     }
-    VERSION.to_string()
+    BString::from(VERSION)
 }
 
 /// Internal data type corresponding to \Composer\PartialComposer.

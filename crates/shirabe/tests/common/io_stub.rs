@@ -28,7 +28,7 @@ impl<T: Clone> CallRecorder<T> {
 #[derive(Debug, Default)]
 pub struct IOStub {
     authentications:
-        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>,
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 
     is_interactive: Option<bool>,
     is_decorated: Option<bool>,
@@ -40,7 +40,7 @@ pub struct IOStub {
     // willReturn that applies to any argument, so a single Option<bool> matches.
     has_authentication: Option<bool>,
     // `getAuthentication` willReturn is a `['username' => ..., 'password' => ...]` array.
-    get_authentication: Option<indexmap::IndexMap<String, Option<bstr::BString>>>,
+    get_authentication: Option<indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 
     ask: Option<PhpMixed>,
     // When set, `askAndValidate` invokes the caller's validator with this value and returns/
@@ -101,7 +101,7 @@ impl IOStub {
     }
     pub fn with_get_authentication(
         mut self,
-        value: indexmap::IndexMap<String, Option<bstr::BString>>,
+        value: indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
     ) -> Self {
         self.get_authentication = Some(value);
         self
@@ -111,7 +111,7 @@ impl IOStub {
     // `array_shift`).
     pub fn set_get_authentication(
         &mut self,
-        value: indexmap::IndexMap<String, Option<bstr::BString>>,
+        value: indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
     ) {
         self.get_authentication = Some(value);
     }
@@ -154,8 +154,11 @@ impl IOStub {
         password: Option<String>,
     ) -> Self {
         let mut auth = indexmap::IndexMap::new();
-        auth.insert("username".to_string(), Some(username.into()));
-        auth.insert("password".to_string(), password.map(bstr::BString::from));
+        auth.insert(bstr::BString::from("username"), Some(username.into()));
+        auth.insert(
+            bstr::BString::from("password"),
+            password.map(bstr::BString::from),
+        );
         self.authentications.insert(repository_name.into(), auth);
         self
     }
@@ -286,7 +289,8 @@ impl IOInterfaceImmutable for IOStub {
 
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         <Self as BaseIO>::get_authentications(self)
     }
     fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
@@ -300,7 +304,7 @@ impl IOInterfaceImmutable for IOStub {
     fn get_authentication(
         &self,
         repository_name: &bstr::BStr,
-    ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
+    ) -> indexmap::IndexMap<bstr::BString, Option<bstr::BString>> {
         self.get_authentication_calls
             .push(repository_name.to_owned());
         match &self.get_authentication {
@@ -351,13 +355,16 @@ impl IOInterface for IOStub {
 impl BaseIO for IOStub {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         &self.authentications
     }
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
-    {
+    ) -> &mut indexmap::IndexMap<
+        bstr::BString,
+        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    > {
         &mut self.authentications
     }
 }

@@ -97,7 +97,7 @@ impl Command for RemoveCommand {
         Some(InputOption::VALUE_REQUIRED),
         "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
         Some(InputValue::from(Auditor::FORMAT_SUMMARY)),
-        SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+        SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
         InputOption::new("no-security-blocking",
         None,
         Some(InputOption::VALUE_NONE),

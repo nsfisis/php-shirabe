@@ -980,7 +980,7 @@ impl Factory {
             let mut cache = Cache::new(
                 io.clone(),
                 path_from_bytes(&config.borrow_mut().get_str("cache-files-dir")?),
-                Some("a-z0-9_./"),
+                Some(BStr::new("a-z0-9_./")),
                 None,
                 false,
             );

@@ -3,6 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
@@ -52,7 +53,7 @@ impl Command for OutdatedCommand {
         InputOption::new("minor-only", Some("m".into()), Some(InputOption::VALUE_NONE), "Show only packages that have minor SemVer-compatible updates.", None).unwrap().into(),
         InputOption::new("patch-only", Some("p".into()), Some(InputOption::VALUE_NONE), "Show only packages that have patch SemVer-compatible updates.", None).unwrap().into(),
         InputOption::new("sort-by-age", Some("A".into()), Some(InputOption::VALUE_NONE), "Displays the installed version's age, and sorts packages oldest first.", None).unwrap().into(),
-        InputOption::new6("format", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(InputValue::from("text")), SuggestedValues::List(vec!["json".to_string(), "text".to_string()])).unwrap().into(),
+        InputOption::new6("format", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(InputValue::from("text")), SuggestedValues::List(vec![BString::from("json"), BString::from("text")])).unwrap().into(),
         InputOption::new6("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables search in require-dev packages.", None).unwrap().into(),
         InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option", None).unwrap().into(),

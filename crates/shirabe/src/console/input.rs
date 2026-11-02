@@ -1,4 +1,4 @@
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 pub mod input_argument;
 pub mod input_option;
 
@@ -29,7 +29,7 @@ pub type SuggestedValuesClosure = Box<
 /// closure returns plain strings, and `complete` lifts them into suggestions. PHP's runtime
 /// "Closure must return an array" LogicException is statically guaranteed by the type.
 pub enum SuggestedValues {
-    List(Vec<String>),
+    List(Vec<BString>),
     Closure(SuggestedValuesClosure),
 }
 
@@ -58,7 +58,7 @@ impl SuggestedValues {
         let values = match self {
             SuggestedValues::List(values) => values
                 .iter()
-                .map(|value| BString::from(value.as_str()))
+                .map(|value| BString::from(value.as_bstr()))
                 .collect(),
             SuggestedValues::Closure(closure) => closure(this, input, suggestions)?,
         };

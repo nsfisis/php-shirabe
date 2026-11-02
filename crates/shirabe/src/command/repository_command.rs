@@ -253,13 +253,13 @@ impl Command for RepositoryCommand {
                 "Action to perform: list, add, remove, set-url, get-url, enable, disable",
                 Some(InputValue::from("list")),
                 crate::console::input::SuggestedValues::List(vec![
-                    "list".to_string(),
-                    "add".to_string(),
-                    "remove".to_string(),
-                    "set-url".to_string(),
-                    "get-url".to_string(),
-                    "enable".to_string(),
-                    "disable".to_string(),
+                    BString::from("list"),
+                    BString::from("add"),
+                    BString::from("remove"),
+                    BString::from("set-url"),
+                    BString::from("get-url"),
+                    BString::from("enable"),
+                    BString::from("disable"),
                 ]),
             )
             .unwrap()

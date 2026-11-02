@@ -91,7 +91,7 @@ impl AuthHelper {
                         .borrow()
                         .get_authentication(origin)
                         .into_iter()
-                        .map(|(k, v)| (k.into(), v.map_or(PhpMixed::Null, PhpMixed::string)))
+                        .map(|(k, v)| (k, v.map_or(PhpMixed::Null, PhpMixed::string)))
                         .collect(),
                 ),
             )?;
@@ -242,12 +242,12 @@ impl AuthHelper {
             );
             let mut git_lab_util = GitLab::new(self.io.clone(), self.config.clone(), None, None)?;
 
-            let mut auth: Option<IndexMap<String, Option<BString>>> = None;
+            let mut auth: Option<IndexMap<BString, Option<BString>>> = None;
             if self.io.has_authentication(origin) {
                 auth = Some(self.io.get_authentication(origin));
                 let password = auth
                     .as_ref()
-                    .and_then(|a| a.get("password"))
+                    .and_then(|a| a.get(bstr::B("password")))
                     .and_then(|v| v.clone())
                     .unwrap_or_default();
                 if matches!(
@@ -302,14 +302,14 @@ impl AuthHelper {
             if self.io.has_authentication(origin) {
                 let auth = self.io.get_authentication(origin);
                 let username = auth
-                    .get("username")
+                    .get(bstr::B("username"))
                     .and_then(|v| v.clone())
                     .unwrap_or_default();
                 if username != "x-token-auth" {
                     let mut bitbucket_util =
                         Bitbucket::new(self.io.clone(), self.config.clone(), None, None, None)?;
                     let password = auth
-                        .get("password")
+                        .get(bstr::B("password"))
                         .and_then(|v| v.clone())
                         .unwrap_or_default();
                     let access_token = bitbucket_util.request_token(
@@ -515,11 +515,11 @@ impl AuthHelper {
             let mut authentication_display_message: Option<String> = None;
             let auth = self.io.get_authentication(origin);
             let password = auth
-                .get("password")
+                .get(bstr::B("password"))
                 .and_then(|v| v.clone())
                 .unwrap_or_default();
             let username = auth
-                .get("username")
+                .get(bstr::B("username"))
                 .and_then(|v| v.clone())
                 .unwrap_or_default();
             if password == "bearer" {

@@ -19,7 +19,7 @@ use shirabe_symfony_console::formatter::OutputFormatter;
 #[derive(Debug)]
 pub struct Problem {
     /// A map containing the id of each rule part of this problem as a key
-    reason_seen: IndexMap<String, bool>,
+    reason_seen: IndexMap<BString, bool>,
 
     /// A set of reasons for the problem, each is a rule or a root require and a rule
     reasons: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
@@ -45,7 +45,7 @@ impl Problem {
     /// Add a rule as a reason
     pub fn add_rule(&mut self, rule: std::rc::Rc<std::cell::RefCell<Rule>>) {
         let id = spl_object_hash(rule.clone());
-        self.add_reason(id.display_lossy().to_string(), rule);
+        self.add_reason(id, rule);
     }
 
     /// Retrieve all reasons for this problem
@@ -351,7 +351,7 @@ impl Problem {
     }
 
     /// Store a reason descriptor but ignore duplicates
-    fn add_reason(&mut self, id: String, reason: std::rc::Rc<std::cell::RefCell<Rule>>) {
+    fn add_reason(&mut self, id: BString, reason: std::rc::Rc<std::cell::RefCell<Rule>>) {
         // TODO: if a rule is part of a problem description in two sections, isn't this going to remove a message
         // that is important to understand the issue?
 
