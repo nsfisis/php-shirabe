@@ -291,12 +291,12 @@ fn strtol_port(buf: &[u8]) -> Option<u16> {
 mod tests {
     use super::*;
 
-    fn parse(url: &str) -> Option<PhpUrl> {
-        php_url_parse_ex2(url.as_bytes())
+    fn parse(url: impl AsRef<[u8]>) -> Option<PhpUrl> {
+        php_url_parse_ex2(url.as_ref())
     }
 
-    fn some(s: &str) -> Option<BString> {
-        Some(s.into())
+    fn some(s: impl AsRef<[u8]>) -> Option<BString> {
+        Some(BString::from(s.as_ref()))
     }
 
     #[test]

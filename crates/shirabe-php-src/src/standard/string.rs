@@ -1,4 +1,5 @@
 use bstr::BString;
+use std::io::Write;
 
 /// php-src: ext/standard/string.c `php_charmask` (PHP 8.5.2)
 ///
@@ -46,7 +47,7 @@ pub fn addcslashes(_string: impl AsRef<[u8]>, _charlist: impl AsRef<[u8]>) -> BS
                     0x0B => out.push(b'v'),
                     0x08 => out.push(b'b'),
                     0x0C => out.push(b'f'),
-                    _ => out.extend_from_slice(format!("{:03o}", c).as_bytes()),
+                    _ => write!(out, "{:03o}", c).expect("writing to a Vec cannot fail"),
                 }
             } else {
                 out.push(b'\\');

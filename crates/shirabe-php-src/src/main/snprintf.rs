@@ -1,4 +1,5 @@
 use bstr::BString;
+use std::io::Write;
 
 /// php-src: main/snprintf.c `php_gcvt` (PHP 8.5.8)
 ///
@@ -30,7 +31,6 @@ pub fn php_gcvt(value: f64, ndigit: i32, dec_point: u8, exponent: u8) -> BString
         // exponential format (e.g. 1.0E+17)
         let exp = decpt - 1;
         let (first, rest) = digits
-            .as_bytes()
             .split_first()
             .expect("dtoa always yields at least one digit");
         buf.push(*first);
@@ -46,24 +46,24 @@ pub fn php_gcvt(value: f64, ndigit: i32, dec_point: u8, exponent: u8) -> BString
         } else {
             buf.push(b'+');
         }
-        buf.extend_from_slice(exp.abs().to_string().as_bytes());
+        write!(buf, "{}", exp.abs()).expect("writing to a Vec cannot fail");
     } else if decpt > 0 {
         // standard format, integer part present
         let decpt = decpt as usize;
         if digits.len() <= decpt {
-            buf.extend_from_slice(digits.as_bytes());
+            buf.extend_from_slice(&digits);
             buf.resize(buf.len() + (decpt - digits.len()), b'0');
         } else {
-            buf.extend_from_slice(&digits.as_bytes()[..decpt]);
+            buf.extend_from_slice(&digits[..decpt]);
             buf.push(dec_point);
-            buf.extend_from_slice(&digits.as_bytes()[decpt..]);
+            buf.extend_from_slice(&digits[decpt..]);
         }
     } else {
         // standard format, 0.000ddd
         buf.push(b'0');
         buf.push(dec_point);
         buf.resize(buf.len() + decpt.unsigned_abs() as usize, b'0');
-        buf.extend_from_slice(digits.as_bytes());
+        buf.extend_from_slice(&digits);
     }
 
     BString::from(buf)
@@ -74,7 +74,11 @@ pub fn php_gcvt(value: f64, ndigit: i32, dec_point: u8, exponent: u8) -> BString
 /// Rust's `{:e}` supplies the shortest round-trip digit count, but it breaks a tie between two
 /// equally distant digit strings away from zero while `zend_dtoa` breaks it to even, so the digits
 /// themselves come from `dtoa_fixed` at that count.
-fn dtoa_shortest(value: f64) -> (bool, String, i32) {
+#[expect(
+    clippy::disallowed_macros,
+    reason = "`{:e}` is Rust's shortest digit generator"
+)]
+fn dtoa_shortest(value: f64) -> (bool, Vec<u8>, i32) {
     let shortest = format!("{:e}", value.abs());
     let shortest_mantissa = shortest
         .split_once('e')
@@ -90,7 +94,11 @@ fn dtoa_shortest(value: f64) -> (bool, String, i32) {
 /// (`value = 0.digits * 10^decpt`). Rust's `{:.*e}` rounds the exact decimal value of the double
 /// half to even, which is how `zend_dtoa` breaks a tie. Trailing zeros are dropped, as dtoa never
 /// emits them; a value that rounds down to nothing keeps a single `0` digit.
-fn dtoa_fixed(value: f64, ndigit: i32) -> (bool, String, i32) {
+#[expect(
+    clippy::disallowed_macros,
+    reason = "`{:.*e}` is Rust's fixed digit generator"
+)]
+fn dtoa_fixed(value: f64, ndigit: i32) -> (bool, Vec<u8>, i32) {
     let sign = value.is_sign_negative();
     let value = value.abs();
 
@@ -98,12 +106,16 @@ fn dtoa_fixed(value: f64, ndigit: i32) -> (bool, String, i32) {
     let (mantissa, exp) = formatted
         .split_once('e')
         .expect("`{:e}` always contains an exponent");
-    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let mut digits: Vec<u8> = mantissa.bytes().filter(|c| *c != b'.').collect();
     let exp: i32 = exp.parse().expect("`{:e}` exponent is a decimal integer");
 
-    let trimmed = digits.trim_end_matches('0');
-    let digits = if trimmed.is_empty() { "0" } else { trimmed };
-    (sign, digits.to_string(), exp + 1)
+    while digits.last() == Some(&b'0') {
+        digits.pop();
+    }
+    if digits.is_empty() {
+        digits.push(b'0');
+    }
+    (sign, digits, exp + 1)
 }
 
 #[cfg(test)]
