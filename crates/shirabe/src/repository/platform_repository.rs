@@ -1607,7 +1607,7 @@ impl PlatformRepository {
                     bconcat!("lib-", name),
                     bconcat!("lib-", replace_lower),
                     SimpleConstraint::new("=", BString::from(&version[..]), None).into(),
-                    Some(bstr::BString::from(Link::TYPE_REPLACE.to_string())),
+                    Some(Link::TYPE_REPLACE.to_owned()),
                     bstr::BString::from(lib.get_pretty_version()),
                 ),
             );
@@ -1621,7 +1621,7 @@ impl PlatformRepository {
                     bconcat!("lib-", name),
                     bconcat!("lib-", provide_lower),
                     SimpleConstraint::new("=", BString::from(&version[..]), None).into(),
-                    Some(bstr::BString::from(Link::TYPE_PROVIDE.to_string())),
+                    Some(Link::TYPE_PROVIDE.to_owned()),
                     bstr::BString::from(lib.get_pretty_version()),
                 ),
             );

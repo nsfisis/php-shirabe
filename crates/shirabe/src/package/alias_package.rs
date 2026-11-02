@@ -60,23 +60,22 @@ impl AliasPackage {
         };
 
         for r#type in Link::types() {
-            let links: std::rc::Rc<IndexMap<BString, Link>> = match r#type {
-                Link::TYPE_REQUIRE => this.alias_of.get_requires(),
-                Link::TYPE_DEV_REQUIRE => this.alias_of.get_dev_requires(),
-                Link::TYPE_PROVIDE => this.alias_of.get_provides(),
-                Link::TYPE_CONFLICT => this.alias_of.get_conflicts(),
-                Link::TYPE_REPLACE => this.alias_of.get_replaces(),
-                _ => unreachable!(),
-            };
+            let links: std::rc::Rc<IndexMap<BString, Link>> =
+                this.alias_of.get_links_for_type(r#type);
             let replaced =
                 std::rc::Rc::new(this.replace_self_version_dependencies((*links).clone(), r#type));
-            match r#type {
-                Link::TYPE_REQUIRE => this.requires = replaced,
-                Link::TYPE_DEV_REQUIRE => this.dev_requires = replaced,
-                Link::TYPE_PROVIDE => this.provides = replaced,
-                Link::TYPE_CONFLICT => this.conflicts = replaced,
-                Link::TYPE_REPLACE => this.replaces = replaced,
-                _ => unreachable!(),
+            if r#type == Link::TYPE_REQUIRE {
+                this.requires = replaced;
+            } else if r#type == Link::TYPE_DEV_REQUIRE {
+                this.dev_requires = replaced;
+            } else if r#type == Link::TYPE_PROVIDE {
+                this.provides = replaced;
+            } else if r#type == Link::TYPE_CONFLICT {
+                this.conflicts = replaced;
+            } else if r#type == Link::TYPE_REPLACE {
+                this.replaces = replaced;
+            } else {
+                unreachable!();
             }
         }
 
@@ -101,7 +100,7 @@ impl AliasPackage {
     pub(crate) fn replace_self_version_dependencies(
         &mut self,
         mut links: IndexMap<BString, Link>,
-        link_type: &str,
+        link_type: &BStr,
     ) -> IndexMap<BString, Link> {
         // for self.version requirements, we use the original package's branch name instead, to avoid leaking the magic dev-master-alias to users
         let mut pretty_version = self.pretty_version.clone();
@@ -109,10 +108,7 @@ impl AliasPackage {
             pretty_version = self.alias_of.get_pretty_version();
         }
 
-        if matches!(
-            link_type,
-            Link::TYPE_CONFLICT | Link::TYPE_PROVIDE | Link::TYPE_REPLACE
-        ) {
+        if [Link::TYPE_CONFLICT, Link::TYPE_PROVIDE, Link::TYPE_REPLACE].contains(&link_type) {
             let mut new_links: Vec<Link> = vec![];
             for link in links.values() {
                 // link is self.version, but must be replacing also the replaced version

@@ -84,7 +84,7 @@ impl RepositorySet {
             crate::package::base_package::stability_priority(minimum_stability).unwrap_or(0);
         for (stability, value) in stabilities.iter() {
             if *value <= min_value {
-                acceptable_stabilities.insert(bstr::BString::from(stability.to_string()), *value);
+                acceptable_stabilities.insert(bstr::BString::from(*stability), *value);
             }
         }
         // PHP: foreach ($rootRequires as $name => $constraint) { if (...) unset(...); }

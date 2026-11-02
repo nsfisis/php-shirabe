@@ -101,7 +101,7 @@ impl ArrayDumper {
                 );
             }
             link_map.sort_keys();
-            data.insert(type_name.to_string().into(), PhpMixed::Array(link_map));
+            data.insert(BString::from(*type_name), PhpMixed::Array(link_map));
         }
 
         let suggests = package.get_suggests();

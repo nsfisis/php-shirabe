@@ -60,7 +60,7 @@ fn require_link(package_name: &str, target: &str, pretty_constraint: &str) -> Li
         bstr::BString::from(package_name.to_string()),
         bstr::BString::from(target.to_string()),
         parser.parse_constraints(pretty_constraint).unwrap(),
-        Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+        Some(Link::TYPE_REQUIRE.to_owned()),
         bstr::BString::from(pretty_constraint.to_string()),
     )
 }

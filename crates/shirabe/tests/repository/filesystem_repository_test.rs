@@ -200,7 +200,7 @@ impl Drop for CwdGuard {
 fn configure_links(
     name: &str,
     pretty_version: &str,
-    description: &str,
+    description: &bstr::BStr,
     links: &[(&str, &str)],
 ) -> IndexMap<BString, Link> {
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();

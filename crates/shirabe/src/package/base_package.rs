@@ -8,68 +8,65 @@ use shirabe_php_shim::{bconcat, implode, preg_quote, str_replace};
 use std::sync::LazyLock;
 
 pub struct SupportedLinkType {
-    pub description: &'static str,
-    pub method: &'static str,
+    pub description: &'static BStr,
+    pub method: &'static BStr,
 }
 
-pub static SUPPORTED_LINK_TYPES: LazyLock<IndexMap<&'static str, SupportedLinkType>> =
+pub static SUPPORTED_LINK_TYPES: LazyLock<IndexMap<&'static BStr, SupportedLinkType>> =
     LazyLock::new(|| {
         let mut m = IndexMap::new();
         m.insert(
-            "require",
+            BStr::new("require"),
             SupportedLinkType {
-                description: "requires",
+                description: BStr::new("requires"),
                 method: Link::TYPE_REQUIRE,
             },
         );
         m.insert(
-            "conflict",
+            BStr::new("conflict"),
             SupportedLinkType {
-                description: "conflicts",
+                description: BStr::new("conflicts"),
                 method: Link::TYPE_CONFLICT,
             },
         );
         m.insert(
-            "provide",
+            BStr::new("provide"),
             SupportedLinkType {
-                description: "provides",
+                description: BStr::new("provides"),
                 method: Link::TYPE_PROVIDE,
             },
         );
         m.insert(
-            "replace",
+            BStr::new("replace"),
             SupportedLinkType {
-                description: "replaces",
+                description: BStr::new("replaces"),
                 method: Link::TYPE_REPLACE,
             },
         );
         m.insert(
-            "require-dev",
+            BStr::new("require-dev"),
             SupportedLinkType {
-                description: "requires (for development)",
+                description: BStr::new("requires (for development)"),
                 method: Link::TYPE_DEV_REQUIRE,
             },
         );
         m
     });
 
-pub static STABILITIES: LazyLock<IndexMap<&'static str, i64>> = LazyLock::new(|| {
+pub static STABILITIES: LazyLock<IndexMap<&'static BStr, i64>> = LazyLock::new(|| {
     let mut m = IndexMap::new();
-    m.insert("stable", 0i64);
-    m.insert("RC", 5i64);
-    m.insert("beta", 10i64);
-    m.insert("alpha", 15i64);
-    m.insert("dev", 20i64);
+    m.insert(BStr::new("stable"), 0i64);
+    m.insert(BStr::new("RC"), 5i64);
+    m.insert(BStr::new("beta"), 10i64);
+    m.insert(BStr::new("alpha"), 15i64);
+    m.insert(BStr::new("dev"), 20i64);
     m
 });
 
 /// `self::STABILITIES[$stability]` for a stability name held as bytes.
 pub fn stability_priority(stability: impl AsRef<[u8]>) -> Option<i64> {
     let stability = stability.as_ref();
-    STABILITIES
-        .iter()
-        .find(|(name, _)| name.as_bytes() == stability)
-        .map(|(_, priority)| *priority)
+    STABILITIES.get(BStr::new(stability)).copied()
 }
 
 pub const STABILITY_STABLE: i64 = 0;

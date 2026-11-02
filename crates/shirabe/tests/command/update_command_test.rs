@@ -457,7 +457,7 @@ fn test_interactive_tmp() {
                 bstr::BString::from("root/req".to_string()),
                 bstr::BString::from("dep/pkg".to_string()),
                 AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                Some(Link::TYPE_REQUIRE.to_owned()),
                 bstr::BString::from("^1".to_string()),
             ),
         );
@@ -467,7 +467,7 @@ fn test_interactive_tmp() {
                 bstr::BString::from("root/req".to_string()),
                 bstr::BString::from("another-dep/pkg".to_string()),
                 AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                Some(Link::TYPE_REQUIRE.to_owned()),
                 bstr::BString::from("^1".to_string()),
             ),
         );

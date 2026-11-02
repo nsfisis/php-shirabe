@@ -10,8 +10,9 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, php_regex,
-    preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error, trim,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, implode,
+    php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
+    trim,
 };
 
 #[derive(Debug)]
@@ -309,8 +310,8 @@ impl RootPackageLoader {
                 }
             }
 
-            let stability_names: Vec<&str> = stabilities.keys().copied().collect();
-            let pattern = format!("{{^[^@]*?@({})$}}i", stability_names.join("|"));
+            let stability_names: Vec<&BStr> = stabilities.keys().copied().collect();
+            let pattern = bconcat!("{^[^@]*?@(", implode("|", &stability_names), ")$}i");
 
             let mut matched = false;
             for constraint in &constraints {

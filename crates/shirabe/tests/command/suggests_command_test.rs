@@ -53,12 +53,12 @@ fn get_package_with_suggest_and_requires(
     pkg
 }
 
-fn link(source: &str, target: &str, description: &str) -> Link {
+fn link(source: &str, target: &str, description: &bstr::BStr) -> Link {
     Link::new(
         bstr::BString::from(source.to_string()),
         bstr::BString::from(target.to_string()),
         get_version_constraint(">=", "1.0"),
-        Some(bstr::BString::from(description.to_string())),
+        Some(description.to_owned()),
         bstr::BString::from("^1.0".to_string()),
     )
 }

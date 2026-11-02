@@ -389,7 +389,7 @@ fn run_test_pool_builder(
     // PHP: array_map over stability flags, mapping to BasePackage::STABILITIES[$stability].
     let mut stability_flags: IndexMap<BString, i64> = IndexMap::new();
     for (name, stability) in &stability_flags_data {
-        let Some(value) = utf8_text(stability).and_then(|s| STABILITIES.get(s)) else {
+        let Some(value) = STABILITIES.get(stability.as_bstr()) else {
             panic!("Invalid stability given: {}", stability.display_lossy());
         };
         stability_flags.insert(name.clone(), *value);

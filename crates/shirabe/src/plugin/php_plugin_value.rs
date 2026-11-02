@@ -496,7 +496,7 @@ mod tests {
                 bstr::BString::from("Vendor/Root".to_string()),
                 bstr::BString::from("Vendor/Dep".to_string()),
                 constraint,
-                Some(bstr::BString::from(Link::TYPE_DEV_REQUIRE.to_string())),
+                Some(Link::TYPE_DEV_REQUIRE.to_owned()),
                 bstr::BString::from("^1.0".to_string()),
             );
             let decoded = link_from_wire(&link_to_wire(&link)).expect("decode failed");

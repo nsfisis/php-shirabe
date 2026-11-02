@@ -15,9 +15,9 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     array_values_mixed, bconcat, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class,
     implode, in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric,
-    is_object, is_string, json_encode, path_from_bytes, path_to_bytes, php_regex, php_to_string,
-    preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, system, touch, trim2,
-    var_export,
+    is_object, is_string, json_encode, path_from_bytes, path_to_bytes, php_regex, php_str,
+    php_to_string, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower,
+    system, touch, trim2, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::input::InputInterfaceByName;
@@ -39,19 +39,19 @@ impl_php_class!(ConfigCommand, r"Composer\Command\ConfigCommand");
 
 impl ConfigCommand {
     /// List of additional configurable package-properties
-    const CONFIGURABLE_PACKAGE_PROPERTIES: &'static [&'static str] = &[
-        "name",
-        "type",
-        "description",
-        "homepage",
-        "version",
-        "minimum-stability",
-        "prefer-stable",
-        "keywords",
-        "license",
-        "repositories",
-        "suggest",
-        "extra",
+    const CONFIGURABLE_PACKAGE_PROPERTIES: &'static [&'static BStr] = &[
+        php_str(b"name"),
+        php_str(b"type"),
+        php_str(b"description"),
+        php_str(b"homepage"),
+        php_str(b"version"),
+        php_str(b"minimum-stability"),
+        php_str(b"prefer-stable"),
+        php_str(b"keywords"),
+        php_str(b"license"),
+        php_str(b"repositories"),
+        php_str(b"suggest"),
+        php_str(b"extra"),
     ];
 
     pub fn new() -> Self {
@@ -74,30 +74,27 @@ impl ConfigCommand {
         key: &BStr,
         callbacks: &(ValidatorFn, NormalizerFn),
         values: &[BString],
-        method: &str,
+        method: &BStr,
     ) -> anyhow::Result<()> {
         let (validator, normalizer) = callbacks;
         if 1 != values.len() {
-            return Err(RuntimeException::new(
-                "You can only pass one value. Example: shirabe config process-timeout 300"
-                    .to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "You can only pass one value. Example: shirabe config process-timeout 300",
+            ))
             .into());
         }
 
         let validation = validator(&PhpMixed::string(values[0].clone()));
         if validation.as_bool() != Some(true) {
             let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
-                format!(
-                    " ({})",
-                    validation.as_string().unwrap_or_default().display_lossy()
-                )
+                bconcat!(" (", validation.as_string().unwrap_or_default(), ")")
             } else {
-                String::new()
+                BString::default()
             };
-            return Err(RuntimeException::new(format!(
-                "\"{}\" is an invalid value{}",
-                values[0].display_lossy(),
+            return Err(RuntimeException::new(bconcat!(
+                "\"",
+                values[0],
+                "\" is an invalid value",
                 suffix
             ))
             .into());
@@ -130,11 +127,11 @@ impl ConfigCommand {
 
         let mut config_source = self.config_source.borrow_mut();
         let config_source = config_source.as_mut().unwrap();
-        match method {
-            "addConfigSetting" => {
+        match method.as_bytes() {
+            b"addConfigSetting" => {
                 config_source.add_config_setting(bstr::BStr::new(key), normalized_value)?
             }
-            "addProperty" => config_source.add_property(bstr::BStr::new(key), normalized_value)?,
+            b"addProperty" => config_source.add_property(bstr::BStr::new(key), normalized_value)?,
             _ => unreachable!(),
         }
         Ok(())
@@ -145,7 +142,7 @@ impl ConfigCommand {
         key: &BStr,
         callbacks: &(ValidatorFn, NormalizerFn),
         values: &[BString],
-        method: &str,
+        method: &BStr,
     ) -> anyhow::Result<()> {
         let (validator, normalizer) = callbacks;
         let values_mixed =
@@ -153,12 +150,9 @@ impl ConfigCommand {
         let validation = validator(&values_mixed);
         if validation.as_bool() != Some(true) {
             let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
-                format!(
-                    " ({})",
-                    validation.as_string().unwrap_or_default().display_lossy()
-                )
+                bconcat!(" (", validation.as_string().unwrap_or_default(), ")")
             } else {
-                String::new()
+                BString::default()
             };
             return Err(RuntimeException::new(bconcat!(
                 json_encode(&values_mixed).ok().unwrap_or_default(),
@@ -170,11 +164,11 @@ impl ConfigCommand {
 
         let mut config_source = self.config_source.borrow_mut();
         let config_source = config_source.as_mut().unwrap();
-        match method {
-            "addConfigSetting" => {
+        match method.as_bytes() {
+            b"addConfigSetting" => {
                 config_source.add_config_setting(bstr::BStr::new(key), normalizer(&values_mixed))?
             }
-            "addProperty" => {
+            b"addProperty" => {
                 config_source.add_property(bstr::BStr::new(key), normalizer(&values_mixed))?
             }
             _ => unreachable!(),
@@ -544,7 +538,7 @@ impl Command for ConfigCommand {
                 "bearer",
                 "forgejo-token",
             ] {
-                empty_objs.insert(k.to_string().into(), PhpMixed::Object(IndexMap::new()));
+                empty_objs.insert(bconcat!(k), PhpMixed::Object(IndexMap::new()));
             }
             auth_config_file
                 .borrow()
@@ -568,7 +562,7 @@ impl Command for ConfigCommand {
                     editor = Some("notepad".into());
                 } else {
                     for candidate in &["editor", "vim", "vi", "nano", "pico", "ed"] {
-                        if !exec(format!("which {}", candidate), None, None)
+                        if !exec(bconcat!("which ", candidate), None, None)
                             .unwrap_or_default()
                             .is_empty()
                         {
@@ -680,23 +674,23 @@ impl Command for ConfigCommand {
             .unwrap_or_default();
         if !setting_values.is_empty() && input.borrow().get_option("unset")?.as_bool() == Some(true)
         {
-            return Err(RuntimeException::new(
-                "You can not combine a setting value with --unset".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "You can not combine a setting value with --unset",
+            ))
             .into());
         }
 
         // show the value if no value is provided
         if setting_values.is_empty() && input.borrow().get_option("unset")?.as_bool() != Some(true)
         {
-            let properties: Vec<&'static str> = Self::CONFIGURABLE_PACKAGE_PROPERTIES.to_vec();
+            let properties: Vec<&'static BStr> = Self::CONFIGURABLE_PACKAGE_PROPERTIES.to_vec();
             let mut properties_defaults: IndexMap<BString, PhpMixed> = IndexMap::new();
-            properties_defaults.insert("type".into(), PhpMixed::string("library".to_string()));
-            properties_defaults.insert("description".into(), PhpMixed::string(String::new()));
-            properties_defaults.insert("homepage".into(), PhpMixed::string(String::new()));
+            properties_defaults.insert("type".into(), PhpMixed::string(BString::from("library")));
+            properties_defaults.insert("description".into(), PhpMixed::string(BString::default()));
+            properties_defaults.insert("homepage".into(), PhpMixed::string(BString::default()));
             properties_defaults.insert(
                 "minimum-stability".into(),
-                PhpMixed::string("stable".to_string()),
+                PhpMixed::string(BString::from("stable")),
             );
             properties_defaults.insert("prefer-stable".into(), PhpMixed::Bool(false));
             properties_defaults.insert("keywords".into(), PhpMixed::List(vec![]));
@@ -726,9 +720,10 @@ impl Command for ConfigCommand {
                     {
                         Some(v) => v.clone(),
                         None => {
-                            return Err(InvalidArgumentException::new(format!(
-                                "There is no {} repository defined",
-                                repo_key.display_lossy()
+                            return Err(InvalidArgumentException::new(bconcat!(
+                                "There is no ",
+                                repo_key,
+                                " repository defined"
                             ))
                             .into());
                         }
@@ -761,11 +756,9 @@ impl Command for ConfigCommand {
                 }
 
                 if !r#match {
-                    return Err(RuntimeException::new(format!(
-                        "{} is not defined.",
-                        setting_key.display_lossy()
-                    ))
-                    .into());
+                    return Err(
+                        RuntimeException::new(bconcat!(setting_key, " is not defined.")).into(),
+                    );
                 }
 
                 value = cursor;
@@ -821,7 +814,7 @@ impl Command for ConfigCommand {
                     setting_key.clone(),
                     &properties
                         .iter()
-                        .map(|s| PhpMixed::string(s.to_string()))
+                        .map(|s| PhpMixed::string(*s))
                         .collect::<Vec<_>>(),
                 )
             {
@@ -836,11 +829,7 @@ impl Command for ConfigCommand {
                 value = v.clone();
                 source = "defaults".into();
             } else {
-                return Err(RuntimeException::new(format!(
-                    "{} is not defined",
-                    setting_key.display_lossy()
-                ))
-                .into());
+                return Err(RuntimeException::new(bconcat!(setting_key, " is not defined")).into());
             }
 
             let value_str = if is_array(&value) || is_object(&value) || is_bool(&value) {
@@ -926,7 +915,7 @@ impl Command for ConfigCommand {
                 setting_key.as_bstr(),
                 callbacks,
                 &values,
-                "addConfigSetting",
+                BStr::new("addConfigSetting"),
             )?;
 
             return Ok(0);
@@ -936,7 +925,7 @@ impl Command for ConfigCommand {
                 setting_key.as_bstr(),
                 callbacks,
                 &values,
-                "addConfigSetting",
+                BStr::new("addConfigSetting"),
             )?;
 
             return Ok(0);
@@ -958,9 +947,10 @@ impl Command for ConfigCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(RuntimeException::new(format!(
-                    "Invalid value for {}. Should be one of: auto, source, or dist",
-                    setting_key.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "Invalid value for ",
+                    setting_key,
+                    ". Should be one of: auto, source, or dist"
                 ))
                 .into());
             }
@@ -993,9 +983,10 @@ impl Command for ConfigCommand {
             }
 
             if !boolean_validator(&PhpMixed::string(values[0].clone())) {
-                return Err(RuntimeException::new(format!(
-                    "\"{}\" is an invalid value",
-                    values[0].display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "\"",
+                    values[0],
+                    "\" is an invalid value"
                 ))
                 .into());
             }
@@ -1020,7 +1011,7 @@ impl Command for ConfigCommand {
                 || multi_props.contains_key(&setting_key)
                 || strpos(&setting_key, "extra.") == Some(0))
         {
-            return Err(InvalidArgumentException::new(format!("The {} property can not be set in the global config.json file. Use `shirabe global config` to apply changes to the global composer.json", setting_key.display_lossy()))
+            return Err(InvalidArgumentException::new(bconcat!("The ", setting_key, " property can not be set in the global config.json file. Use `shirabe global config` to apply changes to the global composer.json"))
             .into());
         }
         if input.borrow().get_option("unset")?.as_bool() == Some(true)
@@ -1035,12 +1026,22 @@ impl Command for ConfigCommand {
             return Ok(0);
         }
         if let Some(callbacks) = unique_props.get(&setting_key) {
-            self.handle_single_value(setting_key.as_bstr(), callbacks, &values, "addProperty")?;
+            self.handle_single_value(
+                setting_key.as_bstr(),
+                callbacks,
+                &values,
+                BStr::new("addProperty"),
+            )?;
 
             return Ok(0);
         }
         if let Some(callbacks) = multi_props.get(&setting_key) {
-            self.handle_multi_value(setting_key.as_bstr(), callbacks, &values, "addProperty")?;
+            self.handle_multi_value(
+                setting_key.as_bstr(),
+                callbacks,
+                &values,
+                BStr::new("addProperty"),
+            )?;
 
             return Ok(0);
         }
@@ -1113,7 +1114,7 @@ impl Command for ConfigCommand {
                 }
             }
 
-            return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe config repositories.foo vcs https://bar.com".to_string())
+            return Err(RuntimeException::new(BString::from("You must pass the type and a url. Example: shirabe config repositories.foo vcs https://bar.com"))
         .into());
         }
 
@@ -1159,7 +1160,7 @@ impl Command for ConfigCommand {
                                 PhpMixed::List(l) => l
                                     .iter()
                                     .enumerate()
-                                    .map(|(i, v)| (i.to_string().into(), v.clone()))
+                                    .map(|(i, v)| (bconcat!(i), v.clone()))
                                     .collect(),
                                 _ => value.as_array().cloned().unwrap_or_default(),
                             };
@@ -1167,7 +1168,7 @@ impl Command for ConfigCommand {
                                 PhpMixed::List(l) => l
                                     .iter()
                                     .enumerate()
-                                    .map(|(i, v)| (i.to_string().into(), v.clone()))
+                                    .map(|(i, v)| (bconcat!(i), v.clone()))
                                     .collect(),
                                 _ => current_value.as_array().cloned().unwrap_or_default(),
                             };
@@ -1286,9 +1287,9 @@ impl Command for ConfigCommand {
                 value =
                     JsonFile::parse_json(Some(&values[0]), Some(bstr::BStr::new("composer.json")))?;
                 if !is_array(&value) {
-                    return Err(RuntimeException::new(format!(
-                        "Expected an array or object for {}",
-                        setting_key.display_lossy()
+                    return Err(RuntimeException::new(bconcat!(
+                        "Expected an array or object for ",
+                        setting_key
                     ))
                     .into());
                 }
@@ -1327,9 +1328,9 @@ impl Command for ConfigCommand {
                         }
                         value = PhpMixed::Array(merged);
                     } else {
-                        return Err(RuntimeException::new(format!(
-                            "Cannot merge array and object for {}",
-                            setting_key.display_lossy()
+                        return Err(RuntimeException::new(bconcat!(
+                            "Cannot merge array and object for ",
+                            setting_key
                         ))
                         .into());
                     }
@@ -1378,8 +1379,8 @@ impl Command for ConfigCommand {
             let key = bconcat!(matches.get(1).unwrap(), ".", matches.get(2).unwrap());
             if matches.get(1).unwrap() == "bitbucket-oauth" {
                 if 2 != values.len() {
-                    return Err(RuntimeException::new(format!(
-                        "Expected two arguments (consumer-key, consumer-secret), got {}",
+                    return Err(RuntimeException::new(bconcat!(
+                        "Expected two arguments (consumer-key, consumer-secret), got ",
                         values.len()
                     ))
                     .into());
@@ -1419,9 +1420,9 @@ impl Command for ConfigCommand {
                 b"github-oauth" | b"gitlab-oauth" | b"gitlab-token" | b"bearer"
             ) {
                 if 1 != values.len() {
-                    return Err(RuntimeException::new(
-                        "Too many arguments, expected only one token".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Too many arguments, expected only one token",
+                    ))
                     .into());
                 }
                 self.config_source
@@ -1436,8 +1437,8 @@ impl Command for ConfigCommand {
                     .add_config_setting(bstr::BStr::new(&key), PhpMixed::string(values[0].clone()));
             } else if matches.get(1).unwrap() == "http-basic" {
                 if 2 != values.len() {
-                    return Err(RuntimeException::new(format!(
-                        "Expected two arguments (username, password), got {}",
+                    return Err(RuntimeException::new(bconcat!(
+                        "Expected two arguments (username, password), got ",
                         values.len()
                     ))
                     .into());
@@ -1457,9 +1458,9 @@ impl Command for ConfigCommand {
                     .add_config_setting(bstr::BStr::new(&key), PhpMixed::Array(obj));
             } else if matches.get(1).unwrap() == "custom-headers" {
                 if values.is_empty() {
-                    return Err(RuntimeException::new(
-                        "Expected at least one argument (header), got none".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Expected at least one argument (header), got none",
+                    ))
                     .into());
                 }
 
@@ -1467,18 +1468,18 @@ impl Command for ConfigCommand {
                 let mut formatted_headers: Vec<PhpMixed> = vec![];
                 for header in &values {
                     if !is_string(&PhpMixed::string(header.clone())) {
-                        return Err(RuntimeException::new(
-                            "Headers must be strings in \"Header-Name: Header-Value\" format"
-                                .to_string(),
-                        )
+                        return Err(RuntimeException::new(BString::from(
+                            "Headers must be strings in \"Header-Name: Header-Value\" format",
+                        ))
                         .into());
                     }
 
                     // Check if the header is in correct "Name: Value" format
                     if !preg_is_match(php_regex!("/^[^:]+:\\s*.+$/"), header) {
-                        return Err(RuntimeException::new(format!(
-                            "Header \"{}\" is not in \"Header-Name: Header-Value\" format",
-                            header.display_lossy()
+                        return Err(RuntimeException::new(bconcat!(
+                            "Header \"",
+                            header,
+                            "\" is not in \"Header-Name: Header-Value\" format"
                         ))
                         .into());
                     }
@@ -1498,8 +1499,8 @@ impl Command for ConfigCommand {
                     .add_config_setting(bstr::BStr::new(&key), PhpMixed::List(formatted_headers));
             } else if matches.get(1).unwrap() == "forgejo-token" {
                 if 2 != values.len() {
-                    return Err(RuntimeException::new(format!(
-                        "Expected two arguments (username, access token), got {}",
+                    return Err(RuntimeException::new(bconcat!(
+                        "Expected two arguments (username, access token), got ",
                         values.len()
                     ))
                     .into());
@@ -1559,9 +1560,10 @@ impl Command for ConfigCommand {
             return Ok(0);
         }
 
-        Err(InvalidArgumentException::new(format!(
-            "Setting {} does not exist or is not supported by this command",
-            setting_key.display_lossy()
+        Err(InvalidArgumentException::new(bconcat!(
+            "Setting ",
+            setting_key,
+            " does not exist or is not supported by this command"
         ))
         .into())
     }
@@ -1657,7 +1659,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
             Box::new(|val| {
                 let s = val.as_string().unwrap_or_default();
                 if s == "prompt" {
-                    PhpMixed::string("prompt".to_string())
+                    PhpMixed::string(BString::from("prompt"))
                 } else {
                     PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
@@ -1764,10 +1766,10 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
                 PhpMixed::Bool(in_array_loose(
                     val.as_string().unwrap_or_default(),
                     &[
-                        PhpMixed::string("auto".to_string()),
-                        PhpMixed::string("full".to_string()),
-                        PhpMixed::string("proxy".to_string()),
-                        PhpMixed::string("symlink".to_string()),
+                        PhpMixed::string(BString::from("auto")),
+                        PhpMixed::string(BString::from("full")),
+                        PhpMixed::string(BString::from("proxy")),
+                        PhpMixed::string(BString::from("symlink")),
                     ],
                 ))
             }),
@@ -1786,7 +1788,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
             Box::new(|val| {
                 let s = val.as_string().unwrap_or_default();
                 if s == "stash" {
-                    PhpMixed::string("stash".to_string())
+                    PhpMixed::string(BString::from("stash"))
                 } else {
                     PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
@@ -1925,7 +1927,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
             Box::new(|val| {
                 let s = val.as_string().unwrap_or_default();
                 if s == "php-only" {
-                    PhpMixed::string("php-only".to_string())
+                    PhpMixed::string(BString::from("php-only"))
                 } else {
                     PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
@@ -1944,7 +1946,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
             Box::new(|val| {
                 let s = val.as_string().unwrap_or_default();
                 if s == "prompt" {
-                    PhpMixed::string("prompt".to_string())
+                    PhpMixed::string(BString::from("prompt"))
                 } else {
                     PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
                 }
@@ -1989,21 +1991,21 @@ fn build_multi_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)>
         (
             Box::new(|vals| {
                 if !is_array(vals) {
-                    return PhpMixed::string("array expected".to_string());
+                    return PhpMixed::string(BString::from("array expected"));
                 }
                 if let Some(list) = vals.as_list() {
                     for val in list {
                         if !in_array_loose(
                             val.as_string().unwrap_or_default(),
                             &[
-                                PhpMixed::string("git".to_string()),
-                                PhpMixed::string("https".to_string()),
-                                PhpMixed::string("ssh".to_string()),
+                                PhpMixed::string(BString::from("git")),
+                                PhpMixed::string(BString::from("https")),
+                                PhpMixed::string(BString::from("ssh")),
                             ],
                         ) {
-                            return PhpMixed::string(
-                                "valid protocols include: git, https, ssh".to_string(),
-                            );
+                            return PhpMixed::string(BString::from(
+                                "valid protocols include: git, https, ssh",
+                            ));
                         }
                     }
                 }
@@ -2017,7 +2019,7 @@ fn build_multi_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)>
         (
             Box::new(|vals| {
                 if !is_array(vals) {
-                    return PhpMixed::string("array expected".to_string());
+                    return PhpMixed::string(BString::from("array expected"));
                 }
                 PhpMixed::Bool(true)
             }),
@@ -2029,7 +2031,7 @@ fn build_multi_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)>
         (
             Box::new(|vals| {
                 if !is_array(vals) {
-                    return PhpMixed::string("array expected".to_string());
+                    return PhpMixed::string(BString::from("array expected"));
                 }
                 PhpMixed::Bool(true)
             }),
@@ -2041,7 +2043,7 @@ fn build_multi_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)>
         (
             Box::new(|vals| {
                 if !is_array(vals) {
-                    return PhpMixed::string("array expected".to_string());
+                    return PhpMixed::string(BString::from("array expected"));
                 }
                 if let Some(list) = vals.as_list() {
                     for val in list {
@@ -2049,9 +2051,9 @@ fn build_multi_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)>
                             val.as_string().unwrap_or_default().as_bytes(),
                             b"low" | b"medium" | b"high" | b"critical"
                         ) {
-                            return PhpMixed::string(
-                                "valid severities include: low, medium, high, critical".to_string(),
-                            );
+                            return PhpMixed::string(BString::from(
+                                "valid severities include: low, medium, high, critical",
+                            ));
                         }
                     }
                 }
@@ -2131,7 +2133,7 @@ fn build_multi_props() -> IndexMap<BString, (ValidatorFn, NormalizerFn)> {
         (
             Box::new(|vals| {
                 if !is_array(vals) {
-                    return PhpMixed::string("array expected".to_string());
+                    return PhpMixed::string(BString::from("array expected"));
                 }
                 PhpMixed::Bool(true)
             }),
@@ -2143,7 +2145,7 @@ fn build_multi_props() -> IndexMap<BString, (ValidatorFn, NormalizerFn)> {
         (
             Box::new(|vals| {
                 if !is_array(vals) {
-                    return PhpMixed::string("array expected".to_string());
+                    return PhpMixed::string(BString::from("array expected"));
                 }
                 PhpMixed::Bool(true)
             }),

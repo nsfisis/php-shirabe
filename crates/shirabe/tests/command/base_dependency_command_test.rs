@@ -387,7 +387,7 @@ fn test_why_command_outputs() {
                 bstr::BString::from("vendor1/package1".to_string()),
                 bstr::BString::from("vendor1/package2".to_string()),
                 match_all(),
-                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                Some(Link::TYPE_REQUIRE.to_owned()),
                 bstr::BString::from("^2".to_string()),
             ),
         );
@@ -405,7 +405,7 @@ fn test_why_command_outputs() {
                 bstr::BString::from("vendor1/package2".to_string()),
                 bstr::BString::from("vendor1/package3".to_string()),
                 match_all(),
-                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                Some(Link::TYPE_REQUIRE.to_owned()),
                 bstr::BString::from("^1".to_string()),
             ),
         );
@@ -568,7 +568,7 @@ fn test_why_not_command_outputs() {
                 bstr::BString::from("vendor2/package2".to_string()),
                 bstr::BString::from("vendor2/package3".to_string()),
                 match_all(),
-                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                Some(Link::TYPE_REQUIRE.to_owned()),
                 bstr::BString::from("1.4.*".to_string()),
             ),
         );
@@ -585,7 +585,7 @@ fn test_why_not_command_outputs() {
                     true,
                     None,
                 )),
-                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                Some(Link::TYPE_REQUIRE.to_owned()),
                 bstr::BString::from("^8.2".to_string()),
             ),
         );

@@ -224,7 +224,7 @@ fn test_message_output_when_no_unused_packages_to_remove() {
             bstr::BString::from("root/req".to_string()),
             bstr::BString::from("nested/req".to_string()),
             AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-            Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+            Some(Link::TYPE_REQUIRE.to_owned()),
             bstr::BString::from("^1".to_string()),
         ),
     );

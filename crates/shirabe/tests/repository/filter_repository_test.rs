@@ -52,10 +52,10 @@ fn match_all() -> AnyConstraint {
     MatchAllConstraint::new(None).into()
 }
 
-fn stabilities() -> IndexMap<String, i64> {
+fn stabilities() -> IndexMap<bstr::BString, i64> {
     STABILITIES
         .iter()
-        .map(|(k, v)| (k.to_string(), *v))
+        .map(|(k, v)| (bstr::BString::from(*k), *v))
         .collect()
 }
 
@@ -130,15 +130,7 @@ fn test_canonical_default_true() {
         Some(match_all()),
     );
     let result = repo
-        .load_packages(
-            map,
-            stabilities()
-                .into_iter()
-                .map(|(k, v)| (bstr::BString::from(k), v))
-                .collect::<indexmap::IndexMap<_, _>>(),
-            IndexMap::new(),
-            IndexMap::new(),
-        )
+        .load_packages(map, stabilities(), IndexMap::new(), IndexMap::new())
         .unwrap();
 
     assert_eq!(1, result.packages.len());
@@ -157,15 +149,7 @@ fn test_non_canonical() {
         Some(match_all()),
     );
     let result = repo
-        .load_packages(
-            map,
-            stabilities()
-                .into_iter()
-                .map(|(k, v)| (bstr::BString::from(k), v))
-                .collect::<indexmap::IndexMap<_, _>>(),
-            IndexMap::new(),
-            IndexMap::new(),
-        )
+        .load_packages(map, stabilities(), IndexMap::new(), IndexMap::new())
         .unwrap();
 
     assert_eq!(1, result.packages.len());

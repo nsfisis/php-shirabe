@@ -94,7 +94,7 @@ impl ShowCommand {
     fn print_packages(
         &self,
         packages: &[PackageViewData],
-        indent: &str,
+        indent: &BStr,
         write_version: bool,
         write_latest: bool,
         write_description: bool,
@@ -333,9 +333,9 @@ impl ShowCommand {
         if let Some(ref mp) = matched_package
             && mp.as_complete().is_none()
         {
-            return Err(LogicException::new(format!(
-                "ShowCommand::getPackage can only work with CompletePackageInterface, but got {}",
-                get_class(&PhpMixed::Null).display_lossy()
+            return Err(LogicException::new(bconcat!(
+                "ShowCommand::getPackage can only work with CompletePackageInterface, but got ",
+                get_class(&PhpMixed::Null)
             ))
             .into());
         }
@@ -357,17 +357,14 @@ impl ShowCommand {
         self.print_links(
             package.clone(),
             Link::TYPE_DEV_REQUIRE,
-            Some("requires (dev)"),
+            Some(BStr::new("requires (dev)")),
         );
 
         if !package.get_suggests().is_empty() {
             self.get_io().write("\n<info>suggests</info>");
             for (suggested, reason) in package.get_suggests().iter() {
-                self.get_io().write(format!(
-                    "{} <comment>{}</comment>",
-                    suggested.display_lossy(),
-                    reason.display_lossy()
-                ));
+                self.get_io()
+                    .write(bconcat!(suggested, " <comment>", reason, "</comment>"));
             }
         }
 
@@ -388,21 +385,18 @@ impl ShowCommand {
         let is_installed_package = !PlatformRepository::is_platform_package(package.get_name())
             && installed_repo.has_package(package.clone().into())?;
 
-        self.get_io().write(format!(
-            "<info>name</info>     : {}",
-            package.get_pretty_name().display_lossy()
+        self.get_io().write(bconcat!(
+            "<info>name</info>     : ",
+            package.get_pretty_name()
         ));
-        self.get_io().write(format!(
-            "<info>descrip.</info> : {}",
-            package
-                .get_description()
-                .unwrap_or_default()
-                .display_lossy()
+        self.get_io().write(bconcat!(
+            "<info>descrip.</info> : ",
+            package.get_description().unwrap_or_default()
         ));
         let keywords = package.get_keywords();
-        self.get_io().write(format!(
-            "<info>keywords</info> : {}",
-            implode(", ", &keywords).display_lossy()
+        self.get_io().write(bconcat!(
+            "<info>keywords</info> : ",
+            implode(", ", &keywords)
         ));
         self.print_versions(package.clone(), versions, installed_repo)?;
         if is_installed_package && let Some(rd) = package.get_release_date() {
@@ -442,35 +436,28 @@ impl ShowCommand {
         } else {
             package.clone().into()
         };
-        self.get_io().write(format!(
-            "<info>type</info>     : {}",
-            package.get_type().display_lossy()
-        ));
+        self.get_io()
+            .write(bconcat!("<info>type</info>     : ", package.get_type()));
         self.print_licenses(package.clone());
-        self.get_io().write(format!(
-            "<info>homepage</info> : {}",
-            package.get_homepage().unwrap_or_default().display_lossy()
+        self.get_io().write(bconcat!(
+            "<info>homepage</info> : ",
+            package.get_homepage().unwrap_or_default()
         ));
-        self.get_io().write(format!(
-            "<info>source</info>   : [{}] <comment>{}</comment> {}",
-            package
-                .get_source_type()
-                .unwrap_or_default()
-                .display_lossy(),
-            package.get_source_url().unwrap_or_default().display_lossy(),
-            package
-                .get_source_reference()
-                .unwrap_or_default()
-                .display_lossy()
+        self.get_io().write(bconcat!(
+            "<info>source</info>   : [",
+            package.get_source_type().unwrap_or_default(),
+            "] <comment>",
+            package.get_source_url().unwrap_or_default(),
+            "</comment> ",
+            package.get_source_reference().unwrap_or_default()
         ));
-        self.get_io().write(format!(
-            "<info>dist</info>     : [{}] <comment>{}</comment> {}",
-            package.get_dist_type().unwrap_or_default().display_lossy(),
-            package.get_dist_url().unwrap_or_default().display_lossy(),
-            package
-                .get_dist_reference()
-                .unwrap_or_default()
-                .display_lossy()
+        self.get_io().write(bconcat!(
+            "<info>dist</info>     : [",
+            package.get_dist_type().unwrap_or_default(),
+            "] <comment>",
+            package.get_dist_url().unwrap_or_default(),
+            "</comment> ",
+            package.get_dist_reference().unwrap_or_default()
         ));
         if is_installed_package {
             let path = self.require_composer(None, None).ok().and_then(|c| {
@@ -498,28 +485,23 @@ impl ShowCommand {
             && c.is_abandoned()
         {
             let replacement = match c.get_replacement_package() {
-                Some(rp) => format!(
-                    " The author suggests using the {} package instead.",
-                    rp.display_lossy()
-                ),
-                None => String::new(),
+                Some(rp) => bconcat!(" The author suggests using the ", rp, " package instead."),
+                None => BString::default(),
             };
 
-            self.get_io().write_error(format!(
-                    "<warning>Attention: This package is abandoned and no longer maintained.{}</warning>",
-                    replacement
-                ));
+            self.get_io().write_error(bconcat!(
+                "<warning>Attention: This package is abandoned and no longer maintained.",
+                replacement,
+                "</warning>"
+            ));
         }
 
         let support = package.get_support();
         if !support.is_empty() {
             self.get_io().write("\n<info>support</info>");
             for (r#type, value) in support.iter() {
-                self.get_io().write(format!(
-                    "<comment>{}</comment> : {}",
-                    r#type.display_lossy(),
-                    value.display_lossy()
-                ));
+                self.get_io()
+                    .write(bconcat!("<comment>", r#type, "</comment> : ", value));
             }
         }
 
@@ -528,7 +510,7 @@ impl ShowCommand {
             self.get_io().write("\n<info>autoload</info>");
             for (r#type, autoloads) in autoload_config.iter() {
                 self.get_io()
-                    .write(format!("<comment>{}</comment>", r#type.display_lossy()));
+                    .write(bconcat!("<comment>", r#type, "</comment>"));
 
                 if r#type == "psr-0" || r#type == "psr-4" {
                     if let PhpMixed::Array(map) = autoloads {
@@ -606,20 +588,21 @@ impl ShowCommand {
     fn print_links(
         &self,
         package: CompletePackageInterfaceHandle,
-        link_type: &str,
-        title: Option<&str>,
+        link_type: &BStr,
+        title: Option<&BStr>,
     ) {
         let title = title.unwrap_or(link_type);
         let io = self.get_io();
         let links = package.get_links_for_type(link_type);
         if !links.is_empty() {
-            io.write(format!("\n<info>{}</info>", title));
+            io.write(bconcat!("\n<info>", title, "</info>"));
 
             for link in links.iter() {
-                io.write(format!(
-                    "{} <comment>{}</comment>",
-                    link.1.get_target().display_lossy(),
-                    link.1.get_pretty_constraint().display_lossy(),
+                io.write(bconcat!(
+                    link.1.get_target(),
+                    " <comment>",
+                    link.1.get_pretty_constraint(),
+                    "</comment>"
                 ));
             }
         }
@@ -828,7 +811,7 @@ impl ShowCommand {
                                 _ => false,
                             };
                             if is_empty_path {
-                                path_val = PhpMixed::string(".".to_string());
+                                path_val = PhpMixed::string(BString::from("."));
                             }
 
                             let key = if name.is_empty() {
@@ -851,7 +834,7 @@ impl ShowCommand {
     }
 
     fn append_links(json: &mut PackageInfoJson, package: CompletePackageInterfaceHandle) {
-        for link_type in Link::types().iter() {
+        for link_type in Link::types() {
             Self::append_link(json, package.clone(), link_type);
         }
     }
@@ -859,7 +842,7 @@ impl ShowCommand {
     fn append_link(
         json: &mut PackageInfoJson,
         package: CompletePackageInterfaceHandle,
-        link_type: &str,
+        link_type: &BStr,
     ) {
         let links = package.get_links_for_type(link_type);
 
@@ -871,13 +854,18 @@ impl ShowCommand {
                     BString::from(link.1.get_pretty_constraint()),
                 );
             }
-            let slot = match link_type {
-                Link::TYPE_REQUIRE => &mut json.requires,
-                Link::TYPE_DEV_REQUIRE => &mut json.dev_requires,
-                Link::TYPE_PROVIDE => &mut json.provides,
-                Link::TYPE_CONFLICT => &mut json.conflicts,
-                Link::TYPE_REPLACE => &mut json.replaces,
-                _ => unreachable!("Link::types() yields only the five link types"),
+            let slot = if link_type == Link::TYPE_REQUIRE {
+                &mut json.requires
+            } else if link_type == Link::TYPE_DEV_REQUIRE {
+                &mut json.dev_requires
+            } else if link_type == Link::TYPE_PROVIDE {
+                &mut json.provides
+            } else if link_type == Link::TYPE_CONFLICT {
+                &mut json.conflicts
+            } else if link_type == Link::TYPE_REPLACE {
+                &mut json.replaces
+            } else {
+                unreachable!("Link::types() yields only the five link types")
             };
             *slot = Some(m);
         }
@@ -919,13 +907,13 @@ impl ShowCommand {
             }
 
             if let Some(requires) = &package.requires {
-                let mut tree_bar = "├".to_string();
+                let mut tree_bar = BString::from("├");
                 let mut j = 0_usize;
                 let total = requires.len();
                 for require in requires.iter() {
                     j += 1;
                     if j == total {
-                        tree_bar = "└".to_string();
+                        tree_bar = BString::from("└");
                     }
                     let level: usize = 1;
                     let color = self.colors.borrow().get(level).cloned().unwrap_or_default();
@@ -942,11 +930,11 @@ impl ShowCommand {
                     );
                     self.write_tree_line(BStr::new(&info));
 
-                    tree_bar = tree_bar.replace('└', " ");
+                    tree_bar = str_replace("└", " ", &tree_bar);
                     let packages_in_tree: Vec<BString> =
                         vec![package.name.clone(), require.name.clone()];
 
-                    self.display_tree(require, &packages_in_tree, &tree_bar, level + 1);
+                    self.display_tree(require, &packages_in_tree, tree_bar.as_bstr(), level + 1);
                 }
             }
         }
@@ -1012,22 +1000,22 @@ impl ShowCommand {
         &self,
         package: &PackageTreeChild,
         packages_in_tree: &[BString],
-        previous_tree_bar: &str,
+        previous_tree_bar: &BStr,
         level: usize,
     ) {
-        let previous_tree_bar = previous_tree_bar.replace('├', "│");
+        let previous_tree_bar = str_replace("├", "│", previous_tree_bar);
         let requires = match &package.requires {
             Some(r) => r,
             None => return,
         };
-        let mut tree_bar = format!("{}  ├", previous_tree_bar);
+        let mut tree_bar = bconcat!(previous_tree_bar, "  ├");
         let mut i = 0_usize;
         let total = requires.len();
         for require in requires.iter() {
             let mut current_tree = packages_in_tree.to_vec();
             i += 1;
             if i == total {
-                tree_bar = format!("{}  └", previous_tree_bar);
+                tree_bar = bconcat!(previous_tree_bar, "  └");
             }
             let color_ident = level % self.colors.borrow().len();
             let color = self
@@ -1057,10 +1045,10 @@ impl ShowCommand {
             ));
             self.write_tree_line(BStr::new(&info));
 
-            tree_bar = tree_bar.replace('└', " ");
+            tree_bar = str_replace("└", " ", &tree_bar);
 
             current_tree.push(require.name.clone());
-            self.display_tree(require, &current_tree, &tree_bar, level + 1);
+            self.display_tree(require, &current_tree, tree_bar.as_bstr(), level + 1);
         }
     }
 
@@ -1186,13 +1174,13 @@ impl ShowCommand {
         let mut stability = composer_ref.get_package().get_minimum_stability();
         let flags = composer_ref.get_package().get_stability_flags();
         if let Some(flag_value) = flags.get(bstr::B(&name)) {
-            let key_map: IndexMap<String, String> = base_package::STABILITIES
+            let key_map: IndexMap<BString, BString> = base_package::STABILITIES
                 .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .map(|(k, v)| (BString::from(*k), bconcat!(v)))
                 .collect();
-            let needle = flag_value.to_string();
+            let needle = bconcat!(flag_value);
             if let Some(found_key) = array_search(&needle, &key_map) {
-                stability = bstr::BString::from(found_key);
+                stability = found_key;
             }
         }
 
@@ -1314,9 +1302,7 @@ impl ShowCommand {
     }
 
     fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::Utc>) -> BString {
-        if release_date
-            .format(date_format_to_strftime(b"Ymd"))
-            .to_string()
+        if display_to_bytes(release_date.format(date_format_to_strftime(b"Ymd")))
             == date_local("Ymd", None)
         {
             return BString::from("today");
@@ -1369,10 +1355,10 @@ impl Command for ShowCommand {
         self.set_name("show".into())?;
         self.set_aliases(vec!["info".into()])?;
         self.set_description("Shows information about packages".into());
-        let opt_none = |name: &str, shortcut: Option<&str>, description: &str| {
+        let opt_none = |name: &BStr, shortcut: Option<&BStr>, description: &BStr| {
             InputOption::new(
                 name,
-                shortcut.map(bstr::BStr::new),
+                shortcut,
                 Some(InputOption::VALUE_NONE),
                 description,
                 None,
@@ -1398,24 +1384,24 @@ impl Command for ShowCommand {
             )
             .unwrap()
             .into(),
-            opt_none("all", None, "List all packages"),
-            opt_none("locked", None, "List all locked packages"),
+            opt_none(BStr::new("all"), None, BStr::new("List all packages")),
+            opt_none(BStr::new("locked"), None, BStr::new("List all locked packages")),
             opt_none(
-                "installed",
-                Some("i"),
-                "List installed packages only (enabled by default, only present for BC).",
+                BStr::new("installed"),
+                Some(BStr::new("i")),
+                BStr::new("List installed packages only (enabled by default, only present for BC)."),
             ),
-            opt_none("platform", Some("p"), "List platform packages only"),
-            opt_none("available", Some("a"), "List available packages only"),
-            opt_none("self", Some("s"), "Show the root package information"),
-            opt_none("name-only", Some("N"), "List package names only"),
-            opt_none("path", Some("P"), "Show package paths"),
-            opt_none("tree", Some("t"), "List the dependencies as a tree"),
-            opt_none("latest", Some("l"), "Show the latest version"),
+            opt_none(BStr::new("platform"), Some(BStr::new("p")), BStr::new("List platform packages only")),
+            opt_none(BStr::new("available"), Some(BStr::new("a")), BStr::new("List available packages only")),
+            opt_none(BStr::new("self"), Some(BStr::new("s")), BStr::new("Show the root package information")),
+            opt_none(BStr::new("name-only"), Some(BStr::new("N")), BStr::new("List package names only")),
+            opt_none(BStr::new("path"), Some(BStr::new("P")), BStr::new("Show package paths")),
+            opt_none(BStr::new("tree"), Some(BStr::new("t")), BStr::new("List the dependencies as a tree")),
+            opt_none(BStr::new("latest"), Some(BStr::new("l")), BStr::new("Show the latest version")),
             opt_none(
-                "outdated",
-                Some("o"),
-                "Show the latest version but only for packages that are outdated",
+                BStr::new("outdated"),
+                Some(BStr::new("o")),
+                BStr::new("Show the latest version but only for packages that are outdated"),
             ),
             InputOption::new6(
                 "ignore",
@@ -1428,34 +1414,34 @@ impl Command for ShowCommand {
             .unwrap()
             .into(),
             opt_none(
-                "major-only",
-                Some("M"),
-                "Show only packages that have major SemVer-compatible updates. Use with the --latest or --outdated option.",
+                BStr::new("major-only"),
+                Some(BStr::new("M")),
+                BStr::new("Show only packages that have major SemVer-compatible updates. Use with the --latest or --outdated option."),
             ),
             opt_none(
-                "minor-only",
-                Some("m"),
-                "Show only packages that have minor SemVer-compatible updates. Use with the --latest or --outdated option.",
+                BStr::new("minor-only"),
+                Some(BStr::new("m")),
+                BStr::new("Show only packages that have minor SemVer-compatible updates. Use with the --latest or --outdated option."),
             ),
             opt_none(
-                "patch-only",
+                BStr::new("patch-only"),
                 None,
-                "Show only packages that have patch SemVer-compatible updates. Use with the --latest or --outdated option.",
+                BStr::new("Show only packages that have patch SemVer-compatible updates. Use with the --latest or --outdated option."),
             ),
             opt_none(
-                "sort-by-age",
-                Some("A"),
-                "Displays the installed version's age, and sorts packages oldest first. Use with the --latest or --outdated option.",
+                BStr::new("sort-by-age"),
+                Some(BStr::new("A")),
+                BStr::new("Displays the installed version's age, and sorts packages oldest first. Use with the --latest or --outdated option."),
             ),
             opt_none(
-                "direct",
-                Some("D"),
-                "Shows only packages that are directly required by the root package",
+                BStr::new("direct"),
+                Some(BStr::new("D")),
+                BStr::new("Shows only packages that are directly required by the root package"),
             ),
             opt_none(
-                "strict",
+                BStr::new("strict"),
                 None,
-                "Return a non-zero exit code when there are outdated packages",
+                BStr::new("Return a non-zero exit code when there are outdated packages"),
             ),
             InputOption::new6(
                 "format",
@@ -1467,7 +1453,7 @@ impl Command for ShowCommand {
             )
             .unwrap()
             .into(),
-            opt_none("no-dev", None, "Disables search in require-dev packages."),
+            opt_none(BStr::new("no-dev"), None, BStr::new("Disables search in require-dev packages.")),
             InputOption::new(
                 "ignore-platform-req",
                 None,
@@ -1478,9 +1464,9 @@ impl Command for ShowCommand {
             .unwrap()
             .into(),
             opt_none(
-                "ignore-platform-reqs",
+                BStr::new("ignore-platform-reqs"),
                 None,
-                "Ignore all platform requirements (php & ext- packages). Use with the --outdated option",
+                BStr::new("Ignore all platform requirements (php & ext- packages). Use with the --outdated option"),
             ),
         ]);
         self.set_help(
@@ -1589,13 +1575,14 @@ impl Command for ShowCommand {
         if !in_array_loose(
             format.clone(),
             &[
-                PhpMixed::string("text".to_string()),
-                PhpMixed::string("json".to_string()),
+                PhpMixed::string(BString::from("text")),
+                PhpMixed::string(BString::from("json")),
             ],
         ) {
-            self.get_io().write_error(format!(
-                "Unsupported format \"{}\". See help for supported formats.",
-                format.display_lossy()
+            self.get_io().write_error(bconcat!(
+                "Unsupported format \"",
+                format,
+                "\". See help for supported formats."
             ));
 
             return Ok(1);
@@ -1650,9 +1637,9 @@ impl Command for ShowCommand {
                 .as_string()
                 .is_some()
             {
-                return Err(InvalidArgumentException::new(
-                    "You cannot use --self together with a package name".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "You cannot use --self together with a package name",
+                ))
                 .into());
             }
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
@@ -1694,10 +1681,7 @@ impl Command for ShowCommand {
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     default_repos.into_values().collect(),
                 ));
-                self.get_io().write_error(format!(
-                    "No composer.json found in the current directory, showing available packages from {}",
-                    implode(", ", &names).display_lossy()
-                ));
+                self.get_io().write_error(bconcat!("No composer.json found in the current directory, showing available packages from ", implode(", ", &names)));
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             }
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
@@ -1744,9 +1728,9 @@ impl Command for ShowCommand {
             let default_repos =
                 RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
             let names: Vec<BString> = default_repos.keys().cloned().collect();
-            self.get_io().write_error(format!(
-                "No composer.json found in the current directory, showing available packages from {}",
-                implode(", ", &names).display_lossy()
+            self.get_io().write_error(bconcat!(
+                "No composer.json found in the current directory, showing available packages from ",
+                implode(", ", &names)
             ));
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 platform_repo.clone().into(),
@@ -1763,7 +1747,7 @@ impl Command for ShowCommand {
                     .borrow_mut()
                     .is_locked()
             {
-                return Err(UnexpectedValueException::new("A valid composer.json and composer.lock files is required to run this command with --locked".to_string())
+                return Err(UnexpectedValueException::new(BString::from("A valid composer.json and composer.lock files is required to run this command with --locked"))
                 .into());
             }
             let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
@@ -1918,25 +1902,27 @@ impl Command for ShowCommand {
                         .collect::<Vec<_>>(),
                 )
             {
-                return Err(InvalidArgumentException::new(format!(
-                    "Package \"{}\" is installed but not a direct dependent of the root package.",
-                    pkg.get_name().display_lossy()
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Package \"",
+                    pkg.get_name(),
+                    "\" is installed but not a direct dependent of the root package."
                 ))
                 .into());
             }
 
             if matched_package.is_none() {
                 let options = input.borrow().get_options();
-                let mut hint = String::new();
+                let mut hint = BString::default();
                 if input.borrow().get_option("locked")?.as_bool() == Some(true) {
                     hint.push_str(" in lock file");
                 }
                 if let Some(working_dir) =
                     options.get(bstr::B("working-dir")).filter(|v| !v.is_null())
                 {
-                    hint.push_str(&format!(
-                        " in {}/composer.json",
-                        working_dir.as_string().unwrap_or_default().display_lossy()
+                    hint.push_str(&bconcat!(
+                        " in ",
+                        working_dir.as_string().unwrap_or_default(),
+                        "/composer.json"
                     ));
                 }
                 if PlatformRepository::is_platform_package(pf)
@@ -1950,10 +1936,12 @@ impl Command for ShowCommand {
                     hint.push_str(", try using --available (-a) to show all available packages");
                 }
 
-                return Err(InvalidArgumentException::new(format!(
-                    "Package \"{}\" not found{}.",
-                    pf.display_lossy(),
-                    hint
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Package \"",
+                    pf,
+                    "\" not found",
+                    hint,
+                    "."
                 ))
                 .into());
             }
@@ -2218,7 +2206,7 @@ impl Command for ShowCommand {
                 .unwrap_or_default(),
             BStr::new("{^(?:%s)$}iD"),
         );
-        let indent = if show_all_types { "  " } else { "" };
+        let indent = BStr::new(if show_all_types { "  " } else { "" });
         let mut latest_packages: IndexMap<BString, crate::package::PackageInterfaceHandle> =
             IndexMap::new();
         let mut exit_code: i64 = 0;

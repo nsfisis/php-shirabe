@@ -630,7 +630,7 @@ impl ArrayLoader {
         &self,
         source: &BStr,
         source_version: &BStr,
-        description: &str,
+        description: &BStr,
         links: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<IndexMap<BString, Link>> {
         let mut res: IndexMap<BString, Link> = IndexMap::new();
@@ -656,7 +656,7 @@ impl ArrayLoader {
         &self,
         source: &BStr,
         source_version: &BStr,
-        description: &str,
+        description: &BStr,
         target: &BStr,
         pretty_constraint: &BStr,
     ) -> anyhow::Result<Link> {
@@ -672,12 +672,16 @@ impl ArrayLoader {
         let parsed_constraint = match self.version_parser.parse_constraints(constraint) {
             Ok(c) => c,
             Err(e) => {
-                let message = format!(
-                    "Link constraint in {} {} > {} should be a valid version constraint, got \"{}\"",
-                    source.display_lossy(),
+                let message = bconcat!(
+                    "Link constraint in ",
+                    source,
+                    " ",
                     description,
-                    target.display_lossy(),
-                    constraint.display_lossy()
+                    " > ",
+                    target,
+                    " should be a valid version constraint, got \"",
+                    constraint,
+                    "\""
                 );
                 let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
                 return Err(UnexpectedValueException::with_code_and_previous(
@@ -841,7 +845,7 @@ fn php_to_string_vec(value: &PhpMixed) -> Vec<BString> {
     }
 }
 
-fn apply_link_setter(package: &mut Package, method: &str, links: IndexMap<BString, Link>) {
+fn apply_link_setter(package: &mut Package, method: &BStr, links: IndexMap<BString, Link>) {
     if method == Link::TYPE_REQUIRE {
         package.set_requires(links);
     } else if method == Link::TYPE_DEV_REQUIRE {

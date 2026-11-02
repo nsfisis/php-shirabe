@@ -17,9 +17,10 @@ use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, bconcat, empty,
     explode, file, file_exists, file_get_contents, file_put_contents, filter_var_email,
-    get_current_user, impl_php_class, implode, is_dir, is_string, path_from_bytes, path_to_bytes,
-    pcre_check_utf8_subject, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
-    preg_replace, realpath, str_replace, strpos, strtolower, trim, ucwords, unlink,
+    get_current_user, impl_php_class, implode, is_dir, is_string, os_str_from_bytes,
+    path_from_bytes, path_to_bytes, pcre_check_utf8_subject, php_regex, preg_is_match, preg_match,
+    preg_match_all, preg_quote, preg_replace, realpath, str_replace, strpos, strtolower, trim,
+    ucwords, unlink,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use shirabe_symfony_console::input::InputInterfaceByName;
@@ -38,7 +39,7 @@ pub struct InitCommand {
     git_config: std::cell::RefCell<Option<IndexMap<BString, BString>>>,
     repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
     repository_sets: std::cell::RefCell<
-        IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
+        IndexMap<BString, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
     >,
 }
 
@@ -55,7 +56,7 @@ impl PackageDiscoveryTrait for InitCommand {
         &self,
     ) -> std::cell::RefMut<
         '_,
-        IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
+        IndexMap<BString, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
     > {
         self.repository_sets.borrow_mut()
     }
@@ -98,9 +99,10 @@ impl InitCommand {
             if let Some(ref email) = email
                 && !self.is_valid_email(email.as_bstr())
             {
-                return Err(InvalidArgumentException::new(format!(
-                    "Invalid email \"{}\"",
-                    email.display_lossy()
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Invalid email \"",
+                    email,
+                    "\""
                 ))
                 .into());
             }
@@ -115,8 +117,7 @@ impl InitCommand {
             return Ok(result);
         }
 
-        Err(InvalidArgumentException::new("Invalid author string.  Must be in the formats: Jane Doe or John Smith <john@example.com>"
-            .to_string())
+        Err(InvalidArgumentException::new(BString::from("Invalid author string.  Must be in the formats: Jane Doe or John Smith <john@example.com>"))
         .into())
     }
 
@@ -165,7 +166,11 @@ impl InitCommand {
 
         let mut output = BString::default();
         if process.execute(
-            &["git".to_string(), "config".to_string(), "-l".to_string()],
+            &[
+                BString::from("git"),
+                BString::from("config"),
+                BString::from("-l"),
+            ],
             &mut output,
             None,
         )? == 0
@@ -200,7 +205,7 @@ impl InitCommand {
     ///  "/$vendor/"
     ///  "/$vendor/*"
     ///  "$vendor/*"
-    fn has_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &str) -> bool {
+    fn has_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &BStr) -> bool {
         let ignore_file = ignore_file.as_ref();
         if !file_exists(ignore_file) {
             return false;
@@ -218,7 +223,7 @@ impl InitCommand {
         false
     }
 
-    fn add_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &str) {
+    fn add_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &BStr) {
         let ignore_file = ignore_file.as_ref();
         let mut contents: Vec<u8> = vec![];
         if file_exists(ignore_file) {
@@ -235,17 +240,17 @@ impl InitCommand {
     /// For testing only: invoke the private `parse_author_string`.
     pub fn __parse_author_string(
         &self,
-        author: &str,
+        author: &BStr,
     ) -> anyhow::Result<IndexMap<BString, Option<BString>>> {
-        self.parse_author_string(author.into())
+        self.parse_author_string(author)
     }
 
     /// For testing only: invoke the crate-private `format_authors`.
     pub fn __format_authors(
         &self,
-        author: &str,
+        author: &BStr,
     ) -> anyhow::Result<Vec<IndexMap<BString, PhpMixed>>> {
-        self.format_authors(author.into())
+        self.format_authors(author)
     }
 
     /// For testing only: invoke the crate-private `get_git_config`.
@@ -254,12 +259,12 @@ impl InitCommand {
     }
 
     /// For testing only: invoke the crate-private `has_vendor_ignore`.
-    pub fn __has_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &str) -> bool {
+    pub fn __has_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &BStr) -> bool {
         self.has_vendor_ignore(ignore_file, vendor)
     }
 
     /// For testing only: invoke the crate-private `add_vendor_ignore`.
-    pub fn __add_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &str) {
+    pub fn __add_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &BStr) {
         self.add_vendor_ignore(ignore_file, vendor)
     }
 
@@ -356,9 +361,9 @@ impl InitCommand {
         let name = self.sanitize_package_name_component(name.as_bstr())?;
 
         let mut vendor = name.clone();
-        let composer_default_vendor = server_value("COMPOSER_DEFAULT_VENDOR");
-        let server_username = server_value("USERNAME");
-        let server_user = server_value("USER");
+        let composer_default_vendor = server_value(BStr::new("COMPOSER_DEFAULT_VENDOR"));
+        let server_username = server_value(BStr::new("USERNAME"));
+        let server_user = server_value(BStr::new("USER"));
         if !empty(
             &composer_default_vendor
                 .clone()
@@ -395,7 +400,7 @@ impl InitCommand {
         let git = self.get_git_config()?;
 
         let mut author_name: Option<BString> = None;
-        let composer_default_author = server_value("COMPOSER_DEFAULT_AUTHOR");
+        let composer_default_author = server_value(BStr::new("COMPOSER_DEFAULT_AUTHOR"));
         if !empty(
             &composer_default_author
                 .clone()
@@ -408,7 +413,7 @@ impl InitCommand {
         }
 
         let mut author_email: Option<BString> = None;
-        let composer_default_email = server_value("COMPOSER_DEFAULT_EMAIL");
+        let composer_default_email = server_value(BStr::new("COMPOSER_DEFAULT_EMAIL"));
         if !empty(
             &composer_default_email
                 .clone()
@@ -429,12 +434,12 @@ impl InitCommand {
 }
 
 /// `$_SERVER[$name]`, holding the bytes of the environment.
-fn server_value(name: &str) -> Option<BString> {
+fn server_value(name: &BStr) -> Option<BString> {
     PHP_SERVER
         .lock()
         .unwrap()
-        .get(name)
-        .map(|value| BString::from(value.into_encoded_bytes()))
+        .get(os_str_from_bytes(name))
+        .map(|value| BString::from(value.as_encoded_bytes()))
 }
 
 #[async_trait::async_trait(?Send)]
@@ -450,7 +455,7 @@ impl Command for InitCommand {
         InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
         InputOption::new6("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
         InputOption::new6("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
-        InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()).display_lossy()), None).unwrap().into(),
+        InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), bconcat!("Minimum stability (empty or one of: ", implode(", ", &base_package::STABILITIES.keys().copied().collect::<Vec<_>>()), ")"), None).unwrap().into(),
         InputOption::new("license", Some("l".into()), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
         InputOption::new("autoload", Some("a".into()), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
@@ -509,10 +514,7 @@ impl Command for InitCommand {
                     .unwrap_or_default(),
             )
         {
-            return Err(InvalidArgumentException::new(format!(
-                "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                options.get(B("name")).and_then(|v| v.as_string()).unwrap_or_default().display_lossy()
-            ))
+            return Err(InvalidArgumentException::new(bconcat!("The package name ", options.get(B("name")).and_then(|v| v.as_string()).unwrap_or_default(), " is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+"))
             .into());
         }
 
@@ -651,7 +653,7 @@ impl Command for InitCommand {
             }
         } else {
             io.write_error3(
-                format!("Writing {}", file_obj.get_path().display()),
+                bconcat!("Writing ", file_obj.get_path()),
                 true,
                 io_interface::NORMAL,
             );
@@ -700,17 +702,19 @@ impl Command for InitCommand {
                     .to_path_buf()
             });
 
-            if !self.has_vendor_ignore(&ignore_file, "vendor") {
-                let question = "Would you like the <info>vendor</info> directory added to your <info>.gitignore</info> [<comment>yes</comment>]? ".to_string();
+            if !self.has_vendor_ignore(&ignore_file, BStr::new("vendor")) {
+                let question = BString::from(
+                    "Would you like the <info>vendor</info> directory added to your <info>.gitignore</info> [<comment>yes</comment>]? ",
+                );
 
                 if io.ask_confirmation(question, true)? {
-                    self.add_vendor_ignore(&ignore_file, "/vendor/");
+                    self.add_vendor_ignore(&ignore_file, BStr::new("/vendor/"));
                 }
             }
         }
 
         let question =
-            "Would you like to install dependencies now [<comment>yes</comment>]? ".to_string();
+            BString::from("Would you like to install dependencies now [<comment>yes</comment>]? ");
         if input.borrow().is_interactive()
             && self.has_dependencies(&options)
             && io.ask_confirmation(question, true)?
@@ -832,10 +836,11 @@ impl Command for InitCommand {
 
                 if create_default_packagist_repo {
                     let mut default_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-                    default_config.insert("type".into(), PhpMixed::string("composer".to_string()));
+                    default_config
+                        .insert("type".into(), PhpMixed::string(BString::from("composer")));
                     default_config.insert(
                         "url".into(),
-                        PhpMixed::string("https://repo.packagist.org".to_string()),
+                        PhpMixed::string(BString::from("https://repo.packagist.org")),
                     );
                     repos.push(RepositoryFactory::create_repo(
                         io.clone(),
@@ -888,10 +893,7 @@ impl Command for InitCommand {
             let name_for_validate = name.clone();
             name = BString::from(io
             .ask_and_validate(
-                format!(
-                    "Package name (<vendor>/<name>) [<comment>{}</comment>]: ",
-                    name_default.display_lossy()
-                ),
+                bconcat!("Package name (<vendor>/<name>) [<comment>", name_default, "</comment>]: "),
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     if value.is_null() {
                         return Ok(PhpMixed::string(name_for_validate.clone()));
@@ -903,10 +905,7 @@ impl Command for InitCommand {
                         ),
                         value.as_string().unwrap_or_default(),
                     ) {
-                        return Err(InvalidArgumentException::new(format!(
-                            "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                            value.as_string().unwrap_or_default().display_lossy()
-                        ))
+                        return Err(InvalidArgumentException::new(bconcat!("The package name ", value.as_string().unwrap_or_default(), " is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+"))
                         .into());
                     }
 
@@ -928,9 +927,10 @@ impl Command for InitCommand {
                 .map(BString::from);
             let description_default = description.clone();
             let description = io.ask(
-                format!(
-                    "Description [<comment>{}</comment>]: ",
-                    description.unwrap_or_default().display_lossy()
+                bconcat!(
+                    "Description [<comment>",
+                    description.unwrap_or_default(),
+                    "</comment>]: "
                 ),
                 description_default
                     .map(PhpMixed::string)
@@ -954,13 +954,14 @@ impl Command for InitCommand {
             let author_default = author.clone();
             // PHP: $this->parseAuthorString is called inside a closure. We approximate by binding.
             let author_value = io.ask_and_validate(
-                format!(
-                    "Author [{} n to skip]: ",
+                bconcat!(
+                    "Author [",
                     if is_string(&PhpMixed::string(author.clone())) {
-                        format!("<comment>{}</comment>, ", author.display_lossy())
+                        bconcat!("<comment>", author, "</comment>, ")
                     } else {
-                        String::new()
-                    }
+                        BString::default()
+                    },
+                    " n to skip]: "
                 ),
                 // PHP: function ($value) use ($self, $author) { ... $author = $self->parseAuthorString($value); ... }
                 // The validator is a `'static` closure and cannot borrow `&self`, but
@@ -1002,9 +1003,10 @@ impl Command for InitCommand {
             let minimum_stability_default = minimum_stability.clone();
             let minimum_stability_for_validate = minimum_stability.clone();
             let minimum_stability_value = io.ask_and_validate(
-                format!(
-                    "Minimum Stability [<comment>{}</comment>]: ",
-                    minimum_stability.unwrap_or_default().display_lossy()
+                bconcat!(
+                    "Minimum Stability [<comment>",
+                    minimum_stability.unwrap_or_default(),
+                    "</comment>]: "
                 ),
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     if value.is_null() {
@@ -1017,17 +1019,17 @@ impl Command for InitCommand {
                     if base_package::stability_priority(value.as_string().unwrap_or_default())
                         .is_none()
                     {
-                        return Err(InvalidArgumentException::new(format!(
-                            "Invalid minimum stability \"{}\". Must be empty or one of: {}",
-                            value.as_string().unwrap_or_default().display_lossy(),
+                        return Err(InvalidArgumentException::new(bconcat!(
+                            "Invalid minimum stability \"",
+                            value.as_string().unwrap_or_default(),
+                            "\". Must be empty or one of: ",
                             implode(
                                 ", ",
                                 &base_package::STABILITIES
                                     .keys()
-                                    .map(|k| k.to_string())
+                                    .copied()
                                     .collect::<Vec<_>>()
                             )
-                            .display_lossy()
                         ))
                         .into());
                     }
@@ -1048,12 +1050,13 @@ impl Command for InitCommand {
             let type_val = input.borrow().get_option("type")?;
             let type_str = BString::from(type_val.as_string().unwrap_or_default());
             let mut type_value = io.ask(
-            format!(
-                "Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>{}</comment>]: ",
-                type_str.display_lossy()
-            ),
-            type_val.into(),
-        )?;
+                bconcat!(
+                    "Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>",
+                    type_str,
+                    "</comment>]: "
+                ),
+                type_val.into(),
+            )?;
             if type_value.as_string() == Some("".into())
                 || matches!(type_value, PhpMixed::Bool(false))
             {
@@ -1069,7 +1072,7 @@ impl Command for InitCommand {
                 .as_string()
                 .map(BString::from);
             if license.is_none() {
-                let default_license = server_value("COMPOSER_DEFAULT_LICENSE");
+                let default_license = server_value(BStr::new("COMPOSER_DEFAULT_LICENSE"));
                 if !empty(
                     &default_license
                         .clone()
@@ -1081,9 +1084,10 @@ impl Command for InitCommand {
             }
 
             let license = io.ask(
-                format!(
-                    "License [<comment>{}</comment>]: ",
-                    license.clone().unwrap_or_default().display_lossy()
+                bconcat!(
+                    "License [<comment>",
+                    license.clone().unwrap_or_default(),
+                    "</comment>]: "
                 ),
                 license.map(PhpMixed::string).unwrap_or(PhpMixed::Null),
             )?;
@@ -1092,10 +1096,7 @@ impl Command for InitCommand {
                 && !spdx.validate(license.as_string().unwrap_or_default())
                 && license.as_string() != Some("proprietary".into())
             {
-                return Err(InvalidArgumentException::new(format!(
-                    "Invalid license provided: {}. Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted.",
-                    license.as_string().unwrap_or_default().display_lossy()
-                ))
+                return Err(InvalidArgumentException::new(bconcat!("Invalid license provided: ", license.as_string().unwrap_or_default(), ". Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted."))
             .into());
             }
             input
@@ -1128,7 +1129,9 @@ impl Command for InitCommand {
                     None
                 };
 
-            let question = "Would you like to define your dependencies (require) interactively [<comment>yes</comment>]? ".to_string();
+            let question = BString::from(
+                "Would you like to define your dependencies (require) interactively [<comment>yes</comment>]? ",
+            );
             let require: Vec<bstr::BString> = input
                 .borrow()
                 .get_option("require")?
@@ -1153,7 +1156,9 @@ impl Command for InitCommand {
                 .borrow_mut()
                 .set_option("require", InputValue::from(requirements));
 
-            let question = "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ".to_string();
+            let question = BString::from(
+                "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ",
+            );
             let require_dev: Vec<bstr::BString> = input
                 .borrow()
                 .get_option("require-dev")?
@@ -1193,11 +1198,7 @@ impl Command for InitCommand {
             let autoload_for_validate = autoload.clone();
             let autoload_default = autoload.clone();
             let autoload_value = io.ask_and_validate(
-            format!(
-                "Add PSR-4 autoload mapping? Maps namespace \"{}\" to the entered relative path. [<comment>{}</comment>, n to skip]: ",
-                namespace.display_lossy(),
-                autoload.display_lossy()
-            ),
+            bconcat!("Add PSR-4 autoload mapping? Maps namespace \"", namespace, "\" to the entered relative path. [<comment>", autoload, "</comment>, n to skip]: "),
             Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                 if value.is_null() {
                     return Ok(PhpMixed::string(autoload_for_validate.clone()));
@@ -1216,10 +1217,7 @@ impl Command for InitCommand {
 
                 if !preg_is_match(php_regex!(r"{^[^/][A-Za-z0-9\-_/]+/$}"), &value_or_default)
                 {
-                    return Err(InvalidArgumentException::new(format!(
-                        "The src folder name \"{}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
-                        value_or_default.display_lossy(),
-                    ))
+                    return Err(InvalidArgumentException::new(bconcat!("The src folder name \"", value_or_default, "\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/"))
                     .into());
                 }
 

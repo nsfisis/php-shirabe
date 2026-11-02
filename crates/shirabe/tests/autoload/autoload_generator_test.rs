@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Autoload/AutoloadGeneratorTest.php
 
 use crate::config_stub::ConfigStubBuilder;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::autoload::AutoloadGenerator;
@@ -309,12 +309,17 @@ fn constraint(operator: &str, version: &str) -> AnyConstraint {
     AnyConstraint::Simple(SimpleConstraint::new(operator, version.to_string(), None))
 }
 
-fn link(source: &str, target: &str, constraint: AnyConstraint, description: Option<&str>) -> Link {
+fn link(
+    source: &str,
+    target: &str,
+    constraint: AnyConstraint,
+    description: Option<&bstr::BStr>,
+) -> Link {
     Link::new(
         bstr::BString::from(source.to_string()),
         bstr::BString::from(target.to_string()),
         constraint,
-        description.map(|d| d.to_string()).map(bstr::BString::from),
+        description.map(|d| d.to_owned()),
         bstr::BString::from(String::new()),
     )
 }
@@ -2324,7 +2329,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     package.set_requires(
         requires(vec![(
             "dep/a",
-            link("root/a", "dep/a", match_all(), Some("requires")),
+            link("root/a", "dep/a", match_all(), Some(BStr::new("requires"))),
         )])
         .into_iter()
         .map(|(k, v)| (bstr::BString::from(k), v))

@@ -14,14 +14,14 @@ fn mk_link(
     source: &str,
     target: &str,
     constraint: shirabe_semver::constraint::AnyConstraint,
-    r#type: &str,
+    r#type: &bstr::BStr,
 ) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
         bstr::BString::from(source.to_string()),
         bstr::BString::from(target.to_string()),
         constraint,
-        Some(bstr::BString::from(r#type.to_string())),
+        Some(r#type.to_owned()),
         pretty,
     )
 }

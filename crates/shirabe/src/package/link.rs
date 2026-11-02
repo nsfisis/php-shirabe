@@ -2,7 +2,7 @@
 
 use crate::package::PackageInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, strtolower};
+use shirabe_php_shim::{bconcat, php_str, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Clone, Debug)]
@@ -15,18 +15,18 @@ pub struct Link {
 }
 
 impl Link {
-    pub const TYPE_REQUIRE: &'static str = "requires";
-    pub const TYPE_DEV_REQUIRE: &'static str = "devRequires";
-    pub const TYPE_PROVIDE: &'static str = "provides";
-    pub const TYPE_CONFLICT: &'static str = "conflicts";
-    pub const TYPE_REPLACE: &'static str = "replaces";
+    pub const TYPE_REQUIRE: &'static BStr = php_str(b"requires");
+    pub const TYPE_DEV_REQUIRE: &'static BStr = php_str(b"devRequires");
+    pub const TYPE_PROVIDE: &'static BStr = php_str(b"provides");
+    pub const TYPE_CONFLICT: &'static BStr = php_str(b"conflicts");
+    pub const TYPE_REPLACE: &'static BStr = php_str(b"replaces");
 
     /// Special type
-    pub const TYPE_DOES_NOT_REQUIRE: &'static str = "does not require";
+    pub const TYPE_DOES_NOT_REQUIRE: &'static BStr = php_str(b"does not require");
 
-    const TYPE_UNKNOWN: &'static str = "relates to";
+    const TYPE_UNKNOWN: &'static BStr = php_str(b"relates to");
 
-    pub fn types() -> Vec<&'static str> {
+    pub fn types() -> Vec<&'static BStr> {
         vec![
             Self::TYPE_REQUIRE,
             Self::TYPE_DEV_REQUIRE,
@@ -44,7 +44,7 @@ impl Link {
         pretty_constraint: BString,
     ) -> Self {
         let description = description.unwrap_or_else(|| Self::TYPE_UNKNOWN.into());
-        let description = if description == Self::TYPE_DEV_REQUIRE {
+        let description = if description.as_bstr() == Self::TYPE_DEV_REQUIRE {
             "requires (for development)".into()
         } else {
             description

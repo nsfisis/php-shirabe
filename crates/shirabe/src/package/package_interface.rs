@@ -141,15 +141,21 @@ pub trait PackageInterface: std::fmt::Debug {
     /// `Link::TYPE_*` values.
     fn get_links_for_type(
         &self,
-        link_type: &str,
+        link_type: &BStr,
     ) -> std::rc::Rc<IndexMap<BString, crate::package::Link>> {
-        match link_type {
-            crate::package::Link::TYPE_REQUIRE => self.get_requires(),
-            crate::package::Link::TYPE_DEV_REQUIRE => self.get_dev_requires(),
-            crate::package::Link::TYPE_CONFLICT => self.get_conflicts(),
-            crate::package::Link::TYPE_PROVIDE => self.get_provides(),
-            crate::package::Link::TYPE_REPLACE => self.get_replaces(),
-            _ => std::rc::Rc::new(IndexMap::new()),
+        use crate::package::Link;
+        if link_type == Link::TYPE_REQUIRE {
+            self.get_requires()
+        } else if link_type == Link::TYPE_DEV_REQUIRE {
+            self.get_dev_requires()
+        } else if link_type == Link::TYPE_CONFLICT {
+            self.get_conflicts()
+        } else if link_type == Link::TYPE_PROVIDE {
+            self.get_provides()
+        } else if link_type == Link::TYPE_REPLACE {
+            self.get_replaces()
+        } else {
+            std::rc::Rc::new(IndexMap::new())
         }
     }
 

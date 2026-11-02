@@ -519,14 +519,8 @@ impl CreateProjectCommand {
                 let matched = preg_match(
                     format!(
                         "{{^[^,\\s]*?@({})$}}i",
-                        implode(
-                            "|",
-                            &STABILITIES
-                                .keys()
-                                .map(|k| k.to_string())
-                                .collect::<Vec<_>>()
-                        )
-                        .display_lossy()
+                        implode("|", &STABILITIES.keys().copied().collect::<Vec<_>>())
+                            .display_lossy()
                     ),
                     package_version
                         .as_ref()
@@ -550,14 +544,7 @@ impl CreateProjectCommand {
             return Err(InvalidArgumentException::new(format!(
                 "Invalid stability provided ({}), must be one of: {}",
                 stability.display_lossy(),
-                implode(
-                    ", ",
-                    &STABILITIES
-                        .keys()
-                        .map(|k| k.to_string())
-                        .collect::<Vec<_>>()
-                )
-                .display_lossy()
+                implode(", ", &STABILITIES.keys().copied().collect::<Vec<_>>()).display_lossy()
             ))
             .into());
         }

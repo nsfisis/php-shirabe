@@ -40,7 +40,7 @@ fn link(target: &str, constraint: AnyConstraint, pretty_constraint: &str) -> Lin
         bstr::BString::from("dummy/root".to_string()),
         bstr::BString::from(target.to_string()),
         constraint,
-        Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+        Some(Link::TYPE_REQUIRE.to_owned()),
         bstr::BString::from(pretty_constraint.to_string()),
     )
 }

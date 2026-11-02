@@ -629,7 +629,7 @@ macro_rules! impl_package_interface_handle {
 
             pub fn get_links_for_type(
                 &self,
-                link_type: &str,
+                link_type: &bstr::BStr,
             ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.0
                     .borrow()

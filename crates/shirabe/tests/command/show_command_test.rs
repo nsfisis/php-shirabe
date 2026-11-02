@@ -1389,7 +1389,7 @@ fn test_specific_package_and_tree_with_one_package_requirement() {
             bstr::BString::from("vendor/package".to_string()),
             bstr::BString::from("vendor/required-package".to_string()),
             get_version_constraint("=", "1.0.0"),
-            Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+            Some(Link::TYPE_REQUIRE.to_owned()),
             bstr::BString::from("1.0.0".to_string()),
         ),
     );
@@ -1418,7 +1418,7 @@ fn test_specific_package_and_tree_with_platform_requirement() {
             bstr::BString::from("vendor/package".to_string()),
             bstr::BString::from("php".to_string()),
             get_version_constraint("=", "8.2.0"),
-            Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+            Some(Link::TYPE_REQUIRE.to_owned()),
             bstr::BString::from("8.2.0".to_string()),
         ),
     );
@@ -1529,14 +1529,14 @@ vendor/longpackagename",
 
 /// A `vendor/package` fixture carrying one link of every type `show <package>` renders.
 fn package_with_every_link_type() -> PackageInterfaceHandle {
-    let link = |target: &str, operator: &str, version: &str, pretty: &str, r#type: &str| {
+    let link = |target: &str, operator: &str, version: &str, pretty: &str, r#type: &bstr::BStr| {
         indexmap::IndexMap::from([(
             target.to_string(),
             Link::new(
                 bstr::BString::from("vendor/package".to_string()),
                 bstr::BString::from(target.to_string()),
                 get_version_constraint(operator, version),
-                Some(bstr::BString::from(r#type.to_string())),
+                Some(r#type.to_owned()),
                 bstr::BString::from(pretty.to_string()),
             ),
         )])

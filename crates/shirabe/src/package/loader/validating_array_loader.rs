@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, bconcat,
     date_create, display_to_bytes, error_message, explode, filter_var_email, get_debug_type,
-    is_array, is_bool, is_int, is_numeric, is_scalar, is_string, json_encode, parse_url,
+    implode, is_array, is_bool, is_int, is_numeric, is_scalar, is_string, json_encode, parse_url,
     pcre_check_utf8_subject, php_regex, php_to_string, preg_is_match, preg_replace, str_replace,
     strcasecmp, stripos, strtolower, strtotime, substr, trigger_error, trim2, var_export,
 };
@@ -1469,7 +1469,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     "minimum-stability : invalid value (",
                     min_stability,
                     "), must be one of ",
-                    STABILITIES.keys().copied().collect::<Vec<_>>().join(", ")
+                    implode(", ", &STABILITIES.keys().copied().collect::<Vec<_>>())
                 ));
                 self.config
                     .borrow_mut()

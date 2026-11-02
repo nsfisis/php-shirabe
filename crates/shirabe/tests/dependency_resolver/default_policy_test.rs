@@ -583,13 +583,13 @@ fn test_select_local_repos_first() {
 
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
-fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
+fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
         bstr::BString::from(source.to_string()),
         bstr::BString::from(target.to_string()),
         constraint,
-        Some(bstr::BString::from(r#type.to_string())),
+        Some(r#type.to_owned()),
         pretty,
     )
 }

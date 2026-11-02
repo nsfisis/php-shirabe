@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use shirabe::package::{Link, RootAliasPackageHandle, RootPackageHandle};
 use shirabe_semver::constraint::MatchAllConstraint;
 
-fn links(link_type: &str) -> IndexMap<String, Link> {
+fn links(link_type: &bstr::BStr) -> IndexMap<String, Link> {
     let mut map: IndexMap<String, Link> = IndexMap::new();
     map.insert(
         "b".to_string(),
@@ -12,7 +12,7 @@ fn links(link_type: &str) -> IndexMap<String, Link> {
             bstr::BString::from("a".to_string()),
             bstr::BString::from("b".to_string()),
             MatchAllConstraint::new(None).into(),
-            Some(bstr::BString::from(link_type.to_string())),
+            Some(link_type.to_owned()),
             bstr::BString::from("self.version".to_string()),
         ),
     );

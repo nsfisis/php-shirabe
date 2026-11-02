@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/InitCommandTest.php
 
 use crate::test_case::{RestoreEnv, RunOptions, get_application_tester, init_temp_composer};
-use bstr::BString;
+use bstr::{BStr, BString};
 use serial_test::serial;
 use shirabe::command::init_command::InitCommand;
 use shirabe::json::JsonFile;
@@ -100,7 +100,9 @@ fn test_parse_valid_author_string() {
 
     for (name, email, input) in valid_author_string_provider() {
         let command = InitCommand::new();
-        let author = command.__parse_author_string(input).unwrap();
+        let author = command
+            .__parse_author_string(bstr::BStr::new(input))
+            .unwrap();
         assert_eq!(
             Some(BString::from(name)),
             author.get(bstr::B("name")).cloned().flatten()
@@ -117,7 +119,7 @@ fn test_parse_empty_author_string() {
     set_up();
 
     let command = InitCommand::new();
-    let result = command.__parse_author_string("");
+    let result = command.__parse_author_string(BStr::new(""));
     assert!(result.is_err());
 }
 
@@ -126,7 +128,7 @@ fn test_parse_author_string_with_invalid_email() {
     set_up();
 
     let command = InitCommand::new();
-    let result = command.__parse_author_string("John Smith <john>");
+    let result = command.__parse_author_string(BStr::new("John Smith <john>"));
     assert!(result.is_err());
 }
 
@@ -576,7 +578,9 @@ fn test_format_authors() {
     let author_without_email = "John Smith";
     let command = InitCommand::new();
 
-    let authors = command.__format_authors(author_with_email).unwrap();
+    let authors = command
+        .__format_authors(bstr::BStr::new(author_with_email))
+        .unwrap();
     let mut expected: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
     expected.insert("name".into(), PhpMixed::string("John Smith".to_string()));
     expected.insert(
@@ -585,7 +589,9 @@ fn test_format_authors() {
     );
     assert_eq!(expected, authors[0]);
 
-    let authors = command.__format_authors(author_without_email).unwrap();
+    let authors = command
+        .__format_authors(bstr::BStr::new(author_without_email))
+        .unwrap();
     let mut expected: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
     expected.insert("name".into(), PhpMixed::string("John Smith".to_string()));
     assert_eq!(expected, authors[0]);
@@ -626,7 +632,7 @@ fn test_add_vendor_ignore() {
     let ignore_file = tmp.path().join("ignore");
 
     let command = InitCommand::new();
-    command.__add_vendor_ignore(&ignore_file, "/vendor/");
+    command.__add_vendor_ignore(&ignore_file, BStr::new("/vendor/"));
     assert!(std::path::Path::new(&ignore_file).exists());
     let content = std::fs::read_to_string(&ignore_file).unwrap();
     assert!(content.contains("/vendor/"));
@@ -640,7 +646,7 @@ fn test_has_vendor_ignore() {
     let ignore_file = tmp.path().join("ignore");
 
     let command = InitCommand::new();
-    assert!(!command.__has_vendor_ignore(&ignore_file, "vendor"));
-    command.__add_vendor_ignore(&ignore_file, "/vendor/");
-    assert!(command.__has_vendor_ignore(&ignore_file, "vendor"));
+    assert!(!command.__has_vendor_ignore(&ignore_file, BStr::new("vendor")));
+    command.__add_vendor_ignore(&ignore_file, BStr::new("/vendor/"));
+    assert!(command.__has_vendor_ignore(&ignore_file, BStr::new("vendor")));
 }
