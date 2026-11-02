@@ -1,6 +1,6 @@
 //! ref: composer/vendor/composer/metadata-minifier/src/MetadataMinifier.php
 
-use bstr::{B, BString};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -125,11 +125,11 @@ impl ExpandedVersions {
 
     /// Writes one field of one expanded version, leaving the others alone. A field the version
     /// does not have yet is appended, as assigning to a missing key would in PHP.
-    pub fn set(&mut self, index: usize, key: &str, val: PhpMixed) {
+    pub fn set(&mut self, index: usize, key: impl AsRef<[u8]>, val: PhpMixed) {
         let value = Slot::Overridden(self.overrides.len() as u32);
         self.overrides.push(val);
 
-        let key = intern(&mut self.keys, key.as_bytes());
+        let key = intern(&mut self.keys, key.as_ref());
         match self.views[index].iter_mut().find(|entry| entry.key == key) {
             Some(entry) => entry.value = value,
             None => self.views[index].push(Entry { key, value }),
@@ -184,16 +184,16 @@ pub struct ExpandedVersion<'a> {
 }
 
 impl<'a> ExpandedVersion<'a> {
-    pub fn get(&self, key: &str) -> Option<&'a PhpMixed> {
-        let key = *self.versions.keys.get(B(key))?;
+    pub fn get(&self, key: impl AsRef<[u8]>) -> Option<&'a PhpMixed> {
+        let key = *self.versions.keys.get(key.as_ref())?;
         let entry = self.versions.views[self.index]
             .iter()
             .find(|entry| entry.key == key)?;
         Some(self.versions.value_of(entry))
     }
 
-    pub fn contains_key(&self, key: &str) -> bool {
-        let Some(&key) = self.versions.keys.get(B(key)) else {
+    pub fn contains_key(&self, key: impl AsRef<[u8]>) -> bool {
+        let Some(&key) = self.versions.keys.get(key.as_ref()) else {
             return false;
         };
         self.versions.views[self.index]
@@ -206,10 +206,10 @@ impl<'a> ExpandedVersion<'a> {
 mod tests {
     use super::*;
 
-    fn version(fields: &[(&str, &str)]) -> IndexMap<BString, PhpMixed> {
+    fn version(fields: &[(impl AsRef<[u8]>, impl AsRef<[u8]>)]) -> IndexMap<BString, PhpMixed> {
         fields
             .iter()
-            .map(|(key, val)| ((*key).into(), PhpMixed::string(val.to_string())))
+            .map(|(key, val)| (BString::from(key.as_ref()), PhpMixed::string(val.as_ref())))
             .collect()
     }
 
@@ -277,36 +277,29 @@ mod tests {
     #[test]
     fn set_overrides_a_field_of_one_version_only() {
         let mut versions = MetadataMinifier::expand(versions());
-        versions.set(1, "version", PhpMixed::string("2.0.0.0".to_string()));
+        versions.set(1, "version", PhpMixed::string("2.0.0.0"));
 
         assert_eq!(
             versions.version(1).get("version"),
-            Some(&PhpMixed::string("2.0.0.0".to_string())),
+            Some(&PhpMixed::string("2.0.0.0")),
         );
         assert_eq!(
             versions.version(2).get("version"),
-            Some(&PhpMixed::string("1.0".to_string())),
+            Some(&PhpMixed::string("1.0")),
         );
 
         let mut expected = expanded();
-        expected[1].insert("version".into(), PhpMixed::string("2.0.0.0".to_string()));
+        expected[1].insert("version".into(), PhpMixed::string("2.0.0.0"));
         assert_eq!(versions.into_vec(), expected);
     }
 
     #[test]
     fn set_appends_a_field_the_version_does_not_have() {
         let mut versions = MetadataMinifier::expand(versions());
-        versions.set(
-            0,
-            "version_normalized",
-            PhpMixed::string("3.0.0.0".to_string()),
-        );
+        versions.set(0, "version_normalized", PhpMixed::string("3.0.0.0"));
 
         let mut expected = expanded();
-        expected[0].insert(
-            "version_normalized".into(),
-            PhpMixed::string("3.0.0.0".to_string()),
-        );
+        expected[0].insert("version_normalized".into(), PhpMixed::string("3.0.0.0"));
         assert_eq!(versions.into_vec(), expected);
     }
 }
