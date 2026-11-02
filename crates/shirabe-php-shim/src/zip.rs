@@ -1,6 +1,29 @@
+// TODO(php-semantics): this differs from PHP's `ZipArchive` in details. Its compatibility needs to
+// be investigated against the C sources of PHP's `ext/zip`.
+
 use crate::{ErrorException, StreamBacking, StreamState};
-use bstr::BString;
+use bstr::{BStr, BString};
+use zip::read::{ExtractOptions, SymlinkExtractAction};
+use zip::result::ZipResult;
 use zip::write::SimpleFileOptions;
+
+/// Starts a directory entry whose name may hold any bytes, which `ZipWriter::add_directory` does
+/// not accept. A name without a trailing separator gets a `/`, as `add_directory` does.
+pub(crate) fn start_directory<W: std::io::Write + std::io::Seek>(
+    writer: &mut zip::ZipWriter<W>,
+    name: &BStr,
+    options: SimpleFileOptions,
+) -> ZipResult<()> {
+    let mut name = BString::from(name);
+    if !matches!(name.last(), Some(b'/' | b'\\')) {
+        name.push(b'/');
+    }
+    writer.start_file_with_options(
+        options
+            .name(&name)
+            .compression_method(zip::CompressionMethod::Stored),
+    )
+}
 
 /// Test-only behaviour mirroring PHPUnit's `getMockBuilder('ZipArchive')->getMock()`, where
 /// `open`/`extractTo`/`count` are stubbed via `->willReturn(...)`/`->willThrowException(...)`.
@@ -120,11 +143,11 @@ impl ZipArchive {
     }
 
     pub fn stat_index(&self, index: i64) -> Option<ZipEntryStat> {
-        let mut state = self.state.borrow_mut();
-        let ZipState::Reader(archive) = &mut *state else {
+        let state = self.state.borrow();
+        let ZipState::Reader(archive) = &*state else {
             return None;
         };
-        let file = archive.by_index(index as usize).ok()?;
+        let file = archive.by_index_data(index as usize).ok()?;
         Some(ZipEntryStat {
             size: file.size() as i64,
             comp_size: file.compressed_size() as i64,
@@ -142,22 +165,17 @@ impl ZipArchive {
         let ZipState::Reader(archive) = &mut *state else {
             return Ok(false);
         };
-        Ok(archive.extract(path.as_ref()).is_ok())
+        let options = ExtractOptions::default().symlink_action(SymlinkExtractAction::ExtractAsFile);
+        Ok(archive.extract_with_options(path.as_ref(), options).is_ok())
     }
 
     /// The index of the entry whose name is `name`, compared as the bytes the archive stores.
     pub fn locate_name(&self, name: impl AsRef<[u8]>) -> Option<i64> {
-        let mut state = self.state.borrow_mut();
-        let ZipState::Reader(archive) = &mut *state else {
+        let state = self.state.borrow();
+        let ZipState::Reader(archive) = &*state else {
             return None;
         };
-        (0..archive.len())
-            .find(|&i| {
-                archive
-                    .by_index_raw(i)
-                    .is_ok_and(|file| file.name_raw() == name.as_ref())
-            })
-            .map(|i| i as i64)
+        archive.index_for_name_raw(name.as_ref()).map(|i| i as i64)
     }
 
     pub fn get_from_index(&self, index: i64) -> Option<Vec<u8>> {
@@ -172,11 +190,11 @@ impl ZipArchive {
     }
 
     pub fn get_name_index(&self, index: i64) -> BString {
-        let mut state = self.state.borrow_mut();
-        let ZipState::Reader(archive) = &mut *state else {
+        let state = self.state.borrow();
+        let ZipState::Reader(archive) = &*state else {
             return BString::default();
         };
-        match archive.by_index_raw(index as usize) {
+        match archive.by_index_data(index as usize) {
             Ok(file) => BString::from(file.name_raw()),
             Err(_) => BString::default(),
         }
@@ -208,20 +226,23 @@ impl ZipArchive {
         )))
     }
 
-    pub fn add_empty_dir(&self, local_name: &str, opsys: i64, attr: u32) -> bool {
+    pub fn add_empty_dir(&self, local_name: impl AsRef<[u8]>, opsys: i64, attr: u32) -> bool {
         let mut state = self.state.borrow_mut();
         let ZipState::Writer { writer, .. } = &mut *state else {
             return false;
         };
-        writer
-            .add_directory(local_name, Self::entry_options(opsys, attr))
-            .is_ok()
+        start_directory(
+            writer,
+            BStr::new(local_name.as_ref()),
+            Self::entry_options(opsys, attr),
+        )
+        .is_ok()
     }
 
     pub fn add_file(
         &self,
         filepath: impl AsRef<std::path::Path>,
-        local_name: &str,
+        local_name: impl AsRef<[u8]>,
         opsys: i64,
         attr: u32,
     ) -> bool {
@@ -233,9 +254,10 @@ impl ZipArchive {
         let ZipState::Writer { writer, .. } = &mut *state else {
             return false;
         };
-        let options =
-            Self::entry_options(opsys, attr).compression_method(zip::CompressionMethod::Deflated);
-        if writer.start_file(local_name, options).is_err() {
+        let options = Self::entry_options(opsys, attr)
+            .name(local_name.as_ref())
+            .compression_method(zip::CompressionMethod::Deflated);
+        if writer.start_file_with_options(options).is_err() {
             return false;
         }
         std::io::Write::write_all(writer, &contents).is_ok()
@@ -243,10 +265,7 @@ impl ZipArchive {
 
     /// `opsys` and `attr` carry what PHP passes to `setExternalAttributesName`, which
     /// amends an entry after `addFile`. The `zip` crate fixes external attributes when
-    /// the entry is started, so they are taken up front instead. `unix_permissions`
-    /// keeps only the low 9 mode bits, on top of which the crate restores `S_IFREG` for
-    /// files and `S_IFDIR` for directories; libzip stores `attr` verbatim, so
-    /// setuid/setgid/sticky bits and the remaining file types do not survive.
+    /// the entry is started, so they are taken up front instead.
     fn entry_options(opsys: i64, attr: u32) -> SimpleFileOptions {
         let system = match opsys {
             Self::OPSYS_UNIX => zip::System::Unix,
@@ -254,7 +273,7 @@ impl ZipArchive {
         };
         SimpleFileOptions::default()
             .system(system)
-            .unix_permissions(attr >> 16)
+            .external_attributes(attr)
     }
 
     pub fn get_status_string(&self) -> String {
@@ -276,4 +295,92 @@ impl ZipArchive {
     pub const ER_INVAL: i64 = 18;
     pub const ER_NOZIP: i64 = 19;
     pub const ER_INCONS: i64 = 21;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write as _;
+
+    #[test]
+    fn entries_keep_names_that_are_not_valid_utf8_and_verbatim_attributes() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        std::fs::write(&source, b"hello").unwrap();
+        let target = dir.path().join("archive.zip");
+
+        let mut zip = ZipArchive::new();
+        zip.open(&target, ZipArchive::CREATE).unwrap();
+        assert!(zip.add_file(
+            &source,
+            b"caf\xE9.txt",
+            ZipArchive::OPSYS_UNIX,
+            0o104755 << 16
+        ));
+        assert!(zip.add_empty_dir(b"d\xE9", ZipArchive::OPSYS_UNIX, 0o040711 << 16));
+        assert!(zip.close());
+
+        let mut zip = ZipArchive::new();
+        zip.open(&target, 0).unwrap();
+        assert_eq!(zip.count(), 2);
+        assert_eq!(zip.locate_name(b"caf\xE9.txt"), Some(0));
+        assert_eq!(zip.locate_name(b"d\xE9/"), Some(1));
+        assert_eq!(zip.locate_name(b"absent"), None);
+        assert_eq!(zip.get_name_index(1), BString::from(&b"d\xE9/"[..]));
+        assert_eq!(zip.get_from_name(b"caf\xE9.txt").unwrap(), b"hello");
+
+        let archive = zip::ZipArchive::new(std::fs::File::open(&target).unwrap()).unwrap();
+        let file = archive.by_index_data(0).unwrap();
+        assert_eq!(file.external_attributes(), 0o104755 << 16);
+        let directory = archive.by_index_data(1).unwrap();
+        assert!(directory.is_dir());
+        assert_eq!(directory.size(), 0);
+        assert_eq!(directory.compressed_size(), 0);
+        assert_eq!(directory.external_attributes(), 0o040711 << 16);
+    }
+
+    #[test]
+    fn stat_index_reports_an_encrypted_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("archive.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&target).unwrap());
+        writer
+            .start_file(
+                "secret.txt",
+                SimpleFileOptions::default().with_aes_encryption(zip::AesMode::Aes256, "password"),
+            )
+            .unwrap();
+        writer.write_all(b"secret").unwrap();
+        writer.finish().unwrap();
+
+        let mut zip = ZipArchive::new();
+        zip.open(&target, 0).unwrap();
+        assert_eq!(zip.stat_index(0).unwrap().size, 6);
+        assert_eq!(zip.get_name_index(0), BString::from("secret.txt"));
+    }
+
+    #[test]
+    fn extract_to_writes_a_symlink_entry_as_a_regular_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("archive.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&target).unwrap());
+        writer
+            .add_symlink("link", "../outside", SimpleFileOptions::default())
+            .unwrap();
+        writer
+            .start_file("after.txt", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"after").unwrap();
+        writer.finish().unwrap();
+
+        let out = dir.path().join("out");
+        let mut zip = ZipArchive::new();
+        zip.open(&target, 0).unwrap();
+        assert!(zip.extract_to(&out).unwrap());
+
+        let link = std::fs::symlink_metadata(out.join("link")).unwrap();
+        assert!(link.file_type().is_file());
+        assert_eq!(std::fs::read(out.join("link")).unwrap(), b"../outside");
+        assert_eq!(std::fs::read(out.join("after.txt")).unwrap(), b"after");
+    }
 }

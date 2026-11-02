@@ -1,7 +1,10 @@
 //! The native phar binary layout implemented here follows the php.net manual
 //! (`https://www.php.net/manual/en/phar.fileformat.php`); no PHP C sources were referenced.
 
-use crate::{UnexpectedValueException, path_from_bytes, path_to_bytes, rtrim2, trim2, utf8_text};
+// TODO(php-semantics): this differs from PHP's `Phar` and `PharData` in details. Its compatibility
+// needs to be investigated against the C sources of PHP's `ext/phar`.
+
+use crate::{UnexpectedValueException, path_from_bytes, path_to_bytes, rtrim2, trim2};
 use bstr::{BString, ByteSlice};
 use std::io::{Read as _, Write as _};
 
@@ -853,23 +856,17 @@ impl PharData {
         for entry in self.entries.borrow().iter() {
             let options = zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated);
-            // TODO(bytes): the zip crate only writes entry names that are valid UTF-8, where phar
-            // stores any bytes.
-            let localname = utf8_text(&entry.localname).ok_or_else(|| {
-                write_error(format!(
-                    "the entry name {:?} is not valid UTF-8",
-                    entry.localname
-                ))
-            })?;
+            let localname = entry.localname.as_bstr();
             match &entry.data {
                 PharEntryData::Disk(source) => {
                     use std::os::unix::fs::PermissionsExt;
                     let metadata =
                         std::fs::metadata(source).map_err(|e| write_error(e.to_string()))?;
                     writer
-                        .start_file(
-                            localname,
-                            options.unix_permissions(metadata.permissions().mode() & 0o7777),
+                        .start_file_with_options(
+                            options
+                                .name(localname)
+                                .unix_permissions(metadata.permissions().mode() & 0o7777),
                         )
                         .map_err(|e| write_error(e.to_string()))?;
                     let mut file =
@@ -883,16 +880,19 @@ impl PharData {
                         None => options,
                     };
                     writer
-                        .start_file(localname, options)
+                        .start_file_with_options(options.name(localname))
                         .map_err(|e| write_error(e.to_string()))?;
                     writer
                         .write_all(content)
                         .map_err(|e| write_error(e.to_string()))?;
                 }
                 PharEntryData::Dir => {
-                    writer
-                        .add_directory(localname, options)
-                        .map_err(|e| write_error(e.to_string()))?;
+                    crate::zip::start_directory(
+                        &mut writer,
+                        localname,
+                        options.external_attributes(0o040755 << 16),
+                    )
+                    .map_err(|e| write_error(e.to_string()))?;
                 }
             }
         }
@@ -924,6 +924,33 @@ mod tests {
             read_back.get(b"caf\xE9.txt").unwrap().get_content(),
             b"hello"
         );
+    }
+
+    #[test]
+    fn zip_entry_name_keeps_bytes_that_are_not_valid_utf8() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        let file = src.join(path_from_bytes(b"caf\xE9.txt"));
+        std::fs::write(&file, b"hello").unwrap();
+        let zip_path = dir.path().join("out.zip");
+
+        let phar = PharData::new(&zip_path).unwrap();
+        phar.build_from_iterator(&mut vec![file].into_iter(), &src)
+            .unwrap();
+        phar.add_empty_dir(b"d\xE9").unwrap();
+
+        let read_back = PharData::new(&zip_path).unwrap();
+        assert_eq!(
+            read_back.get(b"caf\xE9.txt").unwrap().get_content(),
+            b"hello"
+        );
+        let archive = zip::ZipArchive::new(std::fs::File::open(&zip_path).unwrap()).unwrap();
+        let directory = archive
+            .by_index_data(archive.index_for_name_raw(b"d\xE9/").unwrap())
+            .unwrap();
+        assert!(directory.is_dir());
+        assert_eq!(directory.unix_mode(), Some(0o040755));
     }
 
     #[test]
