@@ -112,8 +112,8 @@ impl Svn {
             std::rc::Rc::new(std::cell::RefCell::new(None));
         let io = self.io.clone();
         let output_for_handler = output.clone();
-        let handler: Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>> =
-            Box::new(move |r#type: &str, buffer: &bstr::BStr| {
+        let handler: Box<dyn FnMut(&bstr::BStr, &bstr::BStr) -> anyhow::Result<bool>> =
+            Box::new(move |r#type: &bstr::BStr, buffer: &bstr::BStr| {
                 if r#type != "out" {
                     return Ok(false);
                 }

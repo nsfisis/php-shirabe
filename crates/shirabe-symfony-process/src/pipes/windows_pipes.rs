@@ -9,7 +9,7 @@ use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
 #[derive(Debug)]
 pub struct WindowsPipes {
     inner: AbstractPipes,
-    files: IndexMap<i64, String>,
+    files: IndexMap<i64, bstr::BString>,
     file_handles: IndexMap<i64, PhpResource>,
     lock_handles: IndexMap<i64, PhpResource>,
     read_bytes: IndexMap<i64, i64>,
@@ -33,7 +33,7 @@ impl PipesInterface for WindowsPipes {
         todo!()
     }
 
-    fn get_files(&self) -> IndexMap<i64, String> {
+    fn get_files(&self) -> IndexMap<i64, bstr::BString> {
         self.files.clone()
     }
 

@@ -477,7 +477,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                 let commands = unzip_commands.as_mut().unwrap();
                 if Platform::is_windows()
                     && let Some(cmd) =
-                        finder.find("7z", None, &[r"C:\Program Files\7-Zip".to_string()])
+                        finder.find("7z", None, &[BString::from(r"C:\Program Files\7-Zip")])
                 {
                     commands.push(vec![
                         "7z".into(),

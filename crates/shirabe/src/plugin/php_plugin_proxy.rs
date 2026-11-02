@@ -1645,8 +1645,8 @@ fn dispatch_process_executor_method(
             };
             if is_php_callable(output).map_err(failed)? {
                 let callable = output.clone();
-                let callback: Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>> =
-                    Box::new(move |r#type: &str, buffer: &BStr| {
+                let callback: Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>> =
+                    Box::new(move |r#type: &BStr, buffer: &BStr| {
                         call_php_callable(
                             &callable,
                             vec![PluginValue::string(r#type), PluginValue::string(buffer)],

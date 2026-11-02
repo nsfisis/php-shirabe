@@ -2,6 +2,7 @@
 
 use crate::exception::RuntimeException;
 use crate::process::Process;
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug)]
 pub struct ProcessSignaledException {
@@ -15,9 +16,10 @@ impl ProcessSignaledException {
         let signal = process.get_term_signal()?;
 
         Ok(Self {
-            inner: RuntimeException::new(format!(
-                "The process has been signaled with signal \"{}\".",
-                signal
+            inner: RuntimeException::new(bconcat!(
+                "The process has been signaled with signal \"",
+                signal,
+                "\"."
             )),
             signal,
         })

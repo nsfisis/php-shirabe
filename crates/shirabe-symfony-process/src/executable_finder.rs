@@ -1,18 +1,58 @@
 //! ref: composer/vendor/symfony/process/ExecutableFinder.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
     PATHINFO_EXTENSION, PHP_EOL, basename, bconcat, escapeshellarg, exec, getenv, is_dir,
-    is_executable, is_file, path_from_bytes, path_to_bytes, pathinfo, strcspn, strpos, strtolower,
-    substr,
+    is_executable, is_file, path_from_bytes, path_to_bytes, pathinfo, php_str, strcspn, strpos,
+    strtolower, substr,
 };
 use std::path::PathBuf;
 
-const CMD_BUILTINS: &[&str] = &[
-    "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del", "dir", "echo",
-    "endlocal", "erase", "exit", "for", "ftype", "goto", "help", "if", "label", "md", "mkdir",
-    "mklink", "move", "path", "pause", "popd", "prompt", "pushd", "rd", "rem", "ren", "rename",
-    "rmdir", "set", "setlocal", "shift", "start", "time", "title", "type", "ver", "vol",
+const CMD_BUILTINS: &[&BStr] = &[
+    php_str(b"assoc"),
+    php_str(b"break"),
+    php_str(b"call"),
+    php_str(b"cd"),
+    php_str(b"chdir"),
+    php_str(b"cls"),
+    php_str(b"color"),
+    php_str(b"copy"),
+    php_str(b"date"),
+    php_str(b"del"),
+    php_str(b"dir"),
+    php_str(b"echo"),
+    php_str(b"endlocal"),
+    php_str(b"erase"),
+    php_str(b"exit"),
+    php_str(b"for"),
+    php_str(b"ftype"),
+    php_str(b"goto"),
+    php_str(b"help"),
+    php_str(b"if"),
+    php_str(b"label"),
+    php_str(b"md"),
+    php_str(b"mkdir"),
+    php_str(b"mklink"),
+    php_str(b"move"),
+    php_str(b"path"),
+    php_str(b"pause"),
+    php_str(b"popd"),
+    php_str(b"prompt"),
+    php_str(b"pushd"),
+    php_str(b"rd"),
+    php_str(b"rem"),
+    php_str(b"ren"),
+    php_str(b"rename"),
+    php_str(b"rmdir"),
+    php_str(b"set"),
+    php_str(b"setlocal"),
+    php_str(b"shift"),
+    php_str(b"start"),
+    php_str(b"time"),
+    php_str(b"title"),
+    php_str(b"type"),
+    php_str(b"ver"),
+    php_str(b"vol"),
 ];
 
 #[derive(Debug)]
@@ -34,8 +74,8 @@ impl ExecutableFinder {
     pub fn find(
         &self,
         name: impl AsRef<[u8]>,
-        default: Option<&str>,
-        extra_dirs: &[String],
+        default: Option<&BStr>,
+        extra_dirs: &[BString],
     ) -> Option<BString> {
         let name = name.as_ref();
         // windows built-in commands that are present in cmd.exe should not be resolved using PATH as they do not exist as exes
@@ -47,7 +87,11 @@ impl ExecutableFinder {
             .or_else(|| getenv("Path"))
             .unwrap_or_default();
         let mut dirs: Vec<PathBuf> = std::env::split_paths(&path).collect();
-        dirs.extend(extra_dirs.iter().map(PathBuf::from));
+        dirs.extend(
+            extra_dirs
+                .iter()
+                .map(|dir| path_from_bytes(dir).to_path_buf()),
+        );
 
         let mut suffixes: Vec<BString> = vec![];
         if cfg!(windows) {
@@ -88,7 +132,9 @@ impl ExecutableFinder {
             }
         }
 
-        if cfg!(windows) || name.len() != strcspn(name, format!("/{}", std::path::MAIN_SEPARATOR)) {
+        if cfg!(windows)
+            || name.len() != strcspn(name, bconcat!("/", std::path::MAIN_SEPARATOR_STR))
+        {
             return default.map(BString::from);
         }
 

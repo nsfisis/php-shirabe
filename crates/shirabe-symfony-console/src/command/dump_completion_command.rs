@@ -117,7 +117,7 @@ impl DumpCompletionCommand {
             Some(0.0),
         )?;
         process.run(
-            Some(Box::new(move |_type: &str, line: &BStr| {
+            Some(Box::new(move |_type: &BStr, line: &BStr| {
                 output.borrow_mut().write(
                     &[BString::from(line)],
                     false,

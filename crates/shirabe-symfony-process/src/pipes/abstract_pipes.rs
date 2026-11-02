@@ -4,7 +4,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, PhpResource, fclose, fwrite, php_to_string, php_truthy, stream_select,
-    stream_set_blocking,
+    stream_set_blocking, stripos,
 };
 
 #[derive(Debug)]
@@ -14,7 +14,7 @@ pub struct AbstractPipes {
     input_buffer: BString,
     input: PhpMixed,
     blocked: bool,
-    last_error: Option<String>,
+    last_error: Option<BString>,
 }
 
 impl AbstractPipes {
@@ -56,7 +56,7 @@ impl AbstractPipes {
 
         // stream_select returns false when the `select` system call is interrupted by an incoming signal
         last_error
-            .map(|e| e.to_lowercase().contains("interrupted system call"))
+            .map(|e| stripos(&e, "interrupted system call").is_some())
             .unwrap_or(false)
     }
 

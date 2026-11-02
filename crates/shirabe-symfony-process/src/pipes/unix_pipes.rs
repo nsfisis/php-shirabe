@@ -24,10 +24,10 @@ impl UnixPipes {
     }
 }
 
-fn descriptor(items: &[&str]) -> Descriptor {
+fn descriptor(items: &[&[u8]]) -> Descriptor {
     match items {
-        ["pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
-        ["file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
+        [b"pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
+        [b"file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
         _ => panic!("unsupported descriptor spec: {:?}", items),
     }
 }
@@ -36,20 +36,20 @@ impl PipesInterface for UnixPipes {
     fn get_descriptors(&mut self) -> Vec<Descriptor> {
         if self.tty_mode == Some(true) {
             return vec![
-                descriptor(&["file", "/dev/tty", "r"]),
-                descriptor(&["file", "/dev/tty", "w"]),
-                descriptor(&["file", "/dev/tty", "w"]),
+                descriptor(&[b"file", b"/dev/tty", b"r"]),
+                descriptor(&[b"file", b"/dev/tty", b"w"]),
+                descriptor(&[b"file", b"/dev/tty", b"w"]),
             ];
         }
 
         vec![
-            descriptor(&["pipe", "r"]),
-            descriptor(&["pipe", "w"]),
-            descriptor(&["pipe", "w"]),
+            descriptor(&[b"pipe", b"r"]),
+            descriptor(&[b"pipe", b"w"]),
+            descriptor(&[b"pipe", b"w"]),
         ]
     }
 
-    fn get_files(&self) -> IndexMap<i64, String> {
+    fn get_files(&self) -> IndexMap<i64, bstr::BString> {
         IndexMap::new()
     }
 

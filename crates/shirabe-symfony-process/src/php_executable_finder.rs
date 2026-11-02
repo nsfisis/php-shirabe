@@ -64,7 +64,7 @@ impl PhpExecutableFinder {
     }
 
     /// Finds the PHP executable arguments.
-    pub fn find_arguments(&self) -> Vec<String> {
+    pub fn find_arguments(&self) -> Vec<BString> {
         // If PHP_SAPI is not "phpdbg", returns an empty array. In Rust, PHP_SAPI is always "cli",
         // so always returns an empty array.
         vec![]

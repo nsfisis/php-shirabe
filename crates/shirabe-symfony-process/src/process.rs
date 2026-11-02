@@ -14,18 +14,19 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
     SEEK_SET, bconcat, exec, fopen, fseek, fwrite, getcwd, getenv_all, implode, is_dir, microtime,
-    os_str_from_bytes, php_regex, preg_is_match, preg_replace, preg_replace_callback, proc_close,
-    proc_get_status, proc_open, proc_terminate, stream_get_contents3, strpbrk, uniqid, usleep,
+    os_str_from_bytes, path_from_bytes, php_regex, php_str, php_to_string, preg_is_match,
+    preg_replace, preg_replace_callback, proc_close, proc_get_status, proc_open, proc_terminate,
+    stream_get_contents3, strpbrk, uniqid, usleep,
 };
 use std::sync::OnceLock;
 
 /// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output. An
 /// error it returns is the exception PHP lets unwind out of `readPipes()`.
-pub type UserCallback = Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>>;
+pub type UserCallback = Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>;
 
 /// The callback built by `build_callback`. It receives the owning Process so it can append output
 /// to the internal buffers, mirroring the `$this`-capturing closure produced in PHP.
-type ProcessCallback = Box<dyn FnMut(&mut Process, &str, &BStr) -> anyhow::Result<bool>>;
+type ProcessCallback = Box<dyn FnMut(&mut Process, &BStr, &BStr) -> anyhow::Result<bool>>;
 
 /// PHP `$this->commandline` is `array|string`.
 #[derive(Debug, Clone)]
@@ -42,8 +43,8 @@ enum CommandLine {
 #[derive(Debug, Clone)]
 pub struct ProcessMock {
     pub exit_code: i64,
-    pub stdout: String,
-    pub stderr: String,
+    pub stdout: BString,
+    pub stderr: BString,
 }
 
 /// Process is a thin wrapper around proc_* functions to easily
@@ -69,7 +70,7 @@ pub struct Process {
     stdout: Option<PhpResource>,
     stderr: Option<PhpResource>,
     process: Option<PhpResource>,
-    status: String,
+    status: BString,
     incremental_output_offset: i64,
     incremental_error_output_offset: i64,
     tty: bool,
@@ -91,10 +92,10 @@ impl std::fmt::Debug for Process {
     }
 }
 
-fn descriptor(items: &[&str]) -> Descriptor {
+fn descriptor(items: &[&[u8]]) -> Descriptor {
     match items {
-        ["pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
-        ["file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
+        [b"pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
+        [b"file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
         _ => panic!("unsupported descriptor spec: {:?}", items),
     }
 }
@@ -103,8 +104,7 @@ fn descriptor(items: &[&str]) -> Descriptor {
 fn to_php_string(value: &PhpMixed) -> BString {
     match value {
         PhpMixed::String(s) => s.clone(),
-        PhpMixed::Int(i) => i.to_string().into(),
-        PhpMixed::Float(f) => f.to_string().into(),
+        PhpMixed::Int(_) | PhpMixed::Float(_) => php_to_string(value),
         PhpMixed::Bool(b) => {
             if *b {
                 "1".into()
@@ -117,12 +117,12 @@ fn to_php_string(value: &PhpMixed) -> BString {
 }
 
 impl Process {
-    pub const ERR: &'static str = "err";
-    pub const OUT: &'static str = "out";
+    pub const ERR: &'static BStr = php_str(b"err");
+    pub const OUT: &'static BStr = php_str(b"out");
 
-    pub const STATUS_READY: &'static str = "ready";
-    pub const STATUS_STARTED: &'static str = "started";
-    pub const STATUS_TERMINATED: &'static str = "terminated";
+    pub const STATUS_READY: &'static BStr = php_str(b"ready");
+    pub const STATUS_STARTED: &'static BStr = php_str(b"started");
+    pub const STATUS_TERMINATED: &'static BStr = php_str(b"terminated");
 
     pub const STDOUT: i64 = 1;
     pub const STDERR: i64 = 2;
@@ -131,8 +131,8 @@ impl Process {
     pub const TIMEOUT_PRECISION: f64 = 0.2;
 
     /// Exit codes translation table.
-    fn exit_code_text(code: i64) -> Option<&'static str> {
-        Some(match code {
+    fn exit_code_text(code: i64) -> Option<&'static BStr> {
+        Some(BStr::new(match code {
             0 => "OK",
             1 => "General error",
             2 => "Misuse of shell builtins",
@@ -174,7 +174,7 @@ impl Process {
             // 158 - not defined
             159 => "Bad syscall",
             _ => return None,
-        })
+        }))
     }
 
     fn empty() -> Self {
@@ -196,7 +196,7 @@ impl Process {
             stdout: None,
             stderr: None,
             process: None,
-            status: Self::STATUS_READY.to_string(),
+            status: Self::STATUS_READY.to_owned(),
             incremental_output_offset: 0,
             incremental_error_output_offset: 0,
             tty: false,
@@ -212,7 +212,7 @@ impl Process {
     /// real subprocess.
     pub fn __mock(mock: ProcessMock) -> Self {
         let mut this = Self::empty();
-        this.status = Self::STATUS_TERMINATED.to_string();
+        this.status = Self::STATUS_TERMINATED.to_owned();
         this.exitcode = Some(mock.exit_code);
         this.mock = Some(mock);
         this
@@ -221,7 +221,7 @@ impl Process {
     pub fn new(
         command: impl IntoIterator<Item = impl Into<BString>>,
         cwd: Option<std::path::PathBuf>,
-        env: Option<IndexMap<String, String>>,
+        env: Option<IndexMap<BString, BString>>,
         input: PhpMixed,
         timeout: Option<f64>,
     ) -> anyhow::Result<Self> {
@@ -240,7 +240,7 @@ impl Process {
         if let Some(env) = env {
             this.set_env(
                 env.into_iter()
-                    .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                    .map(|(k, v)| (k, PhpMixed::string(v)))
                     .collect(),
             );
         }
@@ -255,7 +255,7 @@ impl Process {
     pub fn from_shell_commandline(
         command: impl AsRef<[u8]>,
         cwd: Option<&std::path::Path>,
-        env: Option<IndexMap<String, String>>,
+        env: Option<IndexMap<BString, BString>>,
         input: PhpMixed,
         timeout: Option<f64>,
     ) -> anyhow::Result<Self> {
@@ -289,7 +289,7 @@ impl Process {
         mut env: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         if self.is_running() {
-            return Err(RuntimeException::new("Process is already running.".to_string()).into());
+            return Err(RuntimeException::new("Process is already running.").into());
         }
 
         self.reset_process_data();
@@ -344,12 +344,10 @@ impl Process {
         }
 
         if !self.cwd.as_deref().map(is_dir).unwrap_or(false) {
-            return Err(RuntimeException::new(format!(
-                "The provided cwd \"{}\" does not exist.",
-                self.cwd
-                    .as_deref()
-                    .unwrap_or(std::path::Path::new(""))
-                    .display()
+            return Err(RuntimeException::new(bconcat!(
+                "The provided cwd \"",
+                self.cwd.as_deref().unwrap_or(std::path::Path::new("")),
+                "\" does not exist."
             ))
             .into());
         }
@@ -370,11 +368,9 @@ impl Process {
         self.process = process.ok();
 
         if self.process.is_none() {
-            return Err(
-                RuntimeException::new("Unable to launch a new process.".to_string()).into(),
-            );
+            return Err(RuntimeException::new("Unable to launch a new process.").into());
         }
-        self.status = Self::STATUS_STARTED.to_string();
+        self.status = Self::STATUS_STARTED.to_owned();
 
         if self.tty {
             return Ok(());
@@ -388,7 +384,7 @@ impl Process {
 
     /// Waits for the process to terminate.
     pub fn wait(&mut self, callback: Option<UserCallback>) -> anyhow::Result<i64> {
-        self.require_process_is_started("wait")?;
+        self.require_process_is_started(BStr::new("wait"))?;
 
         self.update_status(false);
         self.take_callback_error()?;
@@ -441,10 +437,10 @@ impl Process {
     /// Returns the current output of the process (STDOUT).
     pub fn get_output(&mut self) -> anyhow::Result<BString> {
         if let Some(mock) = &self.mock {
-            return Ok(BString::from(mock.stdout.as_str()));
+            return Ok(mock.stdout.clone());
         }
 
-        self.read_pipes_for_output("getOutput", false)?;
+        self.read_pipes_for_output(BStr::new("getOutput"), false)?;
 
         Ok(BString::from(
             stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0).unwrap_or_default(),
@@ -454,10 +450,10 @@ impl Process {
     /// Returns the current error output of the process (STDERR).
     pub fn get_error_output(&mut self) -> anyhow::Result<BString> {
         if let Some(mock) = &self.mock {
-            return Ok(BString::from(mock.stderr.as_str()));
+            return Ok(mock.stderr.clone());
         }
 
-        self.read_pipes_for_output("getErrorOutput", false)?;
+        self.read_pipes_for_output(BStr::new("getErrorOutput"), false)?;
 
         Ok(BString::from(
             stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0).unwrap_or_default(),
@@ -476,13 +472,13 @@ impl Process {
     }
 
     /// Returns a string representation for the exit code returned by the process.
-    pub fn get_exit_code_text(&mut self) -> Option<String> {
+    pub fn get_exit_code_text(&mut self) -> Option<BString> {
         let exitcode = self.get_exit_code()?;
 
         Some(
             Self::exit_code_text(exitcode)
-                .unwrap_or("Unknown error")
-                .to_string(),
+                .unwrap_or(BStr::new("Unknown error"))
+                .to_owned(),
         )
     }
 
@@ -493,7 +489,7 @@ impl Process {
 
     /// Returns the number of the signal that caused the child process to terminate.
     pub fn get_term_signal(&mut self) -> anyhow::Result<i64> {
-        self.require_process_is_terminated("getTermSignal")?;
+        self.require_process_is_terminated(BStr::new("getTermSignal"))?;
 
         Ok(self
             .process_information
@@ -504,7 +500,7 @@ impl Process {
 
     /// Returns true if the child process has been terminated by an uncaught signal.
     pub fn has_been_signaled(&mut self) -> anyhow::Result<bool> {
-        self.require_process_is_terminated("hasBeenSignaled")?;
+        self.require_process_is_terminated(BStr::new("hasBeenSignaled"))?;
 
         Ok(self
             .process_information
@@ -515,7 +511,7 @@ impl Process {
 
     /// Returns true if the child process has been stopped by a signal.
     pub fn has_been_stopped(&mut self) -> anyhow::Result<bool> {
-        self.require_process_is_terminated("hasBeenStopped")?;
+        self.require_process_is_terminated(BStr::new("hasBeenStopped"))?;
 
         Ok(self
             .process_information
@@ -526,7 +522,7 @@ impl Process {
 
     /// Returns the number of the signal that caused the child process to stop its execution.
     pub fn get_stop_signal(&mut self) -> anyhow::Result<i64> {
-        self.require_process_is_terminated("getStopSignal")?;
+        self.require_process_is_terminated(BStr::new("getStopSignal"))?;
 
         Ok(self
             .process_information
@@ -562,10 +558,10 @@ impl Process {
     }
 
     /// Gets the process status.
-    pub fn get_status(&mut self) -> &str {
+    pub fn get_status(&mut self) -> &BStr {
         self.update_status(false);
 
-        &self.status
+        self.status.as_bstr()
     }
 
     /// Stops the process.
@@ -643,17 +639,15 @@ impl Process {
     /// Enables or disables the TTY mode.
     pub fn set_tty(&mut self, tty: bool) -> anyhow::Result<&mut Self> {
         if cfg!(windows) && tty {
-            return Err(RuntimeException::new(
-                "TTY mode is not supported on Windows platform.".to_string(),
-            )
-            .into());
+            return Err(
+                RuntimeException::new("TTY mode is not supported on Windows platform.").into(),
+            );
         }
 
         if tty && !Self::is_tty_supported() {
-            return Err(RuntimeException::new(
-                "TTY mode requires /dev/tty to be read/writable.".to_string(),
-            )
-            .into());
+            return Err(
+                RuntimeException::new("TTY mode requires /dev/tty to be read/writable.").into(),
+            );
         }
 
         self.tty = tty;
@@ -692,14 +686,15 @@ impl Process {
     /// Sets the input.
     pub fn set_input(&mut self, input: PhpMixed) -> anyhow::Result<&mut Self> {
         if self.is_running() {
-            return Err(LogicException::new(
-                "Input cannot be set while the process is running.".to_string(),
-            )
-            .into());
+            return Err(
+                LogicException::new("Input cannot be set while the process is running.").into(),
+            );
         }
 
-        self.input =
-            ProcessUtils::validate_input("Symfony\\Component\\Process\\Process::setInput", input)?;
+        self.input = ProcessUtils::validate_input(
+            BStr::new("Symfony\\Component\\Process\\Process::setInput"),
+            input,
+        )?;
 
         Ok(self)
     }
@@ -723,10 +718,9 @@ impl Process {
 
     pub fn get_start_time(&self) -> anyhow::Result<f64> {
         if !self.is_started() {
-            return Err(LogicException::new(
-                "Start time is only available after process start.".to_string(),
-            )
-            .into());
+            return Err(
+                LogicException::new("Start time is only available after process start.").into(),
+            );
         }
 
         Ok(self.starttime.unwrap_or_default())
@@ -741,9 +735,9 @@ impl Process {
             proc_open(
                 "echo 1 >/dev/null",
                 &[
-                    descriptor(&["file", "/dev/tty", "r"]),
-                    descriptor(&["file", "/dev/tty", "w"]),
-                    descriptor(&["file", "/dev/tty", "w"]),
+                    descriptor(&[b"file", b"/dev/tty", b"r"]),
+                    descriptor(&[b"file", b"/dev/tty", b"w"]),
+                    descriptor(&[b"file", b"/dev/tty", b"w"]),
                 ],
                 &mut pipes,
                 None,
@@ -775,7 +769,7 @@ impl Process {
         let out = Self::OUT;
 
         Box::new(
-            move |this: &mut Process, r#type: &str, data: &BStr| -> anyhow::Result<bool> {
+            move |this: &mut Process, r#type: &BStr, data: &BStr| -> anyhow::Result<bool> {
                 if out == r#type {
                     this.add_output(data);
                 } else {
@@ -807,7 +801,7 @@ impl Process {
     }
 
     /// Reads pipes for the freshest output.
-    fn read_pipes_for_output(&mut self, caller: &str, blocking: bool) -> anyhow::Result<()> {
+    fn read_pipes_for_output(&mut self, caller: &BStr, blocking: bool) -> anyhow::Result<()> {
         self.require_process_is_started(caller)?;
 
         self.update_status(blocking);
@@ -830,7 +824,7 @@ impl Process {
             Ok(None)
         } else if timeout < 0.0 {
             Err(InvalidArgumentException::new(
-                "The timeout value must be a valid positive integer or float number.".to_string(),
+                "The timeout value must be a valid positive integer or float number.",
             )
             .into())
         } else {
@@ -878,7 +872,7 @@ impl Process {
             self.process = None;
         }
         self.exitcode = self.process_information.as_ref().map(|i| i.exitcode);
-        self.status = Self::STATUS_TERMINATED.to_string();
+        self.status = Self::STATUS_TERMINATED.to_owned();
 
         if self.exitcode == Some(-1) {
             let signaled = self
@@ -910,11 +904,23 @@ impl Process {
         self.exitcode = None;
         self.process_information = None;
         // php://temp is an in-memory stream; fopen never fails for it.
-        self.stdout = Some(fopen(format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
-        self.stderr = Some(fopen(format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
+        self.stdout = Some(
+            fopen(
+                path_from_bytes(&bconcat!("php://temp/maxmemory:", 1024 * 1024)),
+                "w+",
+            )
+            .unwrap(),
+        );
+        self.stderr = Some(
+            fopen(
+                path_from_bytes(&bconcat!("php://temp/maxmemory:", 1024 * 1024)),
+                "w+",
+            )
+            .unwrap(),
+        );
         self.process = None;
         self.latest_signal = None;
-        self.status = Self::STATUS_READY.to_string();
+        self.status = Self::STATUS_READY.to_owned();
         self.incremental_output_offset = 0;
         self.incremental_error_output_offset = 0;
     }
@@ -925,7 +931,7 @@ impl Process {
             None => {
                 if throw_exception {
                     return Err(LogicException::new(
-                        "Cannot send signal on a non running process.".to_string(),
+                        "Cannot send signal on a non running process.",
                     )
                     .into());
                 }
@@ -939,15 +945,16 @@ impl Process {
             let mut output: Vec<BString> = Vec::new();
             let mut exit_code: i64 = 0;
             exec(
-                format!("taskkill /F /T /PID {} 2>&1", pid),
+                bconcat!("taskkill /F /T /PID ", pid, " 2>&1"),
                 Some(&mut output),
                 Some(&mut exit_code),
             );
             if exit_code != 0 && self.is_running() {
                 if throw_exception {
-                    return Err(RuntimeException::new(format!(
-                        "Unable to kill the process ({}).",
-                        implode(" ", &output).display_lossy()
+                    return Err(RuntimeException::new(bconcat!(
+                        "Unable to kill the process (",
+                        implode(" ", &output),
+                        ")."
                     ))
                     .into());
                 }
@@ -958,9 +965,10 @@ impl Process {
             let ok = proc_terminate(self.process.as_ref().unwrap(), signal);
             if !ok {
                 if throw_exception {
-                    return Err(RuntimeException::new(format!(
-                        "Error while sending signal \"{}\".",
-                        signal
+                    return Err(RuntimeException::new(bconcat!(
+                        "Error while sending signal \"",
+                        signal,
+                        "\"."
                     ))
                     .into());
                 }
@@ -1057,18 +1065,19 @@ impl Process {
             ")"
         );
         for (offset, filename) in self.process_pipes.as_ref().unwrap().get_files() {
-            cmd.extend_from_slice(format!(" {}>\"{}\"", offset, filename).as_bytes());
+            cmd.extend_from_slice(&bconcat!(" ", offset, ">\"", filename, "\""));
         }
 
         Ok(cmd)
     }
 
     /// Ensures the process is running or terminated.
-    fn require_process_is_started(&self, function_name: &str) -> anyhow::Result<()> {
+    fn require_process_is_started(&self, function_name: &BStr) -> anyhow::Result<()> {
         if !self.is_started() {
-            return Err(LogicException::new(format!(
-                "Process must be started before calling \"{}()\".",
-                function_name
+            return Err(LogicException::new(bconcat!(
+                "Process must be started before calling \"",
+                function_name,
+                "()\"."
             ))
             .into());
         }
@@ -1076,11 +1085,12 @@ impl Process {
     }
 
     /// Ensures the process is terminated.
-    fn require_process_is_terminated(&mut self, function_name: &str) -> anyhow::Result<()> {
+    fn require_process_is_terminated(&mut self, function_name: &BStr) -> anyhow::Result<()> {
         if !self.is_terminated() {
-            return Err(LogicException::new(format!(
-                "Process must be terminated before calling \"{}()\".",
-                function_name
+            return Err(LogicException::new(bconcat!(
+                "Process must be terminated before calling \"",
+                function_name,
+                "()\"."
             ))
             .into());
         }
@@ -1128,16 +1138,18 @@ impl Process {
             |matches: &PregMatches| -> anyhow::Result<BString> {
                 let key = matches.get(1).unwrap_or_default();
                 match env.get(key) {
-                    None => Err(InvalidArgumentException::new(format!(
-                        "Command line is missing a value for parameter \"{}\": {}",
-                        key.display_lossy(),
-                        commandline.as_bstr().display_lossy()
+                    None => Err(InvalidArgumentException::new(bconcat!(
+                        "Command line is missing a value for parameter \"",
+                        key,
+                        "\": ",
+                        commandline
                     ))
                     .into()),
-                    Some(PhpMixed::Bool(false)) => Err(InvalidArgumentException::new(format!(
-                        "Command line is missing a value for parameter \"{}\": {}",
-                        key.display_lossy(),
-                        commandline.as_bstr().display_lossy()
+                    Some(PhpMixed::Bool(false)) => Err(InvalidArgumentException::new(bconcat!(
+                        "Command line is missing a value for parameter \"",
+                        key,
+                        "\": ",
+                        commandline
                     ))
                     .into()),
                     Some(v) => Ok(self.escape_argument(Some(&to_php_string(v)))),

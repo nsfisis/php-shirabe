@@ -1362,7 +1362,9 @@ pub trait RunCommandOutput {
 
     /// In callable mode, builds the per-command output handler passed to
     /// `ProcessExecutor::execute`. `None` in the accumulate/discard modes.
-    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>>;
+    fn make_handler(
+        &self,
+    ) -> Option<Box<dyn FnMut(&bstr::BStr, &bstr::BStr) -> anyhow::Result<bool>>>;
 
     /// PHP: `$commandOutput = implode('', $outputs);` — only meaningful in the accumulate-and-assign
     /// mode; a no-op for the discard and callable variants.
@@ -1376,7 +1378,9 @@ impl RunCommandOutput for () {
         true
     }
 
-    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>> {
+    fn make_handler(
+        &self,
+    ) -> Option<Box<dyn FnMut(&bstr::BStr, &bstr::BStr) -> anyhow::Result<bool>>> {
         None
     }
 
@@ -1390,7 +1394,9 @@ impl RunCommandOutput for &mut PhpMixed {
         true
     }
 
-    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>> {
+    fn make_handler(
+        &self,
+    ) -> Option<Box<dyn FnMut(&bstr::BStr, &bstr::BStr) -> anyhow::Result<bool>>> {
         None
     }
 
@@ -1403,7 +1409,9 @@ impl RunCommandOutput for &mut PhpMixed {
 /// PHP passes the same `$commandOutput` callable to each `process->execute` call, so the handler
 /// state is shared across all commands and protocol/auth retries.
 pub struct GitRunCommandOutputHandler {
-    handler: std::rc::Rc<std::cell::RefCell<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>>,
+    handler: std::rc::Rc<
+        std::cell::RefCell<dyn FnMut(&bstr::BStr, &bstr::BStr) -> anyhow::Result<bool>>,
+    >,
 }
 
 impl std::fmt::Debug for GitRunCommandOutputHandler {
@@ -1413,7 +1421,9 @@ impl std::fmt::Debug for GitRunCommandOutputHandler {
 }
 
 impl GitRunCommandOutputHandler {
-    pub fn new(handler: impl FnMut(&str, &bstr::BStr) -> anyhow::Result<bool> + 'static) -> Self {
+    pub fn new(
+        handler: impl FnMut(&bstr::BStr, &bstr::BStr) -> anyhow::Result<bool> + 'static,
+    ) -> Self {
         Self {
             handler: std::rc::Rc::new(std::cell::RefCell::new(handler)),
         }
@@ -1425,9 +1435,11 @@ impl RunCommandOutput for GitRunCommandOutputHandler {
         false
     }
 
-    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>> {
+    fn make_handler(
+        &self,
+    ) -> Option<Box<dyn FnMut(&bstr::BStr, &bstr::BStr) -> anyhow::Result<bool>>> {
         let handler = self.handler.clone();
-        Some(Box::new(move |r#type: &str, buffer: &bstr::BStr| {
+        Some(Box::new(move |r#type: &bstr::BStr, buffer: &bstr::BStr| {
             (handler.borrow_mut())(r#type, buffer)
         }))
     }

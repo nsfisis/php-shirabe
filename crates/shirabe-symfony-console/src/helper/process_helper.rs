@@ -36,7 +36,7 @@ impl ProcessHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
         error: Option<&BStr>,
-        callback: Option<Box<dyn FnMut(&str, &BStr)>>,
+        callback: Option<Box<dyn FnMut(&BStr, &BStr)>>,
         verbosity: i64,
     ) -> anyhow::Result<Process> {
         // `class_exists(Process::class)` guards against the optional symfony/process
@@ -126,12 +126,14 @@ impl ProcessHelper {
                 ProcessHelperCmdElement::Process(_) => None,
             })
             .collect();
-        let callback: Option<Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>>> =
+        let callback: Option<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>> =
             callback.map(|mut cb| {
-                Box::new(move |r#type: &str, buffer: &BStr| -> anyhow::Result<bool> {
-                    cb(r#type, buffer);
-                    Ok(false)
-                }) as Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>>
+                Box::new(
+                    move |r#type: &BStr, buffer: &BStr| -> anyhow::Result<bool> {
+                        cb(r#type, buffer);
+                        Ok(false)
+                    },
+                ) as Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>
             });
         process.run(callback, env)?;
 
@@ -179,7 +181,7 @@ impl ProcessHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
         error: Option<&BStr>,
-        callback: Option<Box<dyn FnMut(&str, &BStr)>>,
+        callback: Option<Box<dyn FnMut(&BStr, &BStr)>>,
     ) -> anyhow::Result<Process> {
         let mut process = self.run(
             output,
@@ -201,8 +203,8 @@ impl ProcessHelper {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         process: &Process,
-        mut callback: Option<Box<dyn FnMut(&str, &BStr)>>,
-    ) -> Box<dyn FnMut(&str, &BStr)> {
+        mut callback: Option<Box<dyn FnMut(&BStr, &BStr)>>,
+    ) -> Box<dyn FnMut(&BStr, &BStr)> {
         // PHP: `if ($output instanceof ConsoleOutputInterface) { $output =
         // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
         // implementor that also implements ConsoleOutputInterface, so the check
@@ -222,7 +224,7 @@ impl ProcessHelper {
 
         let object_hash = spl_object_hash(process);
 
-        Box::new(move |r#type: &str, buffer: &BStr| {
+        Box::new(move |r#type: &BStr, buffer: &BStr| {
             let progressed = Self::formatter_progress(
                 &formatter,
                 BStr::new(&object_hash),

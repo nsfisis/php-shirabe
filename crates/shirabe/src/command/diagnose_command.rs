@@ -1373,7 +1373,7 @@ impl Command for DiagnoseCommand {
         let has_system_unzip = finder.find("unzip", None, &[]).is_some();
         let mut bin_7zip = BString::default();
         let has_system_7zip = if finder
-            .find("7z", None, &["C:\\Program Files\\7-Zip".to_string()])
+            .find("7z", None, &[BString::from("C:\\Program Files\\7-Zip")])
             .is_some()
         {
             bin_7zip = BString::from("7z");
