@@ -10,7 +10,9 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat, implode, preg_replace, str_replace, var_export};
+use shirabe_php_shim::{
+    PhpMixed, bconcat, implode, preg_replace, str_repeat, str_replace, var_export,
+};
 
 /// Markdown descriptor.
 #[derive(Debug, Default)]
@@ -166,7 +168,8 @@ impl MarkdownDescriptor {
                     "`",
                     command.get_name().unwrap_or_default(),
                     "`\n",
-                    "-".repeat(
+                    str_repeat(
+                        "-",
                         (Helper::width(command.get_name().unwrap_or_default()) + 2) as usize
                     ),
                     "\n\n",
@@ -199,7 +202,10 @@ impl MarkdownDescriptor {
                 "`",
                 command.get_name().unwrap_or_default(),
                 "`\n",
-                "-".repeat((Helper::width(command.get_name().unwrap_or_default()) + 2) as usize),
+                str_repeat(
+                    "-",
+                    (Helper::width(command.get_name().unwrap_or_default()) + 2) as usize
+                ),
                 "\n\n",
                 if !command.get_description().is_empty() {
                     bconcat!(command.get_description(), "\n\n")
@@ -242,7 +248,7 @@ impl MarkdownDescriptor {
         let title = self.get_application_title(&*application.borrow());
 
         self.write(
-            bconcat!(title, "\n", "=".repeat(Helper::width(&title) as usize)),
+            bconcat!(title, "\n", str_repeat("=", Helper::width(&title) as usize)),
             true,
         );
 

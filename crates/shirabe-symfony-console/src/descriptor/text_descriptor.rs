@@ -13,7 +13,8 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, STR_PAD_RIGHT, bconcat, count,
-    implode, json_encode_ex, php_truthy, preg_replace, str_pad, str_replace, strip_tags, strlen,
+    implode, json_encode_ex, php_truthy, preg_replace, str_pad, str_repeat, str_replace,
+    strip_tags, strlen,
 };
 
 /// Text descriptor.
@@ -61,11 +62,11 @@ impl TextDescriptor {
                 "  <info>",
                 argument.get_name(),
                 "</info>  ",
-                " ".repeat(spacing_width as usize),
+                str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    format!("\n{}", " ".repeat((total_width + 4) as usize)),
+                    bconcat!("\n", str_repeat(" ", (total_width + 4) as usize)),
                     argument.get_description(),
                 ),
                 default,
@@ -127,11 +128,11 @@ impl TextDescriptor {
                 "  <info>",
                 synopsis,
                 "</info>  ",
-                " ".repeat(spacing_width as usize),
+                str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    format!("\n{}", " ".repeat((total_width + 4) as usize)),
+                    bconcat!("\n", str_repeat(" ", (total_width + 4) as usize)),
                     option.get_description(),
                 ),
                 default,
@@ -398,7 +399,7 @@ impl TextDescriptor {
                             "  <info>",
                             name,
                             "</info>",
-                            " ".repeat(spacing_width as usize),
+                            str_repeat(" ", spacing_width as usize),
                             command_aliases,
                             command.get_description(),
                         ),

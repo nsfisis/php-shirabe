@@ -79,9 +79,9 @@ impl CompleteCommand {
     ) -> anyhow::Result<CompletionInput> {
         let current_index = input.get_option("current")?;
         if !current_index.to_bool() || !ctype_digit(current_index.as_string().unwrap_or_default()) {
-            anyhow::bail!(RuntimeException::new(BString::from(
+            anyhow::bail!(RuntimeException::new(
                 "The \"--current\" option must be set and it must be an integer."
-            )));
+            ));
         }
 
         let tokens: Vec<bstr::BString> = input
@@ -249,9 +249,7 @@ impl Command for CompleteCommand {
 
             let shell = input.borrow().get_option("shell")?;
             if !shell.to_bool() {
-                anyhow::bail!(RuntimeException::new(BString::from(
-                    "The \"--shell\" option must be set."
-                )));
+                anyhow::bail!(RuntimeException::new("The \"--shell\" option must be set."));
             }
 
             let completion_output = self

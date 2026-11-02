@@ -170,7 +170,7 @@ pub trait QuestionHelperInterface {
                 }
 
                 if matches!(read, PhpMixed::Bool(false)) {
-                    return Ok(Err(MissingInputException::new("Aborted.".to_string())));
+                    return Ok(Err(MissingInputException::new("Aborted.")));
                 }
                 r = read;
                 if question.is_trimmable() {
@@ -317,7 +317,7 @@ impl QuestionHelper {
                     v.clone()
                 };
                 let value = choices.get(B(&v)).cloned().unwrap_or(PhpMixed::string(v));
-                resolved.insert(k.to_string().into(), value);
+                resolved.insert(bconcat!(k), value);
             }
 
             return PhpMixed::Array(resolved);
@@ -456,7 +456,7 @@ impl QuestionHelper {
                     && matches!(question.get_default(), PhpMixed::Null))
             {
                 shell_exec(bconcat!("stty ", stty_mode));
-                return Err(MissingInputException::new("Aborted.".to_string()));
+                return Err(MissingInputException::new("Aborted."));
             } else if c.as_deref() == Some(b"\x7f".as_slice()) {
                 // Backspace Character
                 if 0 == num_matches && 0 != i {
@@ -672,9 +672,7 @@ impl QuestionHelper {
             stty_mode = shell_exec("stty -g").unwrap_or_default();
             shell_exec("stty -echo");
         } else if self.is_interactive_input(input_stream) {
-            return Ok(Err(RuntimeException::new(
-                "Unable to hide the response.".to_string(),
-            )));
+            return Ok(Err(RuntimeException::new("Unable to hide the response.")));
         }
 
         let value = fgets(input_stream, Some(4096));
@@ -686,7 +684,7 @@ impl QuestionHelper {
         let mut value = match value {
             Some(value) => value,
             None => {
-                return Err(MissingInputException::new("Aborted.".to_string()).into());
+                return Err(MissingInputException::new("Aborted.").into());
             }
         };
         if trimmable {

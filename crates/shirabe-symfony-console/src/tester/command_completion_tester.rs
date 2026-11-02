@@ -17,8 +17,8 @@ impl CommandCompletionTester {
     }
 
     /// Create completion suggestions from input tokens.
-    pub fn complete(&self, input: &[&str]) -> anyhow::Result<Vec<BString>> {
-        let mut input: Vec<BString> = input.iter().map(|s| BString::from(*s)).collect();
+    pub fn complete(&self, input: &[impl AsRef<[u8]>]) -> anyhow::Result<Vec<BString>> {
+        let mut input: Vec<BString> = input.iter().map(|s| BString::from(s.as_ref())).collect();
         let current_index = input.len() as i64;
         if input.last().is_some_and(|last| last.is_empty()) {
             input.pop();

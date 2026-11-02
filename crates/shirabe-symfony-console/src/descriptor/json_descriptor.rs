@@ -169,7 +169,7 @@ impl JsonDescriptor {
                 "name".into(),
                 PhpMixed::string(bconcat!("--no-", option.get_name())),
             );
-            data.insert("shortcut".into(), PhpMixed::string(String::new()));
+            data.insert("shortcut".into(), PhpMixed::string(BString::default()));
             data.insert("accept_value".into(), PhpMixed::Bool(false));
             data.insert("is_value_required".into(), PhpMixed::Bool(false));
             data.insert("is_multiple".into(), PhpMixed::Bool(false));

@@ -2,10 +2,11 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::HelperSet;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr, php_regex, preg_is_match, preg_replace,
-    strlen, substr, trigger_deprecation, utf8_text,
+    PhpMixed, bconcat, mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr, php_regex,
+    php_to_string, preg_is_match, preg_replace, sprintf, strlen, substr, trigger_deprecation,
+    utf8_text,
 };
 use shirabe_symfony_string::unicode_string::UnicodeString;
 
@@ -89,16 +90,16 @@ impl Helper {
 
     pub fn format_time(secs: f64) -> Option<BString> {
         // [threshold, label, divisor?]
-        let time_formats: [(f64, &str, Option<f64>); 9] = [
-            (0.0, "< 1 sec", None),
-            (1.0, "1 sec", None),
-            (2.0, "secs", Some(1.0)),
-            (60.0, "1 min", None),
-            (120.0, "mins", Some(60.0)),
-            (3600.0, "1 hr", None),
-            (7200.0, "hrs", Some(3600.0)),
-            (86400.0, "1 day", None),
-            (172800.0, "days", Some(86400.0)),
+        let time_formats: [(f64, &BStr, Option<f64>); 9] = [
+            (0.0, BStr::new("< 1 sec"), None),
+            (1.0, BStr::new("1 sec"), None),
+            (2.0, BStr::new("secs"), Some(1.0)),
+            (60.0, BStr::new("1 min"), None),
+            (120.0, BStr::new("mins"), Some(60.0)),
+            (3600.0, BStr::new("1 hr"), None),
+            (7200.0, BStr::new("hrs"), Some(3600.0)),
+            (86400.0, BStr::new("1 day"), None),
+            (172800.0, BStr::new("days"), Some(86400.0)),
         ];
 
         for (index, format) in time_formats.iter().enumerate() {
@@ -107,9 +108,13 @@ impl Helper {
                     || index == time_formats.len() - 1)
             {
                 match format.2 {
-                    None => return Some(format.1.into()),
+                    None => return Some(format.1.to_owned()),
                     Some(divisor) => {
-                        return Some(format!("{} {}", (secs / divisor).floor(), format.1).into());
+                        return Some(bconcat!(
+                            php_to_string(&PhpMixed::Float((secs / divisor).floor())),
+                            " ",
+                            format.1
+                        ));
                     }
                 }
             }
@@ -120,18 +125,24 @@ impl Helper {
 
     pub fn format_memory(memory: i64) -> BString {
         if memory >= 1024 * 1024 * 1024 {
-            return format!("{:.1} GiB", memory as f64 / 1024.0 / 1024.0 / 1024.0).into();
+            return sprintf(
+                "%.1f GiB",
+                &[PhpMixed::Float(memory as f64 / 1024.0 / 1024.0 / 1024.0)],
+            );
         }
 
         if memory >= 1024 * 1024 {
-            return format!("{:.1} MiB", memory as f64 / 1024.0 / 1024.0).into();
+            return sprintf(
+                "%.1f MiB",
+                &[PhpMixed::Float(memory as f64 / 1024.0 / 1024.0)],
+            );
         }
 
         if memory >= 1024 {
-            return format!("{} KiB", memory / 1024).into();
+            return sprintf("%d KiB", &[PhpMixed::Int(memory / 1024)]);
         }
 
-        format!("{} B", memory).into()
+        sprintf("%d B", &[PhpMixed::Int(memory)])
     }
 
     pub fn strlen_without_decoration(

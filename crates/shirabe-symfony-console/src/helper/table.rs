@@ -86,6 +86,10 @@ impl Cell {
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl From<String> for Cell {
     fn from(value: String) -> Self {
         Cell::Value(value.into())
@@ -98,6 +102,10 @@ impl From<BString> for Cell {
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl From<&str> for Cell {
     fn from(value: &str) -> Self {
         Cell::Value(value.into())
@@ -201,6 +209,10 @@ pub enum StyleName {
     Style(TableStyle),
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl From<&str> for StyleName {
     fn from(name: &str) -> Self {
         StyleName::Name(name.into())
@@ -308,9 +320,10 @@ impl Table {
             return Ok(Ok(style.clone()));
         }
 
-        Ok(Err(InvalidArgumentException::new(format!(
-            "Style \"{}\" is not defined.",
-            name.display_lossy()
+        Ok(Err(InvalidArgumentException::new(bconcat!(
+            "Style \"",
+            name,
+            "\" is not defined."
         ))))
     }
 
@@ -773,7 +786,7 @@ impl Table {
                     eol,
                     str_replace(
                         eol,
-                        format!("<fg=default;bg=default></>{}", eol),
+                        bconcat!("<fg=default;bg=default></>", eol),
                         cell.to_php_string(),
                     ),
                 );
@@ -857,7 +870,11 @@ impl Table {
                     };
                     let exploded = explode(
                         eol,
-                        str_replace(eol, format!("<fg=default;bg=default>{}</>", eol), &cell_str),
+                        str_replace(
+                            eol,
+                            bconcat!("<fg=default;bg=default>", eol, "</>"),
+                            &cell_str,
+                        ),
                     );
                     lines = exploded
                         .iter()
@@ -1165,9 +1182,10 @@ impl Table {
             return Ok(Ok(style.clone()));
         }
 
-        Ok(Err(InvalidArgumentException::new(format!(
-            "Style \"{}\" is not defined.",
-            name.display_lossy()
+        Ok(Err(InvalidArgumentException::new(bconcat!(
+            "Style \"",
+            name,
+            "\" is not defined."
         ))))
     }
 

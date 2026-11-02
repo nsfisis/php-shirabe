@@ -91,10 +91,9 @@ impl ProcessHelper {
                 };
             }
             None => {
-                anyhow::bail!(InvalidArgumentException::new(format!(
-                    "Invalid command provided to \"{}()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
-                    "ProcessHelper::run",
-                )));
+                anyhow::bail!(InvalidArgumentException::new(
+                    "Invalid command provided to \"ProcessHelper::run()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
+                ));
             }
         }
 
@@ -121,7 +120,7 @@ impl ProcessHelper {
             .enumerate()
             .filter_map(|(i, element)| match element {
                 ProcessHelperCmdElement::String(s) => {
-                    Some((i.to_string().into(), PhpMixed::string(s.clone())))
+                    Some((bconcat!(i), PhpMixed::string(s.clone())))
                 }
                 ProcessHelperCmdElement::Process(_) => None,
             })
@@ -141,13 +140,13 @@ impl ProcessHelper {
             let message = if process.is_successful() {
                 BString::from("Command ran successfully")
             } else {
-                BString::from(format!(
-                    "{} Command did not run successfully",
+                bconcat!(
                     process
                         .get_exit_code()
-                        .map(|code| code.to_string())
+                        .map(|code| bconcat!(code))
                         .unwrap_or_default(),
-                ))
+                    " Command did not run successfully"
+                )
             };
             let stopped = Self::formatter_stop(
                 &formatter,

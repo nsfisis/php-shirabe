@@ -4,6 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::helper::TableCellStyle;
 use bstr::{B, BString};
 use indexmap::IndexMap;
+use shirabe_php_shim::{bconcat, implode};
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.
 #[derive(Debug, Clone)]
@@ -30,15 +31,15 @@ impl TableCell {
         this_options.insert("style".into(), TableCellOption::Null);
 
         // check option names
-        let diff: Vec<String> = options
+        let diff: Vec<&BString> = options
             .keys()
             .filter(|key| !this_options.contains_key(*key))
-            .map(|key| key.display_lossy().to_string())
             .collect();
         if !diff.is_empty() {
-            return Err(InvalidArgumentException::new(format!(
-                "The TableCell does not support the following options: '{}'.",
-                diff.join("', '"),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The TableCell does not support the following options: '",
+                implode("', '", &diff),
+                "'."
             )));
         }
 
@@ -47,7 +48,7 @@ impl TableCell {
             && !matches!(style, TableCellOption::Null)
         {
             return Err(InvalidArgumentException::new(
-                "The style option must be an instance of \"TableCellStyle\".".to_string(),
+                "The style option must be an instance of \"TableCellStyle\".",
             ));
         }
 

@@ -3,10 +3,18 @@
 use crate::helper::{Helper, HelperInterface, HelperSet};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, str_replace};
+use shirabe_php_shim::{bconcat, php_str, str_replace};
 
-const COLORS: [&str; 9] = [
-    "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white", "default",
+const COLORS: [&BStr; 9] = [
+    php_str(b"black"),
+    php_str(b"red"),
+    php_str(b"green"),
+    php_str(b"yellow"),
+    php_str(b"blue"),
+    php_str(b"magenta"),
+    php_str(b"cyan"),
+    php_str(b"white"),
+    php_str(b"default"),
 ];
 
 /// Helps outputting debug information when running an external program from a command.

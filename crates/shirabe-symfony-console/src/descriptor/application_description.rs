@@ -5,7 +5,7 @@ use crate::command::Command;
 use crate::exception::CommandNotFoundException;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, php_str};
 
 #[derive(Debug)]
 pub struct ApplicationDescription {
@@ -19,7 +19,7 @@ pub struct ApplicationDescription {
 }
 
 impl ApplicationDescription {
-    pub const GLOBAL_NAMESPACE: &'static str = "_global";
+    pub const GLOBAL_NAMESPACE: &'static BStr = php_str(b"_global");
 
     pub fn new(
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
@@ -70,7 +70,7 @@ impl ApplicationDescription {
             .unwrap_or(false);
         if !in_commands && !in_aliases {
             return Err(CommandNotFoundException::new(
-                format!("Command \"{}\" does not exist.", name.display_lossy()),
+                bconcat!("Command \"", name, "\" does not exist."),
                 vec![],
                 0,
             )

@@ -96,17 +96,17 @@ impl Command for HelpCommand {
         self.inner.set_name("help".into())?;
         self.inner.set_definition(SetDefinitionArg::Array(vec![
             DefinitionItem::InputArgument(InputArgument::new(
-                "command_name".to_string(),
+                "command_name",
                 Some(InputArgument::OPTIONAL),
                 "The command name",
-                InputValue::from("help".to_string()),
+                InputValue::from("help"),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "format",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
                 "The output format (txt, xml, json, or md)",
-                InputValue::from("txt".to_string()),
+                InputValue::from("txt"),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "raw",

@@ -115,6 +115,10 @@ impl From<InputValue> for PhpMixed {
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl From<&str> for InputValue {
     fn from(value: &str) -> Self {
         Self::String(BString::from(value))
@@ -127,6 +131,10 @@ impl From<&BStr> for InputValue {
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl From<String> for InputValue {
     fn from(value: String) -> Self {
         Self::String(BString::from(value))
@@ -145,6 +153,10 @@ impl From<bool> for InputValue {
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl From<Option<String>> for InputValue {
     fn from(value: Option<String>) -> Self {
         match value {
@@ -163,6 +175,10 @@ impl From<Option<BString>> for InputValue {
     }
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "removed once every caller holds a BString"
+)]
 impl From<Vec<String>> for InputValue {
     fn from(value: Vec<String>) -> Self {
         Self::Array(value.into_iter().map(BString::from).collect())

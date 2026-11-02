@@ -11,19 +11,19 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, memory_get_usage,
-    microtime, php_to_string, preg_replace_callback, round, rtrim2, sprintf, str_pad, str_repeat,
-    substr_count, time,
+    microtime, php_str, php_to_string, preg_replace_callback, round, rtrim2, sprintf, str_pad,
+    str_repeat, substr_count, time,
 };
 
-pub const FORMAT_VERBOSE: &str = "verbose";
-pub const FORMAT_VERY_VERBOSE: &str = "very_verbose";
-pub const FORMAT_DEBUG: &str = "debug";
-pub const FORMAT_NORMAL: &str = "normal";
+pub const FORMAT_VERBOSE: &BStr = php_str(b"verbose");
+pub const FORMAT_VERY_VERBOSE: &BStr = php_str(b"very_verbose");
+pub const FORMAT_DEBUG: &BStr = php_str(b"debug");
+pub const FORMAT_NORMAL: &BStr = php_str(b"normal");
 
-const FORMAT_VERBOSE_NOMAX: &str = "verbose_nomax";
-const FORMAT_VERY_VERBOSE_NOMAX: &str = "very_verbose_nomax";
-const FORMAT_DEBUG_NOMAX: &str = "debug_nomax";
-const FORMAT_NORMAL_NOMAX: &str = "normal_nomax";
+const FORMAT_VERBOSE_NOMAX: &BStr = php_str(b"verbose_nomax");
+const FORMAT_VERY_VERBOSE_NOMAX: &BStr = php_str(b"very_verbose_nomax");
+const FORMAT_DEBUG_NOMAX: &BStr = php_str(b"debug_nomax");
+const FORMAT_NORMAL_NOMAX: &BStr = php_str(b"normal_nomax");
 
 /// A placeholder formatter callable, receiving the bar and the output.
 pub type PlaceholderFormatter = Box<
@@ -425,7 +425,7 @@ impl ProgressBar {
         self.format = None;
         self.max = max.max(0);
         self.step_width = if self.max != 0 {
-            Helper::width(self.max.to_string())
+            Helper::width(bconcat!(self.max))
         } else {
             4
         };
@@ -559,7 +559,7 @@ impl ProgressBar {
         self.write_count += 1;
     }
 
-    fn determine_best_format(&self) -> &'static str {
+    fn determine_best_format(&self) -> &'static BStr {
         match self.output.borrow().get_verbosity() {
             // OutputInterface::VERBOSITY_QUIET: display is disabled anyway
             output_interface::VERBOSITY_VERBOSE => {
@@ -639,7 +639,7 @@ impl ProgressBar {
             "remaining".into(),
             Box::new(|bar: &ProgressBar, _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 if bar.get_max_steps() == 0 {
-                    return Ok(Err(LogicException::new("Unable to display the remaining time if the maximum number of steps is not set.".to_string())));
+                    return Ok(Err(LogicException::new("Unable to display the remaining time if the maximum number of steps is not set.")));
                 }
 
                 Ok(Ok(PhpMixed::string(Helper::format_time(bar.get_remaining()).unwrap_or_default())))
@@ -650,7 +650,7 @@ impl ProgressBar {
             "estimated".into(),
             Box::new(|bar: &ProgressBar, _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 if bar.get_max_steps() == 0 {
-                    return Ok(Err(LogicException::new("Unable to display the estimated time if the maximum number of steps is not set.".to_string())));
+                    return Ok(Err(LogicException::new("Unable to display the estimated time if the maximum number of steps is not set.")));
                 }
 
                 Ok(Ok(PhpMixed::string(Helper::format_time(bar.get_estimated()).unwrap_or_default())))
@@ -675,7 +675,7 @@ impl ProgressBar {
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(PhpMixed::string(str_pad(
-                        bar.get_progress().to_string(),
+                        bconcat!(bar.get_progress()),
                         bar.get_step_width() as usize,
                         " ",
                         STR_PAD_LEFT,
@@ -750,7 +750,7 @@ impl ProgressBar {
     }
 
     fn build_line(&mut self) -> anyhow::Result<BString> {
-        let regex = "{%([a-z\\-_]+)(?:\\:([^%]+))?%}i";
+        let regex = BStr::new("{%([a-z\\-_]+)(?:\\:([^%]+))?%}i");
 
         // The callback resolves a placeholder match into its replacement text.
         // It is invoked by preg_replace_callback over $this->format.
@@ -781,7 +781,7 @@ impl ProgressBar {
 
     /// Applies the placeholder-resolving callback over `$this->format`, mirroring
     /// the `preg_replace_callback` invocation in PHP's `buildLine()`.
-    fn build_line_apply(&self, regex: &str) -> anyhow::Result<BString> {
+    fn build_line_apply(&self, regex: &BStr) -> anyhow::Result<BString> {
         let format = self.format.clone().unwrap_or_default();
 
         // $callback in PHP, expressed as a closure over $this and the matches.

@@ -37,7 +37,7 @@ pub struct CommandData {
     code: std::cell::RefCell<
         Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>,
     >,
-    synopsis: std::cell::RefCell<IndexMap<String, bstr::BString>>,
+    synopsis: std::cell::RefCell<IndexMap<BString, bstr::BString>>,
     usages: std::cell::RefCell<Vec<BString>>,
     helper_set: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>>,
 }
@@ -106,9 +106,10 @@ impl CommandData {
     /// Throws InvalidArgumentException when the name is invalid.
     fn validate_name(&self, name: &BStr) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         if !preg_is_match(php_regex!(r"/^[^\:]++(\:[^\:]++)*$/"), name) {
-            return Ok(Err(InvalidArgumentException::new(format!(
-                "Command name \"{}\" is invalid.",
-                name.display_lossy()
+            return Ok(Err(InvalidArgumentException::new(bconcat!(
+                "Command name \"",
+                name,
+                "\" is invalid."
             ))));
         }
 
@@ -718,7 +719,7 @@ impl Command for CommandData {
     }
 
     fn get_synopsis(&self, short: bool) -> bstr::BString {
-        let key = if short { "short" } else { "long" }.to_string();
+        let key = BString::from(if short { "short" } else { "long" });
 
         if !self.synopsis.borrow().contains_key(&key) {
             let value = trim(bconcat!(
@@ -757,9 +758,10 @@ impl Command for CommandData {
         let helper_set_ref = self.helper_set.borrow();
         let helper_set = match &*helper_set_ref {
             None => {
-                return Ok(Err(crate::exception::LogicException::new(format!(
-                    "Cannot retrieve helper \"{}\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method.",
-                    name.display_lossy()
+                return Ok(Err(crate::exception::LogicException::new(bconcat!(
+                    "Cannot retrieve helper \"",
+                    name,
+                    "\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method."
                 ))));
             }
             Some(helper_set) => helper_set,

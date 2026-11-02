@@ -88,7 +88,7 @@ impl Command for ListCommand {
         self.inner.set_name("list".into())?;
         self.inner.set_definition(SetDefinitionArg::Array(vec![
             DefinitionItem::InputArgument(InputArgument::new(
-                "namespace".to_string(),
+                "namespace",
                 Some(InputArgument::OPTIONAL),
                 "The namespace name",
                 InputValue::Null,
@@ -105,7 +105,7 @@ impl Command for ListCommand {
                 None,
                 Some(InputOption::VALUE_REQUIRED),
                 "The output format (txt, xml, json, or md)",
-                InputValue::from("txt".to_string()),
+                InputValue::from("txt"),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "short",
