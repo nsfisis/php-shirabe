@@ -70,7 +70,8 @@ impl CaBundle {
         std::path::PathBuf::new()
     }
 
-    fn get_env_variable(name: &str) -> Option<std::ffi::OsString> {
+    fn get_env_variable(name: impl AsRef<std::ffi::OsStr>) -> Option<std::ffi::OsString> {
+        let name = name.as_ref();
         let value = PHP_SERVER.lock().unwrap().get(name);
         value.or_else(|| getenv(name))
     }
