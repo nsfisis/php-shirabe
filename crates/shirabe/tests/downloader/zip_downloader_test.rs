@@ -311,8 +311,8 @@ fn test_system_unzip_only_failed() {
         false,
         MockHandler {
             r#return: 1,
-            stdout: String::new(),
-            stderr: "output".to_string(),
+            stdout: BString::default(),
+            stderr: BString::from("output"),
         },
     );
     let downloader = make_downloader_with_process(&set_up, process);
@@ -348,8 +348,8 @@ fn test_system_unzip_only_good() {
         false,
         MockHandler {
             r#return: 0,
-            stdout: String::new(),
-            stderr: "output".to_string(),
+            stdout: BString::default(),
+            stderr: BString::from("output"),
         },
     );
     let downloader = make_downloader_with_process(&set_up, process);
@@ -380,8 +380,8 @@ fn test_non_windows_fallback_good() {
         false,
         MockHandler {
             r#return: 1,
-            stdout: String::new(),
-            stderr: "output".to_string(),
+            stdout: BString::default(),
+            stderr: BString::from("output"),
         },
     );
     let downloader = make_downloader_with_process(&set_up, process);
@@ -418,8 +418,8 @@ fn test_non_windows_fallback_failed() {
         false,
         MockHandler {
             r#return: 1,
-            stdout: String::new(),
-            stderr: "output".to_string(),
+            stdout: BString::default(),
+            stderr: BString::from("output"),
         },
     );
     let downloader = make_downloader_with_process(&set_up, process);

@@ -54,7 +54,7 @@ mockall::mock! {
         fn load(
             &self,
             config: IndexMap<BString, PhpMixed>,
-            class: Option<String>,
+            class: Option<BString>,
         ) -> anyhow::Result<PackageInterfaceHandle>;
         fn as_any(&self) -> &dyn std::any::Any;
     }
@@ -363,7 +363,10 @@ fn test_load_success() {
             ValidatingArrayLoader::CHECK_ALL,
         );
         loader
-            .load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))
+            .load(
+                cfg,
+                Some(BString::from("Composer\\Package\\CompletePackage")),
+            )
             .unwrap();
     }
 }
@@ -781,7 +784,9 @@ fn error_provider() -> Vec<(IndexMap<BString, PhpMixed>, Vec<String>)> {
 /// ref: ValidatingArrayLoaderTest::testLoadFailureThrowsException
 #[test]
 fn test_load_failure_throws_exception() {
-    for (cfg, mut expected_errors) in error_provider() {
+    for (cfg, expected_errors) in error_provider() {
+        let mut expected_errors: Vec<BString> =
+            expected_errors.into_iter().map(BString::from).collect();
         let internal_loader = mock_loader();
         let loader = ValidatingArrayLoader::new(
             Box::new(internal_loader),
@@ -789,13 +794,16 @@ fn test_load_failure_throws_exception() {
             None,
             ValidatingArrayLoader::CHECK_ALL,
         );
-        match loader.load(cfg, Some("Composer\\Package\\CompletePackage".to_string())) {
+        match loader.load(
+            cfg,
+            Some(BString::from("Composer\\Package\\CompletePackage")),
+        ) {
             Ok(_) => panic!("Expected exception to be thrown"),
             Err(e) => {
                 let exception = e
                     .catch::<InvalidPackageException>()
                     .expect("Expected InvalidPackageException");
-                let mut errors: Vec<String> = exception.get_errors().to_vec();
+                let mut errors: Vec<BString> = exception.get_errors().to_vec();
                 expected_errors.sort();
                 errors.sort();
                 assert_eq!(expected_errors, errors);
@@ -959,7 +967,9 @@ fn warning_provider() -> Vec<(
 /// ref: ValidatingArrayLoaderTest::testLoadWarnings
 #[test]
 fn test_load_warnings() {
-    for (cfg, mut expected_warnings, _must_check, _expected_array) in warning_provider() {
+    for (cfg, expected_warnings, _must_check, _expected_array) in warning_provider() {
+        let mut expected_warnings: Vec<BString> =
+            expected_warnings.into_iter().map(BString::from).collect();
         let internal_loader = mock_loader();
         let loader = ValidatingArrayLoader::new(
             Box::new(internal_loader),
@@ -968,9 +978,12 @@ fn test_load_warnings() {
             ValidatingArrayLoader::CHECK_ALL,
         );
         loader
-            .load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))
+            .load(
+                cfg,
+                Some(BString::from("Composer\\Package\\CompletePackage")),
+            )
             .unwrap();
-        let mut warnings: Vec<String> = loader.get_warnings();
+        let mut warnings: Vec<BString> = loader.get_warnings();
         expected_warnings.sort();
         warnings.sort();
         assert_eq!(expected_warnings, warnings);
@@ -1002,7 +1015,10 @@ fn test_load_skips_warning_data_when_ignoring_errors() {
         );
         cfg.insert("name".into(), s("a/b"));
         loader
-            .load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))
+            .load(
+                cfg,
+                Some(BString::from("Composer\\Package\\CompletePackage")),
+            )
             .unwrap();
     }
 }

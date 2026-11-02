@@ -65,7 +65,7 @@ fn http_mock_with_body(
     HttpDownloaderMockGuard,
 ) {
     get_http_downloader_mock(
-        vec![expect_full(url, None, 200, body, vec![String::new()])],
+        vec![expect_full(url, None, 200, body, vec![BString::default()])],
         true,
         HttpDownloaderMockHandler::default(),
     )
@@ -349,7 +349,7 @@ fn test_invalid_support_data() {
             None,
             200,
             format!(r#"{{"support": "{}" }}"#, repo_url),
-            vec![String::new()],
+            vec![BString::default()],
         )],
         true,
         HttpDownloaderMockHandler::default(),
@@ -541,14 +541,18 @@ fn test_get_paginated_refs() {
                 None,
                 200,
                 branch_data.display_lossy().to_string(),
-                vec!["Link: <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=2&per_page=20>; rel=\"next\", <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=1&per_page=20>; rel=\"first\", <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=3&per_page=20>; rel=\"last\"".to_string()],
+                vec![BString::from(
+                    "Link: <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=2&per_page=20>; rel=\"next\", <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=1&per_page=20>; rel=\"first\", <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=3&per_page=20>; rel=\"last\"",
+                )],
             ),
             expect_full(
                 "http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=2&per_page=20",
                 None,
                 200,
                 branch_data.display_lossy().to_string(),
-                vec!["Link: <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=2&per_page=20>; rel=\"prev\", <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=1&per_page=20>; rel=\"first\", <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=3&per_page=20>; rel=\"last\"".to_string()],
+                vec![BString::from(
+                    "Link: <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=2&per_page=20>; rel=\"prev\", <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=1&per_page=20>; rel=\"first\", <http://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/tags?id=mygroup%2Fmyproject&page=3&per_page=20>; rel=\"last\"",
+                )],
             ),
         ],
         true,

@@ -68,7 +68,7 @@ fn get_downloader(
         false,
         HttpDownloaderMockHandler {
             status: 200,
-            body: "file~".to_string(),
+            body: BString::from("file~"),
             headers: Vec::new(),
         },
     );
@@ -242,7 +242,7 @@ fn test_cache_garbage_collection_is_called() {
         false,
         HttpDownloaderMockHandler {
             status: 200,
-            body: "file~".to_string(),
+            body: BString::from("file~"),
             headers: Vec::new(),
         },
     );
@@ -361,7 +361,7 @@ fn test_downgrade_shows_appropriate_message() {
         false,
         HttpDownloaderMockHandler {
             status: 200,
-            body: "file~".to_string(),
+            body: BString::from("file~"),
             headers: Vec::new(),
         },
     );

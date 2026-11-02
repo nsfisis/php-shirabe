@@ -61,7 +61,7 @@ impl PackageRepository {
             };
             let package_loaded = match loader.load(
                 config_map,
-                Some("Composer\\Package\\CompletePackage".to_string()),
+                Some(BString::from("Composer\\Package\\CompletePackage")),
             ) {
                 Ok(p) => p,
                 Err(e) => {

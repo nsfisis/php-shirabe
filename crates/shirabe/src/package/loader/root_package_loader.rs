@@ -135,7 +135,7 @@ impl RootPackageLoader {
 
         let package = self.inner.load(
             config.clone(),
-            Some("Composer\\Package\\RootPackage".to_string()),
+            Some(BString::from("Composer\\Package\\RootPackage")),
         )?;
 
         let real_package = if let Some(alias) = package.as_root_alias_package() {

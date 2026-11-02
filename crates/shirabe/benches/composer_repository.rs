@@ -80,18 +80,18 @@ fn repository(
 ) -> ComposerRepository {
     let expectations = vec![
         HttpDownloaderMockExpectation {
-            url: REPOSITORY_URL.to_string(),
+            url: REPOSITORY_URL.into(),
             options: None,
             status: 200,
-            body: root.display_lossy().to_string(),
-            headers: vec![String::new()],
+            body: root.into(),
+            headers: vec![bstr::BString::default()],
         },
         HttpDownloaderMockExpectation {
-            url: METADATA_URL.replace("%package%", package),
+            url: METADATA_URL.replace("%package%", package).into(),
             options: None,
             status: 200,
-            body: metadata.to_string(),
-            headers: vec![String::new()],
+            body: metadata.into(),
+            headers: vec![bstr::BString::default()],
         },
     ];
 

@@ -87,14 +87,8 @@ impl DiagnoseCommand {
 
         if !errors.is_empty() || !warnings.is_empty() {
             let mut messages: IndexMap<BString, Vec<BString>> = IndexMap::new();
-            messages.insert(
-                BString::from("error"),
-                errors.into_iter().map(BString::from).collect(),
-            );
-            messages.insert(
-                BString::from("warning"),
-                warnings.into_iter().map(BString::from).collect(),
-            );
+            messages.insert(BString::from("error"), errors);
+            messages.insert(BString::from("warning"), warnings);
 
             let mut output = BString::default();
             for (style, msgs) in &messages {
@@ -222,7 +216,7 @@ impl DiagnoseCommand {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
-                            result_list.push(BString::from(hint));
+                            result_list.push(hint);
                         }
                     }
 
@@ -286,7 +280,7 @@ impl DiagnoseCommand {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
-                            result_list.push(BString::from(hint));
+                            result_list.push(hint);
                         }
                     }
 

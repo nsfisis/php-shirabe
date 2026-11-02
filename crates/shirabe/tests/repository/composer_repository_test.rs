@@ -17,9 +17,9 @@ use tempfile::TempDir;
 // options match any executed options).
 fn http_body(
     url: &str,
-    body: impl Into<String>,
+    body: impl Into<BString>,
 ) -> shirabe::util::http_downloader::HttpDownloaderMockExpectation {
-    expect_full(url, None, 200, body, vec![String::new()])
+    expect_full(url, None, 200, body, vec![BString::default()])
 }
 
 // Equivalent to FactoryMock::createConfig(): a real Config with a writable, unique

@@ -20,9 +20,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect,
-    array_keys, array_map, array_merge, empty, file_get_contents, filemtime, hash, in_array_loose,
-    intval, is_int, ksort, php_regex, preg_is_match, preg_match, realpath, strcmp, strtolower,
-    touch2, trim, usort,
+    array_keys, array_map, array_merge, bconcat, empty, file_get_contents, filemtime, hash,
+    in_array_loose, intval, is_int, ksort, php_regex, preg_is_match, preg_match, realpath, strcmp,
+    strtolower, touch2, trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -182,7 +182,7 @@ impl Locker {
             if let Some(packages_dev) = lock_data.get(B("packages-dev")).cloned() {
                 locked_packages = array_merge(locked_packages, packages_dev);
             } else {
-                return Err(RuntimeException::new("The lock file does not contain require-dev information, run install with the --no-dev option or delete it and run shirabe update to generate a new lock file.".to_string())
+                return Err(RuntimeException::new(BString::from("The lock file does not contain require-dev information, run install with the --no-dev option or delete it and run shirabe update to generate a new lock file."))
                 .into());
             }
         }
@@ -256,10 +256,9 @@ impl Locker {
             return Ok(packages);
         }
 
-        Err(RuntimeException::new(
-            "Your composer.lock is invalid. Run \"shirabe update\" to generate a new one."
-                .to_string(),
-        )
+        Err(RuntimeException::new(BString::from(
+            "Your composer.lock is invalid. Run \"shirabe update\" to generate a new one.",
+        ))
         .into())
     }
 
@@ -431,9 +430,9 @@ impl Locker {
         }
 
         if !self.lock_file.exists() {
-            return Err(LogicException::new(
-                "No lockfile found. Unable to read locked packages".to_string(),
-            )
+            return Err(LogicException::new(BString::from(
+                "No lockfile found. Unable to read locked packages",
+            ))
             .into());
         }
 
@@ -491,13 +490,13 @@ impl Locker {
             "_readme".into(),
             PhpMixed::List(vec![
                 PhpMixed::string(
-                    "This file locks the dependencies of your project to a known state".to_string(),
+                    BString::from("This file locks the dependencies of your project to a known state"),
                 ),
                 PhpMixed::string(
-                    "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies".to_string(),
+                    BString::from("Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies"),
                 ),
                 PhpMixed::string(
-                    format!("This file is @{}ated automatically", "gener"),
+                    bconcat!("This file is @", "gener", "ated automatically"),
                 ),
             ]),
         );
@@ -630,9 +629,10 @@ impl Locker {
         let contents = match file_get_contents(composer_json.get_path()) {
             Ok(s) => s,
             Err(_) => {
-                return Err(RuntimeException::new(format!(
-                    "Unable to read {} contents to update the lock file hash.",
-                    composer_json.get_path().display()
+                return Err(RuntimeException::new(bconcat!(
+                    "Unable to read ",
+                    composer_json.get_path(),
+                    " contents to update the lock file hash."
                 ))
                 .into());
             }
@@ -706,9 +706,10 @@ impl Locker {
             let version = package.get_pretty_version();
 
             if name.is_empty() || version.is_empty() {
-                return Err(LogicException::new(format!(
-                    "Package \"{}\" has no version or name and can not be locked",
-                    package.to_php_string().display_lossy(),
+                return Err(LogicException::new(bconcat!(
+                    "Package \"",
+                    package.to_php_string(),
+                    "\" has no version or name and can not be locked"
                 ))
                 .into());
             }
@@ -792,8 +793,8 @@ impl Locker {
             && in_array_loose(
                 source_type.clone().unwrap_or_default(),
                 &[
-                    PhpMixed::string("git".to_string()),
-                    PhpMixed::string("hg".to_string()),
+                    PhpMixed::string(BString::from("git")),
+                    PhpMixed::string(BString::from("hg")),
                 ],
             )
         {
@@ -859,19 +860,19 @@ impl Locker {
         &mut self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
-    ) -> anyhow::Result<Vec<String>> {
-        let mut missing_requirement_info: Vec<String> = vec![];
+    ) -> anyhow::Result<Vec<BString>> {
+        let mut missing_requirement_info: Vec<BString> = vec![];
         let mut missing_requirements = false;
         let mut sets: Vec<SetEntry> = vec![SetEntry {
             repo: self.get_locked_repository(false)?,
-            method: "getRequires",
-            description: "Required",
+            method: BStr::new("getRequires"),
+            description: BStr::new("Required"),
         }];
         if include_dev {
             sets.push(SetEntry {
                 repo: self.get_locked_repository(true)?,
-                method: "getDevRequires",
-                description: "Required (in require-dev)",
+                method: BStr::new("getDevRequires"),
+                description: BStr::new("Required (in require-dev)"),
             });
         }
         let root_repo: RepositoryInterfaceHandle = RepositoryInterfaceHandle::new(
@@ -883,9 +884,9 @@ impl Locker {
                 InstalledRepository::new(vec![set.repo.clone().into(), root_repo.clone()]);
 
             // PHP: call_user_func([$package, $set['method']])
-            let links = match set.method {
-                "getRequires" => package.get_requires(),
-                "getDevRequires" => package.get_dev_requires(),
+            let links = match set.method.as_bytes() {
+                b"getRequires" => package.get_requires(),
+                b"getDevRequires" => package.get_dev_requires(),
                 _ => unreachable!(),
             };
             for link in links.values() {
@@ -911,8 +912,7 @@ impl Locker {
                         // PHP `reset($results)` returns the first shared package; clone the handle.
                         let provider: BasePackageHandle = results.first().unwrap().clone();
                         let _ = &results;
-                        let mut description =
-                            provider.get_pretty_version().display_lossy().to_string();
+                        let mut description = provider.get_pretty_version().to_owned();
                         if provider.get_name() != link.get_target() {
                             'outer: for (method, verb) in
                                 [("getReplaces", "replaced"), ("getProvides", "provided")].iter()
@@ -924,30 +924,38 @@ impl Locker {
                                 };
                                 for provider_link in provider_links.values() {
                                     if provider_link.get_target() == link.get_target() {
-                                        description = format!(
-                                            "{} as {} by {} {}",
+                                        description = bconcat!(
                                             verb,
-                                            provider_link.get_pretty_constraint().display_lossy(),
-                                            provider.get_pretty_name().display_lossy(),
-                                            provider.get_pretty_version().display_lossy(),
+                                            " as ",
+                                            provider_link.get_pretty_constraint(),
+                                            " by ",
+                                            provider.get_pretty_name(),
+                                            " ",
+                                            provider.get_pretty_version()
                                         );
                                         break 'outer;
                                     }
                                 }
                             }
                         }
-                        missing_requirement_info.push(format!(
-                            "- {} package \"{}\" is in the lock file as \"{}\" but that does not satisfy your constraint \"{}\".",
+                        missing_requirement_info.push(bconcat!(
+                            "- ",
                             set.description,
-                            link.get_target().display_lossy(),
+                            " package \"",
+                            link.get_target(),
+                            "\" is in the lock file as \"",
                             description,
-                            link.get_pretty_constraint().display_lossy(),
+                            "\" but that does not satisfy your constraint \"",
+                            link.get_pretty_constraint(),
+                            "\"."
                         ));
                     } else {
-                        missing_requirement_info.push(format!(
-                            "- {} package \"{}\" is not present in the lock file.",
+                        missing_requirement_info.push(bconcat!(
+                            "- ",
                             set.description,
-                            link.get_target().display_lossy()
+                            " package \"",
+                            link.get_target(),
+                            "\" is not present in the lock file."
                         ));
                     }
                     missing_requirements = true;
@@ -956,9 +964,9 @@ impl Locker {
         }
 
         if missing_requirements {
-            missing_requirement_info.push("This usually happens when composer files are incorrectly merged or the composer.json file is manually edited.".to_string());
-            missing_requirement_info.push("Read more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md".to_string());
-            missing_requirement_info.push("and prefer using the \"require\" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r".to_string());
+            missing_requirement_info.push(BString::from("This usually happens when composer files are incorrectly merged or the composer.json file is manually edited."));
+            missing_requirement_info.push(BString::from("Read more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md"));
+            missing_requirement_info.push(BString::from("and prefer using the \"require\" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r"));
         }
 
         Ok(missing_requirement_info)
@@ -1015,7 +1023,7 @@ pub trait LockerInterface: std::fmt::Debug {
         &mut self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
-    ) -> anyhow::Result<Vec<String>>;
+    ) -> anyhow::Result<Vec<BString>>;
 }
 
 impl LockerInterface for Locker {
@@ -1125,13 +1133,13 @@ impl LockerInterface for Locker {
         &mut self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
-    ) -> anyhow::Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<BString>> {
         self.get_missing_requirement_info(package, include_dev)
     }
 }
 
 struct SetEntry {
     repo: LockArrayRepositoryHandle,
-    method: &'static str,
-    description: &'static str,
+    method: &'static BStr,
+    description: &'static BStr,
 }

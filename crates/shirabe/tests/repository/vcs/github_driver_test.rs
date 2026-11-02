@@ -101,9 +101,9 @@ fn null_config_source() -> MockConfigSource {
 // entry (status defaults to 200).
 fn http_body(
     url: &str,
-    body: impl Into<String>,
+    body: impl Into<BString>,
 ) -> shirabe::util::http_downloader::HttpDownloaderMockExpectation {
-    expect_full(url, None, 200, body, vec![String::new()])
+    expect_full(url, None, 200, body, vec![BString::default()])
 }
 
 // Mirrors PHP's `['url' => .., 'status' => 404]` entry (no body).
@@ -111,7 +111,7 @@ fn http_status(
     url: &str,
     status: i64,
 ) -> shirabe::util::http_downloader::HttpDownloaderMockExpectation {
-    expect_full(url, None, status, String::new(), vec![String::new()])
+    expect_full(url, None, status, String::new(), vec![BString::default()])
 }
 
 fn b64(s: &str) -> String {
@@ -183,8 +183,8 @@ fn test_private_repository() {
         false,
         MockHandler {
             r#return: 1,
-            stdout: String::new(),
-            stderr: String::new(),
+            stdout: BString::default(),
+            stderr: BString::default(),
         },
     );
 

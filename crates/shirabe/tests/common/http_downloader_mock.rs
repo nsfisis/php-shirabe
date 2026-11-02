@@ -14,22 +14,22 @@ use shirabe_php_shim::PhpMixed;
 // A single HTTP request expectation as written in the PHP tests: a `url` plus an
 // optional response (`status`/`body`/`headers`). `options` of `None` matches any
 // options; `Some(..)` requires an exact match against the executed options.
-pub fn expect(url: impl Into<String>) -> HttpDownloaderMockExpectation {
+pub fn expect(url: impl Into<BString>) -> HttpDownloaderMockExpectation {
     HttpDownloaderMockExpectation {
         url: url.into(),
         options: None,
         status: 200,
-        body: String::new(),
-        headers: vec![String::new()],
+        body: BString::default(),
+        headers: vec![BString::default()],
     }
 }
 
 pub fn expect_full(
-    url: impl Into<String>,
+    url: impl Into<BString>,
     options: Option<IndexMap<BString, PhpMixed>>,
     status: i64,
-    body: impl Into<String>,
-    headers: Vec<String>,
+    body: impl Into<BString>,
+    headers: Vec<BString>,
 ) -> HttpDownloaderMockExpectation {
     HttpDownloaderMockExpectation {
         url: url.into(),

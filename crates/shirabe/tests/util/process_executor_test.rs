@@ -269,8 +269,8 @@ fn test_mock_default_handler_for_unexpected_command() {
         false,
         MockHandler {
             r#return: 7,
-            stdout: "fallback".to_string(),
-            stderr: String::new(),
+            stdout: BString::from("fallback"),
+            stderr: BString::default(),
         },
     );
 

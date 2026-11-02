@@ -147,15 +147,19 @@ impl FilesystemRepository {
         if let Some(packages_list) = packages.as_list() {
             for package_data in packages_list.iter() {
                 let cfg = package_data.as_array().cloned().unwrap_or_default();
-                let package =
-                    loader.load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))?;
+                let package = loader.load(
+                    cfg,
+                    Some(BString::from("Composer\\Package\\CompletePackage")),
+                )?;
                 self.inner.add_package(package)?;
             }
         } else if let Some(packages_array) = packages.as_array() {
             for (_, package_data) in packages_array.iter() {
                 let cfg = package_data.as_array().cloned().unwrap_or_default();
-                let package =
-                    loader.load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))?;
+                let package = loader.load(
+                    cfg,
+                    Some(BString::from("Composer\\Package\\CompletePackage")),
+                )?;
                 self.inner.add_package(package)?;
             }
         }

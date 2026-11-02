@@ -917,7 +917,7 @@ impl Installer {
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
             let loaded = loader.load(
                 dumper.dump(pkg.clone()),
-                Some("Composer\\Package\\CompletePackage".to_string()),
+                Some(BString::from("Composer\\Package\\CompletePackage")),
             )?;
             result_repo.add_package(loaded)?;
         }
@@ -1047,7 +1047,8 @@ impl Installer {
                 .borrow_mut()
                 .get_missing_requirement_info(package_for_missing, self.dev_mode)?;
             if !missing_requirement_info.is_empty() {
-                self.io.write_error(missing_requirement_info.join("\n"));
+                self.io
+                    .write_error(implode("\n", &missing_requirement_info));
 
                 if !self
                     .config

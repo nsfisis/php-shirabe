@@ -12,8 +12,8 @@ pub fn cmd(command: impl IntoMockCmd) -> MockExpectation {
 pub fn cmd_full(
     command: impl IntoMockCmd,
     r#return: i64,
-    stdout: impl Into<String>,
-    stderr: impl Into<String>,
+    stdout: impl Into<bstr::BString>,
+    stderr: impl Into<bstr::BString>,
 ) -> MockExpectation {
     MockExpectation {
         cmd: command.into_mock_cmd(),

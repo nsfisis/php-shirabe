@@ -67,26 +67,26 @@ pub struct HttpDownloaderMockState {
 /// exactly equal (PHP `===`).
 #[derive(Debug, Clone)]
 pub struct HttpDownloaderMockExpectation {
-    pub url: String,
+    pub url: BString,
     pub options: Option<IndexMap<BString, PhpMixed>>,
     pub status: i64,
-    pub body: String,
-    pub headers: Vec<String>,
+    pub body: BString,
+    pub headers: Vec<BString>,
 }
 
 /// For testing only. The default response handler used for undefined requests when not strict.
 #[derive(Debug, Clone)]
 pub struct HttpDownloaderMockHandler {
     pub status: i64,
-    pub body: String,
-    pub headers: Vec<String>,
+    pub body: BString,
+    pub headers: Vec<BString>,
 }
 
 impl Default for HttpDownloaderMockHandler {
     fn default() -> Self {
         Self {
             status: 200,
-            body: String::new(),
+            body: BString::default(),
             headers: Vec::new(),
         }
     }
@@ -585,7 +585,7 @@ impl HttpDownloader {
         Ok(())
     }
 
-    pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<String>> {
+    pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<BString>> {
         let e_as_transport: Option<&TransportException> = e.catch::<TransportException>();
         e_as_transport?;
         let e_as_transport = e_as_transport.unwrap();
@@ -606,14 +606,14 @@ impl HttpDownloader {
             let _ = stream_context_create(&ctx_options, None);
             let test_connectivity = file_get_contents("https://8.8.8.8");
             if test_connectivity.is_ok() {
-                return Some(vec![
-                    "<error>The following exception probably indicates you have misconfigured DNS resolver(s)</error>".to_string(),
-                ]);
+                return Some(vec![BString::from(
+                    "<error>The following exception probably indicates you have misconfigured DNS resolver(s)</error>",
+                )]);
             }
 
-            return Some(vec![
-                "<error>The following exception probably indicates you are offline or have misconfigured DNS resolver(s)</error>".to_string(),
-            ]);
+            return Some(vec![BString::from(
+                "<error>The following exception probably indicates you are offline or have misconfigured DNS resolver(s)</error>",
+            )]);
         }
 
         None
@@ -699,12 +699,12 @@ impl HttpDownloader {
             return;
         };
         if !expectations.is_empty() {
-            let urls: Vec<&str> = expectations.iter().map(|e| e.url.as_str()).collect();
+            let urls: Vec<&BStr> = expectations.iter().map(|e| e.url.as_bstr()).collect();
             panic!(
                 "There are still {} expected HTTP requests which have not been consumed:{}{}{}{}Received calls:{}{}",
                 expectations.len(),
                 PHP_EOL.display_lossy(),
-                urls.join("\n"),
+                implode("\n", &urls).display_lossy(),
                 PHP_EOL.display_lossy(),
                 PHP_EOL.display_lossy(),
                 PHP_EOL.display_lossy(),
@@ -757,17 +757,19 @@ impl HttpDownloader {
             .and_then(|e| e.first())
             .map(|first| {
                 let opts = if first.options.is_some() {
-                    format!(
-                        "\" with options \"{}",
-                        serde_json::to_string(&first.options.clone().map(PhpMixed::Array))
-                            .unwrap_or_default()
+                    bconcat!(
+                        "\" with options \"",
+                        BString::from(
+                            serde_json::to_vec(&first.options.clone().map(PhpMixed::Array))
+                                .unwrap_or_default()
+                        )
                     )
                 } else {
-                    String::new()
+                    BString::default()
                 };
-                format!("Expected \"{}{}\" at this point.", first.url, opts)
+                bconcat!("Expected \"", first.url, opts, "\" at this point.")
             })
-            .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
+            .unwrap_or_else(|| BString::from("Expected no more calls at this point."));
         let prior_calls = if mock.log.len() > 1 {
             implode(PHP_EOL, &mock.log[..mock.log.len() - 1])
         } else {
@@ -778,7 +780,7 @@ impl HttpDownloader {
             file_url.display_lossy(),
             serde_json::to_string(&PhpMixed::Array(options.clone())).unwrap_or_default(),
             PHP_EOL.display_lossy(),
-            next_expected,
+            next_expected.display_lossy(),
             PHP_EOL.display_lossy(),
             PHP_EOL.display_lossy(),
             prior_calls.display_lossy(),
@@ -789,28 +791,24 @@ impl HttpDownloader {
     fn mock_respond(
         url: &BStr,
         status: i64,
-        headers: Vec<String>,
-        body: String,
+        headers: Vec<BString>,
+        body: BString,
     ) -> anyhow::Result<Response> {
-        let headers: Vec<BString> = headers.into_iter().map(BString::from).collect();
         if status < 400 {
             return Ok(Response::new(
                 url.to_owned(),
                 Some(status),
                 headers,
-                Some(body.into_bytes()),
+                Some(body.into()),
             ));
         }
 
         let mut e = TransportException::new(
-            format!(
-                "The \"{}\" file could not be downloaded",
-                url.display_lossy()
-            ),
+            bconcat!("The \"", url, "\" file could not be downloaded"),
             status,
         );
         e.set_headers(headers);
-        e.set_response(Some(body.into_bytes()));
+        e.set_response(Some(body.into()));
 
         Err(e.into())
     }

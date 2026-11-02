@@ -8,7 +8,8 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::ValidatingArrayLoader;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::util::{ConfigValidator, Filesystem};
-use shirabe_php_shim::{impl_php_class, path_from_bytes};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{bconcat, impl_php_class, path_from_bytes, path_to_bytes};
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
@@ -40,45 +41,50 @@ impl ValidateCommand {
     fn output_result(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        name: &str,
-        errors: &mut Vec<String>,
-        warnings: &mut Vec<String>,
+        name: &BStr,
+        errors: &mut Vec<BString>,
+        warnings: &mut Vec<BString>,
         check_publish: bool,
-        publish_errors: &mut Vec<String>,
+        publish_errors: &mut Vec<BString>,
         check_lock: bool,
-        lock_errors: &mut Vec<String>,
+        lock_errors: &mut Vec<BString>,
         print_schema_url: bool,
     ) {
         let mut do_print_schema_url = false;
 
         if !errors.is_empty() {
-            io.write_error(format!(
-                "<error>{} is invalid, the following errors/warnings were found:</error>",
-                name
+            io.write_error(bconcat!(
+                "<error>",
+                name,
+                " is invalid, the following errors/warnings were found:</error>"
             ));
         } else if !publish_errors.is_empty() && check_publish {
-            io.write_error(format!(
-                "<info>{} is valid for simple usage with Composer but has</info>",
-                name
+            io.write_error(bconcat!(
+                "<info>",
+                name,
+                " is valid for simple usage with Composer but has</info>"
             ));
             io.write_error(
                 "<info>strict errors that make it unable to be published as a package</info>",
             );
             do_print_schema_url = print_schema_url;
         } else if !warnings.is_empty() {
-            io.write_error(format!(
-                "<info>{} is valid, but with a few warnings</info>",
-                name
+            io.write_error(bconcat!(
+                "<info>",
+                name,
+                " is valid, but with a few warnings</info>"
             ));
             do_print_schema_url = print_schema_url;
         } else if !lock_errors.is_empty() {
-            io.write(format!(
-                "<info>{} is valid but your composer.lock has some {}</info>",
+            io.write(bconcat!(
+                "<info>",
                 name,
-                if check_lock { "errors" } else { "warnings" }
+                " is valid but your composer.lock has some ",
+                if check_lock { "errors" } else { "warnings" },
+                "</info>"
             ));
         } else {
-            io.write(format!("<info>{} is valid</info>", name));
+            io.write(bconcat!("<info>", name, " is valid</info>"));
         }
 
         if do_print_schema_url {
@@ -86,44 +92,44 @@ impl ValidateCommand {
         }
 
         if !errors.is_empty() {
-            *errors = errors.iter().map(|e| format!("- {}", e)).collect();
-            errors.insert(0, "# General errors".to_string());
+            *errors = errors.iter().map(|e| bconcat!("- ", e)).collect();
+            errors.insert(0, BString::from("# General errors"));
         }
         if !warnings.is_empty() {
-            *warnings = warnings.iter().map(|w| format!("- {}", w)).collect();
-            warnings.insert(0, "# General warnings".to_string());
+            *warnings = warnings.iter().map(|w| bconcat!("- ", w)).collect();
+            warnings.insert(0, BString::from("# General warnings"));
         }
 
-        let mut extra_warnings: Vec<String> = vec![];
+        let mut extra_warnings: Vec<BString> = vec![];
 
         if !publish_errors.is_empty() && check_publish {
-            *publish_errors = publish_errors.iter().map(|e| format!("- {}", e)).collect();
-            publish_errors.insert(0, "# Publish errors".to_string());
+            *publish_errors = publish_errors.iter().map(|e| bconcat!("- ", e)).collect();
+            publish_errors.insert(0, BString::from("# Publish errors"));
             errors.append(publish_errors);
         }
 
         if !lock_errors.is_empty() {
             if check_lock {
-                lock_errors.insert(0, "# Lock file errors".to_string());
+                lock_errors.insert(0, BString::from("# Lock file errors"));
                 errors.append(lock_errors);
             } else {
-                lock_errors.insert(0, "# Lock file warnings".to_string());
+                lock_errors.insert(0, BString::from("# Lock file warnings"));
                 extra_warnings.append(lock_errors);
             }
         }
 
-        let all_warnings: Vec<String> = warnings.iter().cloned().chain(extra_warnings).collect();
+        let all_warnings: Vec<BString> = warnings.iter().cloned().chain(extra_warnings).collect();
 
         for msg in errors.iter() {
-            if msg.starts_with('#') {
-                io.write_error(format!("<error>{}</error>", msg));
+            if msg.starts_with(b"#") {
+                io.write_error(bconcat!("<error>", msg, "</error>"));
             } else {
                 io.write_error(msg);
             }
         }
         for msg in &all_warnings {
-            if msg.starts_with('#') {
-                io.write_error(format!("<warning>{}</warning>", msg));
+            if msg.starts_with(b"#") {
+                io.write_error(bconcat!("<warning>", msg, "</warning>"));
             } else {
                 io.write_error(msg);
             }
@@ -235,14 +241,11 @@ impl Command for ValidateCommand {
         let io = self.get_io().clone();
 
         if !file.exists() {
-            io.write_error(format!("<error>{} not found.</error>", file.display()));
+            io.write_error(bconcat!("<error>", file, " not found.</error>"));
             return Ok(3);
         }
         if !Filesystem::is_readable(&file) {
-            io.write_error(format!(
-                "<error>{} is not readable.</error>",
-                file.display()
-            ));
+            io.write_error(bconcat!("<error>", file, " is not readable.</error>"));
             return Ok(3);
         }
 
@@ -285,7 +288,7 @@ impl Command for ValidateCommand {
         let (mut errors, mut publish_errors, mut warnings) =
             validator.validate(&file, check_all, check_version);
 
-        let mut lock_errors: Vec<String> = vec![];
+        let mut lock_errors: Vec<BString> = vec![];
         let composer =
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?;
         let composer = crate::composer::composer_full(&composer);
@@ -304,7 +307,7 @@ impl Command for ValidateCommand {
         let locker = composer.get_locker().clone();
         let mut locker = locker.borrow_mut();
         if locker.is_locked() && !locker.is_fresh()? {
-            lock_errors.push("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `shirabe update` or `shirabe update <package name>`.".to_string());
+            lock_errors.push(BString::from("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `shirabe update` or `shirabe update <package name>`."));
         }
 
         if locker.is_locked() {
@@ -314,7 +317,7 @@ impl Command for ValidateCommand {
 
         self.output_result(
             io.clone(),
-            &file.display().to_string(),
+            BStr::new(path_to_bytes(&file)),
             &mut errors,
             &mut warnings,
             check_publish,
@@ -361,7 +364,7 @@ impl Command for ValidateCommand {
 
                     self.output_result(
                         io.clone(),
-                        &package.get_pretty_name().display_lossy().to_string(),
+                        package.get_pretty_name().as_bstr(),
                         &mut dep_errors,
                         &mut dep_warnings,
                         check_publish,

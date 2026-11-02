@@ -180,8 +180,8 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
             JsonValidationException::new(message, byte_strings("errors")).into()
         }
         br"Composer\Package\Loader\InvalidPackageException" => InvalidPackageException::new(
-            strings("errors"),
-            strings("warnings"),
+            byte_strings("errors"),
+            byte_strings("warnings"),
             match property("data") {
                 PhpMixed::Array(data) => data,
                 _ => IndexMap::new(),
@@ -310,8 +310,8 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
         );
     }
     if let Some(exception) = error.catch::<InvalidPackageException>() {
-        properties.insert("errors".into(), strings(exception.get_errors()));
-        properties.insert("warnings".into(), strings(exception.get_warnings()));
+        properties.insert("errors".into(), byte_strings(exception.get_errors()));
+        properties.insert("warnings".into(), byte_strings(exception.get_warnings()));
         properties.insert(
             "data".into(),
             PluginValue::from_php_mixed(&PhpMixed::Array(exception.get_data().clone())),

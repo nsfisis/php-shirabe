@@ -58,9 +58,9 @@ impl Drop for TearDown {
 // entry (status defaults to 200).
 fn http_body(
     url: &str,
-    body: impl Into<String>,
+    body: impl Into<BString>,
 ) -> shirabe::util::http_downloader::HttpDownloaderMockExpectation {
-    expect_full(url, None, 200, body, vec![String::new()])
+    expect_full(url, None, 200, body, vec![BString::default()])
 }
 
 // Mirrors PHP's getDriver: constructs the driver from the given repo url with a mocked

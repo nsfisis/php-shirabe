@@ -136,7 +136,7 @@ fn test_public_repository() {
         None,
         200,
         repo_body(),
-        vec![String::new()],
+        vec![BString::default()],
     )]);
 
     let (mut driver, _process_guard) = initialize_driver(
@@ -185,14 +185,14 @@ fn test_get_branches() {
             None,
             200,
             repo_body(),
-            vec![String::new()],
+            vec![BString::default()],
         ),
         expect_full(
             "https://codeberg.org/api/v1/repos/acme/repo/branches?per_page=100",
             None,
             200,
             branches_body.display_lossy().to_string(),
-            vec![String::new()],
+            vec![BString::default()],
         ),
     ]);
 
@@ -237,14 +237,14 @@ fn test_get_tags() {
             None,
             200,
             repo_body(),
-            vec![String::new()],
+            vec![BString::default()],
         ),
         expect_full(
             "https://codeberg.org/api/v1/repos/acme/repo/tags?per_page=100",
             None,
             200,
             tags_body.display_lossy().to_string(),
-            vec![String::new()],
+            vec![BString::default()],
         ),
     ]);
 
@@ -279,14 +279,14 @@ fn test_get_empty_file_content() {
             None,
             200,
             repo_body(),
-            vec![String::new()],
+            vec![BString::default()],
         ),
         expect_full(
             "https://codeberg.org/api/v1/repos/acme/repo/contents/composer.json?ref=main",
             None,
             200,
             "{\"encoding\":\"base64\",\"content\":\"\"}",
-            vec![String::new()],
+            vec![BString::default()],
         ),
     ]);
 

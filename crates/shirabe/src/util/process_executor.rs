@@ -7,10 +7,10 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
-    array_map, bconcat, escapeshellarg, explode, implode, in_array_strict, intval, is_dir,
-    is_numeric, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
-    preg_replace_callback, preg_replace2, preg_split, rtrim2, str_replace, strcspn, strlen,
-    strpbrk, strtolower, strtr_array, substr_replace, trim,
+    array_map, bconcat, display_to_bytes, escapeshellarg, explode, implode, in_array_strict,
+    intval, is_dir, is_numeric, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim2,
+    str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
 use shirabe_symfony_process::{
     ExecutableFinder, Process, ProcessMock,
@@ -62,8 +62,8 @@ pub struct ProcessExecutorMockState {
 pub struct MockExpectation {
     pub cmd: CommandLine,
     pub r#return: i64,
-    pub stdout: String,
-    pub stderr: String,
+    pub stdout: BString,
+    pub stderr: BString,
     /// Optional `callable` fired when the expectation is consumed. Rare in Composer's suite.
     pub callback: Option<Box<dyn FnMut()>>,
 }
@@ -87,8 +87,8 @@ impl MockExpectation {
         Self {
             cmd,
             r#return: 0,
-            stdout: String::new(),
-            stderr: String::new(),
+            stdout: BString::default(),
+            stderr: BString::default(),
             callback: None,
         }
     }
@@ -99,8 +99,8 @@ impl MockExpectation {
 #[derive(Debug, Clone, Default)]
 pub struct MockHandler {
     pub r#return: i64,
-    pub stdout: String,
-    pub stderr: String,
+    pub stdout: BString,
+    pub stderr: BString,
 }
 
 /// Output target marking the "no `$output` argument" case of `ProcessExecutor::execute`, where the
@@ -359,7 +359,7 @@ impl ProcessExecutor {
         &self,
         command: &CommandLine,
         cwd: Option<&Path>,
-    ) -> anyhow::Result<(String, String, i64)> {
+    ) -> anyhow::Result<(BString, BString, i64)> {
         let command_string = match command {
             CommandLine::Args(args) => implode(" ", args),
             CommandLine::Shell(command) => command.clone(),
@@ -391,8 +391,14 @@ impl ProcessExecutor {
                 .expectations
                 .as_ref()
                 .filter(|exps| !exps.is_empty())
-                .map(|exps| format!("Expected {:?} at this point.", exps[0].cmd))
-                .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
+                .map(|exps| {
+                    bconcat!(
+                        "Expected ",
+                        display_to_bytes(format_args!("{:?}", exps[0].cmd)),
+                        " at this point."
+                    )
+                })
+                .unwrap_or_else(|| BString::from("Expected no more calls at this point."));
             let received = implode(PHP_EOL, &mock.log[..mock.log.len().saturating_sub(1)]);
             // PHPUnit's `AssertionFailedError` (thrown by `ProcessExecutorMock::doExecute` on a
             // strict-mode mismatch) extends `\RuntimeException`, so PHP call sites that
@@ -400,15 +406,18 @@ impl ProcessExecutor {
             // `GitDriver::supports`) treat a mismatch as an ordinary recoverable failure. Using
             // the same `RuntimeException` type here keeps `catch::<RuntimeException>()` checks
             // working the same way against a mismatch.
-            return Err(RuntimeException::new(format!(
-                "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
-                command,
-                cwd.unwrap_or(Path::new("")).display(),
-                PHP_EOL.display_lossy(),
+            return Err(RuntimeException::new(bconcat!(
+                "Received unexpected command ",
+                display_to_bytes(format_args!("{:?}", command)),
+                " in \"",
+                cwd.unwrap_or(Path::new("")),
+                "\"",
+                PHP_EOL,
                 expected,
-                PHP_EOL.display_lossy(),
-                PHP_EOL.display_lossy(),
-                received.display_lossy()
+                PHP_EOL,
+                "Received calls:",
+                PHP_EOL,
+                received
             ))
             .into());
         }
@@ -443,37 +452,27 @@ impl ProcessExecutor {
         match output.to_callback() {
             Ok(mut callback) => {
                 if !stdout.is_empty() {
-                    callback(Process::OUT, stdout.as_bytes().as_bstr())?;
+                    callback(Process::OUT, stdout.as_bstr())?;
                 }
                 if !stderr.is_empty() {
-                    callback(Process::ERR, stderr.as_bytes().as_bstr())?;
+                    callback(Process::ERR, stderr.as_bstr())?;
                 }
             }
             Err(mut out) => {
                 let mut io = self.io.clone();
                 if !stdout.is_empty() {
-                    Self::output_handler(
-                        capture_output,
-                        &mut io,
-                        Process::OUT,
-                        stdout.as_bytes().as_bstr(),
-                    );
+                    Self::output_handler(capture_output, &mut io, Process::OUT, stdout.as_bstr());
                 }
                 if !stderr.is_empty() {
-                    Self::output_handler(
-                        capture_output,
-                        &mut io,
-                        Process::ERR,
-                        stderr.as_bytes().as_bstr(),
-                    );
+                    Self::output_handler(capture_output, &mut io, Process::ERR, stderr.as_bstr());
                 }
                 if capture_output {
-                    out.write_back(stdout.clone().into());
+                    out.write_back(stdout.clone());
                 }
             }
         }
 
-        *self.error_output.borrow_mut() = stderr.into();
+        *self.error_output.borrow_mut() = stderr;
 
         Ok(r#return)
     }
@@ -570,14 +569,14 @@ impl ProcessExecutor {
             let matched = self.mock_match(&command, cwd);
             if let Ok((_, ref stderr, _)) = matched {
                 self.capture_output.set(true);
-                *self.error_output.borrow_mut() = stderr.clone().into();
+                *self.error_output.borrow_mut() = stderr.clone();
             }
             return Box::pin(async move {
                 let (stdout, stderr, r#return) = matched?;
                 Ok(Process::__mock(ProcessMock {
                     exit_code: r#return,
-                    stdout: stdout.into(),
-                    stderr: stderr.into(),
+                    stdout,
+                    stderr,
                 }))
             });
         }

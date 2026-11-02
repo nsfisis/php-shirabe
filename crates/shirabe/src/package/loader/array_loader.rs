@@ -64,7 +64,8 @@ impl ArrayLoader {
         > = IndexMap::new();
 
         for mut version in versions {
-            let mut package = self.create_object(&version, "Composer\\Package\\CompletePackage")?;
+            let mut package =
+                self.create_object(&version, BStr::new("Composer\\Package\\CompletePackage"))?;
 
             self.configure_cached_links(&mut link_cache, &mut package, &version)?;
             let package = self.configure_object(package, &mut version)?;
@@ -78,7 +79,7 @@ impl ArrayLoader {
     fn create_object(
         &self,
         config: &IndexMap<BString, PhpMixed>,
-        class: &str,
+        class: &BStr,
     ) -> anyhow::Result<CompleteOrRootPackage> {
         if !config.contains_key(B("name")) {
             return Err(UnexpectedValueException::new(bconcat!(
@@ -884,9 +885,9 @@ impl LoaderInterface for ArrayLoader {
     fn load(
         &self,
         mut config: IndexMap<BString, PhpMixed>,
-        class: Option<String>,
+        class: Option<BString>,
     ) -> anyhow::Result<PackageInterfaceHandle> {
-        let class = class.unwrap_or_else(|| "Composer\\Package\\CompletePackage".to_string());
+        let class = class.unwrap_or_else(|| BString::from("Composer\\Package\\CompletePackage"));
 
         if class != "Composer\\Package\\CompletePackage"
             && class != "Composer\\Package\\RootPackage"
@@ -897,7 +898,7 @@ impl LoaderInterface for ArrayLoader {
             );
         }
 
-        let mut package = self.create_object(&config, &class)?;
+        let mut package = self.create_object(&config, class.as_bstr())?;
 
         for (r#type, opts) in SUPPORTED_LINK_TYPES.iter() {
             let entry = config.get(B(r#type));
