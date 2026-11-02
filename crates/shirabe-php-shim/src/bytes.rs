@@ -1,21 +1,13 @@
 //! Conversions between PHP strings, which are byte strings, and Rust's text and path types.
 
 use bstr::BString;
-use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::path::Path;
-
-/// Decodes `bytes` as UTF-8, replacing invalid sequences with U+FFFD. PHP never does this: it is
-/// the single conversion left at the boundary between code that holds PHP strings as bytes and code
-/// that still holds them as `String`/`&str`.
-// TODO(bytes): remove once every caller takes the bytes as they are.
-pub fn legacy_lossy(bytes: &(impl AsRef<[u8]> + ?Sized)) -> Cow<'_, str> {
-    String::from_utf8_lossy(bytes.as_ref())
-}
 
 /// `bytes` as UTF-8 text, or `None` if they are not valid UTF-8. Only for the shim of a PHP
 /// function that itself requires UTF-8, which reproduces how that function fails, and for a lookup
 /// in data that is valid UTF-8, which other bytes cannot match.
+#[allow(clippy::disallowed_methods)]
 pub fn utf8_text(bytes: &(impl AsRef<[u8]> + ?Sized)) -> Option<&str> {
     std::str::from_utf8(bytes.as_ref()).ok()
 }

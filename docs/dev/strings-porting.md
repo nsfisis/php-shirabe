@@ -27,10 +27,8 @@ does (`JSON_ERROR_UTF8`, `PREG_BAD_UTF8_ERROR`, ...).
 
 Everywhere else, do not call `from_utf8()`, `from_utf8_lossy()`, `to_str()`, `to_str_lossy()`,
 `to_string_lossy()` or `into_string()`: a lossy conversion corrupts bytes that are not valid UTF-8,
-and a strict one fails where PHP does not. The `no_utf8_gate` linter enforces this. The conversions
-that predate the rule are recorded in `scripts/linters/baselines/no_utf8_gate.txt`; the counts may
-only go down, and `scripts/linters/update-baseline` rewrites the file. Code that still holds a PHP
-string as `String` converts at its boundary with `legacy_lossy()`.
+and a strict one fails where PHP does not. Clippy's `disallowed_methods` lint enforces this; the
+methods are listed in `clippy.toml`. `utf8_text()` is the one exemption, for such a shim.
 
 Boundaries with Rust APIs that take text:
 
@@ -60,7 +58,6 @@ explicitly instead:
 
 * `display_lossy()` for a message read by people, as `Path::display()` does for a path.
 * `{:?}` for an error about malformed data, where the exact bytes matter.
-* `legacy_lossy()` where the result goes into code that still holds the string as `String`.
 
 `PhpMixed` and the semver constraints do not implement `Display` either: convert them with
 `php_to_string()` and `to_php_string()`, which keep the bytes.

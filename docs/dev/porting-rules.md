@@ -68,8 +68,7 @@ Map PHP types to Rust types as follows:
     * `PathBuf`, `OsString`: for the same purposes as in Rust.
     * `Vec<u8>`: for what is best described as binary data or a blob.
     * `BString`: for what is best described as a string.
-    * `String`: do not use for a PHP string. Some code still does; it converts at its boundary with
-      `legacy_lossy()`.
+    * `String`: do not use for a PHP string.
 * `array`: `Vec` or `indexmap::IndexMap`, depending on whether the array is used as a list or as a
   map.
     * PHP arrays preserve insertion order, and `IndexMap` emulates this. Use `IndexMap` even where
