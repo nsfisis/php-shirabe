@@ -97,12 +97,12 @@ impl RepositoryManager {
         &self,
         r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
-        name: Option<&str>,
+        name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         if !self.repository_classes.contains_key(r#type) {
-            return Err(InvalidArgumentException::new(format!(
-                "Repository type is not registered: {}",
-                r#type.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Repository type is not registered: ",
+                r#type
             ))
             .into());
         }
@@ -199,19 +199,17 @@ impl RepositoryManager {
             )),
             // TODO(plugin): `setRepositoryClass` lets a plugin register a repository class of
             // its own, which needs a Rust-side counterpart before it can be built here.
-            _ => Err(RuntimeException::new(format!(
-                "Repository class has no Rust implementation: {}",
-                class.display_lossy()
+            _ => Err(RuntimeException::new(bconcat!(
+                "Repository class has no Rust implementation: ",
+                class
             ))
             .into()),
         }
     }
 
-    pub fn set_repository_class(&mut self, r#type: &BStr, class: &str) {
-        self.repository_classes.insert(
-            bstr::BString::from(r#type),
-            bstr::BString::from(class.to_string()),
-        );
+    pub fn set_repository_class(&mut self, r#type: &BStr, class: &BStr) {
+        self.repository_classes
+            .insert(bstr::BString::from(r#type), bconcat!(class));
     }
 
     pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
@@ -243,7 +241,7 @@ pub trait RepositoryManagerInterface: std::fmt::Debug {
         &self,
         r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
-        name: Option<&str>,
+        name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle>;
     fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
     fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
@@ -262,7 +260,7 @@ impl RepositoryManagerInterface for RepositoryManager {
         &self,
         r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
-        name: Option<&str>,
+        name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         self.create_repository(r#type, config, name)
     }

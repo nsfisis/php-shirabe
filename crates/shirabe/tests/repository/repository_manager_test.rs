@@ -4,7 +4,7 @@
 // curl_multi_init, todo!()) with a mocked IO/Config/EventDispatcher and exercise repo
 // creation/prepending/wrapping.
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -113,36 +113,39 @@ fn test_repo_creation() {
 
     rm.set_repository_class(
         bstr::BStr::new("composer"),
-        "Composer\\Repository\\ComposerRepository",
+        BStr::new("Composer\\Repository\\ComposerRepository"),
     );
     rm.set_repository_class(
         bstr::BStr::new("vcs"),
-        "Composer\\Repository\\VcsRepository",
+        BStr::new("Composer\\Repository\\VcsRepository"),
     );
     rm.set_repository_class(
         bstr::BStr::new("package"),
-        "Composer\\Repository\\PackageRepository",
+        BStr::new("Composer\\Repository\\PackageRepository"),
     );
     rm.set_repository_class(
         bstr::BStr::new("pear"),
-        "Composer\\Repository\\PearRepository",
+        BStr::new("Composer\\Repository\\PearRepository"),
     );
     rm.set_repository_class(
         bstr::BStr::new("git"),
-        "Composer\\Repository\\VcsRepository",
+        BStr::new("Composer\\Repository\\VcsRepository"),
     );
     rm.set_repository_class(
         bstr::BStr::new("svn"),
-        "Composer\\Repository\\VcsRepository",
+        BStr::new("Composer\\Repository\\VcsRepository"),
     );
     rm.set_repository_class(
         bstr::BStr::new("perforce"),
-        "Composer\\Repository\\VcsRepository",
+        BStr::new("Composer\\Repository\\VcsRepository"),
     );
-    rm.set_repository_class(bstr::BStr::new("hg"), "Composer\\Repository\\VcsRepository");
+    rm.set_repository_class(
+        bstr::BStr::new("hg"),
+        BStr::new("Composer\\Repository\\VcsRepository"),
+    );
     rm.set_repository_class(
         bstr::BStr::new("artifact"),
-        "Composer\\Repository\\ArtifactRepository",
+        BStr::new("Composer\\Repository\\ArtifactRepository"),
     );
 
     let cases: Vec<(&str, IndexMap<BString, PhpMixed>)> = vec![
@@ -250,7 +253,7 @@ fn test_filter_repo_wrapping() {
 
     rm.set_repository_class(
         bstr::BStr::new("path"),
-        "Composer\\Repository\\PathRepository",
+        BStr::new("Composer\\Repository\\PathRepository"),
     );
     let repo = rm
         .create_repository(

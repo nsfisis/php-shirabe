@@ -74,38 +74,17 @@ impl VcsRepository {
         let inner = ArrayRepository::new(vec![])?;
         let drivers = drivers.unwrap_or_else(|| {
             let mut m: IndexMap<BString, VcsDriverKind> = IndexMap::new();
-            m.insert(
-                bstr::BString::from("github".to_string()),
-                VcsDriverKind::GitHub,
-            );
-            m.insert(
-                bstr::BString::from("gitlab".to_string()),
-                VcsDriverKind::GitLab,
-            );
-            m.insert(
-                bstr::BString::from("bitbucket".to_string()),
-                VcsDriverKind::GitBitbucket,
-            );
-            m.insert(
-                bstr::BString::from("git-bitbucket".to_string()),
-                VcsDriverKind::GitBitbucket,
-            );
-            m.insert(
-                bstr::BString::from("forgejo".to_string()),
-                VcsDriverKind::Forgejo,
-            );
-            m.insert(bstr::BString::from("git".to_string()), VcsDriverKind::Git);
-            m.insert(bstr::BString::from("hg".to_string()), VcsDriverKind::Hg);
-            m.insert(
-                bstr::BString::from("perforce".to_string()),
-                VcsDriverKind::Perforce,
-            );
-            m.insert(
-                bstr::BString::from("fossil".to_string()),
-                VcsDriverKind::Fossil,
-            );
+            m.insert(BString::from("github"), VcsDriverKind::GitHub);
+            m.insert(BString::from("gitlab"), VcsDriverKind::GitLab);
+            m.insert(BString::from("bitbucket"), VcsDriverKind::GitBitbucket);
+            m.insert(BString::from("git-bitbucket"), VcsDriverKind::GitBitbucket);
+            m.insert(BString::from("forgejo"), VcsDriverKind::Forgejo);
+            m.insert(BString::from("git"), VcsDriverKind::Git);
+            m.insert(BString::from("hg"), VcsDriverKind::Hg);
+            m.insert(BString::from("perforce"), VcsDriverKind::Perforce);
+            m.insert(BString::from("fossil"), VcsDriverKind::Fossil);
             // svn must be last because identifying a subversion server for sure is practically impossible
-            m.insert(bstr::BString::from("svn".to_string()), VcsDriverKind::Svn);
+            m.insert(BString::from("svn"), VcsDriverKind::Svn);
             m
         });
 
@@ -303,9 +282,9 @@ impl VcsRepository {
         let driver_url = self.url.clone();
         self.ensure_driver();
         if self.driver.borrow().is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "No driver found to handle VCS repository {}",
-                driver_url.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "No driver found to handle VCS repository ",
+                driver_url
             ))
             .into());
         }
@@ -388,14 +367,15 @@ impl VcsRepository {
 
         let tags = self.driver.borrow_mut().as_mut().unwrap().get_tags()?;
         for (tag, identifier) in tags {
-            let msg = format!(
-                "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
+            let msg = bconcat!(
+                "Reading composer.json of <info>",
                 self.package_name
                     .borrow()
                     .clone()
-                    .unwrap_or_else(|| self.url.clone())
-                    .display_lossy(),
-                tag.display_lossy()
+                    .unwrap_or_else(|| self.url.clone()),
+                "</info> (<comment>",
+                tag,
+                "</comment>)"
             );
 
             // strip the release- prefix from tags if present
@@ -423,9 +403,10 @@ impl VcsRepository {
             let parsed_tag = self.validate_tag(tag.as_bstr());
             if parsed_tag.is_none() {
                 if is_very_verbose {
-                    self.io.write_error(format!(
-                        "<warning>Skipped tag {}, invalid tag name</warning>",
-                        tag.display_lossy()
+                    self.io.write_error(bconcat!(
+                        "<warning>Skipped tag ",
+                        tag,
+                        ", invalid tag name</warning>"
                     ));
                 }
                 continue;
@@ -448,9 +429,10 @@ impl VcsRepository {
                     .get_composer_information(identifier.as_bstr())?;
                 if data_opt.is_none() {
                     if is_very_verbose {
-                        self.io.write_error(format!(
-                            "<warning>Skipped tag {}, no composer file</warning>",
-                            tag.display_lossy()
+                        self.io.write_error(bconcat!(
+                            "<warning>Skipped tag ",
+                            tag,
+                            ", no composer file</warning>"
                         ));
                     }
                     self.empty_references.borrow_mut().push(identifier.clone());
@@ -511,14 +493,16 @@ impl VcsRepository {
                 if version_normalized != parsed_tag {
                     if is_very_verbose {
                         if preg_is_match(php_regex!(r"{(^dev-|[.-]?dev$)}i"), &parsed_tag) {
-                            self.io.write_error(format!(
-                                "<warning>Skipped tag {}, invalid tag name, tags can not use dev prefixes or suffixes</warning>",
-                                tag.display_lossy()
-                            ));
+                            self.io.write_error(bconcat!("<warning>Skipped tag ", tag, ", invalid tag name, tags can not use dev prefixes or suffixes</warning>"));
                         } else {
-                            self.io.write_error(format!(
-                                "<warning>Skipped tag {}, tag ({}) does not match version ({}) in composer.json</warning>",
-                                tag.display_lossy(), parsed_tag.display_lossy(), version_normalized.display_lossy()
+                            self.io.write_error(bconcat!(
+                                "<warning>Skipped tag ",
+                                tag,
+                                ", tag (",
+                                parsed_tag,
+                                ") does not match version (",
+                                version_normalized,
+                                ") in composer.json</warning>"
                             ));
                         }
                     }
@@ -545,19 +529,26 @@ impl VcsRepository {
                     ),
                 )? {
                     if is_very_verbose {
-                        self.io.write_error(format!(
-                            "<warning>Skipped tag {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
-                            tag.display_lossy(), existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
+                        self.io.write_error(bconcat!(
+                            "<warning>Skipped tag ",
+                            tag,
+                            ", it conflicts with an another tag (",
+                            existing_package.get_pretty_version(),
+                            ") as both resolve to ",
+                            version_normalized,
+                            " internally</warning>"
                         ));
                     }
                     return Ok(());
                 }
 
                 if is_very_verbose {
-                    self.io.write_error(format!(
-                        "Importing tag {} ({})",
-                        tag.display_lossy(),
-                        version_normalized.display_lossy()
+                    self.io.write_error(bconcat!(
+                        "Importing tag ",
+                        tag,
+                        " (",
+                        version_normalized,
+                        ")"
                     ));
                 }
 
@@ -579,7 +570,7 @@ impl VcsRepository {
                 if let Some(te) = e.catch::<TransportException>() {
                     self.version_transport_exceptions
                         .borrow_mut()
-                        .entry(bstr::BString::from("tags".to_string()))
+                        .entry(BString::from("tags"))
                         .or_default()
                         .insert(tag.clone(), te.clone());
                     if te.get_code() == 404 {
@@ -639,14 +630,15 @@ impl VcsRepository {
         }
 
         for (branch, identifier) in branches {
-            let msg = format!(
-                "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
+            let msg = bconcat!(
+                "Reading composer.json of <info>",
                 self.package_name
                     .borrow()
                     .clone()
-                    .unwrap_or_else(|| self.url.clone())
-                    .display_lossy(),
-                branch.display_lossy()
+                    .unwrap_or_else(|| self.url.clone()),
+                "</info> (<comment>",
+                branch,
+                "</comment>)"
             );
             if is_very_verbose {
                 self.io.write_error(&msg);
@@ -658,9 +650,10 @@ impl VcsRepository {
             let parsed_branch_opt = self.validate_branch(branch.as_bstr());
             if parsed_branch_opt.is_none() {
                 if is_very_verbose {
-                    self.io.write_error(format!(
-                        "<warning>Skipped branch {}, invalid name</warning>",
-                        branch.display_lossy()
+                    self.io.write_error(bconcat!(
+                        "<warning>Skipped branch ",
+                        branch,
+                        ", invalid name</warning>"
                     ));
                 }
                 continue;
@@ -718,9 +711,10 @@ impl VcsRepository {
                     .get_composer_information(identifier.as_bstr())?;
                 if data_opt.is_none() {
                     if is_very_verbose {
-                        self.io.write_error(format!(
-                            "<warning>Skipped branch {}, no composer file</warning>",
-                            branch.display_lossy()
+                        self.io.write_error(bconcat!(
+                            "<warning>Skipped branch ",
+                            branch,
+                            ", no composer file</warning>"
                         ));
                     }
                     self.empty_references.borrow_mut().push(identifier.clone());
@@ -748,13 +742,14 @@ impl VcsRepository {
                 }
 
                 if is_very_verbose {
-                    self.io.write_error(format!(
-                        "Importing branch {} ({})",
-                        branch.display_lossy(),
+                    self.io.write_error(bconcat!(
+                        "Importing branch ",
+                        branch,
+                        " (",
                         data.get(B("version"))
                             .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .display_lossy()
+                            .unwrap_or_default(),
+                        ")"
                     ));
                 }
 
@@ -792,7 +787,7 @@ impl VcsRepository {
                 if let Some(te) = e.catch::<TransportException>() {
                     self.version_transport_exceptions
                         .borrow_mut()
-                        .entry(bstr::BString::from("branches".to_string()))
+                        .entry(BString::from("branches"))
                         .or_default()
                         .insert(branch.clone(), te.clone());
                     if te.get_code() == 404 {
@@ -802,9 +797,12 @@ impl VcsRepository {
                         return Err(e);
                     }
                     if is_very_verbose {
-                        self.io.write_error(format!(
-                            "<warning>Skipped branch {}, no composer file was found ({} HTTP status code)</warning>",
-                            branch.display_lossy(), te.get_code()
+                        self.io.write_error(bconcat!(
+                            "<warning>Skipped branch ",
+                            branch,
+                            ", no composer file was found (",
+                            te.get_code(),
+                            " HTTP status code)</warning>"
                         ));
                     }
                     continue;
@@ -832,10 +830,12 @@ impl VcsRepository {
         }
 
         if self.inner.get_packages_internal().is_empty() {
-            return Err(InvalidRepositoryException::new(format!(
-                "No valid composer.json was found in any branch or tag of {}, could not load a package from it.",
-                self.url.display_lossy()
-            )).into());
+            return Err(InvalidRepositoryException::new(bconcat!(
+                "No valid composer.json was found in any branch or tag of ",
+                self.url,
+                ", could not load a package from it."
+            ))
+            .into());
         }
 
         Ok(())
@@ -968,10 +968,12 @@ impl VcsRepository {
             .get_version_package(version, identifier);
         if matches!(cached_package, VersionCacheResult::Missing) {
             if is_very_verbose {
-                self.io.write_error(format!(
-                    "<warning>Skipped {}, no composer file (cached from ref {})</warning>",
-                    version.display_lossy(),
-                    identifier.display_lossy()
+                self.io.write_error(bconcat!(
+                    "<warning>Skipped ",
+                    version,
+                    ", no composer file (cached from ref ",
+                    identifier,
+                    ")</warning>"
                 ));
             }
 
@@ -979,14 +981,15 @@ impl VcsRepository {
         }
 
         if let VersionCacheResult::Package(ref mut data) = cached_package {
-            let msg = format!(
-                "Found cached composer.json of <info>{}</info> (<comment>{}</comment>)",
+            let msg = bconcat!(
+                "Found cached composer.json of <info>",
                 self.package_name
                     .borrow()
                     .clone()
-                    .unwrap_or_else(|| self.url.clone())
-                    .display_lossy(),
-                version.display_lossy()
+                    .unwrap_or_else(|| self.url.clone()),
+                "</info> (<comment>",
+                version,
+                "</comment>)"
             );
             if is_very_verbose {
                 self.io.write_error(&msg);
@@ -1017,9 +1020,14 @@ impl VcsRepository {
                 ),
             )? {
                 if is_very_verbose {
-                    self.io.write_error(format!(
-                        "<warning>Skipped cached version {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
-                        version.display_lossy(), existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
+                    self.io.write_error(bconcat!(
+                        "<warning>Skipped cached version ",
+                        version,
+                        ", it conflicts with an another tag (",
+                        existing_package.get_pretty_version(),
+                        ") as both resolve to ",
+                        version_normalized,
+                        " internally</warning>"
                     ));
                 }
                 cached_package = VersionCacheResult::None;

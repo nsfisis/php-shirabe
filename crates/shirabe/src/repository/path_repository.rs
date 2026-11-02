@@ -47,9 +47,9 @@ impl PathRepository {
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<Self> {
         if !repo_config.contains_key(B("url")) {
-            return Err(RuntimeException::new(
-                "You must specify the `url` configuration for the path repository".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "You must specify the `url` configuration for the path repository",
+            ))
             .into());
         }
 
@@ -161,9 +161,10 @@ impl PathRepository {
                 }
             }
 
-            return Err(RuntimeException::new(format!(
-                "The `url` supplied for the path ({}) repository does not exist",
-                self.url.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "The `url` supplied for the path (",
+                self.url,
+                ") repository does not exist"
             ))
             .into());
         }
@@ -188,7 +189,7 @@ impl PathRepository {
             };
             let dist = {
                 let mut dist: IndexMap<BString, PhpMixed> = IndexMap::new();
-                dist.insert("type".into(), PhpMixed::string("path".to_string()));
+                dist.insert("type".into(), PhpMixed::string(BString::from("path")));
                 dist.insert("url".into(), PhpMixed::string(url.clone()));
                 dist
             };
@@ -328,20 +329,23 @@ impl PathRepository {
 
                         package.insert("version".into(), PhpMixed::string(pretty_version));
                     } else {
-                        package.insert("version".into(), PhpMixed::string("dev-main".to_string()));
+                        package.insert(
+                            "version".into(),
+                            PhpMixed::string(BString::from("dev-main")),
+                        );
                     }
                 } else {
-                    package.insert("version".into(), PhpMixed::string("dev-main".to_string()));
+                    package.insert(
+                        "version".into(),
+                        PhpMixed::string(BString::from("dev-main")),
+                    );
                 }
             }
 
             self.inner
                 .add_package(self.loader.load(package.clone(), None).map_err(|e| {
                     RuntimeException::with_code_and_previous(
-                        format!(
-                            "Failed loading the package in {}",
-                            composer_file_path.display()
-                        ),
+                        bconcat!("Failed loading the package in ", composer_file_path),
                         0,
                         Some(std::sync::Arc::new(e)),
                     )
@@ -357,9 +361,9 @@ impl PathRepository {
         if defined("GLOB_BRACE") {
             flags |= GLOB_BRACE;
         } else if self.url.contains(&b'{') || self.url.contains(&b'}') {
-            return Err(RuntimeException::new(format!(
-                "The operating system does not support GLOB_BRACE which is required for the url {}",
-                self.url.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "The operating system does not support GLOB_BRACE which is required for the url ",
+                self.url
             ))
             .into());
         }

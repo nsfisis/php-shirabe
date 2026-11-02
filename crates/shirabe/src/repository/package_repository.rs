@@ -236,11 +236,13 @@ impl AdvisoryProviderInterface for PackageRepository {
                 };
                 if !allow_partial_advisories && matches!(advisory, AnySecurityAdvisory::Partial(_))
                 {
-                    return Err(RuntimeException::new(format!(
-                        "Advisory for {} could not be loaded as a full advisory from {}\n{}",
-                        package_name.display_lossy(),
-                        self.get_repo_name()?.display_lossy(),
-                        var_export(data, true).display_lossy()
+                    return Err(RuntimeException::new(bconcat!(
+                        "Advisory for ",
+                        package_name,
+                        " could not be loaded as a full advisory from ",
+                        self.get_repo_name()?,
+                        "\n",
+                        var_export(data, true)
                     ))
                     .into());
                 }

@@ -269,18 +269,12 @@ impl RepositoryInterface for ArrayRepository {
                         .unwrap_or(false)
                 {
                     // add selected packages which match stability requirements
-                    result.insert(
-                        bstr::BString::from(package.ptr_id().to_string()),
-                        package.clone(),
-                    );
+                    result.insert(bconcat!(package.ptr_id()), package.clone());
                     // add the aliased package for packages where the alias matches
                     if let Some(alias) = package.as_alias() {
                         let aliased = alias.get_alias_of();
-                        if !result.contains_key(aliased.ptr_id().to_string().as_bytes()) {
-                            result.insert(
-                                bstr::BString::from(aliased.ptr_id().to_string()),
-                                aliased.into(),
-                            );
+                        if !result.contains_key(bconcat!(aliased.ptr_id()).as_slice()) {
+                            result.insert(bconcat!(aliased.ptr_id()), aliased.into());
                         }
                     }
                 }
@@ -293,11 +287,8 @@ impl RepositoryInterface for ArrayRepository {
         for package in &packages {
             if let Some(alias) = package.as_alias() {
                 let aliased = alias.get_alias_of();
-                if result.contains_key(aliased.ptr_id().to_string().as_bytes()) {
-                    result.insert(
-                        bstr::BString::from(package.ptr_id().to_string()),
-                        package.clone(),
-                    );
+                if result.contains_key(bconcat!(aliased.ptr_id()).as_slice()) {
+                    result.insert(bconcat!(package.ptr_id()), package.clone());
                 }
             }
         }

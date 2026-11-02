@@ -52,7 +52,7 @@ mockall::mock! {
             &self,
             r#type: &BStr,
             config: IndexMap<BString, PhpMixed>,
-            name: Option<&'a str>,
+            name: Option<&'a bstr::BStr>,
         ) -> anyhow::Result<RepositoryInterfaceHandle>;
         fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
         fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);

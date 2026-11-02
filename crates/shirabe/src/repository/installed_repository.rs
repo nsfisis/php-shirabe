@@ -255,14 +255,12 @@ impl InstalledRepository {
 
                         let platform_pkg = self.find_package(
                             bstr::BStr::new(link.get_target()),
-                            FindPackageConstraint::String(bstr::BString::from("*".to_string())),
+                            FindPackageConstraint::String(BString::from("*")),
                         )?;
                         let description = platform_pkg
                             .as_ref()
                             .map(|p| bconcat!("but ", p.get_pretty_version(), " is installed"))
-                            .unwrap_or_else(|| {
-                                bstr::BString::from("but it is missing".to_string())
-                            });
+                            .unwrap_or_else(|| BString::from("but it is missing"));
                         results.push(DependentsEntry(
                             package.clone(),
                             Link::new(

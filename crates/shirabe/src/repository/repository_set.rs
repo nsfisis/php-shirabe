@@ -126,7 +126,7 @@ impl RepositorySet {
     /// repository the search for that package ends, and following repos will not be consulted.
     pub fn add_repository(&mut self, repo: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         if self.locked {
-            return Err(RuntimeException::new("Pool has already been created from this repository set, it cannot be modified anymore.".to_string())
+            return Err(RuntimeException::new(BString::from("Pool has already been created from this repository set, it cannot be modified anymore."))
             .into());
         }
 
@@ -447,9 +447,9 @@ impl RepositorySet {
                     || repo_ref.as_any().is::<InstalledRepository>()
             };
             if is_installed && !self.allow_installed_repositories {
-                return Err(LogicException::new(
-                    "The pool can not accept packages from an installed repository".to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "The pool can not accept packages from an installed repository",
+                ))
                 .into());
             }
         }
@@ -468,9 +468,9 @@ impl RepositorySet {
                     || repo_ref.as_any().is::<InstalledRepository>()
             };
             if is_installed && !self.allow_installed_repositories {
-                return Err(LogicException::new(
-                    "The pool can not accept packages from an installed repository".to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "The pool can not accept packages from an installed repository",
+                ))
                 .into());
             }
         }
@@ -543,7 +543,7 @@ impl RepositorySet {
         let mut allowed_packages: Vec<BString> = vec![];
         for package_name in &package_names {
             if PlatformRepository::is_platform_package(package_name) {
-                return Err(LogicException::new("createPoolForPackage(s) can not be used for platform packages, as they are never loaded by the PoolBuilder which expects them to be fixed. Use createPoolWithAllPackages or pass in a proper request with the platform packages you need fixed in it.".to_string())
+                return Err(LogicException::new(BString::from("createPoolForPackage(s) can not be used for platform packages, as they are never loaded by the PoolBuilder which expects them to be fixed. Use createPoolWithAllPackages or pass in a proper request with the platform packages you need fixed in it."))
                 .into());
             }
 

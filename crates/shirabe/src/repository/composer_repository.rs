@@ -30,8 +30,8 @@ use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
     PhpMixed, RuntimeException, UnexpectedValueException, bconcat, error_message, explode,
     extension_loaded, hash, http_build_query_mixed, implode, json_decode_assoc, parse_url,
-    path_from_bytes, php_regex, preg_grep, preg_is_match, preg_match, preg_replace, preg_split,
-    realpath, rtrim2, str_replace, strpos, strtolower, strtr, urlencode, var_export,
+    path_from_bytes, php_regex, php_to_string, preg_grep, preg_is_match, preg_match, preg_replace,
+    preg_split, realpath, rtrim2, str_replace, strpos, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -149,10 +149,10 @@ impl VersionList {
         }
     }
 
-    fn set(&mut self, index: usize, key: &str, val: PhpMixed) {
+    fn set(&mut self, index: usize, key: &BStr, val: PhpMixed) {
         match self {
             Self::Plain(versions) => {
-                versions[index].insert(key.to_string().into(), val);
+                versions[index].insert(bconcat!(key), val);
             }
             Self::Minified(expanded) => expanded.set(index, key, val),
         }
@@ -174,18 +174,18 @@ enum Version<'a> {
 }
 
 impl<'a> Version<'a> {
-    fn get(&self, key: &str) -> Option<&'a PhpMixed> {
+    fn get(&self, key: &BStr) -> Option<&'a PhpMixed> {
         match self {
             Self::Plain(version) => version.get(B(key)),
             Self::Minified(version) => version.get(key),
         }
     }
 
-    fn get_string(&self, key: &str) -> Option<&'a bstr::BStr> {
+    fn get_string(&self, key: &BStr) -> Option<&'a bstr::BStr> {
         self.get(key).and_then(|v| v.as_string())
     }
 
-    fn contains_key(&self, key: &str) -> bool {
+    fn contains_key(&self, key: &BStr) -> bool {
         match self {
             Self::Plain(version) => version.contains_key(B(key)),
             Self::Minified(version) => version.contains_key(key),
@@ -194,11 +194,11 @@ impl<'a> Version<'a> {
 }
 
 impl VersionFields for Version<'_> {
-    fn get(&self, key: &str) -> Option<&PhpMixed> {
+    fn get(&self, key: &BStr) -> Option<&PhpMixed> {
         Version::get(self, key)
     }
 
-    fn contains_key(&self, key: &str) -> bool {
+    fn contains_key(&self, key: &BStr) -> bool {
         Version::contains_key(self, key)
     }
 }
@@ -247,9 +247,9 @@ impl ComposerRepository {
         );
         repo_config.insert("url".into(), PhpMixed::string(url_after.clone()));
         if url_after.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "The repository url must not be an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "The repository url must not be an empty string",
+            ))
             .into());
         }
 
@@ -274,9 +274,9 @@ impl ComposerRepository {
             .and_then(|url_bits| url_bits.scheme.as_deref())
             .is_some_and(|scheme| !scheme.is_empty());
         if url_bits.is_none() || !scheme_present {
-            return Err(UnexpectedValueException::new(format!(
-                "Invalid url given for Composer repository: {}",
-                current_url.display_lossy()
+            return Err(UnexpectedValueException::new(bconcat!(
+                "Invalid url given for Composer repository: ",
+                current_url
             ))
             .into());
         }
@@ -451,10 +451,9 @@ impl ComposerRepository {
 
             if self.has_partial_packages()? {
                 if self.partial_packages_by_name.is_none() {
-                    return Err(LogicException::new(
-                        "hasPartialPackages failed to initialize $this->partialPackagesByName"
-                            .to_string(),
-                    )
+                    return Err(LogicException::new(BString::from(
+                        "hasPartialPackages failed to initialize $this->partialPackagesByName",
+                    ))
                     .into());
                 }
 
@@ -464,11 +463,11 @@ impl ComposerRepository {
                 return self.create_packages(flat, Some("packages.json inline packages".into()));
             }
 
-            return Err(LogicException::new("Composer repositories that have lazy providers and no available-packages list can not load the complete list of packages, use getPackageNames instead.".to_string()).into());
+            return Err(LogicException::new(BString::from("Composer repositories that have lazy providers and no available-packages list can not load the complete list of packages, use getPackageNames instead.")).into());
         }
 
         if has_providers {
-            return Err(LogicException::new("Composer repositories that have providers can not load the complete list of packages, use getPackageNames instead.".to_string()).into());
+            return Err(LogicException::new(BString::from("Composer repositories that have providers can not load the complete list of packages, use getPackageNames instead.")).into());
         }
 
         // PHP relies on ArrayRepository::getPackages() invoking the virtual initialize(),
@@ -566,9 +565,9 @@ impl ComposerRepository {
 
     fn load_package_list(&mut self, package_filter: Option<&BStr>) -> anyhow::Result<Vec<BString>> {
         if self.list_url.is_none() {
-            return Err(LogicException::new(
-                "Make sure to call loadRootServerFile before loadPackageList".to_string(),
-            )
+            return Err(LogicException::new(BString::from(
+                "Make sure to call loadRootServerFile before loadPackageList",
+            ))
             .into());
         }
 
@@ -684,7 +683,7 @@ impl ComposerRepository {
                 let constraint = package_name_map.get(&name).and_then(|c| c.clone());
                 for (_uid, candidate) in candidates.iter() {
                     if candidate.get_name() != name {
-                        return Err(LogicException::new("whatProvides should never return a package with a different name than the requested one".to_string()).into());
+                        return Err(LogicException::new(BString::from("whatProvides should never return a package with a different name than the requested one")).into());
                     }
                     names_found.insert(name.clone(), true);
 
@@ -696,11 +695,11 @@ impl ComposerRepository {
                         }
                     };
                     if matches_constraint {
-                        let hash_c = BString::from(candidate.ptr_id().to_string());
+                        let hash_c = bconcat!(candidate.ptr_id());
                         matches.insert(hash_c, candidate.clone());
                         if let Some(alias) = candidate.as_alias() {
                             let aliased = alias.get_alias_of();
-                            let aliased_hash = BString::from(aliased.ptr_id().to_string());
+                            let aliased_hash = bconcat!(aliased.ptr_id());
                             if !matches.contains_key(&aliased_hash) {
                                 matches.insert(aliased_hash, aliased.into());
                             }
@@ -712,9 +711,9 @@ impl ComposerRepository {
                 for (_uid, candidate) in candidates.iter() {
                     if let Some(alias) = candidate.as_alias() {
                         let aliased = alias.get_alias_of();
-                        let aliased_hash = BString::from(aliased.ptr_id().to_string());
+                        let aliased_hash = bconcat!(aliased.ptr_id());
                         if matches.contains_key(&aliased_hash) {
-                            let hash_c = BString::from(candidate.ptr_id().to_string());
+                            let hash_c = bconcat!(candidate.ptr_id());
                             matches.insert(hash_c, candidate.clone());
                         }
                     }
@@ -826,7 +825,7 @@ impl ComposerRepository {
             for name in preg_grep(&regex, vendor_names) {
                 let mut entry = IndexMap::new();
                 entry.insert("name".into(), PhpMixed::string(name));
-                entry.insert("description".into(), PhpMixed::string(String::new()));
+                entry.insert("description".into(), PhpMixed::string(BString::default()));
                 results.push(entry);
             }
 
@@ -865,7 +864,8 @@ impl ComposerRepository {
                         if let Some(name) = name_mixed.as_string() {
                             let mut entry = IndexMap::new();
                             entry.insert("name".into(), PhpMixed::string(name));
-                            entry.insert("description".into(), PhpMixed::string(String::new()));
+                            entry
+                                .insert("description".into(), PhpMixed::string(BString::default()));
                             results.push(entry);
                         }
                     }
@@ -882,7 +882,7 @@ impl ComposerRepository {
             for name in preg_grep(&regex, package_names) {
                 let mut entry = IndexMap::new();
                 entry.insert("name".into(), PhpMixed::string(name));
-                entry.insert("description".into(), PhpMixed::string(String::new()));
+                entry.insert("description".into(), PhpMixed::string(BString::default()));
                 results.push(entry);
             }
 
@@ -1075,7 +1075,7 @@ impl ComposerRepository {
                 .entry("http".into())
                 .or_insert(PhpMixed::Array(IndexMap::new()));
             if let PhpMixed::Array(http_map) = http_entry {
-                http_map.insert("method".into(), PhpMixed::string("POST".to_string()));
+                http_map.insert("method".into(), PhpMixed::string(BString::from("POST")));
                 if let Some(header_val) = http_map.get(B("header")) {
                     // cast to array
                     let arr = match header_val {
@@ -1088,9 +1088,9 @@ impl ComposerRepository {
                     Some(PhpMixed::List(l)) => l.clone(),
                     _ => vec![],
                 };
-                headers.push(PhpMixed::string(
-                    "Content-type: application/x-www-form-urlencoded".to_string(),
-                ));
+                headers.push(PhpMixed::string(BString::from(
+                    "Content-type: application/x-www-form-urlencoded",
+                )));
                 http_map.insert("header".into(), PhpMixed::List(headers));
                 http_map.insert("timeout".into(), PhpMixed::Int(10));
                 let mut query: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -1119,12 +1119,7 @@ impl ComposerRepository {
             for (name, list_box) in advisories_response.iter() {
                 if !package_constraint_map.contains_key(name) {
                     if !warned {
-                        self.io.write_error(format!(
-                                "<warning>{} returned names which were not requested in response to the security-advisories API. {} was not requested but is present in the response. Requested names were: {}</warning>",
-                                self.get_repo_name().display_lossy(),
-                                name.display_lossy(),
-                                implode(", ", &package_constraint_map.keys().collect::<Vec<_>>()).display_lossy(),
-                            ));
+                        self.io.write_error(bconcat!("<warning>", self.get_repo_name(), " returned names which were not requested in response to the security-advisories API. ", name, " was not requested but is present in the response. Requested names were: ", implode(", ", &package_constraint_map.keys().collect::<Vec<_>>()), "</warning>"));
                         warned = true;
                     }
                     continue;
@@ -1210,10 +1205,9 @@ impl ComposerRepository {
 
         if self.has_partial_packages()? {
             if self.partial_packages_by_name.is_none() {
-                return Err(LogicException::new(
-                    "hasPartialPackages failed to initialize $this->partialPackagesByName"
-                        .to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "hasPartialPackages failed to initialize $this->partialPackagesByName",
+                ))
                 .into());
             }
             for (_name, versions) in self.partial_packages_by_name.as_ref().unwrap().iter() {
@@ -1239,14 +1233,14 @@ impl ComposerRepository {
                         candidate
                             .get(B("description"))
                             .cloned()
-                            .unwrap_or(PhpMixed::string(String::new())),
+                            .unwrap_or(PhpMixed::string(BString::default())),
                     );
                     entry.insert(
                         "type".into(),
                         candidate
                             .get(B("type"))
                             .cloned()
-                            .unwrap_or(PhpMixed::string(String::new())),
+                            .unwrap_or(PhpMixed::string(BString::default())),
                     );
                     result.insert(candidate_name, entry);
                 }
@@ -1568,9 +1562,9 @@ impl ComposerRepository {
                 }
 
                 let uid_key = match version.get(B("uid")) {
-                    Some(PhpMixed::Int(i)) => BString::from(i.to_string()),
+                    Some(PhpMixed::Int(i)) => bconcat!(i),
                     Some(PhpMixed::String(s)) => s.clone(),
-                    Some(other) => BString::from(format!("{:?}", other)),
+                    Some(other) => php_to_string(other),
                     None => continue,
                 };
                 if !versions_to_load.contains_key(&uid_key) {
@@ -1748,10 +1742,9 @@ impl ComposerRepository {
         let mut names_found: IndexMap<BString, bool> = IndexMap::new();
 
         if self.lazy_providers_url.is_none() {
-            return Err(LogicException::new(
-                "loadAsyncPackages only supports v2 protocol composer repos with a metadata-url"
-                    .to_string(),
-            )
+            return Err(LogicException::new(BString::from(
+                "loadAsyncPackages only supports v2 protocol composer repos with a metadata-url",
+            ))
             .into());
         }
 
@@ -1890,34 +1883,46 @@ impl ComposerRepository {
             names_found.insert(real_name.clone(), true);
             let mut versions_to_load: Vec<IndexMap<BString, PhpMixed>> = Vec::new();
             for index in 0..versions.len() {
-                let has_vn = versions.version(index).contains_key("version_normalized");
+                let has_vn = versions
+                    .version(index)
+                    .contains_key(BStr::new("version_normalized"));
                 if !has_vn {
                     let v = BString::from(
                         versions
                             .version(index)
-                            .get_string("version")
+                            .get_string(BStr::new("version"))
                             .unwrap_or_default(),
                     );
                     let normalized = version_parser.normalize(&v, None)?;
-                    versions.set(index, "version_normalized", PhpMixed::string(normalized));
-                } else if versions.version(index).get_string("version_normalized")
+                    versions.set(
+                        index,
+                        BStr::new("version_normalized"),
+                        PhpMixed::string(normalized),
+                    );
+                } else if versions
+                    .version(index)
+                    .get_string(BStr::new("version_normalized"))
                     == Some(VersionParser::DEFAULT_BRANCH_ALIAS.into())
                 {
                     // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
                     let v = BString::from(
                         versions
                             .version(index)
-                            .get_string("version")
+                            .get_string(BStr::new("version"))
                             .unwrap_or_default(),
                     );
                     let normalized = version_parser.normalize(&v, None)?;
-                    versions.set(index, "version_normalized", PhpMixed::string(normalized));
+                    versions.set(
+                        index,
+                        BStr::new("version_normalized"),
+                        PhpMixed::string(normalized),
+                    );
                 }
 
                 let version_normalized = BString::from(
                     versions
                         .version(index)
-                        .get_string("version_normalized")
+                        .get_string(BStr::new("version_normalized"))
                         .unwrap_or_default(),
                 );
                 // avoid loading packages which have already been loaded
@@ -1947,14 +1952,14 @@ impl ComposerRepository {
                 if let Some(h) = self_handle.as_ref() {
                     package.set_repository(h.clone())?;
                 }
-                let hash_c = BString::from(package.ptr_id().to_string());
+                let hash_c = bconcat!(package.ptr_id());
                 if let Some(alias) = package.as_alias() {
                     let aliased = alias.get_alias_of();
                     if let Some(h) = self_handle.as_ref() {
                         let aliased_pkg: PackageInterfaceHandle = aliased.clone().into();
                         aliased_pkg.set_repository(h.clone())?;
                     }
-                    let aliased_hash = BString::from(aliased.ptr_id().to_string());
+                    let aliased_hash = bconcat!(aliased.ptr_id());
                     if !packages.contains_key(&aliased_hash) {
                         packages.insert(aliased_hash, aliased.into());
                     }
@@ -1976,7 +1981,7 @@ impl ComposerRepository {
         package_name: Option<&BStr>,
     ) -> anyhow::Result<PhpMixed> {
         if self.lazy_providers_url.is_none() {
-            return Err(LogicException::new("startCachedAsyncDownload only supports v2 protocol composer repos with a metadata-url".to_string()).into());
+            return Err(LogicException::new(BString::from("startCachedAsyncDownload only supports v2 protocol composer repos with a metadata-url")).into());
         }
 
         let name = strtolower(file_name);
@@ -2093,7 +2098,7 @@ impl ComposerRepository {
     ) -> anyhow::Result<bool> {
         let mut versions: Vec<BString> = vec![BString::from(
             version_data
-                .get("version_normalized")
+                .get(BStr::new("version_normalized"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default(),
         )];
@@ -2146,9 +2151,9 @@ impl ComposerRepository {
         }
 
         if !extension_loaded("openssl") && self.url.starts_with(b"https") {
-            return Err(RuntimeException::new(format!(
-                "You must enable the openssl extension in your php.ini to load information from {}",
-                self.url.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "You must enable the openssl extension in your php.ini to load information from ",
+                self.url
             ))
             .into());
         }
@@ -2385,10 +2390,7 @@ impl ComposerRepository {
                     api_url: api_url.clone(),
                 });
                 if api_url.is_none() && !self.has_available_package_list {
-                    return Err(UnexpectedValueException::new(format!(
-                        "Invalid security advisory configuration on {}: If the repository does not provide a security-advisories.api-url then available-packages or available-package-patterns are required to be provided for performance reason.",
-                        self.get_repo_name().display_lossy()
-                    )).into());
+                    return Err(UnexpectedValueException::new(bconcat!("Invalid security advisory configuration on ", self.get_repo_name(), ": If the repository does not provide a security-advisories.api-url then available-packages or available-package-patterns are required to be provided for performance reason.")).into());
                 }
             }
         }
@@ -2452,9 +2454,9 @@ impl ComposerRepository {
 
     fn canonicalize_url(&self, url: &BStr) -> anyhow::Result<BString> {
         if url.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "Expected a string with a value and not an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "Expected a string with a value and not an empty string",
+            ))
             .into());
         }
 
@@ -2473,9 +2475,9 @@ impl ComposerRepository {
         let data = self.load_root_server_file(None)?;
         let data = match data {
             RootData::True => {
-                return Err(LogicException::new(
-                    "loadRootServerFile should not return true during initialization".to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "loadRootServerFile should not return true during initialization",
+                ))
                 .into());
             }
             RootData::Data(d) => d,
@@ -2607,9 +2609,14 @@ impl ComposerRepository {
                         && package_name != strtolower(&meta_name)
                     {
                         self.displayed_warning_about_non_matching_package_index = true;
-                        self.io.write_error(format!(
-                            "<warning>Warning: the packages key '{}' doesn't match the name defined in the package metadata '{}' in repository {}</warning>",
-                            package.display_lossy(), meta_name.display_lossy(), self.base_url.display_lossy()
+                        self.io.write_error(bconcat!(
+                            "<warning>Warning: the packages key '",
+                            package,
+                            "' doesn't match the name defined in the package metadata '",
+                            meta_name,
+                            "' in repository ",
+                            self.base_url,
+                            "</warning>"
                         ));
                     }
                 }
@@ -2733,9 +2740,9 @@ impl ComposerRepository {
         store_last_modified_time: bool,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         if filename.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "$filename should not be an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "$filename should not be an empty string",
+            ))
             .into());
         }
 
@@ -2768,7 +2775,7 @@ impl ComposerRepository {
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
-                        PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
+                        bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
                         self.http_downloader.clone(),
                         filename.clone(),
                         "metadata".into(),
@@ -2808,16 +2815,13 @@ impl ComposerRepository {
                     }
 
                     // TODO use scarier wording once we know for sure it doesn't do false positives anymore
-                    return Err(RepositorySecurityException::new(format!(
-                        "The contents of {} do not match its signature. This could indicate a man-in-the-middle attack or e.g. antivirus software corrupting files. Try running composer again and report this if you think it is a mistake.",
-                        filename.display_lossy()
-                    )).into());
+                    return Err(RepositorySecurityException::new(bconcat!("The contents of ", filename, " do not match its signature. This could indicate a man-in-the-middle attack or e.g. antivirus software corrupting files. Try running composer again and report this if you think it is a mistake.")).into());
                 }
 
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let mut post_file_download_event = PostFileDownloadEvent::new(
-                        PluginEvents::POST_FILE_DOWNLOAD.to_string(),
+                        bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                         None,
                         sha256.map(BString::from),
                         filename.clone(),
@@ -2914,7 +2918,7 @@ impl ComposerRepository {
 
         match data {
             Some(d) => Ok(d),
-            None => Err(LogicException::new("ComposerRepository: Undefined $data. Please report at https://github.com/nsfisis/php-shirabe/issues/new.".to_string()).into()),
+            None => Err(LogicException::new(BString::from("ComposerRepository: Undefined $data. Please report at https://github.com/nsfisis/php-shirabe/issues/new.")).into()),
         }
     }
 
@@ -2925,9 +2929,9 @@ impl ComposerRepository {
         last_modified_time: &BStr,
     ) -> anyhow::Result<FetchFileIfLastModifiedResult> {
         if filename.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "$filename should not be an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "$filename should not be an empty string",
+            ))
             .into());
         }
 
@@ -2937,7 +2941,7 @@ impl ComposerRepository {
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
-                    PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
+                    bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
                     self.http_downloader.clone(),
                     filename.clone(),
                     "metadata".into(),
@@ -2993,7 +2997,7 @@ impl ComposerRepository {
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let mut post_file_download_event = PostFileDownloadEvent::new(
-                    PluginEvents::POST_FILE_DOWNLOAD.to_string(),
+                    bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                     None,
                     None,
                     filename.clone(),
@@ -3061,9 +3065,9 @@ impl ComposerRepository {
         last_modified_time: Option<&BStr>,
     ) -> anyhow::Result<PhpMixed> {
         if filename.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "$filename should not be an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "$filename should not be an empty string",
+            ))
             .into());
         }
 
@@ -3088,7 +3092,7 @@ impl ComposerRepository {
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
             let mut dispatcher = dispatcher.borrow_mut();
             let mut pre_file_download_event = PreFileDownloadEvent::new(
-                PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
+                bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
                 self.http_downloader.clone(),
                 filename.clone(),
                 "metadata".into(),
@@ -3172,7 +3176,7 @@ impl ComposerRepository {
 
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
             let mut post_file_download_event = PostFileDownloadEvent::new(
-                PluginEvents::POST_FILE_DOWNLOAD.to_string(),
+                bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                 None,
                 None,
                 BString::from(filename),
@@ -3305,9 +3309,14 @@ impl ComposerRepository {
                     if !self.displayed_warning_about_non_matching_package_index
                         && version_package_name != strtolower(package)
                     {
-                        self.io.write_error(format!(
-                            "<warning>Warning: the packages key '{}' doesn't match the name defined in the package metadata '{}' in repository {}</warning>",
-                            package.display_lossy(), name_str.display_lossy(), self.base_url.display_lossy()
+                        self.io.write_error(bconcat!(
+                            "<warning>Warning: the packages key '",
+                            package,
+                            "' doesn't match the name defined in the package metadata '",
+                            name_str,
+                            "' in repository ",
+                            self.base_url,
+                            "</warning>"
                         ));
                         self.displayed_warning_about_non_matching_package_index = true;
                     }
@@ -3323,7 +3332,7 @@ impl ComposerRepository {
     /// Checks if the package name is present in this lazy providers repo
     fn lazy_providers_repo_contains(&self, name: &BStr) -> anyhow::Result<bool> {
         if !self.has_available_package_list {
-            return Err(LogicException::new("lazyProvidersRepoContains should not be called unless hasAvailablePackageList is true".to_string()).into());
+            return Err(LogicException::new(BString::from("lazyProvidersRepoContains should not be called unless hasAvailablePackageList is true")).into());
         }
 
         if let Some(ref available) = self.available_packages

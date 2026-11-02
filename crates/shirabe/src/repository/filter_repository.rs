@@ -7,7 +7,7 @@ use crate::repository::{
 };
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, preg_is_match};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat, preg_is_match};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -46,9 +46,10 @@ impl FilterRepository {
                     ));
                 }
                 _ => {
-                    return Err(InvalidArgumentException::new(format!(
-                        r#""only" key for repository {} should be an array"#,
-                        repo.get_repo_name()?.display_lossy()
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        r#""only" key for repository "#,
+                        repo.get_repo_name()?,
+                        r#" should be an array"#
                     ))
                     .into());
                 }
@@ -73,18 +74,19 @@ impl FilterRepository {
                     ));
                 }
                 _ => {
-                    return Err(InvalidArgumentException::new(format!(
-                        r#""exclude" key for repository {} should be an array"#,
-                        repo.get_repo_name()?.display_lossy()
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        r#""exclude" key for repository "#,
+                        repo.get_repo_name()?,
+                        r#" should be an array"#
                     ))
                     .into());
                 }
             }
         }
         if exclude.is_some() && only.is_some() {
-            return Err(InvalidArgumentException::new(format!(
-                r#"Only one of "only" and "exclude" can be specified for repository {}"#,
-                repo.get_repo_name()?.display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                r#"Only one of "only" and "exclude" can be specified for repository "#,
+                repo.get_repo_name()?
             ))
             .into());
         }
@@ -94,9 +96,10 @@ impl FilterRepository {
                     canonical = *b;
                 }
                 _ => {
-                    return Err(InvalidArgumentException::new(format!(
-                        r#""canonical" key for repository {} should be a boolean"#,
-                        repo.get_repo_name()?.display_lossy()
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        r#""canonical" key for repository "#,
+                        repo.get_repo_name()?,
+                        r#" should be a boolean"#
                     ))
                     .into());
                 }

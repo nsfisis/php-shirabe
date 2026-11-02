@@ -14,9 +14,9 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_slice_mixed,
-    array_slice_strs, bconcat, explode, get_class, get_debug_type, implode, intval, is_string,
-    php_regex, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower,
-    var_export,
+    array_slice_strs, bconcat, display_to_bytes, explode, get_class, get_debug_type, implode,
+    intval, is_string, php_regex, php_str, preg_is_match, preg_match, preg_replace, str_replace,
+    strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use std::sync::{LazyLock, Mutex};
@@ -45,7 +45,7 @@ pub struct PlatformRepository {
 }
 
 impl PlatformRepository {
-    const PLATFORM_PACKAGE_REGEX: &'static str = "{^(?:php(?:-64bit|-ipv6|-zts|-debug)?|hhvm|(?:ext|lib)-[a-z0-9](?:[_.-]?[a-z0-9]+)*|composer(?:-(?:plugin|runtime)-api)?)$}iD";
+    const PLATFORM_PACKAGE_REGEX: &'static BStr = php_str(b"{^(?:php(?:-64bit|-ipv6|-zts|-debug)?|hhvm|(?:ext|lib)-[a-z0-9](?:[_.-]?[a-z0-9]+)*|composer(?:-(?:plugin|runtime)-api)?)$}iD");
 
     /// A `None` `platform_info` is resolved from the PHP worker on the first `initialize()`, so
     /// constructing the repository on its own never starts the worker.
@@ -60,18 +60,21 @@ impl PlatformRepository {
         let mut overrides_map: IndexMap<BString, PlatformOverride> = IndexMap::new();
         for (name, version) in overrides {
             if !is_string(&version) && !matches!(version, PhpMixed::Bool(false)) {
-                return Err(UnexpectedValueException::new(format!(
-                    "config.platform.{} should be a string or false, but got {} {}",
-                    name.display_lossy(),
-                    get_debug_type(&version).display_lossy(),
-                    var_export(&version, true).display_lossy()
+                return Err(UnexpectedValueException::new(bconcat!(
+                    "config.platform.",
+                    name,
+                    " should be a string or false, but got ",
+                    get_debug_type(&version),
+                    " ",
+                    var_export(&version, true)
                 ))
                 .into());
             }
             if name == "php" && matches!(version, PhpMixed::Bool(false)) {
-                return Err(UnexpectedValueException::new(format!(
-                    "config.platform.{} cannot be set to false as you cannot disable php entirely.",
-                    name.display_lossy()
+                return Err(UnexpectedValueException::new(bconcat!(
+                    "config.platform.",
+                    name,
+                    " cannot be set to false as you cannot disable php entirely."
                 ))
                 .into());
             }
@@ -100,7 +103,7 @@ impl PlatformRepository {
     }
 
     pub fn get_repo_name(&self) -> BString {
-        bstr::BString::from("platform repo".to_string())
+        BString::from("platform repo")
     }
 
     pub fn is_platform_package_disabled(&self, name: &BStr) -> bool {
@@ -144,9 +147,9 @@ impl PlatformRepository {
         for r#override in &overrides {
             // Check that it's a platform package.
             if !Self::is_platform_package(&r#override.name) {
-                return Err(InvalidArgumentException::new(format!(
-                    "Invalid platform package name in config.platform: {}",
-                    r#override.name.display_lossy()
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Invalid platform package name in config.platform: ",
+                    r#override.name
                 ))
                 .into());
             }
@@ -165,11 +168,11 @@ impl PlatformRepository {
                 .normalize(&pretty_version, None)?[..],
         );
         let mut composer = CompletePackage::new(
-            bstr::BString::from("composer".to_string()),
+            BString::from("composer"),
             version.clone(),
             pretty_version.clone(),
         );
-        composer.set_description(bstr::BString::from("Composer package".to_string()));
+        composer.set_description(BString::from("Composer package"));
         self.add_package(CompletePackageHandle::from_complete_package(composer).into())?;
 
         pretty_version = plugin_interface::PLUGIN_API_VERSION.into();
@@ -181,12 +184,11 @@ impl PlatformRepository {
                 .normalize(&pretty_version, None)?[..],
         );
         let mut composer_plugin_api = CompletePackage::new(
-            bstr::BString::from("composer-plugin-api".to_string()),
+            BString::from("composer-plugin-api"),
             version.clone(),
             pretty_version.clone(),
         );
-        composer_plugin_api
-            .set_description(bstr::BString::from("The Composer Plugin API".to_string()));
+        composer_plugin_api.set_description(BString::from("The Composer Plugin API"));
         self.add_package(CompletePackageHandle::from_complete_package(composer_plugin_api).into())?;
 
         pretty_version = composer::RUNTIME_API_VERSION.into();
@@ -198,12 +200,11 @@ impl PlatformRepository {
                 .normalize(&pretty_version, None)?[..],
         );
         let mut composer_runtime_api = CompletePackage::new(
-            bstr::BString::from("composer-runtime-api".to_string()),
+            BString::from("composer-runtime-api"),
             version.clone(),
             pretty_version.clone(),
         );
-        composer_runtime_api
-            .set_description(bstr::BString::from("The Composer Runtime API".to_string()));
+        composer_runtime_api.set_description(BString::from("The Composer Runtime API"));
         self.add_package(
             CompletePackageHandle::from_complete_package(composer_runtime_api).into(),
         )?;
@@ -237,11 +238,11 @@ impl PlatformRepository {
         }
 
         let mut php = CompletePackage::new(
-            bstr::BString::from("php".to_string()),
+            BString::from("php"),
             version.clone(),
             pretty_version.clone(),
         );
-        php.set_description(bstr::BString::from("The PHP interpreter".to_string()));
+        php.set_description(BString::from("The PHP interpreter"));
         self.add_package(CompletePackageHandle::from_complete_package(php).into())?;
 
         if platform_info
@@ -250,13 +251,11 @@ impl PlatformRepository {
             .unwrap_or(false)
         {
             let mut phpdebug = CompletePackage::new(
-                bstr::BString::from("php-debug".to_string()),
+                BString::from("php-debug"),
                 version.clone(),
                 pretty_version.clone(),
             );
-            phpdebug.set_description(bstr::BString::from(
-                "The PHP interpreter, with debugging symbols".to_string(),
-            ));
+            phpdebug.set_description(BString::from("The PHP interpreter, with debugging symbols"));
             self.add_package(CompletePackageHandle::from_complete_package(phpdebug).into())?;
         }
 
@@ -267,12 +266,12 @@ impl PlatformRepository {
                 .unwrap_or(false)
         {
             let mut phpzts = CompletePackage::new(
-                bstr::BString::from("php-zts".to_string()),
+                BString::from("php-zts"),
                 version.clone(),
                 pretty_version.clone(),
             );
-            phpzts.set_description(bstr::BString::from(
-                "The PHP interpreter, with Zend Thread Safety".to_string(),
+            phpzts.set_description(BString::from(
+                "The PHP interpreter, with Zend Thread Safety",
             ));
             self.add_package(CompletePackageHandle::from_complete_package(phpzts).into())?;
         }
@@ -284,13 +283,11 @@ impl PlatformRepository {
             .unwrap_or(false)
         {
             let mut php64 = CompletePackage::new(
-                bstr::BString::from("php-64bit".to_string()),
+                BString::from("php-64bit"),
                 version.clone(),
                 pretty_version.clone(),
             );
-            php64.set_description(bstr::BString::from(
-                "The PHP interpreter, 64bit".to_string(),
-            ));
+            php64.set_description(BString::from("The PHP interpreter, 64bit"));
             self.add_package(CompletePackageHandle::from_complete_package(php64).into())?;
         }
 
@@ -299,14 +296,9 @@ impl PlatformRepository {
         let has_inet6 = platform_info.has_constant("AF_INET6", None);
         let inet_pton_check = &platform_info.inet_pton_ipv6;
         if has_inet6 || !matches!(inet_pton_check, PhpMixed::Bool(false)) {
-            let mut php_ipv6 = CompletePackage::new(
-                bstr::BString::from("php-ipv6".to_string()),
-                version,
-                pretty_version,
-            );
-            php_ipv6.set_description(bstr::BString::from(
-                "The PHP interpreter, with IPv6 support".to_string(),
-            ));
+            let mut php_ipv6 =
+                CompletePackage::new(BString::from("php-ipv6"), version, pretty_version);
+            php_ipv6.set_description(BString::from("The PHP interpreter, with IPv6 support"));
             self.add_package(CompletePackageHandle::from_complete_package(php_ipv6).into())?;
         }
 
@@ -379,7 +371,7 @@ impl PlatformRepository {
                             &mut libraries,
                             name.as_bstr(),
                             matches.name("version"),
-                            None::<&str>,
+                            None::<&BStr>,
                             &[],
                             &[],
                         )?;
@@ -398,7 +390,7 @@ impl PlatformRepository {
                             &mut libraries,
                             name.as_bstr(),
                             Some(cv),
-                            None::<&str>,
+                            None::<&BStr>,
                             &[],
                             &[],
                         )?;
@@ -422,7 +414,7 @@ impl PlatformRepository {
                             let parsed_version = Version::parse_openssl(&ssl_version, &mut is_fips)
                                 .unwrap_or_default();
                             let fips_provides: Vec<BString> = if is_fips {
-                                vec![bstr::BString::from("curl-openssl".to_string())]
+                                vec![BString::from("curl-openssl")]
                             } else {
                                 Vec::new()
                             };
@@ -590,7 +582,7 @@ impl PlatformRepository {
                         &mut libraries,
                         name.as_bstr(),
                         gd_version_str.as_deref(),
-                        None::<&str>,
+                        None::<&BStr>,
                         &[],
                         &[],
                     )?;
@@ -669,7 +661,7 @@ impl PlatformRepository {
                         &mut libraries,
                         name.as_bstr(),
                         gmp_version_str.as_deref(),
-                        None::<&str>,
+                        None::<&BStr>,
                         &[],
                         &[],
                     )?;
@@ -685,7 +677,7 @@ impl PlatformRepository {
                         &mut libraries,
                         name.as_bstr(),
                         iconv_version_str.as_deref(),
-                        None::<&str>,
+                        None::<&BStr>,
                         &[],
                         &[],
                     )?;
@@ -749,7 +741,7 @@ impl PlatformRepository {
                         let resource_bundle = &platform_info.resource_bundle;
                         if !matches!(resource_bundle, PhpMixed::Null) {
                             let version_value =
-                                Self::resource_bundle_get(resource_bundle, "Version");
+                                Self::resource_bundle_get(resource_bundle, BStr::new("Version"));
                             let version_str = match version_value {
                                 PhpMixed::String(s) => Some(s.clone()),
                                 _ => None,
@@ -802,8 +794,8 @@ impl PlatformRepository {
                             &mut libraries,
                             bstr::BStr::new(&bconcat!(name, "-imagemagick")),
                             Some(&version_built),
-                            None::<&str>,
-                            &[bstr::BString::from("imagick".to_string())],
+                            None::<&BStr>,
+                            &[BString::from("imagick")],
                             &[],
                         )?;
                     }
@@ -968,7 +960,7 @@ impl PlatformRepository {
                     let pcre_version = platform_info.get_constant("PCRE_VERSION", None);
                     let pcre_version_str = match &pcre_version {
                         PhpMixed::String(s) => s.clone(),
-                        _ => bstr::BString::from("".to_string()),
+                        _ => BString::from(""),
                     };
                     let stripped = BString::from(
                         &preg_replace(php_regex!("{^(\\S+).*}"), "$1", &pcre_version_str)[..],
@@ -977,7 +969,7 @@ impl PlatformRepository {
                         &mut libraries,
                         name.as_bstr(),
                         Some(&stripped),
-                        None::<&str>,
+                        None::<&BStr>,
                         &[],
                         &[],
                     )?;
@@ -1167,7 +1159,7 @@ impl PlatformRepository {
                             &mut libraries,
                             bstr::BStr::new("libsodium"),
                             sodium_str.as_deref(),
-                            None::<&str>,
+                            None::<&BStr>,
                             &[],
                             &[],
                         )?;
@@ -1175,7 +1167,7 @@ impl PlatformRepository {
                             &mut libraries,
                             bstr::BStr::new("libsodium"),
                             sodium_str.as_deref(),
-                            None::<&str>,
+                            None::<&BStr>,
                             &[],
                             &[],
                         )?;
@@ -1192,7 +1184,7 @@ impl PlatformRepository {
                             &mut libraries,
                             bstr::BStr::new(&bconcat!(name, "-sqlite")),
                             matches.name("version"),
-                            None::<&str>,
+                            None::<&BStr>,
                             &[],
                             &[],
                         )?;
@@ -1209,7 +1201,7 @@ impl PlatformRepository {
                             &mut libraries,
                             bstr::BStr::new(&bconcat!(name, "-libssh2")),
                             matches.name("version"),
-                            None::<&str>,
+                            None::<&BStr>,
                             &[],
                             &[],
                         )?;
@@ -1227,8 +1219,8 @@ impl PlatformRepository {
                         &mut libraries,
                         bstr::BStr::new("libxslt"),
                         libxslt_str.as_deref(),
-                        None::<&str>,
-                        &[bstr::BString::from("xsl".to_string())],
+                        None::<&BStr>,
+                        &[BString::from("xsl")],
                         &[],
                     )?;
 
@@ -1279,8 +1271,8 @@ impl PlatformRepository {
                             &mut libraries,
                             bstr::BStr::new(&bconcat!(name, "-libzip")),
                             libzip_str.as_deref(),
-                            None::<&str>,
-                            &[bstr::BString::from("zip".to_string())],
+                            None::<&BStr>,
+                            &[BString::from("zip")],
                             &[],
                         )?;
                     }
@@ -1297,7 +1289,7 @@ impl PlatformRepository {
                             &mut libraries,
                             name.as_bstr(),
                             zlib_str.as_deref(),
-                            None::<&str>,
+                            None::<&BStr>,
                             &[],
                             &[],
                         )?;
@@ -1312,7 +1304,7 @@ impl PlatformRepository {
                                 &mut libraries,
                                 name.as_bstr(),
                                 matches.name("version"),
-                                None::<&str>,
+                                None::<&BStr>,
                                 &[],
                                 &[],
                             )?;
@@ -1348,11 +1340,7 @@ impl PlatformRepository {
                 }
             }
 
-            let mut hhvm = CompletePackage::new(
-                bstr::BString::from("hhvm".to_string()),
-                version,
-                pretty_version,
-            );
+            let mut hhvm = CompletePackage::new(BString::from("hhvm"), version, pretty_version);
             hhvm.set_description("The HHVM Runtime (64bit)".into());
             self.add_package(CompletePackageHandle::from_complete_package(hhvm).into())?;
         }
@@ -1361,9 +1349,9 @@ impl PlatformRepository {
 
     pub fn add_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         if package.as_complete().is_none() {
-            return Err(UnexpectedValueException::new(format!(
-                "Expected CompletePackage but got {}",
-                get_class(&PhpMixed::Null).display_lossy()
+            return Err(UnexpectedValueException::new(bconcat!(
+                "Expected CompletePackage but got ",
+                get_class(&PhpMixed::Null)
             ))
             .into());
         }
@@ -1435,7 +1423,7 @@ impl PlatformRepository {
     ) -> anyhow::Result<CompletePackageHandle> {
         let version_str = match &r#override.version {
             PhpMixed::String(s) => s.clone(),
-            _ => bstr::BString::from("".to_string()),
+            _ => BString::from(""),
         };
         let version = self
             .version_parser
@@ -1447,9 +1435,7 @@ impl PlatformRepository {
             version,
             version_str,
         );
-        package.set_description(bstr::BString::from(
-            "Package overridden via config.platform".to_string(),
-        ));
+        package.set_description(BString::from("Package overridden via config.platform"));
         let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
         extra.insert("config.platform".into(), PhpMixed::Bool(true));
         package.inner.set_extra(extra);
@@ -1677,19 +1663,19 @@ impl PlatformRepository {
 
     /// PHP `$resourceBundle->get($key)`. A live PHP object has no `PhpMixed` counterpart, so
     /// [`PlatformInfo`] carries the entries the caller reads instead of the object.
-    fn resource_bundle_get(value: &PhpMixed, key: &str) -> PhpMixed {
+    fn resource_bundle_get(value: &PhpMixed, key: &BStr) -> PhpMixed {
         Self::php_object_field(value, key).unwrap_or(PhpMixed::Null)
     }
 
     /// PHP `$imagick->getVersion()['versionString']`, read the same way.
     fn imagick_get_version_string(value: &PhpMixed) -> BString {
-        match Self::php_object_field(value, "versionString") {
+        match Self::php_object_field(value, BStr::new("versionString")) {
             Some(PhpMixed::String(version)) => version.clone(),
             _ => BString::default(),
         }
     }
 
-    fn php_object_field(value: &PhpMixed, key: &str) -> Option<PhpMixed> {
+    fn php_object_field(value: &PhpMixed, key: &BStr) -> Option<PhpMixed> {
         match value {
             PhpMixed::Object(fields) | PhpMixed::Array(fields) => fields.get(B(key)).cloned(),
             _ => None,
@@ -1702,18 +1688,18 @@ impl PlatformRepository {
                 .iter()
                 .map(|v| match v {
                     PhpMixed::String(s) => s.clone(),
-                    PhpMixed::Int(i) => bstr::BString::from(i.to_string()),
-                    PhpMixed::Float(f) => bstr::BString::from(f.to_string()),
-                    _ => bstr::BString::from("".to_string()),
+                    PhpMixed::Int(i) => bconcat!(i),
+                    PhpMixed::Float(f) => display_to_bytes(f),
+                    _ => BString::from(""),
                 })
                 .collect(),
             PhpMixed::Array(m) => m
                 .values()
                 .map(|v| match v {
                     PhpMixed::String(s) => s.clone(),
-                    PhpMixed::Int(i) => bstr::BString::from(i.to_string()),
-                    PhpMixed::Float(f) => bstr::BString::from(f.to_string()),
-                    _ => bstr::BString::from("".to_string()),
+                    PhpMixed::Int(i) => bconcat!(i),
+                    PhpMixed::Float(f) => display_to_bytes(f),
+                    _ => BString::from(""),
                 })
                 .collect(),
             _ => Vec::new(),

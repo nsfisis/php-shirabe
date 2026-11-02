@@ -20,7 +20,7 @@ impl RootPackageRepository {
     }
 
     pub fn get_repo_name(&self) -> BString {
-        bstr::BString::from("root package repo".to_string())
+        BString::from("root package repo")
     }
 }
 

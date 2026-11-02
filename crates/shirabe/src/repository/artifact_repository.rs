@@ -42,9 +42,9 @@ impl ArtifactRepository {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<Self> {
         if !extension_loaded("zip") {
-            return Err(RuntimeException::new(
-                "The artifact repository requires PHP's zip extension".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "The artifact repository requires PHP's zip extension",
+            ))
             .into());
         }
 
@@ -122,21 +122,29 @@ impl ArtifactRepository {
             match package {
                 None => {
                     self.io.write_error3(
-                        format!(
-                            "File <comment>{}</comment> doesn't seem to hold a package",
-                            basename.display_lossy()
+                        bconcat!(
+                            "File <comment>",
+                            basename,
+                            "</comment> doesn't seem to hold a package"
                         ),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 Some(package) => {
-                    self.io.write_error3(format!(
-                        "Found package <info>{}</info> (<comment>{}</comment>) in file <info>{}</info>",
-                        package.get_name().display_lossy(),
-                        package.get_pretty_version().display_lossy(),
-                        basename.display_lossy(),
-                    ), true, io_interface::VERBOSE);
+                    self.io.write_error3(
+                        bconcat!(
+                            "Found package <info>",
+                            package.get_name(),
+                            "</info> (<comment>",
+                            package.get_pretty_version(),
+                            "</comment>) in file <info>",
+                            basename,
+                            "</info>"
+                        ),
+                        true,
+                        io_interface::VERBOSE,
+                    );
                     self.inner.add_package(package);
                 }
             }
@@ -152,16 +160,13 @@ impl ArtifactRepository {
         let pathname = path_to_bytes(file).as_bstr();
         let file_extension = pathinfo(pathname, PATHINFO_EXTENSION);
 
-        let file_type: &str;
+        let file_type: &BStr;
         if matches!(file_extension.as_slice(), b"gz" | b"tar" | b"tgz") {
-            file_type = "tar";
+            file_type = BStr::new("tar");
         } else if file_extension == "zip" {
-            file_type = "zip";
+            file_type = BStr::new("zip");
         } else {
-            return Err(RuntimeException::new(format!(
-                "Files with \"{}\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported.",
-                file_extension.display_lossy()
-            ))
+            return Err(RuntimeException::new(bconcat!("Files with \"", file_extension, "\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported."))
             .into());
         }
 
@@ -198,7 +203,7 @@ impl ArtifactRepository {
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
-        dist.insert("type".into(), PhpMixed::string(file_type.to_string()));
+        dist.insert("type".into(), PhpMixed::string(bconcat!(file_type)));
         dist.insert("url".into(), PhpMixed::string(url_normalized));
         dist.insert("shasum".into(), PhpMixed::string(shasum));
         if let Some(arr) = package.as_array_mut() {

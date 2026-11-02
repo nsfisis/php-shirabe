@@ -89,7 +89,7 @@ impl RepositoryInterface for LockArrayRepository {
     }
 
     fn get_repo_name(&self) -> anyhow::Result<BString> {
-        Ok(bstr::BString::from("lock repo".to_string()))
+        Ok(BString::from("lock repo"))
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

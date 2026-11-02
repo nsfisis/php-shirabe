@@ -20,19 +20,19 @@ use shirabe_php_shim::{
 /// array decoded from a repository response implements this, and so does one still held as a view
 /// into minified metadata.
 pub trait VersionFields {
-    fn get(&self, key: &str) -> Option<&PhpMixed>;
+    fn get(&self, key: &BStr) -> Option<&PhpMixed>;
 
-    fn contains_key(&self, key: &str) -> bool {
+    fn contains_key(&self, key: &BStr) -> bool {
         self.get(key).is_some()
     }
 }
 
 impl VersionFields for IndexMap<BString, PhpMixed> {
-    fn get(&self, key: &str) -> Option<&PhpMixed> {
+    fn get(&self, key: &BStr) -> Option<&PhpMixed> {
         IndexMap::get(self, B(key))
     }
 
-    fn contains_key(&self, key: &str) -> bool {
+    fn contains_key(&self, key: &BStr) -> bool {
         IndexMap::contains_key(self, B(key))
     }
 }
@@ -704,12 +704,17 @@ impl ArrayLoader {
 
     /// Retrieves a branch alias (dev-master => 1.0.x-dev for example) if it exists
     pub fn get_branch_alias(&self, config: &impl VersionFields) -> anyhow::Result<Option<BString>> {
-        if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
+        if !config.contains_key(BStr::new("version"))
+            || !is_scalar(config.get(BStr::new("version")).unwrap())
+        {
             return Err(
                 UnexpectedValueException::new("no/invalid version defined".to_string()).into(),
             );
         }
-        let mut config_version = config.get("version").cloned().unwrap_or(PhpMixed::Null);
+        let mut config_version = config
+            .get(BStr::new("version"))
+            .cloned()
+            .unwrap_or(PhpMixed::Null);
         if !is_string(&config_version) {
             config_version = PhpMixed::string(strval(&config_version));
         }
@@ -720,7 +725,7 @@ impl ArrayLoader {
         }
 
         let extra_branch_alias = config
-            .get("extra")
+            .get(BStr::new("extra"))
             .and_then(|v| match v {
                 PhpMixed::Array(m) => m.get(B("branch-alias")).cloned(),
                 _ => None,
@@ -775,9 +780,11 @@ impl ArrayLoader {
             }
         }
 
-        let default_branch_is_true =
-            config.get("default-branch").and_then(|v| v.as_bool()) == Some(true);
-        if config.contains_key("default-branch")
+        let default_branch_is_true = config
+            .get(BStr::new("default-branch"))
+            .and_then(|v| v.as_bool())
+            == Some(true);
+        if config.contains_key(BStr::new("default-branch"))
             && default_branch_is_true
             && self
                 .version_parser

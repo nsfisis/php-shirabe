@@ -130,7 +130,7 @@ impl RepositoryManagerInterface for MockRepositoryManager {
         &self,
         _type: &BStr,
         _config: IndexMap<BString, PhpMixed>,
-        _name: Option<&str>,
+        _name: Option<&bstr::BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         unimplemented!("not exercised by PluginInstallerTest")
     }

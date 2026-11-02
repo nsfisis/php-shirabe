@@ -44,9 +44,9 @@ impl FilesystemRepository {
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         if dump_versions && root_package.is_none() {
-            return Err(InvalidArgumentException::new(
-                "Expected a root package instance if $dumpVersions is true".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "Expected a root package instance if $dumpVersions is true",
+            ))
             .into());
         }
         Ok(Self {
@@ -119,9 +119,9 @@ impl FilesystemRepository {
             }
 
             if !is_array(&packages_value) {
-                return Err(UnexpectedValueException::new(
-                    "Could not parse package list from the repository".to_string(),
-                )
+                return Err(UnexpectedValueException::new(BString::from(
+                    "Could not parse package list from the repository",
+                ))
                 .into());
             }
 
@@ -395,7 +395,7 @@ impl FilesystemRepository {
                         let inner_map: IndexMap<BString, PhpMixed> = list
                             .iter()
                             .enumerate()
-                            .map(|(i, v)| (i.to_string().into(), v.clone()))
+                            .map(|(i, v)| (bconcat!(i), v.clone()))
                             .collect();
                         lines.extend_from_slice(&self.dump_to_php_code(&inner_map, level));
                     } else {
@@ -465,10 +465,9 @@ impl FilesystemRepository {
             self.inner.get_packages()?.into_iter().collect();
         let mut current_root: RootPackageInterfaceHandle = match &self.root_package {
             None => {
-                return Err(LogicException::new(
-                    "It should not be possible to dump packages if no root package is given"
-                        .to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "It should not be possible to dump packages if no root package is given",
+                ))
                 .into());
             }
             Some(r) => r.clone(),
@@ -537,7 +536,7 @@ impl FilesystemRepository {
                 record_replace_or_provide(
                     &mut versions,
                     replace.get_target(),
-                    "replaced",
+                    BStr::new("replaced"),
                     replaced,
                     is_dev_package,
                 );
@@ -554,7 +553,7 @@ impl FilesystemRepository {
                 record_replace_or_provide(
                     &mut versions,
                     provide.get_target(),
-                    "provided",
+                    BStr::new("provided"),
                     provided,
                     is_dev_package,
                 );
@@ -569,13 +568,13 @@ impl FilesystemRepository {
             let pretty = BString::from(&package.get_pretty_version()[..]);
             push_to_list(
                 versions_entry(&mut versions, package.get_name().as_bstr()),
-                "aliases",
+                BStr::new("aliases"),
                 pretty.clone(),
             );
             if package.as_root().is_some()
                 && let Some(PhpMixed::Array(root_map)) = versions.get_mut(B("root"))
             {
-                push_to_list(root_map, "aliases", pretty);
+                push_to_list(root_map, BStr::new("aliases"), pretty);
             }
         }
 
@@ -841,9 +840,9 @@ fn versions_entry<'a>(
     }
 }
 
-fn push_to_list(entry: &mut IndexMap<BString, PhpMixed>, key: &str, value: BString) {
+fn push_to_list(entry: &mut IndexMap<BString, PhpMixed>, key: &BStr, value: BString) {
     if let PhpMixed::List(list) = entry
-        .entry(key.to_string().into())
+        .entry(bconcat!(key))
         .or_insert_with(|| PhpMixed::List(vec![]))
     {
         list.push(PhpMixed::string(value));
@@ -853,7 +852,7 @@ fn push_to_list(entry: &mut IndexMap<BString, PhpMixed>, key: &str, value: BStri
 fn record_replace_or_provide(
     versions: &mut IndexMap<BString, PhpMixed>,
     target: &BStr,
-    key: &str,
+    key: &BStr,
     value: BString,
     is_dev_package: bool,
 ) {
