@@ -140,7 +140,7 @@ impl CheckPlatformReqsCommand {
                 })
                 .collect();
 
-            self.render_table(rows, output);
+            self.render_table(rows, output)?;
         }
 
         Ok(())

@@ -164,17 +164,17 @@ impl OutputFormatter {
         current: &BStr,
         width: i64,
         current_line_length: &mut i64,
-    ) -> BString {
+    ) -> anyhow::Result<BString> {
         if text.is_empty() {
-            return BString::default();
+            return Ok(BString::default());
         }
 
         if width == 0 {
-            return if self.is_decorated() {
+            return Ok(if self.is_decorated() {
                 self.style_stack.get_current_mut().apply(text)
             } else {
                 BString::from(text)
-            };
+            });
         }
 
         let mut text = BString::from(text);
@@ -197,7 +197,7 @@ impl OutputFormatter {
                 .and_then(|matches| matches.get(1))
                 .unwrap_or_default(),
         );
-        text = bconcat!(prefix, self.add_line_breaks(text.as_bstr(), width));
+        text = bconcat!(prefix, self.add_line_breaks(text.as_bstr(), width)?);
         text = bconcat!(rtrim2(&text, "\n"), trailing);
 
         if *current_line_length == 0 && !current.is_empty() && substr(current, -1, None) != "\n" {
@@ -219,18 +219,18 @@ impl OutputFormatter {
             }
         }
 
-        implode("\n", &lines)
+        Ok(implode("\n", &lines))
     }
 
-    fn add_line_breaks(&self, text: &BStr, width: i64) -> BString {
+    fn add_line_breaks(&self, text: &BStr, width: i64) -> anyhow::Result<BString> {
         let encoding = mb_detect_encoding(text, None, true)
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| BString::from("UTF-8"));
 
-        b(text)
-            .to_code_point_string(encoding.as_bstr())
+        Ok(b(text)
+            .to_code_point_string(encoding.as_bstr())?
             .wordwrap(width, BStr::new("\n"), true)
-            .to_byte_string(encoding.as_bstr())
+            .to_byte_string(encoding.as_bstr()))
     }
 }
 
@@ -316,7 +316,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
                 output.as_bstr(),
                 width,
                 &mut current_line_length,
-            );
+            )?;
             output.extend_from_slice(&applied);
             offset = pos + strlen(text);
 
@@ -345,7 +345,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
                     output.as_bstr(),
                     width,
                     &mut current_line_length,
-                );
+                )?;
                 output.extend_from_slice(&applied);
             }
         }
@@ -356,7 +356,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
             output.as_bstr(),
             width,
             &mut current_line_length,
-        );
+        )?;
         output.extend_from_slice(&applied);
 
         let mut pairs = indexmap::IndexMap::new();
@@ -364,5 +364,30 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         pairs.insert("\\<", "<");
         pairs.insert("\\>", ">");
         Ok(Some(strtr_array(&output, &pairs)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shirabe_php_shim::Catch as _;
+
+    #[test]
+    fn wrapping_invalid_utf8_throws_what_symfony_string_throws() {
+        let mut formatter = OutputFormatter::new(false, indexmap::IndexMap::new());
+        let error = formatter
+            .format_and_wrap(Some(BStr::new(b"caf\xE9")), 10)
+            .unwrap_err();
+        let exception = error
+            .catch::<shirabe_symfony_string::exception::InvalidArgumentException>()
+            .expect("the exception Symfony's ByteString throws");
+        assert_eq!(exception.get_message(), r#"Invalid "UTF-8" string."#);
+    }
+
+    #[test]
+    fn formatting_invalid_utf8_without_wrapping_keeps_the_bytes() {
+        let mut formatter = OutputFormatter::new(false, indexmap::IndexMap::new());
+        let formatted = formatter.format(Some(BStr::new(b"caf\xE9"))).unwrap();
+        assert_eq!(formatted, Some(BString::from(b"caf\xE9".as_slice())));
     }
 }

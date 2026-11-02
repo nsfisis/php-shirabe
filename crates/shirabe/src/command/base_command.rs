@@ -221,7 +221,7 @@ pub trait BaseCommand: Command {
         &self,
         table: Vec<PhpMixed>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    );
+    ) -> anyhow::Result<()>;
 
     fn get_terminal_width(&self) -> i64;
 
@@ -257,7 +257,7 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
         shirabe_symfony_console::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
         shirabe_symfony_console::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<bstr::BString>) -> anyhow::Result<indexmap::IndexMap<bstr::BString, bstr::BString>>);
         shirabe_symfony_console::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<bstr::BString>) -> anyhow::Result<Vec<indexmap::IndexMap<bstr::BString, bstr::BString>>>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>));
+        shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>) -> anyhow::Result<()>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &str) -> anyhow::Result<String>);
         shirabe_symfony_console::delegate_to_inner!($field, fn create_audit_config(&self, config: &mut $crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
@@ -617,7 +617,7 @@ impl BaseCommand for BaseCommandData {
         &self,
         table: Vec<PhpMixed>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
+    ) -> anyhow::Result<()> {
         let mut renderer = Table::new(output);
         renderer
             .set_style("compact".into())
@@ -625,8 +625,10 @@ impl BaseCommand for BaseCommandData {
             .expect("'compact' is a built-in table style");
         renderer
             .set_rows(table.into_iter().map(Into::into).collect())
-            .render();
+            .render()?;
         let _ = TableSeparator::new();
+
+        Ok(())
     }
 
     fn get_terminal_width(&self) -> i64 {

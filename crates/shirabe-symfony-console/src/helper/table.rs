@@ -416,7 +416,7 @@ impl Table {
     }
 
     /// Renders table to output.
-    pub fn render(&mut self) {
+    pub fn render(&mut self) -> anyhow::Result<()> {
         let rows: Vec<Row> = if self.horizontal {
             let mut horizontal_rows: IndexMap<i64, Vec<Cell>> = IndexMap::new();
             let header0 = self.headers.first().map(|h| h.cells()).unwrap_or_default();
@@ -455,7 +455,7 @@ impl Table {
 
         self.calculate_number_of_columns(&rows);
 
-        let row_groups = self.build_table_rows(rows);
+        let row_groups = self.build_table_rows(rows)?;
         self.calculate_columns_width(&row_groups);
 
         let mut is_header = !self.horizontal;
@@ -522,6 +522,8 @@ impl Table {
         self.render_row_separator(SEPARATOR_BOTTOM);
 
         self.cleanup();
+
+        Ok(())
     }
 
     /// Renders horizontal header separator.
@@ -730,7 +732,7 @@ impl Table {
         self.number_of_columns = Some(*columns.iter().max().unwrap());
     }
 
-    fn build_table_rows(&mut self, rows: Vec<Row>) -> TableRows {
+    fn build_table_rows(&mut self, rows: Vec<Row>) -> anyhow::Result<TableRows> {
         let mut rows = rows;
         let mut unmerged_rows: IndexMap<i64, IndexMap<i64, Vec<Cell>>> = IndexMap::new();
         let mut row_key = 0i64;
@@ -755,7 +757,7 @@ impl Table {
                     let wrapped = self.format_and_wrap(
                         cell.to_php_string().as_ref(),
                         self.column_max_widths[&column] * colspan,
-                    );
+                    )?;
                     cell = Cell::Value(wrapped);
                 }
                 let cell_str = cell.to_php_string();
@@ -845,7 +847,7 @@ impl Table {
             row_groups.push(row_group);
         }
 
-        TableRows::from_row_groups(row_groups)
+        Ok(TableRows::from_row_groups(row_groups))
     }
 
     /// fill rows that contains rowspan > 1.
@@ -1201,17 +1203,16 @@ impl Table {
     /// `setColumnMaxWidth` guarantees the formatter is a `WrappableOutputFormatterInterface`, and
     /// `OutputFormatter` is the sole implementor in this port, so `instanceof` reduces to this
     /// downcast.
-    fn format_and_wrap(&self, string: &BStr, width: i64) -> BString {
+    fn format_and_wrap(&self, string: &BStr, width: i64) -> anyhow::Result<BString> {
         let formatter = self.output.borrow().get_formatter();
         let mut formatter = formatter.borrow_mut();
         let formatter = formatter
             .as_any_mut()
             .downcast_mut::<OutputFormatter>()
             .expect("formatter must be a WrappableOutputFormatterInterface");
-        formatter
-            .format_and_wrap(Some(string), width)
-            .unwrap()
-            .unwrap_or_default()
+        Ok(formatter
+            .format_and_wrap(Some(string), width)?
+            .unwrap_or_default())
     }
 
     /// PHP `Helper::removeDecoration($this->output->getFormatter(), $string)`.
@@ -1276,7 +1277,7 @@ mod tests {
         let mut table = Table::new(output.clone());
         table.set_style(style.into()).unwrap().unwrap();
         table.add_row(vec![Cell::from(cell)].into());
-        table.render();
+        table.render().unwrap();
 
         let rendered = output.borrow().fetch();
         assert!(rendered.contains_str(b"\xE9"));

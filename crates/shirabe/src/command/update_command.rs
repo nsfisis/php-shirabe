@@ -195,7 +195,7 @@ impl UpdateCommand {
         for package in &packages {
             table.add_row(PhpMixed::List(vec![PhpMixed::string(package.clone())]).into());
         }
-        table.render();
+        table.render()?;
 
         if io.ask_confirmation(
             format!(

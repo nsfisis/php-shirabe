@@ -309,7 +309,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             ));
             self.print_tree(&results, "", 1);
         } else {
-            self.print_table(output, results);
+            self.print_table(output, results)?;
         }
 
         if inverted
@@ -347,7 +347,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         results: Vec<DependentsEntry>,
-    ) {
+    ) -> anyhow::Result<()> {
         let mut table: Vec<Vec<BString>> = vec![];
         let mut doubles: IndexMap<BString, bool> = IndexMap::new();
         let mut results = results;
@@ -399,7 +399,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             .into_iter()
             .map(|row| PhpMixed::List(row.into_iter().map(PhpMixed::string).collect()))
             .collect();
-        self.render_table(table_as_mixed, output);
+        self.render_table(table_as_mixed, output)
     }
 
     fn init_styles(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {

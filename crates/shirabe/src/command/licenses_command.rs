@@ -228,7 +228,7 @@ impl Command for LicensesCommand {
                         .into(),
                     );
                 }
-                table.render();
+                table.render()?;
             }
             b"json" => {
                 let mut dependencies: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -302,7 +302,7 @@ impl Command for LicensesCommand {
                 symfony_io.table(
                     vec!["License".into(), "Number of dependencies".into()],
                     rows,
-                );
+                )?;
             }
             _ => {
                 return Err(RuntimeException::new(format!(

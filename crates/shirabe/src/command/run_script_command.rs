@@ -78,7 +78,7 @@ impl RunScriptCommand {
             })
             .collect();
 
-        self.render_table(table, output);
+        self.render_table(table, output)?;
 
         Ok(0)
     }

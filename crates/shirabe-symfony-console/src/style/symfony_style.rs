@@ -291,13 +291,15 @@ impl StyleInterface for SymfonyStyle {
         );
     }
 
-    fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) {
+    fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) -> anyhow::Result<()> {
         self.create_table()
             .set_headers(headers)
             .set_rows(rows)
-            .render();
+            .render()?;
 
         self.new_line(1);
+
+        Ok(())
     }
 
     fn confirm(&mut self, question: &BStr, default: bool) -> bool {

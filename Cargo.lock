@@ -2459,6 +2459,7 @@ dependencies = [
 name = "shirabe-symfony-string"
 version = "0.2.0-dev"
 dependencies = [
+ "anyhow",
  "bstr",
  "shirabe-php-shim",
 ]

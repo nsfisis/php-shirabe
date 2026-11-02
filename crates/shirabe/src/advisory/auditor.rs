@@ -504,7 +504,7 @@ impl Auditor {
                 table
                     .set_column_width(1, 80)
                     .set_column_max_width(1, 80)
-                    .render();
+                    .render()?;
             }
         }
 
@@ -635,7 +635,7 @@ impl Auditor {
             table.add_row(row.into());
         }
 
-        table.render();
+        table.render()?;
 
         Ok(())
     }

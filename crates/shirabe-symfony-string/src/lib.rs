@@ -2,6 +2,7 @@
 
 pub mod byte_string;
 pub mod code_point_string;
+pub mod exception;
 pub mod unicode_string;
 
 pub use byte_string::*;
