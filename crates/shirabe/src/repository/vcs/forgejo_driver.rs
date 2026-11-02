@@ -141,17 +141,19 @@ impl ForgejoDriver {
         match content_b64 {
             Some(b64) => match base64_decode(b64) {
                 Some(bytes) => Ok(Some(bstr::BString::from(bytes))),
-                None => Err(RuntimeException::new(format!(
-                    "Could not retrieve {} for {}",
-                    file.display_lossy(),
-                    identifier.display_lossy()
+                None => Err(RuntimeException::new(bconcat!(
+                    "Could not retrieve ",
+                    file,
+                    " for ",
+                    identifier
                 ))
                 .into()),
             },
-            None => Err(RuntimeException::new(format!(
-                "Could not retrieve {} for {}",
-                file.display_lossy(),
-                identifier.display_lossy()
+            None => Err(RuntimeException::new(bconcat!(
+                "Could not retrieve ",
+                file,
+                " for ",
+                identifier
             ))
             .into()),
         }
@@ -188,10 +190,7 @@ impl ForgejoDriver {
         };
 
         let date_str = date_str.ok_or_else(|| {
-            RuntimeException::new(format!(
-                "Could not parse commit date for {}",
-                identifier.display_lossy()
-            ))
+            RuntimeException::new(bconcat!("Could not parse commit date for ", identifier))
         })?;
 
         let date: chrono::DateTime<chrono::FixedOffset> = date_create(date_str)?;
@@ -495,9 +494,10 @@ impl ForgejoDriver {
 
         if !extension_loaded("openssl") {
             io.write_error3(
-                format!(
-                    "Skipping Forgejo driver for {} because the OpenSSL PHP extension is missing.",
-                    url.display_lossy()
+                bconcat!(
+                    "Skipping Forgejo driver for ",
+                    url,
+                    " because the OpenSSL PHP extension is missing."
                 ),
                 true,
                 io_interface::VERBOSE,
@@ -608,9 +608,10 @@ impl ForgejoDriver {
                 {
                     let origin_url = self.forgejo_url.as_ref().unwrap().origin_url.clone();
                     let message = if e.get_code() == 429 {
-                        Some(format!(
-                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>{}</info>)",
-                            self.inner.url.display_lossy()
+                        Some(bconcat!(
+                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>",
+                            self.inner.url,
+                            "</info>)"
                         ))
                     } else {
                         None
@@ -621,8 +622,10 @@ impl ForgejoDriver {
                         self.inner.config.clone(),
                         self.inner.http_downloader.clone(),
                     );
-                    let auth_result = forgejo
-                        .authorize_o_auth_interactively(origin_url.as_bstr(), message.as_deref())?;
+                    let auth_result = forgejo.authorize_o_auth_interactively(
+                        origin_url.as_bstr(),
+                        message.as_ref().map(|m| m.as_bstr()),
+                    )?;
 
                     if let Ok(true) = auth_result {
                         return self.inner.get_contents(url);
@@ -642,10 +645,7 @@ impl ForgejoDriver {
             Ok(()) => Ok(true),
             Err(e) => {
                 self.git_driver = None;
-                self.inner.io.write_error3(format!(
-                    "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Forgejo credentials</error>",
-                    ssh_url.display_lossy()
-                ), true, io_interface::NORMAL);
+                self.inner.io.write_error3(bconcat!("<error>Failed to clone the ", ssh_url, " repository, try running in interactive mode so that you can enter your Forgejo credentials</error>"), true, io_interface::NORMAL);
                 Err(e)
             }
         }

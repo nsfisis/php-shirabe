@@ -31,7 +31,7 @@ impl Forgejo {
     pub fn authorize_o_auth_interactively(
         &mut self,
         origin_url: &BStr,
-        message: Option<&str>,
+        message: Option<&BStr>,
     ) -> anyhow::Result<Result<bool, TransportException>> {
         if let Some(message) = message {
             self.io.write_error3(message, true, io_interface::NORMAL);

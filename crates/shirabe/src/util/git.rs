@@ -413,7 +413,8 @@ impl Git {
                     let message = "Enter your Bitbucket credentials to access private repos";
 
                     if !bitbucket_util.authorize_oauth(domain)? && self.io.is_interactive() {
-                        bitbucket_util.authorize_oauth_interactively(domain, Some(message))?;
+                        bitbucket_util
+                            .authorize_oauth_interactively(domain, Some(BStr::new(message)))?;
                         let access_token = bitbucket_util.get_token();
                         self.io.borrow_mut().set_authentication(
                             domain.to_owned(),
@@ -580,7 +581,7 @@ impl Git {
                         git_lab_util.authorize_oauth_interactively(
                             m1.as_bstr(),
                             origin,
-                            Some(message),
+                            Some(BStr::new(message)),
                         )?;
                     }
                 }

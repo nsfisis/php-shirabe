@@ -182,7 +182,7 @@ impl Bitbucket {
     pub fn authorize_oauth_interactively(
         &mut self,
         origin_url: &BStr,
-        message: Option<&str>,
+        message: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
             self.io.write_error3(msg, true, io_interface::NORMAL);

@@ -48,9 +48,10 @@ impl GitDriver {
                 &preg_replace(php_regex!(r"{[\\/]\.git/?$}"), "", &self.inner.url)[..],
             );
             if !is_dir(path_from_bytes(&self.inner.url)) {
-                return Err(RuntimeException::new(format!(
-                    "Failed to read package information from {} as the path does not exist",
-                    self.inner.url.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "Failed to read package information from ",
+                    self.inner.url,
+                    " as the path does not exist"
                 ))
                 .into());
             }
@@ -70,7 +71,7 @@ impl GitDriver {
                 )[..],
             );
             if !Cache::is_usable(path_from_bytes(&cache_vcs_dir)) {
-                return Err(RuntimeException::new("GitDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string())
+                return Err(RuntimeException::new(BString::from("GitDriver requires a usable cache directory, and it looks like you set it to be disabled"))
                 .into());
             }
 
@@ -87,19 +88,18 @@ impl GitDriver {
             fs.ensure_directory_exists(path_from_bytes(&dirname(&self.repo_dir)))?;
 
             if !is_writable(path_from_bytes(&dirname(&self.repo_dir))) {
-                return Err(RuntimeException::new(format!(
-                    "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
-                    self.inner.url.display_lossy(),
-                    dirname(&self.repo_dir).display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "Can not clone ",
+                    self.inner.url,
+                    " to access package information. The \"",
+                    dirname(&self.repo_dir),
+                    "\" directory is not writable by the current user."
                 ))
                 .into());
             }
 
             if preg_is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), &self.inner.url) {
-                return Err(InvalidArgumentException::new(format!(
-                    "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
-                    self.inner.url.display_lossy()
-                ))
+                return Err(InvalidArgumentException::new(bconcat!("The source URL ", self.inner.url, " is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port."))
                 .into());
             }
 
@@ -111,16 +111,22 @@ impl GitDriver {
             );
             if !git_util.sync_mirror(self.inner.url.as_bstr(), path_from_bytes(&self.repo_dir))? {
                 if !is_dir(path_from_bytes(&self.repo_dir)) {
-                    return Err(RuntimeException::new(format!(
-                        "Failed to clone {} to read package information from it",
-                        self.inner.url.display_lossy()
+                    return Err(RuntimeException::new(bconcat!(
+                        "Failed to clone ",
+                        self.inner.url,
+                        " to read package information from it"
                     ))
                     .into());
                 }
-                self.inner.io.write_error3(format!(
-                    "<error>Failed to update {}, package information from this repository may be outdated</error>",
-                    self.inner.url.display_lossy()
-                ), true, io_interface::NORMAL);
+                self.inner.io.write_error3(
+                    bconcat!(
+                        "<error>Failed to update ",
+                        self.inner.url,
+                        ", package information from this repository may be outdated</error>"
+                    ),
+                    true,
+                    io_interface::NORMAL,
+                );
             }
 
             cache_url = self.inner.url.clone();
@@ -164,7 +170,7 @@ impl GitDriver {
 
     pub fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         if self.root_identifier.is_none() {
-            self.root_identifier = Some(bstr::BString::from("master".to_string()));
+            self.root_identifier = Some(BString::from("master"));
 
             let mut git_util = GitUtil::new(
                 self.inner.io.clone(),
@@ -187,15 +193,15 @@ impl GitDriver {
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 &[
-                    "git".to_string(),
-                    "branch".to_string(),
-                    "--no-color".to_string(),
+                    BString::from("git"),
+                    BString::from("branch"),
+                    BString::from("--no-color"),
                 ],
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
             )?;
             let branches = self.inner.process.borrow().split_lines(&output);
-            if !branches.contains(&bstr::BString::from("* master".to_string().clone())) {
+            if !branches.contains(&BString::from("* master").clone()) {
                 for branch in &branches {
                     if !branch.is_empty()
                         && let Some(caps) = preg_match(php_regex!(r"{^\* +(\S+)}"), branch)
@@ -233,9 +239,9 @@ impl GitDriver {
         identifier: &BStr,
     ) -> anyhow::Result<Option<BString>> {
         if identifier.starts_with(b"-") {
-            return Err(RuntimeException::new(format!(
-                "Invalid git identifier detected. Identifier must not start with a -, given: {}",
-                identifier.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Invalid git identifier detected. Identifier must not start with a -, given: ",
+                identifier
             ))
             .into());
         }
@@ -251,7 +257,7 @@ impl GitDriver {
             Some(path_from_bytes(&self.repo_dir)),
         )?;
 
-        if content.trim().is_empty() {
+        if trim(&content).is_empty() {
             return Ok(None);
         }
 
@@ -263,9 +269,9 @@ impl GitDriver {
         identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if identifier.starts_with(b"-") {
-            return Err(RuntimeException::new(format!(
-                "Invalid git identifier detected. Identifier must not start with a -, given: {}",
-                identifier.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Invalid git identifier detected. Identifier must not start with a -, given: ",
+                identifier
             ))
             .into());
         }
@@ -273,8 +279,8 @@ impl GitDriver {
         let command = GitUtil::build_rev_list_command(
             &self.inner.process,
             vec![
-                bstr::BString::from("-n1".to_string()),
-                bstr::BString::from("--format=%at".to_string()),
+                BString::from("-n1"),
+                BString::from("--format=%at"),
                 bstr::BString::from(identifier),
             ],
         )?;
@@ -304,10 +310,10 @@ impl GitDriver {
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 &[
-                    "git".to_string(),
-                    "show-ref".to_string(),
-                    "--tags".to_string(),
-                    "--dereference".to_string(),
+                    BString::from("git"),
+                    BString::from("show-ref"),
+                    BString::from("--tags"),
+                    BString::from("--dereference"),
                 ],
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
@@ -338,11 +344,11 @@ impl GitDriver {
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 &[
-                    "git".to_string(),
-                    "branch".to_string(),
-                    "--no-color".to_string(),
-                    "--no-abbrev".to_string(),
-                    "-v".to_string(),
+                    BString::from("git"),
+                    BString::from("branch"),
+                    BString::from("--no-color"),
+                    BString::from("--no-abbrev"),
+                    BString::from("-v"),
                 ],
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
@@ -391,7 +397,7 @@ impl GitDriver {
             ))));
             let mut output = BString::default();
             if process.borrow_mut().execute(
-                &["git".to_string(), "tag".to_string()],
+                &[BString::from("git"), BString::from("tag")],
                 &mut output,
                 Some(path_from_bytes(&url)),
             )? == 0

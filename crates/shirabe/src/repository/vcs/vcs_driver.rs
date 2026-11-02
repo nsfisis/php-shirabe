@@ -12,7 +12,8 @@ use bstr::{B, BStr, BString};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, DATE_RFC3339, PhpMixed, bconcat, extension_loaded, php_regex, preg_is_match,
+    Catch as _, DATE_RFC3339, PhpMixed, bconcat, display_to_bytes, extension_loaded, php_regex,
+    preg_is_match,
 };
 
 #[derive(Debug)]
@@ -60,11 +61,11 @@ impl VcsDriverBase {
         self.cache.is_some() && preg_is_match(php_regex!("{^[a-f0-9]{40}$}iD"), identifier)
     }
 
-    pub fn get_scheme(&self) -> &str {
+    pub fn get_scheme(&self) -> &BStr {
         if extension_loaded("openssl") {
-            return "https";
+            return BStr::new("https");
         }
-        "http"
+        BStr::new("http")
     }
 
     pub fn get_contents(
@@ -126,7 +127,7 @@ impl VcsDriverBase {
         {
             composer.insert(
                 "time".into(),
-                PhpMixed::string(d.format(DATE_RFC3339).to_string()),
+                PhpMixed::string(display_to_bytes(d.format(DATE_RFC3339))),
             );
         }
 
@@ -184,9 +185,9 @@ impl VcsDriverBase {
 }
 
 pub trait VcsDriver: VcsDriverInterface {
-    fn url(&self) -> &str;
+    fn url(&self) -> &BStr;
     fn url_mut(&mut self) -> &mut BString;
-    fn origin_url(&self) -> &str;
+    fn origin_url(&self) -> &BStr;
     fn origin_url_mut(&mut self) -> &mut BString;
     fn repo_config(&self) -> &IndexMap<BString, PhpMixed>;
     fn repo_config_mut(&mut self) -> &mut IndexMap<BString, PhpMixed>;
@@ -283,7 +284,7 @@ pub trait VcsDriver: VcsDriverInterface {
         {
             composer.insert(
                 "time".into(),
-                PhpMixed::string(change_date.format(DATE_RFC3339).to_string()),
+                PhpMixed::string(display_to_bytes(change_date.format(DATE_RFC3339))),
             );
         }
 
@@ -297,11 +298,11 @@ pub trait VcsDriver: VcsDriverInterface {
         )
     }
 
-    fn get_scheme(&self) -> &str {
+    fn get_scheme(&self) -> &BStr {
         if extension_loaded("openssl") {
-            return "https";
+            return BStr::new("https");
         }
-        "http"
+        BStr::new("http")
     }
 
     fn get_contents(

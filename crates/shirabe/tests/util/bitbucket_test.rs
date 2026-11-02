@@ -471,7 +471,7 @@ fn test_username_password_authentication_flow() {
 
     assert!(
         f.bitbucket
-            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
 }
@@ -492,7 +492,7 @@ fn test_authorize_oauth_interactively_with_empty_username() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
 }
@@ -519,7 +519,7 @@ fn test_authorize_oauth_interactively_with_empty_password() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
 }
@@ -548,7 +548,7 @@ fn test_authorize_oauth_interactively_with_request_access_token_failure() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
 }

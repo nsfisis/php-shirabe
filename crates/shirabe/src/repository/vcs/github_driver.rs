@@ -69,9 +69,10 @@ impl GitHubDriver {
             ),
             &self.inner.url,
         ) else {
-            return Err(InvalidArgumentException::new(format!(
-                "The GitHub repository URL {} is invalid.",
-                self.inner.url.clone().display_lossy(),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The GitHub repository URL ",
+                self.inner.url.clone(),
+                " is invalid."
             ))
             .into());
         };
@@ -88,7 +89,7 @@ impl GitHubDriver {
             )[..],
         );
         if self.inner.origin_url == "www.github.com" {
-            self.inner.origin_url = bstr::BString::from("github.com".to_string());
+            self.inner.origin_url = BString::from("github.com");
         }
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
@@ -214,7 +215,7 @@ impl GitHubDriver {
         };
 
         let mut result = IndexMap::new();
-        result.insert("type".into(), PhpMixed::string("git".to_string()));
+        result.insert("type".into(), PhpMixed::string(BString::from("git")));
         result.insert("url".into(), PhpMixed::string(url));
         result.insert(
             "reference".into(),
@@ -235,7 +236,7 @@ impl GitHubDriver {
         );
 
         let mut result = IndexMap::new();
-        result.insert("type".into(), PhpMixed::string("zip".to_string()));
+        result.insert("type".into(), PhpMixed::string(BString::from("zip")));
         result.insert("url".into(), PhpMixed::string(url));
         result.insert(
             "reference".into(),
@@ -664,9 +665,10 @@ impl GitHubDriver {
                         }
 
                         self.inner.io.write_error3(
-                            format!(
-                                "<warning>Funding URL {} not in a supported format.</warning>",
-                                item_url.display_lossy()
+                            bconcat!(
+                                "<warning>Funding URL ",
+                                item_url,
+                                " not in a supported format.</warning>"
                             ),
                             true,
                             io_interface::NORMAL,
@@ -765,10 +767,11 @@ impl GitHubDriver {
         let content = match content {
             Some(c) => c,
             None => {
-                return Err(RuntimeException::new(format!(
-                    "Could not retrieve {} for {}",
-                    file.display_lossy(),
-                    identifier.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "Could not retrieve ",
+                    file,
+                    " for ",
+                    identifier
                 ))
                 .into());
             }
@@ -955,9 +958,10 @@ impl GitHubDriver {
 
         if !extension_loaded("openssl") {
             io.write_error3(
-                format!(
-                    "Skipping GitHub driver for {} because the OpenSSL PHP extension is missing.",
-                    url.display_lossy()
+                bconcat!(
+                    "Skipping GitHub driver for ",
+                    url,
+                    " because the OpenSSL PHP extension is missing."
                 ),
                 true,
                 io_interface::VERBOSE,
@@ -1100,10 +1104,7 @@ impl GitHubDriver {
                         {
                             if !self.inner.io.is_interactive() {
                                 self.inner.io.write_error3(
-                                    format!(
-                                        "<error>GitHub API limit exhausted. Failed to get metadata for the {} repository, try running in interactive mode so that you can enter your GitHub credentials to increase the API limit</error>",
-                                        self.inner.url.display_lossy()
-                                    ),
+                                    bconcat!("<error>GitHub API limit exhausted. Failed to get metadata for the ", self.inner.url, " repository, try running in interactive mode so that you can enter your GitHub credentials to increase the API limit</error>"),
                                     true,
                                     io_interface::NORMAL,
                                 );
@@ -1121,11 +1122,7 @@ impl GitHubDriver {
                         if rate_limited {
                             let rate_limit = git_hub_util.get_rate_limit(&headers);
                             self.inner.io.write_error3(
-                                format!(
-                                    "<error>GitHub API limit ({} calls/hr) is exhausted. You are already authorized so you have to wait until {} before doing more requests</error>",
-                                    rate_limit.get(B("limit")).map(php_to_string).unwrap_or_default().display_lossy(),
-                                    rate_limit.get(B("reset")).map(php_to_string).unwrap_or_default().display_lossy(),
-                                ),
+                                bconcat!("<error>GitHub API limit (", rate_limit.get(B("limit")).map(php_to_string).unwrap_or_default(), " calls/hr) is exhausted. You are already authorized so you have to wait until ", rate_limit.get(B("reset")).map(php_to_string).unwrap_or_default(), " before doing more requests</error>"),
                                 true,
                                 io_interface::NORMAL,
                             );
@@ -1207,7 +1204,7 @@ impl GitHubDriver {
         {
             self.root_identifier = BString::from(master_branch);
         } else {
-            self.root_identifier = bstr::BString::from("master".to_string());
+            self.root_identifier = BString::from("master");
         }
         self.has_issues = !empty(
             &repo_data
@@ -1231,7 +1228,7 @@ impl GitHubDriver {
     ) -> anyhow::Result<bool> {
         if !self.allow_git_fallback {
             return Err(RuntimeException::with_code_and_previous(
-                "Fallback to git driver disabled".to_string(),
+                BString::from("Fallback to git driver disabled"),
                 0,
                 e,
             )
@@ -1251,10 +1248,7 @@ impl GitHubDriver {
                 self.git_driver = None;
 
                 self.inner.io.write_error3(
-                    format!(
-                        "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your GitHub credentials</error>",
-                        self.generate_ssh_url().display_lossy()
-                    ),
+                    bconcat!("<error>Failed to clone the ", self.generate_ssh_url(), " repository, try running in interactive mode so that you can enter your GitHub credentials</error>"),
                     true,
                     io_interface::NORMAL,
                 );
@@ -1266,7 +1260,7 @@ impl GitHubDriver {
     fn setup_git_driver(&mut self, url: &BStr) -> anyhow::Result<()> {
         if !self.allow_git_fallback {
             return Err(
-                RuntimeException::new("Fallback to git driver disabled".to_string()).into(),
+                RuntimeException::new(BString::from("Fallback to git driver disabled")).into(),
             );
         }
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();

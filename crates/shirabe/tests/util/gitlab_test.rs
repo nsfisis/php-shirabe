@@ -99,7 +99,7 @@ fn test_username_password_authentication_flow() {
             .authorize_oauth_interactively(
                 bstr::BStr::new("http"),
                 bstr::BStr::new(ORIGIN),
-                Some(MESSAGE)
+                Some(bstr::BStr::new(MESSAGE))
             )
             .unwrap()
     );

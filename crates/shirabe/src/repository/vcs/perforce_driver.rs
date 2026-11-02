@@ -80,7 +80,7 @@ impl PerforceDriver {
                 .unwrap_or_default(),
         );
         if !Cache::is_usable(path_from_bytes(&cache_vcs_dir)) {
-            return Err(RuntimeException::new("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
+            return Err(RuntimeException::new(BString::from("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled")).into());
         }
 
         let repo_dir = path_from_bytes(&bconcat!(cache_vcs_dir, "/", self.depot)).to_path_buf();
@@ -138,7 +138,7 @@ impl PerforceDriver {
 
     pub fn get_source(&self, identifier: &BStr) -> IndexMap<BString, PhpMixed> {
         let mut source = IndexMap::new();
-        source.insert("type".into(), PhpMixed::string("perforce".to_string()));
+        source.insert("type".into(), PhpMixed::string(BString::from("perforce")));
         source.insert(
             "url".into(),
             self.inner
@@ -177,9 +177,9 @@ impl PerforceDriver {
             .is_ok_and(|info| info.is_some_and(|i| !i.is_empty()))
     }
 
-    pub fn get_contents(&self, _url: &str) -> anyhow::Result<Response> {
+    pub fn get_contents(&self, _url: &BStr) -> anyhow::Result<Response> {
         Err(
-            BadMethodCallException::new("Not implemented/used in PerforceDriver".to_string())
+            BadMethodCallException::new(BString::from("Not implemented/used in PerforceDriver"))
                 .into(),
         )
     }

@@ -69,16 +69,17 @@ impl GitBitbucketDriver {
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i"),
             &self.inner.url,
         ) else {
-            return Err(InvalidArgumentException::new(format!(
-                "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
-                self.inner.url.clone().display_lossy(),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The Bitbucket repository URL ",
+                self.inner.url.clone(),
+                " is invalid. It must be the HTTPS URL of a Bitbucket repository."
             ))
             .into());
         };
 
         self.owner = BString::from(m.get(1).unwrap_or_default());
         self.repository = BString::from(m.get(2).unwrap_or_default());
-        self.inner.origin_url = bstr::BString::from("bitbucket.org".to_string());
+        self.inner.origin_url = BString::from("bitbucket.org");
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
             path_from_bytes(&implode(
@@ -474,14 +475,11 @@ impl GitBitbucketDriver {
 
         let mut m: IndexMap<BString, BString> = IndexMap::new();
         m.insert(
-            bstr::BString::from("type".to_string()),
+            BString::from("type"),
             self.vcs_type.clone().unwrap_or_default(),
         );
-        m.insert(bstr::BString::from("url".to_string()), self.get_url());
-        m.insert(
-            bstr::BString::from("reference".to_string()),
-            bstr::BString::from(identifier),
-        );
+        m.insert(BString::from("url"), self.get_url());
+        m.insert(BString::from("reference"), bstr::BString::from(identifier));
         m
     }
 
@@ -501,19 +499,10 @@ impl GitBitbucketDriver {
         );
 
         let mut m: IndexMap<BString, BString> = IndexMap::new();
-        m.insert(
-            bstr::BString::from("type".to_string()),
-            bstr::BString::from("zip".to_string()),
-        );
-        m.insert(bstr::BString::from("url".to_string()), url);
-        m.insert(
-            bstr::BString::from("reference".to_string()),
-            bstr::BString::from(identifier),
-        );
-        m.insert(
-            bstr::BString::from("shasum".to_string()),
-            BString::default(),
-        );
+        m.insert(BString::from("type"), BString::from("zip"));
+        m.insert(BString::from("url"), url);
+        m.insert(BString::from("reference"), bstr::BString::from(identifier));
+        m.insert(BString::from("shasum"), BString::default());
         Some(m)
     }
 
@@ -719,10 +708,7 @@ impl GitBitbucketDriver {
                 if e.is_instanceof::<RuntimeException>() {
                     self.fallback_driver = None;
 
-                    self.inner.io.write_error(format!(
-                        "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Bitbucket OAuth consumer credentials</error>",
-                        self.generate_ssh_url().display_lossy()
-                    ));
+                    self.inner.io.write_error(bconcat!("<error>Failed to clone the ", self.generate_ssh_url(), " repository, try running in interactive mode so that you can enter your Bitbucket OAuth consumer credentials</error>"));
                 }
                 Err(e)
             }
@@ -776,10 +762,9 @@ impl GitBitbucketDriver {
         if self.root_identifier.is_none() {
             if !self.get_repo_data()? {
                 if self.fallback_driver.is_none() {
-                    return Err(LogicException::new(
-                        "A fallback driver should be setup if getRepoData returns false"
-                            .to_string(),
-                    )
+                    return Err(LogicException::new(BString::from(
+                        "A fallback driver should be setup if getRepoData returns false",
+                    ))
                     .into());
                 }
 
@@ -787,10 +772,7 @@ impl GitBitbucketDriver {
             }
 
             if self.vcs_type.as_ref().is_none_or(|t| t != "git") {
-                return Err(RuntimeException::new(format!(
-                    "{} does not appear to be a git repository, use {} but remember that Bitbucket no longer supports the mercurial repositories. https://bitbucket.org/blog/sunsetting-mercurial-support-in-bitbucket",
-                    self.inner.url.display_lossy(), self.clone_https_url.display_lossy()
-                ))
+                return Err(RuntimeException::new(bconcat!(self.inner.url, " does not appear to be a git repository, use ", self.clone_https_url, " but remember that Bitbucket no longer supports the mercurial repositories. https://bitbucket.org/blog/sunsetting-mercurial-support-in-bitbucket"))
                 .into());
             }
 
@@ -824,9 +806,10 @@ impl GitBitbucketDriver {
 
         if !extension_loaded("openssl") {
             io.write_error3(
-                format!(
-                    "Skipping Bitbucket git driver for {} because the OpenSSL PHP extension is missing.",
-                    url.display_lossy()
+                bconcat!(
+                    "Skipping Bitbucket git driver for ",
+                    url,
+                    " because the OpenSSL PHP extension is missing."
                 ),
                 true,
                 io_interface::VERBOSE,

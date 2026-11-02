@@ -47,9 +47,9 @@ impl SvnDriver {
             tags: None,
             branches: None,
             root_identifier: None,
-            trunk_path: Some(bstr::BString::from("trunk".to_string())),
-            branches_path: bstr::BString::from("branches".to_string()),
-            tags_path: bstr::BString::from("tags".to_string()),
+            trunk_path: Some(BString::from("trunk")),
+            branches_path: BString::from("branches"),
+            tags_path: BString::from("tags"),
             package_path: BString::default(),
             cache_credentials: true,
             util: None,
@@ -159,7 +159,7 @@ impl SvnDriver {
                 // old cache files had '' stored instead of null due to af3783b5f40bae32a23e353eaf0a00c9b8ce82e2, so we make sure here that we always return null or array
                 // and fix outdated invalid cache files
                 if res == "\"\"" {
-                    res = bstr::BString::from("null".to_string());
+                    res = BString::from("null");
                     self.inner
                         .cache
                         .as_mut()
@@ -257,10 +257,7 @@ impl SvnDriver {
         };
 
         let output: BString = match self.execute(
-            vec![
-                bstr::BString::from("svn".to_string()),
-                bstr::BString::from("cat".to_string()),
-            ],
+            vec![BString::from("svn"), BString::from("cat")],
             bstr::BStr::new(&bconcat!(self.base_url, path, rev)),
         ) {
             Ok(o) => o,
@@ -296,10 +293,7 @@ impl SvnDriver {
         };
 
         let output = self.execute(
-            vec![
-                bstr::BString::from("svn".to_string()),
-                bstr::BString::from("info".to_string()),
-            ],
+            vec![BString::from("svn"), BString::from("info")],
             bstr::BStr::new(&bconcat!(self.base_url, path, rev)),
         )?;
         for line in self.inner.process.borrow().split_lines(&output) {
@@ -307,7 +301,7 @@ impl SvnDriver {
                 && let Some(m) = preg_match(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line)
             {
                 let date_str = BString::from(m.get(1).unwrap_or_default());
-                return Ok(date_create::<Utc>(date_str.trim())
+                return Ok(date_create::<Utc>(trim(&date_str))
                     .ok()
                     .map(|d| d.fixed_offset()));
             }
@@ -324,9 +318,9 @@ impl SvnDriver {
             if !self.tags_path.is_empty() {
                 let output = self.execute(
                     vec![
-                        bstr::BString::from("svn".to_string()),
-                        bstr::BString::from("ls".to_string()),
-                        bstr::BString::from("--verbose".to_string()),
+                        BString::from("svn"),
+                        BString::from("ls"),
+                        BString::from("--verbose"),
                     ],
                     bstr::BStr::new(&bconcat!(self.base_url, "/", self.tags_path)),
                 )?;
@@ -372,9 +366,9 @@ impl SvnDriver {
 
             let output = self.execute(
                 vec![
-                    bstr::BString::from("svn".to_string()),
-                    bstr::BString::from("ls".to_string()),
-                    bstr::BString::from("--verbose".to_string()),
+                    BString::from("svn"),
+                    BString::from("ls"),
+                    BString::from("--verbose"),
                 ],
                 bstr::BStr::new(&trunk_parent),
             )?;
@@ -392,10 +386,7 @@ impl SvnDriver {
                                     .as_bstr(),
                                 rev,
                             );
-                            branches.insert(
-                                bstr::BString::from("trunk".to_string()),
-                                identifier.clone(),
-                            );
+                            branches.insert(BString::from("trunk"), identifier.clone());
                             self.root_identifier = Some(identifier);
                             break;
                         }
@@ -408,9 +399,9 @@ impl SvnDriver {
             if !self.branches_path.is_empty() {
                 let output = self.execute(
                     vec![
-                        bstr::BString::from("svn".to_string()),
-                        bstr::BString::from("ls".to_string()),
-                        bstr::BString::from("--verbose".to_string()),
+                        BString::from("svn"),
+                        BString::from("ls"),
+                        BString::from("--verbose"),
                     ],
                     bstr::BStr::new(&bconcat!(self.base_url, "/", self.branches_path)),
                 )?;
@@ -531,10 +522,11 @@ impl SvnDriver {
             Ok(o) => Ok(o),
             Err(e) => {
                 if self.util.as_mut().unwrap().binary_version()?.is_none() {
-                    return Err(RuntimeException::new(format!(
-                        "Failed to load {}, svn was not found, check that it is installed and in your PATH env.\n\n{}",
-                        self.inner.url.display_lossy(),
-                        self.inner.process.borrow().get_error_output().display_lossy(),
+                    return Err(RuntimeException::new(bconcat!(
+                        "Failed to load ",
+                        self.inner.url,
+                        ", svn was not found, check that it is installed and in your PATH env.\n\n",
+                        self.inner.process.borrow().get_error_output()
                     ))
                     .into());
                 }

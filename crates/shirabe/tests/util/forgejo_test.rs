@@ -106,7 +106,7 @@ fn test_username_password_authentication_flow() {
 
     assert!(
         forgejo
-            .authorize_o_auth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
+            .authorize_o_auth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
             .unwrap()
     );

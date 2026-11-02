@@ -81,7 +81,7 @@ impl FossilDriver {
             if !Cache::is_usable(path_from_bytes(&cache_repo_dir))
                 || !Cache::is_usable(path_from_bytes(&cache_vcs_dir))
             {
-                return Err(RuntimeException::new("FossilDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string())
+                return Err(RuntimeException::new(BString::from("FossilDriver requires a usable cache directory, and it looks like you set it to be disabled"))
                 .into());
             }
 
@@ -101,18 +101,14 @@ impl FossilDriver {
     fn check_fossil(&self) -> anyhow::Result<()> {
         let mut ignored_output = BString::default();
         if self.inner.process.borrow_mut().execute(
-            ["fossil", "version"].map(|s| s.to_string()).as_ref(),
+            ["fossil", "version"].map(|s| bconcat!(s)).as_ref(),
             &mut ignored_output,
             None,
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "fossil was not found, check that it is installed and in your PATH env.\n\n{}",
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "fossil was not found, check that it is installed and in your PATH env.\n\n",
+                self.inner.process.borrow().get_error_output()
             ))
             .into());
         }
@@ -126,9 +122,12 @@ impl FossilDriver {
         fs.ensure_directory_exists(path_from_bytes(&self.checkout_dir))?;
 
         if !is_writable(path_from_bytes(&dirname(&self.checkout_dir))) {
-            return Err(RuntimeException::new(format!(
-                "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
-                self.inner.url.display_lossy(), self.checkout_dir.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Can not clone ",
+                self.inner.url,
+                " to access package information. The \"",
+                self.checkout_dir,
+                "\" directory is not writable by the current user."
             ))
             .into());
         }
@@ -139,22 +138,28 @@ impl FossilDriver {
         if is_file(path_from_bytes(&repo_file))
             && is_dir(path_from_bytes(&self.checkout_dir))
             && self.inner.process.borrow_mut().execute(
-                ["fossil", "info"].map(|s| s.to_string()).as_ref(),
+                ["fossil", "info"].map(|s| bconcat!(s)).as_ref(),
                 &mut BString::default(),
                 Some(path_from_bytes(&self.checkout_dir)),
             )? == 0
         {
             if self.inner.process.borrow_mut().execute(
-                ["fossil", "pull"].map(|s| s.to_string()).as_ref(),
+                ["fossil", "pull"].map(|s| bconcat!(s)).as_ref(),
                 &mut BString::default(),
                 Some(path_from_bytes(&self.checkout_dir)),
             )? != 0
             {
-                self.inner.io.write_error3(format!(
-                    "<error>Failed to update {}, package information from this repository may be outdated ({})</error>",
-                    self.inner.url.display_lossy(),
-                    self.inner.process.borrow().get_error_output().display_lossy()
-                ), true, io_interface::NORMAL);
+                self.inner.io.write_error3(
+                    bconcat!(
+                        "<error>Failed to update ",
+                        self.inner.url,
+                        ", package information from this repository may be outdated (",
+                        self.inner.process.borrow().get_error_output(),
+                        ")</error>"
+                    ),
+                    true,
+                    io_interface::NORMAL,
+                );
             }
         } else {
             // clean up directory and do a fresh clone into it
@@ -176,11 +181,13 @@ impl FossilDriver {
             )? != 0
             {
                 let output = BString::from(&self.inner.process.borrow().get_error_output()[..]);
-                return Err(RuntimeException::new(format!(
-                    "Failed to clone {} to repository {}\n\n{}",
-                    self.inner.url.display_lossy(),
-                    repo_file.display_lossy(),
-                    output.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "Failed to clone ",
+                    self.inner.url,
+                    " to repository ",
+                    repo_file,
+                    "\n\n",
+                    output
                 ))
                 .into());
             }
@@ -198,11 +205,13 @@ impl FossilDriver {
             )? != 0
             {
                 let output = BString::from(&self.inner.process.borrow().get_error_output()[..]);
-                return Err(RuntimeException::new(format!(
-                    "Failed to open repository {} in {}\n\n{}",
-                    repo_file.display_lossy(),
-                    self.checkout_dir.display_lossy(),
-                    output.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "Failed to open repository ",
+                    repo_file,
+                    " in ",
+                    self.checkout_dir,
+                    "\n\n",
+                    output
                 ))
                 .into());
             }
@@ -213,7 +222,7 @@ impl FossilDriver {
 
     pub fn get_root_identifier(&mut self) -> BString {
         if self.root_identifier.is_none() {
-            self.root_identifier = Some(bstr::BString::from("trunk".to_string()));
+            self.root_identifier = Some(BString::from("trunk"));
         }
         self.root_identifier.clone().unwrap()
     }
@@ -240,9 +249,9 @@ impl FossilDriver {
         identifier: &BStr,
     ) -> anyhow::Result<Option<BString>> {
         if identifier.starts_with(b"-") {
-            return Err(RuntimeException::new(format!(
-                "Invalid fossil identifier detected. Identifier must not start with a -, given: {}",
-                identifier.display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Invalid fossil identifier detected. Identifier must not start with a -, given: ",
+                identifier
             ))
             .into());
         }
@@ -261,7 +270,7 @@ impl FossilDriver {
             Some(path_from_bytes(&self.checkout_dir)),
         )?;
 
-        if content.trim().is_empty() {
+        if trim(&content).is_empty() {
             return Ok(None);
         }
 
@@ -275,7 +284,7 @@ impl FossilDriver {
         let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
             ["fossil", "finfo", "-b", "-n", "1", "composer.json"]
-                .map(|s| s.to_string())
+                .map(|s| bconcat!(s))
                 .as_ref(),
             &mut output,
             Some(path_from_bytes(&self.checkout_dir)),
@@ -292,7 +301,7 @@ impl FossilDriver {
             let mut tags: IndexMap<BString, BString> = IndexMap::new();
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["fossil", "tag", "list"].map(|s| s.to_string()).as_ref(),
+                ["fossil", "tag", "list"].map(|s| bconcat!(s)).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.checkout_dir)),
             )?;
@@ -309,7 +318,7 @@ impl FossilDriver {
             let mut branches: IndexMap<BString, BString> = IndexMap::new();
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["fossil", "branch", "list"].map(|s| s.to_string()).as_ref(),
+                ["fossil", "branch", "list"].map(|s| bconcat!(s)).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.checkout_dir)),
             )?;
@@ -350,7 +359,7 @@ impl FossilDriver {
             let process = ProcessExecutor::new(Some(io));
             let mut output = BString::default();
             if process.execute(
-                ["fossil", "info"].map(|s| s.to_string()).as_ref(),
+                ["fossil", "info"].map(|s| bconcat!(s)).as_ref(),
                 &mut output,
                 Some(&url),
             )? == 0

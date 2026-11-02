@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
     array_search_mixed, array_shift, bconcat, date_create, empty, explode, extension_loaded,
-    implode, in_array_loose, is_array, is_string, path_from_bytes, php_regex, preg_is_match,
-    preg_match, preg_replace, sprintf, strpos, strtolower,
+    implode, in_array_loose, is_array, is_string, path_from_bytes, php_regex, php_str,
+    preg_is_match, preg_match, preg_replace, sprintf, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -39,7 +39,7 @@ pub struct GitLabDriver {
 }
 
 impl GitLabDriver {
-    pub const URL_REGEX: &'static str = r##"#^(?:(?P<scheme>https?)://(?P<domain>.+?)(?::(?P<port>[0-9]+))?/|git@(?P<domain2>[^:]+):)(?P<parts>.+)/(?P<repo>[^/]+?)(?:\.git|/)?$#"##;
+    pub const URL_REGEX: &'static BStr = php_str(r##"#^(?:(?P<scheme>https?)://(?P<domain>.+?)(?::(?P<port>[0-9]+))?/|git@(?P<domain2>[^:]+):)(?P<parts>.+)/(?P<repo>[^/]+?)(?:\.git|/)?$#"##.as_bytes());
 
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
@@ -69,9 +69,10 @@ impl GitLabDriver {
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let Some(match_) = preg_match(Self::URL_REGEX, &self.inner.url) else {
-            return Err(InvalidArgumentException::new(format!(
-                "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
-                self.inner.url.clone().display_lossy(),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The GitLab repository URL ",
+                self.inner.url.clone(),
+                " is invalid. It must be the HTTP URL of a GitLab project."
             ))
             .into());
         };
@@ -97,9 +98,9 @@ impl GitLabDriver {
             .and_then(|v| v.as_bool())
             == Some(false)
         {
-            bstr::BString::from("http".to_string())
+            BString::from("http")
         } else {
-            bstr::BString::from("https".to_string())
+            BString::from("https")
         };
         let port = match_.name("port").map(BString::from);
         let origin =
@@ -107,10 +108,7 @@ impl GitLabDriver {
         let origin = match origin {
             Some(o) => o,
             None => {
-                return Err(LogicException::new(format!(
-                    "It should not be possible to create a gitlab driver with an unparsable origin URL ({})",
-                    self.inner.url.display_lossy()
-                ))
+                return Err(LogicException::new(bconcat!("It should not be possible to create a gitlab driver with an unparsable origin URL (", self.inner.url, ")"))
                 .into());
             }
         };
@@ -123,15 +121,15 @@ impl GitLabDriver {
         {
             // https treated as a synonym for http.
             if !matches!(protocol.as_bytes(), b"git" | b"http" | b"https") {
-                return Err(RuntimeException::new(
-                    "gitlab-protocol must be one of git, http.".to_string(),
-                )
+                return Err(RuntimeException::new(BString::from(
+                    "gitlab-protocol must be one of git, http.",
+                ))
                 .into());
             }
             self.protocol = if protocol == "git" {
-                bstr::BString::from("ssh".to_string())
+                BString::from("ssh")
             } else {
-                bstr::BString::from("http".to_string())
+                BString::from("http")
             };
         }
 
@@ -487,7 +485,7 @@ impl GitLabDriver {
         );
 
         let mut result = IndexMap::new();
-        result.insert("type".into(), PhpMixed::string("zip".to_string()));
+        result.insert("type".into(), PhpMixed::string(BString::from("zip")));
         result.insert("url".into(), PhpMixed::string(url));
         result.insert(
             "reference".into(),
@@ -507,7 +505,7 @@ impl GitLabDriver {
         }
 
         let mut result = IndexMap::new();
-        result.insert("type".into(), PhpMixed::string("git".to_string()));
+        result.insert("type".into(), PhpMixed::string(BString::from("git")));
         result.insert("url".into(), PhpMixed::string(self.get_repository_url()));
         result.insert(
             "reference".into(),
@@ -692,10 +690,7 @@ impl GitLabDriver {
                 self.git_driver = None;
 
                 self.inner.io.write_error3(
-                    format!(
-                        "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your credentials</error>",
-                        url.display_lossy()
-                    ),
+                    bconcat!("<error>Failed to clone the ", url, " repository, try running in interactive mode so that you can enter your credentials</error>"),
                     true,
                     io_interface::NORMAL,
                 );
@@ -835,7 +830,7 @@ impl GitLabDriver {
                             == Some("disabled".into())
                         {
                             return Ok(Err(Box::new(TransportException::new(
-                                "The GitLab repository is disabled in the project".to_string(),
+                                BString::from("The GitLab repository is disabled in the project"),
                                 400,
                             ))));
                         }
@@ -845,10 +840,11 @@ impl GitLabDriver {
                         }
 
                         return Ok(Err(Box::new(TransportException::new(
-                        "GitLab API seems to not be authenticated as it did not return a default_branch"
-                            .to_string(),
-                        401,
-                    ))));
+                            BString::from(
+                                "GitLab API seems to not be authenticated as it did not return a default_branch",
+                            ),
+                            401,
+                        ))));
                     }
                 }
 
@@ -913,7 +909,7 @@ impl GitLabDriver {
                 git_lab_util.authorize_oauth_interactively(
                     self.scheme.as_bstr(),
                     self.inner.origin_url.as_bstr(),
-                    Some(&format!("Your credentials are required to fetch private repository metadata (<info>{}</info>)", self.inner.url.display_lossy())),
+                    Some(bconcat!("Your credentials are required to fetch private repository metadata (<info>", self.inner.url, "</info>)").as_bstr()),
                 )?;
 
                 self.inner.get_contents(url)
@@ -981,9 +977,10 @@ impl GitLabDriver {
 
         if scheme == "https" && !extension_loaded("openssl") {
             io.write_error3(
-                format!(
-                    "Skipping GitLab driver for {} because the OpenSSL PHP extension is missing.",
-                    url.display_lossy()
+                bconcat!(
+                    "Skipping GitLab driver for ",
+                    url,
+                    " because the OpenSSL PHP extension is missing."
                 ),
                 true,
                 io_interface::VERBOSE,

@@ -271,7 +271,7 @@ impl AuthHelper {
                     || !git_lab_util.authorize_oauth_interactively(
                         scheme.unwrap_or_default().as_bstr(),
                         origin,
-                        Some(&message),
+                        Some(BStr::new(&message)),
                     )?)
             {
                 return Err(TransportException::new(
@@ -355,7 +355,7 @@ impl AuthHelper {
                 if !bit_bucket_util.authorize_oauth(origin)?
                     && (!self.io.is_interactive()
                         || !bit_bucket_util
-                            .authorize_oauth_interactively(origin, Some(&message))?)
+                            .authorize_oauth_interactively(origin, Some(BStr::new(&message)))?)
                 {
                     return Err(TransportException::new(
                         format!("Could not authenticate against {}", origin.display_lossy()),
