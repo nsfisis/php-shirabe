@@ -1581,7 +1581,7 @@ impl ComposerRepository {
                     } else if version
                         .get(B("version_normalized"))
                         .and_then(|v| v.as_string())
-                        == Some(VersionParser::DEFAULT_BRANCH_ALIAS.into())
+                        == Some(VersionParser::DEFAULT_BRANCH_ALIAS)
                     {
                         // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
                         let v = BString::from(
@@ -1902,7 +1902,7 @@ impl ComposerRepository {
                 } else if versions
                     .version(index)
                     .get_string(BStr::new("version_normalized"))
-                    == Some(VersionParser::DEFAULT_BRANCH_ALIAS.into())
+                    == Some(VersionParser::DEFAULT_BRANCH_ALIAS)
                 {
                     // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
                     let v = BString::from(

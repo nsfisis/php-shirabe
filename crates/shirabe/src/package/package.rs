@@ -206,7 +206,7 @@ impl Package {
             self.source_mirrors.as_ref(),
             self.source_reference.as_ref().map(|s| s.as_bstr()),
             self.source_type.as_ref().map(|s| s.as_bstr()),
-            "source",
+            BStr::new("source"),
         )
     }
 
@@ -256,7 +256,7 @@ impl Package {
             self.dist_mirrors.as_ref(),
             self.dist_reference.as_ref().map(|s| s.as_bstr()),
             self.dist_type.as_ref().map(|s| s.as_bstr()),
-            "dist",
+            BStr::new("dist"),
         )
     }
 
@@ -287,7 +287,7 @@ impl Package {
     /// Set the required packages
     pub fn set_requires(&mut self, mut requires: IndexMap<BString, Link>) {
         if requires.contains_key(b"0".as_slice()) {
-            requires = self.convert_links_to_map(requires, "setRequires");
+            requires = self.convert_links_to_map(requires, BStr::new("setRequires"));
         }
 
         self.requires = std::rc::Rc::new(requires);
@@ -299,7 +299,7 @@ impl Package {
 
     pub fn set_conflicts(&mut self, mut conflicts: IndexMap<BString, Link>) {
         if conflicts.contains_key(b"0".as_slice()) {
-            conflicts = self.convert_links_to_map(conflicts, "setConflicts");
+            conflicts = self.convert_links_to_map(conflicts, BStr::new("setConflicts"));
         }
 
         self.conflicts = std::rc::Rc::new(conflicts);
@@ -311,7 +311,7 @@ impl Package {
 
     pub fn set_provides(&mut self, mut provides: IndexMap<BString, Link>) {
         if provides.contains_key(b"0".as_slice()) {
-            provides = self.convert_links_to_map(provides, "setProvides");
+            provides = self.convert_links_to_map(provides, BStr::new("setProvides"));
         }
 
         self.provides = std::rc::Rc::new(provides);
@@ -323,7 +323,7 @@ impl Package {
 
     pub fn set_replaces(&mut self, mut replaces: IndexMap<BString, Link>) {
         if replaces.contains_key(b"0".as_slice()) {
-            replaces = self.convert_links_to_map(replaces, "setReplaces");
+            replaces = self.convert_links_to_map(replaces, BStr::new("setReplaces"));
         }
 
         self.replaces = std::rc::Rc::new(replaces);
@@ -335,7 +335,7 @@ impl Package {
 
     pub fn set_dev_requires(&mut self, mut dev_requires: IndexMap<BString, Link>) {
         if dev_requires.contains_key(b"0".as_slice()) {
-            dev_requires = self.convert_links_to_map(dev_requires, "setDevRequires");
+            dev_requires = self.convert_links_to_map(dev_requires, BStr::new("setDevRequires"));
         }
 
         self.dev_requires = std::rc::Rc::new(dev_requires);
@@ -458,7 +458,7 @@ impl Package {
         mirrors: Option<&Vec<Mirror>>,
         r#ref: Option<&BStr>,
         r#type: Option<&BStr>,
-        url_type: &str,
+        url_type: &BStr,
     ) -> Vec<BString> {
         let url = match url {
             Some(u) if !u.is_empty() => u,
@@ -523,12 +523,13 @@ impl Package {
     fn convert_links_to_map(
         &self,
         links: IndexMap<BString, Link>,
-        source: &str,
+        source: &BStr,
     ) -> IndexMap<BString, Link> {
         trigger_error(
-            format!(
-                "Package::{} must be called with a map of lowercased package name => Link object, got a indexed array, this is deprecated and you should fix your usage.",
-                source
+            bconcat!(
+                "Package::",
+                source,
+                " must be called with a map of lowercased package name => Link object, got a indexed array, this is deprecated and you should fix your usage."
             ),
             E_USER_DEPRECATED,
         );
@@ -720,9 +721,9 @@ impl PackageInterface for Package {
         if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade())
             && !std::rc::Rc::ptr_eq(&existing, repository.as_rc())
         {
-            return Err(LogicException::new(
-                "A package can only be added to one repository".to_string(),
-            )
+            return Err(LogicException::new(BString::from(
+                "A package can only be added to one repository",
+            ))
             .into());
         }
         self.repository = Some(repository.downgrade());

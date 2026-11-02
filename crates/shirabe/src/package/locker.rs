@@ -20,9 +20,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect,
-    array_keys, array_map, array_merge, bconcat, empty, file_get_contents, filemtime, hash,
-    in_array_loose, intval, is_int, ksort, php_regex, preg_is_match, preg_match, realpath, strcmp,
-    strtolower, touch2, trim, usort,
+    array_keys, array_map, array_merge, bconcat, display_to_bytes, empty, file_get_contents,
+    filemtime, hash, in_array_loose, intval, is_int, ksort, php_regex, preg_is_match, preg_match,
+    realpath, strcmp, strtolower, touch2, trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -78,18 +78,18 @@ impl Locker {
             _ => IndexMap::new(),
         };
 
-        let relevant_keys: Vec<&str> = vec![
-            "name",
-            "version",
-            "require",
-            "require-dev",
-            "conflict",
-            "replace",
-            "provide",
-            "minimum-stability",
-            "prefer-stable",
-            "repositories",
-            "extra",
+        let relevant_keys: Vec<&BStr> = vec![
+            BStr::new("name"),
+            BStr::new("version"),
+            BStr::new("require"),
+            BStr::new("require-dev"),
+            BStr::new("conflict"),
+            BStr::new("replace"),
+            BStr::new("provide"),
+            BStr::new("minimum-stability"),
+            BStr::new("prefer-stable"),
+            BStr::new("repositories"),
+            BStr::new("extra"),
         ];
 
         let mut relevant_content: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -477,7 +477,7 @@ impl Locker {
                 ) {
                     alias.insert(
                         "version".into(),
-                        PhpMixed::string(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()),
+                        PhpMixed::string(bconcat!(VersionParser::DEFAULT_BRANCH_ALIAS)),
                     );
                 }
                 alias
@@ -563,7 +563,7 @@ impl Locker {
         }
         lock.insert(
             "plugin-api-version".into(),
-            PhpMixed::string(plugin_interface::PLUGIN_API_VERSION.to_string()),
+            PhpMixed::string(bconcat!(plugin_interface::PLUGIN_API_VERSION)),
         );
 
         let lock = self.fixup_json_data_type(lock);
@@ -680,7 +680,7 @@ impl Locker {
                 .unwrap_or(false);
             if should_replace {
                 // PHP: new \stdClass() — empty JSON object
-                lock_data.insert(key.to_string().into(), PhpMixed::Object(IndexMap::new()));
+                lock_data.insert(bconcat!(key), PhpMixed::Object(IndexMap::new()));
             }
         }
 
@@ -853,7 +853,7 @@ impl Locker {
             }
         }
 
-        Ok(datetime.map(|d| BString::from(d.format(DATE_RFC3339).to_string())))
+        Ok(datetime.map(|d| display_to_bytes(d.format(DATE_RFC3339))))
     }
 
     pub fn get_missing_requirement_info(

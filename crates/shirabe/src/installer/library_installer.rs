@@ -212,10 +212,7 @@ impl LibraryInstaller {
         assert!(
             self.download_manager.is_some(),
             "{}",
-            LogicException::new(format!(
-                    "{} should be initialized with a fully loaded Composer instance to be able to install/... packages",
-                    "LibraryInstaller",
-                ))
+            LogicException::new(bconcat!("LibraryInstaller", " should be initialized with a fully loaded Composer instance to be able to install/... packages"))
             .get_message().display_lossy()
         );
 
@@ -278,7 +275,7 @@ impl InstallerInterface for LibraryInstaller {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -287,13 +284,13 @@ impl InstallerInterface for LibraryInstaller {
 
         self.get_download_manager()
             .borrow()
-            .prepare(BStr::new(r#type), package, &download_path, prev_package)
+            .prepare(r#type, package, &download_path, prev_package)
             .await
     }
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -302,7 +299,7 @@ impl InstallerInterface for LibraryInstaller {
 
         self.get_download_manager()
             .borrow()
-            .cleanup(BStr::new(r#type), package, &download_path, prev_package)
+            .cleanup(r#type, package, &download_path, prev_package)
             .await
     }
 
@@ -346,9 +343,9 @@ impl InstallerInterface for LibraryInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                initial.to_php_string().display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                initial.to_php_string()
             ))
             .into());
         }
@@ -379,9 +376,9 @@ impl InstallerInterface for LibraryInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                package.to_php_string().display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                package.to_php_string()
             ))
             .into());
         }

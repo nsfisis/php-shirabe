@@ -103,9 +103,10 @@ impl ArchiverInterface for PharArchiver {
                 } else if format == "tar.gz" || format == "tar.bz2" {
                     let compress_algo = *compress_formats.get(format.as_bytes()).unwrap();
                     if !PharData::can_compress(compress_algo) {
-                        return Err(RuntimeException::new(format!(
-                            "Can not compress to {} format",
-                            format.display_lossy()
+                        return Err(RuntimeException::new(bconcat!(
+                            "Can not compress to ",
+                            format,
+                            " format"
                         ))
                         .into());
                     }
@@ -124,9 +125,10 @@ impl ArchiverInterface for PharArchiver {
             if compress_formats.contains_key(format.as_bytes()) {
                 let compress_algo = *compress_formats.get(format.as_bytes()).unwrap();
                 if !PharData::can_compress(compress_algo) {
-                    return Err(RuntimeException::new(format!(
-                        "Can not compress to {} format",
-                        format.display_lossy()
+                    return Err(RuntimeException::new(bconcat!(
+                        "Can not compress to ",
+                        format,
+                        " format"
                     ))
                     .into());
                 }

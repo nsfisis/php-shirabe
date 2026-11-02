@@ -3,6 +3,7 @@
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::version::version_parser::VersionParser;
+use shirabe_php_shim::utf8_text;
 
 fn pairs(items: &[&str]) -> Vec<String> {
     items.iter().map(|s| s.to_string()).collect()
@@ -87,16 +88,24 @@ fn provide_is_upgrade_tests() -> Vec<(String, String, bool)> {
         ("1.0.0.0".to_string(), "0.9.0.0".to_string(), false),
         (
             "1.0.0.0".to_string(),
-            VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
+            utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS)
+                .unwrap()
+                .to_string(),
             true,
         ),
         (
-            VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
-            VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
+            utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS)
+                .unwrap()
+                .to_string(),
+            utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS)
+                .unwrap()
+                .to_string(),
             true,
         ),
         (
-            VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
+            utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS)
+                .unwrap()
+                .to_string(),
             "1.0.0.0".to_string(),
             false,
         ),

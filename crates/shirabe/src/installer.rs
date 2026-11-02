@@ -202,10 +202,9 @@ impl Installer {
         // It is possible to disable GC in PHP via RPC, but it might not be effective.
 
         if self.update_allow_list.is_some() && self.update_mirrors {
-            return Err(RuntimeException::new(
-                "The installer options updateMirrors and updateAllowList are mutually exclusive."
-                    .to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "The installer options updateMirrors and updateAllowList are mutually exclusive.",
+            ))
             .into());
         }
 
@@ -348,15 +347,17 @@ impl Installer {
             };
 
             let replacement = if let Some(repl) = complete.get_replacement_package() {
-                format!("Use {} instead", repl.display_lossy())
+                bconcat!("Use ", repl, " instead")
             } else {
-                "No replacement was suggested".to_string()
+                BString::from("No replacement was suggested")
             };
 
-            self.io.write_error(format!(
-                "<warning>Package {} is abandoned, you should avoid using it. {}.</warning>",
-                complete.get_pretty_name().display_lossy(),
+            self.io.write_error(bconcat!(
+                "<warning>Package ",
+                complete.get_pretty_name(),
+                " is abandoned, you should avoid using it. ",
                 replacement,
+                ".</warning>"
             ));
         }
 
@@ -429,11 +430,14 @@ impl Installer {
                 }
             }
             if funding_count > 0 {
-                self.io.write_error(format!(
-                    "<info>{} package{} you are using {} looking for funding.</info>",
+                self.io.write_error(bconcat!(
+                    "<info>",
                     funding_count,
+                    " package",
                     (if 1 == funding_count { "" } else { "s" }),
+                    " you are using ",
                     (if 1 == funding_count { "is" } else { "are" }),
+                    " looking for funding.</info>"
                 ));
                 self.io
                     .write_error("<info>Use the `shirabe fund` command to find out more!</info>");
@@ -511,7 +515,7 @@ impl Installer {
                     Err(e) => {
                         if let Some(te) = e.catch::<TransportException>() {
                             self.io
-                                .error(format!("Failed to audit {} packages.", target), &[]);
+                                .error(bconcat!("Failed to audit ", target, " packages."), &[]);
                             if self.io.is_verbose() {
                                 self.io.error(
                                     bconcat!("[", "TransportException", "] ", te.get_message()),
@@ -525,7 +529,7 @@ impl Installer {
                 }
             } else {
                 self.io
-                    .write_error(format!("No {} packages - skipping audit.", target));
+                    .write_error(bconcat!("No ", target, " packages - skipping audit."));
             }
         }
 
@@ -572,14 +576,11 @@ impl Installer {
         if (self.update_allow_list.is_some() || self.update_mirrors) && locked_repository.is_none()
         {
             self.io.write_error3(
-                format!(
-                    "<error>Cannot update {} without a lock file present. Run `shirabe update` to generate a lock file.</error>",
-                    if self.update_mirrors {
+                bconcat!("<error>Cannot update ", if self.update_mirrors {
                         "lock file information"
                     } else {
                         "only a partial set of packages"
-                    }
-                ),
+                    }, " without a lock file present. Run `shirabe update` to generate a lock file.</error>"),
                 true,
                 io_interface::QUIET,
             );
@@ -658,8 +659,11 @@ impl Installer {
                     false,
                 )?;
 
-                self.io
-                    .write_error3(format!("<error>{}</error>", err), true, io_interface::QUIET);
+                self.io.write_error3(
+                    bconcat!("<error>", err, "</error>"),
+                    true,
+                    io_interface::QUIET,
+                );
                 self.io.write_error(&pretty_problem);
                 if !self.dev_mode {
                     self.io.write_error3(
@@ -678,15 +682,16 @@ impl Installer {
         let _ = solver;
 
         self.io.write_error3(
-            format!(
-                "Analyzed {} packages to resolve dependencies",
-                pool.borrow().get_packages().len()
+            bconcat!(
+                "Analyzed ",
+                pool.borrow().get_packages().len(),
+                " packages to resolve dependencies"
             ),
             true,
             io_interface::VERBOSE,
         );
         self.io.write_error3(
-            format!("Analyzed {} rules to resolve dependencies", rule_set_size),
+            bconcat!("Analyzed ", rule_set_size, " rules to resolve dependencies"),
             true,
             io_interface::VERBOSE,
         );
@@ -772,38 +777,38 @@ impl Installer {
                 .as_bool()
                 .unwrap_or(false)
             {
-                self.io.write_error(format!(
-                    "<info>Lock file operations: {} install{}, {} update{}, {} removal{}</info>",
+                self.io.write_error(bconcat!(
+                    "<info>Lock file operations: ",
                     (install_names.len() as i64),
+                    " install",
                     (if 1 == install_names.len() { "" } else { "s" }),
+                    ", ",
                     (update_names.len() as i64),
+                    " update",
                     (if 1 == update_names.len() { "" } else { "s" }),
+                    ", ",
                     (uninstalls.len() as i64),
+                    " removal",
                     (if 1 == uninstalls.len() { "" } else { "s" }),
+                    "</info>"
                 ));
                 if !install_names.is_empty() {
                     self.io.write_error3(
-                        format!(
-                            "Installs: {}",
-                            implode(", ", &install_names).display_lossy()
-                        ),
+                        bconcat!("Installs: ", implode(", ", &install_names)),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !update_names.is_empty() {
                     self.io.write_error3(
-                        format!("Updates: {}", implode(", ", &update_names).display_lossy()),
+                        bconcat!("Updates: ", implode(", ", &update_names)),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !uninstalls.is_empty() {
                     self.io.write_error3(
-                        format!(
-                            "Removals: {}",
-                            implode(", ", &uninstall_names).display_lossy()
-                        ),
+                        bconcat!("Removals: ", implode(", ", &uninstall_names)),
                         true,
                         io_interface::VERBOSE,
                     );
@@ -956,8 +961,11 @@ impl Installer {
                     true,
                 )?;
 
-                self.io
-                    .write_error3(format!("<error>{}</error>", err), true, io_interface::QUIET);
+                self.io.write_error3(
+                    bconcat!("<error>", err, "</error>"),
+                    true,
+                    io_interface::QUIET,
+                );
                 self.io.write_error(
                     "Your requirements can be resolved successfully when require-dev packages are present.",
                 );
@@ -992,13 +1000,14 @@ impl Installer {
             .as_bool()
             .unwrap_or(false)
         {
-            self.io.write_error(format!(
-                "<info>Installing dependencies from lock file{}</info>",
+            self.io.write_error(bconcat!(
+                "<info>Installing dependencies from lock file",
                 if self.dev_mode {
                     " (including require-dev)"
                 } else {
                     ""
-                }
+                },
+                "</info>"
             ));
         }
 
@@ -1139,7 +1148,7 @@ impl Installer {
                     )?;
 
                     self.io.write_error3(
-                        format!("<error>{}</error>", err),
+                        bconcat!("<error>", err, "</error>"),
                         true,
                         io_interface::QUIET,
                     );
@@ -1170,7 +1179,7 @@ impl Installer {
         self.event_dispatcher
             .borrow_mut()
             .dispatch_installer_event(
-                InstallerEvents::PRE_OPERATIONS_EXEC.into(),
+                InstallerEvents::PRE_OPERATIONS_EXEC,
                 self.dev_mode,
                 self.execute_operations,
                 local_repo_transaction.clone(),
@@ -1202,32 +1211,38 @@ impl Installer {
         if installs.is_empty() && updates.is_empty() && uninstalls.is_empty() {
             self.io.write_error("Nothing to install, update or remove");
         } else {
-            self.io.write_error(format!(
-                "<info>Package operations: {} install{}, {} update{}, {} removal{}</info>",
+            self.io.write_error(bconcat!(
+                "<info>Package operations: ",
                 (installs.len() as i64),
+                " install",
                 (if 1 == installs.len() { "" } else { "s" }),
+                ", ",
                 (updates.len() as i64),
+                " update",
                 (if 1 == updates.len() { "" } else { "s" }),
+                ", ",
                 (uninstalls.len() as i64),
+                " removal",
                 (if 1 == uninstalls.len() { "" } else { "s" }),
+                "</info>"
             ));
             if !installs.is_empty() {
                 self.io.write_error3(
-                    format!("Installs: {}", implode(", ", &installs).display_lossy()),
+                    bconcat!("Installs: ", implode(", ", &installs)),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !updates.is_empty() {
                 self.io.write_error3(
-                    format!("Updates: {}", implode(", ", &updates).display_lossy()),
+                    bconcat!("Updates: ", implode(", ", &updates)),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !uninstalls.is_empty() {
                 self.io.write_error3(
-                    format!("Removals: {}", implode(", ", &uninstalls).display_lossy()),
+                    bconcat!("Removals: ", implode(", ", &uninstalls)),
                     true,
                     io_interface::VERBOSE,
                 );
@@ -1376,7 +1391,9 @@ impl Installer {
             {
                 constraint = filter
                     .filter_constraint(req.as_bstr(), constraint, false)
-                    .unwrap_or_else(|_| SimpleConstraint::new("=", String::new(), None).into());
+                    .unwrap_or_else(|_| {
+                        SimpleConstraint::new("=", BString::default(), None).into()
+                    });
             }
             root_requires.insert(req, constraint);
         }

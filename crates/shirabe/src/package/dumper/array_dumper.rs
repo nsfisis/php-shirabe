@@ -3,7 +3,7 @@
 use crate::package::{Mirror, PackageInterfaceHandle, SUPPORTED_LINK_TYPES};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed};
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed, display_to_bytes};
 
 /// Serializes a Mirror back into the PHP array shape `{url, preferred}`.
 fn mirror_to_php(mirror: Mirror) -> PhpMixed {
@@ -122,7 +122,7 @@ impl ArrayDumper {
         if let Some(release_date) = package.get_release_date() {
             data.insert(
                 "time".into(),
-                PhpMixed::string(release_date.format(DATE_RFC3339).to_string()),
+                PhpMixed::string(display_to_bytes(release_date.format(DATE_RFC3339))),
             );
         }
 

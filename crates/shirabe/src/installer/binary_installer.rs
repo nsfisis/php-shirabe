@@ -86,10 +86,12 @@ impl BinaryInstaller {
             let mut bin_path = PathBuf::from(path_from_bytes(&bconcat!(install_path, "/", bin)));
             if !file_exists(&bin_path) {
                 self.io.write_error3(
-                    format!(
-                        "    <warning>Skipped installation of bin {} for package {}: file not found in package</warning>",
-                        bin.display_lossy(),
-                        package.get_name().display_lossy(),
+                    bconcat!(
+                        "    <warning>Skipped installation of bin ",
+                        bin,
+                        " for package ",
+                        package.get_name(),
+                        ": file not found in package</warning>"
                     ),
                     true,
                     io_interface::NORMAL,
@@ -98,10 +100,12 @@ impl BinaryInstaller {
             }
             if is_dir(&bin_path) {
                 self.io.write_error3(
-                    format!(
-                        "    <warning>Skipped installation of bin {} for package {}: found a directory at that path</warning>",
-                        bin.display_lossy(),
-                        package.get_name().display_lossy(),
+                    bconcat!(
+                        "    <warning>Skipped installation of bin ",
+                        bin,
+                        " for package ",
+                        package.get_name(),
+                        ": found a directory at that path</warning>"
                     ),
                     true,
                     io_interface::NORMAL,
@@ -121,10 +125,12 @@ impl BinaryInstaller {
                 if !is_link(&link) {
                     if warn_on_overwrite {
                         self.io.write_error3(
-                            format!(
-                                "    Skipped installation of bin {} for package {}: name conflicts with an existing file",
-                                bin.display_lossy(),
-                                package.get_name().display_lossy(),
+                            bconcat!(
+                                "    Skipped installation of bin ",
+                                bin,
+                                " for package ",
+                                package.get_name(),
+                                ": name conflicts with an existing file"
                             ),
                             true,
                             io_interface::NORMAL,
@@ -223,10 +229,12 @@ impl BinaryInstaller {
             link = PathBuf::from(path_from_bytes(&bconcat!(link, ".bat")));
             if file_exists(&link) {
                 self.io.write_error3(
-                    format!(
-                        "    Skipped installation of bin {}.bat proxy for package {}: a .bat proxy was already installed",
-                        bin.display_lossy(),
-                        package.get_name().display_lossy(),
+                    bconcat!(
+                        "    Skipped installation of bin ",
+                        bin,
+                        ".bat proxy for package ",
+                        package.get_name(),
+                        ": a .bat proxy was already installed"
                     ),
                     true,
                     io_interface::NORMAL,

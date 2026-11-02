@@ -7,7 +7,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
-use bstr::B;
+use bstr::{B, BStr};
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, bconcat, empty, error_message};
 
 #[derive(Debug)]
@@ -85,7 +85,7 @@ impl InstallerInterface for PluginInstaller {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -119,10 +119,7 @@ impl InstallerInterface for PluginInstaller {
         let extra = package.get_extra();
         let class = extra.get(B("class")).cloned().unwrap_or(PhpMixed::Null);
         if empty(&class) {
-            return Err(UnexpectedValueException::new(format!(
-                "Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.",
-                package.get_pretty_name().display_lossy()
-            )).into());
+            return Err(UnexpectedValueException::new(bconcat!("Error while installing ", package.get_pretty_name(), ", composer-plugin packages should have a class defined in their extra key to be usable.")).into());
         }
 
         self.inner.download(package, prev_package).await
@@ -186,7 +183,7 @@ impl InstallerInterface for PluginInstaller {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {

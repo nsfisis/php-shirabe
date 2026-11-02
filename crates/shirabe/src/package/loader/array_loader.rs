@@ -90,13 +90,13 @@ impl ArrayLoader {
             .into());
         }
         if !config.contains_key(B("version")) || !is_scalar(config.get(B("version")).unwrap()) {
-            return Err(UnexpectedValueException::new(format!(
-                "Package {} has no version defined.",
+            return Err(UnexpectedValueException::new(bconcat!(
+                "Package ",
                 config
                     .get(B("name"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .display_lossy()
+                    .unwrap_or_default(),
+                " has no version defined."
             ))
             .into());
         }
@@ -407,9 +407,10 @@ impl ArrayLoader {
             for reserved in ["composer", "php", "putenv"].iter() {
                 if scripts_map.contains_key(B(reserved)) {
                     trigger_error(
-                        format!(
-                            "The `{}` script name is reserved for internal use, please avoid defining it",
-                            reserved
+                        bconcat!(
+                            "The `",
+                            reserved,
+                            "` script name is reserved for internal use, please avoid defining it"
                         ),
                         E_USER_DEPRECATED,
                     );
@@ -708,7 +709,7 @@ impl ArrayLoader {
             || !is_scalar(config.get(BStr::new("version")).unwrap())
         {
             return Err(
-                UnexpectedValueException::new("no/invalid version defined".to_string()).into(),
+                UnexpectedValueException::new(BString::from("no/invalid version defined")).into(),
             );
         }
         let mut config_version = config

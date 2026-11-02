@@ -3,6 +3,7 @@
 use crate::installer::{BinaryPresenceInterface, PluginInstaller};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
+use bstr::BStr;
 use shirabe_php_shim::PhpMixed;
 
 #[async_trait::async_trait(?Send)]
@@ -23,7 +24,7 @@ pub trait InstallerInterface: std::fmt::Debug {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
@@ -49,7 +50,7 @@ pub trait InstallerInterface: std::fmt::Debug {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;

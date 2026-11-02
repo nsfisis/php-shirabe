@@ -66,9 +66,9 @@ impl VersionSelector {
         show_warnings: ShowWarnings,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         let Some(min_priority) = base_package::stability_priority(preferred_stability) else {
-            return Err(UnexpectedValueException::new(format!(
-                "Expected a valid stability name as 3rd argument, got {}",
-                preferred_stability.display_lossy()
+            return Err(UnexpectedValueException::new(bconcat!(
+                "Expected a valid stability name as 3rd argument, got ",
+                preferred_stability
             ))
             .into());
         };
@@ -184,15 +184,21 @@ impl VersionSelector {
                                 ""
                             };
                             io.write_error3(
-                                format!(
-                                    "<warning>Cannot use {}{} {} as it {} {} {} which {}.</>",
-                                    pkg.get_pretty_name().display_lossy(),
+                                bconcat!(
+                                    "<warning>Cannot use ",
+                                    pkg.get_pretty_name(),
                                     latest,
-                                    pkg.get_pretty_version().display_lossy(),
-                                    link.get_description().display_lossy(),
-                                    link.get_target().display_lossy(),
-                                    link.get_pretty_constraint().display_lossy(),
-                                    reason
+                                    " ",
+                                    pkg.get_pretty_version(),
+                                    " as it ",
+                                    link.get_description(),
+                                    " ",
+                                    link.get_target(),
+                                    " ",
+                                    link.get_pretty_constraint(),
+                                    " which ",
+                                    reason,
+                                    ".</>"
                                 ),
                                 true,
                                 if is_first_warning {
@@ -247,7 +253,7 @@ impl VersionSelector {
     ) -> anyhow::Result<BString> {
         if package.get_name().starts_with(b"ext-") {
             let php = shirabe_php_rpc::get_php_version();
-            let php_version = format!("{}.{}.{}", php.major, php.minor, php.release);
+            let php_version = bconcat!(php.major, ".", php.minor, ".", php.release);
             let package_version = package.get_version();
             let ext_parts = explode_with_limit(".", package_version, 4);
             let ext_version = implode(".", &ext_parts[..3.min(ext_parts.len())]);

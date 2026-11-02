@@ -5,7 +5,7 @@ use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
-use bstr::BStr;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, bconcat, path_from_bytes, path_to_bytes, rtrim2, strtr,
 };
@@ -57,9 +57,10 @@ impl InstallerInterface for ProjectInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let install_path = &self.install_path;
         if install_path.exists() && !self.filesystem.borrow().is_dir_empty(install_path) {
-            return Err(InvalidArgumentException::new(format!(
-                "Project directory {} is not empty.",
-                install_path.display()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Project directory ",
+                install_path,
+                " is not empty."
             ))
             .into());
         }
@@ -75,25 +76,25 @@ impl InstallerInterface for ProjectInstaller {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
-            .prepare(BStr::new(r#type), package, &self.install_path, prev_package)
+            .prepare(r#type, package, &self.install_path, prev_package)
             .await
     }
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
-            .cleanup(BStr::new(r#type), package, &self.install_path, prev_package)
+            .cleanup(r#type, package, &self.install_path, prev_package)
             .await
     }
 
@@ -114,7 +115,7 @@ impl InstallerInterface for ProjectInstaller {
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Err(InvalidArgumentException::new("not supported".to_string()).into())
+        Err(InvalidArgumentException::new(BString::from("not supported")).into())
     }
 
     async fn uninstall(
@@ -122,7 +123,7 @@ impl InstallerInterface for ProjectInstaller {
         _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Err(InvalidArgumentException::new("not supported".to_string()).into())
+        Err(InvalidArgumentException::new(BString::from("not supported")).into())
     }
 
     fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<PathBuf> {

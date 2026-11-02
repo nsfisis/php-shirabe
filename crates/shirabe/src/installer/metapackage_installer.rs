@@ -7,7 +7,8 @@ use crate::installer::InstallerInterface;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
+use bstr::BStr;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat};
 
 #[derive(Debug)]
 pub struct MetapackageInstaller {
@@ -44,7 +45,7 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -53,7 +54,7 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -66,10 +67,7 @@ impl InstallerInterface for MetapackageInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.write_error3(
-            format!(
-                "  - {}",
-                InstallOperation::format(package.clone(), false).display_lossy()
-            ),
+            bconcat!("  - ", InstallOperation::format(package.clone(), false)),
             true,
             io_interface::NORMAL,
         );
@@ -87,17 +85,17 @@ impl InstallerInterface for MetapackageInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                initial.to_php_string().display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                initial.to_php_string()
             ))
             .into());
         }
 
         self.io.write_error3(
-            format!(
-                "  - {}",
-                UpdateOperation::format(initial.clone(), target.clone(), false).display_lossy()
+            bconcat!(
+                "  - ",
+                UpdateOperation::format(initial.clone(), target.clone(), false)
             ),
             true,
             io_interface::NORMAL,
@@ -116,18 +114,15 @@ impl InstallerInterface for MetapackageInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                package.to_php_string().display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                package.to_php_string()
             ))
             .into());
         }
 
         self.io.write_error3(
-            format!(
-                "  - {}",
-                UninstallOperation::format(package.clone(), false).display_lossy()
-            ),
+            bconcat!("  - ", UninstallOperation::format(package.clone(), false)),
             true,
             io_interface::NORMAL,
         );

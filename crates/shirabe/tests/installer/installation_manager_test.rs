@@ -89,7 +89,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -123,7 +123,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -189,7 +189,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -223,7 +223,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {

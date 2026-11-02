@@ -129,7 +129,7 @@ impl AliasPackage {
                 }
             }
             for (index, new_link) in new_links.into_iter().enumerate() {
-                links.insert(BString::from(index.to_string()), new_link);
+                links.insert(bconcat!(index), new_link);
             }
         } else {
             for link in links.values_mut() {
@@ -403,9 +403,9 @@ impl PackageInterface for AliasPackage {
         if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade())
             && !std::rc::Rc::ptr_eq(&existing, repository.as_rc())
         {
-            return Err(LogicException::new(
-                "A package can only be added to one repository".to_string(),
-            )
+            return Err(LogicException::new(BString::from(
+                "A package can only be added to one repository",
+            ))
             .into());
         }
         self.repository = Some(repository.downgrade());

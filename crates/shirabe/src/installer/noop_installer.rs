@@ -3,6 +3,7 @@
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
+use bstr::BStr;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat, path_from_bytes};
 
 #[derive(Debug)]
@@ -32,7 +33,7 @@ impl InstallerInterface for NoopInstaller {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -41,7 +42,7 @@ impl InstallerInterface for NoopInstaller {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -69,9 +70,9 @@ impl InstallerInterface for NoopInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
         if !repo.has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                initial.to_php_string().display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                initial.to_php_string()
             ))
             .into());
         }
@@ -91,9 +92,9 @@ impl InstallerInterface for NoopInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
         if !repo.has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                package.to_php_string().display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                package.to_php_string()
             ))
             .into());
         }

@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Package/Version/VersionParser.php
 
 use crate::repository::PlatformRepository;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    bconcat, explode_with_limit, php_regex, preg_is_match, preg_replace, strpos, trim,
+    bconcat, explode_with_limit, php_regex, php_str, preg_is_match, preg_replace, strpos, trim,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::{Semver, VersionParser as SemverVersionParser};
@@ -25,7 +25,7 @@ impl Default for VersionParser {
 }
 
 impl VersionParser {
-    pub const DEFAULT_BRANCH_ALIAS: &'static str = "9999999-dev";
+    pub const DEFAULT_BRANCH_ALIAS: &'static BStr = php_str(b"9999999-dev");
 
     pub fn parse_constraints(
         &self,

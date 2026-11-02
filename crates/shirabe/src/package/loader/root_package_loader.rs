@@ -55,7 +55,7 @@ impl RootPackageLoader {
     pub fn load(
         &mut self,
         config: IndexMap<BString, PhpMixed>,
-        class: &str,
+        class: &BStr,
         cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<crate::package::PackageInterfaceHandle> {
         if class != "Composer\\Package\\RootPackage" {
@@ -68,7 +68,7 @@ impl RootPackageLoader {
         let mut config = config;
 
         if !config.contains_key(B("name")) {
-            config.insert("name".into(), PhpMixed::string("__root__".to_string()));
+            config.insert("name".into(), PhpMixed::string(BString::from("__root__")));
         } else if let Some(err) = ValidatingArrayLoader::has_package_naming_error(
             config[B("name")].as_string().unwrap_or_default(),
             false,
@@ -109,26 +109,23 @@ impl RootPackageLoader {
                         .and_then(|v| v.as_string())
                         .unwrap_or_default();
                     if name != "__root__" && package_type != "project" {
-                        io.warning(format!(
-                            "Shirabe could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
-                            name.display_lossy()
-                        ), &[]);
+                        io.warning(bconcat!("Shirabe could not detect the root package (", name, ") version, defaulting to '1.0.0'. See https://getcomposer.org/root-version"), &[]);
                     }
                 }
-                config.insert("version".into(), PhpMixed::string("1.0.0".to_string()));
+                config.insert("version".into(), PhpMixed::string(BString::from("1.0.0")));
                 auto_versioned = true;
             }
 
             if let Some(commit_hash) = commit {
                 let mut source = IndexMap::new();
-                source.insert("type".into(), PhpMixed::string(String::new()));
-                source.insert("url".into(), PhpMixed::string(String::new()));
+                source.insert("type".into(), PhpMixed::string(BString::default()));
+                source.insert("url".into(), PhpMixed::string(BString::default()));
                 source.insert("reference".into(), PhpMixed::string(commit_hash.clone()));
                 config.insert("source".into(), PhpMixed::Array(source));
 
                 let mut dist = IndexMap::new();
-                dist.insert("type".into(), PhpMixed::string(String::new()));
-                dist.insert("url".into(), PhpMixed::string(String::new()));
+                dist.insert("type".into(), PhpMixed::string(BString::default()));
+                dist.insert("url".into(), PhpMixed::string(BString::default()));
                 dist.insert("reference".into(), PhpMixed::string(commit_hash));
                 config.insert("dist".into(), PhpMixed::Array(dist));
             }
@@ -192,10 +189,7 @@ impl RootPackageLoader {
 
                 let package_name = config[B("name")].as_string().unwrap_or_default();
                 if links.contains_key(package_name) {
-                    return Err(RuntimeException::new(format!(
-                        "Root package '{}' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?",
-                        package_name.display_lossy()
-                    )).into());
+                    return Err(RuntimeException::new(bconcat!("Root package '", package_name, "' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?")).into());
                 }
             }
         }
@@ -278,10 +272,7 @@ impl RootPackageLoader {
                 return {
                     panic!(
                         "{}",
-                        UnexpectedValueException::new(format!(
-                                "Invalid alias definition in \"{}\": \"{}\". Aliases should be in the form \"exact-version as other-exact-version\".",
-                                req_name.display_lossy(), req_version.display_lossy()
-                            ))
+                        UnexpectedValueException::new(bconcat!("Invalid alias definition in \"", req_name, "\": \"", req_version, "\". Aliases should be in the form \"exact-version as other-exact-version\"."))
                         .get_message().display_lossy()
                     )
                 };

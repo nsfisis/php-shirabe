@@ -657,7 +657,7 @@ impl Factory {
                     );
                     let package = loader.load(
                         local_config_data.clone(),
-                        "Composer\\Package\\RootPackage",
+                        BStr::new("Composer\\Package\\RootPackage"),
                         Some(&cwd),
                     )?;
                     // load() builds a RootPackage of the requested class, so as_root() is always

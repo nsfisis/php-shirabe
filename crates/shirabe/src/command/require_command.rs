@@ -172,7 +172,7 @@ impl RequireCommand {
         //   function () use (&$dependencyResolutionCompleted) { $dependencyResolutionCompleted = true; }, 10000);
         let dependency_resolution_completed = self.dependency_resolution_completed.clone();
         composer.get_event_dispatcher().borrow_mut().add_listener(
-            InstallerEvents::PRE_OPERATIONS_EXEC.into(),
+            InstallerEvents::PRE_OPERATIONS_EXEC,
             crate::event_dispatcher::Callable::Closure(std::rc::Rc::new(move |_event| {
                 dependency_resolution_completed.set(true);
                 PhpMixed::Null

@@ -8,7 +8,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, php_str};
 
 #[derive(Debug, Clone)]
 pub struct RootPackage {
@@ -22,7 +22,7 @@ pub struct RootPackage {
 }
 
 impl RootPackage {
-    pub const DEFAULT_PRETTY_VERSION: &'static str = "1.0.0+no-version-set";
+    pub const DEFAULT_PRETTY_VERSION: &'static BStr = php_str(b"1.0.0+no-version-set");
 
     pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         let inner = CompletePackage::new(name, version, pretty_version);

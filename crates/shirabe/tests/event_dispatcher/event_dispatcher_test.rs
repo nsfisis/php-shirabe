@@ -380,7 +380,7 @@ fn test_dispatcher_installer_events() {
 
     dispatcher
         .dispatch_installer_event(
-            InstallerEvents::PRE_OPERATIONS_EXEC.into(),
+            InstallerEvents::PRE_OPERATIONS_EXEC,
             true,
             true,
             transaction,

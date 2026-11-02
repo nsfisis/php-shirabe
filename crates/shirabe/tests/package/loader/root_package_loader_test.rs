@@ -6,7 +6,7 @@
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use crate::test_case::GitVersionGuard;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -167,7 +167,7 @@ fn test_stability_flags_parsing() {
     );
 
     let package = loader
-        .load(data, "Composer\\Package\\RootPackage", None)
+        .load(data, BStr::new("Composer\\Package\\RootPackage"), None)
         .unwrap();
     let package = package.as_root().unwrap();
 
@@ -207,7 +207,11 @@ fn test_no_version_is_visible_in_pretty_version() {
     let mut loader = RootPackageLoader::new(manager, config, None, Some(Box::new(guesser)), None);
 
     let package = loader
-        .load(IndexMap::new(), "Composer\\Package\\RootPackage", None)
+        .load(
+            IndexMap::new(),
+            BStr::new("Composer\\Package\\RootPackage"),
+            None,
+        )
         .unwrap();
     let package = package.as_root().unwrap();
 
@@ -244,7 +248,11 @@ fn test_pretty_version_for_root_package_in_version_branch() {
         RootPackageLoader::new(manager, config, None, Some(Box::new(version_guesser)), None);
 
     let package = loader
-        .load(IndexMap::new(), "Composer\\Package\\RootPackage", None)
+        .load(
+            IndexMap::new(),
+            BStr::new("Composer\\Package\\RootPackage"),
+            None,
+        )
         .unwrap();
 
     assert_eq!("3.0-dev", package.as_root().unwrap().get_pretty_version());
@@ -282,7 +290,7 @@ fn test_feature_branch_pretty_version() {
     );
 
     let package = loader
-        .load(data, "Composer\\Package\\RootPackage", None)
+        .load(data, BStr::new("Composer\\Package\\RootPackage"), None)
         .unwrap();
 
     assert_eq!(
@@ -324,7 +332,7 @@ fn test_non_feature_branch_pretty_version() {
     );
 
     let package = loader
-        .load(data, "Composer\\Package\\RootPackage", None)
+        .load(data, BStr::new("Composer\\Package\\RootPackage"), None)
         .unwrap();
 
     assert_eq!(

@@ -13,7 +13,7 @@ use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfa
 use crate::signal::SignalSubscription;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, bconcat, http_build_query,
@@ -174,11 +174,7 @@ impl InstallationManager {
             }
         }
 
-        Err(InvalidArgumentException::new(format!(
-            "Unknown installer type: {}",
-            r#type.display_lossy()
-        ))
-        .into())
+        Err(InvalidArgumentException::new(bconcat!("Unknown installer type: ", r#type)).into())
     }
 
     /// Checks whether provided package is installed in one of the registered installers.
@@ -451,7 +447,7 @@ impl InstallationManager {
                         Box<dyn std::future::Future<Output = anyhow::Result<()>>>,
                     > = Box::pin(async move {
                         installer
-                            .cleanup(op_type, package, initial_package)
+                            .cleanup(BStr::new(op_type), package, initial_package)
                             .await
                             .map(|_| ())
                     });
@@ -601,12 +597,12 @@ impl InstallationManager {
                 "install" => PackageEvents::PRE_PACKAGE_INSTALL,
                 "update" => PackageEvents::PRE_PACKAGE_UPDATE,
                 "uninstall" => PackageEvents::PRE_PACKAGE_UNINSTALL,
-                _ => "",
+                _ => BStr::new(""),
             };
 
             if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
                 event_dispatcher.borrow_mut().dispatch_package_event(
-                    event_name.into(),
+                    event_name,
                     dev_mode,
                     repo.clone(),
                     all_operations.to_vec(),
@@ -626,7 +622,7 @@ impl InstallationManager {
             promises.push(Box::pin(async move {
                 let chain_result: anyhow::Result<()> = async {
                     installer
-                        .prepare(op_type, package.clone(), initial_package.clone())
+                        .prepare(BStr::new(op_type), package.clone(), initial_package.clone())
                         .await?;
 
                     match &*executed_operation {
@@ -657,10 +653,12 @@ impl InstallationManager {
 
                 // PHP rejects the promise with an "<op> of <name> failed" message before rethrowing.
                 if let Err(e) = chain_result {
-                    self.io.write_error(format!(
-                        "    <error>{} of {} failed</error>",
-                        ucfirst(op_type).display_lossy(),
-                        package.get_pretty_name().display_lossy()
+                    self.io.write_error(bconcat!(
+                        "    <error>",
+                        ucfirst(op_type),
+                        " of ",
+                        package.get_pretty_name(),
+                        " failed</error>"
                     ));
                     return Err(e);
                 }
@@ -675,7 +673,7 @@ impl InstallationManager {
                 "install" => PackageEvents::POST_PACKAGE_INSTALL,
                 "update" => PackageEvents::POST_PACKAGE_UPDATE,
                 "uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
-                _ => "",
+                _ => BStr::new(""),
             };
 
             if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
@@ -684,7 +682,7 @@ impl InstallationManager {
                 let all_operations = all_operations.to_vec();
                 post_exec_callbacks.push(Box::new(move || {
                     event_dispatcher.borrow_mut().dispatch_package_event(
-                        event_name.into(),
+                        event_name,
                         dev_mode,
                         repo.clone(),
                         all_operations.clone(),
@@ -717,7 +715,10 @@ impl InstallationManager {
     pub async fn download(&self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
         let installer = self.get_installer(package.get_type()).ok()?;
 
-        installer.cleanup("install", package, None).await.ok()?
+        installer
+            .cleanup(BStr::new("install"), package, None)
+            .await
+            .ok()?
     }
 
     /// Executes install operation.
@@ -840,22 +841,22 @@ impl InstallationManager {
 
                         let mut params: IndexMap<BString, BString> = IndexMap::new();
                         params.insert(
-                            bstr::BString::from("version".to_string()),
+                            BString::from("version"),
                             bstr::BString::from(&package.get_pretty_version()[..]),
                         );
                         params.insert(
-                            bstr::BString::from("version_normalized".to_string()),
+                            BString::from("version_normalized"),
                             bstr::BString::from(&package.get_version()[..]),
                         );
                         let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
                         opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
                         let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-                        http.insert("method".into(), PhpMixed::string("POST".to_string()));
+                        http.insert("method".into(), PhpMixed::string(BString::from("POST")));
                         http.insert(
                             "header".into(),
-                            PhpMixed::List(vec![PhpMixed::string(
-                                "Content-type: application/x-www-form-urlencoded".to_string(),
-                            )]),
+                            PhpMixed::List(vec![PhpMixed::string(BString::from(
+                                "Content-type: application/x-www-form-urlencoded",
+                            ))]),
                         );
                         let params_vec: Vec<(&BString, &BString)> = params.iter().collect();
                         http.insert(
@@ -899,12 +900,12 @@ impl InstallationManager {
                 let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
                 opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
                 let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-                http.insert("method".into(), PhpMixed::string("POST".to_string()));
+                http.insert("method".into(), PhpMixed::string(BString::from("POST")));
                 http.insert(
                     "header".into(),
-                    PhpMixed::List(vec![PhpMixed::string(
-                        "Content-Type: application/json".to_string(),
-                    )]),
+                    PhpMixed::List(vec![PhpMixed::string(BString::from(
+                        "Content-Type: application/json",
+                    ))]),
                 );
                 http.insert(
                     "content".into(),
@@ -1030,7 +1031,7 @@ impl InstallationManager {
         >,
     ) {
         self.io.write_error3(
-            format!("Received {}, aborting", signals.last_signal().as_str()),
+            bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
             true,
             io_interface::DEBUG,
         );

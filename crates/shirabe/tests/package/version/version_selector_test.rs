@@ -13,7 +13,7 @@ use shirabe::package::{
     PackageInterfaceHandle,
 };
 use shirabe::repository::{PlatformRepository, RepositorySetInterface};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, utf8_text};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::output::output_interface;
 
@@ -540,8 +540,8 @@ fn test_default_branch_alias_is_never_returned() {
     let package2_complete = CompletePackageHandle::from_rc_unchecked(package2.as_rc().clone());
     let package2_alias: PackageInterfaceHandle = CompleteAliasPackageHandle::new(
         package2_complete,
-        bstr::BString::from(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()),
-        bstr::BString::from(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()),
+        VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
+        VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
     )
     .into();
     let packages = vec![package, package2_alias];
@@ -642,7 +642,7 @@ fn test_find_recommended_require_version() {
         (
             "dev-master".to_string(),
             "dev-master",
-            Some(VersionParser::DEFAULT_BRANCH_ALIAS),
+            Some(utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS).unwrap()),
             "foo/bar",
         ),
         // numeric alias
