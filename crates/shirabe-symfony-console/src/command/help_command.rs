@@ -81,7 +81,7 @@ impl HelpCommand {
                 helper
                     .get_formats()
                     .into_iter()
-                    .map(|value| StringOrSuggestion::String(value.into()))
+                    .map(StringOrSuggestion::String)
                     .collect(),
             );
         }

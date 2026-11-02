@@ -2787,21 +2787,15 @@ impl ApplicationHandle {
                     output_interface::OUTPUT_NORMAL,
                 );
                 let formatted_block = FormatterHelper::default().format_block(
-                    FormatBlockMessages::String(format!(
-                        "Command \"{}\" is not defined.",
-                        name.display_lossy(),
-                    )),
-                    "error",
+                    FormatBlockMessages::String(bconcat!("Command \"", name, "\" is not defined.")),
+                    "error".into(),
                     true,
                 );
                 output
                     .borrow()
                     .writeln(&[formatted_block], output_interface::OUTPUT_NORMAL);
                 if !style.confirm(
-                    &format!(
-                        "Do you want to run \"{}\" instead? ",
-                        alternative.display_lossy()
-                    ),
+                    bconcat!("Do you want to run \"", alternative, "\" instead? ").as_ref(),
                     false,
                 ) {
                     return Ok(1);

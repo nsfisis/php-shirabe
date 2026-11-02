@@ -7,7 +7,7 @@ use crate::output::{
     ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
 };
 use crate::terminal::Terminal;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, memory_get_usage,
@@ -37,11 +37,11 @@ pub type PlaceholderFormatter = Box<
 #[derive(Debug)]
 pub struct ProgressBar {
     bar_width: i64,
-    bar_char: Option<String>,
-    empty_bar_char: String,
-    progress_char: String,
-    format: Option<String>,
-    internal_format: Option<String>,
+    bar_char: Option<BString>,
+    empty_bar_char: BString,
+    progress_char: BString,
+    format: Option<BString>,
+    internal_format: Option<BString>,
     redraw_freq: Option<i64>,
     write_count: i64,
     last_write_time: f64,
@@ -53,7 +53,7 @@ pub struct ProgressBar {
     start_time: i64,
     step_width: i64,
     percent: f64,
-    messages: IndexMap<String, String>,
+    messages: IndexMap<BString, BString>,
     overwrite: bool,
     terminal: Terminal,
     previous_message: Option<BString>,
@@ -61,8 +61,8 @@ pub struct ProgressBar {
 }
 
 thread_local! {
-    static FORMATTERS: std::cell::RefCell<Option<IndexMap<String, PlaceholderFormatter>>> = const { std::cell::RefCell::new(None) };
-    static FORMATS: std::cell::RefCell<Option<IndexMap<String, String>>> = const { std::cell::RefCell::new(None) };
+    static FORMATTERS: std::cell::RefCell<Option<IndexMap<BString, PlaceholderFormatter>>> = const { std::cell::RefCell::new(None) };
+    static FORMATS: std::cell::RefCell<Option<IndexMap<BString, BString>>> = const { std::cell::RefCell::new(None) };
 }
 
 impl ProgressBar {
@@ -86,8 +86,8 @@ impl ProgressBar {
         let mut this = Self {
             bar_width: 28,
             bar_char: None,
-            empty_bar_char: "-".to_string(),
-            progress_char: ">".to_string(),
+            empty_bar_char: "-".into(),
+            progress_char: ">".into(),
             format: None,
             internal_format: None,
             redraw_freq: Some(1),
@@ -134,7 +134,7 @@ impl ProgressBar {
     ///
     /// `$name` The placeholder name (including the delimiter char like %)
     /// `$callable` A PHP callable
-    pub fn set_placeholder_formatter_definition(name: &str, callable: PlaceholderFormatter) {
+    pub fn set_placeholder_formatter_definition(name: &BStr, callable: PlaceholderFormatter) {
         FORMATTERS.with(|formatters| {
             let mut formatters = formatters.borrow_mut();
             if formatters.is_none() {
@@ -144,14 +144,14 @@ impl ProgressBar {
             formatters
                 .as_mut()
                 .unwrap()
-                .insert(name.to_string(), callable);
+                .insert(name.to_owned(), callable);
         });
     }
 
     /// Gets the placeholder formatter for a given name.
     ///
     /// `$name` The placeholder name (including the delimiter char like %)
-    pub fn get_placeholder_formatter_definition(name: &str) -> Option<()> {
+    pub fn get_placeholder_formatter_definition(name: &BStr) -> Option<()> {
         // Note: the returned callable cannot be cloned out of the thread-local
         // map; call sites invoke the formatter via the map directly.
         FORMATTERS.with(|formatters| {
@@ -170,7 +170,7 @@ impl ProgressBar {
     ///
     /// `$name` The format name
     /// `$format` A format string
-    pub fn set_format_definition(name: &str, format: &str) {
+    pub fn set_format_definition(name: &BStr, format: &BStr) {
         FORMATS.with(|formats| {
             let mut formats = formats.borrow_mut();
             if formats.is_none() {
@@ -180,14 +180,14 @@ impl ProgressBar {
             formats
                 .as_mut()
                 .unwrap()
-                .insert(name.to_string(), format.to_string());
+                .insert(name.to_owned(), format.to_owned());
         });
     }
 
     /// Gets the format for a given name.
     ///
     /// `$name` The format name
-    pub fn get_format_definition(name: &str) -> Option<String> {
+    pub fn get_format_definition(name: &BStr) -> Option<BString> {
         FORMATS.with(|formats| {
             let mut formats = formats.borrow_mut();
             if formats.is_none() {
@@ -206,11 +206,11 @@ impl ProgressBar {
     ///
     /// `$message` The text to associate with the placeholder
     /// `$name` The name of the placeholder
-    pub fn set_message(&mut self, message: &str, name: &str) {
-        self.messages.insert(name.to_string(), message.to_string());
+    pub fn set_message(&mut self, message: &BStr, name: &BStr) {
+        self.messages.insert(name.to_owned(), message.to_owned());
     }
 
-    pub fn get_message(&self, name: &str) -> Option<String> {
+    pub fn get_message(&self, name: &BStr) -> Option<BString> {
         self.messages.get(name).cloned()
     }
 
@@ -274,16 +274,16 @@ impl ProgressBar {
         self.bar_width
     }
 
-    pub fn set_bar_character(&mut self, char: &str) {
-        self.bar_char = Some(char.to_string());
+    pub fn set_bar_character(&mut self, char: &BStr) {
+        self.bar_char = Some(char.to_owned());
     }
 
-    pub fn get_bar_character(&self) -> String {
+    pub fn get_bar_character(&self) -> BString {
         match &self.bar_char {
             Some(bar_char) => bar_char.clone(),
             None => {
                 if self.max != 0 {
-                    "=".to_string()
+                    "=".into()
                 } else {
                     self.empty_bar_char.clone()
                 }
@@ -291,25 +291,25 @@ impl ProgressBar {
         }
     }
 
-    pub fn set_empty_bar_character(&mut self, char: &str) {
-        self.empty_bar_char = char.to_string();
+    pub fn set_empty_bar_character(&mut self, char: &BStr) {
+        self.empty_bar_char = char.to_owned();
     }
 
-    pub fn get_empty_bar_character(&self) -> String {
+    pub fn get_empty_bar_character(&self) -> BString {
         self.empty_bar_char.clone()
     }
 
-    pub fn set_progress_character(&mut self, char: &str) {
-        self.progress_char = char.to_string();
+    pub fn set_progress_character(&mut self, char: &BStr) {
+        self.progress_char = char.to_owned();
     }
 
-    pub fn get_progress_character(&self) -> String {
+    pub fn get_progress_character(&self) -> BString {
         self.progress_char.clone()
     }
 
-    pub fn set_format(&mut self, format: &str) {
+    pub fn set_format(&mut self, format: &BStr) {
         self.format = None;
-        self.internal_format = Some(format.to_string());
+        self.internal_format = Some(format.to_owned());
     }
 
     /// Sets the redraw frequency.
@@ -454,9 +454,9 @@ impl ProgressBar {
         if self.format.is_none() {
             let format = match &self.internal_format {
                 Some(internal_format) if !internal_format.is_empty() => internal_format.clone(),
-                _ => self.determine_best_format().to_string(),
+                _ => self.determine_best_format().into(),
             };
-            self.set_real_format(&format);
+            self.set_real_format(format.as_ref());
         }
 
         let line = self.build_line()?;
@@ -478,9 +478,9 @@ impl ProgressBar {
         if self.format.is_none() {
             let format = match &self.internal_format {
                 Some(internal_format) if !internal_format.is_empty() => internal_format.clone(),
-                _ => self.determine_best_format().to_string(),
+                _ => self.determine_best_format().into(),
             };
-            self.set_real_format(&format);
+            self.set_real_format(format.as_ref());
         }
 
         self.overwrite("");
@@ -488,14 +488,15 @@ impl ProgressBar {
         Ok(())
     }
 
-    fn set_real_format(&mut self, format: &str) {
+    fn set_real_format(&mut self, format: &BStr) {
+        let format_nomax = bconcat!(format, "_nomax");
         // try to use the _nomax variant if available
-        if self.max == 0 && Self::get_format_definition(&format!("{format}_nomax")).is_some() {
-            self.format = Self::get_format_definition(&format!("{format}_nomax"));
+        if self.max == 0 && Self::get_format_definition(format_nomax.as_ref()).is_some() {
+            self.format = Self::get_format_definition(format_nomax.as_ref());
         } else if Self::get_format_definition(format).is_some() {
             self.format = Self::get_format_definition(format);
         } else {
-            self.format = Some(format.to_string());
+            self.format = Some(format.to_owned());
         }
     }
 
@@ -592,11 +593,11 @@ impl ProgressBar {
         }
     }
 
-    fn init_placeholder_formatters() -> IndexMap<String, PlaceholderFormatter> {
-        let mut formatters: IndexMap<String, PlaceholderFormatter> = IndexMap::new();
+    fn init_placeholder_formatters() -> IndexMap<BString, PlaceholderFormatter> {
+        let mut formatters: IndexMap<BString, PlaceholderFormatter> = IndexMap::new();
 
         formatters.insert(
-            "bar".to_string(),
+            "bar".into(),
             Box::new(
                 |bar: &ProgressBar,
                  output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
@@ -609,7 +610,7 @@ impl ProgressBar {
                                 &mut *output.borrow().get_formatter().borrow_mut(),
                                 bar.get_progress_character(),
                             )) as f64;
-                        display.extend_from_slice(bar.get_progress_character().as_bytes());
+                        display.extend_from_slice(&bar.get_progress_character());
                         display.extend_from_slice(&str_repeat(
                             bar.get_empty_bar_character(),
                             empty_bars as usize,
@@ -622,7 +623,7 @@ impl ProgressBar {
         );
 
         formatters.insert(
-            "elapsed".to_string(),
+            "elapsed".into(),
             Box::new(
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
@@ -635,7 +636,7 @@ impl ProgressBar {
         );
 
         formatters.insert(
-            "remaining".to_string(),
+            "remaining".into(),
             Box::new(|bar: &ProgressBar, _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 if bar.get_max_steps() == 0 {
                     return Ok(Err(LogicException::new("Unable to display the remaining time if the maximum number of steps is not set.".to_string())));
@@ -646,7 +647,7 @@ impl ProgressBar {
         );
 
         formatters.insert(
-            "estimated".to_string(),
+            "estimated".into(),
             Box::new(|bar: &ProgressBar, _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                 if bar.get_max_steps() == 0 {
                     return Ok(Err(LogicException::new("Unable to display the estimated time if the maximum number of steps is not set.".to_string())));
@@ -657,7 +658,7 @@ impl ProgressBar {
         );
 
         formatters.insert(
-            "memory".to_string(),
+            "memory".into(),
             Box::new(
                 |_bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
@@ -669,7 +670,7 @@ impl ProgressBar {
         );
 
         formatters.insert(
-            "current".to_string(),
+            "current".into(),
             Box::new(
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
@@ -684,7 +685,7 @@ impl ProgressBar {
         );
 
         formatters.insert(
-            "max".to_string(),
+            "max".into(),
             Box::new(
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
@@ -694,7 +695,7 @@ impl ProgressBar {
         );
 
         formatters.insert(
-            "percent".to_string(),
+            "percent".into(),
             Box::new(
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
@@ -708,44 +709,41 @@ impl ProgressBar {
         formatters
     }
 
-    fn init_formats() -> IndexMap<String, String> {
-        let mut formats: IndexMap<String, String> = IndexMap::new();
+    fn init_formats() -> IndexMap<BString, BString> {
+        let mut formats: IndexMap<BString, BString> = IndexMap::new();
 
         formats.insert(
-            FORMAT_NORMAL.to_string(),
-            " %current%/%max% [%bar%] %percent:3s%%".to_string(),
+            FORMAT_NORMAL.into(),
+            " %current%/%max% [%bar%] %percent:3s%%".into(),
         );
-        formats.insert(
-            FORMAT_NORMAL_NOMAX.to_string(),
-            " %current% [%bar%]".to_string(),
-        );
+        formats.insert(FORMAT_NORMAL_NOMAX.into(), " %current% [%bar%]".into());
 
         formats.insert(
-            FORMAT_VERBOSE.to_string(),
-            " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%".to_string(),
+            FORMAT_VERBOSE.into(),
+            " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%".into(),
         );
         formats.insert(
-            FORMAT_VERBOSE_NOMAX.to_string(),
-            " %current% [%bar%] %elapsed:6s%".to_string(),
+            FORMAT_VERBOSE_NOMAX.into(),
+            " %current% [%bar%] %elapsed:6s%".into(),
         );
 
         formats.insert(
-            FORMAT_VERY_VERBOSE.to_string(),
-            " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s%".to_string(),
+            FORMAT_VERY_VERBOSE.into(),
+            " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s%".into(),
         );
         formats.insert(
-            FORMAT_VERY_VERBOSE_NOMAX.to_string(),
-            " %current% [%bar%] %elapsed:6s%".to_string(),
+            FORMAT_VERY_VERBOSE_NOMAX.into(),
+            " %current% [%bar%] %elapsed:6s%".into(),
         );
 
         formats.insert(
-            FORMAT_DEBUG.to_string(),
+            FORMAT_DEBUG.into(),
             " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s% %memory:6s%"
-                .to_string(),
+                .into(),
         );
         formats.insert(
-            FORMAT_DEBUG_NOMAX.to_string(),
-            " %current% [%bar%] %elapsed:6s% %memory:6s%".to_string(),
+            FORMAT_DEBUG_NOMAX.into(),
+            " %current% [%bar%] %elapsed:6s% %memory:6s%".into(),
         );
 
         formats
@@ -788,22 +786,17 @@ impl ProgressBar {
 
         // $callback in PHP, expressed as a closure over $this and the matches.
         let callback = |matches: &PregMatches| -> anyhow::Result<BString> {
-            // Placeholder names are declared in code; other bytes in the format match none of them.
-            let name = matches
-                .get(1)
-                .unwrap_or_default()
-                .display_lossy()
-                .to_string();
+            let name = matches.get(1).unwrap_or_default();
 
-            let text: PhpMixed = if Self::get_placeholder_formatter_definition(&name).is_some() {
+            let text: PhpMixed = if Self::get_placeholder_formatter_definition(name).is_some() {
                 // $text = $formatter($this, $this->output);
                 let formatter_result = FORMATTERS.with(|formatters| {
                     let formatters = formatters.borrow();
-                    let formatter = formatters.as_ref().unwrap().get(&name).unwrap();
+                    let formatter = formatters.as_ref().unwrap().get(name).unwrap();
                     formatter(self, &self.output)
                 });
                 formatter_result??
-            } else if let Some(message) = self.messages.get(&name) {
+            } else if let Some(message) = self.messages.get(name) {
                 PhpMixed::string(message.clone())
             } else {
                 return Ok(matches.get(0).unwrap_or_default().into());
@@ -818,5 +811,33 @@ impl ProgressBar {
         };
 
         preg_replace_callback(regex, callback, &format)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::output::BufferedOutput;
+    use bstr::ByteSlice;
+
+    #[test]
+    fn format_message_and_characters_keep_their_bytes() {
+        let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+            None, false, None,
+        )));
+        let mut bar = ProgressBar::new(output.clone(), 2, 0.0);
+        bar.set_format(BStr::new(b"f\xE9 %m% %bar%"));
+        bar.set_message(BStr::new(b"m\xE9"), "m".into());
+        bar.set_bar_character(BStr::new(b"\xE9"));
+        bar.set_bar_width(2);
+        bar.start(None).unwrap();
+        bar.advance(2).unwrap();
+
+        assert!(
+            output
+                .borrow()
+                .fetch()
+                .contains_str(b"f\xE9 m\xE9 \xE9\xE9")
+        );
     }
 }

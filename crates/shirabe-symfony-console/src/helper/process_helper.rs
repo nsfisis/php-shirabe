@@ -25,7 +25,7 @@ pub enum ProcessHelperCmd {
 
 #[derive(Debug)]
 pub enum ProcessHelperCmdElement {
-    String(String),
+    String(BString),
     Process(Process),
 }
 
@@ -35,7 +35,7 @@ impl ProcessHelper {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
-        error: Option<&str>,
+        error: Option<&BStr>,
         callback: Option<Box<dyn FnMut(&str, &BStr)>>,
         verbosity: i64,
     ) -> anyhow::Result<Process> {
@@ -73,7 +73,7 @@ impl ProcessHelper {
         let mut process: Process;
         match cmd.first() {
             Some(ProcessHelperCmdElement::String(_)) => {
-                let command: Vec<String> = cmd
+                let command: Vec<BString> = cmd
                     .iter()
                     .map(|element| match element {
                         ProcessHelperCmdElement::String(s) => s.clone(),
@@ -101,7 +101,7 @@ impl ProcessHelper {
         if verbosity <= output.borrow().get_verbosity() {
             let started = Self::formatter_start(
                 &formatter,
-                &spl_object_hash(&process),
+                BStr::new(&spl_object_hash(&process)),
                 Self::escape_string(process.get_command_line()).as_ref(),
             );
             output
@@ -137,27 +137,25 @@ impl ProcessHelper {
 
         if verbosity <= output.borrow().get_verbosity() {
             let message = if process.is_successful() {
-                "Command ran successfully".to_string()
+                BString::from("Command ran successfully")
             } else {
-                format!(
+                BString::from(format!(
                     "{} Command did not run successfully",
                     process
                         .get_exit_code()
                         .map(|code| code.to_string())
                         .unwrap_or_default(),
-                )
+                ))
             };
             let stopped = Self::formatter_stop(
                 &formatter,
-                &spl_object_hash(&process),
-                &message,
+                BStr::new(&spl_object_hash(&process)),
+                message.as_ref(),
                 process.is_successful(),
             );
-            output.borrow().write(
-                &[bstr::BString::from(stopped)],
-                false,
-                output_interface::OUTPUT_NORMAL,
-            );
+            output
+                .borrow()
+                .write(&[stopped], false, output_interface::OUTPUT_NORMAL);
         }
 
         if !process.is_successful()
@@ -180,7 +178,7 @@ impl ProcessHelper {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
-        error: Option<&str>,
+        error: Option<&BStr>,
         callback: Option<Box<dyn FnMut(&str, &BStr)>>,
     ) -> anyhow::Result<Process> {
         let mut process = self.run(
@@ -227,7 +225,7 @@ impl ProcessHelper {
         Box::new(move |r#type: &str, buffer: &BStr| {
             let progressed = Self::formatter_progress(
                 &formatter,
-                &object_hash,
+                BStr::new(&object_hash),
                 Self::escape_string(buffer).as_ref(),
                 Process::ERR == r#type,
             );
@@ -247,30 +245,32 @@ impl ProcessHelper {
 
     fn formatter_start(
         formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
-        id: &str,
+        id: &BStr,
         message: &BStr,
     ) -> BString {
-        formatter.borrow_mut().start(id, message, "RUN")
+        formatter.borrow_mut().start(id, message, "RUN".into())
     }
 
     fn formatter_stop(
         formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
-        id: &str,
-        message: &str,
+        id: &BStr,
+        message: &BStr,
         successful: bool,
-    ) -> String {
-        formatter.borrow_mut().stop(id, message, successful, "RES")
+    ) -> BString {
+        formatter
+            .borrow_mut()
+            .stop(id, message, successful, "RES".into())
     }
 
     fn formatter_progress(
         formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
-        id: &str,
+        id: &BStr,
         buffer: &BStr,
         error: bool,
     ) -> BString {
         formatter
             .borrow_mut()
-            .progress(id, buffer, error, "OUT", "ERR")
+            .progress(id, buffer, error, "OUT".into(), "ERR".into())
     }
 }
 
@@ -283,7 +283,7 @@ impl HelperInterface for ProcessHelper {
         self.inner.get_helper_set()
     }
 
-    fn get_name(&self) -> String {
-        "process".to_string()
+    fn get_name(&self) -> BString {
+        "process".into()
     }
 }

@@ -13,12 +13,17 @@ pub struct FormatterHelper {
 
 impl FormatterHelper {
     /// Formats a message within a section.
-    pub fn format_section(&self, section: &BStr, message: &BStr, style: &str) -> BString {
+    pub fn format_section(&self, section: &BStr, message: &BStr, style: &BStr) -> BString {
         bconcat!("<", style, ">[", section, "]</", style, "> ", message)
     }
 
     /// Formats a message as a block of text.
-    pub fn format_block(&self, messages: FormatBlockMessages, style: &str, large: bool) -> BString {
+    pub fn format_block(
+        &self,
+        messages: FormatBlockMessages,
+        style: &BStr,
+        large: bool,
+    ) -> BString {
         let messages = match messages {
             FormatBlockMessages::String(message) => vec![message],
             FormatBlockMessages::Array(messages) => messages,
@@ -83,14 +88,31 @@ impl HelperInterface for FormatterHelper {
         self.inner.get_helper_set()
     }
 
-    fn get_name(&self) -> String {
-        "formatter".to_string()
+    fn get_name(&self) -> BString {
+        "formatter".into()
     }
 }
 
 /// `formatBlock` accepts either a single string or an array of strings.
 #[derive(Debug)]
 pub enum FormatBlockMessages {
-    String(String),
-    Array(Vec<String>),
+    String(BString),
+    Array(Vec<BString>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bstr::ByteSlice;
+
+    #[test]
+    fn block_messages_keep_their_bytes() {
+        let block = FormatterHelper::default().format_block(
+            FormatBlockMessages::String(BString::from(b"message\xE9".as_slice())),
+            "error".into(),
+            false,
+        );
+
+        assert!(block.contains_str(b"message\xE9"));
+    }
 }

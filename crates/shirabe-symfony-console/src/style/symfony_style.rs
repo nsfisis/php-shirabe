@@ -65,9 +65,9 @@ impl SymfonyStyle {
     pub fn block(
         &mut self,
         messages: &[BString],
-        r#type: Option<&str>,
-        style: Option<&str>,
-        prefix: &str,
+        r#type: Option<&BStr>,
+        style: Option<&BStr>,
+        prefix: &BStr,
         padding: bool,
         escape: bool,
     ) {
@@ -121,10 +121,10 @@ impl SymfonyStyle {
             } else {
                 self.output.clone()
             };
-        let mut style = Table::get_style_definition("symfony-style-guide".to_string())
+        let mut style = Table::get_style_definition("symfony-style-guide".into())
             .expect("style definition lookup")
             .expect("undefined style definition");
-        style.set_cell_header_format("<info>%s</info>".to_string());
+        style.set_cell_header_format("<info>%s</info>".into());
 
         let mut table = Table::new(output);
         let _ = table.set_style(crate::helper::StyleName::Style(style));
@@ -156,9 +156,9 @@ impl SymfonyStyle {
     fn create_block(
         &mut self,
         messages: &[BString],
-        r#type: Option<&str>,
-        style: Option<&str>,
-        prefix: &str,
+        r#type: Option<&BStr>,
+        style: Option<&BStr>,
+        prefix: &BStr,
         padding: bool,
         escape: bool,
     ) -> Vec<BString> {
@@ -169,10 +169,10 @@ impl SymfonyStyle {
         ));
         let mut lines: Vec<BString> = Vec::new();
 
-        let mut r#type = r#type.map(|t| t.to_string());
+        let mut r#type = r#type.map(BString::from);
         let mut line_indentation = BString::default();
         if let Some(t) = &r#type {
-            let formatted = format!("[{}] ", t.clone());
+            let formatted = bconcat!("[", t, "] ");
             indent_length = strlen(&formatted);
             line_indentation = str_repeat(" ", indent_length as usize);
             r#type = Some(formatted);
@@ -283,9 +283,9 @@ impl StyleInterface for SymfonyStyle {
     fn error(&mut self, message: &[BString]) {
         self.block(
             message,
-            Some("ERROR"),
-            Some("fg=white;bg=red"),
-            " ",
+            Some("ERROR".into()),
+            Some("fg=white;bg=red".into()),
+            " ".into(),
             true,
             true,
         );
@@ -300,12 +300,8 @@ impl StyleInterface for SymfonyStyle {
         self.new_line(1);
     }
 
-    fn confirm(&mut self, question: &str, default: bool) -> bool {
-        let answer = self.ask_question(&ConfirmationQuestion::new(
-            question.to_string(),
-            default,
-            "/^y/i".to_string(),
-        ));
+    fn confirm(&mut self, question: &BStr, default: bool) -> bool {
+        let answer = self.ask_question(&ConfirmationQuestion::new(question, default, "/^y/i"));
 
         boolval(&answer)
     }

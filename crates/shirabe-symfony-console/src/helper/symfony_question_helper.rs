@@ -22,12 +22,12 @@ impl SymfonyQuestionHelper {
         Self::default()
     }
 
-    fn get_eof_shortcut(&self) -> String {
+    fn get_eof_shortcut(&self) -> BString {
         if php_os_family() == "Windows" {
-            return "<comment>Ctrl+Z</comment> then <comment>Enter</comment>".to_string();
+            return "<comment>Ctrl+Z</comment> then <comment>Enter</comment>".into();
         }
 
-        "<comment>Ctrl+D</comment>".to_string()
+        "<comment>Ctrl+D</comment>".into()
     }
 }
 
@@ -112,7 +112,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
             output.borrow().writeln(
                 &self
                     .inner
-                    .format_choice_question_choices(choice_question, "comment"),
+                    .format_choice_question_choices(choice_question, "comment".into()),
                 output_interface::OUTPUT_NORMAL,
             );
 

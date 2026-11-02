@@ -372,7 +372,7 @@ pub fn sapi_windows_cp_set(_codepage: i64) -> bool {
     todo!()
 }
 
-pub fn sapi_windows_cp_conv(_in_codepage: i64, _out_codepage: i64, _subject: &str) -> String {
+pub fn sapi_windows_cp_conv(_in_codepage: i64, _out_codepage: i64, _subject: &[u8]) -> BString {
     // TODO(windows): Windows-only SAPI function; see sapi_windows_vt100_support.
     todo!()
 }

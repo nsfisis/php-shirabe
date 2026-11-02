@@ -2,7 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::helper::TableCellStyle;
-use bstr::BString;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.
@@ -16,24 +16,24 @@ pub enum TableCellOption {
 #[derive(Debug, Clone)]
 pub struct TableCell {
     value: BString,
-    options: IndexMap<String, TableCellOption>,
+    options: IndexMap<BString, TableCellOption>,
 }
 
 impl TableCell {
     pub fn new(
         value: impl AsRef<[u8]>,
-        options: IndexMap<String, TableCellOption>,
+        options: IndexMap<BString, TableCellOption>,
     ) -> Result<Self, InvalidArgumentException> {
-        let mut this_options: IndexMap<String, TableCellOption> = IndexMap::new();
-        this_options.insert("rowspan".to_string(), TableCellOption::Int(1));
-        this_options.insert("colspan".to_string(), TableCellOption::Int(1));
-        this_options.insert("style".to_string(), TableCellOption::Null);
+        let mut this_options: IndexMap<BString, TableCellOption> = IndexMap::new();
+        this_options.insert("rowspan".into(), TableCellOption::Int(1));
+        this_options.insert("colspan".into(), TableCellOption::Int(1));
+        this_options.insert("style".into(), TableCellOption::Null);
 
         // check option names
         let diff: Vec<String> = options
             .keys()
             .filter(|key| !this_options.contains_key(*key))
-            .cloned()
+            .map(|key| key.display_lossy().to_string())
             .collect();
         if !diff.is_empty() {
             return Err(InvalidArgumentException::new(format!(
@@ -42,7 +42,7 @@ impl TableCell {
             )));
         }
 
-        if let Some(style) = options.get("style")
+        if let Some(style) = options.get(B("style"))
             && !matches!(style, TableCellOption::Style(_))
             && !matches!(style, TableCellOption::Null)
         {
@@ -65,13 +65,13 @@ impl TableCell {
     ///
     /// The options used by the Table helper are internally controlled, so a malformed-option
     /// error here would be a programming bug rather than a recoverable condition.
-    pub fn new2(value: impl AsRef<[u8]>, options: IndexMap<String, TableCellOption>) -> Self {
+    pub fn new2(value: impl AsRef<[u8]>, options: IndexMap<BString, TableCellOption>) -> Self {
         Self::new(value, options).expect("TableCell options built internally are always valid")
     }
 
     /// Gets number of colspan.
     pub fn get_colspan(&self) -> i64 {
-        match self.options["colspan"] {
+        match self.options[B("colspan")] {
             TableCellOption::Int(colspan) => colspan,
             _ => 0,
         }
@@ -79,7 +79,7 @@ impl TableCell {
 
     /// Gets number of rowspan.
     pub fn get_rowspan(&self) -> i64 {
-        match self.options["rowspan"] {
+        match self.options[B("rowspan")] {
             TableCellOption::Int(rowspan) => rowspan,
             _ => 0,
         }
@@ -91,7 +91,7 @@ impl TableCell {
     }
 
     pub fn get_style(&self) -> Option<std::rc::Rc<TableCellStyle>> {
-        match &self.options["style"] {
+        match &self.options[B("style")] {
             TableCellOption::Style(style) => Some(style.clone()),
             _ => None,
         }

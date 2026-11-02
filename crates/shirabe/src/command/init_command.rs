@@ -856,9 +856,9 @@ impl Command for InitCommand {
                     "\n",
                     formatter.borrow().format_block(
                         FormatBlockMessages::String(
-                            "Welcome to the Shirabe config generator".to_string(),
+                            "Welcome to the Shirabe config generator".into(),
                         ),
-                        "bg=blue;fg=white",
+                        "bg=blue;fg=white".into(),
                         true,
                     ),
                     "\n"

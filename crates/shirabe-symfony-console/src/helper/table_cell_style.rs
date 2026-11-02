@@ -10,11 +10,11 @@ pub const DEFAULT_ALIGN: &str = "left";
 const TAG_OPTIONS: [&str; 3] = ["fg", "bg", "options"];
 
 /// Maps an alignment name to the corresponding `STR_PAD_*` value.
-fn align_map(align: &str) -> Option<i64> {
+fn align_map(align: &[u8]) -> Option<i64> {
     match align {
-        "left" => Some(STR_PAD_RIGHT),
-        "center" => Some(STR_PAD_BOTH),
-        "right" => Some(STR_PAD_LEFT),
+        b"left" => Some(STR_PAD_RIGHT),
+        b"center" => Some(STR_PAD_BOTH),
+        b"right" => Some(STR_PAD_LEFT),
         _ => None,
     }
 }
@@ -31,10 +31,10 @@ pub struct TableCellStyle {
 impl TableCellStyle {
     pub fn new(options: IndexMap<BString, PhpMixed>) -> Result<Self, InvalidArgumentException> {
         let mut this_options: IndexMap<BString, PhpMixed> = IndexMap::new();
-        this_options.insert("fg".into(), PhpMixed::string("default".to_string()));
-        this_options.insert("bg".into(), PhpMixed::string("default".to_string()));
+        this_options.insert("fg".into(), PhpMixed::string("default"));
+        this_options.insert("bg".into(), PhpMixed::string("default"));
         this_options.insert("options".into(), PhpMixed::Null);
-        this_options.insert("align".into(), PhpMixed::string(DEFAULT_ALIGN.to_string()));
+        this_options.insert("align".into(), PhpMixed::string(DEFAULT_ALIGN));
         this_options.insert("cellFormat".into(), PhpMixed::Null);
 
         let diff: Vec<String> = options
@@ -50,11 +50,11 @@ impl TableCellStyle {
         }
 
         if let Some(align) = options.get(B("align")) {
-            let align = match align {
-                PhpMixed::String(align) => align.display_lossy().to_string(),
-                _ => String::new(),
+            let align: &[u8] = match align {
+                PhpMixed::String(align) => align,
+                _ => b"",
             };
-            if align_map(&align).is_none() {
+            if align_map(align).is_none() {
                 return Err(InvalidArgumentException::new(format!(
                     "Wrong align value. Value must be following: '{}'.",
                     align_map_keys().join("', '"),
@@ -89,16 +89,17 @@ impl TableCellStyle {
     }
 
     pub fn get_pad_by_align(&self) -> i64 {
-        let align = match &self.get_options()[B("align")] {
-            PhpMixed::String(align) => align.display_lossy().to_string(),
-            _ => String::new(),
+        let options = self.get_options();
+        let align: &[u8] = match &options[B("align")] {
+            PhpMixed::String(align) => align,
+            _ => b"",
         };
-        align_map(&align).unwrap()
+        align_map(align).unwrap()
     }
 
-    pub fn get_cell_format(&self) -> Option<String> {
+    pub fn get_cell_format(&self) -> Option<BString> {
         match &self.get_options()[B("cellFormat")] {
-            PhpMixed::String(format) => Some(format.display_lossy().to_string()),
+            PhpMixed::String(format) => Some(format.clone()),
             _ => None,
         }
     }

@@ -14,9 +14,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc,
     fgets, fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
-    path_from_bytes, php_fopen_resource, php_to_string, rewind, rtrim, sapi_windows_cp_conv,
-    sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat,
-    stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
+    path_from_bytes, path_to_bytes, php_fopen_resource, php_to_string, rewind, rtrim,
+    sapi_windows_cp_conv, sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand,
+    str_repeat, stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
     stream_set_blocking, strlen, substr, sys_get_temp_dir, trim, unlink,
 };
 use shirabe_symfony_string::s;
@@ -283,8 +283,8 @@ impl QuestionHelperInterface for QuestionHelper {
 }
 
 impl QuestionHelper {
-    pub fn get_name(&self) -> String {
-        "question".to_string()
+    pub fn get_name(&self) -> BString {
+        "question".into()
     }
 
     /// Prevents usage of stty.
@@ -340,7 +340,7 @@ impl QuestionHelper {
 
         if let Some(choice_question) = question.as_choice() {
             let mut lines = vec![BString::from(question.get_question())];
-            lines.extend(self.format_choice_question_choices(choice_question, "info"));
+            lines.extend(self.format_choice_question_choices(choice_question, "info".into()));
             output
                 .borrow()
                 .writeln(&lines, output_interface::OUTPUT_NORMAL);
@@ -356,7 +356,7 @@ impl QuestionHelper {
     pub(crate) fn format_choice_question_choices(
         &self,
         question: &ChoiceQuestion,
-        tag: &str,
+        tag: &BStr,
     ) -> Vec<BString> {
         let mut messages: Vec<BString> = vec![];
 
@@ -392,8 +392,8 @@ impl QuestionHelper {
             let formatter = helper_set.borrow().get_formatter();
 
             formatter.borrow().format_block(
-                FormatBlockMessages::String(error.get_message().to_string()),
-                "error",
+                FormatBlockMessages::String(error.get_message().into()),
+                "error".into(),
                 false,
             )
         } else {
@@ -535,7 +535,7 @@ impl QuestionHelper {
 
                     if c.as_deref() == Some(b"\n".as_slice()) {
                         output.borrow().write(
-                            &[bstr::BString::from("\n".to_string())],
+                            &[bstr::BString::from("\n")],
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
@@ -660,10 +660,9 @@ impl QuestionHelper {
 
             let s_exec = shell_exec(bconcat!("\"", exe, "\"")).unwrap_or_default();
             let value = if trimmable { rtrim(&s_exec) } else { s_exec };
-            output.borrow().writeln(
-                &[bstr::BString::from("".to_string())],
-                output_interface::OUTPUT_NORMAL,
-            );
+            output
+                .borrow()
+                .writeln(&[bstr::BString::default()], output_interface::OUTPUT_NORMAL);
 
             if let Some(tmp) = tmp_exe {
                 unlink(path_from_bytes(&tmp));
@@ -697,10 +696,9 @@ impl QuestionHelper {
         if trimmable {
             value = trim(&value);
         }
-        output.borrow().writeln(
-            &[bstr::BString::from("".to_string())],
-            output_interface::OUTPUT_NORMAL,
-        );
+        output
+            .borrow()
+            .writeln(&[bstr::BString::default()], output_interface::OUTPUT_NORMAL);
 
         Ok(Ok(value))
     }
@@ -782,7 +780,7 @@ impl QuestionHelper {
                 input = PhpMixed::string(sapi_windows_cp_conv(
                     sapi_windows_cp_get(Some("oem")),
                     cp,
-                    php_to_string(&input).display_lossy().to_string().as_str(),
+                    &php_to_string(&input),
                 ));
             }
         }
@@ -819,11 +817,10 @@ impl QuestionHelper {
 /// PHP `__FILE__` magic constant. The executing code lives in the Shirabe binary itself, which is
 /// the closest analogue for a native executable; it never carries the `phar:` scheme, so the
 /// phar-relocation branch in `get_hidden_response` correctly never triggers.
-fn magic_file() -> String {
-    std::env::current_exe()
-        .expect("current executable path")
-        .display()
-        .to_string()
+fn magic_file() -> BString {
+    BString::from(path_to_bytes(
+        &std::env::current_exe().expect("current executable path"),
+    ))
 }
 
 impl HelperInterface for QuestionHelper {
@@ -835,7 +832,7 @@ impl HelperInterface for QuestionHelper {
         self.inner.get_helper_set()
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self) -> BString {
         self.get_name()
     }
 }

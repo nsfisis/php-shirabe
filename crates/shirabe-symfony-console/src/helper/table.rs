@@ -197,18 +197,18 @@ impl From<PhpMixed> for Row {
 /// registered style or a `TableStyle` instance.
 #[derive(Debug, Clone)]
 pub enum StyleName {
-    Name(String),
+    Name(BString),
     Style(TableStyle),
 }
 
 impl From<&str> for StyleName {
     fn from(name: &str) -> Self {
-        StyleName::Name(name.to_string())
+        StyleName::Name(name.into())
     }
 }
 
-impl From<String> for StyleName {
-    fn from(name: String) -> Self {
+impl From<BString> for StyleName {
+    fn from(name: BString) -> Self {
         StyleName::Name(name)
     }
 }
@@ -264,8 +264,8 @@ const BORDER_INSIDE: i64 = 1;
 /// Global style definitions, lazily initialized.
 ///
 /// In PHP this is `private static $styles`. Here it is a process-global cache.
-fn styles() -> &'static std::sync::Mutex<Option<IndexMap<String, TableStyle>>> {
-    static STYLES: std::sync::Mutex<Option<IndexMap<String, TableStyle>>> =
+fn styles() -> &'static std::sync::Mutex<Option<IndexMap<BString, TableStyle>>> {
+    static STYLES: std::sync::Mutex<Option<IndexMap<BString, TableStyle>>> =
         std::sync::Mutex::new(None);
     &STYLES
 }
@@ -297,7 +297,7 @@ impl Table {
 
     /// Gets a style definition by name.
     pub(crate) fn get_style_definition(
-        name: String,
+        name: BString,
     ) -> anyhow::Result<Result<TableStyle, InvalidArgumentException>> {
         let mut styles_guard = styles().lock().unwrap();
         if styles_guard.is_none() {
@@ -310,7 +310,7 @@ impl Table {
 
         Ok(Err(InvalidArgumentException::new(format!(
             "Style \"{}\" is not defined.",
-            name
+            name.display_lossy()
         ))))
     }
 
@@ -490,16 +490,16 @@ impl Table {
                 if self.horizontal {
                     self.render_row(
                         row.cells(),
-                        self.style.get_cell_row_format().into(),
-                        Some(self.style.get_cell_header_format().into()),
+                        self.style.get_cell_row_format(),
+                        Some(self.style.get_cell_header_format()),
                     );
                 } else {
                     self.render_row(
                         row.cells(),
                         if is_header {
-                            self.style.get_cell_header_format().into()
+                            self.style.get_cell_header_format()
                         } else {
-                            self.style.get_cell_row_format().into()
+                            self.style.get_cell_row_format()
                         },
                         None,
                     );
@@ -557,21 +557,18 @@ impl Table {
             )
         };
 
-        let mut markup = BString::from(left_char);
+        let mut markup = left_char;
         let mut column = 0;
         while column < count {
             markup.extend_from_slice(&str_repeat(
                 &horizontal,
                 self.effective_column_widths[&column] as usize,
             ));
-            markup.extend_from_slice(
-                if column == count - 1 {
-                    &right_char
-                } else {
-                    &mid_char
-                }
-                .as_bytes(),
-            );
+            markup.extend_from_slice(if column == count - 1 {
+                &right_char
+            } else {
+                &mid_char
+            });
             column += 1;
         }
 
@@ -675,7 +672,7 @@ impl Table {
             if is_not_styled_by_tag {
                 let cell_style = cell.style().unwrap();
                 match cell_style.get_cell_format() {
-                    Some(fmt) => cell_format = fmt.into(),
+                    Some(fmt) => cell_format = fmt,
                     None => {
                         let tag = http_build_query_mixed(&cell_style.get_tag_options(), "", ";");
                         cell_format = bconcat!("<", tag, ">%s</>");
@@ -1084,41 +1081,41 @@ impl Table {
         self.number_of_columns = None;
     }
 
-    fn init_styles() -> IndexMap<String, TableStyle> {
+    fn init_styles() -> IndexMap<BString, TableStyle> {
         let mut borderless = TableStyle::default();
         borderless
-            .set_horizontal_border_chars("=".to_string(), None)
-            .set_vertical_border_chars(" ".to_string(), None)
-            .set_default_crossing_char(" ".to_string());
+            .set_horizontal_border_chars("=".into(), None)
+            .set_vertical_border_chars(" ".into(), None)
+            .set_default_crossing_char(" ".into());
 
         let mut compact = TableStyle::default();
         compact
-            .set_horizontal_border_chars("".to_string(), None)
-            .set_vertical_border_chars("".to_string(), None)
-            .set_default_crossing_char("".to_string())
-            .set_cell_row_content_format("%s ".to_string());
+            .set_horizontal_border_chars("".into(), None)
+            .set_vertical_border_chars("".into(), None)
+            .set_default_crossing_char("".into())
+            .set_cell_row_content_format("%s ".into());
 
         let mut style_guide = TableStyle::default();
         style_guide
-            .set_horizontal_border_chars("-".to_string(), None)
-            .set_vertical_border_chars(" ".to_string(), None)
-            .set_default_crossing_char(" ".to_string())
-            .set_cell_header_format("%s".to_string());
+            .set_horizontal_border_chars("-".into(), None)
+            .set_vertical_border_chars(" ".into(), None)
+            .set_default_crossing_char(" ".into())
+            .set_cell_header_format("%s".into());
 
         let mut r#box = TableStyle::default();
         r#box
-            .set_horizontal_border_chars("─".to_string(), None)
-            .set_vertical_border_chars("│".to_string(), None)
+            .set_horizontal_border_chars("─".into(), None)
+            .set_vertical_border_chars("│".into(), None)
             .set_crossing_chars(
-                "┼".to_string(),
-                "┌".to_string(),
-                "┬".to_string(),
-                "┐".to_string(),
-                "┤".to_string(),
-                "┘".to_string(),
-                "┴".to_string(),
-                "└".to_string(),
-                "├".to_string(),
+                "┼".into(),
+                "┌".into(),
+                "┬".into(),
+                "┐".into(),
+                "┤".into(),
+                "┘".into(),
+                "┴".into(),
+                "└".into(),
+                "├".into(),
                 None,
                 None,
                 None,
@@ -1126,30 +1123,30 @@ impl Table {
 
         let mut box_double = TableStyle::default();
         box_double
-            .set_horizontal_border_chars("═".to_string(), Some("─".to_string()))
-            .set_vertical_border_chars("║".to_string(), Some("│".to_string()))
+            .set_horizontal_border_chars("═".into(), Some("─".into()))
+            .set_vertical_border_chars("║".into(), Some("│".into()))
             .set_crossing_chars(
-                "┼".to_string(),
-                "╔".to_string(),
-                "╤".to_string(),
-                "╗".to_string(),
-                "╢".to_string(),
-                "╝".to_string(),
-                "╧".to_string(),
-                "╚".to_string(),
-                "╟".to_string(),
-                Some("╠".to_string()),
-                Some("╪".to_string()),
-                Some("╣".to_string()),
+                "┼".into(),
+                "╔".into(),
+                "╤".into(),
+                "╗".into(),
+                "╢".into(),
+                "╝".into(),
+                "╧".into(),
+                "╚".into(),
+                "╟".into(),
+                Some("╠".into()),
+                Some("╪".into()),
+                Some("╣".into()),
             );
 
-        let mut result: IndexMap<String, TableStyle> = IndexMap::new();
-        result.insert("default".to_string(), TableStyle::default());
-        result.insert("borderless".to_string(), borderless);
-        result.insert("compact".to_string(), compact);
-        result.insert("symfony-style-guide".to_string(), style_guide);
-        result.insert("box".to_string(), r#box);
-        result.insert("box-double".to_string(), box_double);
+        let mut result: IndexMap<BString, TableStyle> = IndexMap::new();
+        result.insert("default".into(), TableStyle::default());
+        result.insert("borderless".into(), borderless);
+        result.insert("compact".into(), compact);
+        result.insert("symfony-style-guide".into(), style_guide);
+        result.insert("box".into(), r#box);
+        result.insert("box-double".into(), box_double);
 
         result
     }
@@ -1170,7 +1167,7 @@ impl Table {
 
         Ok(Err(InvalidArgumentException::new(format!(
             "Style \"{}\" is not defined.",
-            name
+            name.display_lossy()
         ))))
     }
 
@@ -1206,27 +1203,65 @@ impl Table {
         Helper::remove_decoration(&mut *formatter, string)
     }
 
-    fn table_cell_options_colspan(colspan: i64) -> IndexMap<String, TableCellOption> {
+    fn table_cell_options_colspan(colspan: i64) -> IndexMap<BString, TableCellOption> {
         // PHP: ['colspan' => $colspan]
         let mut options = IndexMap::new();
-        options.insert("colspan".to_string(), TableCellOption::Int(colspan));
+        options.insert("colspan".into(), TableCellOption::Int(colspan));
         options
     }
 
     fn table_cell_options_colspan_style(
         colspan: i64,
         style: Option<std::rc::Rc<TableCellStyle>>,
-    ) -> IndexMap<String, TableCellOption> {
+    ) -> IndexMap<BString, TableCellOption> {
         // PHP: ['colspan' => $colspan, 'style' => $style]
         let mut options = IndexMap::new();
-        options.insert("colspan".to_string(), TableCellOption::Int(colspan));
+        options.insert("colspan".into(), TableCellOption::Int(colspan));
         options.insert(
-            "style".to_string(),
+            "style".into(),
             match style {
                 Some(style) => TableCellOption::Style(style),
                 None => TableCellOption::Null,
             },
         );
         options
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::output::BufferedOutput;
+    use bstr::ByteSlice;
+
+    #[test]
+    fn style_characters_and_cell_format_keep_their_bytes() {
+        let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+            None, false, None,
+        )));
+        let mut style = TableStyle::default();
+        style.set_vertical_border_chars(BString::from(b"\xE9".as_slice()), None);
+        let cell_style = TableCellStyle::new(IndexMap::from([(
+            BString::from("cellFormat"),
+            PhpMixed::string(b"f\xE8 %s".as_slice()),
+        )]))
+        .unwrap();
+        let cell = TableCell::new(
+            "value",
+            IndexMap::from([(
+                BString::from("style"),
+                TableCellOption::Style(std::rc::Rc::new(cell_style)),
+            )]),
+        )
+        .unwrap();
+
+        let mut table = Table::new(output.clone());
+        table.set_style(style.into()).unwrap().unwrap();
+        table.add_row(vec![Cell::from(cell)].into());
+        table.render();
+
+        let rendered = output.borrow().fetch();
+        assert!(rendered.contains_str(b"\xE9"));
+        assert!(rendered.contains_str(b"f\xE8 "));
     }
 }

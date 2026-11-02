@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/HelperInterface.php
 
 use crate::helper::HelperSet;
+use bstr::BString;
 use shirabe_php_shim::AsAny;
 
 /// HelperInterface is the interface all helpers must implement.
@@ -12,5 +13,5 @@ pub trait HelperInterface: std::fmt::Debug + AsAny {
     fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>;
 
     /// Returns the canonical name of this helper.
-    fn get_name(&self) -> String;
+    fn get_name(&self) -> BString;
 }

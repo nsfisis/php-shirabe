@@ -1,58 +1,59 @@
 //! ref: composer/vendor/symfony/console/Helper/TableStyle.php
 
+use bstr::BString;
 use shirabe_php_shim::STR_PAD_RIGHT;
 
 /// Defines the styles for a Table.
 #[derive(Debug, Clone)]
 pub struct TableStyle {
-    padding_char: String,
-    horizontal_outside_border_char: String,
-    horizontal_inside_border_char: String,
-    vertical_outside_border_char: String,
-    vertical_inside_border_char: String,
-    crossing_char: String,
-    crossing_top_right_char: String,
-    crossing_top_mid_char: String,
-    crossing_top_left_char: String,
-    crossing_mid_right_char: String,
-    crossing_bottom_right_char: String,
-    crossing_bottom_mid_char: String,
-    crossing_bottom_left_char: String,
-    crossing_mid_left_char: String,
-    crossing_top_left_bottom_char: String,
-    crossing_top_mid_bottom_char: String,
-    crossing_top_right_bottom_char: String,
-    cell_header_format: String,
-    cell_row_format: String,
-    cell_row_content_format: String,
-    border_format: String,
+    padding_char: BString,
+    horizontal_outside_border_char: BString,
+    horizontal_inside_border_char: BString,
+    vertical_outside_border_char: BString,
+    vertical_inside_border_char: BString,
+    crossing_char: BString,
+    crossing_top_right_char: BString,
+    crossing_top_mid_char: BString,
+    crossing_top_left_char: BString,
+    crossing_mid_right_char: BString,
+    crossing_bottom_right_char: BString,
+    crossing_bottom_mid_char: BString,
+    crossing_bottom_left_char: BString,
+    crossing_mid_left_char: BString,
+    crossing_top_left_bottom_char: BString,
+    crossing_top_mid_bottom_char: BString,
+    crossing_top_right_bottom_char: BString,
+    cell_header_format: BString,
+    cell_row_format: BString,
+    cell_row_content_format: BString,
+    border_format: BString,
     pad_type: i64,
 }
 
 impl Default for TableStyle {
     fn default() -> Self {
         Self {
-            padding_char: " ".to_string(),
-            horizontal_outside_border_char: "-".to_string(),
-            horizontal_inside_border_char: "-".to_string(),
-            vertical_outside_border_char: "|".to_string(),
-            vertical_inside_border_char: "|".to_string(),
-            crossing_char: "+".to_string(),
-            crossing_top_right_char: "+".to_string(),
-            crossing_top_mid_char: "+".to_string(),
-            crossing_top_left_char: "+".to_string(),
-            crossing_mid_right_char: "+".to_string(),
-            crossing_bottom_right_char: "+".to_string(),
-            crossing_bottom_mid_char: "+".to_string(),
-            crossing_bottom_left_char: "+".to_string(),
-            crossing_mid_left_char: "+".to_string(),
-            crossing_top_left_bottom_char: "+".to_string(),
-            crossing_top_mid_bottom_char: "+".to_string(),
-            crossing_top_right_bottom_char: "+".to_string(),
-            cell_header_format: "<info>%s</info>".to_string(),
-            cell_row_format: "%s".to_string(),
-            cell_row_content_format: " %s ".to_string(),
-            border_format: "%s".to_string(),
+            padding_char: " ".into(),
+            horizontal_outside_border_char: "-".into(),
+            horizontal_inside_border_char: "-".into(),
+            vertical_outside_border_char: "|".into(),
+            vertical_inside_border_char: "|".into(),
+            crossing_char: "+".into(),
+            crossing_top_right_char: "+".into(),
+            crossing_top_mid_char: "+".into(),
+            crossing_top_left_char: "+".into(),
+            crossing_mid_right_char: "+".into(),
+            crossing_bottom_right_char: "+".into(),
+            crossing_bottom_mid_char: "+".into(),
+            crossing_bottom_left_char: "+".into(),
+            crossing_mid_left_char: "+".into(),
+            crossing_top_left_bottom_char: "+".into(),
+            crossing_top_mid_bottom_char: "+".into(),
+            crossing_top_right_bottom_char: "+".into(),
+            cell_header_format: "<info>%s</info>".into(),
+            cell_row_format: "%s".into(),
+            cell_row_content_format: " %s ".into(),
+            border_format: "%s".into(),
             pad_type: STR_PAD_RIGHT,
         }
     }
@@ -60,15 +61,15 @@ impl Default for TableStyle {
 
 impl TableStyle {
     /// Gets padding character, used for cell padding.
-    pub fn get_padding_char(&self) -> String {
+    pub fn get_padding_char(&self) -> BString {
         self.padding_char.clone()
     }
 
     /// Sets horizontal border characters.
     pub fn set_horizontal_border_chars(
         &mut self,
-        outside: String,
-        inside: Option<String>,
+        outside: BString,
+        inside: Option<BString>,
     ) -> &mut Self {
         self.horizontal_outside_border_char = outside.clone();
         self.horizontal_inside_border_char = inside.unwrap_or(outside);
@@ -79,8 +80,8 @@ impl TableStyle {
     /// Sets vertical border characters.
     pub fn set_vertical_border_chars(
         &mut self,
-        outside: String,
-        inside: Option<String>,
+        outside: BString,
+        inside: Option<BString>,
     ) -> &mut Self {
         self.vertical_outside_border_char = outside.clone();
         self.vertical_inside_border_char = inside.unwrap_or(outside);
@@ -89,7 +90,7 @@ impl TableStyle {
     }
 
     /// Gets border characters.
-    pub fn get_border_chars(&self) -> Vec<String> {
+    pub fn get_border_chars(&self) -> Vec<BString> {
         vec![
             self.horizontal_outside_border_char.clone(),
             self.vertical_outside_border_char.clone(),
@@ -102,18 +103,18 @@ impl TableStyle {
     #[allow(clippy::too_many_arguments)]
     pub fn set_crossing_chars(
         &mut self,
-        cross: String,
-        top_left: String,
-        top_mid: String,
-        top_right: String,
-        mid_right: String,
-        bottom_right: String,
-        bottom_mid: String,
-        bottom_left: String,
-        mid_left: String,
-        top_left_bottom: Option<String>,
-        top_mid_bottom: Option<String>,
-        top_right_bottom: Option<String>,
+        cross: BString,
+        top_left: BString,
+        top_mid: BString,
+        top_right: BString,
+        mid_right: BString,
+        bottom_right: BString,
+        bottom_mid: BString,
+        bottom_left: BString,
+        mid_left: BString,
+        top_left_bottom: Option<BString>,
+        top_mid_bottom: Option<BString>,
+        top_right_bottom: Option<BString>,
     ) -> &mut Self {
         self.crossing_char = cross.clone();
         self.crossing_top_left_char = top_left;
@@ -132,7 +133,7 @@ impl TableStyle {
     }
 
     /// Sets default crossing character used for each cross.
-    pub fn set_default_crossing_char(&mut self, char: String) -> &mut Self {
+    pub fn set_default_crossing_char(&mut self, char: BString) -> &mut Self {
         self.set_crossing_chars(
             char.clone(),
             char.clone(),
@@ -150,12 +151,12 @@ impl TableStyle {
     }
 
     /// Gets crossing character.
-    pub fn get_crossing_char(&self) -> String {
+    pub fn get_crossing_char(&self) -> BString {
         self.crossing_char.clone()
     }
 
     /// Gets crossing characters.
-    pub fn get_crossing_chars(&self) -> Vec<String> {
+    pub fn get_crossing_chars(&self) -> Vec<BString> {
         vec![
             self.crossing_char.clone(),
             self.crossing_top_left_char.clone(),
@@ -173,36 +174,36 @@ impl TableStyle {
     }
 
     /// Sets header cell format.
-    pub fn set_cell_header_format(&mut self, cell_header_format: String) -> &mut Self {
+    pub fn set_cell_header_format(&mut self, cell_header_format: BString) -> &mut Self {
         self.cell_header_format = cell_header_format;
 
         self
     }
 
     /// Gets header cell format.
-    pub fn get_cell_header_format(&self) -> String {
+    pub fn get_cell_header_format(&self) -> BString {
         self.cell_header_format.clone()
     }
 
     /// Gets row cell format.
-    pub fn get_cell_row_format(&self) -> String {
+    pub fn get_cell_row_format(&self) -> BString {
         self.cell_row_format.clone()
     }
 
     /// Sets row cell content format.
-    pub fn set_cell_row_content_format(&mut self, cell_row_content_format: String) -> &mut Self {
+    pub fn set_cell_row_content_format(&mut self, cell_row_content_format: BString) -> &mut Self {
         self.cell_row_content_format = cell_row_content_format;
 
         self
     }
 
     /// Gets row cell content format.
-    pub fn get_cell_row_content_format(&self) -> String {
+    pub fn get_cell_row_content_format(&self) -> BString {
         self.cell_row_content_format.clone()
     }
 
     /// Gets table border format.
-    pub fn get_border_format(&self) -> String {
+    pub fn get_border_format(&self) -> BString {
         self.border_format.clone()
     }
 

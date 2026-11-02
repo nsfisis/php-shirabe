@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Style/StyleInterface.php
 
 use crate::helper::{Cell, Row};
-use bstr::BString;
+use bstr::{BStr, BString};
 
 /// Output style helpers.
 pub trait StyleInterface {
@@ -12,7 +12,7 @@ pub trait StyleInterface {
     fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>);
 
     /// Asks for confirmation.
-    fn confirm(&mut self, question: &str, default: bool) -> bool;
+    fn confirm(&mut self, question: &BStr, default: bool) -> bool;
 
     /// Add newline(s).
     fn new_line(&mut self, count: i64);

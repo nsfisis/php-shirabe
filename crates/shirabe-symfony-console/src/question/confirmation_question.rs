@@ -9,17 +9,21 @@ use shirabe_php_shim::{PhpMixed, empty, preg_is_match, strval};
 #[derive(Debug)]
 pub struct ConfirmationQuestion {
     inner: Question,
-    true_answer_regex: String,
+    true_answer_regex: BString,
 }
 
 impl ConfirmationQuestion {
     /// `$question` The question to ask to the user.
     /// `$default` The default answer to return, true or false.
     /// `$trueAnswerRegex` A regex to match the "yes" answer.
-    pub fn new(question: impl Into<BString>, default: bool, true_answer_regex: String) -> Self {
+    pub fn new(
+        question: impl Into<BString>,
+        default: bool,
+        true_answer_regex: impl Into<BString>,
+    ) -> Self {
         let mut this = Self {
             inner: Question::new(question, Some(PhpMixed::Bool(default))),
-            true_answer_regex,
+            true_answer_regex: true_answer_regex.into(),
         };
 
         let normalizer = this.get_default_normalizer();

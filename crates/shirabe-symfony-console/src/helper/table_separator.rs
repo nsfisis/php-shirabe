@@ -2,6 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::helper::{TableCell, TableCellOption};
+use bstr::BString;
 use indexmap::IndexMap;
 
 /// Marks a row as being a separator.
@@ -15,7 +16,7 @@ impl TableSeparator {
         Self::new1(IndexMap::new()).expect("TableSeparator default options are always valid")
     }
 
-    fn new1(options: IndexMap<String, TableCellOption>) -> Result<Self, InvalidArgumentException> {
+    fn new1(options: IndexMap<BString, TableCellOption>) -> Result<Self, InvalidArgumentException> {
         Ok(Self {
             inner: TableCell::new("", options)?,
         })

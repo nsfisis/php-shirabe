@@ -87,7 +87,7 @@ impl Helper {
         mb_substr(string, from, length, Some(encoding.as_bstr()))
     }
 
-    pub fn format_time(secs: f64) -> Option<String> {
+    pub fn format_time(secs: f64) -> Option<BString> {
         // [threshold, label, divisor?]
         let time_formats: [(f64, &str, Option<f64>); 9] = [
             (0.0, "< 1 sec", None),
@@ -107,9 +107,9 @@ impl Helper {
                     || index == time_formats.len() - 1)
             {
                 match format.2 {
-                    None => return Some(format.1.to_string()),
+                    None => return Some(format.1.into()),
                     Some(divisor) => {
-                        return Some(format!("{} {}", (secs / divisor).floor(), format.1));
+                        return Some(format!("{} {}", (secs / divisor).floor(), format.1).into());
                     }
                 }
             }
@@ -118,20 +118,20 @@ impl Helper {
         None
     }
 
-    pub fn format_memory(memory: i64) -> String {
+    pub fn format_memory(memory: i64) -> BString {
         if memory >= 1024 * 1024 * 1024 {
-            return format!("{:.1} GiB", memory as f64 / 1024.0 / 1024.0 / 1024.0);
+            return format!("{:.1} GiB", memory as f64 / 1024.0 / 1024.0 / 1024.0).into();
         }
 
         if memory >= 1024 * 1024 {
-            return format!("{:.1} MiB", memory as f64 / 1024.0 / 1024.0);
+            return format!("{:.1} MiB", memory as f64 / 1024.0 / 1024.0).into();
         }
 
         if memory >= 1024 {
-            return format!("{} KiB", memory / 1024);
+            return format!("{} KiB", memory / 1024).into();
         }
 
-        format!("{} B", memory)
+        format!("{} B", memory).into()
     }
 
     pub fn strlen_without_decoration(
