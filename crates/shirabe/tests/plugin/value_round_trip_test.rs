@@ -11,6 +11,7 @@ use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{Link, PackageInterfaceHandle};
+use shirabe_php_shim::path_to_bytes;
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -21,7 +22,7 @@ fn values_fixture_package() -> PackageInterfaceHandle {
         .join("tests/plugin/fixtures/values-v1/composer.json");
     loader
         .load(JsonLoaderInput::String(
-            path.canonicalize().unwrap().to_str().unwrap().to_string(),
+            path_to_bytes(&path.canonicalize().unwrap()).into(),
         ))
         .unwrap()
 }

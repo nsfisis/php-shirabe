@@ -240,11 +240,8 @@ pub(crate) fn set_up() -> SetUp {
         packages.push(
             loader
                 .load(JsonLoaderInput::String(
-                    fixtures_dir()
-                        .join(format!("plugin-v{}/composer.json", i))
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    path_to_bytes(&fixtures_dir().join(format!("plugin-v{}/composer.json", i)))
+                        .into(),
                 ))
                 .unwrap(),
         );

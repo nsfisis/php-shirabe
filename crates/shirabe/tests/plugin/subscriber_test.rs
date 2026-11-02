@@ -8,6 +8,7 @@ use crate::plugin_installer_test::{new_installer, set_up};
 use shirabe::installer::InstallerInterface;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
+use shirabe_php_shim::path_to_bytes;
 
 fn subscriber_fixture_package() -> PackageInterfaceHandle {
     let loader = JsonLoader::new(Box::new(ArrayLoader::new(None, false)));
@@ -15,7 +16,7 @@ fn subscriber_fixture_package() -> PackageInterfaceHandle {
         .join("tests/plugin/fixtures/subscriber-v1/composer.json");
     loader
         .load(JsonLoaderInput::String(
-            path.canonicalize().unwrap().to_str().unwrap().to_string(),
+            path_to_bytes(&path.canonicalize().unwrap()).into(),
         ))
         .unwrap()
 }

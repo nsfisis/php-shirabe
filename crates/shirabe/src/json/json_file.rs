@@ -4,10 +4,10 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::JsonValidationException;
 use crate::util::{Filesystem, HttpDownloader};
-use bstr::{BStr, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
-    JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, UnexpectedValueException, dirname,
+    JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, dirname,
     file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc,
     json_decode_obj, json_encode_ex, mkdir, path_from_bytes, path_to_bytes, php_regex,
     preg_is_match, preg_match, preg_replace2, realpath, strpos, usleep, utf8_text,
@@ -283,7 +283,7 @@ impl JsonFile {
     }
 
     /// Validates the schema of the current json file according to composer-schema.json rules
-    pub fn validate_schema(&self, schema: i64, schema_file: Option<&str>) -> anyhow::Result<bool> {
+    pub fn validate_schema(&self, schema: i64, schema_file: Option<&BStr>) -> anyhow::Result<bool> {
         if !Filesystem::is_readable(&self.path) {
             return Err(RuntimeException::new(format!(
                 "The file \"{}\" is not readable.",
@@ -311,24 +311,24 @@ impl JsonFile {
         source: &BStr,
         data: &PhpMixed,
         schema: i64,
-        schema_file: Option<&str>,
+        schema_file: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         let mut is_composer_schema_file = false;
-        let mut schema_file = match schema_file {
-            Some(f) => f.to_string(),
+        let mut schema_file: BString = match schema_file {
+            Some(f) => f.to_owned(),
             None => {
                 if schema == Self::LOCK_SCHEMA {
-                    Self::LOCK_SCHEMA_PATH.to_string()
+                    Self::LOCK_SCHEMA_PATH.into()
                 } else {
                     is_composer_schema_file = true;
-                    Self::COMPOSER_SCHEMA_PATH.to_string()
+                    Self::COMPOSER_SCHEMA_PATH.into()
                 }
             }
         };
 
         // Prepend with file:// only when not using a special schema already (e.g. in the phar)
         if strpos(&schema_file, "://").is_none() {
-            schema_file = format!("file://{}", schema_file);
+            schema_file = bconcat!("file://", schema_file);
         }
 
         // PHP: $schemaData = (object) ['$ref' => $schemaFile, '$schema' => "https://json-schema.org/draft-04/schema#"];
@@ -359,7 +359,7 @@ impl JsonFile {
             let mut m = indexmap::IndexMap::new();
             m.insert(
                 "$ref".into(),
-                PhpMixed::string(format!("{}#/properties/config", schema_file)),
+                PhpMixed::string(bconcat!(schema_file, "#/properties/config")),
             );
             m.insert(
                 "$schema".into(),
@@ -369,6 +369,8 @@ impl JsonFile {
         }
 
         // convert assoc arrays to objects
+        // TODO(bytes): jsonschema takes the schema reference as text, so a schema path that is not
+        // valid UTF-8 fails here, where PHP reads the file.
         let schema_value = serde_json::to_value(&schema_data)?;
         let data_value = serde_json::to_value(data)?;
         let validator = jsonschema::options()

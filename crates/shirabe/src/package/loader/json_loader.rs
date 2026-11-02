@@ -5,12 +5,11 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::loader::LoaderInterface;
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, TypeError};
-use std::path::Path;
+use shirabe_php_shim::{PhpMixed, TypeError, file_exists, file_get_contents, path_from_bytes};
 
 pub enum JsonLoaderInput {
     File(JsonFile),
-    String(String),
+    String(BString),
 }
 
 pub struct JsonLoader {
@@ -25,8 +24,8 @@ impl JsonLoader {
     pub fn load(&self, json: JsonLoaderInput) -> anyhow::Result<PackageInterfaceHandle> {
         let config = match json {
             JsonLoaderInput::File(json_file) => json_file.read()?,
-            JsonLoaderInput::String(ref s) if Path::new(s).exists() => {
-                let contents = std::fs::read_to_string(s)?;
+            JsonLoaderInput::String(ref s) if file_exists(path_from_bytes(s)) => {
+                let contents = file_get_contents(path_from_bytes(s))?;
                 JsonFile::parse_json(Some(&contents), Some(bstr::BStr::new(s)))?
             }
             JsonLoaderInput::String(ref s) => JsonFile::parse_json(Some(s), None)?,

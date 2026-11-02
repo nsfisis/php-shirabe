@@ -3,7 +3,7 @@
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::json::{JsonEncodeOptions, JsonFile, JsonValidationException};
-use shirabe_php_shim::{Catch as _, PhpMixed, json_decode_assoc, json_decode_obj};
+use shirabe_php_shim::{Catch as _, PhpMixed, json_decode_assoc, json_decode_obj, path_to_bytes};
 use shirabe_seld_json_lint::ParsingException;
 
 /// ref: JsonFileTest::expectParseException
@@ -404,17 +404,20 @@ fn test_custom_schema_validation_lax() {
     .unwrap();
 
     let schema_tmp = create_temp_file();
-    let schema = schema_tmp.path().to_str().unwrap().to_string();
+    let schema = schema_tmp.path();
     std::fs::write(
-        &schema,
+        schema,
         b"{ \"properties\": { \"custom\": { \"type\": \"string\" }}}",
     )
     .unwrap();
 
     let json = JsonFile::new(file, None, None).unwrap();
 
-    json.validate_schema(JsonFile::LAX_SCHEMA, Some(&schema))
-        .unwrap();
+    json.validate_schema(
+        JsonFile::LAX_SCHEMA,
+        Some(bstr::BStr::new(path_to_bytes(schema))),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -424,17 +427,20 @@ fn test_custom_schema_validation_strict() {
     std::fs::write(&file, b"{ \"custom\": \"property\" }").unwrap();
 
     let schema_tmp = create_temp_file();
-    let schema = schema_tmp.path().to_str().unwrap().to_string();
+    let schema = schema_tmp.path();
     std::fs::write(
-        &schema,
+        schema,
         b"{ \"properties\": { \"custom\": { \"type\": \"string\" }}}",
     )
     .unwrap();
 
     let json = JsonFile::new(file, None, None).unwrap();
 
-    json.validate_schema(JsonFile::STRICT_SCHEMA, Some(&schema))
-        .unwrap();
+    json.validate_schema(
+        JsonFile::STRICT_SCHEMA,
+        Some(bstr::BStr::new(path_to_bytes(schema))),
+    )
+    .unwrap();
 }
 
 #[test]

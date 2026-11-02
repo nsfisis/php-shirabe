@@ -1,5 +1,0 @@
-2 crates/shirabe/tests/json/json_file_test.rs
-1 crates/shirabe/tests/plugin/alias_package_test.rs
-1 crates/shirabe/tests/plugin/plugin_installer_test.rs
-1 crates/shirabe/tests/plugin/subscriber_test.rs
-1 crates/shirabe/tests/plugin/value_round_trip_test.rs
