@@ -26,10 +26,10 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
-    array_search_in_vec, array_splice, bconcat, explode, explode_with_limit, file_exists,
-    get_class, hash, implode, ini_get, is_array, is_callable, is_dir, is_object, is_string, krsort,
-    os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
+    array_search_in_vec, array_splice, bconcat, error_message, explode, explode_with_limit,
+    file_exists, get_class, hash, implode, ini_get, is_array, is_callable, is_dir, is_object,
+    is_string, krsort, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
     spl_autoload_register, spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos,
     strtoupper, substr, trim2,
 };
@@ -1870,7 +1870,7 @@ pub(crate) fn dispatch_event_method(
                 }
             };
             let class = crate::plugin::php_plugin_proxy::io_stub_class(&io)
-                .map_err(|error| runtime_throw(error.to_string()))?;
+                .map_err(|error| runtime_throw(error_message(&error)))?;
             let rhandle = crate::plugin::php_plugin_proxy::register_io_entity(&io);
             Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
                 rhandle, class,
@@ -1990,7 +1990,7 @@ fn installer_event(event: &dyn EventInterface) -> Option<&InstallerEvent> {
     event.as_any().downcast_ref::<InstallerEvent>()
 }
 
-fn runtime_throw(message: String) -> PhpThrow {
+fn runtime_throw(message: impl Into<BString>) -> PhpThrow {
     PhpThrow::runtime(message)
 }
 

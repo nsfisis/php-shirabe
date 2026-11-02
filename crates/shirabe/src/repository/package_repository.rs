@@ -12,7 +12,8 @@ use crate::repository::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, json_encode, php_regex, preg_replace, var_export,
+    PhpMixed, RuntimeException, bconcat, error_message, json_encode, php_regex, preg_replace,
+    var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -64,9 +65,10 @@ impl PackageRepository {
             ) {
                 Ok(p) => p,
                 Err(e) => {
-                    let msg = format!(
-                        "A repository of type \"package\" contains an invalid package definition: {}\n\nInvalid package definition:\n{}",
-                        e,
+                    let msg = bconcat!(
+                        "A repository of type \"package\" contains an invalid package definition: ",
+                        error_message(&e),
+                        "\n\nInvalid package definition:\n",
                         json_encode(package).unwrap_or_default()
                     );
                     return Ok(Err(InvalidRepositoryException::new(msg)));

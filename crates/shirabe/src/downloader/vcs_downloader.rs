@@ -16,8 +16,8 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
-    array_shift, bconcat, explode, implode, path_from_bytes, path_to_bytes, rawurldecode, realpath,
-    str_replace, strlen, strpos, substr, trim,
+    array_shift, bconcat, error_message, explode, implode, path_from_bytes, path_to_bytes,
+    rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
 };
 use std::path::Path;
 
@@ -157,12 +157,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            format!(
-                                "Failed: [{}] {}",
+                            bconcat!(
+                                "Failed: [",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
-                                e
+                                "] ",
+                                error_message(&e)
                             ),
                             true,
                             io_interface::NORMAL,
@@ -270,12 +271,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            format!(
-                                "Failed: [{}] {}",
+                            bconcat!(
+                                "Failed: [",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
-                                e
+                                "] ",
+                                error_message(&e)
                             ),
                             true,
                             io_interface::NORMAL,
@@ -342,12 +344,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            format!(
-                                "Failed: [{}] {}",
+                            bconcat!(
+                                "Failed: [",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
-                                e
+                                "] ",
+                                error_message(&e)
                             ),
                             true,
                             io_interface::NORMAL,

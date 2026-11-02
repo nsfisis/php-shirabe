@@ -9,8 +9,8 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, file_get_contents, php_regex, preg_is_match, preg_replace, str_replace,
-    strtolower,
+    Catch as _, PhpMixed, error_message, file_get_contents, php_regex, preg_is_match, preg_replace,
+    str_replace, strtolower,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use std::path::Path;
@@ -66,7 +66,7 @@ impl ConfigValidator {
                         }
                     }
                 } else {
-                    errors.push(e.to_string());
+                    errors.push(error_message(&e).display_lossy().to_string());
 
                     return (errors, publish_errors, warnings);
                 }

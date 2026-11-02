@@ -15,7 +15,7 @@ impl GithubActionError {
         Self { io }
     }
 
-    pub fn emit(&mut self, message: &str, file: Option<&BStr>, line: Option<i64>) {
+    pub fn emit(&mut self, message: &BStr, file: Option<&BStr>, line: Option<i64>) {
         if Platform::get_env("GITHUB_ACTIONS").is_some_and(|v| !v.is_empty())
             && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none_or(|v| v.is_empty())
         {
@@ -39,17 +39,17 @@ impl GithubActionError {
                 self.io
                     .write(bconcat!("::error file=", file, "::", message));
             } else {
-                self.io.write(format!("::error ::{}", message));
+                self.io.write(bconcat!("::error ::", message));
             }
         }
     }
 
-    fn escape_data(&self, data: &str) -> String {
+    fn escape_data(&self, data: &BStr) -> BString {
         // see https://github.com/actions/toolkit/blob/4f7fb6513a355689f69f0849edeb369a4dc81729/packages/core/src/command.ts#L80-L85
-        let data = data.replace('%', "%25");
-        let data = data.replace('\r', "%0D");
+        let data = str_replace("%", "%25", data);
+        let data = str_replace("\r", "%0D", &data);
 
-        data.replace('\n', "%0A")
+        str_replace("\n", "%0A", &data)
     }
 
     fn escape_property(&self, property: &BStr) -> BString {

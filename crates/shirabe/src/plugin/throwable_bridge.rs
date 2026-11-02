@@ -10,7 +10,7 @@ use crate::json::JsonValidationException;
 use crate::package::loader::InvalidPackageException;
 use crate::plugin::PluginBlockedException;
 use crate::repository::{InvalidRepositoryException, RepositorySecurityException};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{
@@ -28,7 +28,9 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
     let revived = std::iter::once(&throw.exception_class)
         .chain(throw.parents.iter())
         .enumerate()
-        .find_map(|(depth, class)| revive(class, &throw).map(|exception| (depth, exception)));
+        .find_map(|(depth, class)| {
+            revive(class.as_bstr(), &throw).map(|exception| (depth, exception))
+        });
     let mut exception = match revived {
         Some((0, exception)) => exception,
         Some((_, parent)) => UnportedThrowable::new(throw.exception_class.clone(), parent).into(),
@@ -42,8 +44,7 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
     };
     exception.set_code(throw.code);
     if !throw.file.is_empty() {
-        // The location only ever appears in messages read by people.
-        exception.set_location(throw.file.display_lossy().to_string(), throw.line);
+        exception.set_location(throw.file.clone(), throw.line);
     }
     anyhow::Error::new(exception)
 }
@@ -76,7 +77,7 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
     if let Some(PhpMixed::List(parents)) = fields.get(6) {
         throw.parents = parents
             .iter()
-            .filter_map(|parent| parent.as_string().map(|s| s.display_lossy().to_string()))
+            .filter_map(|parent| parent.as_string().map(BString::from))
             .collect();
     }
     throw
@@ -84,7 +85,7 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
 
 /// The ported exception of exactly `class`, built from what `throw` carries, or `None` if the
 /// port has no type for it or cannot build one from a `Throw`.
-fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
+fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
     let message = throw.message.clone();
     let code = throw.code;
     let property = |name: &str| {
@@ -122,18 +123,18 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
             _ => Vec::new(),
         }
     };
-    Some(match class {
-        "Exception" => Exception::new(message).into(),
-        "Error" => Error::new(message).into(),
-        "TypeError" => TypeError::new(message).into(),
-        "RuntimeException" => RuntimeException::new(message).into(),
-        "UnexpectedValueException" => UnexpectedValueException::new(message).into(),
-        "OutOfBoundsException" => OutOfBoundsException::new(message).into(),
-        "LogicException" => LogicException::new(message).into(),
-        "InvalidArgumentException" => InvalidArgumentException::new(message).into(),
-        "BadFunctionCallException" => BadFunctionCallException::new(message).into(),
-        "BadMethodCallException" => BadMethodCallException::new(message).into(),
-        r"Composer\Downloader\TransportException" => {
+    Some(match class.as_bytes() {
+        b"Exception" => Exception::new(message).into(),
+        b"Error" => Error::new(message).into(),
+        b"TypeError" => TypeError::new(message).into(),
+        b"RuntimeException" => RuntimeException::new(message).into(),
+        b"UnexpectedValueException" => UnexpectedValueException::new(message).into(),
+        b"OutOfBoundsException" => OutOfBoundsException::new(message).into(),
+        b"LogicException" => LogicException::new(message).into(),
+        b"InvalidArgumentException" => InvalidArgumentException::new(message).into(),
+        b"BadFunctionCallException" => BadFunctionCallException::new(message).into(),
+        b"BadMethodCallException" => BadMethodCallException::new(message).into(),
+        br"Composer\Downloader\TransportException" => {
             let mut exception = TransportException::new(message, code);
             match property("headers") {
                 PhpMixed::List(items) => exception.set_headers(
@@ -159,26 +160,26 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
             });
             exception.into()
         }
-        r"Composer\Downloader\MaxFileSizeExceededException" => {
+        br"Composer\Downloader\MaxFileSizeExceededException" => {
             MaxFileSizeExceededException::new(message).into()
         }
-        r"Composer\Downloader\FilesystemException" => {
+        br"Composer\Downloader\FilesystemException" => {
             FilesystemException::new(message, code).into()
         }
-        r"Composer\Exception\IrrecoverableDownloadException" => {
+        br"Composer\Exception\IrrecoverableDownloadException" => {
             IrrecoverableDownloadException::new(message).into()
         }
-        r"Composer\Exception\NoSslException" => NoSslException::new(message).into(),
-        r"Composer\DependencyResolver\SolverBugException" => {
+        br"Composer\Exception\NoSslException" => NoSslException::new(message).into(),
+        br"Composer\DependencyResolver\SolverBugException" => {
             SolverBugException::new(message).into()
         }
-        r"Composer\EventDispatcher\ScriptExecutionException" => {
+        br"Composer\EventDispatcher\ScriptExecutionException" => {
             ScriptExecutionException::new(message, code).into()
         }
-        r"Composer\Json\JsonValidationException" => {
+        br"Composer\Json\JsonValidationException" => {
             JsonValidationException::new(message, strings("errors")).into()
         }
-        r"Composer\Package\Loader\InvalidPackageException" => InvalidPackageException::new(
+        br"Composer\Package\Loader\InvalidPackageException" => InvalidPackageException::new(
             strings("errors"),
             strings("warnings"),
             match property("data") {
@@ -187,14 +188,14 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
             },
         )
         .into(),
-        r"Composer\Plugin\PluginBlockedException" => PluginBlockedException::new(message).into(),
-        r"Composer\Repository\InvalidRepositoryException" => {
+        br"Composer\Plugin\PluginBlockedException" => PluginBlockedException::new(message).into(),
+        br"Composer\Repository\InvalidRepositoryException" => {
             InvalidRepositoryException::new(message).into()
         }
-        r"Composer\Repository\RepositorySecurityException" => {
+        br"Composer\Repository\RepositorySecurityException" => {
             RepositorySecurityException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\CommandNotFoundException" => {
+        br"Symfony\Component\Console\Exception\CommandNotFoundException" => {
             shirabe_symfony_console::exception::CommandNotFoundException::new(
                 message,
                 byte_strings("alternatives"),
@@ -202,7 +203,7 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
             )
             .into()
         }
-        r"Symfony\Component\Console\Exception\NamespaceNotFoundException" => {
+        br"Symfony\Component\Console\Exception\NamespaceNotFoundException" => {
             shirabe_symfony_console::exception::NamespaceNotFoundException::new(
                 message,
                 byte_strings("alternatives"),
@@ -210,31 +211,31 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
             )
             .into()
         }
-        r"Symfony\Component\Console\Exception\InvalidArgumentException" => {
+        br"Symfony\Component\Console\Exception\InvalidArgumentException" => {
             shirabe_symfony_console::exception::InvalidArgumentException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\InvalidOptionException" => {
+        br"Symfony\Component\Console\Exception\InvalidOptionException" => {
             shirabe_symfony_console::exception::InvalidOptionException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\LogicException" => {
+        br"Symfony\Component\Console\Exception\LogicException" => {
             shirabe_symfony_console::exception::LogicException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\MissingInputException" => {
+        br"Symfony\Component\Console\Exception\MissingInputException" => {
             shirabe_symfony_console::exception::MissingInputException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\RuntimeException" => {
+        br"Symfony\Component\Console\Exception\RuntimeException" => {
             shirabe_symfony_console::exception::RuntimeException::new(message).into()
         }
-        r"Symfony\Component\Process\Exception\InvalidArgumentException" => {
+        br"Symfony\Component\Process\Exception\InvalidArgumentException" => {
             shirabe_symfony_process::exception::InvalidArgumentException::new(message).into()
         }
-        r"Symfony\Component\Process\Exception\LogicException" => {
+        br"Symfony\Component\Process\Exception\LogicException" => {
             shirabe_symfony_process::exception::LogicException::new(message).into()
         }
-        r"Symfony\Component\Process\Exception\RuntimeException" => {
+        br"Symfony\Component\Process\Exception\RuntimeException" => {
             shirabe_symfony_process::exception::RuntimeException::new(message).into()
         }
-        r"Symfony\Component\Filesystem\Exception\IOException" => {
+        br"Symfony\Component\Filesystem\Exception\IOException" => {
             shirabe_symfony_filesystem::exception::IOException::new(message, code, None, None)
                 .into()
         }
@@ -250,7 +251,7 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
 pub(crate) fn exception_into_throw(exception: &AnyThrowable, error: &anyhow::Error) -> PhpThrow {
     let mut throw = PhpThrow::new(
         exception.php_class_name(),
-        exception.get_message().to_string(),
+        exception.get_message().to_owned(),
         exception.get_code(),
     );
     *throw.properties = throwable_properties(error);
@@ -335,10 +336,13 @@ mod tests {
     use super::*;
 
     fn throw(class: &str, parents: &[&str]) -> PhpThrow {
-        let mut throw = PhpThrow::new(class.to_string(), "boom".to_string(), 7);
+        let mut throw = PhpThrow::new(class, "boom", 7);
         throw.file = bstr::BString::from("/project/src/Thrower.php".to_string());
         throw.line = 12;
-        throw.parents = parents.iter().map(|parent| parent.to_string()).collect();
+        throw.parents = parents
+            .iter()
+            .map(|parent| BString::from(*parent))
+            .collect();
         throw
     }
 

@@ -21,10 +21,10 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
-    RuntimeException, UnexpectedValueException, bconcat, chmod, dirname, explode, extension_loaded,
-    file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable,
-    parse_url, path_from_bytes, path_to_bytes, pathinfo, realpath, rtrim2, spl_object_hash, strlen,
-    strpos, strtr, trim, umask, usleep,
+    RuntimeException, UnexpectedValueException, bconcat, chmod, dirname, error_message, explode,
+    extension_loaded, file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir,
+    is_executable, parse_url, path_from_bytes, path_to_bytes, pathinfo, realpath, rtrim2,
+    spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
@@ -181,11 +181,12 @@ impl FileDownloader {
                 return Err(err);
             }
 
-            return Ok(Some(BString::from(format!(
-                "Failed to detect changes: [{}] {}",
-                get_class(&PhpMixed::Null).display_lossy(),
-                err
-            ))));
+            return Ok(Some(bconcat!(
+                "Failed to detect changes: [",
+                get_class(&PhpMixed::Null),
+                "] ",
+                error_message(&err)
+            )));
         }
 
         let output = trim(&output);
@@ -579,23 +580,29 @@ impl DownloaderInterface for FileDownloader {
                                 .catch::<TransportException>()
                                 .map_or(0, |te| te.get_code());
                             if self.io.borrow().is_debug() {
-                                self.io.borrow().write_error(format!(
-                                    "    Failed downloading {}: [{}] {}: {}",
-                                    package.get_name().display_lossy(),
-                                    get_class(&PhpMixed::Null).display_lossy(),
+                                self.io.borrow().write_error(bconcat!(
+                                    "    Failed downloading ",
+                                    package.get_name(),
+                                    ": [",
+                                    get_class(&PhpMixed::Null),
+                                    "] ",
                                     code,
-                                    e
+                                    ": ",
+                                    error_message(&e)
                                 ));
                                 self.io.borrow().write_error(format!(
                                     "    Trying the next URL for {}",
                                     package.get_name().display_lossy()
                                 ));
                             } else {
-                                self.io.borrow().write_error(format!(
-                                    "    Failed downloading {}, trying the next URL ({}: {})",
-                                    package.get_name().display_lossy(),
+                                self.io.borrow().write_error(bconcat!(
+                                    "    Failed downloading ",
+                                    package.get_name(),
+                                    ", trying the next URL (",
                                     code,
-                                    e
+                                    ": ",
+                                    error_message(&e),
+                                    ")"
                                 ));
                             }
 

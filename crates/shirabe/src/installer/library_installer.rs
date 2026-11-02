@@ -216,7 +216,7 @@ impl LibraryInstaller {
                     "{} should be initialized with a fully loaded Composer instance to be able to install/... packages",
                     "LibraryInstaller",
                 ))
-            .get_message()
+            .get_message().display_lossy()
         );
 
         self.download_manager.as_ref().unwrap()

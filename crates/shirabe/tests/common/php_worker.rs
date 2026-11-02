@@ -41,12 +41,7 @@ pub fn load_composer_php_runtime() {
 pub fn php_call_static(class: &str, method: &str, args: Vec<PluginValue>) -> PluginValue {
     shirabe_php_rpc::call_static_method(class, method, args, None)
         .unwrap_or_else(|error| panic!("{class}::{method} request failed: {error}"))
-        .unwrap_or_else(|throw| {
-            panic!(
-                "{class}::{method} threw {}: {}",
-                throw.exception_class, throw.message
-            )
-        })
+        .unwrap_or_else(|throw| panic!("{class}::{method} threw {throw}"))
 }
 
 /// Runs a PHP snippet in the worker and returns its `return` value.

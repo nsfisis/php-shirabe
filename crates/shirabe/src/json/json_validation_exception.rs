@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Json/JsonValidationException.php
 
+use bstr::BString;
 use shirabe_php_shim::Exception;
 
 #[derive(Debug)]
@@ -10,7 +11,7 @@ pub struct JsonValidationException {
 
 impl JsonValidationException {
     #[track_caller]
-    pub fn new(message: String, errors: Vec<String>) -> Self {
+    pub fn new(message: impl Into<BString>, errors: Vec<String>) -> Self {
         Self {
             inner: Exception::new(message),
             errors,

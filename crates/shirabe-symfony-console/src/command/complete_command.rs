@@ -140,9 +140,9 @@ impl CompleteCommand {
     }
 }
 
-fn get_class_of_command(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> String {
+fn get_class_of_command(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> BString {
     // LazyCommand is intentionally not ported.
-    command.borrow().php_class_name()
+    command.borrow().php_class_name().to_owned()
 }
 
 fn get_definition_options(
@@ -333,7 +333,7 @@ impl Command for CompleteCommand {
                     if CompletionInput::TYPE_OPTION_NAME == completion_input.get_completion_type() {
                         self.log(&format!(
                             "  Completing option names for the <comment>{}</> command.",
-                            get_class_of_command(&command)
+                            get_class_of_command(&command).display_lossy()
                         ));
 
                         suggestions.suggest_options(get_definition_options(&command));
@@ -341,7 +341,7 @@ impl Command for CompleteCommand {
                         self.log_many(vec![
                             format!(
                                 "  Completing using the <comment>{}</> class.",
-                                get_class_of_command(&command)
+                                get_class_of_command(&command).display_lossy()
                             ),
                             format!(
                                 "  Completing <comment>{}</> for <comment>{}</>",

@@ -1,5 +1,6 @@
 //! ref: composer/vendor/symfony/filesystem/Exception/IOException.php
 
+use bstr::BString;
 use shirabe_php_shim::RuntimeException;
 use std::path::PathBuf;
 
@@ -12,7 +13,7 @@ pub struct IOException {
 impl IOException {
     #[track_caller]
     pub fn new(
-        message: String,
+        message: impl Into<BString>,
         code: i64,
         previous: Option<std::sync::Arc<anyhow::Error>>,
         path: Option<PathBuf>,

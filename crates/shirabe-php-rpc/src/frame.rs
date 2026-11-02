@@ -65,8 +65,8 @@ pub enum Frame {
     },
     Throw {
         corr_id: u64,
-        exception_class: String,
-        message: String,
+        exception_class: BString,
+        message: BString,
         code: i64,
         /// The state the exception carries beyond `message` and `code`, keyed by the property
         /// names its class declares. Empty for an exception that carries none.
@@ -74,7 +74,7 @@ pub enum Frame {
         file: BString,
         line: i64,
         /// The superclasses of `exception_class`, nearest first.
-        parents: Vec<String>,
+        parents: Vec<BString>,
     },
     ReleaseRustHandle {
         rhandle: u64,
@@ -311,8 +311,8 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         },
         TAG_THROW => Frame::Throw {
             corr_id,
-            exception_class: expect_string(next()),
-            message: expect_string(next()),
+            exception_class: expect_bytes(next()),
+            message: expect_bytes(next()),
             code: match next() {
                 PluginValue::Int(code) => code,
                 other => {
@@ -332,7 +332,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
                     panic!("PHP RPC: protocol violation — Throw line is not an int: {other:?}")
                 }
             },
-            parents: expect_list(next()).into_iter().map(expect_string).collect(),
+            parents: expect_list(next()).into_iter().map(expect_bytes).collect(),
         },
         TAG_RELEASE_RUST_HANDLE => Frame::ReleaseRustHandle {
             rhandle: expect_id(next()),
@@ -468,8 +468,8 @@ mod tests {
     fn frame_roundtrip_throw_with_properties() {
         let frame = roundtrip(Frame::Throw {
             corr_id: 11,
-            exception_class: "Composer\\Downloader\\TransportException".to_string(),
-            message: "The \"https://example.org\" file could not be downloaded".to_string(),
+            exception_class: "Composer\\Downloader\\TransportException".into(),
+            message: "The \"https://example.org\" file could not be downloaded".into(),
             code: 401,
             properties: [
                 ("statusCode".into(), PluginValue::Int(401)),
@@ -479,7 +479,7 @@ mod tests {
             .collect(),
             file: "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".into(),
             line: 42,
-            parents: vec!["RuntimeException".to_string(), "Exception".to_string()],
+            parents: vec!["RuntimeException".into(), "Exception".into()],
         });
         match frame {
             Frame::Throw {

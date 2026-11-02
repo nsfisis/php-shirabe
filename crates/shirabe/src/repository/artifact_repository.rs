@@ -13,8 +13,8 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PATHINFO_EXTENSION, PhpMixed, RuntimeException, UnexpectedValueException, basename, bconcat,
-    extension_loaded, hash_file, path_from_bytes, path_to_bytes, pathinfo, php_regex,
-    preg_is_match, realpath, strtr,
+    error_message, extension_loaded, hash_file, path_from_bytes, path_to_bytes, pathinfo,
+    php_regex, preg_is_match, realpath, strtr,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -174,10 +174,11 @@ impl ArtifactRepository {
             Ok(j) => json = j,
             Err(exception) => {
                 self.io.write3(
-                    format!(
-                        "Failed loading package {}: {}",
-                        pathname.display_lossy(),
-                        exception
+                    bconcat!(
+                        "Failed loading package ",
+                        pathname,
+                        ": ",
+                        error_message(&exception)
                     ),
                     false,
                     io_interface::VERBOSE,
@@ -212,10 +213,11 @@ impl ArtifactRepository {
         match self.loader.load(cfg, None) {
             Ok(package) => Ok(Some(package)),
             Err(exception) => {
-                let message = format!(
-                    "Failed loading package in {}: {}",
-                    pathname.display_lossy(),
-                    exception
+                let message = bconcat!(
+                    "Failed loading package in ",
+                    pathname,
+                    ": ",
+                    error_message(&exception)
                 );
                 Err(UnexpectedValueException::with_code_and_previous(
                     message,

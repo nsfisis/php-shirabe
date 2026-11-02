@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/RepositorySecurityException.php
 
+use bstr::BString;
 use shirabe_php_shim::Exception;
 
 /// Thrown when a security problem, like a broken or missing signature
@@ -8,7 +9,7 @@ pub struct RepositorySecurityException(pub Exception);
 
 impl RepositorySecurityException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self(Exception::new(message))
     }
 }

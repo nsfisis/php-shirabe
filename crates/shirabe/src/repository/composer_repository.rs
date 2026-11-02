@@ -28,10 +28,10 @@ use indexmap::IndexMap;
 use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinifier};
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
-    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, explode, extension_loaded, hash,
-    http_build_query_mixed, implode, json_decode_assoc, parse_url, path_from_bytes, php_regex,
-    preg_grep, preg_is_match, preg_match, preg_replace, preg_split, realpath, rtrim2, str_replace,
-    strpos, strtolower, strtr, urlencode, var_export,
+    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, error_message, explode,
+    extension_loaded, hash, http_build_query_mixed, implode, json_decode_assoc, parse_url,
+    path_from_bytes, php_regex, preg_grep, preg_is_match, preg_match, preg_replace, preg_split,
+    realpath, rtrim2, str_replace, strpos, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -1470,7 +1470,7 @@ impl ComposerRepository {
                                     Some(bconcat!("not-found file (", Url::sanitize(&url), ")"));
                                 if status_code == Some(499) {
                                     self.io.error(
-                                        format!("<warning>{}</warning>", te.get_message()),
+                                        bconcat!("<warning>", te.get_message(), "</warning>"),
                                         &[],
                                     );
                                 }
@@ -2700,16 +2700,18 @@ impl ComposerRepository {
         })();
 
         result.map_err(|e| {
-            let message = format!(
-                "Could not load packages in {}{}: [{}] {}",
-                self.get_repo_name().display_lossy(),
+            let message = bconcat!(
+                "Could not load packages in ",
+                self.get_repo_name(),
                 source
                     .as_ref()
-                    .map(|s| format!(" from {}", s.display_lossy()))
+                    .map(|s| bconcat!(" from ", s))
                     .unwrap_or_default(),
+                ": [",
                 AnyThrowable::of(&e)
-                    .map_or_else(|| "Exception".to_string(), PhpClass::php_class_name),
-                e
+                    .map_or_else(|| BStr::new("Exception"), PhpClass::php_class_name),
+                "] ",
+                error_message(&e),
             );
             RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))
                 .into()
@@ -2880,11 +2882,7 @@ impl ComposerRepository {
                         && let Some(contents) = self.cache.borrow_mut().read(ck)
                     {
                         if !self.degraded_mode.get() {
-                            self.io.write_error(format!(
-                                        "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
-                                        self.url.display_lossy(),
-                                        e
-                                    ));
+                            self.io.write_error(bconcat!("<warning>", self.url, " could not be fully loaded (", error_message(&e), "), package information was loaded from the local cache and may be out of date</warning>"));
                         }
                         self.degraded_mode.set(true);
                         let parsed = JsonFile::parse_json(
@@ -3036,11 +3034,7 @@ impl ComposerRepository {
                 }
 
                 if !self.degraded_mode.get() {
-                    self.io.write_error(format!(
-                        "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
-                        self.url.display_lossy(),
-                        e
-                    ));
+                    self.io.write_error(bconcat!("<warning>", self.url, " could not be fully loaded (", error_message(&e), "), package information was loaded from the local cache and may be out of date</warning>"));
                 }
                 self.degraded_mode.set(true);
 
@@ -3233,11 +3227,7 @@ impl ComposerRepository {
         }
 
         if !self.degraded_mode.get() {
-            self.io.write_error(format!(
-                "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
-                self.url.display_lossy(),
-                e
-            ));
+            self.io.write_error(bconcat!("<warning>", self.url, " could not be fully loaded (", error_message(&e), "), package information was loaded from the local cache and may be out of date</warning>"));
         }
         self.degraded_mode.set(true);
 

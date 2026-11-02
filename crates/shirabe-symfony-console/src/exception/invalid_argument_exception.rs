@@ -1,13 +1,14 @@
 //! ref: composer/vendor/symfony/console/Exception/InvalidArgumentException.php
 
 use super::exception_interface::ExceptionInterface;
+use bstr::BString;
 
 #[derive(Debug)]
 pub struct InvalidArgumentException(pub shirabe_php_shim::InvalidArgumentException);
 
 impl InvalidArgumentException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self(shirabe_php_shim::InvalidArgumentException::new(message))
     }
 }

@@ -8,9 +8,9 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
-    ZipArchive, bconcat, bin2hex, class_exists, file_exists, file_get_contents, filesize,
-    hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex, preg_match,
-    random_int, str_replace, strlen, substr, version_compare,
+    ZipArchive, bconcat, bin2hex, class_exists, error_message, file_exists, file_get_contents,
+    filesize, hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex,
+    preg_match, random_int, str_replace, strlen, substr, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -202,22 +202,24 @@ impl ZipDownloader {
             return Err(process_error);
         }
 
-        if process_error.to_string().contains("zip bomb") {
+        if error_message(&process_error).contains_str("zip bomb") {
             return Err(process_error);
         }
 
         if !is_file(file) {
-            self.inner
-                .io
-                .borrow()
-                .write_error(format!("    <warning>{}</warning>", process_error));
+            self.inner.io.borrow().write_error(bconcat!(
+                "    <warning>",
+                error_message(&process_error),
+                "</warning>"
+            ));
             self.inner.io.borrow().write_error("    <warning>This most likely is due to a custom installer plugin not handling the returned Promise from the downloader</warning>");
             self.inner.io.borrow().write_error("    <warning>See https://github.com/composer/installers/commit/5006d0c28730ade233a8f42ec31ac68fb1c5c9bb for an example fix</warning>");
         } else {
-            self.inner
-                .io
-                .borrow()
-                .write_error(format!("    <warning>{}</warning>", process_error));
+            self.inner.io.borrow().write_error(bconcat!(
+                "    <warning>",
+                error_message(&process_error),
+                "</warning>"
+            ));
             self.inner.io.borrow().write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
             self.inner.io.borrow().write_error(format!(
                 "    Unzip with {} command failed, falling back to ZipArchive class",
@@ -365,11 +367,7 @@ impl ZipDownloader {
 
         result.map_err(|e| {
             if let Some(err) = e.catch::<ErrorException>() {
-                let message = format!(
-                    "The archive for \"{}\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): {}",
-                    package.get_name().display_lossy(),
-                    err.get_message(),
-                );
+                let message = bconcat!("The archive for \"", package.get_name(), "\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): ", err.get_message());
                 RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))
                     .into()
             } else {

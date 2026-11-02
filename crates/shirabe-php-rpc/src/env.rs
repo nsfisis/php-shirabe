@@ -51,7 +51,7 @@ pub(crate) fn flush() -> anyhow::Result<()> {
         .collect();
     let outcome = crate::call_function("__shirabe_sync_env", vec![PluginValue::List(mutations)])?;
     // The worker only writes the three storages; nothing it does there can throw.
-    outcome.unwrap_or_else(|throw| panic!("PHP RPC: __shirabe_sync_env threw: {}", throw.message));
+    outcome.unwrap_or_else(|throw| panic!("PHP RPC: __shirabe_sync_env threw: {throw}"));
     *synced = cursor;
     Ok(())
 }

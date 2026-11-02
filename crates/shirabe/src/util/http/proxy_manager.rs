@@ -3,7 +3,8 @@
 use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;
 use crate::util::http::{ProxyItem, RequestProxy};
-use shirabe_php_shim::{PHP_SERVER, parse_url};
+use bstr::BString;
+use shirabe_php_shim::{PHP_SERVER, bconcat, error_message, parse_url};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -15,7 +16,7 @@ static NEXT_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 pub struct ProxyManager {
-    error: Option<String>,
+    error: Option<BString>,
     http_proxy: Option<ProxyItem>,
     https_proxy: Option<ProxyItem>,
     no_proxy_handler: std::cell::RefCell<Option<NoProxyPattern>>,
@@ -32,7 +33,7 @@ impl ProxyManager {
             generation: NEXT_GENERATION.fetch_add(1, Ordering::Relaxed),
         };
         if let Err(e) = instance.get_proxy_data() {
-            instance.error = Some(e.to_string());
+            instance.error = Some(error_message(&e));
         }
         instance
     }
@@ -75,7 +76,7 @@ impl ProxyManager {
         let request_url = request_url.as_ref();
         if let Some(ref error) = self.error {
             return Err(Box::new(TransportException::new(
-                format!("Unable to use a proxy: {}", error),
+                bconcat!("Unable to use a proxy: ", error),
                 0,
             )));
         }

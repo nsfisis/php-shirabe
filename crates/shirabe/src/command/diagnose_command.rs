@@ -18,13 +18,13 @@ use crate::repository::{
 use crate::self_update::{Keys, Versions};
 use crate::util::http::{ProxyManager, RequestProxy};
 use crate::util::{ConfigValidator, Git, HttpDownloader, IniHelper, Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,
-    PhpMixed, bconcat, disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class,
-    implode, path_from_bytes, php_regex, preg_match, rtrim2, str_replace, strpos, strstr, strstr3,
-    strtolower, trim2, version_compare,
+    PhpMixed, bconcat, disk_free_space, error_message, file_exists, filter_var_boolean, hash,
+    impl_php_class, implode, path_from_bytes, php_regex, preg_match, rtrim2, str_replace, strpos,
+    strstr, strstr3, strtolower, trim2, version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -37,8 +37,8 @@ enum CheckResult {
     Ok,
     /// A falsey PHP result: counted as an error, with no message of its own.
     Failed,
-    Message(String),
-    Messages(Vec<String>),
+    Message(BString),
+    Messages(Vec<BString>),
     Exception(anyhow::Error),
 }
 
@@ -86,21 +86,25 @@ impl DiagnoseCommand {
         let (errors, _, warnings) = validator.validate(&Factory::get_composer_file()?, 0, 0);
 
         if !errors.is_empty() || !warnings.is_empty() {
-            let mut messages: IndexMap<String, Vec<String>> = IndexMap::new();
-            messages.insert("error".to_string(), errors);
-            messages.insert("warning".to_string(), warnings);
+            let mut messages: IndexMap<BString, Vec<BString>> = IndexMap::new();
+            messages.insert(
+                BString::from("error"),
+                errors.into_iter().map(BString::from).collect(),
+            );
+            messages.insert(
+                BString::from("warning"),
+                warnings.into_iter().map(BString::from).collect(),
+            );
 
-            let mut output = String::new();
+            let mut output = BString::default();
             for (style, msgs) in &messages {
                 for msg in msgs {
-                    output.push_str(&format!("<{}>{}</{}>{}", style, msg, style, PHP_EOL));
+                    output.push_str(&bconcat!("<", style, ">", msg, "</", style, ">", PHP_EOL));
                 }
             }
 
             return Ok(CheckResult::Message(
-                rtrim2(&output, " \t\n\r\0\u{0B}")
-                    .display_lossy()
-                    .to_string(),
+                rtrim2(&output, " \t\n\r\0\u{0B}").to_owned(),
             ));
         }
 
@@ -117,15 +121,13 @@ impl DiagnoseCommand {
             Ok(_) => {}
             Err(e) => {
                 if let Some(jve) = e.catch::<JsonValidationException>() {
-                    let mut output = String::new();
+                    let mut output = BString::default();
                     for error in jve.get_errors() {
-                        output.push_str(&format!("<error>{}</error>{}", error, PHP_EOL));
+                        output.push_str(&bconcat!("<error>", error, "</error>", PHP_EOL));
                     }
 
                     return Ok(CheckResult::Message(
-                        trim2(&output, " \t\n\r\0\u{0B}")
-                            .display_lossy()
-                            .to_string(),
+                        trim2(&output, " \t\n\r\0\u{0B}").to_owned(),
                     ));
                 }
                 return Err(e);
@@ -135,11 +137,11 @@ impl DiagnoseCommand {
         Ok(CheckResult::Ok)
     }
 
-    fn check_git(&self) -> anyhow::Result<String> {
+    fn check_git(&self) -> anyhow::Result<BString> {
         if !shirabe_php_rpc::get_diagnostics().function_exists("proc_open") {
-            return Ok(
-                "<comment>proc_open is not available, git cannot be used</comment>".to_string(),
-            );
+            return Ok(BString::from(
+                "<comment>proc_open is not available, git cannot be used</comment>",
+            ));
         }
 
         let mut output = BString::default();
@@ -151,40 +153,44 @@ impl DiagnoseCommand {
             .borrow_mut()
             .execute(
                 vec![
-                    "git".to_string(),
-                    "config".to_string(),
-                    "color.ui".to_string(),
+                    BString::from("git"),
+                    BString::from("config"),
+                    BString::from("color.ui"),
                 ],
                 &mut output,
                 None,
             );
         if strtolower(trim2(&output, " \t\n\r\0\u{0B}")) == "always" {
-            return Ok("<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>".to_string());
+            return Ok(BString::from(
+                "<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>",
+            ));
         }
 
         let process = self.process.borrow();
         let git_version = Git::get_version(process.as_ref().unwrap())?;
         let git_version = match git_version {
             Some(v) => v,
-            None => return Ok("<comment>No git process found</>".to_string()),
+            None => return Ok(BString::from("<comment>No git process found</>")),
         };
 
         if version_compare("2.24.0", &git_version, CmpOp::Gt) {
-            return Ok(format!(
-                "<warning>Your git version ({}) is too old and possibly will cause issues. Please upgrade to git 2.24 or above</>",
-                git_version.display_lossy()
+            return Ok(bconcat!(
+                "<warning>Your git version (",
+                git_version,
+                ") is too old and possibly will cause issues. Please upgrade to git 2.24 or above</>"
             ));
         }
 
-        Ok(format!(
-            "<info>OK</> <comment>git version {}</>",
-            git_version.display_lossy()
+        Ok(bconcat!(
+            "<info>OK</> <comment>git version ",
+            git_version,
+            "</>"
         ))
     }
 
     fn check_http(
         &self,
-        proto: &str,
+        proto: &BStr,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
     ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
@@ -192,10 +198,12 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let mut result_list: Vec<String> = vec![];
-        let mut tls_warning: Option<String> = None;
+        let mut result_list: Vec<BString> = vec![];
+        let mut tls_warning: Option<BString> = None;
         if proto == "https" && config.borrow().get("disable-tls").as_bool() == Some(true) {
-            tls_warning = Some("<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
+            tls_warning = Some(BString::from(
+                "<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>",
+            ));
         }
 
         match self
@@ -205,7 +213,7 @@ impl DiagnoseCommand {
             .unwrap()
             .borrow_mut()
             .get(
-                format!("{}://repo.packagist.org/packages.json", proto),
+                bconcat!(proto, "://repo.packagist.org/packages.json"),
                 IndexMap::new(),
             ) {
             Ok(_) => {}
@@ -214,16 +222,18 @@ impl DiagnoseCommand {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
-                            result_list.push(hint);
+                            result_list.push(BString::from(hint));
                         }
                     }
 
-                    result_list.push(format!(
-                        "<error>[{}] {}</error>",
+                    result_list.push(bconcat!(
+                        "<error>[",
                         AnyThrowable::of(&e)
                             .expect("the catch above proved the error carries a \\Throwable")
                             .php_class_name(),
-                        te.get_message()
+                        "] ",
+                        te.get_message(),
+                        "</error>"
                     ));
                 } else {
                     return Err(e);
@@ -252,12 +262,14 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let mut result_list: Vec<String> = vec![];
-        let mut tls_warning: Option<String> = None;
+        let mut result_list: Vec<BString> = vec![];
+        let mut tls_warning: Option<BString> = None;
         if url.starts_with(b"https://")
             && config.borrow().get("disable-tls").as_bool() == Some(true)
         {
-            tls_warning = Some("<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
+            tls_warning = Some(BString::from(
+                "<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>",
+            ));
         }
 
         match self
@@ -274,16 +286,18 @@ impl DiagnoseCommand {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
-                            result_list.push(hint);
+                            result_list.push(BString::from(hint));
                         }
                     }
 
-                    result_list.push(format!(
-                        "<error>[{}] {}</error>",
+                    result_list.push(bconcat!(
+                        "<error>[",
                         AnyThrowable::of(&e)
                             .expect("the catch above proved the error carries a \\Throwable")
                             .php_class_name(),
-                        te.get_message()
+                        "] ",
+                        te.get_message(),
+                        "</error>"
                     ));
                 } else {
                     return Err(e);
@@ -305,7 +319,7 @@ impl DiagnoseCommand {
     fn check_http_proxy(
         &self,
         proxy: &RequestProxy,
-        protocol: &str,
+        protocol: &BStr,
     ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if !matches!(result, CheckResult::Ok) {
@@ -316,9 +330,10 @@ impl DiagnoseCommand {
             let proxy_status = proxy.get_status(None).unwrap_or_default();
 
             if proxy.is_excluded_by_no_proxy() {
-                return Ok(CheckResult::Message(format!(
-                    "<info>SKIP</> <comment>Because repo.packagist.org is {}</>",
-                    proxy_status
+                return Ok(CheckResult::Message(bconcat!(
+                    "<info>SKIP</> <comment>Because repo.packagist.org is ",
+                    proxy_status,
+                    "</>"
                 )));
             }
 
@@ -329,7 +344,7 @@ impl DiagnoseCommand {
                 .unwrap()
                 .borrow_mut()
                 .get(
-                    format!("{}://repo.packagist.org/packages.json", protocol),
+                    bconcat!(protocol, "://repo.packagist.org/packages.json"),
                     IndexMap::new(),
                 )?
                 .decode_json()?;
@@ -370,16 +385,20 @@ impl DiagnoseCommand {
                 let provider = response.get_body().unwrap_or_default().to_vec();
 
                 if hash("sha256", &provider) != hash_val.as_string().unwrap_or_default() {
-                    return Ok(CheckResult::Message(format!(
-                        "<warning>It seems that your proxy ({}) is modifying {} traffic on the fly</>",
-                        proxy_status, protocol
+                    return Ok(CheckResult::Message(bconcat!(
+                        "<warning>It seems that your proxy (",
+                        proxy_status,
+                        ") is modifying ",
+                        protocol,
+                        " traffic on the fly</>"
                     )));
                 }
             }
 
-            Ok(CheckResult::Message(format!(
-                "<info>OK</> <comment>{}</>",
-                proxy_status
+            Ok(CheckResult::Message(bconcat!(
+                "<info>OK</> <comment>",
+                proxy_status,
+                "</>"
             )))
         })();
         match result {
@@ -420,24 +439,27 @@ impl DiagnoseCommand {
                 let expiration = response.get_header("github-authentication-token-expiration");
 
                 if expiration.is_none() {
-                    return Ok(CheckResult::Message(
-                        "<info>OK</> <comment>does not expire</>".to_string(),
-                    ));
+                    return Ok(CheckResult::Message(BString::from(
+                        "<info>OK</> <comment>does not expire</>",
+                    )));
                 }
 
-                Ok(CheckResult::Message(format!(
-                    "<info>OK</> <comment>expires on {}</>",
-                    expiration.unwrap().display_lossy()
+                Ok(CheckResult::Message(bconcat!(
+                    "<info>OK</> <comment>expires on ",
+                    expiration.unwrap(),
+                    "</>"
                 )))
             }
             Err(e) => {
                 if let Some(te) = e.catch::<TransportException>()
                     && te.get_code() == 401
                 {
-                    return Ok(CheckResult::Message(format!(
-                        "<comment>The oauth token for {} seems invalid, run \"shirabe config --global --unset github-oauth.{}\" to remove it</comment>",
-                        domain.display_lossy(),
-                        domain.display_lossy()
+                    return Ok(CheckResult::Message(bconcat!(
+                        "<comment>The oauth token for ",
+                        domain,
+                        " seems invalid, run \"shirabe config --global --unset github-oauth.",
+                        domain,
+                        "\" to remove it</comment>"
                     )));
                 }
                 Ok(CheckResult::Exception(e))
@@ -447,8 +469,8 @@ impl DiagnoseCommand {
 
     fn get_github_rate_limit(
         &self,
-        domain: &str,
-        token: Option<&str>,
+        domain: &BStr,
+        token: Option<&BStr>,
     ) -> anyhow::Result<GithubRateLimit> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if !matches!(result, CheckResult::Ok) {
@@ -464,9 +486,9 @@ impl DiagnoseCommand {
         }
 
         let url = if domain == "github.com" {
-            format!("https://api.{}/rate_limit", domain)
+            bconcat!("https://api.", domain, "/rate_limit")
         } else {
-            format!("https://{}/api/rate_limit", domain)
+            bconcat!("https://", domain, "/api/rate_limit")
         };
         let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
         opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
@@ -505,18 +527,20 @@ impl DiagnoseCommand {
         let dir = path_from_bytes(home_dir.as_string().unwrap_or_default());
         let df_home = disk_free_space(dir);
         if df_home.map(|d| d < min_space_free).unwrap_or(false) {
-            return CheckResult::Message(format!(
-                "<error>The disk hosting {} is full</error>",
-                dir.display()
+            return CheckResult::Message(bconcat!(
+                "<error>The disk hosting ",
+                dir,
+                " is full</error>"
             ));
         }
         let vendor_dir = config.get("vendor-dir");
         let dir = path_from_bytes(vendor_dir.as_string().unwrap_or_default());
         let df_vendor = disk_free_space(dir);
         if df_vendor.map(|d| d < min_space_free).unwrap_or(false) {
-            return CheckResult::Message(format!(
-                "<error>The disk hosting {} is full</error>",
-                dir.display()
+            return CheckResult::Message(bconcat!(
+                "<error>The disk hosting ",
+                dir,
+                " is full</error>"
             ));
         }
 
@@ -530,7 +554,7 @@ impl DiagnoseCommand {
         let keys_tags = path_from_bytes(&keys_tags);
         let keys_dev = bconcat!(home, "/keys.dev.pub");
         let keys_dev = path_from_bytes(&keys_dev);
-        let mut errors: Vec<String> = vec![];
+        let mut errors: Vec<BString> = vec![];
         let io = self.get_io();
 
         if file_exists(keys_tags) && file_exists(keys_dev) {
@@ -538,27 +562,31 @@ impl DiagnoseCommand {
         }
 
         if file_exists(keys_tags) {
-            io.write(format!(
-                "Tags Public Key Fingerprint: {}",
+            io.write(bconcat!(
+                "Tags Public Key Fingerprint: ",
                 Keys::fingerprint(keys_tags)?
             ));
         } else {
-            errors.push("<error>Missing pubkey for tags verification</error>".to_string());
+            errors.push(BString::from(
+                "<error>Missing pubkey for tags verification</error>",
+            ));
         }
 
         if file_exists(keys_dev) {
-            io.write(format!(
-                "Dev Public Key Fingerprint: {}",
+            io.write(bconcat!(
+                "Dev Public Key Fingerprint: ",
                 Keys::fingerprint(keys_dev)?
             ));
         } else {
-            errors.push("<error>Missing pubkey for dev verification</error>".to_string());
+            errors.push(BString::from(
+                "<error>Missing pubkey for dev verification</error>",
+            ));
         }
 
         if !errors.is_empty() {
-            errors.push(
-                "<error>Run shirabe self-update --update-keys to set them up</error>".to_string(),
-            );
+            errors.push(BString::from(
+                "<error>Run shirabe self-update --update-keys to set them up</error>",
+            ));
         }
 
         Ok(if !errors.is_empty() {
@@ -592,11 +620,14 @@ impl DiagnoseCommand {
             .and_then(|v| v.as_string())
             .unwrap_or_default();
         if composer::VERSION != latest_version && composer::VERSION != "@package_version@" {
-            return Ok(CheckResult::Message(format!(
-                "<comment>You are not running the latest {} version, run `shirabe self-update` to update ({} => {})</comment>",
+            return Ok(CheckResult::Message(bconcat!(
+                "<comment>You are not running the latest ",
                 versions_util.get_channel()?,
+                " version, run `shirabe self-update` to update (",
                 composer::VERSION,
-                latest_version.display_lossy()
+                " => ",
+                latest_version,
+                ")</comment>"
             )));
         }
 
@@ -627,9 +658,9 @@ impl DiagnoseCommand {
             shirabe_php_rpc::composer_runtime::local_file("vendor/composer/installed.json")?;
         let installed_json = JsonFile::new(installed.path(), None, None)?;
         if !installed_json.exists() {
-            return Ok(CheckResult::Message(
-                "<warning>Could not find Composer's installed.json, this must be a non-standard Composer installation.</>".to_string(),
-            ));
+            return Ok(CheckResult::Message(BString::from(
+                "<warning>Could not find Composer's installed.json, this must be a non-standard Composer installation.</>",
+            )));
         }
 
         let local_repo = FilesystemRepository::new(installed_json, false, None, None)?;
@@ -639,17 +670,17 @@ impl DiagnoseCommand {
             let version_parser = VersionParser::new();
             let normalized_version = version_parser.normalize(&version, None)?;
             let root_pkg = RootPackage::new(
-                bstr::BString::from("composer/composer".to_string()),
+                BString::from("composer/composer"),
                 normalized_version,
                 bstr::BString::from(version),
             );
             packages.push(crate::package::RootPackageHandle::from_root_package(root_pkg).into());
         }
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-        repo_config.insert("type".into(), PhpMixed::string("composer".to_string()));
+        repo_config.insert("type".into(), PhpMixed::string(BString::from("composer")));
         repo_config.insert(
             "url".into(),
-            PhpMixed::string("https://packagist.org".to_string()),
+            PhpMixed::string(BString::from("https://packagist.org")),
         );
         let composer_repo_as_repo =
             crate::repository::RepositoryInterfaceHandle::new(ComposerRepository::new(
@@ -663,7 +694,7 @@ impl DiagnoseCommand {
 
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(BufferIO::new(
-                String::new(),
+                BString::default(),
                 shirabe_symfony_console::output::VERBOSITY_NORMAL,
                 None,
             )?));
@@ -681,33 +712,35 @@ impl DiagnoseCommand {
         ) {
             Ok(r) => r,
             Err(e) => {
-                return Ok(CheckResult::Message(format!(
-                    "<highlight>Failed performing audit: {}</>",
-                    e
+                return Ok(CheckResult::Message(bconcat!(
+                    "<highlight>Failed performing audit: ",
+                    error_message(&e),
+                    "</>"
                 )));
             }
         };
 
         if result > 0 {
-            return Ok(CheckResult::Message(format!(
-                "<highlight>Audit found some issues:</>{}{}",
+            return Ok(CheckResult::Message(bconcat!(
+                "<highlight>Audit found some issues:</>",
                 PHP_EOL,
                 io.borrow()
                     .as_any()
                     .downcast_ref::<BufferIO>()
                     .unwrap()
                     .get_output()
-                    .display_lossy()
             )));
         }
 
         Ok(CheckResult::Ok)
     }
 
-    fn get_curl_version(&self) -> String {
+    fn get_curl_version(&self) -> BString {
         if shirabe_php_rpc::get_diagnostics().extension_loaded("curl") {
             if !HttpDownloader::is_curl_enabled() {
-                return "<error>disabled via disable_functions; Shirabe itself does not use curl, but some plugins may be affected</error>".to_string();
+                return BString::from(
+                    "<error>disabled via disable_functions; Shirabe itself does not use curl, but some plugins may be affected</error>",
+                );
             }
 
             let version = shirabe_php_rpc::get_diagnostics()
@@ -733,7 +766,7 @@ impl DiagnoseCommand {
                 (Some(features), Some(zstd)) => features & zstd != 0,
                 _ => false,
             };
-            let mut http_versions = "1.0, 1.1".to_string();
+            let mut http_versions = BString::from("1.0, 1.1");
             if let (Some(features), Some(http2)) = (version.features, version.version_http2)
                 && version.has_http_version_2_0
                 && http2 & features != 0
@@ -746,19 +779,26 @@ impl DiagnoseCommand {
                 http_versions.push_str(", 3");
             }
 
-            return format!(
-                "<comment>{}</comment> libz <comment>{}</comment> brotli <comment>{}</comment> zstd <comment>{}</comment> ssl <comment>{}</comment> HTTP <comment>{}</comment>",
-                version.version.display_lossy(),
-                libz_version.display_lossy(),
-                brotli_version.display_lossy(),
+            return bconcat!(
+                "<comment>",
+                version.version,
+                "</comment> libz <comment>",
+                libz_version,
+                "</comment> brotli <comment>",
+                brotli_version,
+                "</comment> zstd <comment>",
                 if has_zstd { "supported" } else { "missing" },
-                ssl_version.display_lossy(),
+                "</comment> ssl <comment>",
+                ssl_version,
+                "</comment> HTTP <comment>",
                 http_versions,
+                "</comment>"
             );
         }
 
-        "<error>missing; Shirabe itself does not use curl, but some plugins may be affected</error>"
-            .to_string()
+        BString::from(
+            "<error>missing; Shirabe itself does not use curl, but some plugins may be affected</error>",
+        )
     }
 
     fn output_result(&self, result: CheckResult) {
@@ -772,10 +812,12 @@ impl DiagnoseCommand {
             CheckResult::Exception(e) => {
                 let exception = AnyThrowable::of(&e)
                     .expect("a check_* method passes on only an \\Exception it caught");
-                vec![format!(
-                    "<error>[{}] {}</error>",
+                vec![bconcat!(
+                    "<error>[",
                     exception.php_class_name(),
-                    exception.get_message()
+                    "] ",
+                    exception.get_message(),
+                    "</error>"
                 )]
             }
             CheckResult::Failed => vec![],
@@ -810,82 +852,77 @@ impl DiagnoseCommand {
     }
 
     fn check_platform(&self) -> anyhow::Result<CheckResult> {
-        let mut output = String::new();
+        let mut output = BString::default();
         let mut display_ini_message = false;
 
-        let mut ini_message = format!("{}{}{}", PHP_EOL, PHP_EOL, IniHelper::get_message());
-        ini_message.push_str(&format!("{}If you can not modify the ini file, you can also run `php -d option=value` to modify ini values on the fly. You can use -d multiple times.", PHP_EOL));
+        let mut ini_message = bconcat!(PHP_EOL, PHP_EOL, IniHelper::get_message());
+        ini_message.push_str(&bconcat!(PHP_EOL, "If you can not modify the ini file, you can also run `php -d option=value` to modify ini values on the fly. You can use -d multiple times."));
 
         let diagnostics = shirabe_php_rpc::get_diagnostics();
 
         // PHP stores `true` for an issue with no detail, and a version string otherwise.
-        let mut errors: IndexMap<String, Option<String>> = IndexMap::new();
-        let mut warnings: IndexMap<String, Option<String>> = IndexMap::new();
+        let mut errors: IndexMap<BString, Option<BString>> = IndexMap::new();
+        let mut warnings: IndexMap<BString, Option<BString>> = IndexMap::new();
 
         if !diagnostics.function_exists("json_decode") {
-            errors.insert("json".to_string(), None);
+            errors.insert(BString::from("json"), None);
         }
 
         if !diagnostics.extension_loaded("Phar") {
-            errors.insert("phar".to_string(), None);
+            errors.insert(BString::from("phar"), None);
         }
 
         if !diagnostics.extension_loaded("filter") {
-            errors.insert("filter".to_string(), None);
+            errors.insert(BString::from("filter"), None);
         }
 
         if !diagnostics.extension_loaded("hash") {
-            errors.insert("hash".to_string(), None);
+            errors.insert(BString::from("hash"), None);
         }
 
         if !diagnostics.extension_loaded("iconv") && !diagnostics.extension_loaded("mbstring") {
-            errors.insert("iconv_mbstring".to_string(), None);
+            errors.insert(BString::from("iconv_mbstring"), None);
         }
 
         if !filter_var_boolean(diagnostics.ini_get("allow_url_fopen").unwrap_or_default()) {
-            errors.insert("allow_url_fopen".to_string(), None);
+            errors.insert(BString::from("allow_url_fopen"), None);
         }
 
         if diagnostics.extension_loaded("ionCube Loader")
             && diagnostics.ioncube_loader_iversion < 40009
         {
             errors.insert(
-                "ioncube".to_string(),
-                Some(
-                    diagnostics
-                        .ioncube_loader_version
-                        .display_lossy()
-                        .to_string(),
-                ),
+                BString::from("ioncube"),
+                Some(diagnostics.ioncube_loader_version.to_owned()),
             );
         }
 
         if diagnostics.php_version_id < 70205 {
             errors.insert(
-                "php".to_string(),
-                Some(diagnostics.php_version.display_lossy().to_string()),
+                BString::from("php"),
+                Some(diagnostics.php_version.to_owned()),
             );
         }
 
         if !diagnostics.extension_loaded("openssl") {
-            errors.insert("openssl".to_string(), None);
+            errors.insert(BString::from("openssl"), None);
         }
 
         if diagnostics.extension_loaded("openssl")
             && diagnostics.openssl_version_number < 0x1000100f
         {
-            warnings.insert("openssl_version".to_string(), None);
+            warnings.insert(BString::from("openssl_version"), None);
         }
 
         if !diagnostics.has_hhvm_version
             && !diagnostics.extension_loaded("apcu")
             && filter_var_boolean(diagnostics.ini_get("apc.enable_cli").unwrap_or_default())
         {
-            warnings.insert("apc_cli".to_string(), None);
+            warnings.insert(BString::from("apc_cli"), None);
         }
 
         if !diagnostics.extension_loaded("zlib") {
-            warnings.insert("zlib".to_string(), None);
+            warnings.insert(BString::from("zlib"), None);
         }
 
         if let Some(phpinfo_match) = preg_match(
@@ -895,11 +932,11 @@ impl DiagnoseCommand {
             let configure = phpinfo_match.get(1).unwrap_or_default();
 
             if configure.contains_str("--enable-sigchild") {
-                warnings.insert("sigchild".to_string(), None);
+                warnings.insert(BString::from("sigchild"), None);
             }
 
             if configure.contains_str("--with-curlwrappers") {
-                warnings.insert("curlwrappers".to_string(), None);
+                warnings.insert(BString::from("curlwrappers"), None);
             }
         }
 
@@ -908,9 +945,9 @@ impl DiagnoseCommand {
                 .ini_get("xdebug.profiler_enabled")
                 .unwrap_or_default(),
         ) {
-            warnings.insert("xdebug_profile".to_string(), None);
+            warnings.insert(BString::from("xdebug_profile"), None);
         } else if diagnostics.xdebug_active {
-            warnings.insert("xdebug_loaded".to_string(), None);
+            warnings.insert(BString::from("xdebug_loaded"), None);
         }
 
         if diagnostics.has_php_windows_version_build
@@ -919,8 +956,8 @@ impl DiagnoseCommand {
                     && version_compare(&diagnostics.php_version, "7.3.10", CmpOp::Lt)))
         {
             warnings.insert(
-                "onedrive".to_string(),
-                Some(diagnostics.php_version.display_lossy().to_string()),
+                BString::from("onedrive"),
+                Some(diagnostics.php_version.to_owned()),
             );
         }
 
@@ -928,75 +965,92 @@ impl DiagnoseCommand {
             && !(filter_var_boolean(diagnostics.ini_get("uopz.disable").unwrap_or_default())
                 || filter_var_boolean(diagnostics.ini_get("uopz.exit").unwrap_or_default()))
         {
-            warnings.insert("uopz".to_string(), None);
+            warnings.insert(BString::from("uopz"), None);
         }
 
-        let out_fn = |msg: &str, style: &str, output: &mut String| {
-            output.push_str(&format!("<{}>{}</{}>{}", style, msg, style, PHP_EOL));
+        let out_fn = |msg: &BStr, style: &BStr, output: &mut BString| {
+            output.push_str(&bconcat!("<", style, ">", msg, "</", style, ">", PHP_EOL));
         };
 
         if !errors.is_empty() {
             for (error, current) in &errors {
-                let text = match error.as_str() {
-                    "json" => format!(
-                        "{}The json extension is missing.{}Install it or recompile php without --disable-json",
-                        PHP_EOL, PHP_EOL
-                    ),
-                    "phar" => format!(
-                        "{}The phar extension is missing.{}Install it or recompile php without --disable-phar",
-                        PHP_EOL, PHP_EOL
-                    ),
-                    "filter" => format!(
-                        "{}The filter extension is missing.{}Install it or recompile php without --disable-filter",
-                        PHP_EOL, PHP_EOL
-                    ),
-                    "hash" => format!(
-                        "{}The hash extension is missing.{}Install it or recompile php without --disable-hash",
-                        PHP_EOL, PHP_EOL
-                    ),
-                    "iconv_mbstring" => format!(
-                        "{}The iconv OR mbstring extension is required and both are missing.{}Install either of them or recompile php without --disable-iconv",
-                        PHP_EOL, PHP_EOL
-                    ),
-                    "php" => format!(
-                        "{}Your PHP ({}) is too old, you must upgrade to PHP 7.2.5 or higher.",
+                let text = match error.as_bytes() {
+                    b"json" => bconcat!(
                         PHP_EOL,
+                        "The json extension is missing.",
+                        PHP_EOL,
+                        "Install it or recompile php without --disable-json"
+                    ),
+                    b"phar" => bconcat!(
+                        PHP_EOL,
+                        "The phar extension is missing.",
+                        PHP_EOL,
+                        "Install it or recompile php without --disable-phar"
+                    ),
+                    b"filter" => bconcat!(
+                        PHP_EOL,
+                        "The filter extension is missing.",
+                        PHP_EOL,
+                        "Install it or recompile php without --disable-filter"
+                    ),
+                    b"hash" => bconcat!(
+                        PHP_EOL,
+                        "The hash extension is missing.",
+                        PHP_EOL,
+                        "Install it or recompile php without --disable-hash"
+                    ),
+                    b"iconv_mbstring" => bconcat!(
+                        PHP_EOL,
+                        "The iconv OR mbstring extension is required and both are missing.",
+                        PHP_EOL,
+                        "Install either of them or recompile php without --disable-iconv"
+                    ),
+                    b"php" => bconcat!(
+                        PHP_EOL,
+                        "Your PHP (",
                         current
                             .as_deref()
-                            .expect("checkPlatform stores the PHP version with the php error")
+                            .expect("checkPlatform stores the PHP version with the php error"),
+                        ") is too old, you must upgrade to PHP 7.2.5 or higher."
                     ),
-                    "allow_url_fopen" => {
+                    b"allow_url_fopen" => {
                         display_ini_message = true;
-                        format!(
-                            "{}The allow_url_fopen setting is incorrect.{}Add the following to the end of your `php.ini`:{}    allow_url_fopen = On",
-                            PHP_EOL, PHP_EOL, PHP_EOL
+                        bconcat!(
+                            PHP_EOL,
+                            "The allow_url_fopen setting is incorrect.",
+                            PHP_EOL,
+                            "Add the following to the end of your `php.ini`:",
+                            PHP_EOL,
+                            "    allow_url_fopen = On"
                         )
                     }
-                    "ioncube" => {
+                    b"ioncube" => {
                         display_ini_message = true;
-                        format!(
-                            "{}Your ionCube Loader extension ({}) is incompatible with Phar files.{}Upgrade to ionCube 4.0.9 or higher or remove this line (path may be different) from your `php.ini` to disable it:{}    zend_extension = /usr/lib/php5/20090626+lfs/ioncube_loader_lin_5.3.so",
+                        bconcat!(
                             PHP_EOL,
+                            "Your ionCube Loader extension (",
                             current.as_deref().expect(
                                 "checkPlatform stores the loader version with the ioncube error"
                             ),
+                            ") is incompatible with Phar files.",
                             PHP_EOL,
-                            PHP_EOL
+                            "Upgrade to ionCube 4.0.9 or higher or remove this line (path may be different) from your `php.ini` to disable it:",
+                            PHP_EOL,
+                            "    zend_extension = /usr/lib/php5/20090626+lfs/ioncube_loader_lin_5.3.so"
                         )
                     }
-                    "openssl" => format!(
-                        "{}The openssl extension is missing, which means that secure HTTPS transfers are impossible.{}If possible you should enable it or recompile php with --with-openssl",
-                        PHP_EOL, PHP_EOL
+                    b"openssl" => bconcat!(
+                        PHP_EOL,
+                        "The openssl extension is missing, which means that secure HTTPS transfers are impossible.",
+                        PHP_EOL,
+                        "If possible you should enable it or recompile php with --with-openssl"
                     ),
                     other => {
-                        return Err(InvalidArgumentException::new(format!(
-                            "DiagnoseCommand: Unknown error type \"{}\". Please report at https://github.com/nsfisis/php-shirabe/issues/new.",
-                            other,
-                        ))
+                        return Err(InvalidArgumentException::new(bconcat!("DiagnoseCommand: Unknown error type \"", other, "\". Please report at https://github.com/nsfisis/php-shirabe/issues/new."))
                         .into());
                     }
                 };
-                out_fn(&text, "error", &mut output);
+                out_fn(text.as_bstr(), BStr::new("error"), &mut output);
             }
 
             output.push_str(PHP_EOL);
@@ -1004,30 +1058,39 @@ impl DiagnoseCommand {
 
         if !warnings.is_empty() {
             for (warning, current) in &warnings {
-                let text = match warning.as_str() {
-                    "apc_cli" => {
+                let text = match warning.as_bytes() {
+                    b"apc_cli" => {
                         display_ini_message = true;
-                        format!(
-                            "The apc.enable_cli setting is incorrect.{}Add the following to the end of your `php.ini`:{}  apc.enable_cli = Off",
-                            PHP_EOL, PHP_EOL
+                        bconcat!(
+                            "The apc.enable_cli setting is incorrect.",
+                            PHP_EOL,
+                            "Add the following to the end of your `php.ini`:",
+                            PHP_EOL,
+                            "  apc.enable_cli = Off"
                         )
                     }
-                    "zlib" => {
+                    b"zlib" => {
                         display_ini_message = true;
-                        format!(
-                            "The zlib extension is not loaded, this can slow down Shirabe a lot.{}If possible, enable it or recompile php with --with-zlib{}",
-                            PHP_EOL, PHP_EOL
+                        bconcat!(
+                            "The zlib extension is not loaded, this can slow down Shirabe a lot.",
+                            PHP_EOL,
+                            "If possible, enable it or recompile php with --with-zlib",
+                            PHP_EOL
                         )
                     }
-                    "sigchild" => format!(
-                        "PHP was compiled with --enable-sigchild which can cause issues on some platforms.{}Recompile it without this flag if possible, see also:{}  https://bugs.php.net/bug.php?id=22999",
-                        PHP_EOL, PHP_EOL
+                    b"sigchild" => bconcat!(
+                        "PHP was compiled with --enable-sigchild which can cause issues on some platforms.",
+                        PHP_EOL,
+                        "Recompile it without this flag if possible, see also:",
+                        PHP_EOL,
+                        "  https://bugs.php.net/bug.php?id=22999"
                     ),
-                    "curlwrappers" => format!(
-                        "PHP was compiled with --with-curlwrappers which will cause issues with HTTP authentication and GitHub.{} Recompile it without this flag if possible",
-                        PHP_EOL
+                    b"curlwrappers" => bconcat!(
+                        "PHP was compiled with --with-curlwrappers which will cause issues with HTTP authentication and GitHub.",
+                        PHP_EOL,
+                        " Recompile it without this flag if possible"
                     ),
-                    "openssl_version" => {
+                    b"openssl_version" => {
                         // Attempt to parse version number out, fallback to whole string value.
                         let openssl_version_text =
                             diagnostics.openssl_version_text.clone().unwrap_or_default();
@@ -1041,62 +1104,68 @@ impl DiagnoseCommand {
                             openssl_version = openssl_version_text;
                         }
 
-                        format!(
-                            "The OpenSSL library ({}) used by PHP does not support TLSv1.2 or TLSv1.1.{}If possible you should upgrade OpenSSL to version 1.0.1 or above.",
-                            openssl_version.display_lossy(),
-                            PHP_EOL
+                        bconcat!(
+                            "The OpenSSL library (",
+                            openssl_version,
+                            ") used by PHP does not support TLSv1.2 or TLSv1.1.",
+                            PHP_EOL,
+                            "If possible you should upgrade OpenSSL to version 1.0.1 or above."
                         )
                     }
-                    "xdebug_loaded" => format!(
-                        "The xdebug extension is loaded, this can slow down Shirabe a little.{} Disabling it when using Shirabe is recommended.",
-                        PHP_EOL
-                    ),
-                    "xdebug_profile" => {
-                        display_ini_message = true;
-                        format!(
-                            "The xdebug.profiler_enabled setting is enabled, this can slow down Shirabe a lot.{}Add the following to the end of your `php.ini` to disable it:{}  xdebug.profiler_enabled = 0",
-                            PHP_EOL, PHP_EOL
-                        )
-                    }
-                    "onedrive" => format!(
-                        "The Windows OneDrive folder is not supported on PHP versions below 7.2.23 and 7.3.10.{}Upgrade your PHP ({}) to use this location with Shirabe.{}",
+                    b"xdebug_loaded" => bconcat!(
+                        "The xdebug extension is loaded, this can slow down Shirabe a little.",
                         PHP_EOL,
+                        " Disabling it when using Shirabe is recommended."
+                    ),
+                    b"xdebug_profile" => {
+                        display_ini_message = true;
+                        bconcat!(
+                            "The xdebug.profiler_enabled setting is enabled, this can slow down Shirabe a lot.",
+                            PHP_EOL,
+                            "Add the following to the end of your `php.ini` to disable it:",
+                            PHP_EOL,
+                            "  xdebug.profiler_enabled = 0"
+                        )
+                    }
+                    b"onedrive" => bconcat!(
+                        "The Windows OneDrive folder is not supported on PHP versions below 7.2.23 and 7.3.10.",
+                        PHP_EOL,
+                        "Upgrade your PHP (",
                         current.as_deref().expect(
                             "checkPlatform stores the PHP version with the onedrive warning"
                         ),
+                        ") to use this location with Shirabe.",
                         PHP_EOL
                     ),
-                    "uopz" => format!(
-                        "The uopz extension ignores exit calls and may not work with all Shirabe commands.{}Disabling it when using Shirabe is recommended.",
-                        PHP_EOL
+                    b"uopz" => bconcat!(
+                        "The uopz extension ignores exit calls and may not work with all Shirabe commands.",
+                        PHP_EOL,
+                        "Disabling it when using Shirabe is recommended."
                     ),
                     other => {
-                        return Err(InvalidArgumentException::new(format!(
-                            "DiagnoseCommand: Unknown warning type \"{}\". Please report at https://github.com/nsfisis/php-shirabe/issues/new.",
-                            other,
-                        ))
+                        return Err(InvalidArgumentException::new(bconcat!("DiagnoseCommand: Unknown warning type \"", other, "\". Please report at https://github.com/nsfisis/php-shirabe/issues/new."))
                         .into());
                     }
                 };
-                out_fn(&text, "comment", &mut output);
+                out_fn(text.as_bstr(), BStr::new("comment"), &mut output);
             }
         }
 
         if display_ini_message {
-            out_fn(&ini_message, "comment", &mut output);
+            out_fn(ini_message.as_bstr(), BStr::new("comment"), &mut output);
         }
 
         let composer_ipresolve = Platform::get_env("COMPOSER_IPRESOLVE").unwrap_or_default();
         if composer_ipresolve == "4" || composer_ipresolve == "6" {
-            warnings.insert("ipresolve".to_string(), None);
+            warnings.insert(BString::from("ipresolve"), None);
             out_fn(
-                &format!(
-                    "The COMPOSER_IPRESOLVE env var is set to {} which may result in network failures below.",
-                    Platform::get_env("COMPOSER_IPRESOLVE")
-                        .unwrap_or_default()
-                        .display_lossy()
-                ),
-                "comment",
+                bconcat!(
+                    "The COMPOSER_IPRESOLVE env var is set to ",
+                    Platform::get_env("COMPOSER_IPRESOLVE").unwrap_or_default(),
+                    " which may result in network failures below."
+                )
+                .as_bstr(),
+                BStr::new("comment"),
                 &mut output,
             );
         }
@@ -1113,9 +1182,9 @@ impl DiagnoseCommand {
         // PHP: if (!ini_get('allow_url_fopen')) — a missing setting, "" and "0" are all falsey.
         let allow_url_fopen = shirabe_php_rpc::get_diagnostics().ini_get("allow_url_fopen");
         if !allow_url_fopen.is_some_and(|value| !value.is_empty() && value != "0") {
-            return CheckResult::Message(
-                "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>".to_string(),
-            );
+            return CheckResult::Message(BString::from(
+                "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>",
+            ));
         }
 
         CheckResult::Ok
@@ -1141,10 +1210,9 @@ impl DiagnoseCommand {
             .map(|v| !v.is_empty() && v != "0")
             .unwrap_or(false)
         {
-            return CheckResult::Message(
-                "<info>SKIP</> <comment>Network is disabled by COMPOSER_DISABLE_NETWORK.</>"
-                    .to_string(),
-            );
+            return CheckResult::Message(BString::from(
+                "<info>SKIP</> <comment>Network is disabled by COMPOSER_DISABLE_NETWORK.</>",
+            ));
         }
 
         CheckResult::Ok
@@ -1238,10 +1306,12 @@ impl Command for DiagnoseCommand {
             self.output_result(r);
         }
 
-        io.write(format!(
-            "Shirabe version: <comment>{}</comment> (based on Composer <comment>{}</comment>)",
+        io.write(bconcat!(
+            "Shirabe version: <comment>",
             composer::SHIRABE_VERSION,
-            composer::VERSION
+            "</comment> (based on Composer <comment>",
+            composer::VERSION,
+            "</comment>)"
         ));
 
         io.write_no_newline("Checking Shirabe and its dependencies for vulnerabilities: ");
@@ -1261,7 +1331,7 @@ impl Command for DiagnoseCommand {
         let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
             &mut platform_repo,
             bstr::BStr::new("php"),
-            crate::repository::FindPackageConstraint::String(bstr::BString::from("*".to_string())),
+            crate::repository::FindPackageConstraint::String(BString::from("*")),
         )?
         .unwrap();
         let mut php_version = php_pkg.get_pretty_version();
@@ -1274,81 +1344,76 @@ impl Command for DiagnoseCommand {
             php_version = bconcat!(php_version, " - ", cp.get_description().unwrap_or_default());
         }
 
-        io.write(format!(
-            "PHP version: <comment>{}</comment>",
-            php_version.display_lossy()
+        io.write(bconcat!(
+            "PHP version: <comment>",
+            php_version,
+            "</comment>"
         ));
 
         let diagnostics = shirabe_php_rpc::get_diagnostics();
 
         if let Some(php_binary) = &diagnostics.php_binary {
-            io.write(format!(
-                "PHP binary path: <comment>{}</comment>",
-                php_binary.display()
+            io.write(bconcat!(
+                "PHP binary path: <comment>",
+                php_binary,
+                "</comment>"
             ));
         }
 
-        io.write(format!(
-            "OpenSSL version: {}",
+        io.write(bconcat!(
+            "OpenSSL version: ",
             match &diagnostics.openssl_version_text {
-                Some(text) => format!("<comment>{}</comment>", text.display_lossy()),
-                None => "<error>missing</error>".to_string(),
+                Some(text) => bconcat!("<comment>", text, "</comment>"),
+                None => BString::from("<error>missing</error>"),
             }
         ));
-        io.write(format!("curl version: {}", self.get_curl_version()));
+        io.write(bconcat!("curl version: ", self.get_curl_version()));
 
         let finder = ExecutableFinder::new();
         let has_system_unzip = finder.find("unzip", None, &[]).is_some();
-        let mut bin_7zip = String::new();
+        let mut bin_7zip = BString::default();
         let has_system_7zip = if finder
             .find("7z", None, &["C:\\Program Files\\7-Zip".to_string()])
             .is_some()
         {
-            bin_7zip = "7z".to_string();
+            bin_7zip = BString::from("7z");
             true
         } else if !Platform::is_windows() && finder.find("7zz", None, &[]).is_some() {
-            bin_7zip = "7zz".to_string();
+            bin_7zip = BString::from("7zz");
             true
         } else if !Platform::is_windows() && finder.find("7za", None, &[]).is_some() {
-            bin_7zip = "7za".to_string();
+            bin_7zip = BString::from("7za");
             true
         } else {
             false
         };
 
-        io.write(format!(
-            "zip: {}, {}, {}{}",
-            if diagnostics.extension_loaded("zip") {
+        io.write(bconcat!("zip: ", if diagnostics.extension_loaded("zip") {
                 "<comment>extension present</comment>"
             } else {
                 "<comment>extension not loaded</comment>"
-            },
-            if has_system_unzip {
-                "<comment>unzip present</comment>".to_string()
+            }, ", ", if has_system_unzip {
+                BString::from("<comment>unzip present</comment>")
             } else {
-                "<comment>unzip not available</comment>".to_string()
-            },
-            if has_system_7zip {
-                format!("<comment>7-Zip present ({})</comment>", bin_7zip)
+                BString::from("<comment>unzip not available</comment>")
+            }, ", ", if has_system_7zip {
+                bconcat!("<comment>7-Zip present (", bin_7zip, ")</comment>")
             } else {
-                "<comment>7-Zip not available</comment>".to_string()
-            },
-            if (has_system_7zip || has_system_unzip) && !diagnostics.function_exists("proc_open") {
+                BString::from("<comment>7-Zip not available</comment>")
+            }, if (has_system_7zip || has_system_unzip) && !diagnostics.function_exists("proc_open") {
                 ", <warning>proc_open is disabled or not present, unzip/7-z will not be usable</warning>"
             } else {
                 ""
-            }
-        ));
+            }));
 
         if let Some(ref mut c) = composer {
             let c = crate::composer::composer_full(c);
-            io.write(format!(
-                "Active plugins: {}",
+            io.write(bconcat!(
+                "Active plugins: ",
                 implode(
                     ", ",
                     &c.get_plugin_manager().borrow().get_registered_plugins()
                 )
-                .display_lossy()
             ));
 
             io.write_no_newline("Checking composer.json: ");
@@ -1373,11 +1438,11 @@ impl Command for DiagnoseCommand {
         self.output_result(CheckResult::Message(r));
 
         io.write_no_newline("Checking http connectivity to packagist: ");
-        let r = self.check_http("http", &config)?;
+        let r = self.check_http(BStr::new("http"), &config)?;
         self.output_result(r);
 
         io.write_no_newline("Checking https connectivity to packagist: ");
-        let r = self.check_http("https", &config)?;
+        let r = self.check_http(BStr::new("https"), &config)?;
         self.output_result(r);
 
         let repositories = config.borrow().get_repositories();
@@ -1408,34 +1473,34 @@ impl Command for DiagnoseCommand {
                 if url.starts_with(b"https://repo.packagist.org") {
                     continue;
                 }
-                io.write_no_newline(format!(
-                    "Checking connectivity to {}: ",
+                io.write_no_newline(bconcat!(
+                    "Checking connectivity to ",
                     repo_arr
                         .get(B("url"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .display_lossy()
+                        .unwrap_or_default(),
+                    ": "
                 ));
                 let r = self.check_composer_repo(url.as_bstr(), &config)?;
                 self.output_result(r);
             }
         }
 
-        let protos: Vec<&str> = if config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
-            vec!["http"]
+        let protos: Vec<&BStr> = if config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
+            vec![BStr::new("http")]
         } else {
-            vec!["http", "https"]
+            vec![BStr::new("http"), BStr::new("https")]
         };
         let proxy_check_result: anyhow::Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
             for proto in &protos {
                 let proxy = ProxyManager::get_instance()
                     .as_ref()
                     .unwrap()
-                    .get_proxy_for_request(format!("{}://repo.packagist.org", proto))
+                    .get_proxy_for_request(bconcat!(proto, "://repo.packagist.org"))
                     .map_err(|e| anyhow::anyhow!(e))?;
                 if !proxy.get_status(None)?.is_empty() {
                     let r#type = if proxy.is_secure() { "HTTPS" } else { "HTTP" };
-                    io.write_no_newline(format!("Checking {} proxy with {}: ", r#type, proto));
+                    io.write_no_newline(bconcat!("Checking ", r#type, " proxy with ", proto, ": "));
                     let r = self.check_http_proxy(&proxy, proto)?;
                     self.output_result(r);
                 }
@@ -1464,25 +1529,19 @@ impl Command for DiagnoseCommand {
             .unwrap_or_default();
         if oauth.len() as i64 > 0 {
             for (domain, token) in &oauth {
-                io.write_no_newline(format!(
-                    "Checking {} oauth access: ",
-                    domain.display_lossy()
-                ));
+                io.write_no_newline(bconcat!("Checking ", domain, " oauth access: "));
                 let r = self
                     .check_github_oauth(domain.as_bstr(), token.as_string().unwrap_or_default())?;
                 self.output_result(r);
             }
         } else {
             io.write_no_newline("Checking github.com rate limit: ");
-            match self.get_github_rate_limit("github.com", None) {
+            match self.get_github_rate_limit(BStr::new("github.com"), None) {
                 Ok(GithubRateLimit::Unavailable(rate)) => self.output_result(rate),
                 Ok(GithubRateLimit::Core { limit, remaining }) => {
                     if 10 > remaining {
                         io.write("<warning>WARNING</warning>");
-                        io.write(format!(
-                            "<comment>GitHub has a rate limit on their API. You currently have <options=bold>{}</options=bold> out of <options=bold>{}</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>",
-                            remaining, limit,
-                        ));
+                        io.write(bconcat!("<comment>GitHub has a rate limit on their API. You currently have <options=bold>", remaining, "</options=bold> out of <options=bold>", limit, "</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>"));
                     } else {
                         self.output_result(CheckResult::Ok);
                     }
@@ -1491,7 +1550,7 @@ impl Command for DiagnoseCommand {
                     if let Some(te) = e.catch::<TransportException>()
                         && te.get_code() == 401
                     {
-                        self.output_result(CheckResult::Message("<comment>The oauth token for github.com seems invalid, run \"shirabe config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
+                        self.output_result(CheckResult::Message(BString::from("<comment>The oauth token for github.com seems invalid, run \"shirabe config --global --unset github-oauth.github.com\" to remove it</comment>")));
                     } else {
                         self.output_result(CheckResult::Exception(e));
                     }

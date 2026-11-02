@@ -10,10 +10,10 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
-    RuntimeException, array_map, bconcat, clearstatcache, explode, explode_with_limit, implode,
-    in_array_loose, in_array_strict, is_dir, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_quote, preg_replace, rawurldecode, rawurlencode, str_replace_array, strlen, strpos,
-    substr, trim, version_compare,
+    RuntimeException, array_map, bconcat, clearstatcache, error_message, explode,
+    explode_with_limit, implode, in_array_loose, in_array_strict, is_dir, path_to_bytes, php_regex,
+    preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
+    str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -853,7 +853,7 @@ impl Git {
 
             if let Err(e) = outcome {
                 self.io.write_error3(
-                    format!("<error>Sync mirror failed: {}</error>", e),
+                    bconcat!("<error>Sync mirror failed: ", error_message(&e), "</error>"),
                     true,
                     io_interface::DEBUG,
                 );
@@ -1173,9 +1173,10 @@ impl Git {
             Ok(v) => v,
             Err(e) => {
                 self.io.write_error3(
-                    format!(
-                        "<error>Failed to fetch root identifier from remote: {}</error>",
-                        e
+                    bconcat!(
+                        "<error>Failed to fetch root identifier from remote: ",
+                        error_message(&e),
+                        "</error>"
                     ),
                     true,
                     io_interface::DEBUG,

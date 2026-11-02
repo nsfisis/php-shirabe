@@ -146,10 +146,12 @@ impl ArchiverInterface for PharArchiver {
             let Some(caught) = e.catch::<UnexpectedValueException>() else {
                 return e;
             };
-            let message = format!(
-                "Could not create archive '{}' from '{}': {}",
-                target_outer.display(),
-                sources.display(),
+            let message = bconcat!(
+                "Could not create archive '",
+                target_outer,
+                "' from '",
+                sources,
+                "': ",
                 caught.get_message()
             );
             let code = caught.get_code();

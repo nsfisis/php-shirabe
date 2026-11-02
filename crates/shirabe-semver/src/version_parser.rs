@@ -3,8 +3,9 @@
 use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint};
 use bstr::{BStr, BString, ByteVec};
 use shirabe_php_shim::{
-    PhpMixed, PregMatches, bconcat, intval, ltrim2, php_regex, preg_is_match, preg_match,
-    preg_quote, preg_replace, preg_split, str_replace, str_replace_arr, strtolower, substr, trim,
+    PhpMixed, PregMatches, UnexpectedValueException, bconcat, error_message, intval, ltrim2,
+    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_split, str_replace,
+    str_replace_arr, strtolower, substr, trim,
 };
 
 // Regex to match pre-release data (sort of).
@@ -631,7 +632,7 @@ impl VersionParser {
                 }
             };
 
-            let version_error = version_result.as_ref().err().map(|e| e.to_string());
+            let version_error = version_result.as_ref().err().map(error_message);
             if let Ok(mut version) = version_result {
                 let op: &[u8] = if op_str.is_empty() { b"=" } else { op_str };
 
@@ -657,20 +658,18 @@ impl VersionParser {
                 ))]);
             }
 
-            let mut message = format!(
-                "Could not parse version constraint {}",
-                constraint.display_lossy()
-            );
+            let mut message = bconcat!("Could not parse version constraint ", constraint);
             if let Some(error) = version_error {
-                message.push_str(&format!(": {}", error));
+                message.push_str(bconcat!(": ", error));
             }
-            anyhow::bail!(message);
+            return Err(UnexpectedValueException::new(message).into());
         }
 
-        anyhow::bail!(
-            "Could not parse version constraint {}",
-            constraint.display_lossy()
-        )
+        Err(UnexpectedValueException::new(bconcat!(
+            "Could not parse version constraint ",
+            constraint
+        ))
+        .into())
     }
 
     fn manipulate_version_string<'a>(

@@ -490,7 +490,7 @@ pub struct PharException {
 
 impl PharException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self {
             inner: crate::Exception::new(message),
         }
@@ -1040,7 +1040,7 @@ mod tests {
                 .catch::<UnexpectedValueException>()
                 .unwrap()
                 .get_message()
-                .starts_with("Cannot create phar")
+                .starts_with(b"Cannot create phar")
         );
     }
 
@@ -1166,9 +1166,7 @@ mod tests {
             .extract_to(&out, Some(&["dir/absent.txt"]), true)
             .unwrap_err();
         assert!(
-            error
-                .to_string()
-                .contains("\"dir/absent.txt\" is not in the phar"),
+            crate::error_message(&error).contains_str("\"dir/absent.txt\" is not in the phar"),
             "unexpected error: {error}"
         );
     }
@@ -1185,7 +1183,7 @@ mod tests {
                 .catch::<UnexpectedValueException>()
                 .unwrap()
                 .get_message()
-                .contains("broken signature")
+                .contains_str("broken signature")
         );
     }
 }

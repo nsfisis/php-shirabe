@@ -6,9 +6,9 @@ use crate::question::StrictConfirmationQuestion;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
-    PhpMixed, array_search, bconcat, canonical_int_key, in_array_strict, is_array, is_string,
-    mb_check_encoding, mb_convert_encoding, memory_get_usage, microtime, preg_replace, str_repeat,
-    strip_tags, strlen,
+    PhpMixed, array_search, bconcat, canonical_int_key, error_message, in_array_strict, is_array,
+    is_string, mb_check_encoding, mb_convert_encoding, memory_get_usage, microtime, preg_replace,
+    str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
     ProgressBar, QuestionHelper, QuestionHelperInterface, Table,
@@ -384,13 +384,11 @@ impl IOInterfaceImmutable for ConsoleIO {
             >,
         > = Box::new(move |answer: Option<PhpMixed>| {
             validator(answer.unwrap_or(PhpMixed::Null)).map_err(|e| {
-                shirabe_symfony_console::exception::InvalidArgumentException::new(e.to_string())
+                shirabe_symfony_console::exception::InvalidArgumentException::new(error_message(&e))
             })
         });
         question.set_validator(Some(adapted));
-        question
-            .set_max_attempts(attempts)
-            .map_err(|e| anyhow::anyhow!(e.0.get_message().to_string()))?;
+        question.set_max_attempts(attempts)?;
 
         self.ask_question(&question)
     }

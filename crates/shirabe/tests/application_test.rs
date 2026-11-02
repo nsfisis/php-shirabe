@@ -12,9 +12,9 @@ use test_case::init_temp_composer;
 
 use shirabe::command::about_command::AboutCommand;
 use shirabe::command::self_update_command::SelfUpdateCommand;
-use shirabe::console::application::ApplicationHandle;
+use shirabe::console::application::{Application, ApplicationHandle};
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{PHP_EOL, PHP_SERVER, time};
+use shirabe_php_shim::{PHP_EOL, PHP_SERVER, RuntimeException, time};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};
 
@@ -264,4 +264,17 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
         app_output.borrow().fetch().contains_str("hello"),
         "The \"check\" script should have been executed instead of the check-platform-reqs command"
     );
+}
+
+#[test]
+fn a_non_utf8_exception_message_reaches_the_output_unchanged() {
+    let application = Application::new("Shirabe".into(), "".into());
+    let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    let error: anyhow::Error = RuntimeException::new(b"bad name \xff".as_slice()).into();
+
+    application.do_render_throwable(&error, output.clone());
+
+    assert!(output.borrow().fetch().contains_str(b"bad name \xff"));
 }

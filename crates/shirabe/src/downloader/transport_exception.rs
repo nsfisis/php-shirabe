@@ -14,7 +14,7 @@ pub struct TransportException {
 
 impl TransportException {
     #[track_caller]
-    pub fn new(message: String, code: i64) -> Self {
+    pub fn new(message: impl Into<BString>, code: i64) -> Self {
         Self {
             inner: RuntimeException::with_code(message, code),
             headers: None,

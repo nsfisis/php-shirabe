@@ -352,8 +352,8 @@ impl RepositorySet {
                         .catch::<TransportException>()
                         .unwrap()
                         .get_message()
-                        .to_string();
-                    unreachable_repos.push(bstr::BString::from(message));
+                        .to_owned();
+                    unreachable_repos.push(message);
                 }
             }
         }

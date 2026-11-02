@@ -29,7 +29,7 @@ use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
     LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpClass, PhpMixed,
     RuntimeException, STDIN, STR_PAD_RIGHT, basename, bconcat, bin2hex, chdir, defined, dirname,
-    disk_free_space, exec, explode, explode_limit, extension_loaded, file_exists,
+    disk_free_space, error_message, exec, explode, explode_limit, extension_loaded, file_exists,
     file_get_contents, file_put_contents, function_exists, get_debug_type_obj, getcwd, getenv,
     getmypid, glob, implode, ini_set, intval, is_array, is_dir, is_file, is_numeric_string,
     is_string, json_decode_assoc, levenshtein, ltrim2, mb_convert_encoding, mb_convert_variables,
@@ -247,9 +247,9 @@ impl Application {
             io.write_error3(msg, true, io_interface::QUIET);
         }
 
-        let message = exception.to_string();
+        let message = error_message(exception);
         if exception.is_instanceof::<TransportException>()
-            && message.contains("Unable to use a proxy")
+            && message.contains_str("Unable to use a proxy")
         {
             io.write_error3(
                 "<error>The following exception indicates your proxy is misconfigured</error>",
@@ -261,7 +261,7 @@ impl Application {
 
         if Platform::is_windows()
             && exception.is_instanceof::<TransportException>()
-            && message.contains("unable to get local issuer certificate")
+            && message.contains_str("unable to get local issuer certificate")
         {
             let avast_detect = glob("C:\\Program Files\\Avast*");
             let avast_detect_pm = PhpMixed::List(
@@ -353,7 +353,7 @@ impl Application {
                 Err(e) => {
                     if e.is_instanceof::<InvalidArgumentException>() {
                         if required {
-                            self.io.write_error(e.to_string());
+                            self.io.write_error(error_message(&e));
                             if self.are_exceptions_caught() {
                                 // PHP calls `exit(1)` here, terminating before parent::run() can
                                 // re-render the exception. Propagate it as an ExitException so the
@@ -1275,22 +1275,23 @@ impl Application {
         let mut current = Some(e);
         while let Some(e) = current {
             let exception = AnyThrowable::of(e);
-            let message = trim(e.to_string());
+            let message = trim(error_message(e));
             let verbosity = output.borrow().get_verbosity();
 
             let mut len;
-            let mut title = String::new();
+            let mut title = BString::default();
             if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
                 let class = throwable_debug_type(exception);
                 let code = throwable_get_code(exception);
-                title = format!(
-                    "  [{}{}]  ",
+                title = bconcat!(
+                    "  [",
                     class,
                     if code != 0 {
-                        format!(" ({})", code)
+                        bconcat!(" (", code, ")")
                     } else {
-                        String::new()
-                    }
+                        BString::default()
+                    },
+                    "]  "
                 );
                 len = Helper::width(&title);
             } else {
@@ -2092,7 +2093,7 @@ impl ApplicationHandle {
                 for command in plugin_commands {
                     let cmd_name = command.borrow().get_name().unwrap_or_default();
                     if application.borrow_mut().has(cmd_name.as_bstr()) {
-                        let cls = command.borrow().php_class_name();
+                        let cls = command.borrow().php_class_name().to_owned();
                         io.write_error(bconcat!(
                             "<warning>Plugin command ",
                             cmd_name,
@@ -2529,7 +2530,7 @@ impl ApplicationHandle {
                     Ok(see.get_code() as i32)
                 } else {
                     let mut ghe = GithubActionError::new(io.clone());
-                    ghe.emit(&e.to_string(), None, None);
+                    ghe.emit(error_message(&e).as_bstr(), None, None);
 
                     application.borrow_mut().hint_common_errors(&e, output);
 
@@ -2938,8 +2939,8 @@ fn throwable_get_code(e: Option<&AnyThrowable>) -> i64 {
 
 /// PHP's `get_debug_type($e)` for the title line, reached only when the message is empty or output
 /// is verbose.
-fn throwable_debug_type(e: Option<&AnyThrowable>) -> String {
-    e.map_or_else(|| "Exception".to_string(), PhpClass::php_class_name)
+fn throwable_debug_type(e: Option<&AnyThrowable>) -> &BStr {
+    e.map_or_else(|| BStr::new("Exception"), PhpClass::php_class_name)
 }
 
 /// Borrows the shared input as a mutable `dyn InputInterface` for passing to

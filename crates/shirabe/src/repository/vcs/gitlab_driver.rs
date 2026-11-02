@@ -898,11 +898,14 @@ impl GitLabDriver {
                     )));
                 }
                 self.inner.io.write_error3(
-                    format!(
-                        "<warning>Failed to download {}/{}:{}</warning>",
-                        self.namespace.display_lossy(),
-                        self.repository.display_lossy(),
-                        e.get_message()
+                    bconcat!(
+                        "<warning>Failed to download ",
+                        self.namespace,
+                        "/",
+                        self.repository,
+                        ":",
+                        e.get_message(),
+                        "</warning>"
                     ),
                     true,
                     io_interface::NORMAL,

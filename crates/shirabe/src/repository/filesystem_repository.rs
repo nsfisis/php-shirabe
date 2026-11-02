@@ -15,9 +15,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
-    UnexpectedValueException, array_flip, bconcat, dirname, get_debug_type, in_array_strict,
-    is_array, is_null, is_string, ksort, path_from_bytes, path_to_bytes, realpath, str_repeat,
-    strcmp, strnatcmp, usort, var_export,
+    UnexpectedValueException, array_flip, bconcat, dirname, error_message, get_debug_type,
+    in_array_strict, is_array, is_null, is_string, ksort, path_from_bytes, path_to_bytes, realpath,
+    str_repeat, strcmp, strnatcmp, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -129,13 +129,15 @@ impl FilesystemRepository {
         })() {
             Ok(p) => p,
             Err(e) => {
-                return Err(InvalidRepositoryException::new(format!(
-                    "Invalid repository data in {}, packages could not be loaded: [{}] {}",
-                    self.file.get_path().display(),
+                return Err(InvalidRepositoryException::new(bconcat!(
+                    "Invalid repository data in ",
+                    self.file.get_path(),
+                    ", packages could not be loaded: [",
                     AnyThrowable::of(&e)
                         .expect("PHP reaches this only with a caught \\Throwable")
                         .php_class_name(),
-                    e
+                    "] ",
+                    error_message(&e)
                 ))
                 .into());
             }

@@ -106,6 +106,7 @@ impl Decisions {
                 literal_or_package_id
             ))
             .get_message()
+            .display_lossy()
         );
     }
 
@@ -171,6 +172,7 @@ impl Decisions {
                 ))
                 .0
                 .get_message()
+                .display_lossy()
             );
         }
 

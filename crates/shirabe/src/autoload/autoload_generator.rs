@@ -964,9 +964,10 @@ impl AutoloadGenerator {
                     let Some(runtime_exception) = e.catch::<RuntimeException>() else {
                         return Err(e);
                     };
-                    self.io.write_error(format!(
-                        "<warning>{}</warning>",
-                        runtime_exception.get_message()
+                    self.io.write_error(bconcat!(
+                        "<warning>",
+                        runtime_exception.get_message(),
+                        "</warning>"
                     ));
                 }
             }

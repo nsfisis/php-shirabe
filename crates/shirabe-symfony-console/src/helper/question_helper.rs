@@ -238,7 +238,7 @@ pub trait QuestionHelperInterface {
                     // RuntimeException rethrow branch is statically unreachable; record the error
                     // and retry.
                     error = Some(Exception::with_code(
-                        e.get_message().to_string(),
+                        e.get_message().to_owned(),
                         e.get_code(),
                     ));
                 }
@@ -246,11 +246,7 @@ pub trait QuestionHelperInterface {
         }
 
         // throw $error;
-        Err(anyhow::Error::msg(
-            error
-                .map(|e| e.get_message().to_string())
-                .unwrap_or_default(),
-        ))
+        Err(error.expect("a question has at least one attempt").into())
     }
 
     /// Outputs the question prompt (PHP protected; the overridable hook).

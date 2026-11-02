@@ -371,6 +371,7 @@ pub(crate) fn date_time_from_wire(value: &PluginValue) -> Result<DateTime<Utc>, 
 mod tests {
     use super::*;
     use bstr::BStr;
+    use bstr::ByteSlice;
     use chrono::Timelike;
     use shirabe_php_rpc::value::serialize;
 
@@ -524,7 +525,11 @@ mod tests {
         object.set_public("timezone_type", PluginValue::Int(3));
         object.set_public("timezone", PluginValue::string("Asia/Tokyo"));
         let err = date_time_from_wire(&PluginValue::PhpObject(object)).unwrap_err();
-        assert!(err.message.contains("Asia/Tokyo"), "{}", err.message);
+        assert!(
+            err.message.contains_str("Asia/Tokyo"),
+            "{}",
+            err.message.display_lossy()
+        );
     }
 
     #[test]
@@ -532,9 +537,17 @@ mod tests {
         let mut object = PhpObject::new("MyPlugin\\OddConstraint");
         object.set_protected("prettyString", PluginValue::Null);
         let err = constraint_from_wire(&PluginValue::PhpObject(object)).unwrap_err();
-        assert!(err.message.contains("OddConstraint"), "{}", err.message);
+        assert!(
+            err.message.contains_str("OddConstraint"),
+            "{}",
+            err.message.display_lossy()
+        );
 
         let err = link_from_wire(&PluginValue::List(Vec::new())).unwrap_err();
-        assert!(err.message.contains("expected a Link"), "{}", err.message);
+        assert!(
+            err.message.contains_str("expected a Link"),
+            "{}",
+            err.message.display_lossy()
+        );
     }
 }

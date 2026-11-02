@@ -7,11 +7,11 @@ use crate::repository::PlatformRepository;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, date_create,
-    explode, filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar,
-    is_string, json_encode, parse_url, pcre_check_utf8_subject, php_regex, php_to_string,
-    preg_is_match, preg_replace, str_replace, strcasecmp, strtolower, strtotime, substr,
-    trigger_error, trim2, var_export,
+    CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, bconcat,
+    date_create, error_message, explode, filter_var_email, get_debug_type, is_array, is_bool,
+    is_int, is_numeric, is_scalar, is_string, json_encode, parse_url, pcre_check_utf8_subject,
+    php_regex, php_to_string, preg_is_match, preg_replace, str_replace, strcasecmp, strtolower,
+    strtotime, substr, trigger_error, trim2, var_export,
 };
 use shirabe_semver::{
     Intervals,
@@ -399,11 +399,16 @@ impl LoaderInterface for ValidatingArrayLoader {
                 match self.version_parser.normalize(&version_str, None) {
                     Ok(_) => {}
                     Err(e) => {
-                        self.errors.borrow_mut().push(format!(
-                            "version : invalid value ({}): {}",
-                            version_str.display_lossy(),
-                            e
-                        ));
+                        self.errors.borrow_mut().push(
+                            bconcat!(
+                                "version : invalid value (",
+                                version_str,
+                                "): ",
+                                error_message(&e)
+                            )
+                            .display_lossy()
+                            .to_string(),
+                        );
                         self.config.borrow_mut().shift_remove(B("version"));
                     }
                 }
@@ -441,12 +446,18 @@ impl LoaderInterface for ValidatingArrayLoader {
                 }
                 let platform_str = BString::from(platform.as_string().unwrap_or_default());
                 if let Err(e) = self.version_parser.normalize(&platform_str, None) {
-                    self.errors.borrow_mut().push(format!(
-                        "config.platform.{} : invalid value ({}): {}",
-                        key.display_lossy(),
-                        platform_str.display_lossy(),
-                        e
-                    ));
+                    self.errors.borrow_mut().push(
+                        bconcat!(
+                            "config.platform.",
+                            key,
+                            " : invalid value (",
+                            platform_str,
+                            "): ",
+                            error_message(&e)
+                        )
+                        .display_lossy()
+                        .to_string(),
+                    );
                 }
             }
         }
@@ -1262,12 +1273,18 @@ impl LoaderInterface for ValidatingArrayLoader {
                             match self.version_parser.parse_constraints(&constraint_str) {
                                 Ok(c) => c,
                                 Err(e) => {
-                                    self.errors.borrow_mut().push(format!(
-                                        "{}.{} : invalid version constraint ({})",
-                                        link_type,
-                                        package.display_lossy(),
-                                        e
-                                    ));
+                                    self.errors.borrow_mut().push(
+                                        bconcat!(
+                                            link_type,
+                                            ".",
+                                            package,
+                                            " : invalid version constraint (",
+                                            error_message(&e),
+                                            ")"
+                                        )
+                                        .display_lossy()
+                                        .to_string(),
+                                    );
                                     if let Some(PhpMixed::Array(arr)) =
                                         self.config.borrow_mut().get_mut(B(link_type))
                                     {

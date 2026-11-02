@@ -630,8 +630,8 @@ fn string_list(value: PhpMixed, name: &str) -> Vec<BString> {
 /// the fatal `anyhow::Error` lane used for a dead worker or a broken channel).
 #[derive(Debug, Clone)]
 pub struct PhpThrow {
-    pub exception_class: String,
-    pub message: String,
+    pub exception_class: BString,
+    pub message: BString,
     pub code: i64,
     /// The state the exception carries beyond `message` and `code`, keyed by the property names
     /// its class declares. The receiving side revives them onto the instance it rebuilds.
@@ -644,15 +644,19 @@ pub struct PhpThrow {
     pub line: i64,
     /// The superclasses of `exception_class`, nearest first, so the receiving side can rebuild
     /// the nearest one it has a type for. Empty from Rust to PHP, where every class is known.
-    pub parents: Vec<String>,
+    pub parents: Vec<BString>,
 }
 
 impl PhpThrow {
     /// An exception of `exception_class` carrying nothing beyond its message and code.
-    pub fn new(exception_class: String, message: String, code: i64) -> PhpThrow {
+    pub fn new(
+        exception_class: impl Into<BString>,
+        message: impl Into<BString>,
+        code: i64,
+    ) -> PhpThrow {
         PhpThrow {
-            exception_class,
-            message,
+            exception_class: exception_class.into(),
+            message: message.into(),
             code,
             properties: Box::new(IndexMap::new()),
             file: BString::default(),
@@ -661,14 +665,19 @@ impl PhpThrow {
         }
     }
 
-    pub fn runtime(message: String) -> PhpThrow {
-        PhpThrow::new("RuntimeException".to_string(), message, 0)
+    pub fn runtime(message: impl Into<BString>) -> PhpThrow {
+        PhpThrow::new("RuntimeException", message, 0)
     }
 }
 
 impl std::fmt::Display for PhpThrow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.exception_class, self.message)
+        write!(
+            f,
+            "{}: {}",
+            self.exception_class.display_lossy(),
+            self.message.display_lossy()
+        )
     }
 }
 

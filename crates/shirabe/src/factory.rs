@@ -32,9 +32,10 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
     PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, bconcat,
-    class_exists, dirname, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    implode, is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir, path_from_bytes,
-    path_to_bytes, pathinfo, realpath, rename, rtrim2, strpos, strtr, substr, trim2,
+    class_exists, dirname, error_message, extension_loaded, file_exists, file_get_contents,
+    file_put_contents, implode, is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir,
+    path_from_bytes, path_to_bytes, pathinfo, realpath, rename, rtrim2, strpos, strtr, substr,
+    trim2,
 };
 use shirabe_symfony_console::{
     formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
@@ -454,7 +455,7 @@ impl Factory {
                         " - {}",
                         (implode(format!("{} - ", PHP_EOL), jve.get_errors())).display_lossy()
                     );
-                    let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
+                    let message = bconcat!(jve.get_message(), ":", PHP_EOL, errors);
                     return Err(
                         JsonValidationException::new(message, jve.get_errors().clone()).into(),
                     );
@@ -954,7 +955,7 @@ impl Factory {
             Ok(c) => Some(c),
             Err(e) => {
                 io.write_error3(
-                    format!("Failed to initialize global composer: {}", e),
+                    bconcat!("Failed to initialize global composer: ", error_message(&e)),
                     true,
                     crate::io::DEBUG,
                 );
@@ -1603,14 +1604,15 @@ impl Factory {
 
         if let Err(e) = result {
             if let Some(jve) = e.catch::<JsonValidationException>() {
-                let msg = format!(
-                    "{}, this may result in errors and should be resolved:{} - {}",
+                let msg = bconcat!(
                     jve.get_message(),
+                    ", this may result in errors and should be resolved:",
                     PHP_EOL,
-                    (implode(format!("{} - ", PHP_EOL), jve.get_errors())).display_lossy()
+                    " - ",
+                    (implode(format!("{} - ", PHP_EOL), jve.get_errors()))
                 );
                 if let Some(io_ref) = io {
-                    io_ref.write_error3(format!("<warning>{}</>", msg), true, crate::io::NORMAL);
+                    io_ref.write_error3(bconcat!("<warning>", msg, "</>"), true, crate::io::NORMAL);
                 } else {
                     return Err(UnexpectedValueException::new(msg).into());
                 }

@@ -8,7 +8,7 @@ use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use bstr::B;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, bconcat, empty, error_message};
 
 #[derive(Debug)]
 pub struct PluginInstaller {
@@ -46,9 +46,10 @@ impl PluginInstaller {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
-        self.inner.io.write_error(format!(
-            "Plugin initialization failed ({}), uninstalling plugin",
-            e
+        self.inner.io.write_error(bconcat!(
+            "Plugin initialization failed (",
+            error_message(&e),
+            "), uninstalling plugin"
         ));
         self.inner.uninstall(repo, package).await?;
         Err(e)

@@ -14,7 +14,7 @@ use crate::io::{IOInterface, IOInterfaceWrite, NullIO};
 use crate::package::version::VersionParser;
 use crate::plugin::{PluginEvents, PreCommandRunEvent};
 use crate::util::Platform;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
@@ -270,7 +270,7 @@ impl Command for BaseCommandData {
 }
 
 impl PhpClass for BaseCommandData {
-    fn php_class_name(&self) -> String {
+    fn php_class_name(&self) -> &BStr {
         // Forwards to the base state's panicking implementation; concrete commands supply
         // their own class name through `impl_php_class!`.
         self.inner.php_class_name()

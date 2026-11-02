@@ -514,7 +514,7 @@ impl Installer {
                                 .error(format!("Failed to audit {} packages.", target), &[]);
                             if self.io.is_verbose() {
                                 self.io.error(
-                                    format!("[{}] {}", "TransportException", te.get_message()),
+                                    bconcat!("[", "TransportException", "] ", te.get_message()),
                                     &[],
                                 );
                             }
@@ -670,11 +670,7 @@ impl Installer {
                 }
 
                 let mut ghe = GithubActionError::new(self.io.clone());
-                ghe.emit(
-                    &format!("{}\n{}", err, pretty_problem.display_lossy()),
-                    None,
-                    None,
-                );
+                ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
 
                 return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
             }
@@ -971,11 +967,7 @@ impl Installer {
                 self.io.write_error(&pretty_problem);
 
                 let mut ghe = GithubActionError::new(self.io.clone());
-                ghe.emit(
-                    &format!("{}\n{}", err, pretty_problem.display_lossy()),
-                    None,
-                    None,
-                );
+                ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
 
                 return Ok(e.get_code());
             }
@@ -1153,11 +1145,7 @@ impl Installer {
                     self.io.write_error(&pretty_problem);
 
                     let mut ghe = GithubActionError::new(self.io.clone());
-                    ghe.emit(
-                        &format!("{}\n{}", err, pretty_problem.display_lossy()),
-                        None,
-                        None,
-                    );
+                    ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
 
                     return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
                 }

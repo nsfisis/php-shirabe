@@ -19,8 +19,8 @@ use crate::util::{HttpDownloader, Platform, ProcessExecutor, Url};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, bconcat, php_regex, preg_is_match,
-    preg_replace, str_replace, strpos,
+    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, bconcat, error_message, php_regex,
+    preg_is_match, preg_replace, str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -355,10 +355,12 @@ impl VcsRepository {
                                     return Err(e);
                                 }
                                 if is_very_verbose {
-                                    self.io.write_error(format!(
-                                        "<error>Skipped parsing {}, {}</error>",
-                                        root_identifier.display_lossy(),
-                                        e
+                                    self.io.write_error(bconcat!(
+                                        "<error>Skipped parsing ",
+                                        root_identifier,
+                                        ", ",
+                                        error_message(&e),
+                                        "</error>"
                                     ));
                                 }
                             }
@@ -372,10 +374,12 @@ impl VcsRepository {
                         return Err(e);
                     }
                     if is_very_verbose {
-                        self.io.write_error(format!(
-                            "<error>Skipped parsing {}, {}</error>",
-                            root_identifier.display_lossy(),
-                            e
+                        self.io.write_error(bconcat!(
+                            "<error>Skipped parsing ",
+                            root_identifier,
+                            ", ",
+                            error_message(&e),
+                            "</error>"
                         ));
                     }
                 }
@@ -587,17 +591,20 @@ impl VcsRepository {
                 }
                 if is_very_verbose {
                     let detail = if let Some(te) = e.catch::<TransportException>() {
-                        format!(
-                            "no composer file was found ({} HTTP status code)",
-                            te.get_code()
+                        bconcat!(
+                            "no composer file was found (",
+                            te.get_code(),
+                            " HTTP status code)"
                         )
                     } else {
-                        format!("{}", e)
+                        bconcat!(error_message(&e))
                     };
-                    self.io.write_error(format!(
-                        "<warning>Skipped tag {}, {}</warning>",
-                        tag.display_lossy(),
-                        detail
+                    self.io.write_error(bconcat!(
+                        "<warning>Skipped tag ",
+                        tag,
+                        ", ",
+                        detail,
+                        "</warning>"
                     ));
                 }
                 continue;
@@ -806,10 +813,12 @@ impl VcsRepository {
                     self.io.write_error("");
                 }
                 self.branch_error_occurred.set(true);
-                self.io.write_error(format!(
-                    "<error>Skipped branch {}, {}</error>",
-                    branch.display_lossy(),
-                    e
+                self.io.write_error(bconcat!(
+                    "<error>Skipped branch ",
+                    branch,
+                    ", ",
+                    error_message(&e),
+                    "</error>"
                 ));
                 self.io.write_error("");
                 continue;

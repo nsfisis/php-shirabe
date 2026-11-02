@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/EventDispatcher/ScriptExecutionException.php
 
+use bstr::BString;
 use shirabe_php_shim::RuntimeException;
 
 /// Thrown when a script running an external process exits with a non-0 status code
@@ -8,7 +9,7 @@ pub struct ScriptExecutionException(pub RuntimeException);
 
 impl ScriptExecutionException {
     #[track_caller]
-    pub fn new(message: String, code: i64) -> Self {
+    pub fn new(message: impl Into<BString>, code: i64) -> Self {
         Self(RuntimeException::with_code(message, code))
     }
 }

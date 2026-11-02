@@ -12,8 +12,8 @@ use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, bconcat, date_create,
-    empty, is_scalar, is_string, json_encode, ltrim2, php_regex, preg_is_match, preg_replace,
-    stripos, strpos, strtolower, strval, substr, trigger_error, trim,
+    empty, error_message, is_scalar, is_string, json_encode, ltrim2, php_regex, preg_is_match,
+    preg_replace, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
 /// The fields of one package version, read without regard for how they are stored. A version
@@ -129,14 +129,14 @@ impl ArrayLoader {
             {
                 Ok(v) => version = v,
                 Err(e) => {
-                    let message = format!(
-                        "Failed to normalize version for package \"{}\": {}",
+                    let message = bconcat!(
+                        "Failed to normalize version for package \"",
                         config
                             .get(B("name"))
                             .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .display_lossy(),
-                        e
+                            .unwrap_or_default(),
+                        "\": ",
+                        error_message(&e)
                     );
                     let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
                     return Err(UnexpectedValueException::with_code_and_previous(

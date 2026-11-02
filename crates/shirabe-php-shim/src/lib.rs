@@ -410,7 +410,7 @@ impl<T: std::any::Any> AsAny for T {
 /// report.
 pub trait PhpClass {
     /// The fully-qualified class name, e.g. `Composer\Command\InstallCommand`.
-    fn php_class_name(&self) -> String;
+    fn php_class_name(&self) -> &bstr::BStr;
 }
 
 /// Implements [`PhpClass`] for a ported type, given the fully-qualified name of the PHP
@@ -423,8 +423,8 @@ pub trait PhpClass {
 macro_rules! impl_php_class {
     ($ty:ty, $class_name:literal) => {
         impl $crate::PhpClass for $ty {
-            fn php_class_name(&self) -> String {
-                $class_name.to_string()
+            fn php_class_name(&self) -> &::bstr::BStr {
+                ::bstr::BStr::new($class_name)
             }
         }
     };

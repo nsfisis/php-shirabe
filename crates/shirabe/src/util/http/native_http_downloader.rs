@@ -199,8 +199,7 @@ impl NativeHttpDownloader {
         let using_proxy = ProxyManager::get_instance()
             .as_ref()
             .map(|pm| pm.get_proxy_for_request(url))
-            .transpose()
-            .map_err(|e| anyhow::anyhow!(e.get_message().to_string()))?
+            .transpose()?
             .and_then(|p| p.get_status(Some(" using proxy (%s)")).ok())
             .unwrap_or_default();
         // `attributes.redirects == 0 && attributes.retries == 0` in PHP is always true here since
@@ -227,8 +226,7 @@ impl NativeHttpDownloader {
                 current_url.as_bstr(),
             )?;
             let send_options =
-                crate::util::StreamContextFactory::init_options(&current_url, send_options, true)
-                    .map_err(|e| anyhow::anyhow!(e.get_message().to_string()))?;
+                crate::util::StreamContextFactory::init_options(&current_url, send_options, true)?;
 
             let send_result = self
                 .send_once(current_url.as_bstr(), &send_options, copy_to, &attributes)

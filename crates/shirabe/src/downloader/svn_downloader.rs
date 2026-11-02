@@ -12,8 +12,9 @@ use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, bconcat, impl_php_class, implode, is_dir, path_from_bytes,
-    path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split, version_compare,
+    CmpOp, PhpMixed, RuntimeException, bconcat, error_message, impl_php_class, implode, is_dir,
+    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split,
+    version_compare,
 };
 use std::path::Path;
 
@@ -56,11 +57,12 @@ impl SvnDownloader {
         util.set_cache_credentials(self.cache_credentials.get());
         util.execute(command, url, cwd, path, self.inner.io.is_verbose())
             .map_err(|e| {
-                anyhow::anyhow!(
-                    "{} could not be downloaded, {}",
-                    package.get_pretty_name().display_lossy(),
-                    e
-                )
+                RuntimeException::new(bconcat!(
+                    package.get_pretty_name(),
+                    " could not be downloaded, ",
+                    error_message(&e)
+                ))
+                .into()
             })
     }
 
@@ -425,10 +427,11 @@ impl VcsDownloader for SvnDownloader {
             util.set_cache_credentials(self.cache_credentials.get());
             util.execute_local(command.clone(), path, None, self.inner.io.is_verbose())
                 .map_err(|e| {
-                    RuntimeException::new(format!(
-                        "Failed to execute {}\n\n{}",
-                        implode(" ", &command).display_lossy(),
-                        e
+                    RuntimeException::new(bconcat!(
+                        "Failed to execute ",
+                        implode(" ", &command),
+                        "\n\n",
+                        error_message(&e)
                     ))
                     .into()
                 })

@@ -658,6 +658,7 @@ impl StreamableInputInterface for ArgvInput {
 mod tests {
     use super::*;
     use crate::input::{DefinitionItem, InputArgument, InputOption};
+    use shirabe_php_shim::error_message;
 
     fn definition() -> InputDefinition {
         InputDefinition::new(vec![
@@ -709,7 +710,7 @@ mod tests {
     fn undefined_option_names_that_are_not_utf8_do_not_exist() {
         for token in [b"--\xff".as_slice(), b"-\xff".as_slice()] {
             let error = ArgvInput::new(Some(argv(&[token])), Some(definition())).unwrap_err();
-            assert!(error.to_string().contains("option does not exist"));
+            assert!(error_message(&error).contains_str("option does not exist"));
         }
     }
 

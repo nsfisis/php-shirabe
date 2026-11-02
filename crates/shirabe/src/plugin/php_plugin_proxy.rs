@@ -414,7 +414,7 @@ pub(crate) fn dispatch_job_service_method(
             };
             throw.file = arg::<bstr::BString>(method_name, args, 5)?;
             throw.line = arg::<i64>(method_name, args, 6)?;
-            throw.parents = arg::<Vec<String>>(method_name, args, 7)?;
+            throw.parents = arg::<Vec<bstr::BString>>(method_name, args, 7)?;
             job_registry::settle_php_job(id, Err(throw));
             Ok(PluginValue::Null)
         })(),
@@ -3574,7 +3574,7 @@ fn decode_write_args(
     Ok((messages, newline, verbosity))
 }
 
-fn runtime_throw(message: String) -> PhpThrow {
+fn runtime_throw(message: impl Into<BString>) -> PhpThrow {
     PhpThrow::runtime(message)
 }
 
@@ -4772,8 +4772,8 @@ impl BaseCommand for PhpCommandProxy {
 }
 
 impl PhpClass for PhpCommandProxy {
-    fn php_class_name(&self) -> String {
-        self.handle.class.clone()
+    fn php_class_name(&self) -> &BStr {
+        BStr::new(&self.handle.class)
     }
 }
 
@@ -4863,7 +4863,7 @@ mod tests {
         assert!(
             throw
                 .message
-                .starts_with("Shirabe does not support constructing")
+                .starts_with(b"Shirabe does not support constructing")
         );
     }
 }

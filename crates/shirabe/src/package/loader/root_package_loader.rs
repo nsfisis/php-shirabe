@@ -281,7 +281,7 @@ impl RootPackageLoader {
                                 "Invalid alias definition in \"{}\": \"{}\". Aliases should be in the form \"exact-version as other-exact-version\".",
                                 req_name.display_lossy(), req_version.display_lossy()
                             ))
-                        .get_message()
+                        .get_message().display_lossy()
                     )
                 };
             }

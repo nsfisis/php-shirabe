@@ -11,9 +11,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bconcat, date_create, intval, path_from_bytes,
-    php_regex, preg_is_match, preg_match, preg_replace, rtrim2, stripos, strrpos, strtr, substr,
-    trim, trim2,
+    Catch as _, PhpMixed, RuntimeException, bconcat, date_create, error_message, intval,
+    path_from_bytes, php_regex, preg_is_match, preg_match, preg_replace, rtrim2, stripos, strrpos,
+    strtr, substr, trim, trim2,
 };
 
 #[derive(Debug)]
@@ -195,7 +195,7 @@ impl SvnDriver {
                         .catch::<TransportException>()
                         .unwrap()
                         .get_message()
-                        .to_string();
+                        .to_owned();
                     if stripos(&message, "path not found").is_none()
                         && stripos(&message, "svn: warning: W160013").is_none()
                     {
@@ -266,7 +266,7 @@ impl SvnDriver {
             Ok(o) => o,
             Err(e) => {
                 if let Some(e) = e.catch::<RuntimeException>() {
-                    return Err(TransportException::new(e.get_message().to_string(), 0).into());
+                    return Err(TransportException::new(e.get_message().to_owned(), 0).into());
                 }
                 return Err(e);
             }
@@ -539,10 +539,11 @@ impl SvnDriver {
                     .into());
                 }
 
-                Err(RuntimeException::new(format!(
-                    "Repository {} could not be processed, {}",
-                    self.inner.url.display_lossy(),
-                    e,
+                Err(RuntimeException::new(bconcat!(
+                    "Repository ",
+                    self.inner.url,
+                    " could not be processed, ",
+                    error_message(&e)
                 ))
                 .into())
             }

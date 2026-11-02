@@ -12,7 +12,7 @@ pub struct CommandNotFoundException {
 
 impl CommandNotFoundException {
     #[track_caller]
-    pub fn new(message: String, alternatives: Vec<BString>, code: i64) -> Self {
+    pub fn new(message: impl Into<BString>, alternatives: Vec<BString>, code: i64) -> Self {
         Self {
             inner: InvalidArgumentException::with_code(message, code),
             alternatives,

@@ -388,9 +388,9 @@ impl GitLab {
             Ok(r) => r,
             Err(e) => match e.catch::<TransportException>() {
                 Some(te) => {
-                    let message = te.get_message().to_string();
+                    let message = te.get_message().to_owned();
                     self.io.write_error3(
-                        format!("Couldn't refresh access token: {}", message),
+                        bconcat!("Couldn't refresh access token: ", message),
                         true,
                         io_interface::NORMAL,
                     );

@@ -491,7 +491,7 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
 }
 
 impl PhpClass for CommandData {
-    fn php_class_name(&self) -> String {
+    fn php_class_name(&self) -> &BStr {
         panic!(
             "php_class_name called on the base command state; concrete commands supply their class name"
         );

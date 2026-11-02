@@ -29,9 +29,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
-    array_pop, bconcat, chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode,
-    is_dir, is_file, mkdir, path_from_bytes, path_to_bytes, preg_match, realpath, rtrim2,
-    strtolower, unlink,
+    array_pop, bconcat, chdir, error_message, explode_with_limit, file_exists, getcwd,
+    impl_php_class, implode, is_dir, is_file, mkdir, path_from_bytes, path_to_bytes, preg_match,
+    realpath, rtrim2, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
@@ -366,9 +366,10 @@ impl CreateProjectCommand {
                 }
             }
             if let Some(e) = had_error {
-                io.write_error(format!(
-                    "<error>An error occurred while removing the VCS metadata: {}</error>",
-                    e
+                io.write_error(bconcat!(
+                    "<error>An error occurred while removing the VCS metadata: ",
+                    error_message(&e),
+                    "</error>"
                 ));
             }
 

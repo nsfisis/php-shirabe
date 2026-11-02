@@ -141,8 +141,8 @@ impl VcsDriverKind {
 
 impl PhpClass for VcsDriverKind {
     /// Used as the fallback driver name in `getRepoName()`.
-    fn php_class_name(&self) -> String {
-        String::from(match self {
+    fn php_class_name(&self) -> &BStr {
+        BStr::new(match self {
             VcsDriverKind::GitHub => r"Composer\Repository\Vcs\GitHubDriver",
             VcsDriverKind::GitLab => r"Composer\Repository\Vcs\GitLabDriver",
             VcsDriverKind::GitBitbucket => r"Composer\Repository\Vcs\GitBitbucketDriver",

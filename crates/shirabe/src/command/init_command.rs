@@ -672,7 +672,7 @@ impl Command for InitCommand {
                     (implode(format!("{} - ", PHP_EOL), json_err.get_errors())).display_lossy()
                 );
                 io.write_error3(
-                    format!("{}:{}{}", json_err.get_message(), PHP_EOL, errors),
+                    bconcat!(json_err.get_message(), ":", PHP_EOL, errors),
                     true,
                     io_interface::NORMAL,
                 );

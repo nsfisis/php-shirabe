@@ -115,12 +115,15 @@ impl DownloadManager {
             .as_ref()
             .is_none_or(|s| *s != downloader_installation_source)
         {
-            return Err(LogicException::new(format!(
-                "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
+            return Err(LogicException::new(bconcat!(
+                "Downloader \"",
                 downloader.borrow().php_class_name(),
+                "\" is a ",
                 downloader_installation_source,
-                installation_source.unwrap_or_default().display_lossy(),
-                package.to_php_string().display_lossy(),
+                " type downloader and can not be used to download ",
+                installation_source.unwrap_or_default(),
+                " for package ",
+                package.to_php_string()
             ))
             .into());
         }
@@ -197,13 +200,16 @@ impl DownloadManager {
                             .catch::<RuntimeException>()
                             .unwrap()
                             .get_message()
-                            .to_string();
+                            .to_owned();
                         self.io.write_error3(
-                            format!(
-                                "    <warning>Failed to download {} from {}: {}</warning>",
-                                package.get_pretty_name().display_lossy(),
-                                source.display_lossy(),
+                            bconcat!(
+                                "    <warning>Failed to download ",
+                                package.get_pretty_name(),
+                                " from ",
+                                source,
+                                ": ",
                                 message,
+                                "</warning>"
                             ),
                             true,
                             io_interface::NORMAL,
@@ -303,9 +309,9 @@ impl DownloadManager {
                         .catch::<RuntimeException>()
                         .unwrap()
                         .get_message()
-                        .to_string();
+                        .to_owned();
                     self.io.write_error3(
-                        format!("<error>    Update failed ({})</error>", message),
+                        bconcat!("<error>    Update failed (", message, ")</error>"),
                         true,
                         io_interface::NORMAL,
                     );

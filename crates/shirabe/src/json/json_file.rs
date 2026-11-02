@@ -8,9 +8,9 @@ use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
     JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, dirname,
-    file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc,
-    json_decode_obj, json_encode_ex, mkdir, path_from_bytes, path_to_bytes, php_regex,
-    preg_is_match, preg_match, preg_replace2, realpath, strpos, usleep, utf8_text,
+    error_message, file_exists, file_get_contents, file_put_contents, is_dir, is_file,
+    json_decode_assoc, json_decode_obj, json_encode_ex, mkdir, path_from_bytes, path_to_bytes,
+    php_regex, preg_is_match, preg_match, preg_replace2, realpath, strpos, usleep, utf8_text,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 use std::path::{Path, PathBuf};
@@ -158,7 +158,7 @@ impl JsonFile {
             Ok(j) => j,
             Err(e) => {
                 if let Some(te) = e.catch::<TransportException>() {
-                    let message = te.get_message().to_string();
+                    let message = te.get_message().to_owned();
                     return Err(RuntimeException::with_code_and_previous(
                         message,
                         0,
@@ -170,10 +170,11 @@ impl JsonFile {
                 if e.is_instanceof::<Error>() {
                     return Err(e);
                 }
-                return Err(RuntimeException::new(format!(
-                    "Could not read {}\n\n{}",
-                    self.path.display(),
-                    e
+                return Err(RuntimeException::new(bconcat!(
+                    "Could not read ",
+                    self.path,
+                    "\n\n",
+                    error_message(&e)
                 ))
                 .into());
             }
@@ -430,8 +431,9 @@ impl JsonFile {
         data: &T,
         options: JsonEncodeOptions,
     ) -> anyhow::Result<String> {
-        let json = json_encode_ex(data, options.to_flags())
-            .map_err(|err| RuntimeException::new(format!("JSON encoding failed: {}", err)))?;
+        let json = json_encode_ex(data, options.to_flags()).map_err(|err| {
+            RuntimeException::new(bconcat!("JSON encoding failed: ", error_message(&err)))
+        })?;
 
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
@@ -597,7 +599,7 @@ mod tests {
             .unwrap_err();
         assert!(err.is_instanceof::<UnexpectedValueException>());
         assert_eq!(
-            err.to_string(),
+            error_message(&err),
             "\"x.json\" is not UTF-8, could not parse as JSON"
         );
 
