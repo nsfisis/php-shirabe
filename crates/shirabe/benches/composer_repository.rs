@@ -45,7 +45,7 @@ const METADATA_URL: &str = "https://example.org/p2/%package%.json";
 
 /// A root file with nothing but a metadata-url, which is what puts the repository on the lazy
 /// provider path `load_async_packages` serves.
-fn root_file() -> String {
+fn root_file() -> BString {
     let mut root: IndexMap<BString, PhpMixed> = IndexMap::new();
     root.insert("packages".into(), PhpMixed::Array(IndexMap::new()));
     root.insert(
@@ -72,13 +72,18 @@ fn config(home: &TempDir) -> Config {
 
 /// A repository answering exactly two requests, in the order `load_packages` makes them: the root
 /// file, then the package's metadata.
-fn repository(package: &str, root: &str, metadata: &str, config: &Config) -> ComposerRepository {
+fn repository(
+    package: &str,
+    root: &bstr::BStr,
+    metadata: &str,
+    config: &Config,
+) -> ComposerRepository {
     let expectations = vec![
         HttpDownloaderMockExpectation {
             url: REPOSITORY_URL.to_string(),
             options: None,
             status: 200,
-            body: root.to_string(),
+            body: root.display_lossy().to_string(),
             headers: vec![String::new()],
         },
         HttpDownloaderMockExpectation {
@@ -161,13 +166,13 @@ fn bench_load_packages(c: &mut Criterion) {
                 .parse_constraints(constraint)
                 .expect("failed to parse the constraint");
 
-            let mut probe = repository(package, &root, &metadata, &config);
+            let mut probe = repository(package, root.as_ref(), &metadata, &config);
             let loaded = load(&mut probe, package, &constraint, &acceptable_stabilities);
             let parameter = format!("{label}/{loaded}of{total}");
 
             group.bench_function(BenchmarkId::from_parameter(parameter), |b| {
                 b.iter_batched(
-                    || repository(package, &root, &metadata, &config),
+                    || repository(package, root.as_ref(), &metadata, &config),
                     |mut repository| {
                         load(
                             &mut repository,
