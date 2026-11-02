@@ -1,4 +1,5 @@
 //! Rust-to-PHP RPC over a Unix domain socket. See `docs/dev/php-rpc.md`.
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 pub mod composer_runtime;
 mod env;
@@ -12,7 +13,7 @@ pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHan
 use bstr::{B, BStr, BString, ByteSlice};
 use frame::Frame;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, path_from_bytes};
+use shirabe_php_shim::{PhpMixed, bconcat, os_str_from_bytes, path_from_bytes, php_str};
 use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -53,21 +54,23 @@ pub fn get_php_binary() -> std::path::PathBuf {
 }
 
 /// PHP `constant($name)`.
-fn get_constant(name: &str) -> PhpMixed {
+fn get_constant(name: &BStr) -> PhpMixed {
     call("constant", name)
 }
 
-fn string_constant(name: &str) -> BString {
+fn string_constant(name: impl AsRef<[u8]>) -> BString {
+    let name = name.as_ref().as_bstr();
     match get_constant(name) {
         PhpMixed::String(s) => s,
-        other => panic!("PHP RPC: {name} constant did not resolve to a string: {other:?}"),
+        other => panic!("PHP RPC: {name:?} constant did not resolve to a string: {other:?}"),
     }
 }
 
-fn int_constant(name: &str) -> i64 {
+fn int_constant(name: impl AsRef<[u8]>) -> i64 {
+    let name = name.as_ref().as_bstr();
     match get_constant(name) {
         PhpMixed::Int(n) => n,
-        other => panic!("PHP RPC: {name} constant did not resolve to an int: {other:?}"),
+        other => panic!("PHP RPC: {name:?} constant did not resolve to an int: {other:?}"),
     }
 }
 
@@ -118,26 +121,29 @@ pub struct Diagnostics {
 impl Diagnostics {
     /// PHP `extension_loaded($name)`. Only the extensions the worker reports can be asked about;
     /// any other name is a bug in the caller, not a missing extension.
-    pub fn extension_loaded(&self, name: &str) -> bool {
-        *self.extensions.get(B(name)).unwrap_or_else(|| {
-            panic!("PHP RPC: extension `{name}` is not reported by the diagnose payload")
+    pub fn extension_loaded(&self, name: impl AsRef<[u8]>) -> bool {
+        let name = name.as_ref().as_bstr();
+        *self.extensions.get(name).unwrap_or_else(|| {
+            panic!("PHP RPC: extension {name:?} is not reported by the diagnose payload")
         })
     }
 
     /// PHP `function_exists($name)`. See [`Diagnostics::extension_loaded`] for the fixed set of names.
-    pub fn function_exists(&self, name: &str) -> bool {
-        *self.functions.get(B(name)).unwrap_or_else(|| {
-            panic!("PHP RPC: function `{name}` is not reported by the diagnose payload")
+    pub fn function_exists(&self, name: impl AsRef<[u8]>) -> bool {
+        let name = name.as_ref().as_bstr();
+        *self.functions.get(name).unwrap_or_else(|| {
+            panic!("PHP RPC: function {name:?} is not reported by the diagnose payload")
         })
     }
 
     /// PHP `ini_get($option)`, with PHP's `false` (no such setting) mapped to `None`. See
     /// [`Diagnostics::extension_loaded`] for the fixed set of names.
-    pub fn ini_get(&self, option: &str) -> Option<&BStr> {
+    pub fn ini_get(&self, option: impl AsRef<[u8]>) -> Option<&BStr> {
+        let option = option.as_ref().as_bstr();
         self.ini_settings
-            .get(B(option))
+            .get(option)
             .unwrap_or_else(|| {
-                panic!("PHP RPC: ini setting `{option}` is not reported by the diagnose payload")
+                panic!("PHP RPC: ini setting {option:?} is not reported by the diagnose payload")
             })
             .as_ref()
             .map(|value| value.as_bstr())
@@ -155,7 +161,7 @@ pub fn get_diagnostics() -> &'static Diagnostics {
             .as_array()
             .unwrap_or_else(|| panic!("PHP RPC: `diagnose` did not return an array: {payload:?}"));
         let payload = &Payload {
-            what: "diagnose",
+            what: php_str(b"diagnose"),
             map: payload,
         };
 
@@ -179,7 +185,7 @@ pub fn get_diagnostics() -> &'static Diagnostics {
             ini_settings: payload
                 .entries("ini")
                 .map(|(name, value)| {
-                    let value = as_nullable_string(value, "ini", name);
+                    let value = as_nullable_string(value, BStr::new("ini"), name);
                     (name.clone(), value)
                 })
                 .collect(),
@@ -188,30 +194,30 @@ pub fn get_diagnostics() -> &'static Diagnostics {
 }
 
 /// The constants the `platform` payload carries, in the worker's order.
-const PLATFORM_CONSTANTS: &[&str] = &[
-    "PHP_VERSION",
-    "PHP_DEBUG",
-    "PHP_ZTS",
-    "PHP_INT_SIZE",
-    "AF_INET6",
-    "GD_VERSION",
-    "GMP_VERSION",
-    "ICONV_VERSION",
-    "INTL_ICU_VERSION",
-    "LIBXML_DOTTED_VERSION",
-    "MB_ONIGURUMA_VERSION",
-    "OPENSSL_VERSION_TEXT",
-    "PCRE_VERSION",
-    "PGSQL_LIBPQ_VERSION",
-    "RD_KAFKA_VERSION",
-    "SODIUM_LIBRARY_VERSION",
-    "LIBXSLT_DOTTED_VERSION",
-    "ZipArchive::LIBZIP_VERSION",
-    "ZLIB_VERSION",
+const PLATFORM_CONSTANTS: &[&BStr] = &[
+    php_str(b"PHP_VERSION"),
+    php_str(b"PHP_DEBUG"),
+    php_str(b"PHP_ZTS"),
+    php_str(b"PHP_INT_SIZE"),
+    php_str(b"AF_INET6"),
+    php_str(b"GD_VERSION"),
+    php_str(b"GMP_VERSION"),
+    php_str(b"ICONV_VERSION"),
+    php_str(b"INTL_ICU_VERSION"),
+    php_str(b"LIBXML_DOTTED_VERSION"),
+    php_str(b"MB_ONIGURUMA_VERSION"),
+    php_str(b"OPENSSL_VERSION_TEXT"),
+    php_str(b"PCRE_VERSION"),
+    php_str(b"PGSQL_LIBPQ_VERSION"),
+    php_str(b"RD_KAFKA_VERSION"),
+    php_str(b"SODIUM_LIBRARY_VERSION"),
+    php_str(b"LIBXSLT_DOTTED_VERSION"),
+    php_str(b"ZipArchive::LIBZIP_VERSION"),
+    php_str(b"ZLIB_VERSION"),
 ];
 
 /// The classes the `platform` payload carries the existence of.
-const PLATFORM_CLASSES: &[&str] = &["ResourceBundle", "IntlChar"];
+const PLATFORM_CLASSES: &[&BStr] = &[php_str(b"ResourceBundle"), php_str(b"IntlChar")];
 
 /// Everything `PlatformRepository` needs to know about the PHP runtime, fetched in a single round
 /// trip because it would otherwise query the same runtime once per extension and constant.
@@ -224,8 +230,8 @@ pub struct PlatformInfo {
     extension_versions: IndexMap<BString, BString>,
     extension_info: IndexMap<BString, BString>,
     /// Keyed as `ltrim($class.'::'.$constant, ':')`; `None` for a reported but undefined constant.
-    constants: IndexMap<String, Option<PhpMixed>>,
-    classes: IndexMap<String, bool>,
+    constants: IndexMap<BString, Option<PhpMixed>>,
+    classes: IndexMap<BString, bool>,
     /// `curl_version()`, or null when the curl extension is not loaded.
     pub curl_version: PhpMixed,
     /// `@inet_pton('::')`.
@@ -249,11 +255,11 @@ impl Default for PlatformInfo {
             extension_info: IndexMap::new(),
             constants: PLATFORM_CONSTANTS
                 .iter()
-                .map(|name| ((*name).to_string(), None))
+                .map(|name| ((*name).to_owned(), None))
                 .collect(),
             classes: PLATFORM_CLASSES
                 .iter()
-                .map(|name| ((*name).to_string(), false))
+                .map(|name| ((*name).to_owned(), false))
                 .collect(),
             curl_version: PhpMixed::Null,
             inet_pton_ipv6: PhpMixed::Null,
@@ -295,13 +301,13 @@ impl PlatformInfo {
 
     /// PHP `defined(ltrim($class.'::'.$constant, ':'))`. Only the constants the worker reports can
     /// be asked about; any other name is a bug in the caller, not an undefined constant.
-    pub fn has_constant(&self, constant_name: &str, class: Option<&str>) -> bool {
+    pub fn has_constant(&self, constant_name: impl AsRef<[u8]>, class: Option<&BStr>) -> bool {
         self.constant(constant_name, class).is_some()
     }
 
     /// PHP `constant(ltrim($class.'::'.$constant, ':'))`, answering null for an undefined
     /// constant. See [`PlatformInfo::has_constant`] for the fixed set of names.
-    pub fn get_constant(&self, constant_name: &str, class: Option<&str>) -> PhpMixed {
+    pub fn get_constant(&self, constant_name: impl AsRef<[u8]>, class: Option<&BStr>) -> PhpMixed {
         self.constant(constant_name, class)
             .cloned()
             .unwrap_or(PhpMixed::Null)
@@ -309,59 +315,74 @@ impl PlatformInfo {
 
     /// PHP `class_exists($class, false)`. See [`PlatformInfo::has_constant`] for the fixed set of
     /// names.
-    pub fn has_class(&self, class: &str) -> bool {
+    pub fn has_class(&self, class: impl AsRef<[u8]>) -> bool {
+        let class = class.as_ref().as_bstr();
         *self.classes.get(class).unwrap_or_else(|| {
-            panic!("PHP RPC: class `{class}` is not reported by the platform payload")
+            panic!("PHP RPC: class {class:?} is not reported by the platform payload")
         })
     }
 
     /// For testing only: reports `extensions` as loaded, each at `version`.
-    pub fn __set_extensions(&mut self, extensions: Vec<String>, version: &str) {
+    pub fn __set_extensions(
+        &mut self,
+        extensions: impl IntoIterator<Item = impl Into<BString>>,
+        version: impl AsRef<[u8]>,
+    ) {
+        let extensions: Vec<BString> = extensions.into_iter().map(Into::into).collect();
         self.extension_versions = extensions
             .iter()
-            .map(|name| (BString::from(name.as_str()), BString::from(version)))
+            .map(|name| (name.clone(), BString::from(version.as_ref())))
             .collect();
-        self.extensions = extensions.into_iter().map(BString::from).collect();
+        self.extensions = extensions;
     }
 
     /// For testing only: reports `info` as the `ReflectionExtension::info()` output of `extension`.
-    pub fn __set_extension_info(&mut self, extension: &str, info: &str) {
-        self.extension_info
-            .insert(BString::from(extension), BString::from(info));
+    pub fn __set_extension_info(&mut self, extension: impl AsRef<[u8]>, info: impl AsRef<[u8]>) {
+        self.extension_info.insert(
+            BString::from(extension.as_ref()),
+            BString::from(info.as_ref()),
+        );
     }
 
     /// For testing only: reports the constant as defined with `value`. Panics on a constant the
     /// worker does not report, so a test cannot describe a runtime the worker cannot report.
-    pub fn __set_constant(&mut self, constant_name: &str, class: Option<&str>, value: PhpMixed) {
+    pub fn __set_constant(
+        &mut self,
+        constant_name: impl AsRef<[u8]>,
+        class: Option<&BStr>,
+        value: PhpMixed,
+    ) {
         let key = Self::constant_key(constant_name, class);
         let entry = self.constants.get_mut(&key).unwrap_or_else(|| {
-            panic!("PHP RPC: constant `{key}` is not reported by the platform payload")
+            panic!("PHP RPC: constant {key:?} is not reported by the platform payload")
         });
         *entry = Some(value);
     }
 
     /// For testing only: reports the class as defined. See [`PlatformInfo::__set_constant`].
-    pub fn __set_class(&mut self, class: &str) {
+    pub fn __set_class(&mut self, class: impl AsRef<[u8]>) {
+        let class = class.as_ref().as_bstr();
         let entry = self.classes.get_mut(class).unwrap_or_else(|| {
-            panic!("PHP RPC: class `{class}` is not reported by the platform payload")
+            panic!("PHP RPC: class {class:?} is not reported by the platform payload")
         });
         *entry = true;
     }
 
-    fn constant(&self, constant_name: &str, class: Option<&str>) -> Option<&PhpMixed> {
+    fn constant(&self, constant_name: impl AsRef<[u8]>, class: Option<&BStr>) -> Option<&PhpMixed> {
         let key = Self::constant_key(constant_name, class);
         self.constants
             .get(&key)
             .unwrap_or_else(|| {
-                panic!("PHP RPC: constant `{key}` is not reported by the platform payload")
+                panic!("PHP RPC: constant {key:?} is not reported by the platform payload")
             })
             .as_ref()
     }
 
-    fn constant_key(constant_name: &str, class: Option<&str>) -> String {
+    fn constant_key(constant_name: impl AsRef<[u8]>, class: Option<&BStr>) -> BString {
+        let constant_name = constant_name.as_ref();
         match class {
-            Some(class) => format!("{class}::{constant_name}"),
-            None => constant_name.to_string(),
+            Some(class) => bconcat!(class, "::", constant_name),
+            None => BString::from(constant_name),
         }
     }
 }
@@ -377,7 +398,7 @@ pub fn get_platform_info() -> &'static PlatformInfo {
             .as_array()
             .unwrap_or_else(|| panic!("PHP RPC: `platform` did not return an array: {payload:?}"));
         let payload = &Payload {
-            what: "platform",
+            what: php_str(b"platform"),
             map: payload,
         };
 
@@ -402,12 +423,12 @@ pub fn get_platform_info() -> &'static PlatformInfo {
                 .iter()
                 .map(|name| {
                     let value = constants.and_then(|map| map.get(B(name))).cloned();
-                    ((*name).to_string(), value)
+                    ((*name).to_owned(), value)
                 })
                 .collect(),
             classes: PLATFORM_CLASSES
                 .iter()
-                .map(|name| ((*name).to_string(), classes[B(name)]))
+                .map(|name| ((*name).to_owned(), classes[B(name)]))
                 .collect(),
             curl_version: payload.mixed("curl_version"),
             inet_pton_ipv6: payload.mixed("inet_pton_ipv6"),
@@ -421,138 +442,150 @@ pub fn get_platform_info() -> &'static PlatformInfo {
 /// One worker answer, named after the dispatch entry that produced it so a decoding failure says
 /// which payload was malformed.
 struct Payload<'a> {
-    what: &'static str,
+    what: &'static BStr,
     map: &'a IndexMap<BString, PhpMixed>,
 }
 
 impl Payload<'_> {
-    fn field(&self, key: &str) -> &PhpMixed {
+    fn field(&self, key: impl AsRef<[u8]>) -> &PhpMixed {
+        let key = key.as_ref().as_bstr();
         self.map
             .get(B(key))
-            .unwrap_or_else(|| panic!("PHP RPC: `{}` payload has no `{key}` entry", self.what))
+            .unwrap_or_else(|| panic!("PHP RPC: {:?} payload has no {key:?} entry", self.what))
     }
 
-    fn mixed(&self, key: &str) -> PhpMixed {
+    fn mixed(&self, key: impl AsRef<[u8]>) -> PhpMixed {
         self.field(key).clone()
     }
 
-    fn string(&self, key: &str) -> BString {
+    fn string(&self, key: impl AsRef<[u8]>) -> BString {
+        let key = key.as_ref().as_bstr();
         match self.field(key) {
             PhpMixed::String(s) => s.clone(),
             other => panic!(
-                "PHP RPC: `{}` payload entry `{key}` is not a string: {other:?}",
+                "PHP RPC: {:?} payload entry {key:?} is not a string: {other:?}",
                 self.what
             ),
         }
     }
 
-    fn nullable_string(&self, key: &str) -> Option<BString> {
+    fn nullable_string(&self, key: impl AsRef<[u8]>) -> Option<BString> {
+        let key = key.as_ref().as_bstr();
         as_nullable_string(self.field(key), self.what, key)
     }
 
-    fn int(&self, key: &str) -> i64 {
+    fn int(&self, key: impl AsRef<[u8]>) -> i64 {
+        let key = key.as_ref().as_bstr();
         match self.field(key) {
             PhpMixed::Int(n) => *n,
             other => panic!(
-                "PHP RPC: `{}` payload entry `{key}` is not an int: {other:?}",
+                "PHP RPC: {:?} payload entry {key:?} is not an int: {other:?}",
                 self.what
             ),
         }
     }
 
-    fn bool(&self, key: &str) -> bool {
+    fn bool(&self, key: impl AsRef<[u8]>) -> bool {
+        let key = key.as_ref().as_bstr();
         as_bool(self.field(key), self.what, key)
     }
 
     /// `None` for PHP's empty array, which carries no key type and so decodes as an empty list.
-    fn map(&self, key: &str) -> Option<&IndexMap<BString, PhpMixed>> {
+    fn map(&self, key: impl AsRef<[u8]>) -> Option<&IndexMap<BString, PhpMixed>> {
+        let key = key.as_ref().as_bstr();
         match self.field(key) {
             PhpMixed::Array(map) => Some(map),
             PhpMixed::List(items) if items.is_empty() => None,
             other => panic!(
-                "PHP RPC: `{}` payload entry `{key}` is not an array: {other:?}",
+                "PHP RPC: {:?} payload entry {key:?} is not an array: {other:?}",
                 self.what
             ),
         }
     }
 
-    fn entries(&self, key: &str) -> impl Iterator<Item = (&BString, &PhpMixed)> {
+    fn entries(&self, key: impl AsRef<[u8]>) -> impl Iterator<Item = (&BString, &PhpMixed)> {
+        let key = key.as_ref().as_bstr();
         self.map(key).into_iter().flatten()
     }
 
-    fn bool_map(&self, key: &str) -> IndexMap<BString, bool> {
+    fn bool_map(&self, key: impl AsRef<[u8]>) -> IndexMap<BString, bool> {
+        let key = key.as_ref().as_bstr();
         self.entries(key)
             .map(|(name, value)| (name.clone(), as_bool(value, self.what, name)))
             .collect()
     }
 
-    fn string_map(&self, key: &str) -> IndexMap<BString, BString> {
+    fn string_map(&self, key: impl AsRef<[u8]>) -> IndexMap<BString, BString> {
+        let key = key.as_ref().as_bstr();
         self.entries(key)
             .map(|(name, value)| match value {
                 PhpMixed::String(s) => (name.clone(), s.clone()),
                 other => panic!(
-                    "PHP RPC: `{}` payload entry `{key}`[{name:?}] is not a string: {other:?}",
+                    "PHP RPC: {:?} payload entry {key:?}[{name:?}] is not a string: {other:?}",
                     self.what
                 ),
             })
             .collect()
     }
 
-    fn string_list(&self, key: &str) -> Vec<BString> {
+    fn string_list(&self, key: impl AsRef<[u8]>) -> Vec<BString> {
+        let key = key.as_ref().as_bstr();
         match self.field(key) {
             PhpMixed::List(items) => items
                 .iter()
                 .map(|item| match item {
                     PhpMixed::String(s) => s.clone(),
                     other => panic!(
-                        "PHP RPC: `{}` payload entry `{key}` has a non-string element: {other:?}",
+                        "PHP RPC: {:?} payload entry {key:?} has a non-string element: {other:?}",
                         self.what
                     ),
                 })
                 .collect(),
             other => panic!(
-                "PHP RPC: `{}` payload entry `{key}` is not a list: {other:?}",
+                "PHP RPC: {:?} payload entry {key:?} is not a list: {other:?}",
                 self.what
             ),
         }
     }
 }
 
-fn as_bool(value: &PhpMixed, what: &str, key: impl std::fmt::Debug) -> bool {
+fn as_bool(value: &PhpMixed, what: &BStr, key: impl std::fmt::Debug) -> bool {
     match value {
         PhpMixed::Bool(b) => *b,
-        other => panic!("PHP RPC: `{what}` payload entry {key:?} is not a bool: {other:?}"),
+        other => panic!("PHP RPC: {what:?} payload entry {key:?} is not a bool: {other:?}"),
     }
 }
 
-fn as_nullable_string(value: &PhpMixed, what: &str, key: impl std::fmt::Debug) -> Option<BString> {
+fn as_nullable_string(value: &PhpMixed, what: &BStr, key: impl std::fmt::Debug) -> Option<BString> {
     match value {
         PhpMixed::String(s) => Some(s.clone()),
         PhpMixed::Null => None,
         other => {
-            panic!("PHP RPC: `{what}` payload entry {key:?} is not a string or null: {other:?}")
+            panic!("PHP RPC: {what:?} payload entry {key:?} is not a string or null: {other:?}")
         }
     }
 }
 
-fn nullable_int_field(payload: &Payload, key: &str) -> Option<i64> {
+fn nullable_int_field(payload: &Payload, key: impl AsRef<[u8]>) -> Option<i64> {
+    let key = key.as_ref().as_bstr();
     let what = payload.what;
     match payload.field(key) {
         PhpMixed::Int(n) => Some(*n),
         PhpMixed::Null => None,
         other => {
-            panic!("PHP RPC: `{what}` payload entry `{key}` is not an int or null: {other:?}")
+            panic!("PHP RPC: {what:?} payload entry {key:?} is not an int or null: {other:?}")
         }
     }
 }
 
-fn curl_field(payload: &Payload, key: &str) -> Option<Curl> {
+fn curl_field(payload: &Payload, key: impl AsRef<[u8]>) -> Option<Curl> {
+    let key = key.as_ref().as_bstr();
     let what = payload.what;
     let curl = match payload.field(key) {
         PhpMixed::Null => return None,
         PhpMixed::Array(map) => map,
         other => {
-            panic!("PHP RPC: `{what}` payload entry `{key}` is not an array or null: {other:?}")
+            panic!("PHP RPC: {what:?} payload entry {key:?} is not an array or null: {other:?}")
         }
     };
     let curl = &Payload { what, map: curl };
@@ -598,10 +631,13 @@ pub fn stream_resolve_include_path(filename: impl AsRef<[u8]>) -> Option<std::pa
 /// when scanning is active. The worker runs on the ini files of the machine, so these are the
 /// user's own.
 pub fn get_all_ini_files() -> Vec<std::path::PathBuf> {
-    string_list(call("get_all_ini_files", ""), "get_all_ini_files")
-        .into_iter()
-        .map(|path| path_from_bytes(&path).to_path_buf())
-        .collect()
+    string_list(
+        call("get_all_ini_files", ""),
+        BStr::new("get_all_ini_files"),
+    )
+    .into_iter()
+    .map(|path| path_from_bytes(&path).to_path_buf())
+    .collect()
 }
 
 /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()` as measured in the worker, which is
@@ -613,16 +649,16 @@ fn xdebug_active() -> bool {
     }
 }
 
-fn string_list(value: PhpMixed, name: &str) -> Vec<BString> {
+fn string_list(value: PhpMixed, name: &BStr) -> Vec<BString> {
     match value {
         PhpMixed::List(items) => items
             .into_iter()
             .map(|item| match item {
                 PhpMixed::String(s) => s,
-                other => panic!("PHP RPC: `{name}` returned a non-string element: {other:?}"),
+                other => panic!("PHP RPC: {name:?} returned a non-string element: {other:?}"),
             })
             .collect(),
-        other => panic!("PHP RPC: `{name}` did not return a list: {other:?}"),
+        other => panic!("PHP RPC: {name:?} did not return a list: {other:?}"),
     }
 }
 
@@ -695,7 +731,7 @@ pub trait RustMethodDispatcher {
     fn dispatch(
         &mut self,
         rhandle: u64,
-        method_name: &str,
+        method_name: &BStr,
         args: Vec<PluginValue>,
         out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
@@ -732,21 +768,21 @@ pub fn alloc_rhandle() -> u64 {
 /// Calls a PHP function in the worker. The outer `Result` is the fatal lane (dead worker, broken
 /// framing); the inner one carries a PHP exception if the call threw.
 pub fn call_function(
-    name: &str,
+    name: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     call_function_with_dispatcher(name, args, None)
 }
 
 pub fn call_function_with_dispatcher(
-    name: &str,
+    name: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
     dispatcher: Option<&mut dyn RustMethodDispatcher>,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallFunction {
             corr_id,
-            function_name: name.to_string(),
+            function_name: name.as_ref().into(),
             args,
             out_param_positions: Vec::new(),
         },
@@ -756,16 +792,16 @@ pub fn call_function_with_dispatcher(
 
 /// Calls `$class::$method(...$args)` in the worker (autoloading the class if needed).
 pub fn call_static_method(
-    class: &str,
-    method: &str,
+    class: impl AsRef<[u8]>,
+    method: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
     dispatcher: Option<&mut dyn RustMethodDispatcher>,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallStaticMethod {
             corr_id,
-            pclass: class.to_string(),
-            method_name: method.to_string(),
+            pclass: class.as_ref().into(),
+            method_name: method.as_ref().into(),
             args,
             out_param_positions: Vec::new(),
         },
@@ -777,14 +813,14 @@ pub fn call_static_method(
 /// On success the returned value is a `PluginValue::PhpHandle` registered in the worker's P
 /// table; the entity stays alive there until `release_php_handle`.
 pub fn new_object(
-    class: &str,
+    class: impl AsRef<[u8]>,
     ctor_args: Vec<PluginValue>,
     dispatcher: Option<&mut dyn RustMethodDispatcher>,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::NewObject {
             corr_id,
-            pclass: class.to_string(),
+            pclass: class.as_ref().into(),
             ctor_args,
         },
         dispatcher,
@@ -876,16 +912,19 @@ fn rpc_call(
                 let outcome = match dispatcher.as_deref_mut() {
                     Some(dispatcher) => dispatcher.dispatch(
                         rhandle,
-                        &method_name,
+                        method_name.as_bstr(),
                         args,
                         &out_param_positions,
                         &mut out_params,
                     ),
                     // Never fall back to a silent null: an unroutable callback is reported as an
                     // explicit error on the PHP side.
-                    None => Err(PhpThrow::runtime(format!(
-                        "no Rust method dispatcher is active for this call \
-                         (rhandle {rhandle}, method `{method_name}`)"
+                    None => Err(PhpThrow::runtime(bconcat!(
+                        "no Rust method dispatcher is active for this call (rhandle ",
+                        rhandle,
+                        ", method `",
+                        method_name,
+                        "`)"
                     ))),
                 };
                 let reply = match outcome {
@@ -930,249 +969,258 @@ fn rpc_call(
     }
 }
 
-fn call(name: &str, arg: impl AsRef<[u8]>) -> PhpMixed {
+fn call(name: impl AsRef<[u8]>, arg: impl AsRef<[u8]>) -> PhpMixed {
+    let name = name.as_ref().as_bstr();
     let outcome = call_function(name, vec![PluginValue::string(arg.as_ref())])
-        .unwrap_or_else(|e| panic!("PHP RPC: request `{name}` failed: {e:#}"));
+        .unwrap_or_else(|e| panic!("PHP RPC: request {name:?} failed: {e:#}"));
     let value = match outcome {
         Ok(value) => value,
-        Err(throw) => panic!("PHP RPC: request `{name}` threw {throw}"),
+        Err(throw) => panic!("PHP RPC: request {name:?} threw {throw}"),
     };
     value
         .to_php_mixed()
-        .unwrap_or_else(|e| panic!("PHP RPC: request `{name}` returned an unusable value: {e:#}"))
+        .unwrap_or_else(|e| panic!("PHP RPC: request {name:?} returned an unusable value: {e:#}"))
 }
 
-const GLUE_SCRIPT: &str = include_str!("../php/worker.php");
+const GLUE_SCRIPT: &[u8] = include_bytes!("../php/worker.php");
 
 /// Proxy stub classes made autoloadable inside the worker. Generated by
 /// `scripts/plugin-stub-generator/generate-stubs`; this list must cover its targets.list (the
 /// generator's `--check` mode verifies both the file contents and this list).
-const STUB_FILES: &[(&str, &str)] = &[
+const STUB_FILES: &[(&BStr, &[u8])] = &[
     (
-        "Composer/EventDispatcher/EventDispatcher.php",
-        include_str!("../php/stubs/Composer/EventDispatcher/EventDispatcher.php"),
+        php_str(b"Composer/EventDispatcher/EventDispatcher.php"),
+        include_str!("../php/stubs/Composer/EventDispatcher/EventDispatcher.php").as_bytes(),
     ),
     (
-        "Composer/Script/Event.php",
-        include_str!("../php/stubs/Composer/Script/Event.php"),
+        php_str(b"Composer/Script/Event.php"),
+        include_str!("../php/stubs/Composer/Script/Event.php").as_bytes(),
     ),
     (
-        "Composer/PartialComposer.php",
-        include_str!("../php/stubs/Composer/PartialComposer.php"),
+        php_str(b"Composer/PartialComposer.php"),
+        include_str!("../php/stubs/Composer/PartialComposer.php").as_bytes(),
     ),
     (
-        "Composer/Composer.php",
-        include_str!("../php/stubs/Composer/Composer.php"),
+        php_str(b"Composer/Composer.php"),
+        include_str!("../php/stubs/Composer/Composer.php").as_bytes(),
     ),
     (
-        "Composer/Autoload/AutoloadGenerator.php",
-        include_str!("../php/stubs/Composer/Autoload/AutoloadGenerator.php"),
+        php_str(b"Composer/Autoload/AutoloadGenerator.php"),
+        include_str!("../php/stubs/Composer/Autoload/AutoloadGenerator.php").as_bytes(),
     ),
     (
-        "Composer/Config.php",
-        include_str!("../php/stubs/Composer/Config.php"),
+        php_str(b"Composer/Config.php"),
+        include_str!("../php/stubs/Composer/Config.php").as_bytes(),
     ),
     (
-        "Composer/Downloader/DownloadManager.php",
-        include_str!("../php/stubs/Composer/Downloader/DownloadManager.php"),
+        php_str(b"Composer/Downloader/DownloadManager.php"),
+        include_str!("../php/stubs/Composer/Downloader/DownloadManager.php").as_bytes(),
     ),
     (
-        "Composer/IO/BaseIO.php",
-        include_str!("../php/stubs/Composer/IO/BaseIO.php"),
+        php_str(b"Composer/IO/BaseIO.php"),
+        include_str!("../php/stubs/Composer/IO/BaseIO.php").as_bytes(),
     ),
     (
-        "Composer/IO/ConsoleIO.php",
-        include_str!("../php/stubs/Composer/IO/ConsoleIO.php"),
+        php_str(b"Composer/IO/ConsoleIO.php"),
+        include_str!("../php/stubs/Composer/IO/ConsoleIO.php").as_bytes(),
     ),
     (
-        "Composer/IO/BufferIO.php",
-        include_str!("../php/stubs/Composer/IO/BufferIO.php"),
+        php_str(b"Composer/IO/BufferIO.php"),
+        include_str!("../php/stubs/Composer/IO/BufferIO.php").as_bytes(),
     ),
     (
-        "Composer/IO/NullIO.php",
-        include_str!("../php/stubs/Composer/IO/NullIO.php"),
+        php_str(b"Composer/IO/NullIO.php"),
+        include_str!("../php/stubs/Composer/IO/NullIO.php").as_bytes(),
     ),
     (
-        "Composer/Package/BasePackage.php",
-        include_str!("../php/stubs/Composer/Package/BasePackage.php"),
+        php_str(b"Composer/Package/BasePackage.php"),
+        include_str!("../php/stubs/Composer/Package/BasePackage.php").as_bytes(),
     ),
     (
-        "Composer/Package/Package.php",
-        include_str!("../php/stubs/Composer/Package/Package.php"),
+        php_str(b"Composer/Package/Package.php"),
+        include_str!("../php/stubs/Composer/Package/Package.php").as_bytes(),
     ),
     (
-        "Composer/Package/CompletePackage.php",
-        include_str!("../php/stubs/Composer/Package/CompletePackage.php"),
+        php_str(b"Composer/Package/CompletePackage.php"),
+        include_str!("../php/stubs/Composer/Package/CompletePackage.php").as_bytes(),
     ),
     (
-        "Composer/Package/RootPackage.php",
-        include_str!("../php/stubs/Composer/Package/RootPackage.php"),
+        php_str(b"Composer/Package/RootPackage.php"),
+        include_str!("../php/stubs/Composer/Package/RootPackage.php").as_bytes(),
     ),
     (
-        "Composer/Package/AliasPackage.php",
-        include_str!("../php/stubs/Composer/Package/AliasPackage.php"),
+        php_str(b"Composer/Package/AliasPackage.php"),
+        include_str!("../php/stubs/Composer/Package/AliasPackage.php").as_bytes(),
     ),
     (
-        "Composer/Package/CompleteAliasPackage.php",
-        include_str!("../php/stubs/Composer/Package/CompleteAliasPackage.php"),
+        php_str(b"Composer/Package/CompleteAliasPackage.php"),
+        include_str!("../php/stubs/Composer/Package/CompleteAliasPackage.php").as_bytes(),
     ),
     (
-        "Composer/Package/RootAliasPackage.php",
-        include_str!("../php/stubs/Composer/Package/RootAliasPackage.php"),
+        php_str(b"Composer/Package/RootAliasPackage.php"),
+        include_str!("../php/stubs/Composer/Package/RootAliasPackage.php").as_bytes(),
     ),
     (
-        "Composer/Package/Locker.php",
-        include_str!("../php/stubs/Composer/Package/Locker.php"),
+        php_str(b"Composer/Package/Locker.php"),
+        include_str!("../php/stubs/Composer/Package/Locker.php").as_bytes(),
     ),
     (
-        "Composer/Repository/ArrayRepository.php",
-        include_str!("../php/stubs/Composer/Repository/ArrayRepository.php"),
+        php_str(b"Composer/Repository/ArrayRepository.php"),
+        include_str!("../php/stubs/Composer/Repository/ArrayRepository.php").as_bytes(),
     ),
     (
-        "Composer/Repository/WritableArrayRepository.php",
-        include_str!("../php/stubs/Composer/Repository/WritableArrayRepository.php"),
+        php_str(b"Composer/Repository/WritableArrayRepository.php"),
+        include_str!("../php/stubs/Composer/Repository/WritableArrayRepository.php").as_bytes(),
     ),
     (
-        "Composer/Repository/InstalledArrayRepository.php",
-        include_str!("../php/stubs/Composer/Repository/InstalledArrayRepository.php"),
+        php_str(b"Composer/Repository/InstalledArrayRepository.php"),
+        include_str!("../php/stubs/Composer/Repository/InstalledArrayRepository.php").as_bytes(),
     ),
     (
-        "Composer/Repository/LockArrayRepository.php",
-        include_str!("../php/stubs/Composer/Repository/LockArrayRepository.php"),
+        php_str(b"Composer/Repository/LockArrayRepository.php"),
+        include_str!("../php/stubs/Composer/Repository/LockArrayRepository.php").as_bytes(),
     ),
     (
-        "Composer/Repository/FilesystemRepository.php",
-        include_str!("../php/stubs/Composer/Repository/FilesystemRepository.php"),
+        php_str(b"Composer/Repository/FilesystemRepository.php"),
+        include_str!("../php/stubs/Composer/Repository/FilesystemRepository.php").as_bytes(),
     ),
     (
-        "Composer/Repository/InstalledFilesystemRepository.php",
-        include_str!("../php/stubs/Composer/Repository/InstalledFilesystemRepository.php"),
+        php_str(b"Composer/Repository/InstalledFilesystemRepository.php"),
+        include_str!("../php/stubs/Composer/Repository/InstalledFilesystemRepository.php")
+            .as_bytes(),
     ),
     (
-        "Composer/Repository/RepositoryManager.php",
-        include_str!("../php/stubs/Composer/Repository/RepositoryManager.php"),
+        php_str(b"Composer/Repository/RepositoryManager.php"),
+        include_str!("../php/stubs/Composer/Repository/RepositoryManager.php").as_bytes(),
     ),
     (
-        "Composer/Installer/InstallationManager.php",
-        include_str!("../php/stubs/Composer/Installer/InstallationManager.php"),
+        php_str(b"Composer/Installer/InstallationManager.php"),
+        include_str!("../php/stubs/Composer/Installer/InstallationManager.php").as_bytes(),
     ),
     (
-        "Composer/Installer/PackageEvent.php",
-        include_str!("../php/stubs/Composer/Installer/PackageEvent.php"),
+        php_str(b"Composer/Installer/PackageEvent.php"),
+        include_str!("../php/stubs/Composer/Installer/PackageEvent.php").as_bytes(),
     ),
     (
-        "Composer/Installer/InstallerEvent.php",
-        include_str!("../php/stubs/Composer/Installer/InstallerEvent.php"),
+        php_str(b"Composer/Installer/InstallerEvent.php"),
+        include_str!("../php/stubs/Composer/Installer/InstallerEvent.php").as_bytes(),
     ),
     (
-        "Composer/Plugin/PreFileDownloadEvent.php",
-        include_str!("../php/stubs/Composer/Plugin/PreFileDownloadEvent.php"),
+        php_str(b"Composer/Plugin/PreFileDownloadEvent.php"),
+        include_str!("../php/stubs/Composer/Plugin/PreFileDownloadEvent.php").as_bytes(),
     ),
     (
-        "Composer/Plugin/PostFileDownloadEvent.php",
-        include_str!("../php/stubs/Composer/Plugin/PostFileDownloadEvent.php"),
+        php_str(b"Composer/Plugin/PostFileDownloadEvent.php"),
+        include_str!("../php/stubs/Composer/Plugin/PostFileDownloadEvent.php").as_bytes(),
     ),
     (
-        "Composer/Plugin/PrePoolCreateEvent.php",
-        include_str!("../php/stubs/Composer/Plugin/PrePoolCreateEvent.php"),
+        php_str(b"Composer/Plugin/PrePoolCreateEvent.php"),
+        include_str!("../php/stubs/Composer/Plugin/PrePoolCreateEvent.php").as_bytes(),
     ),
     (
-        "Composer/Plugin/CommandEvent.php",
-        include_str!("../php/stubs/Composer/Plugin/CommandEvent.php"),
+        php_str(b"Composer/Plugin/CommandEvent.php"),
+        include_str!("../php/stubs/Composer/Plugin/CommandEvent.php").as_bytes(),
     ),
     (
-        "Composer/DependencyResolver/Transaction.php",
-        include_str!("../php/stubs/Composer/DependencyResolver/Transaction.php"),
+        php_str(b"Composer/DependencyResolver/Transaction.php"),
+        include_str!("../php/stubs/Composer/DependencyResolver/Transaction.php").as_bytes(),
     ),
     (
-        "Composer/DependencyResolver/LocalRepoTransaction.php",
-        include_str!("../php/stubs/Composer/DependencyResolver/LocalRepoTransaction.php"),
+        php_str(b"Composer/DependencyResolver/LocalRepoTransaction.php"),
+        include_str!("../php/stubs/Composer/DependencyResolver/LocalRepoTransaction.php")
+            .as_bytes(),
     ),
     (
-        "Composer/DependencyResolver/Operation/SolverOperation.php",
-        include_str!("../php/stubs/Composer/DependencyResolver/Operation/SolverOperation.php"),
+        php_str(b"Composer/DependencyResolver/Operation/SolverOperation.php"),
+        include_str!("../php/stubs/Composer/DependencyResolver/Operation/SolverOperation.php")
+            .as_bytes(),
     ),
     (
-        "Composer/DependencyResolver/Operation/InstallOperation.php",
-        include_str!("../php/stubs/Composer/DependencyResolver/Operation/InstallOperation.php"),
+        php_str(b"Composer/DependencyResolver/Operation/InstallOperation.php"),
+        include_str!("../php/stubs/Composer/DependencyResolver/Operation/InstallOperation.php")
+            .as_bytes(),
     ),
     (
-        "Composer/DependencyResolver/Operation/UpdateOperation.php",
-        include_str!("../php/stubs/Composer/DependencyResolver/Operation/UpdateOperation.php"),
+        php_str(b"Composer/DependencyResolver/Operation/UpdateOperation.php"),
+        include_str!("../php/stubs/Composer/DependencyResolver/Operation/UpdateOperation.php")
+            .as_bytes(),
     ),
     (
-        "Composer/DependencyResolver/Operation/UninstallOperation.php",
-        include_str!("../php/stubs/Composer/DependencyResolver/Operation/UninstallOperation.php"),
+        php_str(b"Composer/DependencyResolver/Operation/UninstallOperation.php"),
+        include_str!("../php/stubs/Composer/DependencyResolver/Operation/UninstallOperation.php")
+            .as_bytes(),
     ),
     (
-        "Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php",
+        php_str(b"Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php"),
         include_str!(
             "../php/stubs/Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php"
-        ),
+        )
+        .as_bytes(),
     ),
     (
-        "Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php",
+        php_str(b"Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php"),
         include_str!(
             "../php/stubs/Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php"
-        ),
+        )
+        .as_bytes(),
     ),
     (
-        "Composer/Util/Filesystem.php",
-        include_str!("../php/stubs/Composer/Util/Filesystem.php"),
+        php_str(b"Composer/Util/Filesystem.php"),
+        include_str!("../php/stubs/Composer/Util/Filesystem.php").as_bytes(),
     ),
     (
-        "Composer/Util/ProcessExecutor.php",
-        include_str!("../php/stubs/Composer/Util/ProcessExecutor.php"),
+        php_str(b"Composer/Util/ProcessExecutor.php"),
+        include_str!("../php/stubs/Composer/Util/ProcessExecutor.php").as_bytes(),
     ),
     (
-        "Composer/Util/HttpDownloader.php",
-        include_str!("../php/stubs/Composer/Util/HttpDownloader.php"),
+        php_str(b"Composer/Util/HttpDownloader.php"),
+        include_str!("../php/stubs/Composer/Util/HttpDownloader.php").as_bytes(),
     ),
 ];
 
 /// Hand-written worker-side classes (two-world implementations with behavior of their own, not
 /// mechanical proxies), written into the same autoload directory as the generated stubs so the
 /// prepended stub autoloader resolves their FQCNs ahead of any real class file.
-const RUNTIME_FILES: &[(&str, &str)] = &[
+const RUNTIME_FILES: &[(&BStr, &[u8])] = &[
     (
-        "Composer/Console/Application.php",
-        include_str!("../php/runtime/Composer/Console/Application.php"),
+        php_str(b"Composer/Console/Application.php"),
+        include_str!("../php/runtime/Composer/Console/Application.php").as_bytes(),
     ),
     (
-        "Composer/EventDispatcher/Event.php",
-        include_str!("../php/runtime/Composer/EventDispatcher/Event.php"),
+        php_str(b"Composer/EventDispatcher/Event.php"),
+        include_str!("../php/runtime/Composer/EventDispatcher/Event.php").as_bytes(),
     ),
     (
-        "Composer/Plugin/PreCommandRunEvent.php",
-        include_str!("../php/runtime/Composer/Plugin/PreCommandRunEvent.php"),
+        php_str(b"Composer/Plugin/PreCommandRunEvent.php"),
+        include_str!("../php/runtime/Composer/Plugin/PreCommandRunEvent.php").as_bytes(),
     ),
     (
-        "Composer/Util/Loop.php",
-        include_str!("../php/runtime/Composer/Util/Loop.php"),
+        php_str(b"Composer/Util/Loop.php"),
+        include_str!("../php/runtime/Composer/Util/Loop.php").as_bytes(),
     ),
     (
-        "Shirabe/MaterializedThrowable.php",
-        include_str!("../php/runtime/Shirabe/MaterializedThrowable.php"),
+        php_str(b"Shirabe/MaterializedThrowable.php"),
+        include_str!("../php/runtime/Shirabe/MaterializedThrowable.php").as_bytes(),
     ),
     (
-        "Shirabe/MaterializedValue.php",
-        include_str!("../php/runtime/Shirabe/MaterializedValue.php"),
+        php_str(b"Shirabe/MaterializedValue.php"),
+        include_str!("../php/runtime/Shirabe/MaterializedValue.php").as_bytes(),
     ),
     (
-        "Shirabe/RustCommandStub.php",
-        include_str!("../php/runtime/Shirabe/RustCommandStub.php"),
+        php_str(b"Shirabe/RustCommandStub.php"),
+        include_str!("../php/runtime/Shirabe/RustCommandStub.php").as_bytes(),
     ),
     (
-        "Shirabe/RustProcessStub.php",
-        include_str!("../php/runtime/Shirabe/RustProcessStub.php"),
+        php_str(b"Shirabe/RustProcessStub.php"),
+        include_str!("../php/runtime/Shirabe/RustProcessStub.php").as_bytes(),
     ),
     (
-        "Shirabe/RustPluginStub.php",
-        include_str!("../php/runtime/Shirabe/RustPluginStub.php"),
+        php_str(b"Shirabe/RustPluginStub.php"),
+        include_str!("../php/runtime/Shirabe/RustPluginStub.php").as_bytes(),
     ),
     (
-        "Shirabe/RustCapablePluginStub.php",
-        include_str!("../php/runtime/Shirabe/RustCapablePluginStub.php"),
+        php_str(b"Shirabe/RustCapablePluginStub.php"),
+        include_str!("../php/runtime/Shirabe/RustCapablePluginStub.php").as_bytes(),
     ),
 ];
 
@@ -1181,7 +1229,7 @@ const RUNTIME_FILES: &[(&str, &str)] = &[
 /// the real implementation and run an instance the Rust side never sees. Generated by
 /// `scripts/plugin-stub-generator/generate-stubs`; too many to spell out here, so `build.rs`
 /// builds the list from the directory itself.
-const GUARD_FILES: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/guard-files.rs"));
+const GUARD_FILES: &[(&BStr, &[u8])] = include!(concat!(env!("OUT_DIR"), "/guard-files.rs"));
 
 struct Worker {
     stream: UnixStream,
@@ -1197,6 +1245,11 @@ impl Worker {
     /// Describes the PHP worker's current process state, to be attached as `anyhow::Context` to
     /// an I/O error so a dead worker (crash, OOM kill, ...) can be told apart from a live one
     /// hitting a framing bug.
+    #[expect(
+        clippy::disallowed_types,
+        clippy::disallowed_macros,
+        reason = "an anyhow context the port raises about its child, holding no PHP string"
+    )]
     fn worker_state(&mut self) -> String {
         match self.child.try_wait() {
             Ok(Some(status)) => format!("PHP worker process already exited: {status}"),
@@ -1317,7 +1370,7 @@ fn spawn_worker() -> anyhow::Result<Worker> {
         .map(|entry| (&stubs_dir, entry))
         .chain(GUARD_FILES.iter().map(|entry| (&guards_dir, entry)));
     for (dir, (relative_path, contents)) in files {
-        let path = dir.join(relative_path);
+        let path = dir.join(path_from_bytes(relative_path));
         std::fs::create_dir_all(path.parent().expect("generated class paths have a parent"))?;
         std::fs::write(&path, contents)?;
     }
@@ -1350,7 +1403,7 @@ fn spawn_worker() -> anyhow::Result<Worker> {
     }
     command
         .arg(&script_path)
-        .arg(WORKER_SOCKET_FD.to_string())
+        .arg(os_str_from_bytes(&bconcat!(WORKER_SOCKET_FD)))
         .arg(&stubs_dir)
         .arg(&guards_dir);
     // SAFETY: the closure only calls async-signal-safe syscalls, as required between fork and
@@ -1413,7 +1466,7 @@ mod tests {
             &mut worker.stream,
             &Frame::CallFunction {
                 corr_id: 1,
-                function_name: "defined".to_string(),
+                function_name: "defined".into(),
                 args: vec![PluginValue::string("PHP_VERSION")],
                 out_param_positions: Vec::new(),
             },
@@ -1442,7 +1495,7 @@ mod tests {
             &mut worker.stream,
             &Frame::CallFunction {
                 corr_id: 1,
-                function_name: "getenv".to_string(),
+                function_name: "getenv".into(),
                 args: vec![PluginValue::string("XDEBUG_MODE")],
                 out_param_positions: Vec::new(),
             },
@@ -1452,7 +1505,7 @@ mod tests {
         match reply {
             Frame::Return { value, .. } => assert_eq!(
                 value.to_php_mixed().expect("unusable reply"),
-                PhpMixed::string("off".to_string())
+                PhpMixed::string("off")
             ),
             other => panic!("unexpected reply: {other:?}"),
         }

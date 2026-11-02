@@ -5,6 +5,7 @@
 //! produced by PHP `serialize()` must decode into a `PluginValue` whose re-encoding is
 //! byte-identical. Floats (serialize_precision), non-UTF-8 byte strings and deep nesting are the
 //! focus areas.
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::BString;
 use indexmap::IndexMap;
@@ -30,8 +31,8 @@ fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
 }
 
 /// Runs a PHP snippet and returns its `return` value.
-fn php_eval(code: &str) -> PluginValue {
-    call_function("__shirabe_eval", vec![PluginValue::string(code)])
+fn php_eval(code: impl AsRef<[u8]>) -> PluginValue {
+    call_function("__shirabe_eval", vec![PluginValue::string(code.as_ref())])
         .expect("eval request failed")
         .expect("eval threw")
 }

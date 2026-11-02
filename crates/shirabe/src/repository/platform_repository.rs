@@ -1268,9 +1268,9 @@ impl PlatformRepository {
                 }
 
                 b"zip" => {
-                    if platform_info.has_constant("LIBZIP_VERSION", Some("ZipArchive")) {
-                        let libzip =
-                            platform_info.get_constant("LIBZIP_VERSION", Some("ZipArchive"));
+                    if platform_info.has_constant("LIBZIP_VERSION", Some(BStr::new("ZipArchive"))) {
+                        let libzip = platform_info
+                            .get_constant("LIBZIP_VERSION", Some(BStr::new("ZipArchive")));
                         let libzip_str = match &libzip {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,

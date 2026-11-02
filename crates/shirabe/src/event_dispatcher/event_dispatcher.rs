@@ -406,12 +406,16 @@ impl EventDispatcher {
                     Some(&mut PluginRpcDispatcher::default()),
                 ))?;
                 if !matches!(is_callable_value, PluginValue::Bool(true)) {
-                    return Err(RuntimeException::new(format!(
-                        "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
+                    return Err(RuntimeException::new(bconcat!(
+                        "Subscriber ",
                         handle.class,
-                        method_name.display_lossy(),
-                        event.get_name().display_lossy()
-                    )).into());
+                        "::",
+                        method_name,
+                        " for event ",
+                        event.get_name(),
+                        " is not callable, make sure the function is defined and public"
+                    ))
+                    .into());
                 }
                 self.io.write_error3(
                     bconcat!(
@@ -428,13 +432,15 @@ impl EventDispatcher {
                 let stub_class =
                     Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
                         // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
-                        RuntimeException::new(format!(
-                        "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
-                        event.get_name().display_lossy(),
-                        handle.class,
-                        method_name.display_lossy(),
-                    ))
-                    .into()
+                        RuntimeException::new(bconcat!(
+                            "no proxy stub is available yet for the event `",
+                            event.get_name(),
+                            "` dispatched to ",
+                            handle.class,
+                            "::",
+                            method_name
+                        ))
+                        .into()
                     })?;
                 let event_rhandle = shirabe_php_rpc::alloc_rhandle();
                 let mut dispatcher = PluginRpcDispatcher {
@@ -445,7 +451,7 @@ impl EventDispatcher {
                     method_name,
                     vec![PluginValue::RustHandle(RustObjHandle {
                         rhandle: event_rhandle,
-                        class: stub_class.to_string(),
+                        class: bconcat!(stub_class),
                         epoch: 0,
                         snapshot: None,
                     })],
@@ -1213,7 +1219,7 @@ try {
             rpc_name(method_name)?,
             vec![PluginValue::RustHandle(RustObjHandle {
                 rhandle,
-                class: stub_class.to_string(),
+                class: bconcat!(stub_class),
                 epoch: 0,
                 snapshot: None,
             })],
@@ -1737,11 +1743,13 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
     fn dispatch(
         &mut self,
         rhandle: u64,
-        method_name: &str,
+        method_name: &BStr,
         args: Vec<PluginValue>,
         _out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
+        let method_name = method_name.display_lossy().to_string();
+        let method_name = method_name.as_str();
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
                 let class = match args.first() {

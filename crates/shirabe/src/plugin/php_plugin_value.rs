@@ -20,7 +20,7 @@ use bstr::{BString, ByteSlice};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_rpc::{PhpObject, PhpThrow, PluginValue};
-use shirabe_php_shim::utf8_text;
+use shirabe_php_shim::{bconcat, utf8_text};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -46,7 +46,7 @@ const TIMEZONE_TYPE_IDENTIFIER: i64 = 3;
 /// timezone database, so the worker rebases every date on UTC before it is serialized.
 const TIMEZONE_UTC: &str = "UTC";
 
-fn throw(message: String) -> PhpThrow {
+fn throw(message: impl Into<BString>) -> PhpThrow {
     PhpThrow::runtime(message)
 }
 
@@ -130,7 +130,8 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
         ))
     })?;
     let pretty_string = optional_string(object.protected("prettyString"));
-    Ok(match object.class.as_str() {
+    let class = object.class.display_lossy().to_string();
+    Ok(match class.as_str() {
         CONSTRAINT_CLASS => {
             let operator = match object.protected("operator") {
                 Some(PluginValue::Int(code)) => SimpleConstraint::from_operator_constant(*code)
@@ -192,8 +193,10 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
         // TODO(plugin): a plugin-defined ConstraintInterface implementation has no Rust
         // counterpart; the four composer/semver classes are the whole vocabulary here.
         other => {
-            return Err(throw(format!(
-                "the semver constraint class `{other}` cannot cross the plugin boundary"
+            return Err(throw(bconcat!(
+                "the semver constraint class `",
+                other,
+                "` cannot cross the plugin boundary"
             )));
         }
     })
@@ -304,9 +307,10 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     if object.class != LINK_CLASS {
         // TODO(plugin): Link subclasses have no Rust counterpart; the port models links as a
         // single value type.
-        return Err(throw(format!(
-            "the class `{}` cannot cross the plugin boundary as a Link",
-            object.class
+        return Err(throw(bconcat!(
+            "the class `",
+            object.class,
+            "` cannot cross the plugin boundary as a Link"
         )));
     }
     let constraint = constraint_from_wire(
@@ -343,9 +347,10 @@ pub(crate) fn date_time_from_wire(value: &PluginValue) -> Result<DateTime<Utc>, 
     let object = as_object(value)
         .ok_or_else(|| throw(format!("expected a date from the plugin, got {value:?}")))?;
     if object.class != DATE_TIME_IMMUTABLE_CLASS && object.class != DATE_TIME_CLASS {
-        return Err(throw(format!(
-            "the class `{}` cannot cross the plugin boundary as a date",
-            object.class
+        return Err(throw(bconcat!(
+            "the class `",
+            object.class,
+            "` cannot cross the plugin boundary as a date"
         )));
     }
     let zone = optional_string(object.public("timezone"));

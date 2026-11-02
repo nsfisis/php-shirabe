@@ -5,7 +5,7 @@
 use crate::value::{self, PluginValue};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::utf8_text;
+use shirabe_php_shim::{bconcat, utf8_text};
 use std::io::{Read as _, Write as _};
 use std::os::unix::net::UnixStream;
 
@@ -28,20 +28,20 @@ pub const TAG_EPOCH_BUMP: u8 = 0x09;
 pub enum Frame {
     CallFunction {
         corr_id: u64,
-        function_name: String,
+        function_name: BString,
         args: Vec<PluginValue>,
         out_param_positions: Vec<u32>,
     },
     CallStaticMethod {
         corr_id: u64,
-        pclass: String,
-        method_name: String,
+        pclass: BString,
+        method_name: BString,
         args: Vec<PluginValue>,
         out_param_positions: Vec<u32>,
     },
     NewObject {
         corr_id: u64,
-        pclass: String,
+        pclass: BString,
         ctor_args: Vec<PluginValue>,
     },
     CallPhpMethod {
@@ -54,7 +54,7 @@ pub enum Frame {
     CallRustMethod {
         corr_id: u64,
         rhandle: u64,
-        method_name: String,
+        method_name: BString,
         args: Vec<PluginValue>,
         out_param_positions: Vec<u32>,
     },
@@ -181,7 +181,7 @@ impl Frame {
                 PluginValue::Array(
                     out_params
                         .iter()
-                        .map(|(pos, v)| (pos.to_string().into(), v.clone()))
+                        .map(|(pos, v)| (bconcat!(pos), v.clone()))
                         .collect(),
                 ),
             ],
@@ -233,6 +233,10 @@ pub fn write_frame(stream: &mut UnixStream, frame: &Frame) -> std::io::Result<()
     stream.flush()
 }
 
+#[expect(
+    clippy::disallowed_macros,
+    reason = "std::io::Error takes text, and the message holds no PHP string"
+)]
 pub fn read_frame(stream: &mut UnixStream) -> std::io::Result<Frame> {
     let mut header = [0u8; 8];
     stream.read_exact(&mut header)?;
@@ -274,20 +278,20 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
     match tag {
         TAG_CALL_FUNCTION => Frame::CallFunction {
             corr_id,
-            function_name: expect_string(next()),
+            function_name: expect_bytes(next()),
             args: expect_list(next()),
             out_param_positions: expect_positions(next()),
         },
         TAG_CALL_STATIC_METHOD => Frame::CallStaticMethod {
             corr_id,
-            pclass: expect_string(next()),
-            method_name: expect_string(next()),
+            pclass: expect_bytes(next()),
+            method_name: expect_bytes(next()),
             args: expect_list(next()),
             out_param_positions: expect_positions(next()),
         },
         TAG_NEW_OBJECT => Frame::NewObject {
             corr_id,
-            pclass: expect_string(next()),
+            pclass: expect_bytes(next()),
             ctor_args: expect_list(next()),
         },
         TAG_CALL_PHP_METHOD => Frame::CallPhpMethod {
@@ -300,7 +304,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         TAG_CALL_RUST_METHOD => Frame::CallRustMethod {
             corr_id,
             rhandle: expect_id(next()),
-            method_name: expect_string(next()),
+            method_name: expect_bytes(next()),
             args: expect_list(next()),
             out_param_positions: expect_positions(next()),
         },
@@ -345,17 +349,6 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             epoch: expect_id(next()),
         },
         _ => panic!("PHP RPC: protocol violation — unknown frame tag {tag:#04x}"),
-    }
-}
-
-fn expect_string(value: PluginValue) -> String {
-    match value {
-        PluginValue::String(bytes) => utf8_text(&bytes)
-            .unwrap_or_else(|| {
-                panic!("PHP RPC: protocol violation — non-UTF-8 name field: {bytes:?}")
-            })
-            .to_string(),
-        other => panic!("PHP RPC: protocol violation — expected a string field: {other:?}"),
     }
 }
 
@@ -444,7 +437,7 @@ mod tests {
     fn frame_roundtrip_call_function() {
         let frame = roundtrip(Frame::CallFunction {
             corr_id: 7,
-            function_name: "defined".to_string(),
+            function_name: "defined".into(),
             args: vec![PluginValue::string("PHP_VERSION")],
             out_param_positions: vec![],
         });
@@ -459,6 +452,28 @@ mod tests {
                 assert_eq!(function_name, "defined");
                 assert_eq!(args, vec![PluginValue::string("PHP_VERSION")]);
                 assert!(out_param_positions.is_empty());
+            }
+            other => panic!("unexpected frame: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn frame_roundtrip_non_utf8_names() {
+        let frame = roundtrip(Frame::CallStaticMethod {
+            corr_id: 3,
+            pclass: b"Caf\xe9".into(),
+            method_name: b"m\xff".into(),
+            args: vec![],
+            out_param_positions: vec![],
+        });
+        match frame {
+            Frame::CallStaticMethod {
+                pclass,
+                method_name,
+                ..
+            } => {
+                assert_eq!(pclass, b"Caf\xe9".as_slice());
+                assert_eq!(method_name, b"m\xff".as_slice());
             }
             other => panic!("unexpected frame: {other:?}"),
         }

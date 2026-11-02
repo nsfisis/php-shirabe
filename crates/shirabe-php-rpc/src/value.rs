@@ -11,13 +11,13 @@
 use anyhow::bail;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, utf8_text};
+use shirabe_php_shim::{PhpMixed, bconcat, utf8_text};
 
 /// A handle to an object whose entity lives on the Rust side. PHP holds a thin proxy stub.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RustObjHandle {
     pub rhandle: u64,
-    pub class: String,
+    pub class: BString,
     pub epoch: u64,
     /// Present when the descriptor also carries a value snapshot of the entity's fields.
     pub snapshot: Option<IndexMap<BString, PluginValue>>,
@@ -27,14 +27,14 @@ pub struct RustObjHandle {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhpObjHandle {
     pub phandle: u64,
-    pub class: String,
-    pub implements: Vec<String>,
+    pub class: BString,
+    pub implements: Vec<BString>,
 }
 
 /// A PHP class (not an instance), identified by its fully qualified name.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhpClassHandle {
-    pub class: String,
+    pub class: BString,
 }
 
 /// The `O:` record of a serialized PHP object: a class name and a property table, with the
@@ -42,12 +42,12 @@ pub struct PhpClassHandle {
 /// bare names).
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhpObject {
-    pub class: String,
+    pub class: BString,
     pub props: IndexMap<BString, PluginValue>,
 }
 
 impl PhpObject {
-    pub fn new(class: impl Into<String>) -> PhpObject {
+    pub fn new(class: impl Into<BString>) -> PhpObject {
         PhpObject {
             class: class.into(),
             props: IndexMap::new(),
@@ -55,46 +55,57 @@ impl PhpObject {
     }
 
     /// A public property keeps its declared name.
-    pub fn public(&self, name: &str) -> Option<&PluginValue> {
-        self.props.get(name.as_bytes())
+    pub fn public(&self, name: impl AsRef<[u8]>) -> Option<&PluginValue> {
+        self.props.get(name.as_ref())
     }
 
-    pub fn set_public(&mut self, name: &str, value: PluginValue) {
-        self.props.insert(name.into(), value);
+    pub fn set_public(&mut self, name: impl AsRef<[u8]>, value: PluginValue) {
+        self.props.insert(name.as_ref().into(), value);
     }
 
     /// PHP mangles a protected property name to `\0*\0name`.
-    pub fn protected(&self, name: &str) -> Option<&PluginValue> {
-        self.props.get(&protected_key(name))
+    pub fn protected(&self, name: impl AsRef<[u8]>) -> Option<&PluginValue> {
+        self.props.get(&protected_key(name.as_ref()))
     }
 
-    pub fn set_protected(&mut self, name: &str, value: PluginValue) {
-        self.props.insert(protected_key(name), value);
+    pub fn set_protected(&mut self, name: impl AsRef<[u8]>, value: PluginValue) {
+        self.props.insert(protected_key(name.as_ref()), value);
     }
 
     /// PHP mangles a private property name to `\0<declaring class>\0name`. The declaring class is
     /// the one whose body holds the `private` declaration, which is not `self.class` once a
     /// subclass inherits it.
-    pub fn private(&self, declaring_class: &str, name: &str) -> Option<&PluginValue> {
-        self.props.get(&private_key(declaring_class, name))
+    pub fn private(
+        &self,
+        declaring_class: impl AsRef<[u8]>,
+        name: impl AsRef<[u8]>,
+    ) -> Option<&PluginValue> {
+        self.props
+            .get(&private_key(declaring_class.as_ref(), name.as_ref()))
     }
 
-    pub fn set_private(&mut self, declaring_class: &str, name: &str, value: PluginValue) {
-        self.props.insert(private_key(declaring_class, name), value);
+    pub fn set_private(
+        &mut self,
+        declaring_class: impl AsRef<[u8]>,
+        name: impl AsRef<[u8]>,
+        value: PluginValue,
+    ) {
+        self.props
+            .insert(private_key(declaring_class.as_ref(), name.as_ref()), value);
     }
 }
 
-fn protected_key(name: &str) -> BString {
+fn protected_key(name: &[u8]) -> BString {
     let mut key = BString::from(b"\0*\0");
-    key.extend_from_slice(name.as_bytes());
+    key.extend_from_slice(name);
     key
 }
 
-fn private_key(declaring_class: &str, name: &str) -> BString {
+fn private_key(declaring_class: &[u8], name: &[u8]) -> BString {
     let mut key = BString::from(vec![0]);
-    key.extend_from_slice(declaring_class.as_bytes());
+    key.extend_from_slice(declaring_class);
     key.push(0);
-    key.extend_from_slice(name.as_bytes());
+    key.extend_from_slice(name);
     key
 }
 
@@ -215,7 +226,7 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
         }
         PluginValue::Int(n) => {
             out.extend_from_slice(b"i:");
-            out.extend_from_slice(n.to_string().as_bytes());
+            out.extend_from_slice(&bconcat!(n));
             out.push(b';');
         }
         PluginValue::Float(f) => {
@@ -230,11 +241,11 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
         PluginValue::String(bytes) => serialize_bytes(bytes, out),
         PluginValue::List(items) => {
             out.extend_from_slice(b"a:");
-            out.extend_from_slice(items.len().to_string().as_bytes());
+            out.extend_from_slice(&bconcat!(items.len()));
             out.extend_from_slice(b":{");
             for (index, item) in items.iter().enumerate() {
                 out.extend_from_slice(b"i:");
-                out.extend_from_slice(index.to_string().as_bytes());
+                out.extend_from_slice(&bconcat!(index));
                 out.push(b';');
                 serialize_into(item, out);
             }
@@ -245,11 +256,11 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
         PluginValue::Array(map) | PluginValue::Object(map) => serialize_map(map, out),
         PluginValue::PhpObject(object) => {
             out.extend_from_slice(b"O:");
-            out.extend_from_slice(object.class.len().to_string().as_bytes());
+            out.extend_from_slice(&bconcat!(object.class.len()));
             out.extend_from_slice(b":\"");
-            out.extend_from_slice(object.class.as_bytes());
+            out.extend_from_slice(&object.class);
             out.extend_from_slice(b"\":");
-            out.extend_from_slice(object.props.len().to_string().as_bytes());
+            out.extend_from_slice(&bconcat!(object.props.len()));
             out.extend_from_slice(b":{");
             for (name, value) in &object.props {
                 // A property name is always written as a string, even a numeric one, and never
@@ -312,7 +323,7 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
 
 fn serialize_bytes(bytes: &[u8], out: &mut Vec<u8>) {
     out.extend_from_slice(b"s:");
-    out.extend_from_slice(bytes.len().to_string().as_bytes());
+    out.extend_from_slice(&bconcat!(bytes.len()));
     out.extend_from_slice(b":\"");
     out.extend_from_slice(bytes);
     out.extend_from_slice(b"\";");
@@ -320,13 +331,13 @@ fn serialize_bytes(bytes: &[u8], out: &mut Vec<u8>) {
 
 fn serialize_map(map: &IndexMap<BString, PluginValue>, out: &mut Vec<u8>) {
     out.extend_from_slice(b"a:");
-    out.extend_from_slice(map.len().to_string().as_bytes());
+    out.extend_from_slice(&bconcat!(map.len()));
     out.extend_from_slice(b":{");
     for (key, value) in map {
         match canonical_int_key(key) {
             Some(n) => {
                 out.extend_from_slice(b"i:");
-                out.extend_from_slice(n.to_string().as_bytes());
+                out.extend_from_slice(&bconcat!(n));
                 out.push(b';');
             }
             None => serialize_bytes(key, out),
@@ -372,7 +383,7 @@ pub fn unserialize(payload: &[u8]) -> anyhow::Result<PluginValue> {
 enum Lex {
     Value(PluginValue),
     /// The entry count, and the class name of an object record.
-    ContainerOpen(usize, Option<String>),
+    ContainerOpen(usize, Option<BString>),
     BackReference(usize),
 }
 
@@ -382,7 +393,7 @@ enum Lex {
 struct Frame {
     entries: IndexMap<BString, PluginValue>,
     /// The class name of an object record; `None` for an array.
-    class: Option<String>,
+    class: Option<BString>,
     /// This container's own number in the payload's value numbering.
     number: usize,
     count: usize,
@@ -391,6 +402,10 @@ struct Frame {
     pending_key: Option<BString>,
 }
 
+#[expect(
+    clippy::disallowed_macros,
+    reason = "an anyhow error about a malformed payload, raised by the port"
+)]
 fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
     let mut stack: Vec<Frame> = Vec::new();
     let mut completed: Option<PluginValue> = None;
@@ -437,7 +452,7 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
             match lex(payload, pos)? {
                 Lex::Value(PluginValue::Int(n)) => {
                     frame.is_list &= n == index;
-                    frame.pending_key = Some(n.to_string().into());
+                    frame.pending_key = Some(bconcat!(n));
                 }
                 Lex::Value(PluginValue::String(bytes)) => {
                     frame.is_list = false;
@@ -484,6 +499,10 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
     }
 }
 
+#[expect(
+    clippy::disallowed_macros,
+    reason = "an anyhow error about a malformed payload, raised by the port"
+)]
 fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
     let Some(tag) = payload.get(*pos..*pos + 2) else {
         bail!("truncated serialized value at byte {}", *pos);
@@ -525,9 +544,6 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
         b"a:" => Ok(Lex::ContainerOpen(parse_entry_count(payload, pos)?, None)),
         b"O:" => {
             let class = parse_quoted(payload, pos, b':')?;
-            let class = utf8_text(&class)
-                .ok_or_else(|| anyhow::anyhow!("object record with a non-UTF-8 class name"))?
-                .to_string();
             Ok(Lex::ContainerOpen(
                 parse_entry_count(payload, pos)?,
                 Some(class),
@@ -572,6 +588,10 @@ fn finish_frame(frame: Frame) -> anyhow::Result<PluginValue> {
 }
 
 /// The `<count>:{` a container's entries follow.
+#[expect(
+    clippy::disallowed_macros,
+    reason = "an anyhow error about a malformed payload, raised by the port"
+)]
 fn parse_entry_count(payload: &[u8], pos: &mut usize) -> anyhow::Result<usize> {
     let count_bytes = take_until(payload, pos, b':')?;
     let count: usize = utf8_text(count_bytes)
@@ -589,6 +609,10 @@ fn parse_string_body(payload: &[u8], pos: &mut usize) -> anyhow::Result<BString>
 }
 
 /// A length-prefixed quoted run: `<len>:"<bytes>"` followed by `terminator`.
+#[expect(
+    clippy::disallowed_macros,
+    reason = "an anyhow error about a malformed payload, raised by the port"
+)]
 fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Result<BString> {
     let len_bytes = take_until(payload, pos, b':')?;
     let len: usize = utf8_text(len_bytes)
@@ -626,7 +650,7 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
                 bail!("__pclass descriptor with a non-string class: {value:?}");
             };
             return Ok(Some(PluginValue::PhpClass(PhpClassHandle {
-                class: descriptor_utf8(class, "__pclass")?,
+                class: class.clone(),
             })));
         }
         if let Some(value) = get(JOB_KEY) {
@@ -658,7 +682,7 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
                 items
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| (i.to_string().into(), v.clone()))
+                    .map(|(i, v)| (bconcat!(i), v.clone()))
                     .collect(),
             ),
             Some(other) => bail!("__snapshot is not an array: {other:?}"),
@@ -684,7 +708,7 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
             Some(PluginValue::List(items)) => items
                 .iter()
                 .map(|item| match item {
-                    PluginValue::String(name) => descriptor_utf8(name, "__implements"),
+                    PluginValue::String(name) => Ok(name.clone()),
                     other => bail!("__implements entry is not a string: {other:?}"),
                 })
                 .collect::<anyhow::Result<_>>()?,
@@ -700,6 +724,10 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
     Ok(None)
 }
 
+#[expect(
+    clippy::disallowed_types,
+    reason = "core::fmt: names a descriptor in a protocol error"
+)]
 fn descriptor_u64(value: &PluginValue, what: &str) -> anyhow::Result<u64> {
     match value {
         PluginValue::Int(n) => u64::try_from(*n)
@@ -708,17 +736,15 @@ fn descriptor_u64(value: &PluginValue, what: &str) -> anyhow::Result<u64> {
     }
 }
 
-fn descriptor_class(value: Option<&PluginValue>, what: &str) -> anyhow::Result<String> {
+#[expect(
+    clippy::disallowed_types,
+    reason = "core::fmt: names a descriptor in a protocol error"
+)]
+fn descriptor_class(value: Option<&PluginValue>, what: &str) -> anyhow::Result<BString> {
     match value {
-        Some(PluginValue::String(class)) => descriptor_utf8(class, what),
+        Some(PluginValue::String(class)) => Ok(class.clone()),
         other => bail!("{what} descriptor lacks a string __class: {other:?}"),
     }
-}
-
-fn descriptor_utf8(bytes: &[u8], what: &str) -> anyhow::Result<String> {
-    utf8_text(bytes)
-        .map(str::to_string)
-        .ok_or_else(|| anyhow::anyhow!("{what} descriptor holds a non-UTF-8 class name"))
 }
 
 fn take_until<'a>(payload: &'a [u8], pos: &mut usize, terminator: u8) -> anyhow::Result<&'a [u8]> {
@@ -901,20 +927,41 @@ mod tests {
     }
 
     #[test]
-    fn roundtrips_handles() {
+    fn roundtrips_non_utf8_class_names() {
+        let mut object = PhpObject::new(b"Caf\xe9");
+        object.set_private(b"Caf\xe9", "p", PluginValue::Int(1));
+        roundtrip(PluginValue::PhpObject(object));
         roundtrip(PluginValue::RustHandle(RustObjHandle {
             rhandle: 3,
-            class: "Composer\\Script\\Event".to_string(),
+            class: b"Caf\xe9".into(),
             epoch: 1,
             snapshot: None,
         }));
         roundtrip(PluginValue::PhpHandle(PhpObjHandle {
             phandle: 8,
-            class: "MyPlugin".to_string(),
-            implements: vec!["Composer\\Plugin\\PluginInterface".to_string()],
+            class: b"Caf\xe9".into(),
+            implements: vec![b"Plugin\xff".into()],
         }));
         roundtrip(PluginValue::PhpClass(PhpClassHandle {
-            class: "MyPlugin".to_string(),
+            class: b"Caf\xe9".into(),
+        }));
+    }
+
+    #[test]
+    fn roundtrips_handles() {
+        roundtrip(PluginValue::RustHandle(RustObjHandle {
+            rhandle: 3,
+            class: "Composer\\Script\\Event".into(),
+            epoch: 1,
+            snapshot: None,
+        }));
+        roundtrip(PluginValue::PhpHandle(PhpObjHandle {
+            phandle: 8,
+            class: "MyPlugin".into(),
+            implements: vec!["Composer\\Plugin\\PluginInterface".into()],
+        }));
+        roundtrip(PluginValue::PhpClass(PhpClassHandle {
+            class: "MyPlugin".into(),
         }));
         roundtrip(PluginValue::Job(7));
     }
@@ -962,9 +1009,7 @@ mod tests {
         let value = PluginValue::from_php_mixed(&mixed);
         assert_eq!(value.to_php_mixed().unwrap(), mixed);
 
-        let handle = PluginValue::PhpClass(PhpClassHandle {
-            class: "X".to_string(),
-        });
+        let handle = PluginValue::PhpClass(PhpClassHandle { class: "X".into() });
         assert!(handle.to_php_mixed().is_err());
     }
 }

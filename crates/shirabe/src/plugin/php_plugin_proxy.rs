@@ -45,7 +45,7 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, path_from_bytes, path_to_bytes, utf8_text,
+    UnexpectedValueException, bconcat, path_from_bytes, path_to_bytes, utf8_text,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -184,7 +184,7 @@ pub(crate) fn config_handle_value(
 pub(crate) fn rust_handle_value(rhandle: u64, class: &str) -> PluginValue {
     PluginValue::RustHandle(RustObjHandle {
         rhandle,
-        class: class.to_string(),
+        class: bconcat!(class),
         epoch: 0,
         snapshot: None,
     })
@@ -340,11 +340,13 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
     fn dispatch(
         &mut self,
         rhandle: u64,
-        method_name: &str,
+        method_name: &BStr,
         args: Vec<PluginValue>,
         _out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
+        let method_name = method_name.display_lossy().to_string();
+        let method_name = method_name.as_str();
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
                 let class = arg::<BString>(method_name, &args, 0)?;
@@ -3505,8 +3507,9 @@ fn dispatch_installation_manager_method(
                     "{method_name} could not type-check its argument: {error:#}"
                 ))
             })? {
-                return Err(runtime_throw(format!(
-                    "{method_name} expects a Composer\\Installer\\InstallerInterface, got {}",
+                return Err(runtime_throw(bconcat!(
+                    method_name,
+                    " expects a Composer\\Installer\\InstallerInterface, got ",
                     handle.class
                 )));
             }
@@ -3594,14 +3597,14 @@ fn error_throw(context: &str, error: &anyhow::Error) -> PhpThrow {
 #[derive(Debug)]
 pub struct PhpPluginProxy {
     pub(crate) phandle: u64,
-    pub(crate) class: String,
+    pub(crate) class: BString,
     /// Every interface the entity's class implements (`class_implements` in the child), for
     /// the `instanceof` checks PHP performs on plugin objects.
-    pub(crate) implements: Vec<String>,
+    pub(crate) implements: Vec<BString>,
 }
 
 impl PhpPluginProxy {
-    pub fn new(phandle: u64, class: String, implements: Vec<String>) -> Self {
+    pub fn new(phandle: u64, class: BString, implements: Vec<BString>) -> Self {
         Self {
             phandle,
             class,
@@ -3675,7 +3678,7 @@ impl PluginInterface for PhpPluginProxy {
     }
 
     fn get_class_name(&self) -> String {
-        self.class.clone()
+        self.class.display_lossy().to_string()
     }
 
     fn as_event_subscriber(&self) -> Option<&dyn EventSubscriberInterface> {
@@ -3720,7 +3723,7 @@ impl EventSubscriberInterface for PhpPluginProxy {
             Ok(value) => value,
             Err(throw) => return Err(throw_into_error(throw)),
         };
-        decode_subscribed_events(&self.class, value)
+        decode_subscribed_events(&self.class.display_lossy().to_string(), value)
     }
 
     fn subscriber_handle(&self) -> PhpObjHandle {
@@ -3992,7 +3995,7 @@ impl PhpInstallerProxy {
     fn unsupported_shape(&self, method: &str, value: &PluginValue) -> anyhow::Error {
         RuntimeException::new(format!(
             "{}::{method}() returned an unsupported shape over RPC: {value:?}",
-            self.handle.class
+            self.handle.class.display_lossy()
         ))
         .into()
     }
@@ -4105,7 +4108,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         let value = self.call("getInstallPath", args).unwrap_or_else(|error| {
             panic!(
                 "{}::getInstallPath failed over RPC: {error:#}",
-                self.handle.class
+                self.handle.class.display_lossy()
             )
         });
         match value {
@@ -4240,9 +4243,10 @@ impl CommandProvider for PhpCommandProviderProxy {
             PluginValue::List(items) => items,
             PluginValue::Array(map) => map.into_values().collect(),
             _ => {
-                return Err(UnexpectedValueException::new(format!(
-                    "Plugin capability {} failed to return an array from getCommands",
-                    self.handle.class
+                return Err(UnexpectedValueException::new(bconcat!(
+                    "Plugin capability ",
+                    self.handle.class,
+                    " failed to return an array from getCommands"
                 ))
                 .into());
             }
@@ -4265,10 +4269,12 @@ impl CommandProvider for PhpCommandProviderProxy {
 }
 
 fn invalid_command_error(capability: &PhpObjHandle) -> anyhow::Error {
-    UnexpectedValueException::new(format!(
-        "Plugin capability {} returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects",
-        capability.class
-    )).into()
+    UnexpectedValueException::new(bconcat!(
+        "Plugin capability ",
+        capability.class,
+        " returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects"
+    ))
+    .into()
 }
 
 impl Drop for PhpCommandProviderProxy {
@@ -4702,7 +4708,7 @@ impl PhpCommandProxy {
     ) -> anyhow::Error {
         RuntimeException::new(format!(
             "{}::{method}() returned an unsupported shape over RPC: {value:?}",
-            handle.class
+            handle.class.display_lossy()
         ))
         .into()
     }
@@ -4723,10 +4729,12 @@ impl Command for PhpCommandProxy {
         let context = CONSOLE_APP_CONTEXT
             .with(|slot| slot.borrow().clone())
             .ok_or_else(|| -> anyhow::Error {
-                RuntimeException::new(format!(
-                        "cannot run plugin-provided command {}: no worker-side console application context was published",
-                        self.handle.class
-                    )).into()
+                RuntimeException::new(bconcat!(
+                    "cannot run plugin-provided command ",
+                    self.handle.class,
+                    ": no worker-side console application context was published"
+                ))
+                .into()
             })?;
         let app = context.booted_app()?;
         let input_line = input.borrow().__to_string();
@@ -4748,12 +4756,12 @@ impl Command for PhpCommandProxy {
     ) -> anyhow::Result<i64> {
         // `run` above never reaches this template hook; a direct call would bypass the
         // worker-side binding, so it stays an explicit error.
-        Err(RuntimeException::new(
-            format!(
-                "plugin-provided command {} executes in the PHP worker through run(); execute() must not be called directly",
-                self.handle.class
-            )
-        ).into())
+        Err(RuntimeException::new(bconcat!(
+            "plugin-provided command ",
+            self.handle.class,
+            " executes in the PHP worker through run(); execute() must not be called directly"
+        ))
+        .into())
     }
 
     fn is_proxy_command(&self) -> bool {

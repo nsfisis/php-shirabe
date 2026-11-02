@@ -7,6 +7,9 @@
 //! - `composer::SHIRABE_RELEASE_DATE` and
 //! - `composer::COMPOSER_DEV_WARNING_TIME`.
 
+// The file generates Rust source, which rustc reads as text.
+#![allow(clippy::disallowed_types, clippy::disallowed_macros)]
+
 struct Commit {
     hash: String,
     release_date: String,

@@ -40,7 +40,7 @@ fn platform_info(
     let mut platform_info = PlatformInfo::default();
 
     for (constant_name, class, value) in constants {
-        platform_info.__set_constant(&constant_name, class.as_deref(), value);
+        platform_info.__set_constant(&constant_name, class.as_deref().map(bstr::BStr::new), value);
     }
 
     for extension in &extensions {

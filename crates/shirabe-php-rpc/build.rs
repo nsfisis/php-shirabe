@@ -3,6 +3,9 @@
 //!
 //! ref: composer/src/Composer/Compiler.php
 
+// The file generates Rust source, which rustc reads as text.
+#![allow(clippy::disallowed_types, clippy::disallowed_macros)]
+
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -91,7 +94,7 @@ fn write_guard_files(guards: &Path, out_dir: &Path) {
     let mut code = String::from("&[\n");
     for file in find_files(guards) {
         code += &format!(
-            "    ({:?}, include_str!({:?})),\n",
+            "    (php_str(b{:?}), include_str!({:?}).as_bytes()),\n",
             relative_path(guards, &file),
             file.display().to_string()
         );

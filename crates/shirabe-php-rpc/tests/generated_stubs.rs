@@ -4,6 +4,7 @@
 //!
 //! The generator needs a PHP interpreter, its composer vendor directory and the classifier
 //! report. A missing prerequisite fails the test; `just setup` prepares all of them.
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use shirabe_php_shim::path_from_bytes;
 use shirabe_symfony_process::PhpExecutableFinder;
