@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/CompositeRepositoryTest.php
 
 use crate::test_case::get_package;
+use bstr::BString;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::{
     ArrayRepository, CompositeRepository, FindPackageConstraint, RepositoryInterface,
@@ -35,7 +36,7 @@ fn test_find_package() {
     let foo = repo
         .find_package(
             bstr::BStr::new("foo"),
-            FindPackageConstraint::String(bstr::BString::from("1".to_string())),
+            FindPackageConstraint::String(BString::from("1")),
         )
         .unwrap()
         .unwrap();
@@ -45,7 +46,7 @@ fn test_find_package() {
     let bar = repo
         .find_package(
             bstr::BStr::new("bar"),
-            FindPackageConstraint::String(bstr::BString::from("1".to_string())),
+            FindPackageConstraint::String(BString::from("1")),
         )
         .unwrap()
         .unwrap();
@@ -55,7 +56,7 @@ fn test_find_package() {
     assert!(
         repo.find_package(
             bstr::BStr::new("foo"),
-            FindPackageConstraint::String(bstr::BString::from("2".to_string()))
+            FindPackageConstraint::String(BString::from("2"))
         )
         .unwrap()
         .is_none()
@@ -138,13 +139,9 @@ fn test_no_repositories() {
             .is_empty()
     );
     assert!(
-        repo.search(
-            bstr::BString::from("foo".to_string()),
-            SEARCH_FULLTEXT,
-            None
-        )
-        .unwrap()
-        .is_empty()
+        repo.search(BString::from("foo"), SEARCH_FULLTEXT, None)
+            .unwrap()
+            .is_empty()
     );
     assert!(repo.get_packages().unwrap().is_empty());
 }

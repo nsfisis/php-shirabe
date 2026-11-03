@@ -23,7 +23,7 @@ fn artifacts_dir() -> std::path::PathBuf {
 
 fn create_repo(url: impl AsRef<[u8]>) -> ArtifactRepository {
     let mut coordinates: IndexMap<BString, PhpMixed> = IndexMap::new();
-    coordinates.insert("type".into(), PhpMixed::string("artifact".to_string()));
+    coordinates.insert("type".into(), PhpMixed::string(BString::from("artifact")));
     coordinates.insert("url".into(), PhpMixed::string(url.as_ref()));
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -38,13 +38,13 @@ fn test_extracts_configs_from_zip_archives() {
     }
 
     let mut expected_packages = vec![
-        "vendor0/package0-0.0.1".to_string(),
-        "composer/composer-1.0.0-alpha6".to_string(),
-        "vendor1/package2-4.3.2".to_string(),
-        "vendor3/package1-5.4.3".to_string(),
-        "test/jsonInRoot-1.0.0".to_string(),
-        "test/jsonInRootTarFile-1.0.0".to_string(),
-        "test/jsonInFirstLevel-1.0.0".to_string(),
+        BString::from("vendor0/package0-0.0.1"),
+        BString::from("composer/composer-1.0.0-alpha6"),
+        BString::from("vendor1/package2-4.3.2"),
+        BString::from("vendor3/package1-5.4.3"),
+        BString::from("test/jsonInRoot-1.0.0"),
+        BString::from("test/jsonInRootTarFile-1.0.0"),
+        BString::from("test/jsonInFirstLevel-1.0.0"),
         // The files not-an-artifact.zip and jsonSecondLevel are not valid
         // artifacts and do not get detected.
     ];

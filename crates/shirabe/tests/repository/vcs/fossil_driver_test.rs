@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/FossilDriverTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -48,14 +48,14 @@ impl Drop for TearDown {
     }
 }
 
-fn support_provider() -> Vec<(&'static str, bool)> {
+fn support_provider() -> Vec<(&'static BStr, bool)> {
     vec![
-        ("http://fossil.kd2.org/kd2fw/", true),
+        (BStr::new("http://fossil.kd2.org/kd2fw/"), true),
         (
-            "https://chiselapp.com/user/rkeene/repository/flint/index",
+            BStr::new("https://chiselapp.com/user/rkeene/repository/flint/index"),
             true,
         ),
-        ("ssh://fossil.kd2.org/kd2fw.fossil", true),
+        (BStr::new("ssh://fossil.kd2.org/kd2fw.fossil"), true),
     ]
 }
 

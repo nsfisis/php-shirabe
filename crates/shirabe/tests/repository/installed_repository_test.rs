@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/InstalledRepositoryTest.php
 
 use crate::test_case::get_package;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::array_loader::ArrayLoader;
@@ -9,16 +9,16 @@ use shirabe::repository::{
     ArrayRepository, FindPackageConstraint, InstalledArrayRepository, InstalledRepository,
     RepositoryInterfaceHandle,
 };
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 /// PHP `setReplaces`/`setProvides` operate on non-root packages; the public handle API only allows
 /// link setters on root packages, so packages carrying links are built via ArrayLoader.
-fn loaded(name: &str, version: &str, extra: Vec<(&str, PhpMixed)>) -> PackageInterfaceHandle {
+fn loaded(name: &BStr, version: &BStr, extra: Vec<(&BStr, PhpMixed)>) -> PackageInterfaceHandle {
     let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config.insert("name".into(), PhpMixed::string(name.to_string()));
-    config.insert("version".into(), PhpMixed::string(version.to_string()));
+    config.insert("name".into(), PhpMixed::string(bconcat!(name)));
+    config.insert("version".into(), PhpMixed::string(bconcat!(version)));
     for (key, value) in extra {
-        config.insert(key.to_string().into(), value);
+        config.insert(bconcat!(key), value);
     }
 
     ArrayLoader::new(None, false)
@@ -29,19 +29,27 @@ fn loaded(name: &str, version: &str, extra: Vec<(&str, PhpMixed)>) -> PackageInt
 
 fn provided_link() -> PhpMixed {
     let mut links: IndexMap<BString, PhpMixed> = IndexMap::new();
-    links.insert("provided".into(), PhpMixed::string("*".to_string()));
+    links.insert("provided".into(), PhpMixed::string(BString::from("*")));
     PhpMixed::Array(links)
 }
 
 #[test]
 fn test_find_packages_with_replacers_and_providers() {
-    let foo = loaded("foo", "1", vec![("replace", provided_link())]);
+    let foo = loaded(
+        BStr::new("foo"),
+        BStr::new("1"),
+        vec![(BStr::new("replace"), provided_link())],
+    );
     let foo2 = get_package("foo", "2");
     let array_repo_one =
         InstalledArrayRepository::new_with_packages(vec![foo.clone(), foo2.clone()]).unwrap();
 
     let bar = get_package("bar", "1");
-    let bar2 = loaded("bar", "2", vec![("provide", provided_link())]);
+    let bar2 = loaded(
+        BStr::new("bar"),
+        BStr::new("2"),
+        vec![(BStr::new("provide"), provided_link())],
+    );
     let array_repo_two =
         InstalledArrayRepository::new_with_packages(vec![bar.clone(), bar2.clone()]).unwrap();
 
@@ -53,9 +61,7 @@ fn test_find_packages_with_replacers_and_providers() {
     let foo_matches = repo
         .find_packages_with_replacers_and_providers(
             bstr::BStr::new("foo"),
-            Some(FindPackageConstraint::String(bstr::BString::from(
-                "2".to_string(),
-            ))),
+            Some(FindPackageConstraint::String(BString::from("2"))),
         )
         .unwrap();
     assert_eq!(1, foo_matches.len());
@@ -64,9 +70,7 @@ fn test_find_packages_with_replacers_and_providers() {
     let bar_matches = repo
         .find_packages_with_replacers_and_providers(
             bstr::BStr::new("bar"),
-            Some(FindPackageConstraint::String(bstr::BString::from(
-                "1".to_string(),
-            ))),
+            Some(FindPackageConstraint::String(BString::from("1"))),
         )
         .unwrap();
     assert_eq!(1, bar_matches.len());

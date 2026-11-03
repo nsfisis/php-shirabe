@@ -1,13 +1,13 @@
 //! ref: composer/tests/Composer/Test/Repository/RepositoryFactoryTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::RepositoryFactory;
 use shirabe::util::http_downloader::HttpDownloader;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 #[test]
 fn test_manager_with_all_repository_types() {
@@ -51,42 +51,53 @@ fn test_manager_with_all_repository_types() {
 
 fn generate_repository_name_provider() -> Vec<(
     PhpMixed,
-    Vec<(&'static str, PhpMixed)>,
-    Vec<&'static str>,
-    &'static str,
+    Vec<(&'static BStr, PhpMixed)>,
+    Vec<&'static BStr>,
+    &'static BStr,
 )> {
     vec![
-        (PhpMixed::Int(0), vec![], vec![], "0"),
-        (PhpMixed::Int(0), vec![], vec!["0"], "02"),
+        (PhpMixed::Int(0), vec![], vec![], BStr::new("0")),
         (
             PhpMixed::Int(0),
-            vec![("url", PhpMixed::string("https://example.org".to_string()))],
             vec![],
-            "example.org",
+            vec![BStr::new("0")],
+            BStr::new("02"),
         ),
         (
             PhpMixed::Int(0),
-            vec![("url", PhpMixed::string("https://example.org".to_string()))],
-            vec!["example.org"],
-            "example.org2",
-        ),
-        (
-            PhpMixed::string("example.org".to_string()),
             vec![(
-                "url",
-                PhpMixed::string("https://example.org/repository".to_string()),
+                BStr::new("url"),
+                PhpMixed::string(BString::from("https://example.org")),
             )],
             vec![],
-            "example.org",
+            BStr::new("example.org"),
         ),
         (
-            PhpMixed::string("example.org".to_string()),
+            PhpMixed::Int(0),
             vec![(
-                "url",
-                PhpMixed::string("https://example.org/repository".to_string()),
+                BStr::new("url"),
+                PhpMixed::string(BString::from("https://example.org")),
             )],
-            vec!["example.org"],
-            "example.org2",
+            vec![BStr::new("example.org")],
+            BStr::new("example.org2"),
+        ),
+        (
+            PhpMixed::string(BString::from("example.org")),
+            vec![(
+                BStr::new("url"),
+                PhpMixed::string(BString::from("https://example.org/repository")),
+            )],
+            vec![],
+            BStr::new("example.org"),
+        ),
+        (
+            PhpMixed::string(BString::from("example.org")),
+            vec![(
+                BStr::new("url"),
+                PhpMixed::string(BString::from("https://example.org/repository")),
+            )],
+            vec![BStr::new("example.org")],
+            BStr::new("example.org2"),
         ),
     ]
 }
@@ -96,11 +107,11 @@ fn test_generate_repository_name() {
     for (index, repo_pairs, existing_keys, expected) in generate_repository_name_provider() {
         let repo: IndexMap<BString, PhpMixed> = repo_pairs
             .into_iter()
-            .map(|(k, v)| (k.to_string().into(), v))
+            .map(|(k, v)| (bconcat!(k), v))
             .collect();
-        let existing_repos: IndexMap<String, ()> = existing_keys
+        let existing_repos: IndexMap<BString, ()> = existing_keys
             .into_iter()
-            .map(|k| (k.to_string(), ()))
+            .map(|k| (bconcat!(k), ()))
             .collect();
 
         assert_eq!(

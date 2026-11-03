@@ -3,7 +3,7 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BStr, BString, ByteVec};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -53,12 +53,12 @@ impl Drop for TearDown {
     }
 }
 
-fn support_provider() -> Vec<(&'static str, bool)> {
+fn support_provider() -> Vec<(&'static BStr, bool)> {
     vec![
-        ("http://svn.apache.org", true),
-        ("https://svn.sf.net", true),
-        ("svn://example.org", true),
-        ("svn+ssh://example.org", true),
+        (BStr::new("http://svn.apache.org"), true),
+        (BStr::new("https://svn.sf.net"), true),
+        (BStr::new("svn://example.org"), true),
+        (BStr::new("svn+ssh://example.org"), true),
     ]
 }
 
@@ -88,7 +88,7 @@ fn test_wrong_credentials_in_url() {
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());
 
-    let mut output = String::from("svn: OPTIONS of 'https://corp.svn.local/repo':");
+    let mut output = BString::from("svn: OPTIONS of 'https://corp.svn.local/repo':");
     output.push_str(" authorization failed: Could not authenticate to server:");
     output.push_str(" rejected Basic challenge (https://corp.svn.local/)");
 
@@ -122,7 +122,7 @@ fn test_wrong_credentials_in_url() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://till:secret@corp.svn.local/repo".to_string()),
+        PhpMixed::string(BString::from("https://till:secret@corp.svn.local/repo")),
     );
 
     let mut svn = SvnDriver::new(repo_config, console, config, http_downloader, process);

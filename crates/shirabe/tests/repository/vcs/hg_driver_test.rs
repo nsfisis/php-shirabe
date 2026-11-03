@@ -3,7 +3,7 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -53,13 +53,13 @@ impl Drop for TearDown {
     }
 }
 
-fn supports_data_provider() -> Vec<&'static str> {
+fn supports_data_provider() -> Vec<&'static BStr> {
     vec![
-        "ssh://bitbucket.org/user/repo",
-        "ssh://hg@bitbucket.org/user/repo",
-        "ssh://user@bitbucket.org/user/repo",
-        "https://bitbucket.org/user/repo",
-        "https://user@bitbucket.org/user/repo",
+        BStr::new("ssh://bitbucket.org/user/repo"),
+        BStr::new("ssh://hg@bitbucket.org/user/repo"),
+        BStr::new("ssh://user@bitbucket.org/user/repo"),
+        BStr::new("https://bitbucket.org/user/repo"),
+        BStr::new("https://user@bitbucket.org/user/repo"),
     ]
 }
 
@@ -101,21 +101,21 @@ fn test_get_branches_filter_invalid_branch_names() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = HgDriver::new(repo_config, io, config, http_downloader, process);
 
     let branches = driver.get_branches().unwrap();
-    let mut expected: IndexMap<String, String> = IndexMap::new();
-    expected.insert("help".to_string(), "dbf6c8acb641".to_string());
-    expected.insert("default".to_string(), "dbf6c8acb640".to_string());
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
+    expected.insert(BString::from("help"), BString::from("dbf6c8acb641"));
+    expected.insert(BString::from("default"), BString::from("dbf6c8acb640"));
     assert_eq!(
         expected
             .iter()
             .map(|(k, v)| (
-                bstr::BString::from(k.as_str()),
-                bstr::BString::from(v.as_str())
+                bstr::BString::from(k.as_bstr()),
+                bstr::BString::from(v.as_bstr())
             ))
             .collect::<indexmap::IndexMap<_, _>>(),
         branches
@@ -140,7 +140,7 @@ fn test_file_get_content_invalid_identifier() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
@@ -176,7 +176,7 @@ fn test_get_change_date_invalid_identifier() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);

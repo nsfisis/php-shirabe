@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/VcsRepositoryTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, IndexSet};
 use serial_test::serial;
 use shirabe::config::Config;
@@ -11,7 +11,9 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::{PhpMixed, implode, path_to_bytes};
+use shirabe_php_shim::{
+    PhpMixed, bconcat, implode, os_str_from_bytes, path_from_bytes, path_to_bytes,
+};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -28,9 +30,9 @@ fn set_up() -> Option<SetUp> {
     let git_repo = TempDir::new().unwrap();
     let path = git_repo.path();
 
-    let exec = |args: &[&str]| {
+    let exec = |args: &[&BStr]| {
         let status = std::process::Command::new("git")
-            .args(args)
+            .args(args.iter().map(os_str_from_bytes))
             .current_dir(path)
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_SYSTEM", "/dev/null")
@@ -40,85 +42,114 @@ fn set_up() -> Option<SetUp> {
             panic!("Failed to execute git {:?}", args);
         }
     };
-    let write_file = |name: &str, contents: &str| {
-        std::fs::write(path.join(name), contents).unwrap();
+    let write_file = |name: &BStr, contents: &BStr| {
+        std::fs::write(path.join(path_from_bytes(&name)), contents).unwrap();
     };
 
     // init
-    exec(&["init", "-q"]);
-    exec(&["checkout", "-b", "master"]);
-    exec(&["config", "user.email", "composertest@example.org"]);
-    exec(&["config", "user.name", "ComposerTest"]);
-    exec(&["config", "commit.gpgsign", "false"]);
-    write_file("foo", "");
-    exec(&["add", "foo"]);
-    exec(&["commit", "-m", "init"]);
+    exec(&[BStr::new("init"), BStr::new("-q")]);
+    exec(&[BStr::new("checkout"), BStr::new("-b"), BStr::new("master")]);
+    exec(&[
+        BStr::new("config"),
+        BStr::new("user.email"),
+        BStr::new("composertest@example.org"),
+    ]);
+    exec(&[
+        BStr::new("config"),
+        BStr::new("user.name"),
+        BStr::new("ComposerTest"),
+    ]);
+    exec(&[
+        BStr::new("config"),
+        BStr::new("commit.gpgsign"),
+        BStr::new("false"),
+    ]);
+    write_file(BStr::new("foo"), BStr::new(""));
+    exec(&[BStr::new("add"), BStr::new("foo")]);
+    exec(&[BStr::new("commit"), BStr::new("-m"), BStr::new("init")]);
 
     // non-composed tag & branch
-    exec(&["tag", "0.5.0"]);
-    exec(&["branch", "oldbranch"]);
+    exec(&[BStr::new("tag"), BStr::new("0.5.0")]);
+    exec(&[BStr::new("branch"), BStr::new("oldbranch")]);
 
     // add composed tag & master branch
     write_file(
-        "composer.json",
-        &shirabe::json::JsonFile::encode(&composer(None))
+        BStr::new("composer.json"),
+        shirabe::json::JsonFile::encode(&composer(None))
             .unwrap()
-            .display_lossy()
-            .to_string(),
+            .as_bstr(),
     );
-    exec(&["add", "composer.json"]);
-    exec(&["commit", "-m", "addcomposer"]);
-    exec(&["tag", "0.6.0"]);
+    exec(&[BStr::new("add"), BStr::new("composer.json")]);
+    exec(&[
+        BStr::new("commit"),
+        BStr::new("-m"),
+        BStr::new("addcomposer"),
+    ]);
+    exec(&[BStr::new("tag"), BStr::new("0.6.0")]);
 
     // add feature-a branch
-    exec(&["checkout", "-b", "feature/a-1.0-B"]);
-    write_file("foo", "bar feature");
-    exec(&["add", "foo"]);
-    exec(&["commit", "-m", "change-a"]);
+    exec(&[
+        BStr::new("checkout"),
+        BStr::new("-b"),
+        BStr::new("feature/a-1.0-B"),
+    ]);
+    write_file(BStr::new("foo"), BStr::new("bar feature"));
+    exec(&[BStr::new("add"), BStr::new("foo")]);
+    exec(&[BStr::new("commit"), BStr::new("-m"), BStr::new("change-a")]);
 
     // add foo#bar branch which should result in dev-foo+bar
-    exec(&["branch", "foo#bar"]);
+    exec(&[BStr::new("branch"), BStr::new("foo#bar")]);
 
     // add version to composer.json
-    exec(&["checkout", "master"]);
+    exec(&[BStr::new("checkout"), BStr::new("master")]);
     write_file(
-        "composer.json",
-        &shirabe::json::JsonFile::encode(&composer(Some("1.0.0")))
+        BStr::new("composer.json"),
+        shirabe::json::JsonFile::encode(&composer(Some(BStr::new("1.0.0"))))
             .unwrap()
-            .display_lossy()
-            .to_string(),
+            .as_bstr(),
     );
-    exec(&["add", "composer.json"]);
-    exec(&["commit", "-m", "addversion"]);
+    exec(&[BStr::new("add"), BStr::new("composer.json")]);
+    exec(&[
+        BStr::new("commit"),
+        BStr::new("-m"),
+        BStr::new("addversion"),
+    ]);
 
     // create tag with wrong version in it
-    exec(&["tag", "0.9.0"]);
+    exec(&[BStr::new("tag"), BStr::new("0.9.0")]);
     // create tag with correct version in it
-    exec(&["tag", "1.0.0"]);
+    exec(&[BStr::new("tag"), BStr::new("1.0.0")]);
 
     // add feature-b branch
-    exec(&["checkout", "-b", "feature-b"]);
-    write_file("foo", "baz feature");
-    exec(&["add", "foo"]);
-    exec(&["commit", "-m", "change-b"]);
+    exec(&[
+        BStr::new("checkout"),
+        BStr::new("-b"),
+        BStr::new("feature-b"),
+    ]);
+    write_file(BStr::new("foo"), BStr::new("baz feature"));
+    exec(&[BStr::new("add"), BStr::new("foo")]);
+    exec(&[BStr::new("commit"), BStr::new("-m"), BStr::new("change-b")]);
 
     // add 1.0 branch
-    exec(&["checkout", "master"]);
-    exec(&["branch", "1.0"]);
+    exec(&[BStr::new("checkout"), BStr::new("master")]);
+    exec(&[BStr::new("branch"), BStr::new("1.0")]);
 
     // add 1.0.x branch
-    exec(&["branch", "1.1.x"]);
+    exec(&[BStr::new("branch"), BStr::new("1.1.x")]);
 
     // update master to 2.0
     write_file(
-        "composer.json",
-        &shirabe::json::JsonFile::encode(&composer(Some("2.0.0")))
+        BStr::new("composer.json"),
+        shirabe::json::JsonFile::encode(&composer(Some(BStr::new("2.0.0"))))
             .unwrap()
-            .display_lossy()
-            .to_string(),
+            .as_bstr(),
     );
-    exec(&["add", "composer.json"]);
-    exec(&["commit", "-m", "bump-version"]);
+    exec(&[BStr::new("add"), BStr::new("composer.json")]);
+    exec(&[
+        BStr::new("commit"),
+        BStr::new("-m"),
+        BStr::new("bump-version"),
+    ]);
 
     Some(SetUp {
         composer_home,
@@ -126,11 +157,11 @@ fn set_up() -> Option<SetUp> {
     })
 }
 
-fn composer(version: Option<&str>) -> PhpMixed {
+fn composer(version: Option<&BStr>) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
-    m.insert("name".into(), PhpMixed::string("a/b".to_string()));
+    m.insert("name".into(), PhpMixed::string(BString::from("a/b")));
     if let Some(version) = version {
-        m.insert("version".into(), PhpMixed::string(version.to_string()));
+        m.insert("version".into(), PhpMixed::string(bconcat!(version)));
     }
     PhpMixed::Array(m)
 }
@@ -223,7 +254,7 @@ fn test_load_versions() {
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert("url".into(), PhpMixed::string(path_to_bytes(&git_repo)));
-    repo_config.insert("type".into(), PhpMixed::string("vcs".to_string()));
+    repo_config.insert("type".into(), PhpMixed::string(BString::from("vcs")));
 
     let mut repo = VcsRepository::new(
         repo_config,

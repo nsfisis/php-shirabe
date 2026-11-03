@@ -2,7 +2,7 @@
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -12,7 +12,7 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, path_to_bytes,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, path_to_bytes,
 };
 use tempfile::TempDir;
 
@@ -57,7 +57,7 @@ impl Drop for TearDown {
 // Mirrors PHP's $httpDownloader->expects([...], true): an `['url' => .., 'body' => ..]`
 // entry (status defaults to 200).
 fn http_body(
-    url: &str,
+    url: &BStr,
     body: impl Into<BString>,
 ) -> shirabe::util::http_downloader::HttpDownloaderMockExpectation {
     expect_full(url, None, 200, body, vec![BString::default()])
@@ -67,13 +67,13 @@ fn http_body(
 // IOInterface, the test config, the mocked HttpDownloader, and a real ProcessExecutor,
 // then calls initialize().
 fn get_driver(
-    url: &str,
+    url: &BStr,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> anyhow::Result<GitBitbucketDriver> {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(url.to_string()));
+    repo_config.insert("url".into(), PhpMixed::string(bconcat!(url)));
 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
@@ -95,7 +95,9 @@ fn test_get_root_identifier_wrong_scm_type() {
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![http_body(
-            "https://api.bitbucket.org/2.0/repositories/user/repo?fields=-project%2C-owner",
+            BStr::new(
+                "https://api.bitbucket.org/2.0/repositories/user/repo?fields=-project%2C-owner",
+            ),
             r#"{"scm":"hg","website":"","has_wiki":false,"name":"repo","links":{"branches":{"href":"https:\/\/api.bitbucket.org\/2.0\/repositories\/user\/repo\/refs\/branches"},"tags":{"href":"https:\/\/api.bitbucket.org\/2.0\/repositories\/user\/repo\/refs\/tags"},"clone":[{"href":"https:\/\/user@bitbucket.org\/user\/repo","name":"https"},{"href":"ssh:\/\/hg@bitbucket.org\/user\/repo","name":"ssh"}],"html":{"href":"https:\/\/bitbucket.org\/user\/repo"}},"language":"php","created_on":"2015-02-18T16:22:24.688+00:00","updated_on":"2016-05-17T13:20:21.993+00:00","is_private":true,"has_issues":false}"#,
         )],
         true,
@@ -103,7 +105,7 @@ fn test_get_root_identifier_wrong_scm_type() {
     );
 
     let mut driver = get_driver(
-        "https://bitbucket.org/user/repo.git",
+        BStr::new("https://bitbucket.org/user/repo.git"),
         io,
         config,
         http_downloader,
@@ -130,11 +132,15 @@ fn test_driver() {
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     let urls = [
-        "https://api.bitbucket.org/2.0/repositories/user/repo?fields=-project%2C-owner",
-        "https://api.bitbucket.org/2.0/repositories/user/repo/refs/tags?pagelen=100&fields=values.name%2Cvalues.target.hash%2Cnext&sort=-target.date",
-        "https://api.bitbucket.org/2.0/repositories/user/repo/refs/branches?pagelen=100&fields=values.name%2Cvalues.target.hash%2Cvalues.heads%2Cnext&sort=-target.date",
-        "https://api.bitbucket.org/2.0/repositories/user/repo/src/main/composer.json",
-        "https://api.bitbucket.org/2.0/repositories/user/repo/commit/main?fields=date",
+        BStr::new("https://api.bitbucket.org/2.0/repositories/user/repo?fields=-project%2C-owner"),
+        BStr::new(
+            "https://api.bitbucket.org/2.0/repositories/user/repo/refs/tags?pagelen=100&fields=values.name%2Cvalues.target.hash%2Cnext&sort=-target.date",
+        ),
+        BStr::new(
+            "https://api.bitbucket.org/2.0/repositories/user/repo/refs/branches?pagelen=100&fields=values.name%2Cvalues.target.hash%2Cvalues.heads%2Cnext&sort=-target.date",
+        ),
+        BStr::new("https://api.bitbucket.org/2.0/repositories/user/repo/src/main/composer.json"),
+        BStr::new("https://api.bitbucket.org/2.0/repositories/user/repo/commit/main?fields=date"),
     ];
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -161,7 +167,7 @@ fn test_driver() {
     );
 
     let mut driver = get_driver(
-        "https://bitbucket.org/user/repo.git",
+        BStr::new("https://bitbucket.org/user/repo.git"),
         io,
         config,
         http_downloader,
@@ -170,37 +176,37 @@ fn test_driver() {
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 
-    let mut expected_tags: IndexMap<String, String> = IndexMap::new();
+    let mut expected_tags: IndexMap<BString, BString> = IndexMap::new();
     expected_tags.insert(
-        "1.0.1".to_string(),
-        "9b78a3932143497c519e49b8241083838c8ff8a1".to_string(),
+        BString::from("1.0.1"),
+        BString::from("9b78a3932143497c519e49b8241083838c8ff8a1"),
     );
     expected_tags.insert(
-        "1.0.0".to_string(),
-        "d3393d514318a9267d2f8ebbf463a9aaa389f8eb".to_string(),
+        BString::from("1.0.0"),
+        BString::from("d3393d514318a9267d2f8ebbf463a9aaa389f8eb"),
     );
     assert_eq!(
         expected_tags
             .iter()
             .map(|(k, v)| (
-                bstr::BString::from(k.as_str()),
-                bstr::BString::from(v.as_str())
+                bstr::BString::from(k.as_bstr()),
+                bstr::BString::from(v.as_bstr())
             ))
             .collect::<indexmap::IndexMap<_, _>>(),
         driver.get_tags().unwrap()
     );
 
-    let mut expected_branches: IndexMap<String, String> = IndexMap::new();
+    let mut expected_branches: IndexMap<BString, BString> = IndexMap::new();
     expected_branches.insert(
-        "main".to_string(),
-        "937992d19d72b5116c3e8c4a04f960e5fa270b22".to_string(),
+        BString::from("main"),
+        BString::from("937992d19d72b5116c3e8c4a04f960e5fa270b22"),
     );
     assert_eq!(
         expected_branches
             .iter()
             .map(|(k, v)| (
-                bstr::BString::from(k.as_str()),
-                bstr::BString::from(v.as_str())
+                bstr::BString::from(k.as_bstr()),
+                bstr::BString::from(v.as_bstr())
             ))
             .collect::<indexmap::IndexMap<_, _>>(),
         driver.get_branches().unwrap()
@@ -286,7 +292,12 @@ fn test_initialize_invalid_repository_url() {
     let (http_downloader, _http_guard) =
         get_http_downloader_mock(vec![], true, HttpDownloaderMockHandler::default());
 
-    let result = get_driver("https://bitbucket.org/acme", io, config, http_downloader);
+    let result = get_driver(
+        BStr::new("https://bitbucket.org/acme"),
+        io,
+        config,
+        http_downloader,
+    );
     let err = result.unwrap_err();
     assert!(
         err.is_instanceof::<InvalidArgumentException>(),
@@ -303,14 +314,18 @@ fn test_invalid_support_data() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
-    let repo_url = "https://bitbucket.org/user/repo.git";
+    let repo_url = BStr::new("https://bitbucket.org/user/repo.git");
 
     let urls = [
-        "https://api.bitbucket.org/2.0/repositories/user/repo?fields=-project%2C-owner",
-        "https://api.bitbucket.org/2.0/repositories/user/repo/src/main/composer.json",
-        "https://api.bitbucket.org/2.0/repositories/user/repo/commit/main?fields=date",
-        "https://api.bitbucket.org/2.0/repositories/user/repo/refs/tags?pagelen=100&fields=values.name%2Cvalues.target.hash%2Cnext&sort=-target.date",
-        "https://api.bitbucket.org/2.0/repositories/user/repo/refs/branches?pagelen=100&fields=values.name%2Cvalues.target.hash%2Cvalues.heads%2Cnext&sort=-target.date",
+        BStr::new("https://api.bitbucket.org/2.0/repositories/user/repo?fields=-project%2C-owner"),
+        BStr::new("https://api.bitbucket.org/2.0/repositories/user/repo/src/main/composer.json"),
+        BStr::new("https://api.bitbucket.org/2.0/repositories/user/repo/commit/main?fields=date"),
+        BStr::new(
+            "https://api.bitbucket.org/2.0/repositories/user/repo/refs/tags?pagelen=100&fields=values.name%2Cvalues.target.hash%2Cnext&sort=-target.date",
+        ),
+        BStr::new(
+            "https://api.bitbucket.org/2.0/repositories/user/repo/refs/branches?pagelen=100&fields=values.name%2Cvalues.target.hash%2Cvalues.heads%2Cnext&sort=-target.date",
+        ),
     ];
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -318,7 +333,7 @@ fn test_invalid_support_data() {
                 urls[0],
                 r#"{"mainbranch": {"name": "main"}, "scm":"git","website":"","has_wiki":false,"name":"repo","links":{"branches":{"href":"https:\/\/api.bitbucket.org\/2.0\/repositories\/user\/repo\/refs\/branches"},"tags":{"href":"https:\/\/api.bitbucket.org\/2.0\/repositories\/user\/repo\/refs\/tags"},"clone":[{"href":"https:\/\/user@bitbucket.org\/user\/repo.git","name":"https"},{"href":"ssh:\/\/git@bitbucket.org\/user\/repo.git","name":"ssh"}],"html":{"href":"https:\/\/bitbucket.org\/user\/repo"}},"language":"php","created_on":"2015-02-18T16:22:24.688+00:00","updated_on":"2016-05-17T13:20:21.993+00:00","is_private":true,"has_issues":false}"#,
             ),
-            http_body(urls[1], format!(r#"{{"support": "{repo_url}"}}"#)),
+            http_body(urls[1], bconcat!(r#"{"support": ""#, repo_url, r#""}"#)),
             http_body(urls[2], r#"{"date": "2016-05-17T13:19:52+00:00"}"#),
             http_body(
                 urls[3],

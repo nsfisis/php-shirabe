@@ -1,23 +1,23 @@
 //! ref: composer/tests/Composer/Test/Repository/ArrayRepositoryTest.php
 
 use crate::test_case::{get_alias_package, get_package};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::array_loader::ArrayLoader;
 use shirabe::repository::{
     AbandonedInfo, ArrayRepository, RepositoryInterface, SEARCH_FULLTEXT, SearchResult,
 };
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 /// PHP `setType`/`setAbandoned` operate on non-root packages; the public handle API only allows
 /// such setters on root packages, so packages carrying extra config are built via ArrayLoader.
-fn loaded(name: &str, version: &str, extra: Vec<(&str, PhpMixed)>) -> PackageInterfaceHandle {
+fn loaded(name: &BStr, version: &BStr, extra: Vec<(&BStr, PhpMixed)>) -> PackageInterfaceHandle {
     let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config.insert("name".into(), PhpMixed::string(name.to_string()));
-    config.insert("version".into(), PhpMixed::string(version.to_string()));
+    config.insert("name".into(), PhpMixed::string(bconcat!(name)));
+    config.insert("version".into(), PhpMixed::string(bconcat!(version)));
     for (key, value) in extra {
-        config.insert(key.to_string().into(), value);
+        config.insert(bconcat!(key), value);
     }
 
     ArrayLoader::new(None, false)
@@ -128,11 +128,7 @@ fn test_search() {
         vec![(BString::from("foo"), None, Abandoned::No)],
         reprs(
             &repo
-                .search(
-                    bstr::BString::from("foo".to_string()),
-                    SEARCH_FULLTEXT,
-                    None
-                )
+                .search(BString::from("foo"), SEARCH_FULLTEXT, None)
                 .unwrap()
         )
     );
@@ -141,23 +137,15 @@ fn test_search() {
         vec![(BString::from("bar"), None, Abandoned::No)],
         reprs(
             &repo
-                .search(
-                    bstr::BString::from("bar".to_string()),
-                    SEARCH_FULLTEXT,
-                    None
-                )
+                .search(BString::from("bar"), SEARCH_FULLTEXT, None)
                 .unwrap()
         )
     );
 
     assert!(
-        repo.search(
-            bstr::BString::from("foobar".to_string()),
-            SEARCH_FULLTEXT,
-            None
-        )
-        .unwrap()
-        .is_empty()
+        repo.search(BString::from("foobar"), SEARCH_FULLTEXT, None)
+            .unwrap()
+            .is_empty()
     );
 }
 
@@ -169,9 +157,12 @@ fn test_search_with_package_type() {
     repo.add_package(get_package("bar", "1")).unwrap();
 
     let package = loaded(
-        "foobar",
-        "1",
-        vec![("type", PhpMixed::string("composer-plugin".to_string()))],
+        BStr::new("foobar"),
+        BStr::new("1"),
+        vec![(
+            BStr::new("type"),
+            PhpMixed::string(BString::from("composer-plugin")),
+        )],
     );
     repo.add_package(package).unwrap();
 
@@ -180,9 +171,9 @@ fn test_search_with_package_type() {
         reprs(
             &repo
                 .search(
-                    bstr::BString::from("foo".to_string()),
+                    BString::from("foo"),
                     SEARCH_FULLTEXT,
-                    Some(bstr::BString::from("library".to_string()))
+                    Some(BString::from("library"))
                 )
                 .unwrap()
         )
@@ -190,9 +181,9 @@ fn test_search_with_package_type() {
 
     assert!(
         repo.search(
-            bstr::BString::from("bar".to_string()),
+            BString::from("bar"),
             SEARCH_FULLTEXT,
-            Some(bstr::BString::from("package".to_string()))
+            Some(BString::from("package"))
         )
         .unwrap()
         .is_empty()
@@ -203,9 +194,9 @@ fn test_search_with_package_type() {
         reprs(
             &repo
                 .search(
-                    bstr::BString::from("foo".to_string()),
+                    BString::from("foo"),
                     0,
-                    Some(bstr::BString::from("composer-plugin".to_string()))
+                    Some(BString::from("composer-plugin"))
                 )
                 .unwrap()
         )
@@ -216,12 +207,19 @@ fn test_search_with_package_type() {
 fn test_search_with_abandoned_packages() {
     let mut repo = ArrayRepository::new(vec![]).unwrap();
 
-    let package1 = loaded("foo1", "1", vec![("abandoned", PhpMixed::Bool(true))]);
+    let package1 = loaded(
+        BStr::new("foo1"),
+        BStr::new("1"),
+        vec![(BStr::new("abandoned"), PhpMixed::Bool(true))],
+    );
     repo.add_package(package1).unwrap();
     let package2 = loaded(
-        "foo2",
-        "1",
-        vec![("abandoned", PhpMixed::string("bar".to_string()))],
+        BStr::new("foo2"),
+        BStr::new("1"),
+        vec![(
+            BStr::new("abandoned"),
+            PhpMixed::string(BString::from("bar")),
+        )],
     );
     repo.add_package(package2).unwrap();
 
@@ -236,11 +234,7 @@ fn test_search_with_abandoned_packages() {
         ],
         reprs(
             &repo
-                .search(
-                    bstr::BString::from("foo".to_string()),
-                    SEARCH_FULLTEXT,
-                    None
-                )
+                .search(BString::from("foo"), SEARCH_FULLTEXT, None)
                 .unwrap()
         )
     );

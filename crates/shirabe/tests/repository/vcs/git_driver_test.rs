@@ -3,7 +3,7 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -158,7 +158,7 @@ fn test_get_root_identifier_from_remote() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
@@ -198,7 +198,7 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
@@ -242,28 +242,28 @@ fn test_get_branches_filter_invalid_branch_names() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
     driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     let branches = driver.get_branches().unwrap();
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "main".to_string(),
-        "089681446ba44d6d9004350192486f2ceb4eaa06".to_string(),
+        BString::from("main"),
+        BString::from("089681446ba44d6d9004350192486f2ceb4eaa06"),
     );
     expected.insert(
-        "2.2".to_string(),
-        "12681446ba44d6d9004350192486f2ceb4eaa06".to_string(),
+        BString::from("2.2"),
+        BString::from("12681446ba44d6d9004350192486f2ceb4eaa06"),
     );
     assert_eq!(
         expected
             .iter()
             .map(|(k, v)| (
-                bstr::BString::from(k.as_str()),
-                bstr::BString::from(v.as_str())
+                bstr::BString::from(k.as_bstr()),
+                bstr::BString::from(v.as_bstr())
             ))
             .collect::<indexmap::IndexMap<_, _>>(),
         branches
@@ -292,7 +292,7 @@ fn test_file_get_content_invalid_identifier() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
@@ -332,7 +332,7 @@ fn test_get_change_date_invalid_identifier() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);

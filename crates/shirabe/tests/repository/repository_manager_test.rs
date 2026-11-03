@@ -14,7 +14,7 @@ use shirabe::repository::{
 };
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
-use shirabe_php_shim::{PhpMixed, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -65,10 +65,10 @@ fn http_downloader(
     )))
 }
 
-fn str_config(pairs: &[(&str, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
+fn str_config(pairs: &[(&BStr, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
     let mut c: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        c.insert(k.to_string().into(), v.clone());
+        c.insert(bconcat!(k), v.clone());
     }
     c
 }
@@ -102,9 +102,9 @@ fn test_repo_creation() {
 
     config.borrow_mut().merge(
         &str_config(&[(
-            "config",
+            BStr::new("config"),
             PhpMixed::Array(str_config(&[(
-                "cache-repo-dir",
+                BStr::new("cache-repo-dir"),
                 PhpMixed::string(path_to_bytes(&tmpdir.path())),
             )])),
         )]),
@@ -148,53 +148,62 @@ fn test_repo_creation() {
         BStr::new("Composer\\Repository\\ArtifactRepository"),
     );
 
-    let cases: Vec<(&str, IndexMap<BString, PhpMixed>)> = vec![
+    let cases: Vec<(&BStr, IndexMap<BString, PhpMixed>)> = vec![
         (
-            "composer",
-            str_config(&[("url", PhpMixed::string("http://example.org".to_string()))]),
-        ),
-        (
-            "vcs",
+            BStr::new("composer"),
             str_config(&[(
-                "url",
-                PhpMixed::string("http://github.com/foo/bar".to_string()),
+                BStr::new("url"),
+                PhpMixed::string(BString::from("http://example.org")),
             )]),
         ),
         (
-            "git",
+            BStr::new("vcs"),
             str_config(&[(
-                "url",
-                PhpMixed::string("http://github.com/foo/bar".to_string()),
+                BStr::new("url"),
+                PhpMixed::string(BString::from("http://github.com/foo/bar")),
             )]),
         ),
         (
-            "git",
+            BStr::new("git"),
             str_config(&[(
-                "url",
-                PhpMixed::string("git@example.org:foo/bar.git".to_string()),
+                BStr::new("url"),
+                PhpMixed::string(BString::from("http://github.com/foo/bar")),
             )]),
         ),
         (
-            "svn",
+            BStr::new("git"),
             str_config(&[(
-                "url",
-                PhpMixed::string("svn://example.org/foo/bar".to_string()),
+                BStr::new("url"),
+                PhpMixed::string(BString::from("git@example.org:foo/bar.git")),
             )]),
         ),
         (
-            "package",
-            str_config(&[("package", PhpMixed::Array(IndexMap::new()))]),
+            BStr::new("svn"),
+            str_config(&[(
+                BStr::new("url"),
+                PhpMixed::string(BString::from("svn://example.org/foo/bar")),
+            )]),
         ),
         (
-            "artifact",
-            str_config(&[("url", PhpMixed::string("/path/to/zips".to_string()))]),
+            BStr::new("package"),
+            str_config(&[(BStr::new("package"), PhpMixed::Array(IndexMap::new()))]),
+        ),
+        (
+            BStr::new("artifact"),
+            str_config(&[(
+                BStr::new("url"),
+                PhpMixed::string(BString::from("/path/to/zips")),
+            )]),
         ),
     ];
 
     for (r#type, options) in cases {
         rm.create_repository(
             bstr::BStr::new("composer"),
-            str_config(&[("url", PhpMixed::string("http://example.org".to_string()))]),
+            str_config(&[(
+                BStr::new("url"),
+                PhpMixed::string(BString::from("http://example.org")),
+            )]),
             None,
         )
         .unwrap();
@@ -214,24 +223,24 @@ fn test_invalid_repo_creation_throws() {
 
     config.borrow_mut().merge(
         &str_config(&[(
-            "config",
+            BStr::new("config"),
             PhpMixed::Array(str_config(&[(
-                "cache-repo-dir",
+                BStr::new("cache-repo-dir"),
                 PhpMixed::string(path_to_bytes(&tmpdir.path())),
             )])),
         )]),
         "unknown",
     );
 
-    let cases: Vec<(&str, IndexMap<BString, PhpMixed>)> = vec![
+    let cases: Vec<(&BStr, IndexMap<BString, PhpMixed>)> = vec![
         (
-            "pear",
+            BStr::new("pear"),
             str_config(&[(
-                "url",
-                PhpMixed::string("http://pear.example.org/foo".to_string()),
+                BStr::new("url"),
+                PhpMixed::string(BString::from("http://pear.example.org/foo")),
             )]),
         ),
-        ("invalid", IndexMap::new()),
+        (BStr::new("invalid"), IndexMap::new()),
     ];
 
     for (r#type, options) in cases {
@@ -259,16 +268,16 @@ fn test_filter_repo_wrapping() {
         .create_repository(
             bstr::BStr::new("path"),
             str_config(&[
-                ("type", PhpMixed::string("path".to_string())),
+                (BStr::new("type"), PhpMixed::string(BString::from("path"))),
                 (
-                    "url",
+                    BStr::new("url"),
                     PhpMixed::string(bstr::BString::from(path_to_bytes(
                         &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/repository"),
                     ))),
                 ),
                 (
-                    "only",
-                    PhpMixed::List(vec![PhpMixed::string("foo/bar".to_string())]),
+                    BStr::new("only"),
+                    PhpMixed::List(vec![PhpMixed::string(BString::from("foo/bar"))]),
                 ),
             ]),
             None,
