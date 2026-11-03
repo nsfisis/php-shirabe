@@ -16,7 +16,7 @@ use indexmap::IndexMap;
 use shirabe::io::io_interface::NORMAL;
 use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable, IOInterfaceWrite};
 use shirabe_php_shim::{
-    PhpMixed, PhpResource, bconcat, fwrite_resource, php_fopen_resource, rewind,
+    PhpMixed, PhpResource, bconcat, fwrite_resource, php_fopen_resource, rewind, str_repeat,
 };
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, StreamableInputInterface};
@@ -175,13 +175,13 @@ fn test_overwrite() {
         NORMAL,
     );
 
-    let bs = |n: usize| "\u{08}".repeat(n);
+    let bs = |n: usize| str_repeat("\u{08}", n);
     let expected = bconcat!(
         "something (strlen = 23)",
         "\n",
         bs(23),
         "shorter (12)",
-        " ".repeat(11),
+        str_repeat(" ", 11),
         bs(11),
         bs(12),
         "something longer than initial (34)",

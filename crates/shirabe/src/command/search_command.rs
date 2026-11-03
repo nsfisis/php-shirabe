@@ -12,7 +12,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, STR_PAD_RIGHT, bconcat, impl_php_class, implode,
-    in_array_loose, preg_quote, str_pad, substr,
+    in_array_loose, preg_quote, str_pad, str_repeat, substr,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -243,7 +243,7 @@ impl Command for SearchCommand {
                         ">",
                         result.name,
                         "</>",
-                        " ".repeat(name_length as usize - result.name.len()),
+                        str_repeat(" ", name_length as usize - result.name.len()),
                         warning,
                         description
                     ));

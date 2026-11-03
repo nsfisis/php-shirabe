@@ -206,9 +206,9 @@ fn test_format_summary() {
     let lines: Vec<&[u8]> = display.split_str("\n").collect();
     for (i, (key, value)) in expected.iter().enumerate() {
         let pattern = bconcat!(
-            regex::escape(utf8_text(key).unwrap()),
+            BString::from(regex::escape(utf8_text(key).unwrap())),
             r"\s+",
-            regex::escape(utf8_text(value).unwrap())
+            BString::from(regex::escape(utf8_text(value).unwrap()))
         );
         let re = regex::bytes::Regex::new(utf8_text(&pattern).unwrap()).unwrap();
         assert!(

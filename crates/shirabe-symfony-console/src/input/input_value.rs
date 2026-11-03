@@ -115,10 +115,7 @@ impl From<InputValue> for PhpMixed {
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for InputValue {
     fn from(value: &str) -> Self {
         Self::String(BString::from(value))
@@ -127,16 +124,6 @@ impl From<&str> for InputValue {
 
 impl From<&BStr> for InputValue {
     fn from(value: &BStr) -> Self {
-        Self::String(BString::from(value))
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl From<String> for InputValue {
-    fn from(value: String) -> Self {
         Self::String(BString::from(value))
     }
 }
@@ -153,35 +140,12 @@ impl From<bool> for InputValue {
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl From<Option<String>> for InputValue {
-    fn from(value: Option<String>) -> Self {
-        match value {
-            Some(value) => Self::String(BString::from(value)),
-            None => Self::Null,
-        }
-    }
-}
-
 impl From<Option<BString>> for InputValue {
     fn from(value: Option<BString>) -> Self {
         match value {
             Some(value) => Self::String(value),
             None => Self::Null,
         }
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl From<Vec<String>> for InputValue {
-    fn from(value: Vec<String>) -> Self {
-        Self::Array(value.into_iter().map(BString::from).collect())
     }
 }
 

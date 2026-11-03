@@ -5,7 +5,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepository, RepositoryInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, php_regex, preg_replace, str_replace};
+use shirabe_php_shim::{bconcat, php_regex, preg_replace, str_repeat, str_replace};
 use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
@@ -114,7 +114,7 @@ impl SuggestedPackagesReporter {
         if mode & Self::MODE_BY_SUGGESTION != 0 {
             // Improve readability in full mode
             if mode & Self::MODE_BY_PACKAGE != 0 {
-                self.io.write("-".repeat(78));
+                self.io.write(str_repeat("-", 78));
             }
             for (suggestion, suggesters) in &suggested {
                 self.io.write(bconcat!(

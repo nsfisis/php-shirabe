@@ -97,7 +97,7 @@ impl ValidatingArrayLoader {
             return Some(bconcat!(
                 name,
                 " is reserved, package and vendor names can not match any of: ",
-                reserved_names.join(", "),
+                implode(", ", &reserved_names),
                 "."
             ));
         }
@@ -1051,7 +1051,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                                         " : invalid value (",
                                         download_url_method.as_string().unwrap_or_default(),
                                         "), must be one of ",
-                                        valid_download_url_methods.join(", ")
+                                        implode(", ", &valid_download_url_methods)
                                     ));
                                     php_ext.shift_remove(B("download-url-method"));
                                 }
@@ -1121,7 +1121,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                                             " : invalid value (",
                                             os_family.as_string().unwrap_or_default(),
                                             "), must be one of ",
-                                            valid_os_families.join(", ")
+                                            implode(", ", &valid_os_families)
                                         ));
                                         if let Some(PhpMixed::Array(arr)) =
                                             php_ext.get_mut(B(field_name))
@@ -1499,7 +1499,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                         "autoload : invalid value (",
                         r#type,
                         "), must be one of ",
-                        types.join(", ")
+                        implode(", ", &types)
                     ));
                     if let Some(PhpMixed::Array(arr)) =
                         self.config.borrow_mut().get_mut(B("autoload"))

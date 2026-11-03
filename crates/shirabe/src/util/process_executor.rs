@@ -951,26 +951,6 @@ impl IntoExecCommand for &str {
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl IntoExecCommand for String {
-    fn into_exec_command(self) -> CommandLine {
-        CommandLine::Shell(self.into())
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl IntoExecCommand for &String {
-    fn into_exec_command(self) -> CommandLine {
-        CommandLine::Shell(self.as_str().into())
-    }
-}
-
 impl IntoExecCommand for BString {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Shell(self)
@@ -980,26 +960,6 @@ impl IntoExecCommand for BString {
 impl IntoExecCommand for &BString {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Shell(self.clone())
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl IntoExecCommand for Vec<String> {
-    fn into_exec_command(self) -> CommandLine {
-        CommandLine::Args(self.into_iter().map(BString::from).collect())
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl IntoExecCommand for &Vec<String> {
-    fn into_exec_command(self) -> CommandLine {
-        CommandLine::Args(self.iter().map(|s| s.as_str().into()).collect())
     }
 }
 
@@ -1026,26 +986,6 @@ impl<const N: usize> IntoExecCommand for &[&str; N] {
 impl IntoExecCommand for &[&str] {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Args(self.iter().map(|&s| s.into()).collect())
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl IntoExecCommand for &[String] {
-    fn into_exec_command(self) -> CommandLine {
-        CommandLine::Args(self.iter().map(|s| s.as_str().into()).collect())
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl<const N: usize> IntoExecCommand for &[String; N] {
-    fn into_exec_command(self) -> CommandLine {
-        CommandLine::Args(self.iter().map(|s| s.as_str().into()).collect())
     }
 }
 

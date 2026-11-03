@@ -446,16 +446,6 @@ impl From<f64> for PhpMixed {
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl From<String> for PhpMixed {
-    fn from(value: String) -> Self {
-        PhpMixed::string(value)
-    }
-}
-
 #[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for PhpMixed {
     fn from(value: &str) -> Self {
@@ -472,24 +462,6 @@ impl From<BString> for PhpMixed {
 impl From<&bstr::BStr> for PhpMixed {
     fn from(value: &bstr::BStr) -> Self {
         PhpMixed::String(value.to_owned())
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl<T> From<IndexMap<String, T>> for PhpMixed
-where
-    T: Into<PhpMixed>,
-{
-    fn from(value: IndexMap<String, T>) -> Self {
-        PhpMixed::Array(
-            value
-                .into_iter()
-                .map(|(k, v)| (k.into(), v.into()))
-                .collect(),
-        )
     }
 }
 

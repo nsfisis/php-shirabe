@@ -26,8 +26,8 @@ use shirabe_php_shim::{
     UnexpectedValueException, array_search, bconcat, date_format_to_strftime, date_local,
     display_to_bytes, extension_loaded, get_class, impl_php_class, implode, in_array_loose,
     in_array_strict, intval, json_bytes, ltrim2, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_quote, preg_replace, realpath, rtrim, str_pad, str_replace, strtolower,
-    version_compare,
+    preg_match, preg_quote, preg_replace, realpath, rtrim, str_pad, str_repeat, str_replace,
+    strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -131,7 +131,7 @@ impl ShowCommand {
                     ">",
                     name,
                     "</>",
-                    " ".repeat(pad)
+                    str_repeat(" ", pad)
                 ));
             } else {
                 let width_pad = if pad_name { name_length } else { 0 };

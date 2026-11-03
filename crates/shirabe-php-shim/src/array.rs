@@ -1,5 +1,5 @@
 use crate::{PhpMixed, bconcat, canonical_int_key, php_to_string};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 
 pub fn array_values<K, V: Clone>(array: &IndexMap<K, V>) -> Vec<V> {
@@ -28,10 +28,6 @@ pub fn array_search_in_vec(
     haystack: &[impl AsRef<[u8]>],
 ) -> Option<usize> {
     haystack.iter().position(|s| s.as_ref() == needle.as_ref())
-}
-
-pub fn array_map_str_fn<F: Fn(&BStr) -> BString>(_callback: F, _array: &[BString]) -> Vec<BString> {
-    _array.iter().map(|s| _callback(s.as_bstr())).collect()
 }
 
 pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
@@ -376,14 +372,6 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
         _ => panic!("array_flip(): Argument #1 ($array) must be of type array"),
     }
     PhpMixed::Array(result)
-}
-
-pub fn array_flip_strings(array: &[BString]) -> IndexMap<BString, PhpMixed> {
-    array
-        .iter()
-        .enumerate()
-        .map(|(i, s)| (s.as_bstr().into(), PhpMixed::Int(i as i64)))
-        .collect()
 }
 
 pub fn array_key_exists<Q, K, V>(key: &Q, array: &IndexMap<K, V>) -> bool

@@ -15,12 +15,11 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
-    array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, bconcat, empty,
-    explode, file, file_exists, file_get_contents, file_put_contents, filter_var_email,
-    get_current_user, impl_php_class, implode, is_dir, is_string, os_str_from_bytes,
-    path_from_bytes, path_to_bytes, pcre_check_utf8_subject, php_regex, preg_is_match, preg_match,
-    preg_match_all, preg_quote, preg_replace, realpath, str_replace, strpos, strtolower, trim,
-    ucwords, unlink,
+    array_filter_map, array_intersect_key, array_map, basename, bconcat, empty, explode, file,
+    file_exists, file_get_contents, file_put_contents, filter_var_email, get_current_user,
+    impl_php_class, implode, is_dir, is_string, os_str_from_bytes, path_from_bytes, path_to_bytes,
+    pcre_check_utf8_subject, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
+    preg_replace, realpath, str_replace, strpos, strtolower, trim, ucwords, unlink,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use shirabe_symfony_console::input::InputInterfaceByName;
@@ -497,10 +496,16 @@ impl Command for InitCommand {
             .into_iter()
             .map(|(key, value)| (key, value.to_php_mixed()))
             .collect();
-        let filtered_input: IndexMap<BString, PhpMixed> =
-            array_intersect_key(&options, &array_flip_strings(&allowlist))
-                .into_iter()
-                .collect();
+        let filtered_input: IndexMap<BString, PhpMixed> = array_intersect_key(
+            &options,
+            &allowlist
+                .iter()
+                .enumerate()
+                .map(|(i, s)| (s.clone(), PhpMixed::Int(i as i64)))
+                .collect(),
+        )
+        .into_iter()
+        .collect();
         let mut options = array_filter_map(&filtered_input, |val: &PhpMixed| {
             !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
         });

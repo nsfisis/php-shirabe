@@ -86,26 +86,13 @@ impl Cell {
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl From<String> for Cell {
-    fn from(value: String) -> Self {
-        Cell::Value(value.into())
-    }
-}
-
 impl From<BString> for Cell {
     fn from(value: BString) -> Self {
         Cell::Value(value)
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for Cell {
     fn from(value: &str) -> Self {
         Cell::Value(value.into())
@@ -209,10 +196,7 @@ pub enum StyleName {
     Style(TableStyle),
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for StyleName {
     fn from(name: &str) -> Self {
         StyleName::Name(name.into())

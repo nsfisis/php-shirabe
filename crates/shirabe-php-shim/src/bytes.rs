@@ -94,16 +94,6 @@ impl PhpConcat for str {
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl PhpConcat for String {
-    fn php_concat_to(&self, out: &mut BString) {
-        out.extend_from_slice(self.as_bytes());
-    }
-}
-
 impl PhpConcat for Path {
     fn php_concat_to(&self, out: &mut BString) {
         out.extend_from_slice(path_to_bytes(self));

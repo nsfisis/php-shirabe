@@ -452,26 +452,6 @@ impl PregPattern for &str {
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl PregPattern for &String {
-    fn resolve(self) -> ResolvedPattern {
-        BStr::new(self).resolve()
-    }
-}
-
-#[expect(
-    clippy::disallowed_types,
-    reason = "removed once every caller holds a BString"
-)]
-impl PregPattern for String {
-    fn resolve(self) -> ResolvedPattern {
-        BStr::new(&self).resolve()
-    }
-}
-
 // A pattern built from PHP strings may hold bytes that are not valid UTF-8. They are written as
 // `\xNN` escapes, which without the `u` modifier match the same byte, as a non-ASCII literal does.
 // A backslash right before such a byte escapes it, so it is dropped in favour of the escape.
