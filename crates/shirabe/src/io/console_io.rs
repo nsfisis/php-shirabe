@@ -6,9 +6,9 @@ use crate::question::StrictConfirmationQuestion;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
-    PhpMixed, array_search, bconcat, canonical_int_key, error_message, in_array_strict, is_array,
-    is_string, mb_check_encoding, mb_convert_encoding, memory_get_usage, microtime, preg_replace,
-    str_repeat, strip_tags, strlen,
+    PhpMixed, array_search, bconcat, canonical_int_key, display_to_bytes, error_message,
+    in_array_strict, is_array, is_string, mb_check_encoding, mb_convert_encoding, memory_get_usage,
+    microtime, preg_replace, str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
     ProgressBar, QuestionHelper, QuestionHelperInterface, Table,
@@ -86,7 +86,7 @@ impl ConsoleIO {
             let memory_usage = (memory_get_usage() as f64) / 1024.0 / 1024.0;
             let time_spent = microtime() - start_time;
             bconcat!(
-                format!("[{:.1}MiB/{:.2}s] ", memory_usage, time_spent),
+                display_to_bytes(format_args!("[{:.1}MiB/{:.2}s] ", memory_usage, time_spent)),
                 messages
             )
         } else {
@@ -223,14 +223,15 @@ impl ConsoleIO {
         // pair is preserved while a lone CR is removed.
         let (pattern, replacement) = if allow_newlines {
             (
-                format!(
-                    r#"@{}|[\x01-\x09\x0B\x0C\x0E-\x1A]|(\r\n)|\r@u"#,
-                    escape_pattern
+                bconcat!(
+                    r#"@"#,
+                    escape_pattern,
+                    r#"|[\x01-\x09\x0B\x0C\x0E-\x1A]|(\r\n)|\r@u"#
                 ),
                 "$1",
             )
         } else {
-            (format!("{{{}|[\\x01-\\x1A]}}u", escape_pattern), "")
+            (bconcat!("{", escape_pattern, "|[\\x01-\\x1A]}u"), "")
         };
         let messages = Self::ensure_valid_utf8(messages.as_ref());
 
@@ -347,8 +348,8 @@ impl IOInterfaceImmutable for ConsoleIO {
         let question = StrictConfirmationQuestion::new(
             sanitized,
             default,
-            "/^y(?:es)?$/i".to_string(),
-            "/^no?$/i".to_string(),
+            BString::from("/^y(?:es)?$/i"),
+            BString::from("/^no?$/i"),
         );
 
         let result = self.ask_question(&question)?;
@@ -427,7 +428,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             PhpMixed::List(l) => l
                 .iter()
                 .enumerate()
-                .map(|(i, choice)| (i.to_string().into(), sanitize_choice(choice)))
+                .map(|(i, choice)| (bconcat!(i), sanitize_choice(choice)))
                 .collect(),
             PhpMixed::Array(a) => a
                 .iter()
@@ -478,10 +479,7 @@ impl IOInterfaceImmutable for ConsoleIO {
                 PhpMixed::List(l) => l
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, v)| {
-                        v.as_string()
-                            .map(|s| (BString::from(i.to_string()), BString::from(s)))
-                    })
+                    .filter_map(|(i, v)| v.as_string().map(|s| (bconcat!(i), BString::from(s))))
                     .collect(),
                 PhpMixed::Array(a) => a
                     .iter()
@@ -500,7 +498,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             PhpMixed::List(l) => l
                 .iter()
                 .enumerate()
-                .map(|(i, v)| (i.to_string().into(), v.clone()))
+                .map(|(i, v)| (bconcat!(i), v.clone()))
                 .collect(),
             PhpMixed::Array(a) => a.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             _ => vec![],

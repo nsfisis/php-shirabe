@@ -21,7 +21,7 @@ fn test_filter_packages_by_advisories() {
     let audit_config = AuditConfig::new(
         true,
         bstr::BString::from(Auditor::FORMAT_SUMMARY),
-        bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
+        Auditor::ABANDONED_FAIL.to_owned(),
         true,
         true,
         false,
@@ -130,7 +130,7 @@ fn test_dont_filter_packages_by_ignored_advisories() {
     let audit_config = AuditConfig::new(
         true,
         bstr::BString::from(Auditor::FORMAT_SUMMARY),
-        bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
+        Auditor::ABANDONED_FAIL.to_owned(),
         true,
         true,
         false,
@@ -208,7 +208,7 @@ fn test_dont_filter_packages_with_block_insecure_disabled() {
     let audit_config = AuditConfig::new(
         true,
         bstr::BString::from(Auditor::FORMAT_SUMMARY),
-        bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
+        Auditor::ABANDONED_FAIL.to_owned(),
         false,
         true,
         false,
@@ -289,7 +289,7 @@ fn test_dont_filter_packages_with_abandoned_package() {
     let audit_config = AuditConfig::new(
         true,
         bstr::BString::from(Auditor::FORMAT_SUMMARY),
-        bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
+        Auditor::ABANDONED_FAIL.to_owned(),
         true,
         true,
         false,

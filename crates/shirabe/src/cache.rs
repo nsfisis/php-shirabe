@@ -105,10 +105,7 @@ impl Cache {
                 && ((!is_dir(&self.root) && mkdir(&self.root, 0o777, true).is_err())
                     || !is_writable(&self.root))
             {
-                self.io.write_error(format!(
-                    "<warning>Cannot create cache directory {}, or directory is not writable. Proceeding without cache. See also cache-read-only config if your filesystem is read-only.</warning>",
-                    self.root.display(),
-                ));
+                self.io.write_error(bconcat!("<warning>Cannot create cache directory ", self.root, ", or directory is not writable. Proceeding without cache. See also cache-read-only config if your filesystem is read-only.</warning>"));
                 self.enabled = Some(false);
             }
         }
@@ -131,7 +128,7 @@ impl Cache {
             let full_path = self.full_path(file);
             if file_exists(&full_path) {
                 self.io.write_error3(
-                    format!("Reading {} from cache", full_path.display()),
+                    bconcat!("Reading ", full_path, " from cache"),
                     true,
                     crate::io::DEBUG,
                 );
@@ -156,7 +153,7 @@ impl Cache {
             let dest = self.full_path(file);
 
             self.io.write_error3(
-                format!("Writing {} into cache", dest.display()),
+                bconcat!("Writing ", dest, " into cache"),
                 true,
                 crate::io::DEBUG,
             );
@@ -188,15 +185,20 @@ impl Cache {
                     }
 
                     self.io.write_error3(
-                        format!("<warning>Failed to write into cache: {}</warning>", e),
+                        bconcat!(
+                            "<warning>Failed to write into cache: ",
+                            display_to_bytes(&e),
+                            "</warning>"
+                        ),
                         true,
                         crate::io::DEBUG,
                     );
+                    let last_error = display_to_bytes(&e);
                     if let Some(m) = preg_match(
                         php_regex!(
                             r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}"
                         ),
-                        &e.to_string(),
+                        &last_error,
                     ) {
                         // Remove partial file.
                         let _ = unlink(&temp_file_name);
@@ -204,14 +206,18 @@ impl Cache {
                         let free_space = disk_free_space(path_from_bytes(&dirname(path_to_bytes(
                             &temp_file_name,
                         ))))
-                        .map(|space| space.to_string())
+                        .map(display_to_bytes)
                         .unwrap_or_default();
-                        let message = format!(
-                            "<warning>Writing {} into cache failed after {} of {} bytes written, only {} bytes of free space available</warning>",
-                            temp_file_name.display(),
-                            m.get(1).unwrap_or_default().display_lossy(),
-                            m.get(2).unwrap_or_default().display_lossy(),
+                        let message = bconcat!(
+                            "<warning>Writing ",
+                            temp_file_name,
+                            " into cache failed after ",
+                            m.get(1).unwrap_or_default(),
+                            " of ",
+                            m.get(2).unwrap_or_default(),
+                            " bytes written, only ",
                             free_space,
+                            " bytes of free space available</warning>"
                         );
 
                         self.io.write_error(&message);
@@ -238,16 +244,14 @@ impl Cache {
                 .ensure_directory_exists(path_from_bytes(&dirname(path_to_bytes(&full_path))));
 
             if !file_exists(source) {
-                self.io.write_error(format!(
-                    "<error>{} does not exist, can not write into cache</error>",
-                    source.display(),
+                self.io.write_error(bconcat!(
+                    "<error>",
+                    source,
+                    " does not exist, can not write into cache</error>"
                 ));
             } else if self.io.is_debug() {
-                self.io.write_error(format!(
-                    "Writing {} into cache from {}",
-                    full_path.display(),
-                    source.display()
-                ));
+                self.io
+                    .write_error(bconcat!("Writing ", full_path, " into cache from ", source));
             }
 
             return self
@@ -276,7 +280,7 @@ impl Cache {
                 }
 
                 self.io.write_error3(
-                    format!("Reading {} from cache", full_path.display()),
+                    bconcat!("Reading ", full_path, " from cache"),
                     true,
                     crate::io::DEBUG,
                 );
@@ -366,12 +370,12 @@ impl Cache {
 
         if self.is_enabled() && !self.read_only {
             let expire = Utc::now() - chrono::Duration::seconds(ttl);
-            let expire_str = format!(
-                "until {}",
-                expire.format(date_format_to_strftime(b"Y-m-d H:i:s"))
+            let expire_str = bconcat!(
+                "until ",
+                display_to_bytes(expire.format(date_format_to_strftime(b"Y-m-d H:i:s")))
             );
 
-            for file in self.gc_outdated_files(&expire_str) {
+            for file in self.gc_outdated_files(expire_str.as_bstr()) {
                 let _ = self.filesystem.borrow_mut().unlink(&file);
             }
 
@@ -395,7 +399,7 @@ impl Cache {
     }
 
     /// Files matching `get_finder().date(...)`. Honours the [`CacheMock`] seam when set.
-    fn gc_outdated_files(&self, expire_str: &str) -> Vec<std::path::PathBuf> {
+    fn gc_outdated_files(&self, expire_str: &BStr) -> Vec<std::path::PathBuf> {
         if let Some(mock) = &self.mock
             && let Some(finder) = &mock.finder
         {

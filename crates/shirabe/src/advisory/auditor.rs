@@ -10,7 +10,8 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, bconcat, get_class, json_bytes, php_str, preg_is_match,
+    array_keys, array_reduce, bconcat, display_to_bytes, get_class, json_bytes, php_str,
+    preg_is_match,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::helper::Cell;
@@ -91,11 +92,11 @@ impl Auditor {
         Self::FORMAT_SUMMARY,
     ];
 
-    pub const ABANDONED_IGNORE: &'static str = "ignore";
-    pub const ABANDONED_REPORT: &'static str = "report";
-    pub const ABANDONED_FAIL: &'static str = "fail";
+    pub const ABANDONED_IGNORE: &'static BStr = php_str(b"ignore");
+    pub const ABANDONED_REPORT: &'static BStr = php_str(b"report");
+    pub const ABANDONED_FAIL: &'static BStr = php_str(b"fail");
 
-    pub const ABANDONEDS: [&'static str; 3] = [
+    pub const ABANDONEDS: [&'static BStr; 3] = [
         Self::ABANDONED_IGNORE,
         Self::ABANDONED_REPORT,
         Self::ABANDONED_FAIL,
@@ -195,15 +196,19 @@ impl Auditor {
             return Ok(audit_bitmask);
         }
 
-        let error_or_warn = if warning_only { "warning" } else { "error" };
+        let error_or_warn = BStr::new(if warning_only { "warning" } else { "error" });
         if affected_packages_count > 0 || !ignored_advisories.is_empty() {
             let passes: Vec<(
                 &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-                &str,
-                &str,
+                &BStr,
+                &BStr,
             )> = vec![
-                (&ignored_advisories, "info", "ignored "),
-                (&advisories, error_or_warn, ""),
+                (
+                    &ignored_advisories,
+                    BStr::new("info"),
+                    BStr::new("ignored "),
+                ),
+                (&advisories, error_or_warn, BStr::new("")),
             ];
             for (advisories_to_output, tag, ignored) in passes {
                 let (pkg_count, total_advisory_count) = self.count_advisories(advisories_to_output);
@@ -215,8 +220,23 @@ impl Auditor {
                     };
                     let pkg_plurality = if pkg_count == 1 { "" } else { "s" };
                     let punctuation = if format == "summary" { "." } else { ":" };
-                    io.write_error(format!(
-                        "<{tag}>Found {total_advisory_count} {ignored}security vulnerability advisor{plurality} affecting {pkg_count} package{pkg_plurality}{punctuation}</{tag}>"
+                    io.write_error(bconcat!(
+                        "<",
+                        tag,
+                        ">Found ",
+                        total_advisory_count,
+                        " ",
+                        ignored,
+                        "security vulnerability advisor",
+                        plurality,
+                        " affecting ",
+                        pkg_count,
+                        " package",
+                        pkg_plurality,
+                        punctuation,
+                        "</",
+                        tag,
+                        ">"
                     ));
                     self.output_advisories(io, advisories_to_output, format)?;
                 }
@@ -232,7 +252,7 @@ impl Auditor {
         if !unreachable_repos.is_empty() {
             io.write_error("<warning>The following repositories were unreachable:</warning>");
             for repo in &unreachable_repos {
-                io.write_error(format!("  - {}", repo.display_lossy()));
+                io.write_error(bconcat!("  - ", repo));
             }
         }
 
@@ -275,15 +295,14 @@ impl Auditor {
         packages: &[PackageInterfaceHandle],
         ignore_abandoned: &IndexMap<BString, Option<BString>>,
     ) -> anyhow::Result<Vec<CompletePackageInterfaceHandle>> {
-        let mut filter: Option<String> = None;
+        let mut filter: Option<BString> = None;
         if !ignore_abandoned.is_empty() {
             filter = Some(
                 base_package::package_names_to_regexp(
                     &array_keys(ignore_abandoned),
                     BStr::new("{^(?:%s)$}iD"),
                 )
-                .display_lossy()
-                .to_string(),
+                .to_owned(),
             );
         }
 
@@ -428,9 +447,9 @@ impl Auditor {
                         .map(|buffer_io| &buffer_io.inner)
                 });
                 if io_as_console.is_none() {
-                    return Err(InvalidArgumentException::new(format!(
-                        "Cannot use table format with {}",
-                        get_class(&PhpMixed::Null).display_lossy()
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        "Cannot use table format with ",
+                        get_class(&PhpMixed::Null)
                     ))
                     .into());
                 }
@@ -444,11 +463,9 @@ impl Auditor {
                 Ok(())
             }
             _ if format == Self::FORMAT_SUMMARY => Ok(()),
-            _ => Err(InvalidArgumentException::new(format!(
-                "Invalid format \"{}\".",
-                format.display_lossy()
-            ))
-            .into()),
+            _ => Err(
+                InvalidArgumentException::new(bconcat!("Invalid format \"", format, "\".")).into(),
+            ),
         }
     }
 
@@ -459,15 +476,15 @@ impl Auditor {
     ) -> anyhow::Result<()> {
         for package_advisories in advisories.values() {
             for advisory in package_advisories {
-                let mut headers: Vec<String> = vec![
-                    "Package".to_string(),
-                    "Severity".to_string(),
-                    "Advisory ID".to_string(),
-                    "CVE".to_string(),
-                    "Title".to_string(),
-                    "URL".to_string(),
-                    "Affected versions".to_string(),
-                    "Reported at".to_string(),
+                let mut headers: Vec<BString> = vec![
+                    BString::from("Package"),
+                    BString::from("Severity"),
+                    BString::from("Advisory ID"),
+                    BString::from("CVE"),
+                    BString::from("Title"),
+                    BString::from("URL"),
+                    BString::from("Affected versions"),
+                    BString::from("Reported at"),
                 ];
                 let sa = advisory
                     .as_security_advisory()
@@ -480,10 +497,10 @@ impl Auditor {
                     sa.title.clone(),
                     self.get_url(sa),
                     sa.affected_versions().get_pretty_string(),
-                    BString::from(sa.reported_at.format(DATE_ATOM).to_string()),
+                    display_to_bytes(sa.reported_at.format(DATE_ATOM)),
                 ];
                 if let Some(ignored) = advisory.as_ignored() {
-                    headers.push("Ignore reason".to_string());
+                    headers.push(BString::from("Ignore reason"));
                     row.push(
                         ignored
                             .ignore_reason
@@ -516,45 +533,37 @@ impl Auditor {
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         advisories: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> anyhow::Result<()> {
-        let mut error: Vec<String> = vec![];
+        let mut error: Vec<BString> = vec![];
         let mut first_advisory = true;
         for package_advisories in advisories.values() {
             for advisory in package_advisories {
                 if !first_advisory {
-                    error.push("--------".to_string());
+                    error.push(BString::from("--------"));
                 }
                 let sa = advisory
                     .as_security_advisory()
                     .expect("output_advisories_plain only receives full advisories");
-                error.push(format!("Package: {}", sa.package_name().display_lossy()));
-                error.push(format!(
-                    "Severity: {}",
-                    self.get_severity(sa).display_lossy()
-                ));
-                error.push(format!(
-                    "Advisory ID: {}",
-                    self.get_advisory_id(sa).display_lossy()
-                ));
-                error.push(format!("CVE: {}", self.get_cve(sa).display_lossy()));
-                error.push(format!(
-                    "Title: {}",
-                    OutputFormatter::escape(&sa.title)?.display_lossy()
-                ));
-                error.push(format!("URL: {}", self.get_url(sa).display_lossy()));
-                error.push(format!(
-                    "Affected versions: {}",
+                error.push(bconcat!("Package: ", sa.package_name()));
+                error.push(bconcat!("Severity: ", self.get_severity(sa)));
+                error.push(bconcat!("Advisory ID: ", self.get_advisory_id(sa)));
+                error.push(bconcat!("CVE: ", self.get_cve(sa)));
+                error.push(bconcat!("Title: ", OutputFormatter::escape(&sa.title)?));
+                error.push(bconcat!("URL: ", self.get_url(sa)));
+                error.push(bconcat!(
+                    "Affected versions: ",
                     OutputFormatter::escape(sa.affected_versions().get_pretty_string())?
-                        .display_lossy()
                 ));
-                error.push(format!("Reported at: {}", sa.reported_at.format(DATE_ATOM)));
+                error.push(bconcat!(
+                    "Reported at: ",
+                    display_to_bytes(sa.reported_at.format(DATE_ATOM))
+                ));
                 if let Some(ignored) = advisory.as_ignored() {
-                    error.push(format!(
-                        "Ignore reason: {}",
+                    error.push(bconcat!(
+                        "Ignore reason: ",
                         ignored
                             .ignore_reason
                             .clone()
                             .unwrap_or_else(|| BString::from("None specified"))
-                            .display_lossy()
                     ));
                 }
                 first_advisory = false;
@@ -573,10 +582,12 @@ impl Auditor {
         packages: &[CompletePackageInterfaceHandle],
         format: &BStr,
     ) -> anyhow::Result<()> {
-        io.write_error(format!(
-            "<error>Found {} abandoned package{}:</error>",
+        io.write_error(bconcat!(
+            "<error>Found ",
             packages.len() as i64,
+            " abandoned package",
             if packages.len() > 1 { "s" } else { "" },
+            ":</error>"
         ));
 
         if format == Self::FORMAT_PLAIN {
@@ -584,13 +595,13 @@ impl Auditor {
                 let replacement = if pkg.get_replacement_package().is_some() {
                     bconcat!("Use ", pkg.get_replacement_package().unwrap(), " instead")
                 } else {
-                    bstr::BString::from("No replacement was suggested".to_string())
+                    BString::from("No replacement was suggested")
                 };
-                io.write_error(format!(
-                    "{} is abandoned. {}.",
-                    self.get_package_name_with_link(pkg.clone().into())
-                        .display_lossy(),
-                    replacement.display_lossy(),
+                io.write_error(bconcat!(
+                    self.get_package_name_with_link(pkg.clone().into()),
+                    " is abandoned. ",
+                    replacement,
+                    "."
                 ));
             }
 
@@ -607,9 +618,9 @@ impl Auditor {
                 .map(|buffer_io| &buffer_io.inner)
         });
         if io_as_console.is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Cannot use table format with {}",
-                get_class(&PhpMixed::Null).display_lossy()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Cannot use table format with ",
+                get_class(&PhpMixed::Null)
             ))
             .into());
         }
@@ -617,8 +628,8 @@ impl Auditor {
         let mut table = io_as_console.unwrap().get_table();
         table
             .set_headers(vec![
-                "Abandoned Package".to_string().into(),
-                "Suggested Replacement".to_string().into(),
+                BString::from("Abandoned Package").into(),
+                BString::from("Suggested Replacement").into(),
             ])
             .set_column_width(1, 80)
             .set_column_max_width(1, 80);

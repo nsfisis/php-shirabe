@@ -400,7 +400,7 @@ fn test_audit() {
     struct Case {
         packages: Vec<PackageInterfaceHandle>,
         warning_only: bool,
-        abandoned: &'static str,
+        abandoned: &'static BStr,
         format: &'static BStr,
         ignore_abandoned: IndexMap<BString, Option<BString>>,
         expected: i64,

@@ -47,7 +47,7 @@ impl PartialSecurityAdvisory {
                 match parser.parse_constraints(&affected_version) {
                     Ok(c) => c,
                     Err(_) => {
-                        SimpleConstraint::new("==", "0.0.0-invalid-version".to_string(), None)
+                        SimpleConstraint::new("==", BString::from("0.0.0-invalid-version"), None)
                             .into()
                     }
                 }

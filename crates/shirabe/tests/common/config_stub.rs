@@ -18,7 +18,7 @@ pub struct ConfigStubBuilder {
     base_dir: Option<String>,
     // Config values to seed, applied via Config::merge under the `config` section.
     values: IndexMap<BString, PhpMixed>,
-    source: String,
+    source: bstr::BString,
 }
 
 impl Default for ConfigStubBuilder {
@@ -27,7 +27,7 @@ impl Default for ConfigStubBuilder {
             use_environment: false,
             base_dir: None,
             values: IndexMap::new(),
-            source: Config::SOURCE_UNKNOWN.to_string(),
+            source: Config::SOURCE_UNKNOWN.to_owned(),
         }
     }
 }

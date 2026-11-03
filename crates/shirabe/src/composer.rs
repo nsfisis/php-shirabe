@@ -11,31 +11,33 @@ use crate::package::{LockerInterface, RootPackageInterfaceHandle};
 use crate::plugin::PluginManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
-use bstr::BString;
-use shirabe_php_shim::{bconcat, php_regex, preg_is_match};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{bconcat, php_regex, php_str, preg_is_match};
 
 /// The Composer version this port tracks. Kept as-is so `Composer::VERSION`, the `composer`
 /// platform package and the HTTP User-Agent keep reporting a value plugins and servers can
 /// interpret. What Shirabe calls itself is `SHIRABE_VERSION`.
-pub const VERSION: &str = "2.9.7";
-pub const BRANCH_ALIAS_VERSION: &str = "";
-pub const RELEASE_DATE: &str = "2026-04-14 13:31:52";
-pub const SOURCE_VERSION: &str = "";
-pub const RUNTIME_API_VERSION: &str = "2.2.2";
+pub const VERSION: &BStr = php_str(b"2.9.7");
+pub const BRANCH_ALIAS_VERSION: &BStr = php_str(b"");
+pub const RELEASE_DATE: &BStr = php_str(b"2026-04-14 13:31:52");
+pub const SOURCE_VERSION: &BStr = php_str(b"");
+pub const RUNTIME_API_VERSION: &BStr = php_str(b"2.2.2");
 
 /// What Shirabe reports as its own version: the package version of a release build, or
 /// `<package version>+<commit hash>` for a development build, the way Composer's phar reports a
 /// snapshot build through `getVersion()`. Baked in by `build.rs`.
-pub const SHIRABE_VERSION: &str = include!(concat!(env!("OUT_DIR"), "/shirabe_version.rs"));
+pub const SHIRABE_VERSION: &BStr =
+    php_str(include!(concat!(env!("OUT_DIR"), "/shirabe_version.rs")).as_bytes());
 
 /// The package version of a development build, which plays the role of Composer's branch alias,
 /// or empty for a release build. Baked in by `build.rs`.
-pub const SHIRABE_BRANCH_ALIAS_VERSION: &str =
-    include!(concat!(env!("OUT_DIR"), "/shirabe_branch_alias_version.rs"));
+pub const SHIRABE_BRANCH_ALIAS_VERSION: &BStr =
+    php_str(include!(concat!(env!("OUT_DIR"), "/shirabe_branch_alias_version.rs")).as_bytes());
 
 /// The UTC date of the commit this build was made from. Baked in by `build.rs`, the way Composer's
 /// Compiler stamps `RELEASE_DATE` when it builds the phar.
-pub const SHIRABE_RELEASE_DATE: &str = include!(concat!(env!("OUT_DIR"), "/release_date.rs"));
+pub const SHIRABE_RELEASE_DATE: &BStr =
+    php_str(include!(concat!(env!("OUT_DIR"), "/release_date.rs")).as_bytes());
 
 /// The deadline after which a development build reports itself as outdated, or `None` for a
 /// release build. Baked in by `build.rs`.

@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
     UnexpectedValueException, array_merge, bconcat, in_array_strict, json_encode_ex, php_regex,
-    preg_is_match,
+    php_str, preg_is_match,
 };
 
 /// ref: composer/vendor/psr/log/Psr/Log/LogLevel.php
@@ -16,14 +16,14 @@ use shirabe_php_shim::{
 pub struct LogLevel;
 
 impl LogLevel {
-    pub const EMERGENCY: &'static str = "emergency";
-    pub const ALERT: &'static str = "alert";
-    pub const CRITICAL: &'static str = "critical";
-    pub const ERROR: &'static str = "error";
-    pub const WARNING: &'static str = "warning";
-    pub const NOTICE: &'static str = "notice";
-    pub const INFO: &'static str = "info";
-    pub const DEBUG: &'static str = "debug";
+    pub const EMERGENCY: &'static BStr = php_str(b"emergency");
+    pub const ALERT: &'static BStr = php_str(b"alert");
+    pub const CRITICAL: &'static BStr = php_str(b"critical");
+    pub const ERROR: &'static BStr = php_str(b"error");
+    pub const WARNING: &'static BStr = php_str(b"warning");
+    pub const NOTICE: &'static BStr = php_str(b"notice");
+    pub const INFO: &'static BStr = php_str(b"info");
+    pub const DEBUG: &'static BStr = php_str(b"debug");
 }
 
 fn log_context(context: &[(&BStr, &BStr)]) -> IndexMap<BString, PhpMixed> {
@@ -86,10 +86,7 @@ pub trait BaseIO: IOInterface {
                 return;
             }
             self.write_error3(
-                format!(
-                    "<warning>Warning: You should avoid overwriting already defined auth settings for {}.</warning>",
-                    repository_name.display_lossy()
-                ),
+                bconcat!("<warning>Warning: You should avoid overwriting already defined auth settings for ", repository_name, ".</warning>"),
                 true,
                 io_interface::NORMAL,
             );
@@ -141,9 +138,9 @@ pub trait BaseIO: IOInterface {
                 {
                     <Self as BaseIO>::debug(
                         self,
-                        BStr::new(&format!(
-                            "{} is not in the configured github-domains, adding it implicitly as authentication is configured for this domain",
-                            domain.display_lossy()
+                        BStr::new(&bconcat!(
+                            domain,
+                            " is not in the configured github-domains, adding it implicitly as authentication is configured for this domain"
                         )),
                         &[],
                     );
@@ -159,10 +156,12 @@ pub trait BaseIO: IOInterface {
                 }
 
                 if !preg_is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), token_str.as_bstr()) {
-                    return Err(UnexpectedValueException::new(format!(
-                        "Your github oauth token for {} contains invalid characters: \"{}\"",
-                        domain.display_lossy(),
-                        token_str.display_lossy()
+                    return Err(UnexpectedValueException::new(bconcat!(
+                        "Your github oauth token for ",
+                        domain,
+                        " contains invalid characters: \"",
+                        token_str,
+                        "\""
                     ))
                     .into());
                 }
@@ -188,9 +187,9 @@ pub trait BaseIO: IOInterface {
                 {
                     <Self as BaseIO>::debug(
                         self,
-                        BStr::new(&format!(
-                            "{} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain",
-                            domain.display_lossy()
+                        BStr::new(&bconcat!(
+                            domain,
+                            " is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
                         )),
                         &[],
                     );
@@ -232,9 +231,9 @@ pub trait BaseIO: IOInterface {
                 {
                     <Self as BaseIO>::debug(
                         self,
-                        BStr::new(&format!(
-                            "{} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain",
-                            domain.display_lossy()
+                        BStr::new(&bconcat!(
+                            domain,
+                            " is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
                         )),
                         &[],
                     );
@@ -284,9 +283,9 @@ pub trait BaseIO: IOInterface {
                 ) {
                     <Self as BaseIO>::debug(
                         self,
-                        BStr::new(&format!(
-                            "{} is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain",
-                            domain.display_lossy()
+                        BStr::new(&bconcat!(
+                            domain,
+                            " is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain"
                         )),
                         &[],
                     );
@@ -383,10 +382,7 @@ pub trait BaseIO: IOInterface {
                     }
 
                     if !ssl_options.contains_key(B("local_cert")) {
-                        self.write_error3(format!(
-                            "<warning>Warning: Client certificate configuration is missing key `local_cert` for {}.</warning>",
-                            domain.display_lossy()
-                        ), true, io_interface::NORMAL);
+                        self.write_error3(bconcat!("<warning>Warning: Client certificate configuration is missing key `local_cert` for ", domain, ".</warning>"), true, io_interface::NORMAL);
                         continue;
                     }
 
@@ -438,7 +434,7 @@ pub trait BaseIO: IOInterface {
         self.log(LogLevel::DEBUG, message, context);
     }
 
-    fn log(&self, level: &str, message: &BStr, context: &[(&BStr, &BStr)]) {
+    fn log(&self, level: &BStr, message: &BStr, context: &[(&BStr, &BStr)]) {
         let mut message_str = BString::from(message);
 
         if !context.is_empty() {
@@ -451,10 +447,14 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        if matches!(
-            level,
-            LogLevel::EMERGENCY | LogLevel::ALERT | LogLevel::CRITICAL | LogLevel::ERROR
-        ) {
+        if [
+            LogLevel::EMERGENCY,
+            LogLevel::ALERT,
+            LogLevel::CRITICAL,
+            LogLevel::ERROR,
+        ]
+        .contains(&level)
+        {
             self.write_error3(
                 bconcat!("<error>", message_str, "</error>"),
                 true,

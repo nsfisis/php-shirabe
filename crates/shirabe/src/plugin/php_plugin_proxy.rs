@@ -1179,11 +1179,11 @@ fn dispatch_config_method(
             .to_plugin_value()),
         "merge" => {
             let values = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
-            let source = arg_or::<String>(
+            let source = arg_or::<BString>(
                 method_name,
                 args,
                 1,
-                crate::config::Config::SOURCE_UNKNOWN.to_string(),
+                crate::config::Config::SOURCE_UNKNOWN.to_owned(),
             )?;
             config.borrow_mut().merge(&values, &source);
             Ok(PluginValue::Null)

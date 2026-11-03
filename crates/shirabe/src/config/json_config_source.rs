@@ -7,7 +7,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PHP_EOL, PhpMixed, RuntimeException, bconcat, chmod, explode, file_get_contents,
-    file_put_contents, implode, is_writable, path_to_bytes,
+    file_put_contents, implode, is_writable, path_to_bytes, php_str,
 };
 
 /// JSON Configuration Source
@@ -30,17 +30,19 @@ impl JsonConfigSource {
         let contents;
         if self.file.borrow().exists() {
             if !is_writable(self.file.borrow().get_path()) {
-                return Err(RuntimeException::new(format!(
-                    "The file \"{}\" is not writable.",
-                    self.file.borrow().get_path().display(),
+                return Err(RuntimeException::new(bconcat!(
+                    "The file \"",
+                    self.file.borrow().get_path(),
+                    "\" is not writable."
                 ))
                 .into());
             }
 
             if !Filesystem::is_readable(self.file.borrow().get_path()) {
-                return Err(RuntimeException::new(format!(
-                    "The file \"{}\" is not readable.",
-                    self.file.borrow().get_path().display(),
+                return Err(RuntimeException::new(bconcat!(
+                    "The file \"",
+                    self.file.borrow().get_path(),
+                    "\" is not readable."
                 ))
                 .into());
             }
@@ -85,7 +87,7 @@ impl JsonConfigSource {
                     && inner.is_empty()
                 {
                     // PHP: $config[$prop] = new \stdClass;
-                    map.insert(prop.to_string().into(), PhpMixed::Object(IndexMap::new()));
+                    map.insert(bconcat!(prop), PhpMixed::Object(IndexMap::new()));
                 }
             }
             for prop in ["psr-0", "psr-4"] {
@@ -95,16 +97,14 @@ impl JsonConfigSource {
                         && let Some(PhpMixed::Array(inner_map)) = autoload_map.get(B(prop))
                         && inner_map.is_empty()
                     {
-                        autoload_map
-                            .insert(prop.to_string().into(), PhpMixed::Object(IndexMap::new()));
+                        autoload_map.insert(bconcat!(prop), PhpMixed::Object(IndexMap::new()));
                     }
                     if let Some(autoload_dev) = map.get_mut(B("autoload-dev"))
                         && let PhpMixed::Array(autoload_dev_map) = autoload_dev
                         && let Some(PhpMixed::Array(inner_map)) = autoload_dev_map.get(B(prop))
                         && inner_map.is_empty()
                     {
-                        autoload_dev_map
-                            .insert(prop.to_string().into(), PhpMixed::Object(IndexMap::new()));
+                        autoload_dev_map.insert(bconcat!(prop), PhpMixed::Object(IndexMap::new()));
                     }
                 }
             }
@@ -125,7 +125,7 @@ impl JsonConfigSource {
                     && let Some(PhpMixed::Array(inner_map)) = cfg_map.get(B(prop))
                     && inner_map.is_empty()
                 {
-                    cfg_map.insert(prop.to_string().into(), PhpMixed::Object(IndexMap::new()));
+                    cfg_map.insert(bconcat!(prop), PhpMixed::Object(IndexMap::new()));
                 }
             }
             self.file.borrow().write(config)?;
@@ -260,16 +260,16 @@ impl JsonConfigSource {
     }
 
     fn is_auth_config_key(key: &BStr) -> bool {
-        const PREFIXES: &[&str] = &[
-            "bitbucket-oauth.",
-            "github-oauth.",
-            "gitlab-oauth.",
-            "gitlab-token.",
-            "bearer.",
-            "http-basic.",
-            "custom-headers.",
-            "forgejo-token.",
-            "platform.",
+        const PREFIXES: &[&BStr] = &[
+            php_str(b"bitbucket-oauth."),
+            php_str(b"github-oauth."),
+            php_str(b"gitlab-oauth."),
+            php_str(b"gitlab-token."),
+            php_str(b"bearer."),
+            php_str(b"http-basic."),
+            php_str(b"custom-headers."),
+            php_str(b"forgejo-token."),
+            php_str(b"platform."),
         ];
         PREFIXES.iter().any(|p| key.starts_with(p.as_bytes()))
     }
@@ -388,9 +388,10 @@ impl ConfigSourceInterface for JsonConfigSource {
                     }
                 }
                 let Some(index_to_insert) = index_to_insert else {
-                    return Err(RuntimeException::new(format!(
-                        "The referenced repository \"{}\" does not exist.",
-                        reference_name.display_lossy(),
+                    return Err(RuntimeException::new(bconcat!(
+                        "The referenced repository \"",
+                        reference_name,
+                        "\" does not exist."
                     ))
                     .into());
                 };

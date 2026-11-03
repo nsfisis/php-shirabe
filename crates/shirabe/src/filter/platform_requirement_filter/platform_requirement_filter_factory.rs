@@ -7,7 +7,7 @@ use crate::filter::platform_requirement_filter::{
     platform_requirement_filter_interface::PlatformRequirementFilterInterface,
 };
 use bstr::BString;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, get_debug_type};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat, get_debug_type};
 
 pub struct PlatformRequirementFilterFactory;
 
@@ -39,10 +39,12 @@ impl PlatformRequirementFilterFactory {
                     list,
                 )?))
             }
-            other => Err(InvalidArgumentException::new(format!(
-                "PlatformRequirementFilter: Unknown $boolOrList parameter {}. Please report at https://github.com/nsfisis/php-shirabe/issues/new.",
-                get_debug_type(&other).display_lossy()
-            )).into()),
+            other => Err(InvalidArgumentException::new(bconcat!(
+                "PlatformRequirementFilter: Unknown $boolOrList parameter ",
+                get_debug_type(&other),
+                ". Please report at https://github.com/nsfisis/php-shirabe/issues/new."
+            ))
+            .into()),
         }
     }
 

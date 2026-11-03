@@ -605,7 +605,7 @@ fn test_audit() {
     assert!(result.contains_key(B("abandoned")));
     assert!(result.contains_key(B("ignore")));
     assert_eq!(
-        Some(&PhpMixed::string(Auditor::ABANDONED_FAIL.to_string())),
+        Some(&PhpMixed::string(Auditor::ABANDONED_FAIL.to_owned())),
         result.get(B("abandoned"))
     );
     assert_eq!(
@@ -620,7 +620,7 @@ fn test_audit() {
     assert!(result.contains_key(B("abandoned")));
     assert!(result.contains_key(B("ignore")));
     assert_eq!(
-        Some(&PhpMixed::string(Auditor::ABANDONED_IGNORE.to_string())),
+        Some(&PhpMixed::string(Auditor::ABANDONED_IGNORE.to_owned())),
         result.get(B("abandoned"))
     );
     assert_eq!(

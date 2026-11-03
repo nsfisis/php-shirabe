@@ -4,7 +4,7 @@ use crate::advisory::Auditor;
 use crate::config::Config;
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat, canonical_int_key};
 
 #[derive(Debug, Clone)]
 pub struct AuditConfig {
@@ -105,10 +105,14 @@ impl AuditConfig {
                         .map(BString::from);
 
                     if !["audit", "block", "all"].iter().any(|a| apply == *a) {
-                        return Err(InvalidArgumentException::new(format!(
-                            "Invalid 'apply' value for '{}': {}. Expected 'audit', 'block', or 'all'.",
-                            key.display_lossy(), apply.display_lossy()
-                        )).into());
+                        return Err(InvalidArgumentException::new(bconcat!(
+                            "Invalid 'apply' value for '",
+                            key,
+                            "': ",
+                            apply,
+                            ". Expected 'audit', 'block', or 'all'."
+                        ))
+                        .into());
                     }
 
                     (key.clone(), apply, reason)
@@ -163,7 +167,7 @@ impl AuditConfig {
             audit_config
                 .and_then(|m| m.get(B("abandoned")))
                 .and_then(|v| v.as_string())
-                .unwrap_or(Auditor::ABANDONED_FAIL.into()),
+                .unwrap_or(Auditor::ABANDONED_FAIL),
         );
 
         let block_insecure = audit_config

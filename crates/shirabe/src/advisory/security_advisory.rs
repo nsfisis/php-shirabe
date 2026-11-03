@@ -11,7 +11,7 @@ fn serialize_date_rfc3339<S: serde::Serializer>(
     dt: &DateTime<Utc>,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(&dt.format(DATE_RFC3339).to_string())
+    serializer.collect_str(&dt.format(DATE_RFC3339))
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
