@@ -4,7 +4,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
@@ -12,7 +12,9 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::git::Git;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{CommandLine, MockExpectation, MockHandler, ProcessExecutor};
-use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException};
+use shirabe_php_shim::{
+    Catch as _, PhpMixed, RuntimeException, bconcat, display_to_bytes, path_from_bytes,
+};
 
 // No-op ConfigSourceInterface, equivalent to PHPUnit's
 // `getMockBuilder(Config::class)` auto-stubbing getConfigSource/getAuthConfigSource:
@@ -85,15 +87,15 @@ fn build_git(
     Git::new(io, config, process, fs)
 }
 
-fn mock_config(protocol: &str) -> Config {
+fn mock_config(protocol: &BStr) -> Config {
     ConfigStubBuilder::new()
         .with(
             "github-domains",
-            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("github.com"))]),
         )
         .with(
             "github-protocols",
-            PhpMixed::List(vec![PhpMixed::string(protocol.to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(bconcat!(protocol))]),
         )
         .build()
 }
@@ -102,15 +104,15 @@ fn mock_sync_mirror_config() -> Config {
     ConfigStubBuilder::new()
         .with(
             "github-domains",
-            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("github.com"))]),
         )
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("gitlab.com"))]),
         )
         .with(
             "github-protocols",
-            PhpMixed::List(vec![PhpMixed::string("https".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("https"))]),
         )
         .build()
 }
@@ -122,10 +124,10 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_ssh() {
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> =
         Box::new(move |url: &bstr::BStr| {
             assert_eq!(expected_url, url);
-            CommandLine::Shell(bstr::BString::from("git command".to_string()))
+            CommandLine::Shell(BString::from("git command"))
         });
 
-    let config = mock_config("ssh");
+    let config = mock_config(BStr::new("ssh"));
 
     let (process, _guard) =
         get_process_executor_mock(vec![cmd("git command")], true, MockHandler::default());
@@ -149,10 +151,10 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_https() {
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> =
         Box::new(move |url: &bstr::BStr| {
             assert_eq!(expected_url, url);
-            CommandLine::Shell(bstr::BString::from("git command".to_string()))
+            CommandLine::Shell(BString::from("git command"))
         });
 
-    let config = mock_config("https");
+    let config = mock_config(BStr::new("https"));
 
     let (process, _guard) =
         get_process_executor_mock(vec![cmd("git command")], true, MockHandler::default());
@@ -174,10 +176,10 @@ fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive
  {
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> = Box::new(|url: &bstr::BStr| {
         assert_eq!("https://github.com/acme/repo", url);
-        CommandLine::Shell(bstr::BString::from("git command".to_string()))
+        CommandLine::Shell(BString::from("git command"))
     });
 
-    let config = mock_config("https");
+    let config = mock_config(BStr::new("https"));
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -204,19 +206,19 @@ fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive
 
 // privateGithubWithCredentialsProvider helper.
 fn run_command_private_github_with_authentication(
-    git_url: &str,
-    protocol: &str,
-    git_hub_token: &str,
-    expected_url: &str,
+    git_url: &BStr,
+    protocol: &BStr,
+    git_hub_token: &BStr,
+    expected_url: &BStr,
     expected_failures_before_success: usize,
 ) {
-    let expected_url_owned = expected_url.to_string();
+    let expected_url_owned = bconcat!(expected_url);
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> =
         Box::new(move |url: &bstr::BStr| {
             if url != expected_url_owned {
-                return CommandLine::Shell(bstr::BString::from("git command failing".to_string()));
+                return CommandLine::Shell(BString::from("git command failing"));
             }
-            CommandLine::Shell(bstr::BString::from("git command ok".to_string()))
+            CommandLine::Shell(BString::from("git command ok"))
         });
 
     let config = mock_config(protocol);
@@ -246,7 +248,7 @@ fn run_command_private_github_with_authentication(
 
     let mut git = build_git(io, config, process);
 
-    git.__run_command(vec![command_callable], git_url.into(), None, true, ())
+    git.__run_command(vec![command_callable], git_url, None, true, ())
         .unwrap();
 }
 
@@ -254,10 +256,10 @@ fn run_command_private_github_with_authentication(
 fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive_with_authentication_ssh()
  {
     run_command_private_github_with_authentication(
-        "git@github.com:acme/repo.git",
-        "ssh",
-        "MY_GITHUB_TOKEN",
-        "https://token:MY_GITHUB_TOKEN@github.com/acme/repo.git",
+        BStr::new("git@github.com:acme/repo.git"),
+        BStr::new("ssh"),
+        BStr::new("MY_GITHUB_TOKEN"),
+        BStr::new("https://token:MY_GITHUB_TOKEN@github.com/acme/repo.git"),
         1,
     );
 }
@@ -266,39 +268,39 @@ fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive
 fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive_with_authentication_https()
  {
     run_command_private_github_with_authentication(
-        "https://github.com/acme/repo",
-        "https",
-        "MY_GITHUB_TOKEN",
-        "https://token:MY_GITHUB_TOKEN@github.com/acme/repo.git",
+        BStr::new("https://github.com/acme/repo"),
+        BStr::new("https"),
+        BStr::new("MY_GITHUB_TOKEN"),
+        BStr::new("https://token:MY_GITHUB_TOKEN@github.com/acme/repo.git"),
         2,
     );
 }
 
 // privateBitbucketWithCredentialsProvider helper.
 fn run_command_private_bitbucket_with_authentication(
-    git_url: &str,
-    bitbucket_token: Option<&str>,
-    expected_url: &str,
+    git_url: &BStr,
+    bitbucket_token: Option<&BStr>,
+    expected_url: &BStr,
     expected_failures_before_success: usize,
     bitbucket_git_auth_calls: usize,
 ) {
-    let expected_url_owned = expected_url.to_string();
+    let expected_url_owned = bconcat!(expected_url);
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> =
         Box::new(move |url: &bstr::BStr| {
             if url != expected_url_owned {
-                return CommandLine::Shell(bstr::BString::from("git command failing".to_string()));
+                return CommandLine::Shell(BString::from("git command failing"));
             }
-            CommandLine::Shell(bstr::BString::from("git command ok".to_string()))
+            CommandLine::Shell(BString::from("git command ok"))
         });
 
     let config = ConfigStubBuilder::new()
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("gitlab.com"))]),
         )
         .with(
             "github-domains",
-            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("github.com"))]),
         )
         .build();
 
@@ -335,7 +337,7 @@ fn run_command_private_bitbucket_with_authentication(
 
     let mut git = build_git(io, config, process);
 
-    git.__run_command(vec![command_callable], git_url.into(), None, true, ())
+    git.__run_command(vec![command_callable], git_url, None, true, ())
         .unwrap();
 }
 
@@ -343,9 +345,9 @@ fn run_command_private_bitbucket_with_authentication(
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_ssh_token()
  {
     run_command_private_bitbucket_with_authentication(
-        "git@bitbucket.org:acme/repo.git",
-        Some("MY_BITBUCKET_TOKEN"),
-        "https://token:MY_BITBUCKET_TOKEN@bitbucket.org/acme/repo.git",
+        BStr::new("git@bitbucket.org:acme/repo.git"),
+        Some(BStr::new("MY_BITBUCKET_TOKEN")),
+        BStr::new("https://token:MY_BITBUCKET_TOKEN@bitbucket.org/acme/repo.git"),
         1,
         0,
     );
@@ -355,9 +357,9 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_https_token()
  {
     run_command_private_bitbucket_with_authentication(
-        "https://bitbucket.org/acme/repo",
-        Some("MY_BITBUCKET_TOKEN"),
-        "https://token:MY_BITBUCKET_TOKEN@bitbucket.org/acme/repo.git",
+        BStr::new("https://bitbucket.org/acme/repo"),
+        Some(BStr::new("MY_BITBUCKET_TOKEN")),
+        BStr::new("https://token:MY_BITBUCKET_TOKEN@bitbucket.org/acme/repo.git"),
         1,
         0,
     );
@@ -367,9 +369,9 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_https_git_token()
  {
     run_command_private_bitbucket_with_authentication(
-        "https://bitbucket.org/acme/repo.git",
-        Some("MY_BITBUCKET_TOKEN"),
-        "https://token:MY_BITBUCKET_TOKEN@bitbucket.org/acme/repo.git",
+        BStr::new("https://bitbucket.org/acme/repo.git"),
+        Some(BStr::new("MY_BITBUCKET_TOKEN")),
+        BStr::new("https://token:MY_BITBUCKET_TOKEN@bitbucket.org/acme/repo.git"),
         1,
         0,
     );
@@ -379,9 +381,9 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_ssh_no_token()
  {
     run_command_private_bitbucket_with_authentication(
-        "git@bitbucket.org:acme/repo.git",
+        BStr::new("git@bitbucket.org:acme/repo.git"),
         None,
-        "git@bitbucket.org:acme/repo.git",
+        BStr::new("git@bitbucket.org:acme/repo.git"),
         0,
         0,
     );
@@ -391,9 +393,9 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_https_no_token()
  {
     run_command_private_bitbucket_with_authentication(
-        "https://bitbucket.org/acme/repo",
+        BStr::new("https://bitbucket.org/acme/repo"),
         None,
-        "git@bitbucket.org:acme/repo.git",
+        BStr::new("git@bitbucket.org:acme/repo.git"),
         1,
         1,
     );
@@ -403,9 +405,9 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_https_git_no_token()
  {
     run_command_private_bitbucket_with_authentication(
-        "https://bitbucket.org/acme/repo.git",
+        BStr::new("https://bitbucket.org/acme/repo.git"),
         None,
-        "git@bitbucket.org:acme/repo.git",
+        BStr::new("git@bitbucket.org:acme/repo.git"),
         1,
         1,
     );
@@ -415,9 +417,11 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interactive_with_authentication_atat_token()
  {
     run_command_private_bitbucket_with_authentication(
-        "https://bitbucket.org/acme/repo.git",
-        Some("ATAT_BITBUCKET_API_TOKEN"),
-        "https://x-bitbucket-api-token-auth:ATAT_BITBUCKET_API_TOKEN@bitbucket.org/acme/repo.git",
+        BStr::new("https://bitbucket.org/acme/repo.git"),
+        Some(BStr::new("ATAT_BITBUCKET_API_TOKEN")),
+        BStr::new(
+            "https://x-bitbucket-api-token-auth:ATAT_BITBUCKET_API_TOKEN@bitbucket.org/acme/repo.git",
+        ),
         1,
         0,
     );
@@ -425,27 +429,27 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_not_interacti
 
 // privateBitbucketWithOauthProvider helper.
 fn run_command_private_bitbucket_interactive_with_oauth(
-    git_url: &str,
-    expected_url: &str,
-    initial_config: Option<(&str, &str)>,
+    git_url: &BStr,
+    expected_url: &BStr,
+    initial_config: Option<(&BStr, &BStr)>,
 ) {
-    let expected_url_owned = expected_url.to_string();
+    let expected_url_owned = bconcat!(expected_url);
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> =
         Box::new(move |url: &bstr::BStr| {
             if url != expected_url_owned {
-                return CommandLine::Shell(bstr::BString::from("git command failing".to_string()));
+                return CommandLine::Shell(BString::from("git command failing"));
             }
-            CommandLine::Shell(bstr::BString::from("git command ok".to_string()))
+            CommandLine::Shell(BString::from("git command ok"))
         });
 
     let mut config = ConfigStubBuilder::new()
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("gitlab.com"))]),
         )
         .with(
             "github-domains",
-            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("github.com"))]),
         )
         .build();
     config.set_config_source(Box::new(NullConfigSource));
@@ -467,14 +471,14 @@ fn run_command_private_bitbucket_interactive_with_oauth(
 
     let (process, _guard) = get_process_executor_mock(expected_calls, true, MockHandler::default());
 
-    let mut hidden_answers: IndexMap<String, String> = IndexMap::new();
+    let mut hidden_answers: IndexMap<BString, BString> = IndexMap::new();
     hidden_answers.insert(
-        "Consumer Key (hidden): ".to_string(),
-        "my-consumer-key".to_string(),
+        BString::from("Consumer Key (hidden): "),
+        BString::from("my-consumer-key"),
     );
     hidden_answers.insert(
-        "Consumer Secret (hidden): ".to_string(),
-        "my-consumer-secret".to_string(),
+        BString::from("Consumer Secret (hidden): "),
+        BString::from("my-consumer-secret"),
     );
 
     let mut io = IOStub::new()
@@ -482,7 +486,7 @@ fn run_command_private_bitbucket_interactive_with_oauth(
         .with_ask_confirmation(true)
         .with_ask_and_hide_answer_responses(hidden_answers);
     if let Some((username, password)) = initial_config {
-        io = io.with_authentication("bitbucket.org", username, Some(password.to_string()));
+        io = io.with_authentication("bitbucket.org", username, Some(bconcat!(password)));
     }
 
     let (downloader, _http_guard) = get_http_downloader_mock(
@@ -500,15 +504,15 @@ fn run_command_private_bitbucket_interactive_with_oauth(
     let mut git = build_git(io, config, process);
     git.set_http_downloader(downloader);
 
-    git.__run_command(vec![command_callable], git_url.into(), None, true, ())
+    git.__run_command(vec![command_callable], git_url, None, true, ())
         .unwrap();
 }
 
 #[test]
 fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth_ssh() {
     run_command_private_bitbucket_interactive_with_oauth(
-        "git@bitbucket.org:acme/repo.git",
-        "https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git",
+        BStr::new("git@bitbucket.org:acme/repo.git"),
+        BStr::new("https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git"),
         None,
     );
 }
@@ -517,8 +521,8 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_w
 fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth_https_git()
  {
     run_command_private_bitbucket_interactive_with_oauth(
-        "https://bitbucket.org/acme/repo.git",
-        "https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git",
+        BStr::new("https://bitbucket.org/acme/repo.git"),
+        BStr::new("https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git"),
         None,
     );
 }
@@ -526,8 +530,8 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_w
 #[test]
 fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth_https() {
     run_command_private_bitbucket_interactive_with_oauth(
-        "https://bitbucket.org/acme/repo",
-        "https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git",
+        BStr::new("https://bitbucket.org/acme/repo"),
+        BStr::new("https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git"),
         None,
     );
 }
@@ -536,18 +540,21 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_w
 fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_with_oauth_preconfigured()
  {
     run_command_private_bitbucket_interactive_with_oauth(
-        "git@bitbucket.org:acme/repo.git",
-        "https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git",
-        Some(("someuseralsoswappedfortoken", "little green men")),
+        BStr::new("git@bitbucket.org:acme/repo.git"),
+        BStr::new("https://x-token-auth:my-access-token@bitbucket.org/acme/repo.git"),
+        Some((
+            BStr::new("someuseralsoswappedfortoken"),
+            BStr::new("little green men"),
+        )),
     );
 }
 
 #[test]
 fn test_sync_mirror_sanitizes_url_after_initial_clone() {
-    let non_existent_dir = std::env::temp_dir()
-        .join(format!("composer-test-nonexistent-{}", rand_hex()))
-        .display()
-        .to_string();
+    let non_existent_dir = bconcat!(std::env::temp_dir().join(path_from_bytes(&bconcat!(
+        "composer-test-nonexistent-",
+        rand_hex()
+    ))));
 
     let config = mock_sync_mirror_config();
 
@@ -555,12 +562,12 @@ fn test_sync_mirror_sanitizes_url_after_initial_clone() {
         vec![
             cmd_full(
                 vec![
-                    "git",
-                    "clone",
-                    "--mirror",
-                    "--",
-                    "https://user:secret@example.com/repo.git",
-                    &non_existent_dir,
+                    BStr::new("git"),
+                    BStr::new("clone"),
+                    BStr::new("--mirror"),
+                    BStr::new("--"),
+                    BStr::new("https://user:secret@example.com/repo.git"),
+                    non_existent_dir.as_bstr(),
                 ],
                 0,
                 "",
@@ -590,7 +597,7 @@ fn test_sync_mirror_sanitizes_url_after_initial_clone() {
     let result = git
         .sync_mirror(
             "https://user:secret@example.com/repo.git".into(),
-            std::path::Path::new(&non_existent_dir),
+            path_from_bytes(&non_existent_dir),
         )
         .unwrap();
 
@@ -599,7 +606,7 @@ fn test_sync_mirror_sanitizes_url_after_initial_clone() {
 
 #[test]
 fn test_sync_mirror_sanitizes_url_even_after_failed_update() {
-    let dir = std::env::temp_dir().display().to_string();
+    let dir = bconcat!(std::env::temp_dir());
 
     let config = mock_sync_mirror_config();
 
@@ -651,18 +658,18 @@ fn test_sync_mirror_sanitizes_url_even_after_failed_update() {
     let result = git
         .sync_mirror(
             "https://user:secret@example.com/repo.git".into(),
-            std::path::Path::new(&dir),
+            path_from_bytes(&dir),
         )
         .unwrap();
 
     assert!(!result);
 }
 
-fn rand_hex() -> String {
+fn rand_hex() -> BString {
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    format!("{:016x}", nanos as u64)
+    display_to_bytes(format_args!("{:016x}", nanos as u64))
 }

@@ -4,7 +4,7 @@
 // password hiding, line splitting and argument escaping. A few data points remain unportable —
 // see the individual `// TODO(async)` comments below.
 
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{ConsoleIO, IOInterface};
 use shirabe::util::process_executor::ProcessExecutor;
@@ -69,28 +69,41 @@ fn test_timeout() {
     ProcessExecutor::set_timeout(60_i64);
 }
 
-fn hide_password_provider() -> Vec<(&'static str, &'static str)> {
+fn hide_password_provider() -> Vec<(&'static BStr, &'static BStr)> {
     vec![
         (
-            "echo https://foo:bar@example.org/",
-            "echo https://foo:***@example.org/",
-        ),
-        ("echo http://foo@example.org", "echo http://foo@example.org"),
-        (
-            "echo http://abcdef1234567890234578:x-oauth-token@github.com/",
-            "echo http://***:***@github.com/",
+            BStr::new("echo https://foo:bar@example.org/"),
+            BStr::new("echo https://foo:***@example.org/"),
         ),
         (
-            "echo http://github_pat_1234567890abcdefghijkl_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW:x-oauth-token@github.com/",
-            "echo http://***:***@github.com/",
+            BStr::new("echo http://foo@example.org"),
+            BStr::new("echo http://foo@example.org"),
         ),
         (
-            "svn ls --verbose --non-interactive  --username 'foo' --password 'bar'  'https://foo.example.org/svn/'",
-            "svn ls --verbose --non-interactive  --username 'foo' --password '***'  'https://foo.example.org/svn/'",
+            BStr::new("echo http://abcdef1234567890234578:x-oauth-token@github.com/"),
+            BStr::new("echo http://***:***@github.com/"),
         ),
         (
-            "svn ls --verbose --non-interactive  --username 'foo' --password 'bar 'bar'  'https://foo.example.org/svn/'",
-            "svn ls --verbose --non-interactive  --username 'foo' --password '***'  'https://foo.example.org/svn/'",
+            BStr::new(
+                "echo http://github_pat_1234567890abcdefghijkl_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW:x-oauth-token@github.com/",
+            ),
+            BStr::new("echo http://***:***@github.com/"),
+        ),
+        (
+            BStr::new(
+                "svn ls --verbose --non-interactive  --username 'foo' --password 'bar'  'https://foo.example.org/svn/'",
+            ),
+            BStr::new(
+                "svn ls --verbose --non-interactive  --username 'foo' --password '***'  'https://foo.example.org/svn/'",
+            ),
+        ),
+        (
+            BStr::new(
+                "svn ls --verbose --non-interactive  --username 'foo' --password 'bar 'bar'  'https://foo.example.org/svn/'",
+            ),
+            BStr::new(
+                "svn ls --verbose --non-interactive  --username 'foo' --password '***'  'https://foo.example.org/svn/'",
+            ),
         ),
     ]
 }
@@ -99,15 +112,17 @@ fn hide_password_provider() -> Vec<(&'static str, &'static str)> {
 fn test_hide_passwords() {
     for (command, expected_command_output) in hide_password_provider() {
         let buffer = std::rc::Rc::new(std::cell::RefCell::new(
-            BufferIO::new(String::new(), VERBOSITY_DEBUG, None).unwrap(),
+            BufferIO::new(BString::default(), VERBOSITY_DEBUG, None).unwrap(),
         ));
         let process = ProcessExecutor::new(Some(
             buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
         ));
         let mut output = BString::default();
-        process.execute(command, &mut output, None).unwrap();
+        process
+            .execute(command.to_owned(), &mut output, None)
+            .unwrap();
         assert_eq!(
-            format!("Executing command (CWD): {}", expected_command_output),
+            bconcat!("Executing command (CWD): ", expected_command_output),
             trim(buffer.borrow().get_output())
         );
     }
@@ -116,7 +131,7 @@ fn test_hide_passwords() {
 #[test]
 fn test_doesnt_hide_ports() {
     let buffer = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), VERBOSITY_DEBUG, None).unwrap(),
+        BufferIO::new(BString::default(), VERBOSITY_DEBUG, None).unwrap(),
     ));
     let process = ProcessExecutor::new(Some(
         buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
@@ -135,7 +150,7 @@ fn test_doesnt_hide_ports() {
 fn test_split_lines() {
     let process = ProcessExecutor::new(None);
     assert!(process.split_lines("").is_empty());
-    // PHP: $process->splitLines(null). `split_lines` takes `&str` where PHP takes `?string`, and
+    // PHP: $process->splitLines(null). `split_lines` takes a string where PHP takes `?string`, and
     // its body opens with `trim((string) $output)`, so the caller performs the null-to-"" cast.
     assert!(process.split_lines("").is_empty());
     assert_eq!(vec!["foo"], process.split_lines("foo"));
@@ -185,33 +200,33 @@ fn test_execute_async_cancel() {
     todo!()
 }
 
-fn data_escape_arguments() -> Vec<(&'static str, &'static str)> {
+fn data_escape_arguments() -> Vec<(&'static BStr, &'static BStr)> {
     // (argument, unix-expected). Not on Windows, so the unix column is used.
     // null and false arguments are coerced to the empty string.
     vec![
-        ("", "''"),
-        ("", "''"),
-        ("", "''"),
-        ("a'bc", "'a'\\''bc'"),
-        ("a\nb\nc", "'a\nb\nc'"),
-        ("a b c", "'a b c'"),
-        ("a\tb\tc", "'a\tb\tc'"),
-        ("abc", "'abc'"),
-        ("a,bc", "'a,bc'"),
-        ("a\"bc", "'a\"bc'"),
-        ("a\\\"bc", "'a\\\"bc'"),
-        ("ab\\\\c\\", "'ab\\\\c\\'"),
-        ("a b c\\\\", "'a b c\\\\'"),
-        ("a \"b\" c", "'a \"b\" c'"),
-        ("%path%", "'%path%'"),
-        ("%path", "'%path'"),
-        ("%%path", "'%%path'"),
-        ("!path!", "'!path!'"),
-        ("!path", "'!path'"),
-        ("!!path", "'!!path'"),
-        ("<>\"&|()^", "'<>\"&|()^'"),
-        ("<> &| ()^", "'<> &| ()^'"),
-        ("<>&|()^", "'<>&|()^'"),
+        (BStr::new(""), BStr::new("''")),
+        (BStr::new(""), BStr::new("''")),
+        (BStr::new(""), BStr::new("''")),
+        (BStr::new("a'bc"), BStr::new("'a'\\''bc'")),
+        (BStr::new("a\nb\nc"), BStr::new("'a\nb\nc'")),
+        (BStr::new("a b c"), BStr::new("'a b c'")),
+        (BStr::new("a\tb\tc"), BStr::new("'a\tb\tc'")),
+        (BStr::new("abc"), BStr::new("'abc'")),
+        (BStr::new("a,bc"), BStr::new("'a,bc'")),
+        (BStr::new("a\"bc"), BStr::new("'a\"bc'")),
+        (BStr::new("a\\\"bc"), BStr::new("'a\\\"bc'")),
+        (BStr::new("ab\\\\c\\"), BStr::new("'ab\\\\c\\'")),
+        (BStr::new("a b c\\\\"), BStr::new("'a b c\\\\'")),
+        (BStr::new("a \"b\" c"), BStr::new("'a \"b\" c'")),
+        (BStr::new("%path%"), BStr::new("'%path%'")),
+        (BStr::new("%path"), BStr::new("'%path'")),
+        (BStr::new("%%path"), BStr::new("'%%path'")),
+        (BStr::new("!path!"), BStr::new("'!path!'")),
+        (BStr::new("!path"), BStr::new("'!path'")),
+        (BStr::new("!!path"), BStr::new("'!!path'")),
+        (BStr::new("<>\"&|()^"), BStr::new("'<>\"&|()^'")),
+        (BStr::new("<> &| ()^"), BStr::new("'<> &| ()^'")),
+        (BStr::new("<>&|()^"), BStr::new("'<>&|()^'")),
     ]
 }
 

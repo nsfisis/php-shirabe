@@ -2,30 +2,30 @@
 
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::{B, BStr, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::Perforce;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-use shirabe_php_shim::{PHP_EOL, PhpMixed, bconcat, path_to_bytes};
+use shirabe_php_shim::{PHP_EOL, PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str};
 
-const TEST_DEPOT: &str = "depot";
-const TEST_BRANCH: &str = "branch";
-const TEST_P4USER: &str = "user";
-const TEST_CLIENT_NAME: &str = "TEST";
-const TEST_PORT: &str = "port";
-const TEST_PATH: &str = "path";
+const TEST_DEPOT: &BStr = php_str(b"depot");
+const TEST_BRANCH: &BStr = php_str(b"branch");
+const TEST_P4USER: &BStr = php_str(b"user");
+const TEST_CLIENT_NAME: &BStr = php_str(b"TEST");
+const TEST_PORT: &BStr = php_str(b"port");
+const TEST_PATH: &BStr = php_str(b"path");
 
 fn get_test_repo_config() -> IndexMap<BString, PhpMixed> {
     let mut config = IndexMap::new();
-    config.insert("depot".into(), PhpMixed::string(TEST_DEPOT.to_string()));
-    config.insert("branch".into(), PhpMixed::string(TEST_BRANCH.to_string()));
-    config.insert("p4user".into(), PhpMixed::string(TEST_P4USER.to_string()));
+    config.insert("depot".into(), PhpMixed::string(bconcat!(TEST_DEPOT)));
+    config.insert("branch".into(), PhpMixed::string(bconcat!(TEST_BRANCH)));
+    config.insert("p4user".into(), PhpMixed::string(bconcat!(TEST_P4USER)));
     config.insert(
         "unique_perforce_client_name".into(),
-        PhpMixed::string(TEST_CLIENT_NAME.to_string()),
+        PhpMixed::string(bconcat!(TEST_CLIENT_NAME)),
     );
     config
 }
@@ -37,7 +37,7 @@ fn create_new_perforce_with_windows_flag(flag: bool) -> Perforce {
     Perforce::new(
         get_test_repo_config(),
         TEST_PORT.into(),
-        TEST_PATH.into(),
+        path_from_bytes(TEST_PATH).to_path_buf(),
         process,
         flag,
         io,
@@ -54,7 +54,7 @@ fn create_perforce(
     Perforce::new(
         get_test_repo_config(),
         TEST_PORT.into(),
-        TEST_PATH.into(),
+        path_from_bytes(TEST_PATH).to_path_buf(),
         process,
         flag,
         io,
@@ -68,14 +68,17 @@ fn expected_composer_information() -> IndexMap<BString, PhpMixed> {
     autoload.insert("psr-0".into(), PhpMixed::Array(IndexMap::new()));
 
     let mut expected = IndexMap::new();
-    expected.insert("name".into(), PhpMixed::string("test/perforce".to_string()));
+    expected.insert(
+        "name".into(),
+        PhpMixed::string(BString::from("test/perforce")),
+    );
     expected.insert(
         "description".into(),
-        PhpMixed::string("Basic project for testing".to_string()),
+        PhpMixed::string(BString::from("Basic project for testing")),
     );
     expected.insert(
         "minimum-stability".into(),
-        PhpMixed::string("dev".to_string()),
+        PhpMixed::string(BString::from("dev")),
     );
     expected.insert("autoload".into(), PhpMixed::Array(autoload));
     expected
@@ -84,7 +87,7 @@ fn expected_composer_information() -> IndexMap<BString, PhpMixed> {
 // Valid composer.json content fed as p4 print stdout. Equivalent to
 // PerforceTest::getComposerJson(): the exact formatting is irrelevant because the
 // production code json_decodes it.
-const COMPOSER_JSON: &str = r#"{"name":"test/perforce","description":"Basic project for testing","minimum-stability":"dev","autoload":{"psr-0":{}}}"#;
+const COMPOSER_JSON: &BStr = php_str(r#"{"name":"test/perforce","description":"Basic project for testing","minimum-stability":"dev","autoload":{"psr-0":{}}}"#.as_bytes());
 
 #[test]
 fn test_get_client_without_stream() {
@@ -155,15 +158,15 @@ fn test_generate_p4_command() {
 
     let p4_command = perforce.generate_p4_command(vec!["do".into(), "something".into()], true);
     let expected = vec![
-        "p4".to_string(),
-        "-u".to_string(),
-        "user".to_string(),
-        "-c".to_string(),
-        "composer_perforce_TEST_depot".to_string(),
-        "-p".to_string(),
-        "port".to_string(),
-        "do".to_string(),
-        "something".to_string(),
+        BString::from("p4"),
+        BString::from("-u"),
+        BString::from("user"),
+        BString::from("-c"),
+        BString::from("composer_perforce_TEST_depot"),
+        BString::from("-p"),
+        BString::from("port"),
+        BString::from("do"),
+        BString::from("something"),
     ];
     assert_eq!(expected, p4_command);
 }
@@ -182,9 +185,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_with_windows_os() {
         vec![cmd_full(
             "p4 set",
             0,
-            bconcat!("P4USER=TEST_P4VARIABLE_USER", PHP_EOL)
-                .display_lossy()
-                .to_string(),
+            bconcat!("P4USER=TEST_P4VARIABLE_USER", PHP_EOL).to_owned(),
             "",
         )],
         true,
@@ -208,9 +209,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_not_windows_os() {
         vec![cmd_full(
             "echo $P4USER",
             0,
-            bconcat!("TEST_P4VARIABLE_USER", PHP_EOL)
-                .display_lossy()
-                .to_string(),
+            bconcat!("TEST_P4VARIABLE_USER", PHP_EOL).to_owned(),
             "",
         )],
         true,
@@ -235,7 +234,7 @@ fn test_query_p4_user_queries_for_user() {
     let (process, _guard) = get_process_executor_mock(vec![], false, MockHandler::default());
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::string("TEST_QUERY_USER".to_string())),
+            IOStub::new().with_ask(PhpMixed::string(BString::from("TEST_QUERY_USER"))),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -246,18 +245,15 @@ fn test_query_p4_user_queries_for_user() {
 
 #[test]
 fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
-    let expected_command = format!(
-        "p4 set P4USER={}",
-        ProcessExecutor::escape("TEST_QUERY_USER").display_lossy()
-    );
+    let expected_command = bconcat!("p4 set P4USER=", ProcessExecutor::escape("TEST_QUERY_USER"));
     let (process, _guard) = get_process_executor_mock(
-        vec![cmd("p4 set"), cmd(expected_command.as_str())],
+        vec![cmd("p4 set"), cmd(expected_command.as_bstr())],
         true,
         MockHandler::default(),
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::string("TEST_QUERY_USER".to_string())),
+            IOStub::new().with_ask(PhpMixed::string(BString::from("TEST_QUERY_USER"))),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -267,18 +263,15 @@ fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
 
 #[test]
 fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
-    let expected_command = format!(
-        "export P4USER={}",
-        ProcessExecutor::escape("TEST_QUERY_USER").display_lossy()
-    );
+    let expected_command = bconcat!("export P4USER=", ProcessExecutor::escape("TEST_QUERY_USER"));
     let (process, _guard) = get_process_executor_mock(
-        vec![cmd("echo $P4USER"), cmd(expected_command.as_str())],
+        vec![cmd("echo $P4USER"), cmd(expected_command.as_bstr())],
         true,
         MockHandler::default(),
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::string("TEST_QUERY_USER".to_string())),
+            IOStub::new().with_ask(PhpMixed::string(BString::from("TEST_QUERY_USER"))),
         ));
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
@@ -288,18 +281,15 @@ fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
 
 #[test]
 fn test_query_p4_user_escapes_injection_on_windows() {
-    let expected_command = format!(
-        "p4 set P4USER={}",
-        ProcessExecutor::escape("foo && calc.exe").display_lossy()
-    );
+    let expected_command = bconcat!("p4 set P4USER=", ProcessExecutor::escape("foo && calc.exe"));
     let (process, _guard) = get_process_executor_mock(
-        vec![cmd("p4 set"), cmd(expected_command.as_str())],
+        vec![cmd("p4 set"), cmd(expected_command.as_bstr())],
         true,
         MockHandler::default(),
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::string("foo && calc.exe".to_string())),
+            IOStub::new().with_ask(PhpMixed::string(BString::from("foo && calc.exe"))),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -309,17 +299,14 @@ fn test_query_p4_user_escapes_injection_on_windows() {
 
 #[test]
 fn test_query_p4_user_escapes_injection_on_unix() {
-    let expected_command = format!(
-        "export P4USER={}",
-        ProcessExecutor::escape("foo; id").display_lossy()
-    );
+    let expected_command = bconcat!("export P4USER=", ProcessExecutor::escape("foo; id"));
     let (process, _guard) = get_process_executor_mock(
-        vec![cmd("echo $P4USER"), cmd(expected_command.as_str())],
+        vec![cmd("echo $P4USER"), cmd(expected_command.as_bstr())],
         true,
         MockHandler::default(),
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_ask(PhpMixed::string("foo; id".to_string()))),
+        std::cell::RefCell::new(IOStub::new().with_ask(PhpMixed::string(BString::from("foo; id")))),
     );
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
@@ -330,12 +317,12 @@ fn test_query_p4_user_escapes_injection_on_unix() {
 #[test]
 fn test_query_p4_password_with_password_already_set() {
     let mut repo_config = IndexMap::new();
-    repo_config.insert("depot".into(), PhpMixed::string("depot".to_string()));
-    repo_config.insert("branch".into(), PhpMixed::string("branch".to_string()));
-    repo_config.insert("p4user".into(), PhpMixed::string("user".to_string()));
+    repo_config.insert("depot".into(), PhpMixed::string(BString::from("depot")));
+    repo_config.insert("branch".into(), PhpMixed::string(BString::from("branch")));
+    repo_config.insert("p4user".into(), PhpMixed::string(BString::from("user")));
     repo_config.insert(
         "p4password".into(),
-        PhpMixed::string("TEST_PASSWORD".to_string()),
+        PhpMixed::string(BString::from("TEST_PASSWORD")),
     );
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -359,9 +346,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_with_windows_os() {
         vec![cmd_full(
             "p4 set",
             0,
-            bconcat!("P4PASSWD=TEST_P4VARIABLE_PASSWORD", PHP_EOL)
-                .display_lossy()
-                .to_string(),
+            bconcat!("P4PASSWD=TEST_P4VARIABLE_PASSWORD", PHP_EOL).to_owned(),
             "",
         )],
         true,
@@ -381,9 +366,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_not_windows_os() {
         vec![cmd_full(
             "echo $P4PASSWD",
             0,
-            bconcat!("TEST_P4VARIABLE_PASSWORD", PHP_EOL)
-                .display_lossy()
-                .to_string(),
+            bconcat!("TEST_P4VARIABLE_PASSWORD", PHP_EOL).to_owned(),
             "",
         )],
         true,
@@ -404,7 +387,7 @@ fn test_query_p4_password_queries_for_password() {
     let (process, _guard) = get_process_executor_mock(vec![], false, MockHandler::default());
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask_and_hide_answer(Some("TEST_QUERY_PASSWORD".to_string())),
+            IOStub::new().with_ask_and_hide_answer(Some(BString::from("TEST_QUERY_PASSWORD"))),
         ));
     let mut perforce = create_perforce(true, process, io);
 
@@ -443,9 +426,7 @@ fn test_get_branches_with_stream() {
                     "//depot/...",
                 ],
                 0,
-                bconcat!("Stream //depot/branch mainline none 'branch'", PHP_EOL)
-                    .display_lossy()
-                    .to_string(),
+                bconcat!("Stream //depot/branch mainline none 'branch'", PHP_EOL).to_owned(),
                 "",
             ),
             cmd_full(
@@ -516,8 +497,7 @@ fn test_get_tags_without_stream() {
                 "Label 0.0.2 2013/08/01 'Second Label!'",
                 PHP_EOL
             )
-            .display_lossy()
-            .to_string(),
+            .to_owned(),
             "",
         )],
         true,
@@ -553,8 +533,7 @@ fn test_get_tags_with_stream() {
                 "Label 0.0.2 2013/08/01 'Second Label!'",
                 PHP_EOL
             )
-            .display_lossy()
-            .to_string(),
+            .to_owned(),
             "",
         )],
         true,
@@ -856,16 +835,16 @@ fn test_check_server_client_error() {
 
 #[test]
 fn test_cleanup_client_spec_should_delete_client() {
-    let test_client = "composer_perforce_TEST_depot";
+    let test_client = BStr::new("composer_perforce_TEST_depot");
     let (process, _guard) = get_process_executor_mock(
         vec![cmd(vec![
-            "p4",
-            "-u",
+            BStr::new("p4"),
+            BStr::new("-u"),
             TEST_P4USER,
-            "-p",
+            BStr::new("-p"),
             TEST_PORT,
-            "client",
-            "-d",
+            BStr::new("client"),
+            BStr::new("-d"),
             test_client,
         ])],
         true,

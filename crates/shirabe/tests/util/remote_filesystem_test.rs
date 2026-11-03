@@ -2,7 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};
@@ -25,10 +25,10 @@ fn config_mock() -> std::rc::Rc<std::cell::RefCell<shirabe::config::Config>> {
 // private file_url, then invoke the private get_options_for_url with the given args.
 fn call_get_options_for_url(
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    origin_url: &str,
+    origin_url: &BStr,
     additional_options: IndexMap<BString, PhpMixed>,
     options: IndexMap<BString, PhpMixed>,
-    file_url: &str,
+    file_url: &BStr,
 ) -> IndexMap<BString, PhpMixed> {
     let fs = RemoteFilesystem::new(io, config_mock(), options, false);
     fs.__set_file_url(file_url).unwrap();
@@ -60,10 +60,10 @@ fn test_get_options_for_url() {
 
     let res = call_get_options_for_url(
         io,
-        "http://example.org",
+        BStr::new("http://example.org"),
         IndexMap::new(),
         IndexMap::new(),
-        "",
+        BStr::new(""),
     );
 
     assert!(
@@ -96,10 +96,10 @@ fn test_get_options_for_url_with_authorization() {
 
     let options = call_get_options_for_url(
         io,
-        "http://example.org",
+        BStr::new("http://example.org"),
         IndexMap::new(),
         IndexMap::new(),
-        "",
+        BStr::new(""),
     );
 
     let mut found = false;
@@ -134,10 +134,10 @@ fn test_get_options_for_url_with_stream_options() {
 
     let res = call_get_options_for_url(
         io,
-        "https://example.org",
+        BStr::new("https://example.org"),
         IndexMap::new(),
         stream_options,
-        "",
+        BStr::new(""),
     );
 
     let allow_self_signed = res
@@ -169,16 +169,16 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
         ));
 
     let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-    http.insert("header".into(), PhpMixed::string("Foo: bar".to_string()));
+    http.insert("header".into(), PhpMixed::string(BString::from("Foo: bar")));
     let mut additional_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     additional_options.insert("http".into(), PhpMixed::Array(http));
 
     let res = call_get_options_for_url(
         io,
-        "https://example.org",
+        BStr::new("https://example.org"),
         additional_options,
         IndexMap::new(),
-        "",
+        BStr::new(""),
     );
 
     let headers = http_header_list(&res);
@@ -297,17 +297,17 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
     let mut ssl: IndexMap<BString, PhpMixed> = IndexMap::new();
     ssl.insert(
         "cafile".into(),
-        PhpMixed::string("/some/path/file.crt".to_string()),
+        PhpMixed::string(BString::from("/some/path/file.crt")),
     );
     let mut additional_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     additional_options.insert("ssl".into(), PhpMixed::Array(ssl));
 
     let res = call_get_options_for_url(
         io,
-        "example.org",
+        BStr::new("example.org"),
         additional_options,
         IndexMap::new(),
-        "http://www.example.org",
+        BStr::new("http://www.example.org"),
     );
 
     let ssl_res = res.get(B("ssl")).and_then(|v| v.as_array()).unwrap();
@@ -343,10 +343,12 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
 }
 
 // Mirrors RemoteFilesystemTest::provideBitbucketPublicDownloadUrls.
-fn provide_bitbucket_public_download_urls() -> Vec<(&'static str, &'static str)> {
+fn provide_bitbucket_public_download_urls() -> Vec<(&'static BStr, &'static BStr)> {
     vec![(
-        "https://bitbucket.org/seldaek/composer-live-test-repo/raw/master/composer-unit-test-download-me.txt",
-        "1234",
+        BStr::new(
+            "https://bitbucket.org/seldaek/composer-live-test-repo/raw/master/composer-unit-test-download-me.txt",
+        ),
+        BStr::new("1234"),
     )]
 }
 

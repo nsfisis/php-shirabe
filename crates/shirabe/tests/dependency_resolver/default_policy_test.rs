@@ -182,7 +182,7 @@ fn test_select_lowest_with_prefer_dev_over_prerelease() {
 
         Platform::put_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE", "1");
         let dev_package = get_package("A", "dev-master");
-        let prerelease_package = get_package("A", &format!("1.0.0-{}", stability));
+        let prerelease_package = get_package("A", format!("1.0.0-{}", stability));
         fixtures.repo.add_package(dev_package.clone()).unwrap();
         fixtures
             .repo
@@ -217,7 +217,7 @@ fn test_select_lowest_prefers_prerelease_over_dev() {
         let mut fixtures = set_up();
 
         let dev_package = get_package("A", "dev-master");
-        let prerelease_package = get_package("A", &format!("1.0.0-{}", stability));
+        let prerelease_package = get_package("A", format!("1.0.0-{}", stability));
         fixtures.repo.add_package(dev_package.clone()).unwrap();
         fixtures
             .repo

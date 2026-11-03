@@ -4,7 +4,7 @@
 //! `#[path = "../common/php_worker.rs"] mod php_worker;`.
 #![allow(dead_code)]
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{bconcat, str_replace};
 use shirabe_symfony_process::PhpExecutableFinder;
@@ -38,10 +38,28 @@ pub fn load_composer_php_runtime() {
 }
 
 /// Calls a static method in the worker, panicking on either failure lane.
-pub fn php_call_static(class: &str, method: &str, args: Vec<PluginValue>) -> PluginValue {
+pub fn php_call_static(
+    class: impl AsRef<[u8]>,
+    method: impl AsRef<[u8]>,
+    args: Vec<PluginValue>,
+) -> PluginValue {
+    let class = BStr::new(class.as_ref());
+    let method = BStr::new(method.as_ref());
     shirabe_php_rpc::call_static_method(class, method, args, None)
-        .unwrap_or_else(|error| panic!("{class}::{method} request failed: {error}"))
-        .unwrap_or_else(|throw| panic!("{class}::{method} threw {throw}"))
+        .unwrap_or_else(|error| {
+            panic!(
+                "{}::{} request failed: {error}",
+                class.display_lossy(),
+                method.display_lossy()
+            )
+        })
+        .unwrap_or_else(|throw| {
+            panic!(
+                "{}::{} threw {throw}",
+                class.display_lossy(),
+                method.display_lossy()
+            )
+        })
 }
 
 /// Runs a PHP snippet in the worker and returns its `return` value.

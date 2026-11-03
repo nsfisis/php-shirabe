@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Util/MetadataMinifierTest.php
 
+use bstr::BString;
 use indexmap::{IndexMap, indexmap};
 use shirabe::package::ArrayDumper;
 use shirabe::package::handle::CompletePackageHandle;
@@ -11,59 +12,54 @@ use shirabe_php_shim::PhpMixed;
 #[test]
 fn test_minify_expand() {
     let package1 = CompletePackageHandle::new(
-        bstr::BString::from("foo/bar".to_string()),
-        bstr::BString::from("2.0.0.0".to_string()),
-        bstr::BString::from("2.0.0".to_string()),
+        BString::from("foo/bar"),
+        BString::from("2.0.0.0"),
+        BString::from("2.0.0"),
     );
     package1.set_scripts(
-        IndexMap::from([("foo".to_string(), vec!["bar".to_string()])])
+        IndexMap::from([(BString::from("foo"), vec![BString::from("bar")])])
             .into_iter()
-            .map(|(k, v)| {
-                (
-                    bstr::BString::from(k),
-                    v.into_iter().map(bstr::BString::from).collect::<Vec<_>>(),
-                )
-            })
+            .map(|(k, v)| (k, v.into_iter().collect::<Vec<_>>()))
             .collect::<indexmap::IndexMap<_, _>>(),
     );
-    package1.set_license(vec![bstr::BString::from("MIT".to_string())]);
+    package1.set_license(vec![BString::from("MIT")]);
     let package2 = CompletePackageHandle::new(
-        bstr::BString::from("foo/bar".to_string()),
-        bstr::BString::from("1.2.0.0".to_string()),
-        bstr::BString::from("1.2.0".to_string()),
+        BString::from("foo/bar"),
+        BString::from("1.2.0.0"),
+        BString::from("1.2.0"),
     );
-    package2.set_license(vec![bstr::BString::from("GPL".to_string())]);
-    package2.set_homepage(bstr::BString::from("https://example.org".to_string()));
+    package2.set_license(vec![BString::from("GPL")]);
+    package2.set_homepage(BString::from("https://example.org"));
     let package3 = CompletePackageHandle::new(
-        bstr::BString::from("foo/bar".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0.0".to_string()),
+        BString::from("foo/bar"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0.0"),
     );
-    package3.set_license(vec![bstr::BString::from("GPL".to_string())]);
+    package3.set_license(vec![BString::from("GPL")]);
     let dumper = ArrayDumper::new();
 
     let minified = vec![
         indexmap! {
-            "name".into() => PhpMixed::string("foo/bar".to_string()),
-            "version".into() => PhpMixed::string("2.0.0".to_string()),
-            "version_normalized".into() => PhpMixed::string("2.0.0.0".to_string()),
-            "type".into() => PhpMixed::string("library".to_string()),
+            "name".into() => PhpMixed::string(BString::from("foo/bar")),
+            "version".into() => PhpMixed::string(BString::from("2.0.0")),
+            "version_normalized".into() => PhpMixed::string(BString::from("2.0.0.0")),
+            "type".into() => PhpMixed::string(BString::from("library")),
             "scripts".into() => PhpMixed::Array(indexmap! {
-                "foo".into() => PhpMixed::List(vec![PhpMixed::string("bar".to_string())]),
+                "foo".into() => PhpMixed::List(vec![PhpMixed::string(BString::from("bar"))]),
             }),
-            "license".into() => PhpMixed::List(vec![PhpMixed::string("MIT".to_string())]),
+            "license".into() => PhpMixed::List(vec![PhpMixed::string(BString::from("MIT"))]),
         },
         indexmap! {
-            "version".into() => PhpMixed::string("1.2.0".to_string()),
-            "version_normalized".into() => PhpMixed::string("1.2.0.0".to_string()),
-            "license".into() => PhpMixed::List(vec![PhpMixed::string("GPL".to_string())]),
-            "homepage".into() => PhpMixed::string("https://example.org".to_string()),
-            "scripts".into() => PhpMixed::string("__unset".to_string()),
+            "version".into() => PhpMixed::string(BString::from("1.2.0")),
+            "version_normalized".into() => PhpMixed::string(BString::from("1.2.0.0")),
+            "license".into() => PhpMixed::List(vec![PhpMixed::string(BString::from("GPL"))]),
+            "homepage".into() => PhpMixed::string(BString::from("https://example.org")),
+            "scripts".into() => PhpMixed::string(BString::from("__unset")),
         },
         indexmap! {
-            "version".into() => PhpMixed::string("1.0.0".to_string()),
-            "version_normalized".into() => PhpMixed::string("1.0.0.0".to_string()),
-            "homepage".into() => PhpMixed::string("__unset".to_string()),
+            "version".into() => PhpMixed::string(BString::from("1.0.0")),
+            "version_normalized".into() => PhpMixed::string(BString::from("1.0.0.0")),
+            "homepage".into() => PhpMixed::string(BString::from("__unset")),
         },
     ];
 

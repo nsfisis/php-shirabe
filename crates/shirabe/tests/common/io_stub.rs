@@ -48,7 +48,7 @@ pub struct IOStub {
     // validator directly. When unset, `askAndValidate` just returns `default` (unvalidated).
     ask_and_validate_answer: Option<PhpMixed>,
     ask_confirmation: Option<bool>,
-    ask_and_hide_answer: Option<Option<String>>,
+    ask_and_hide_answer: Option<Option<bstr::BString>>,
     // Keyed `askAndHideAnswer` replies, mirroring tests whose willReturnCallback
     // switches on the question string. Unknown questions return `''` like PHP's
     // `switch` default.
@@ -127,20 +127,15 @@ impl IOStub {
         self.ask_confirmation = Some(value);
         self
     }
-    pub fn with_ask_and_hide_answer(mut self, value: Option<String>) -> Self {
+    pub fn with_ask_and_hide_answer(mut self, value: Option<bstr::BString>) -> Self {
         self.ask_and_hide_answer = Some(value);
         self
     }
     pub fn with_ask_and_hide_answer_responses(
         mut self,
-        value: indexmap::IndexMap<String, String>,
+        value: indexmap::IndexMap<bstr::BString, bstr::BString>,
     ) -> Self {
-        self.ask_and_hide_answer_responses = Some(
-            value
-                .into_iter()
-                .map(|(question, answer)| (question.into(), answer.into()))
-                .collect(),
-        );
+        self.ask_and_hide_answer_responses = Some(value.into_iter().collect());
         self
     }
 
@@ -151,14 +146,11 @@ impl IOStub {
         mut self,
         repository_name: impl Into<bstr::BString>,
         username: impl Into<bstr::BString>,
-        password: Option<String>,
+        password: Option<bstr::BString>,
     ) -> Self {
         let mut auth = indexmap::IndexMap::new();
         auth.insert(bstr::BString::from("username"), Some(username.into()));
-        auth.insert(
-            bstr::BString::from("password"),
-            password.map(bstr::BString::from),
-        );
+        auth.insert(bstr::BString::from("password"), password);
         self.authentications.insert(repository_name.into(), auth);
         self
     }
@@ -269,11 +261,7 @@ impl IOInterfaceImmutable for IOStub {
         if let Some(responses) = &self.ask_and_hide_answer_responses {
             return Ok(Some(responses.get(question).cloned().unwrap_or_default()));
         }
-        Ok(self
-            .ask_and_hide_answer
-            .clone()
-            .unwrap_or(None)
-            .map(bstr::BString::from))
+        Ok(self.ask_and_hide_answer.clone().unwrap_or(None))
     }
     fn select_bytes(
         &self,

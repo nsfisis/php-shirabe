@@ -31,13 +31,8 @@ pub trait IntoMockCmd {
     fn into_mock_cmd(self) -> CommandLine;
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl IntoMockCmd for &str {
-    fn into_mock_cmd(self) -> CommandLine {
-        CommandLine::Shell(bstr::BString::from(self.to_string()))
-    }
-}
-
-impl IntoMockCmd for String {
     fn into_mock_cmd(self) -> CommandLine {
         CommandLine::Shell(bstr::BString::from(self))
     }
@@ -49,25 +44,29 @@ impl IntoMockCmd for bstr::BString {
     }
 }
 
-impl IntoMockCmd for Vec<&str> {
+impl IntoMockCmd for &bstr::BStr {
     fn into_mock_cmd(self) -> CommandLine {
-        CommandLine::Args(self.into_iter().map(bstr::BString::from).collect())
+        CommandLine::Shell(self.to_owned())
     }
 }
 
-impl IntoMockCmd for Vec<String> {
+impl<T: AsRef<[u8]>> IntoMockCmd for Vec<T> {
     fn into_mock_cmd(self) -> CommandLine {
         CommandLine::Args(
-            self.into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
+            self.iter()
+                .map(|arg| bstr::BString::from(arg.as_ref()))
+                .collect(),
         )
     }
 }
 
-impl<const N: usize> IntoMockCmd for [&str; N] {
+impl<T: AsRef<[u8]>, const N: usize> IntoMockCmd for [T; N] {
     fn into_mock_cmd(self) -> CommandLine {
-        CommandLine::Args(self.iter().map(|&s| bstr::BString::from(s)).collect())
+        CommandLine::Args(
+            self.iter()
+                .map(|arg| bstr::BString::from(arg.as_ref()))
+                .collect(),
+        )
     }
 }
 

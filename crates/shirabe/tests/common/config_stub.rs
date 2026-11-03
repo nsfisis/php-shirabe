@@ -15,7 +15,7 @@ use shirabe_php_shim::PhpMixed;
 
 pub struct ConfigStubBuilder {
     use_environment: bool,
-    base_dir: Option<String>,
+    base_dir: Option<BString>,
     // Config values to seed, applied via Config::merge under the `config` section.
     values: IndexMap<BString, PhpMixed>,
     source: bstr::BString,
@@ -42,20 +42,20 @@ impl ConfigStubBuilder {
         self
     }
 
-    pub fn base_dir(mut self, base_dir: impl Into<String>) -> Self {
+    pub fn base_dir(mut self, base_dir: impl Into<BString>) -> Self {
         self.base_dir = Some(base_dir.into());
         self
     }
 
     /// Sets the value `Config::get(key)` will return. Equivalent to PHPUnit's
     /// `->method('get')->with(key)->willReturn(value)`.
-    pub fn with(mut self, key: impl Into<String>, value: PhpMixed) -> Self {
-        self.values.insert(BString::from(key.into()), value);
+    pub fn with(mut self, key: impl Into<BString>, value: PhpMixed) -> Self {
+        self.values.insert(key.into(), value);
         self
     }
 
     pub fn build(self) -> Config {
-        let mut config = Config::new(self.use_environment, self.base_dir.map(bstr::BString::from));
+        let mut config = Config::new(self.use_environment, self.base_dir);
         if !self.values.is_empty() {
             let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
             merge.insert("config".into(), PhpMixed::Array(self.values));

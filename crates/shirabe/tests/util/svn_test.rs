@@ -1,43 +1,50 @@
 //! ref: composer/tests/Composer/Test/Util/SvnTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::svn::Svn;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
-fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
-    pairs
-        .into_iter()
-        .map(|(k, v)| (k.to_string().into(), v))
-        .collect()
+fn map(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+    pairs.into_iter().map(|(k, v)| (bconcat!(k), v)).collect()
 }
 
 /// Builds a `['config' => ['http-basic' => [host => ['username' => .., 'password' => ..]]]]`
 /// map for `Config::merge`.
-fn http_basic_config(host: &str, username: &str, password: &str) -> IndexMap<BString, PhpMixed> {
+fn http_basic_config(host: &BStr, username: &BStr, password: &BStr) -> IndexMap<BString, PhpMixed> {
     let creds = map(vec![
-        ("username", PhpMixed::string(username.to_string())),
-        ("password", PhpMixed::string(password.to_string())),
+        (BStr::new("username"), PhpMixed::string(bconcat!(username))),
+        (BStr::new("password"), PhpMixed::string(bconcat!(password))),
     ]);
     let http_basic = map(vec![(host, PhpMixed::Array(creds))]);
-    let config = map(vec![("http-basic", PhpMixed::Array(http_basic))]);
-    map(vec![("config", PhpMixed::Array(config))])
+    let config = map(vec![(BStr::new("http-basic"), PhpMixed::Array(http_basic))]);
+    map(vec![(BStr::new("config"), PhpMixed::Array(config))])
 }
 
 /// ref: SvnTest::urlProvider
-fn url_provider() -> Vec<(&'static str, Vec<&'static str>)> {
+fn url_provider() -> Vec<(&'static BStr, Vec<&'static BStr>)> {
     vec![
         (
-            "http://till:test@svn.example.org/",
-            vec!["--username", "till", "--password", "test"],
+            BStr::new("http://till:test@svn.example.org/"),
+            vec![
+                BStr::new("--username"),
+                BStr::new("till"),
+                BStr::new("--password"),
+                BStr::new("test"),
+            ],
         ),
-        ("http://svn.apache.org/", vec![]),
+        (BStr::new("http://svn.apache.org/"), vec![]),
         (
-            "svn://johndoe@example.org",
-            vec!["--username", "johndoe", "--password", ""],
+            BStr::new("svn://johndoe@example.org"),
+            vec![
+                BStr::new("--username"),
+                BStr::new("johndoe"),
+                BStr::new("--password"),
+                BStr::new(""),
+            ],
         ),
     ]
 }
@@ -50,7 +57,7 @@ fn test_credentials() {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
         let mut svn = Svn::new(url.into(), io, config, None);
 
-        let expect: Vec<String> = expect.iter().map(|s| s.to_string()).collect();
+        let expect: Vec<BString> = expect.iter().map(|s| bconcat!(s)).collect();
         assert_eq!(expect, svn.__get_credential_args());
     }
 }
@@ -66,11 +73,11 @@ fn test_interactive_string() {
 
     assert_eq!(
         vec![
-            "svn".to_string(),
-            "ls".to_string(),
-            "--non-interactive".to_string(),
-            "--".to_string(),
-            "http://svn.example.org".to_string(),
+            BString::from("svn"),
+            BString::from("ls"),
+            BString::from("--non-interactive"),
+            BString::from("--"),
+            BString::from("http://svn.example.org"),
         ],
         svn.__get_command(vec!["svn".into(), "ls".into()], url.into(), None)
     );
@@ -81,7 +88,14 @@ fn test_credentials_from_config() {
     let url = "http://svn.apache.org";
 
     let mut config = Config::new(true, None);
-    config.merge(&http_basic_config("svn.apache.org", "foo", "bar"), "test");
+    config.merge(
+        &http_basic_config(
+            BStr::new("svn.apache.org"),
+            BStr::new("foo"),
+            BStr::new("bar"),
+        ),
+        "test",
+    );
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -94,10 +108,10 @@ fn test_credentials_from_config() {
 
     assert_eq!(
         vec![
-            "--username".to_string(),
-            "foo".to_string(),
-            "--password".to_string(),
-            "bar".to_string(),
+            BString::from("--username"),
+            BString::from("foo"),
+            BString::from("--password"),
+            BString::from("bar"),
         ],
         svn.__get_credential_args()
     );
@@ -108,7 +122,14 @@ fn test_credentials_from_config_with_cache_credentials_true() {
     let url = "http://svn.apache.org";
 
     let mut config = Config::new(true, None);
-    config.merge(&http_basic_config("svn.apache.org", "foo", "bar"), "test");
+    config.merge(
+        &http_basic_config(
+            BStr::new("svn.apache.org"),
+            BStr::new("foo"),
+            BStr::new("bar"),
+        ),
+        "test",
+    );
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -122,10 +143,10 @@ fn test_credentials_from_config_with_cache_credentials_true() {
 
     assert_eq!(
         vec![
-            "--username".to_string(),
-            "foo".to_string(),
-            "--password".to_string(),
-            "bar".to_string(),
+            BString::from("--username"),
+            BString::from("foo"),
+            BString::from("--password"),
+            BString::from("bar"),
         ],
         svn.__get_credential_args()
     );
@@ -136,7 +157,14 @@ fn test_credentials_from_config_with_cache_credentials_false() {
     let url = "http://svn.apache.org";
 
     let mut config = Config::new(true, None);
-    config.merge(&http_basic_config("svn.apache.org", "foo", "bar"), "test");
+    config.merge(
+        &http_basic_config(
+            BStr::new("svn.apache.org"),
+            BStr::new("foo"),
+            BStr::new("bar"),
+        ),
+        "test",
+    );
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -150,11 +178,11 @@ fn test_credentials_from_config_with_cache_credentials_false() {
 
     assert_eq!(
         vec![
-            "--no-auth-cache".to_string(),
-            "--username".to_string(),
-            "foo".to_string(),
-            "--password".to_string(),
-            "bar".to_string(),
+            BString::from("--no-auth-cache"),
+            BString::from("--username"),
+            BString::from("foo"),
+            BString::from("--password"),
+            BString::from("bar"),
         ],
         svn.__get_credential_args()
     );

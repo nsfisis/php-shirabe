@@ -3,39 +3,50 @@
 use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
 use crate::io_mock::{Expectation, IOMock, get_io_mock};
+use bstr::BStr;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::GitLab;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, error_message, php_str};
 
-const USERNAME: &str = "username";
-const PASSWORD: &str = "password";
-const MESSAGE: &str = "mymessage";
-const ORIGIN: &str = "gitlab.com";
-const TOKEN: &str = "gitlabtoken";
-const REFRESHTOKEN: &str = "gitlabrefreshtoken";
+const USERNAME: &BStr = php_str(b"username");
+const PASSWORD: &BStr = php_str(b"password");
+const MESSAGE: &BStr = php_str(b"mymessage");
+const ORIGIN: &BStr = php_str(b"gitlab.com");
+const TOKEN: &BStr = php_str(b"gitlabtoken");
+const REFRESHTOKEN: &BStr = php_str(b"gitlabrefreshtoken");
 
 // Mirrors GitLabTest::getAuthJsonMock: a JsonConfigSource whose getName() returns
 // "auth.json" (atLeastOnce) and whose addConfigSetting is a no-op (the PHP mock
 // never stubs it). Methods left without an expectation panic if called.
-mockall::mock! {
-    #[derive(Debug)]
-    pub AuthJson {}
-    impl ConfigSourceInterface for AuthJson {
-        fn add_repository(&mut self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
-        fn insert_repository(&mut self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
-        fn set_repository_url(&mut self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
-        fn remove_repository(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-        fn add_config_setting(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-        fn remove_config_setting(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-        fn add_property(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-        fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-        fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
-        fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
-        fn get_name(&self) -> bstr::BString;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_auth_json {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub AuthJson {}
+        impl ConfigSourceInterface for AuthJson {
+            fn add_repository(&mut self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+            fn insert_repository(&mut self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
+            fn set_repository_url(&mut self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_repository(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_config_setting(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_config_setting(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_property(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn get_name(&self) -> bstr::BString;
+        }
     }
 }
+use mock_auth_json::MockAuthJson;
 
 fn get_auth_json_mock() -> Box<MockAuthJson> {
     let mut mock = MockAuthJson::new();
@@ -72,13 +83,16 @@ fn test_username_password_authentication_flow() {
         )
         .unwrap();
 
-    let body = format!(
-        "{{\"access_token\": \"{}\", \"refresh_token\": \"{}\", \"token_type\": \"bearer\", \"expires_in\": 7200, \"created_at\": 0}}",
-        TOKEN, REFRESHTOKEN
+    let body = bconcat!(
+        "{\"access_token\": \"",
+        TOKEN,
+        "\", \"refresh_token\": \"",
+        REFRESHTOKEN,
+        "\", \"token_type\": \"bearer\", \"expires_in\": 7200, \"created_at\": 0}"
     );
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![expect_full(
-            format!("http://{}/oauth/token", ORIGIN),
+            bconcat!("http://", ORIGIN, "/oauth/token"),
             None,
             200,
             body,
@@ -149,7 +163,7 @@ fn test_username_password_failure() {
         .authorize_oauth_interactively(bstr::BStr::new("https"), bstr::BStr::new(ORIGIN), None)
         .unwrap_err();
     assert_eq!(
-        err.to_string(),
+        error_message(&err),
         "Invalid GitLab credentials 5 times in a row, aborting."
     );
 }

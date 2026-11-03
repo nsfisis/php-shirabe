@@ -18,36 +18,36 @@ use std::collections::VecDeque;
 #[derive(Debug, Clone)]
 pub enum Expectation {
     Text {
-        text: String,
+        text: BString,
         regex: bool,
     },
     Ask {
-        ask: String,
-        reply: String,
+        ask: BString,
+        reply: BString,
     },
     Auth {
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: BString,
+        username: BString,
+        password: Option<BString>,
     },
 }
 
 impl Expectation {
-    pub fn text(text: impl Into<String>) -> Self {
+    pub fn text(text: impl Into<BString>) -> Self {
         Expectation::Text {
             text: text.into(),
             regex: false,
         }
     }
 
-    pub fn text_regex(text: impl Into<String>) -> Self {
+    pub fn text_regex(text: impl Into<BString>) -> Self {
         Expectation::Text {
             text: text.into(),
             regex: true,
         }
     }
 
-    pub fn ask(ask: impl Into<String>, reply: impl Into<String>) -> Self {
+    pub fn ask(ask: impl Into<BString>, reply: impl Into<BString>) -> Self {
         Expectation::Ask {
             ask: ask.into(),
             reply: reply.into(),
@@ -55,9 +55,9 @@ impl Expectation {
     }
 
     pub fn auth(
-        repository_name: impl Into<String>,
-        username: impl Into<String>,
-        password: Option<String>,
+        repository_name: impl Into<BString>,
+        username: impl Into<BString>,
+        password: Option<BString>,
     ) -> Self {
         Expectation::Auth {
             repository_name: repository_name.into(),
@@ -87,7 +87,7 @@ impl IOMock {
         };
 
         Ok(Self {
-            inner: BufferIO::new(String::new(), sf_verbosity, None)?,
+            inner: BufferIO::new("", sf_verbosity, None)?,
             expectations: None,
             strict: false,
             auth_log: Vec::new(),
@@ -96,7 +96,7 @@ impl IOMock {
 
     // `$strict` set to true requires *all* expected messages, not just a subset.
     pub fn expects(&mut self, expectations: Vec<Expectation>, strict: bool) -> anyhow::Result<()> {
-        let inputs: Vec<String> = expectations
+        let inputs: Vec<BString> = expectations
             .iter()
             .filter_map(|expect| match expect {
                 Expectation::Ask { reply, .. } => Some(reply.clone()),
@@ -140,11 +140,7 @@ impl IOMock {
                     password,
                 } = expect
                 {
-                    let expected = (
-                        bstr::BString::from(repository_name.as_str()),
-                        bstr::BString::from(username.as_str()),
-                        password.as_deref().map(bstr::BString::from),
-                    );
+                    let expected = (repository_name.clone(), username.clone(), password.clone());
                     while let Some(auth) = auth_log.pop_front() {
                         if auth == expected {
                             continue 'expects;
@@ -166,9 +162,7 @@ impl IOMock {
                     Expectation::Ask { ask, .. } => {
                         (bconcat!("{^", preg_quote(ask, None), "$}"), ask.clone())
                     }
-                    Expectation::Text { text, regex: true } => {
-                        (BString::from(text.as_str()), text.clone())
-                    }
+                    Expectation::Text { text, regex: true } => (text.clone(), text.clone()),
                     Expectation::Text { text, regex: false } => {
                         (bconcat!("{^", preg_quote(text, None), "$}"), text.clone())
                     }
@@ -182,14 +176,16 @@ impl IOMock {
 
                     if self.strict {
                         panic!(
-                            "IO output mismatch. Expected:\n{label}\nGot:\n{}",
+                            "IO output mismatch. Expected:\n{}\nGot:\n{}",
+                            label.display_lossy(),
                             line.display_lossy()
                         );
                     }
                 }
 
                 panic!(
-                    "Expected \"{label}\" to be output still but there is no output left to consume. Complete output:\n{}",
+                    "Expected \"{}\" to be output still but there is no output left to consume. Complete output:\n{}",
+                    label.display_lossy(),
                     output.display_lossy()
                 );
             }

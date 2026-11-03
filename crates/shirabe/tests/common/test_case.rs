@@ -39,49 +39,52 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
-pub fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+pub fn get_package(name: impl AsRef<[u8]>, version: impl AsRef<[u8]>) -> PackageInterfaceHandle {
+    let norm_version = VersionParser.normalize(version.as_ref(), None).unwrap();
     CompletePackageHandle::new(
-        bstr::BString::from(name.to_string()),
+        BString::from(name.as_ref()),
         norm_version,
-        bstr::BString::from(version.to_string()),
+        BString::from(version.as_ref()),
     )
     .into()
 }
 
 /// ref: TestCase::getPackage but returning the concrete `CompletePackageHandle` so the
 /// `CompletePackage`-only setters (`set_license`, `set_homepage`, ...) are reachable.
-pub fn get_complete_package(name: &str, version: &str) -> CompletePackageHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+pub fn get_complete_package(
+    name: impl AsRef<[u8]>,
+    version: impl AsRef<[u8]>,
+) -> CompletePackageHandle {
+    let norm_version = VersionParser.normalize(version.as_ref(), None).unwrap();
     CompletePackageHandle::new(
-        bstr::BString::from(name.to_string()),
+        BString::from(name.as_ref()),
         norm_version,
-        bstr::BString::from(version.to_string()),
+        BString::from(version.as_ref()),
     )
 }
 
 /// ref: TestCase::getAliasPackage (default class CompleteAliasPackage)
 pub fn get_alias_package(
     package: &PackageInterfaceHandle,
-    version: &str,
+    version: impl AsRef<[u8]>,
 ) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+    let norm_version = VersionParser.normalize(version.as_ref(), None).unwrap();
     let complete = CompletePackageHandle::from_rc_unchecked(package.as_rc().clone());
-    CompleteAliasPackageHandle::new(
-        complete,
-        norm_version,
-        bstr::BString::from(version.to_string()),
-    )
-    .into()
+    CompleteAliasPackageHandle::new(complete, norm_version, BString::from(version.as_ref())).into()
 }
 
 /// ref: TestCase::getVersionConstraint
-pub fn get_version_constraint(operator: &str, version: &str) -> AnyConstraint {
+pub fn get_version_constraint(
+    operator: impl AsRef<[u8]>,
+    version: impl AsRef<[u8]>,
+) -> AnyConstraint {
+    let operator = operator.as_ref();
+    let version = version.as_ref();
     let normalized = VersionParser.normalize(version, None).unwrap();
     AnyConstraint::Simple(SimpleConstraint::new(
         operator,
         normalized,
-        Some(BString::from(format!("{} {}", operator, version))),
+        Some(bconcat!(operator, " ", version)),
     ))
 }
 
@@ -154,7 +157,7 @@ pub fn init_temp_composer(
                         .get_mut("repositories")
                         .and_then(|r| r.as_object_mut())
                     {
-                        map.insert("packagist.org".to_string(), serde_json::Value::Bool(false));
+                        map.insert("packagist.org".into(), serde_json::Value::Bool(false));
                     }
                 }
             }
@@ -208,21 +211,24 @@ impl Drop for GitVersionGuard {
 /// let _restore = RestoreEnv::new("HOME", original);
 /// ```
 pub struct RestoreEnv {
-    name: &'static str,
+    name: BString,
     original: Option<bstr::BString>,
 }
 
 impl RestoreEnv {
-    pub fn new(name: &'static str, original: Option<bstr::BString>) -> Self {
-        Self { name, original }
+    pub fn new(name: impl Into<BString>, original: Option<bstr::BString>) -> Self {
+        Self {
+            name: name.into(),
+            original,
+        }
     }
 }
 
 impl Drop for RestoreEnv {
     fn drop(&mut self) {
         match &self.original {
-            Some(value) => Platform::put_env(self.name, value),
-            None => Platform::clear_env(self.name),
+            Some(value) => Platform::put_env(&self.name, value),
+            None => Platform::clear_env(&self.name),
         }
     }
 }
@@ -287,7 +293,7 @@ pub fn create_composer_lock(
 ) {
     let io = null_io();
     let json_file = JsonFile::new("./composer.lock", None, None).unwrap();
-    let composer_file_contents = std::fs::read_to_string("./composer.json").unwrap_or_default();
+    let composer_file_contents = std::fs::read("./composer.json").unwrap_or_default();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
@@ -319,7 +325,7 @@ pub fn create_composer_lock(
 pub fn get_application_tester() -> ApplicationTester {
     crate::bootstrap::bootstrap();
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe", "").unwrap();
     application.set_catch_exceptions(false);
     ApplicationTester::new(application)
 }
@@ -342,7 +348,7 @@ pub struct RunOptions {
 /// is ported.
 pub struct ApplicationTester {
     application: ApplicationHandle,
-    inputs: Vec<String>,
+    inputs: Vec<BString>,
     status_code: Option<i32>,
     output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     /// Handles retained before injection so `get_display`/`get_error_output` can read the memory
@@ -365,8 +371,8 @@ impl ApplicationTester {
         }
     }
 
-    pub fn set_inputs(&mut self, inputs: Vec<String>) -> &mut Self {
-        self.inputs = inputs;
+    pub fn set_inputs(&mut self, inputs: Vec<impl Into<BString>>) -> &mut Self {
+        self.inputs = inputs.into_iter().map(Into::into).collect();
         self
     }
 
@@ -472,7 +478,7 @@ impl ApplicationTester {
         }
     }
 
-    fn create_stream(inputs: &[String]) -> PhpResource {
+    fn create_stream(inputs: &[BString]) -> PhpResource {
         let stream = php_fopen_resource("php://memory", "r+");
         for input in inputs {
             fwrite_resource(&stream, bconcat!(input, PHP_EOL));

@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Util/Http/ProxyItemTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use shirabe::util::http::proxy_item::ProxyItem;
 
 #[test]
@@ -10,22 +10,22 @@ fn test_throws_on_malformed_url() {
     }
 }
 
-fn data_malformed() -> Vec<&'static str> {
+fn data_malformed() -> Vec<&'static BStr> {
     vec![
         // 'ws-r'
-        "http://user\rname@localhost:80",
+        BStr::new("http://user\rname@localhost:80"),
         // 'ws-n'
-        "http://user\nname@localhost:80",
+        BStr::new("http://user\nname@localhost:80"),
         // 'ws-t'
-        "http://user\tname@localhost:80",
+        BStr::new("http://user\tname@localhost:80"),
         // 'no-host'
-        "localhost",
+        BStr::new("localhost"),
         // 'no-port'
-        "scheme://localhost",
+        BStr::new("scheme://localhost"),
         // 'port-0'
-        "http://localhost:0",
+        BStr::new("http://localhost:0"),
         // 'port-big'
-        "http://localhost:65536",
+        BStr::new("http://localhost:65536"),
     ]
 }
 
@@ -39,25 +39,40 @@ fn test_url_formatting() {
     }
 }
 
-fn data_formatting() -> Vec<(&'static str, &'static str)> {
+fn data_formatting() -> Vec<(&'static BStr, &'static BStr)> {
     // url, expected
     vec![
         // 'none'
-        ("http://proxy.com:8888", "http://proxy.com:8888"),
+        (
+            BStr::new("http://proxy.com:8888"),
+            BStr::new("http://proxy.com:8888"),
+        ),
         // 'lowercases-scheme'
-        ("HTTP://proxy.com:8888", "http://proxy.com:8888"),
+        (
+            BStr::new("HTTP://proxy.com:8888"),
+            BStr::new("http://proxy.com:8888"),
+        ),
         // 'adds-http-scheme'
-        ("proxy.com:80", "http://proxy.com:80"),
+        (BStr::new("proxy.com:80"), BStr::new("http://proxy.com:80")),
         // 'adds-http-port'
-        ("http://proxy.com", "http://proxy.com:80"),
+        (
+            BStr::new("http://proxy.com"),
+            BStr::new("http://proxy.com:80"),
+        ),
         // 'adds-https-port'
-        ("https://proxy.com", "https://proxy.com:443"),
+        (
+            BStr::new("https://proxy.com"),
+            BStr::new("https://proxy.com:443"),
+        ),
         // 'removes-user'
-        ("http://user@proxy.com:6180", "http://***@proxy.com:6180"),
+        (
+            BStr::new("http://user@proxy.com:6180"),
+            BStr::new("http://***@proxy.com:6180"),
+        ),
         // 'removes-user-pass'
         (
-            "http://user:p%40ss@proxy.com:6180",
-            "http://***:***@proxy.com:6180",
+            BStr::new("http://user:p%40ss@proxy.com:6180"),
+            BStr::new("http://***:***@proxy.com:6180"),
         ),
     ]
 }

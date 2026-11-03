@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Util/PlatformTest.php
 
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::defined;
+use shirabe_php_shim::{bconcat, defined};
 
 #[test]
 fn test_expand_path() {
@@ -15,12 +15,11 @@ fn test_expand_path() {
         Platform::expand_path("$TESTENV/myPath")
     );
     assert_eq!(
-        format!(
-            "{}/test",
+        bconcat!(
             Platform::get_env("HOME")
                 .or_else(|| Platform::get_env("USERPROFILE"))
-                .unwrap_or_default()
-                .display_lossy()
+                .unwrap_or_default(),
+            "/test"
         ),
         Platform::expand_path("~/test")
     );

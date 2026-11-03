@@ -162,7 +162,7 @@ fn test_private_repository() {
         std::rc::Rc::new(std::cell::RefCell::new(
             IOStub::new()
                 .with_is_interactive(true)
-                .with_ask_and_hide_answer(Some("sometoken".to_string())),
+                .with_ask_and_hide_answer(Some(BString::from("sometoken"))),
         ));
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(

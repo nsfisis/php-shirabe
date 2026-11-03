@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Util/ForgejoUrlTest.php
 
+use bstr::BStr;
 use shirabe::util::forgejo_url::ForgejoUrl;
 
 #[test]
@@ -19,11 +20,11 @@ fn test_create() {
     }
 }
 
-fn create_provider() -> Vec<&'static str> {
+fn create_provider() -> Vec<&'static BStr> {
     vec![
-        "git@codeberg.org:acme/repo.git",
-        "https://codeberg.org/acme/repo",
-        "https://codeberg.org/acme/repo.git",
+        BStr::new("git@codeberg.org:acme/repo.git"),
+        BStr::new("https://codeberg.org/acme/repo"),
+        BStr::new("https://codeberg.org/acme/repo.git"),
     ]
 }
 
