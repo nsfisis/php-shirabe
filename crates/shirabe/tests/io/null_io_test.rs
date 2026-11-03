@@ -44,8 +44,9 @@ fn test_ask() {
     let io = NullIO::new();
 
     assert_eq!(
-        PhpMixed::string("foo".to_string()),
-        io.ask("bar", PhpMixed::string("foo".to_string())).unwrap()
+        PhpMixed::string(BString::from("foo")),
+        io.ask("bar", PhpMixed::string(BString::from("foo")))
+            .unwrap()
     );
 }
 
@@ -61,12 +62,12 @@ fn test_ask_and_validate() {
     let io = NullIO::new();
 
     assert_eq!(
-        PhpMixed::string("foo".to_string()),
+        PhpMixed::string(BString::from("foo")),
         io.ask_and_validate(
             "question",
             Box::new(|_x| Ok(PhpMixed::Bool(true))),
             None,
-            PhpMixed::string("foo".to_string())
+            PhpMixed::string(BString::from("foo"))
         )
         .unwrap()
     );
@@ -77,14 +78,14 @@ fn test_select() {
     let io = NullIO::new();
 
     assert_eq!(
-        PhpMixed::string("1".to_string()),
+        PhpMixed::string(BString::from("1")),
         io.select(
             "question",
             PhpMixed::List(vec![
-                PhpMixed::string("item1".to_string()),
-                PhpMixed::string("item2".to_string()),
+                PhpMixed::string(BString::from("item1")),
+                PhpMixed::string(BString::from("item2")),
             ]),
-            PhpMixed::string("1".to_string()),
+            PhpMixed::string(BString::from("1")),
             PhpMixed::Int(2),
             "foo",
             true

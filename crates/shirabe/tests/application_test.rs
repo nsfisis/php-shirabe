@@ -1,11 +1,12 @@
 //! ref: composer/tests/Composer/Test/ApplicationTest.php
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 #[path = "common/bootstrap.rs"]
 mod bootstrap;
 #[path = "common/test_case.rs"]
 mod test_case;
 
-use bstr::{BStr, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
 use test_case::init_temp_composer;
@@ -39,7 +40,7 @@ fn test_dev_warning() {
     let _tear_down = TearDown;
     set_up();
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
 
     application.__set_dev_warning_time(Some(time() - 1));
 
@@ -83,7 +84,7 @@ fn test_dev_warning_suppressed_for_self_update() {
         return;
     }
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     let command: std::rc::Rc<std::cell::RefCell<dyn Command>> =
         std::rc::Rc::new(std::cell::RefCell::new(SelfUpdateCommand::new()));
     application.add(command).unwrap();
@@ -117,7 +118,7 @@ fn test_process_isolation_works_multiple_times() {
     let _tear_down = TearDown;
     set_up();
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     let command: std::rc::Rc<std::cell::RefCell<dyn Command>> =
         std::rc::Rc::new(std::cell::RefCell::new(AboutCommand::new()));
     application.add(command).unwrap();
@@ -176,7 +177,7 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
         true,
     );
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     application.set_catch_exceptions(false);
 
     // Run list command with --no-plugins, this triggers script command registration which previously
@@ -241,7 +242,7 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
         true,
     );
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     application.set_catch_exceptions(false);
 
     let app_output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(

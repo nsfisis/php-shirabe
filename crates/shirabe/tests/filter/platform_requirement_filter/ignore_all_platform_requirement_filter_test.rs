@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Filter/PlatformRequirementFilter/IgnoreAllPlatformRequirementFilterTest.php
 
+use bstr::BStr;
 use shirabe::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterInterface,
 };
@@ -20,11 +21,11 @@ fn test_is_ignored() {
     }
 }
 
-fn data_is_ignored() -> Vec<(&'static str, bool)> {
+fn data_is_ignored() -> Vec<(&'static BStr, bool)> {
     vec![
         // 'php is ignored'
-        ("php", true),
+        (BStr::new("php"), true),
         // 'monolog/monolog is not ignored'
-        ("monolog/monolog", false),
+        (BStr::new("monolog/monolog"), false),
     ]
 }

@@ -1,4 +1,5 @@
 //! ref: composer/tests/Composer/Test/DocumentationTest.php
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::{BString, ByteSlice};
 use shirabe::console::application::ApplicationHandle;
@@ -16,7 +17,7 @@ fn get_command_name(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> B
 }
 
 fn provide_command_cases() -> Vec<std::rc::Rc<std::cell::RefCell<dyn Command>>> {
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     application.set_catch_exceptions(false);
 
     let mut description =

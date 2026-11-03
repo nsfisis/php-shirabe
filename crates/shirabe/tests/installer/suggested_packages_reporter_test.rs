@@ -46,11 +46,7 @@ fn test_constructor() {
         .expects(vec![Expectation::text("b")], true)
         .unwrap();
 
-    reporter.add_package(
-        bstr::BString::from("a".to_string()),
-        bstr::BString::from("b".to_string()),
-        bstr::BString::from("c".to_string()),
-    );
+    reporter.add_package(BString::from("a"), BString::from("b"), BString::from("c"));
     reporter
         .output(SuggestedPackagesReporter::MODE_LIST, None, None)
         .unwrap();
@@ -104,14 +100,9 @@ fn test_add_suggestions_from_package() {
     // PHP mocks getSuggests/getPrettyName; here a real package carries the suggests and name.
     let package = get_package("package-pretty-name", "1.0.0");
     let mut suggests = IndexMap::new();
-    suggests.insert("target-a".to_string(), "reason-a".to_string());
-    suggests.insert("target-b".to_string(), "reason-b".to_string());
-    package.__set_suggests(
-        suggests
-            .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
-            .collect::<indexmap::IndexMap<_, _>>(),
-    );
+    suggests.insert(BString::from("target-a"), BString::from("reason-a"));
+    suggests.insert(BString::from("target-b"), BString::from("reason-b"));
+    package.__set_suggests(suggests.into_iter().collect::<indexmap::IndexMap<_, _>>());
 
     reporter.add_suggestions_from_package(package);
 
@@ -135,11 +126,7 @@ fn test_add_suggestions_from_package() {
 #[test]
 fn test_output() {
     let (mock, mut reporter, _guard) = set_up();
-    reporter.add_package(
-        bstr::BString::from("a".to_string()),
-        bstr::BString::from("b".to_string()),
-        bstr::BString::from("c".to_string()),
-    );
+    reporter.add_package(BString::from("a"), BString::from("b"), BString::from("c"));
 
     mock.borrow_mut()
         .expects(
@@ -160,11 +147,7 @@ fn test_output() {
 #[test]
 fn test_output_with_no_suggestion_reason() {
     let (mock, mut reporter, _guard) = set_up();
-    reporter.add_package(
-        bstr::BString::from("a".to_string()),
-        bstr::BString::from("b".to_string()),
-        bstr::BString::from("".to_string()),
-    );
+    reporter.add_package(BString::from("a"), BString::from("b"), BString::from(""));
 
     mock.borrow_mut()
         .expects(
@@ -186,14 +169,14 @@ fn test_output_with_no_suggestion_reason() {
 fn test_output_ignores_formatting() {
     let (mock, mut reporter, _guard) = set_up();
     reporter.add_package(
-        bstr::BString::from("source".to_string()),
-        bstr::BString::from("target1".to_string()),
-        bstr::BString::from("\x1b[1;37;42m Like us\r\non Facebook \x1b[0m".to_string()),
+        BString::from("source"),
+        BString::from("target1"),
+        BString::from("\x1b[1;37;42m Like us\r\non Facebook \x1b[0m"),
     );
     reporter.add_package(
-        bstr::BString::from("source".to_string()),
-        bstr::BString::from("target2".to_string()),
-        bstr::BString::from("<bg=green>Like us on Facebook</>".to_string()),
+        BString::from("source"),
+        BString::from("target2"),
+        BString::from("<bg=green>Like us on Facebook</>"),
     );
 
     mock.borrow_mut()
@@ -216,15 +199,11 @@ fn test_output_ignores_formatting() {
 #[test]
 fn test_output_multiple_packages() {
     let (mock, mut reporter, _guard) = set_up();
+    reporter.add_package(BString::from("a"), BString::from("b"), BString::from("c"));
     reporter.add_package(
-        bstr::BString::from("a".to_string()),
-        bstr::BString::from("b".to_string()),
-        bstr::BString::from("c".to_string()),
-    );
-    reporter.add_package(
-        bstr::BString::from("source package".to_string()),
-        bstr::BString::from("target".to_string()),
-        bstr::BString::from("because reasons".to_string()),
+        BString::from("source package"),
+        BString::from("target"),
+        BString::from("because reasons"),
     );
 
     mock.borrow_mut()
@@ -258,15 +237,11 @@ fn test_output_skip_installed_packages() {
     let installed = LockArrayRepository::new(vec![package1, package2]).unwrap();
     let mut repository = InstalledRepository::new(vec![RepositoryInterfaceHandle::new(installed)]);
 
+    reporter.add_package(BString::from("a"), BString::from("b"), BString::from("c"));
     reporter.add_package(
-        bstr::BString::from("a".to_string()),
-        bstr::BString::from("b".to_string()),
-        bstr::BString::from("c".to_string()),
-    );
-    reporter.add_package(
-        bstr::BString::from("source package".to_string()),
-        bstr::BString::from("target".to_string()),
-        bstr::BString::from("because reasons".to_string()),
+        BString::from("source package"),
+        BString::from("target"),
+        BString::from("because reasons"),
     );
 
     mock.borrow_mut()

@@ -1,17 +1,18 @@
 //! ref: composer/tests/Composer/Test/AllFunctionalTest.php
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 // The phar build (testBuildPhar / bin/compile) has no Rust equivalent: the binary under test is
 // produced by cargo and located via CARGO_BIN_EXE_shirabe. testIntegration runs the .test
 // integration fixtures by invoking that binary as a subprocess, mirroring the PHP harness which
 // shells out to the built composer.phar.
 
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::{
-    PhpMixed, bconcat, intval, os_str_from_bytes, php_regex, preg_match, preg_split_delim_capture,
-    trim, utf8_text,
+    PhpMixed, bconcat, intval, os_str_from_bytes, path_from_bytes, php_regex, preg_match,
+    preg_split_delim_capture, trim, utf8_text,
 };
 use std::path::{Path, PathBuf};
 
@@ -87,10 +88,10 @@ fn parse_test_file(file: &Path) -> IndexMap<BString, BString> {
         let sec = section.take().unwrap();
 
         // Allow sections to validate, or modify their section data.
-        let section_data = match utf8_text(&sec).unwrap_or_default() {
-            "EXPECT-EXIT-CODE" => intval(&PhpMixed::from(token)).to_string().into(),
-            "RUN" | "EXPECT" | "EXPECT-REGEX" | "EXPECT-REGEXES" => trim(&token),
-            "TEST" => token,
+        let section_data = match sec.as_bytes() {
+            b"EXPECT-EXIT-CODE" => bconcat!(intval(&PhpMixed::from(token))),
+            b"RUN" | b"EXPECT" | b"EXPECT-REGEX" | b"EXPECT-REGEXES" => trim(&token),
+            b"TEST" => token,
             _ => panic!(
                 "Unknown section \"{}\". Allowed sections: \"RUN\", \"EXPECT\", \"EXPECT-EXIT-CODE\", \"EXPECT-REGEX\", \"EXPECT-REGEXES\". \
                  Section headers must be written as \"--HEADER_NAME--\".",
@@ -193,10 +194,10 @@ fn expect_matches(expected: &[u8], output: &[u8]) {
 
 // ref: AllFunctionalTest::testIntegration (the @dataProvider getTestFiles datasets are wired up as
 // the individual #[test] functions below).
-fn run_integration(test_filename: &str) {
+fn run_integration(test_filename: &BStr) {
     let guard = set_up();
 
-    let test_file = fixtures_dir().join(test_filename);
+    let test_file = fixtures_dir().join(path_from_bytes(test_filename));
     let test_data = parse_test_file(&test_file);
 
     let test_dir = unique_tmp_directory();
@@ -204,15 +205,17 @@ fn run_integration(test_filename: &str) {
 
     // if a dir is present with the name of the .test file (without .test), we copy all its contents
     // in the $testDir to be used to run the test with
-    let test_file_setup_dir = fixtures_dir().join(test_filename.strip_suffix(".test").unwrap());
+    let test_file_setup_dir = fixtures_dir().join(path_from_bytes(
+        test_filename.strip_suffix(b".test").unwrap(),
+    ));
     if test_file_setup_dir.is_dir() {
         Filesystem::new(None)
             .copy(&test_file_setup_dir, &test_dir)
             .unwrap();
     }
 
-    let composer_home = format!("{}home", test_dir.display());
-    let composer_cache_dir = format!("{}cache", test_dir.display());
+    let composer_home = bconcat!(test_dir, "home");
+    let composer_cache_dir = bconcat!(test_dir, "cache");
 
     // PHP runs `escapeshellcmd(PHP_BINARY) . ' ' . escapeshellarg($pharPath) . ' --no-ansi ' . RUN`
     // via Process::fromShellCommandline; here the shirabe binary takes the place of php+phar. The
@@ -226,8 +229,8 @@ fn run_integration(test_filename: &str) {
         .arg("-c")
         .arg(os_str_from_bytes(&command_line))
         .current_dir(&test_dir)
-        .env("COMPOSER_HOME", &composer_home)
-        .env("COMPOSER_CACHE_DIR", &composer_cache_dir)
+        .env("COMPOSER_HOME", os_str_from_bytes(&composer_home))
+        .env("COMPOSER_CACHE_DIR", os_str_from_bytes(&composer_cache_dir))
         .output()
         .unwrap();
 
@@ -273,31 +276,33 @@ fn test_build_phar() {
 #[test]
 #[serial]
 fn test_integration_create_project_command() {
-    run_integration("create-project-command.test");
+    run_integration(BStr::new("create-project-command.test"));
 }
 
 #[test]
 #[serial]
 fn test_integration_create_project_shows_full_hash_for_dev_packages() {
-    run_integration("create-project-shows-full-hash-for-dev-packages.test");
+    run_integration(BStr::new(
+        "create-project-shows-full-hash-for-dev-packages.test",
+    ));
 }
 
 #[test]
 #[serial]
 #[ignore = "the fixture's Hooks read Composer\\InstalledVersions, which is not autoloadable in the plugin worker (the fixture ships no vendor/ directory), so the pre-update hook aborts with `Class \"Composer\\InstalledVersions\" not found`"]
 fn test_integration_installed_versions() {
-    run_integration("installed-versions.test");
+    run_integration(BStr::new("installed-versions.test"));
 }
 
 #[test]
 #[serial]
 #[ignore = "the plugin worker's Composer\\InstalledVersions is only reloaded on a repository write, never seeded from the project's installed.php at boot, so the fixture's plugins fail with `Package \"plugin/a\" is not installed`"]
 fn test_integration_installed_versions2() {
-    run_integration("installed-versions2.test");
+    run_integration(BStr::new("installed-versions2.test"));
 }
 
 #[test]
 #[serial]
 fn test_integration_plugin_autoloading_only_loads_dependencies() {
-    run_integration("plugin-autoloading-only-loads-dependencies.test");
+    run_integration(BStr::new("plugin-autoloading-only-loads-dependencies.test"));
 }

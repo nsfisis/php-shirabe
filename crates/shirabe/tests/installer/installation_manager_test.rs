@@ -2,6 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::test_case::get_package;
+use bstr::BStr;
 use shirabe::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,
 };
@@ -13,7 +14,7 @@ use shirabe::package::handle::CompletePackageHandle;
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 use shirabe_semver::VersionParser;
 
 /// ref: setUp(): the PHP loop/io mocks are never exercised by these tests (the loop has its
@@ -45,25 +46,35 @@ fn set_up() -> SetUp {
 // configured by any test (is_installed/download/prepare/cleanup/get_install_path, and the defaulted
 // as_binary_presence_interface/as_plugin_installer_mut) return the same defaults as an unconfigured
 // PHPUnit mock.
-mockall::mock! {
-    #[derive(Debug)]
-    pub Installer {
-        fn supports(&self, package_type: &bstr::BStr) -> bool;
-        fn install(
-            &self,
-            package: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        fn update(
-            &self,
-            initial: PackageInterfaceHandle,
-            target: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        fn uninstall(
-            &self,
-            package: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<PhpMixed>>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_installer {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub Installer {
+            pub fn supports(&self, package_type: &bstr::BStr) -> bool;
+            pub fn install(
+                &self,
+                package: PackageInterfaceHandle,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            pub fn update(
+                &self,
+                initial: PackageInterfaceHandle,
+                target: PackageInterfaceHandle,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            pub fn uninstall(
+                &self,
+                package: PackageInterfaceHandle,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+        }
     }
 }
+use mock_installer::MockInstaller;
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for MockInstaller {
@@ -251,14 +262,10 @@ impl BinaryPresenceInterface for BinaryInstaller {
 
 /// Builds a `CompletePackage` of the given type, mirroring TestCase::getPackage but with a custom
 /// type set via `__set_type` (PackageInterfaceHandle does not expose the setter).
-fn typed_package(name: &str, version: &str, r#type: &str) -> PackageInterfaceHandle {
+fn typed_package(name: &BStr, version: &BStr, r#type: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    let handle = CompletePackageHandle::new(
-        bstr::BString::from(name.to_string()),
-        norm_version,
-        bstr::BString::from(version.to_string()),
-    );
-    handle.__set_type(bstr::BString::from(r#type.to_string()));
+    let handle = CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(version));
+    handle.__set_type(bconcat!(r#type));
     handle.into()
 }
 
@@ -402,8 +409,16 @@ fn test_update_with_equal_types() {
 #[test]
 fn test_update_with_not_equal_types() {
     let set_up = set_up();
-    let initial = typed_package("test/initial", "1.0.0", "library");
-    let target = typed_package("test/target", "1.0.1", "bundles");
+    let initial = typed_package(
+        BStr::new("test/initial"),
+        BStr::new("1.0.0"),
+        BStr::new("library"),
+    );
+    let target = typed_package(
+        BStr::new("test/target"),
+        BStr::new("1.0.1"),
+        BStr::new("bundles"),
+    );
 
     let mut lib_installer = MockInstaller::new();
     lib_installer

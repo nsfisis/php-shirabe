@@ -1,5 +1,7 @@
 //! ref: composer/tests/Composer/Test/ComposerTest.php
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::composer::Composer;
 use shirabe::config::Config;
@@ -48,9 +50,9 @@ fn installation_manager(
 fn test_set_get_package() {
     let mut composer = Composer::new();
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-        bstr::BString::from("foo".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0.0".to_string()),
+        BString::from("foo"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0.0"),
     )
     .into();
     composer.set_package(package.clone());

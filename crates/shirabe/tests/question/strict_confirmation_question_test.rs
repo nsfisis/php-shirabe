@@ -1,50 +1,59 @@
 //! ref: composer/tests/Composer/Test/Question/StrictConfirmationQuestionTest.php
 
+use bstr::{BStr, BString, ByteSlice};
 use shirabe::question::StrictConfirmationQuestion;
-use shirabe_php_shim::{PhpMixed, PhpResource, fwrite_resource, php_fopen_resource, rewind};
+use shirabe_php_shim::{
+    PhpMixed, PhpResource, bconcat, error_message, fwrite_resource, php_fopen_resource, php_str,
+    rewind,
+};
 use shirabe_symfony_console::helper::{QuestionHelper, QuestionHelperInterface};
 use shirabe_symfony_console::input::{
     ArrayInput, InputValue, ParameterName, StreamableInputInterface,
 };
 use shirabe_symfony_console::output::{OutputInterface, StreamOutput};
 
-const TRUE_ANSWER_REGEX: &str = "/^y(?:es)?$/i";
-const FALSE_ANSWER_REGEX: &str = "/^no?$/i";
+const TRUE_ANSWER_REGEX: &BStr = php_str(b"/^y(?:es)?$/i");
+const FALSE_ANSWER_REGEX: &BStr = php_str(b"/^no?$/i");
 
-fn get_ask_confirmation_bad_data() -> Vec<&'static str> {
-    vec!["not correct", "no more", "yes please", "yellow"]
+fn get_ask_confirmation_bad_data() -> Vec<&'static BStr> {
+    vec![
+        BStr::new("not correct"),
+        BStr::new("no more"),
+        BStr::new("yes please"),
+        BStr::new("yellow"),
+    ]
 }
 
 #[test]
 fn test_ask_confirmation_bad_answer() {
     for answer in get_ask_confirmation_bad_data() {
-        let (mut input, mut dialog) = create_input(&format!("{}\n", answer));
+        let (mut input, mut dialog) = create_input(bconcat!(answer, "\n").as_bstr());
 
         let mut question = StrictConfirmationQuestion::new(
-            "Do you like French fries?".to_string(),
+            BString::from("Do you like French fries?"),
             true,
-            TRUE_ANSWER_REGEX.to_string(),
-            FALSE_ANSWER_REGEX.to_string(),
+            bconcat!(TRUE_ANSWER_REGEX),
+            bconcat!(FALSE_ANSWER_REGEX),
         );
         question.inner_mut().set_max_attempts(Some(1)).unwrap();
 
         let error = dialog
             .ask(&mut input, create_output_interface(), question.inner())
             .expect_err("expected an InvalidArgumentException");
-        assert_eq!(error.to_string(), "Please answer yes, y, no, or n.");
+        assert_eq!(error_message(&error), "Please answer yes, y, no, or n.");
     }
 }
 
 #[test]
 fn test_ask_confirmation() {
     for (question, expected, default) in get_ask_confirmation_data() {
-        let (mut input, mut dialog) = create_input(&format!("{}\n", question));
+        let (mut input, mut dialog) = create_input(bconcat!(question, "\n").as_bstr());
 
         let question = StrictConfirmationQuestion::new(
-            "Do you like French fries?".to_string(),
+            BString::from("Do you like French fries?"),
             default,
-            TRUE_ANSWER_REGEX.to_string(),
-            FALSE_ANSWER_REGEX.to_string(),
+            bconcat!(TRUE_ANSWER_REGEX),
+            bconcat!(FALSE_ANSWER_REGEX),
         );
         assert_eq!(
             dialog
@@ -58,27 +67,27 @@ fn test_ask_confirmation() {
     }
 }
 
-fn get_ask_confirmation_data() -> Vec<(&'static str, bool, bool)> {
+fn get_ask_confirmation_data() -> Vec<(&'static BStr, bool, bool)> {
     vec![
-        ("", true, true),
-        ("", false, false),
-        ("y", true, true),
-        ("yes", true, true),
-        ("n", false, true),
-        ("no", false, true),
+        (BStr::new(""), true, true),
+        (BStr::new(""), false, false),
+        (BStr::new("y"), true, true),
+        (BStr::new("yes"), true, true),
+        (BStr::new("n"), false, true),
+        (BStr::new("no"), false, true),
     ]
 }
 
 #[test]
 fn test_ask_confirmation_with_custom_true_and_false_answer() {
     let question = StrictConfirmationQuestion::new(
-        "Do you like French fries?".to_string(),
+        BString::from("Do you like French fries?"),
         false,
-        "/^ja$/i".to_string(),
-        "/^nein$/i".to_string(),
+        BString::from("/^ja$/i"),
+        BString::from("/^nein$/i"),
     );
 
-    let (mut input, mut dialog) = create_input("ja\n");
+    let (mut input, mut dialog) = create_input(BStr::new("ja\n"));
     assert_eq!(
         dialog
             .ask(&mut input, create_output_interface(), question.inner())
@@ -87,7 +96,7 @@ fn test_ask_confirmation_with_custom_true_and_false_answer() {
         PhpMixed::Bool(true)
     );
 
-    let (mut input, mut dialog) = create_input("nein\n");
+    let (mut input, mut dialog) = create_input(BStr::new("nein\n"));
     assert_eq!(
         dialog
             .ask(&mut input, create_output_interface(), question.inner())
@@ -97,7 +106,7 @@ fn test_ask_confirmation_with_custom_true_and_false_answer() {
     );
 }
 
-fn get_input_stream(input: &str) -> PhpResource {
+fn get_input_stream(input: &BStr) -> PhpResource {
     let stream = php_fopen_resource("php://memory", "r+");
 
     fwrite_resource(&stream, input);
@@ -114,11 +123,11 @@ fn create_output_interface() -> std::rc::Rc<std::cell::RefCell<dyn OutputInterfa
     std::rc::Rc::new(std::cell::RefCell::new(output))
 }
 
-fn create_input(entry: &str) -> (ArrayInput, QuestionHelper) {
+fn create_input(entry: &BStr) -> (ArrayInput, QuestionHelper) {
     let mut input = ArrayInput::new(
         vec![(
             ParameterName::Index(0),
-            InputValue::String(bstr::BString::from("--no-interaction".to_string())),
+            InputValue::String(BString::from("--no-interaction")),
         )],
         None,
     )

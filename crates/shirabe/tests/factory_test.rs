@@ -1,11 +1,12 @@
 //! ref: composer/tests/Composer/Test/FactoryTest.php
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::factory::Factory;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{PhpMixed, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bconcat, error_message, path_to_bytes};
 
 #[path = "common/config_stub.rs"]
 mod config_stub;
@@ -71,11 +72,12 @@ fn test_get_composer_json_path_fails_if_dir() {
     Platform::put_env("COMPOSER", dir);
     let err = Factory::get_composer_file().unwrap_err();
     assert_eq!(
-        format!(
-            "The COMPOSER environment variable is set to {} which is a directory, this variable should point to a composer.json or be left unset.",
-            dir
+        bconcat!(
+            "The COMPOSER environment variable is set to ",
+            dir,
+            " which is a directory, this variable should point to a composer.json or be left unset."
         ),
-        err.to_string()
+        error_message(&err)
     );
 }
 

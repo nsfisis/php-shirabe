@@ -1,10 +1,11 @@
 //! ref: composer/tests/Composer/Test/Config/JsonConfigSourceTest.php
 
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::{ConfigSourceInterface, JsonConfigSource};
 use shirabe::json::JsonFile;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -35,7 +36,7 @@ impl Drop for TearDown {
     }
 }
 
-fn fixture_path(name: &str) -> PathBuf {
+fn fixture_path(name: impl AsRef<std::path::Path>) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Config/Fixtures")
         .join(name)
@@ -64,8 +65,8 @@ fn test_add_repository() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".into(), PhpMixed::string("git".to_string()));
-    repo.insert("url".into(), PhpMixed::string("example.tld".to_string()));
+    repo.insert("type".into(), PhpMixed::string(BString::from("git")));
+    repo.insert("url".into(), PhpMixed::string(BString::from("example.tld")));
     json_config_source
         .add_repository(bstr::BStr::new("example_tld"), PhpMixed::Array(repo), true)
         .unwrap();
@@ -84,8 +85,8 @@ fn test_add_repository_as_list() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".into(), PhpMixed::string("git".to_string()));
-    repo.insert("url".into(), PhpMixed::string("example.tld".to_string()));
+    repo.insert("type".into(), PhpMixed::string(BString::from("git")));
+    repo.insert("url".into(), PhpMixed::string(BString::from("example.tld")));
     json_config_source
         .add_repository(bstr::BStr::new(""), PhpMixed::Array(repo), true)
         .unwrap();
@@ -104,16 +105,16 @@ fn test_add_repository_with_options() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".into(), PhpMixed::string("composer".to_string()));
+    repo.insert("type".into(), PhpMixed::string(BString::from("composer")));
     repo.insert(
         "url".into(),
-        PhpMixed::string("https://example.tld".to_string()),
+        PhpMixed::string(BString::from("https://example.tld")),
     );
     {
         let mut local_cert = IndexMap::new();
         local_cert.insert(
             "local_cert".into(),
-            PhpMixed::string("/home/composer/.ssl/composer.pem".to_string()),
+            PhpMixed::string(BString::from("/home/composer/.ssl/composer.pem")),
         );
         let mut ssl = IndexMap::new();
         ssl.insert("ssl".into(), PhpMixed::Array(local_cert));
@@ -181,150 +182,160 @@ fn test_remove_packagist() {
 }
 
 /// Mirror of provideAddLinkData(): (sourceFile, type, name, value, compareAgainst).
-fn provide_add_link_data() -> Vec<(PathBuf, &'static str, &'static str, &'static str, PathBuf)> {
+fn provide_add_link_data() -> Vec<(
+    PathBuf,
+    &'static BStr,
+    &'static BStr,
+    &'static BStr,
+    PathBuf,
+)> {
     let empty = fixture_path("composer-empty.json");
     let one_of_everything = fixture_path("composer-one-of-everything.json");
     let two_of_everything = fixture_path("composer-two-of-everything.json");
 
-    let add_link_data_arguments = |r#type: &'static str,
-                                   name: &'static str,
-                                   value: &'static str,
-                                   fixture_basename: &str,
+    let add_link_data_arguments = |r#type: &'static BStr,
+                                   name: &'static BStr,
+                                   value: &'static BStr,
+                                   fixture_basename: &BStr,
                                    before: &PathBuf| {
         (
             before.clone(),
             r#type,
             name,
             value,
-            fixture_path(&format!("addLink/{}.json", fixture_basename)),
+            fixture_path(path_from_bytes(&bconcat!(
+                "addLink/",
+                fixture_basename,
+                ".json"
+            ))),
         )
     };
 
     vec![
         add_link_data_arguments(
-            "require",
-            "my-vend/my-lib",
-            "1.*",
-            "require-from-empty",
+            BStr::new("require"),
+            BStr::new("my-vend/my-lib"),
+            BStr::new("1.*"),
+            BStr::new("require-from-empty"),
             &empty,
         ),
         add_link_data_arguments(
-            "require",
-            "my-vend/my-lib",
-            "1.*",
-            "require-from-oneOfEverything",
+            BStr::new("require"),
+            BStr::new("my-vend/my-lib"),
+            BStr::new("1.*"),
+            BStr::new("require-from-oneOfEverything"),
             &one_of_everything,
         ),
         add_link_data_arguments(
-            "require",
-            "my-vend/my-lib",
-            "1.*",
-            "require-from-twoOfEverything",
+            BStr::new("require"),
+            BStr::new("my-vend/my-lib"),
+            BStr::new("1.*"),
+            BStr::new("require-from-twoOfEverything"),
             &two_of_everything,
         ),
         add_link_data_arguments(
-            "require-dev",
-            "my-vend/my-lib-tests",
-            "1.*",
-            "require-dev-from-empty",
+            BStr::new("require-dev"),
+            BStr::new("my-vend/my-lib-tests"),
+            BStr::new("1.*"),
+            BStr::new("require-dev-from-empty"),
             &empty,
         ),
         add_link_data_arguments(
-            "require-dev",
-            "my-vend/my-lib-tests",
-            "1.*",
-            "require-dev-from-oneOfEverything",
+            BStr::new("require-dev"),
+            BStr::new("my-vend/my-lib-tests"),
+            BStr::new("1.*"),
+            BStr::new("require-dev-from-oneOfEverything"),
             &one_of_everything,
         ),
         add_link_data_arguments(
-            "require-dev",
-            "my-vend/my-lib-tests",
-            "1.*",
-            "require-dev-from-twoOfEverything",
+            BStr::new("require-dev"),
+            BStr::new("my-vend/my-lib-tests"),
+            BStr::new("1.*"),
+            BStr::new("require-dev-from-twoOfEverything"),
             &two_of_everything,
         ),
         add_link_data_arguments(
-            "provide",
-            "my-vend/my-lib-interface",
-            "1.*",
-            "provide-from-empty",
+            BStr::new("provide"),
+            BStr::new("my-vend/my-lib-interface"),
+            BStr::new("1.*"),
+            BStr::new("provide-from-empty"),
             &empty,
         ),
         add_link_data_arguments(
-            "provide",
-            "my-vend/my-lib-interface",
-            "1.*",
-            "provide-from-oneOfEverything",
+            BStr::new("provide"),
+            BStr::new("my-vend/my-lib-interface"),
+            BStr::new("1.*"),
+            BStr::new("provide-from-oneOfEverything"),
             &one_of_everything,
         ),
         add_link_data_arguments(
-            "provide",
-            "my-vend/my-lib-interface",
-            "1.*",
-            "provide-from-twoOfEverything",
+            BStr::new("provide"),
+            BStr::new("my-vend/my-lib-interface"),
+            BStr::new("1.*"),
+            BStr::new("provide-from-twoOfEverything"),
             &two_of_everything,
         ),
         add_link_data_arguments(
-            "suggest",
-            "my-vend/my-optional-extension",
-            "1.*",
-            "suggest-from-empty",
+            BStr::new("suggest"),
+            BStr::new("my-vend/my-optional-extension"),
+            BStr::new("1.*"),
+            BStr::new("suggest-from-empty"),
             &empty,
         ),
         add_link_data_arguments(
-            "suggest",
-            "my-vend/my-optional-extension",
-            "1.*",
-            "suggest-from-oneOfEverything",
+            BStr::new("suggest"),
+            BStr::new("my-vend/my-optional-extension"),
+            BStr::new("1.*"),
+            BStr::new("suggest-from-oneOfEverything"),
             &one_of_everything,
         ),
         add_link_data_arguments(
-            "suggest",
-            "my-vend/my-optional-extension",
-            "1.*",
-            "suggest-from-twoOfEverything",
+            BStr::new("suggest"),
+            BStr::new("my-vend/my-optional-extension"),
+            BStr::new("1.*"),
+            BStr::new("suggest-from-twoOfEverything"),
             &two_of_everything,
         ),
         add_link_data_arguments(
-            "replace",
-            "my-vend/other-app",
-            "1.*",
-            "replace-from-empty",
+            BStr::new("replace"),
+            BStr::new("my-vend/other-app"),
+            BStr::new("1.*"),
+            BStr::new("replace-from-empty"),
             &empty,
         ),
         add_link_data_arguments(
-            "replace",
-            "my-vend/other-app",
-            "1.*",
-            "replace-from-oneOfEverything",
+            BStr::new("replace"),
+            BStr::new("my-vend/other-app"),
+            BStr::new("1.*"),
+            BStr::new("replace-from-oneOfEverything"),
             &one_of_everything,
         ),
         add_link_data_arguments(
-            "replace",
-            "my-vend/other-app",
-            "1.*",
-            "replace-from-twoOfEverything",
+            BStr::new("replace"),
+            BStr::new("my-vend/other-app"),
+            BStr::new("1.*"),
+            BStr::new("replace-from-twoOfEverything"),
             &two_of_everything,
         ),
         add_link_data_arguments(
-            "conflict",
-            "my-vend/my-old-app",
-            "1.*",
-            "conflict-from-empty",
+            BStr::new("conflict"),
+            BStr::new("my-vend/my-old-app"),
+            BStr::new("1.*"),
+            BStr::new("conflict-from-empty"),
             &empty,
         ),
         add_link_data_arguments(
-            "conflict",
-            "my-vend/my-old-app",
-            "1.*",
-            "conflict-from-oneOfEverything",
+            BStr::new("conflict"),
+            BStr::new("my-vend/my-old-app"),
+            BStr::new("1.*"),
+            BStr::new("conflict-from-oneOfEverything"),
             &one_of_everything,
         ),
         add_link_data_arguments(
-            "conflict",
-            "my-vend/my-old-app",
-            "1.*",
-            "conflict-from-twoOfEverything",
+            BStr::new("conflict"),
+            BStr::new("my-vend/my-old-app"),
+            BStr::new("1.*"),
+            BStr::new("conflict-from-twoOfEverything"),
             &two_of_everything,
         ),
     ]
@@ -351,20 +362,28 @@ fn test_add_link() {
 }
 
 /// Mirror of provideRemoveLinkData(): (sourceFile, type, name, compareAgainst).
-fn provide_remove_link_data() -> Vec<(PathBuf, &'static str, &'static str, PathBuf)> {
+fn provide_remove_link_data() -> Vec<(PathBuf, &'static BStr, &'static BStr, PathBuf)> {
     let one_of_everything = fixture_path("composer-one-of-everything.json");
     let two_of_everything = fixture_path("composer-two-of-everything.json");
 
     let remove_link_data_arguments =
-        |r#type: &'static str,
-         name: &'static str,
-         fixture_basename: &str,
+        |r#type: &'static BStr,
+         name: &'static BStr,
+         fixture_basename: &BStr,
          after: Option<&PathBuf>| {
             let after = after.cloned().unwrap_or_else(|| {
-                fixture_path(&format!("removeLink/{}-after.json", fixture_basename))
+                fixture_path(path_from_bytes(&bconcat!(
+                    "removeLink/",
+                    fixture_basename,
+                    "-after.json"
+                )))
             });
             (
-                fixture_path(&format!("removeLink/{}.json", fixture_basename)),
+                fixture_path(path_from_bytes(&bconcat!(
+                    "removeLink/",
+                    fixture_basename,
+                    ".json"
+                ))),
                 r#type,
                 name,
                 after,
@@ -372,97 +391,112 @@ fn provide_remove_link_data() -> Vec<(PathBuf, &'static str, &'static str, PathB
         };
 
     vec![
-        remove_link_data_arguments("require", "my-vend/my-lib", "require-to-empty", None),
         remove_link_data_arguments(
-            "require",
-            "my-vend/my-lib",
-            "require-to-oneOfEverything",
-            Some(&one_of_everything),
-        ),
-        remove_link_data_arguments(
-            "require",
-            "my-vend/my-lib",
-            "require-to-twoOfEverything",
-            Some(&two_of_everything),
-        ),
-        remove_link_data_arguments(
-            "require-dev",
-            "my-vend/my-lib-tests",
-            "require-dev-to-empty",
+            BStr::new("require"),
+            BStr::new("my-vend/my-lib"),
+            BStr::new("require-to-empty"),
             None,
         ),
         remove_link_data_arguments(
-            "require-dev",
-            "my-vend/my-lib-tests",
-            "require-dev-to-oneOfEverything",
+            BStr::new("require"),
+            BStr::new("my-vend/my-lib"),
+            BStr::new("require-to-oneOfEverything"),
             Some(&one_of_everything),
         ),
         remove_link_data_arguments(
-            "require-dev",
-            "my-vend/my-lib-tests",
-            "require-dev-to-twoOfEverything",
+            BStr::new("require"),
+            BStr::new("my-vend/my-lib"),
+            BStr::new("require-to-twoOfEverything"),
             Some(&two_of_everything),
         ),
         remove_link_data_arguments(
-            "provide",
-            "my-vend/my-lib-interface",
-            "provide-to-empty",
+            BStr::new("require-dev"),
+            BStr::new("my-vend/my-lib-tests"),
+            BStr::new("require-dev-to-empty"),
             None,
         ),
         remove_link_data_arguments(
-            "provide",
-            "my-vend/my-lib-interface",
-            "provide-to-oneOfEverything",
+            BStr::new("require-dev"),
+            BStr::new("my-vend/my-lib-tests"),
+            BStr::new("require-dev-to-oneOfEverything"),
             Some(&one_of_everything),
         ),
         remove_link_data_arguments(
-            "provide",
-            "my-vend/my-lib-interface",
-            "provide-to-twoOfEverything",
+            BStr::new("require-dev"),
+            BStr::new("my-vend/my-lib-tests"),
+            BStr::new("require-dev-to-twoOfEverything"),
             Some(&two_of_everything),
         ),
         remove_link_data_arguments(
-            "suggest",
-            "my-vend/my-optional-extension",
-            "suggest-to-empty",
+            BStr::new("provide"),
+            BStr::new("my-vend/my-lib-interface"),
+            BStr::new("provide-to-empty"),
             None,
         ),
         remove_link_data_arguments(
-            "suggest",
-            "my-vend/my-optional-extension",
-            "suggest-to-oneOfEverything",
+            BStr::new("provide"),
+            BStr::new("my-vend/my-lib-interface"),
+            BStr::new("provide-to-oneOfEverything"),
             Some(&one_of_everything),
         ),
         remove_link_data_arguments(
-            "suggest",
-            "my-vend/my-optional-extension",
-            "suggest-to-twoOfEverything",
+            BStr::new("provide"),
+            BStr::new("my-vend/my-lib-interface"),
+            BStr::new("provide-to-twoOfEverything"),
             Some(&two_of_everything),
         ),
-        remove_link_data_arguments("replace", "my-vend/other-app", "replace-to-empty", None),
         remove_link_data_arguments(
-            "replace",
-            "my-vend/other-app",
-            "replace-to-oneOfEverything",
+            BStr::new("suggest"),
+            BStr::new("my-vend/my-optional-extension"),
+            BStr::new("suggest-to-empty"),
+            None,
+        ),
+        remove_link_data_arguments(
+            BStr::new("suggest"),
+            BStr::new("my-vend/my-optional-extension"),
+            BStr::new("suggest-to-oneOfEverything"),
             Some(&one_of_everything),
         ),
         remove_link_data_arguments(
-            "replace",
-            "my-vend/other-app",
-            "replace-to-twoOfEverything",
+            BStr::new("suggest"),
+            BStr::new("my-vend/my-optional-extension"),
+            BStr::new("suggest-to-twoOfEverything"),
             Some(&two_of_everything),
         ),
-        remove_link_data_arguments("conflict", "my-vend/my-old-app", "conflict-to-empty", None),
         remove_link_data_arguments(
-            "conflict",
-            "my-vend/my-old-app",
-            "conflict-to-oneOfEverything",
+            BStr::new("replace"),
+            BStr::new("my-vend/other-app"),
+            BStr::new("replace-to-empty"),
+            None,
+        ),
+        remove_link_data_arguments(
+            BStr::new("replace"),
+            BStr::new("my-vend/other-app"),
+            BStr::new("replace-to-oneOfEverything"),
             Some(&one_of_everything),
         ),
         remove_link_data_arguments(
-            "conflict",
-            "my-vend/my-old-app",
-            "conflict-to-twoOfEverything",
+            BStr::new("replace"),
+            BStr::new("my-vend/other-app"),
+            BStr::new("replace-to-twoOfEverything"),
+            Some(&two_of_everything),
+        ),
+        remove_link_data_arguments(
+            BStr::new("conflict"),
+            BStr::new("my-vend/my-old-app"),
+            BStr::new("conflict-to-empty"),
+            None,
+        ),
+        remove_link_data_arguments(
+            BStr::new("conflict"),
+            BStr::new("my-vend/my-old-app"),
+            BStr::new("conflict-to-oneOfEverything"),
+            Some(&one_of_everything),
+        ),
+        remove_link_data_arguments(
+            BStr::new("conflict"),
+            BStr::new("my-vend/my-old-app"),
+            BStr::new("conflict-to-twoOfEverything"),
             Some(&two_of_everything),
         ),
     ]

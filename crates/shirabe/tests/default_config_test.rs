@@ -1,4 +1,5 @@
 //! ref: composer/tests/Composer/Test/DefaultConfigTest.php
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use shirabe::config::Config;
 use shirabe_php_shim::PhpMixed;

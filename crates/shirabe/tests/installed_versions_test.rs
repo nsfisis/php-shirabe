@@ -4,20 +4,22 @@
 //! the PHP worker against the copy `FilesystemRepository::write` dumps. These tests drive the real
 //! PHP class there, autoloaded from the Composer checkout's vendor directory just as PHPUnit
 //! autoloads it upstream, so `$selfDir` and the registered `ClassLoader` match the upstream run.
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 #[path = "common/php_worker.rs"]
 mod php_worker;
 
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use php_worker::{
     load_composer_php_runtime, lock_php_worker, php_call_static, php_eval, php_runtime_available,
     php_single_quote,
 };
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes, path_to_bytes, realpath};
+use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str, realpath};
 use tempfile::TempDir;
 
-const INSTALLED_VERSIONS: &str = "Composer\\InstalledVersions";
+const INSTALLED_VERSIONS: &BStr = php_str(b"Composer\\InstalledVersions");
 
 /// `$this->root` of the upstream test class, kept alive for the duration of one test.
 struct SetUp {
@@ -48,7 +50,7 @@ fn set_up() -> SetUp {
 
     let root = TempDir::new().unwrap();
     let data = fixture_data(root.path());
-    call_static("reload", vec![data]);
+    call_static(BStr::new("reload"), vec![data]);
     SetUp { root }
 }
 
@@ -64,7 +66,7 @@ fn fixture_data(dir: &std::path::Path) -> PluginValue {
     ))
 }
 
-fn fixture_path(name: &str) -> std::path::PathBuf {
+fn fixture_path(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Repository/Fixtures")
         .join(name)
@@ -72,7 +74,7 @@ fn fixture_path(name: &str) -> std::path::PathBuf {
         .expect("the Composer checkout must provide the repository fixtures")
 }
 
-fn call_static(method: &str, args: Vec<PluginValue>) -> PluginValue {
+fn call_static(method: &BStr, args: Vec<PluginValue>) -> PluginValue {
     php_call_static(INSTALLED_VERSIONS, method, args)
 }
 
@@ -83,11 +85,11 @@ fn string_of(value: &PluginValue) -> bstr::BString {
     }
 }
 
-fn string_list(names: &[&str]) -> PluginValue {
+fn string_list(names: &[impl AsRef<[u8]>]) -> PluginValue {
     PluginValue::List(
         names
             .iter()
-            .map(|name| PluginValue::string(*name))
+            .map(|name| PluginValue::string(name.as_ref()))
             .collect(),
     )
 }
@@ -113,7 +115,7 @@ fn test_get_installed_packages() {
     ];
     assert_eq!(
         string_list(&names),
-        call_static("getInstalledPackages", vec![])
+        call_static(BStr::new("getInstalledPackages"), vec![])
     );
 }
 
@@ -129,27 +131,28 @@ fn test_is_installed() {
         assert_eq!(
             PluginValue::Bool(expected),
             call_static(
-                "isInstalled",
+                BStr::new("isInstalled"),
                 vec![
                     PluginValue::string(name),
                     PluginValue::Bool(include_dev_requirements)
                 ]
             ),
             "isInstalled({name}, {include_dev_requirements})",
+            name = name.display_lossy(),
         );
     }
 }
 
-fn is_installed_provider() -> Vec<(bool, &'static str, bool)> {
+fn is_installed_provider() -> Vec<(bool, &'static BStr, bool)> {
     vec![
-        (true, "foo/impl", true),
-        (true, "foo/replaced", true),
-        (true, "c/c", true),
-        (false, "c/c", false),
-        (true, "__root__", true),
-        (true, "b/replacer", true),
-        (false, "not/there", true),
-        (true, "meta/package", true),
+        (true, BStr::new("foo/impl"), true),
+        (true, BStr::new("foo/replaced"), true),
+        (true, BStr::new("c/c"), true),
+        (false, BStr::new("c/c"), false),
+        (true, BStr::new("__root__"), true),
+        (true, BStr::new("b/replacer"), true),
+        (false, BStr::new("not/there"), true),
+        (true, BStr::new("meta/package"), true),
     ]
 }
 
@@ -165,7 +168,7 @@ fn test_satisfies() {
         assert_eq!(
             PluginValue::Bool(expected),
             call_static(
-                "satisfies",
+                BStr::new("satisfies"),
                 vec![
                     new_version_parser(),
                     PluginValue::string(name),
@@ -173,6 +176,8 @@ fn test_satisfies() {
                 ]
             ),
             "satisfies({name}, {constraint})",
+            name = name.display_lossy(),
+            constraint = constraint.display_lossy(),
         );
     }
 }
@@ -183,27 +188,27 @@ fn new_version_parser() -> PluginValue {
         .expect("VersionParser threw")
 }
 
-fn satisfies_provider() -> Vec<(bool, &'static str, &'static str)> {
+fn satisfies_provider() -> Vec<(bool, &'static BStr, &'static BStr)> {
     vec![
-        (true, "foo/impl", "1.5"),
-        (true, "foo/impl", "1.2"),
-        (true, "foo/impl", "^1.0"),
-        (true, "foo/impl", "^3 || ^2"),
-        (false, "foo/impl", "^3"),
-        (true, "foo/replaced", "3.5"),
-        (true, "foo/replaced", "^3.2"),
-        (false, "foo/replaced", "4.0"),
-        (true, "c/c", "3.0.0"),
-        (true, "c/c", "^3"),
-        (false, "c/c", "^3.1"),
-        (true, "__root__", "dev-master"),
-        (true, "__root__", "^1.10"),
-        (false, "__root__", "^2"),
-        (true, "b/replacer", "^2.1"),
-        (false, "b/replacer", "^2.3"),
-        (true, "a/provider2", "^1.2"),
-        (true, "a/provider2", "^1.4"),
-        (false, "a/provider2", "^1.5"),
+        (true, BStr::new("foo/impl"), BStr::new("1.5")),
+        (true, BStr::new("foo/impl"), BStr::new("1.2")),
+        (true, BStr::new("foo/impl"), BStr::new("^1.0")),
+        (true, BStr::new("foo/impl"), BStr::new("^3 || ^2")),
+        (false, BStr::new("foo/impl"), BStr::new("^3")),
+        (true, BStr::new("foo/replaced"), BStr::new("3.5")),
+        (true, BStr::new("foo/replaced"), BStr::new("^3.2")),
+        (false, BStr::new("foo/replaced"), BStr::new("4.0")),
+        (true, BStr::new("c/c"), BStr::new("3.0.0")),
+        (true, BStr::new("c/c"), BStr::new("^3")),
+        (false, BStr::new("c/c"), BStr::new("^3.1")),
+        (true, BStr::new("__root__"), BStr::new("dev-master")),
+        (true, BStr::new("__root__"), BStr::new("^1.10")),
+        (false, BStr::new("__root__"), BStr::new("^2")),
+        (true, BStr::new("b/replacer"), BStr::new("^2.1")),
+        (false, BStr::new("b/replacer"), BStr::new("^2.3")),
+        (true, BStr::new("a/provider2"), BStr::new("^1.2")),
+        (true, BStr::new("a/provider2"), BStr::new("^1.4")),
+        (false, BStr::new("a/provider2"), BStr::new("^1.5")),
     ]
 }
 
@@ -218,22 +223,29 @@ fn test_get_version_ranges() {
     for (expected, name) in get_version_ranges_provider() {
         assert_eq!(
             PluginValue::string(expected),
-            call_static("getVersionRanges", vec![PluginValue::string(name)]),
+            call_static(
+                BStr::new("getVersionRanges"),
+                vec![PluginValue::string(name)]
+            ),
             "getVersionRanges({name})",
+            name = name.display_lossy(),
         );
     }
 }
 
-fn get_version_ranges_provider() -> Vec<(&'static str, &'static str)> {
+fn get_version_ranges_provider() -> Vec<(&'static BStr, &'static BStr)> {
     vec![
-        ("dev-master || 1.10.x-dev", "__root__"),
-        ("^1.1 || 1.2 || 1.4 || 2.0", "foo/impl"),
-        ("2.2 || 2.0", "foo/impl2"),
-        ("^3.0", "foo/replaced"),
-        ("1.1", "a/provider"),
-        ("1.2 || 1.4", "a/provider2"),
-        ("2.2", "b/replacer"),
-        ("3.0", "c/c"),
+        (BStr::new("dev-master || 1.10.x-dev"), BStr::new("__root__")),
+        (
+            BStr::new("^1.1 || 1.2 || 1.4 || 2.0"),
+            BStr::new("foo/impl"),
+        ),
+        (BStr::new("2.2 || 2.0"), BStr::new("foo/impl2")),
+        (BStr::new("^3.0"), BStr::new("foo/replaced")),
+        (BStr::new("1.1"), BStr::new("a/provider")),
+        (BStr::new("1.2 || 1.4"), BStr::new("a/provider2")),
+        (BStr::new("2.2"), BStr::new("b/replacer")),
+        (BStr::new("3.0"), BStr::new("c/c")),
     ]
 }
 
@@ -248,22 +260,23 @@ fn test_get_version() {
     for (expected, name) in get_version_provider() {
         assert_eq!(
             optional_string(expected),
-            call_static("getVersion", vec![PluginValue::string(name)]),
+            call_static(BStr::new("getVersion"), vec![PluginValue::string(name)]),
             "getVersion({name})",
+            name = name.display_lossy(),
         );
     }
 }
 
-fn get_version_provider() -> Vec<(Option<&'static str>, &'static str)> {
+fn get_version_provider() -> Vec<(Option<&'static BStr>, &'static BStr)> {
     vec![
-        (Some("dev-master"), "__root__"),
-        (None, "foo/impl"),
-        (None, "foo/impl2"),
-        (None, "foo/replaced"),
-        (Some("1.1.0.0"), "a/provider"),
-        (Some("1.2.0.0"), "a/provider2"),
-        (Some("2.2.0.0"), "b/replacer"),
-        (Some("3.0.0.0"), "c/c"),
+        (Some(BStr::new("dev-master")), BStr::new("__root__")),
+        (None, BStr::new("foo/impl")),
+        (None, BStr::new("foo/impl2")),
+        (None, BStr::new("foo/replaced")),
+        (Some(BStr::new("1.1.0.0")), BStr::new("a/provider")),
+        (Some(BStr::new("1.2.0.0")), BStr::new("a/provider2")),
+        (Some(BStr::new("2.2.0.0")), BStr::new("b/replacer")),
+        (Some(BStr::new("3.0.0.0")), BStr::new("c/c")),
     ]
 }
 
@@ -278,26 +291,30 @@ fn test_get_pretty_version() {
     for (expected, name) in get_pretty_version_provider() {
         assert_eq!(
             optional_string(expected),
-            call_static("getPrettyVersion", vec![PluginValue::string(name)]),
+            call_static(
+                BStr::new("getPrettyVersion"),
+                vec![PluginValue::string(name)]
+            ),
             "getPrettyVersion({name})",
+            name = name.display_lossy(),
         );
     }
 }
 
-fn get_pretty_version_provider() -> Vec<(Option<&'static str>, &'static str)> {
+fn get_pretty_version_provider() -> Vec<(Option<&'static BStr>, &'static BStr)> {
     vec![
-        (Some("dev-master"), "__root__"),
-        (None, "foo/impl"),
-        (None, "foo/impl2"),
-        (None, "foo/replaced"),
-        (Some("1.1"), "a/provider"),
-        (Some("1.2"), "a/provider2"),
-        (Some("2.2"), "b/replacer"),
-        (Some("3.0"), "c/c"),
+        (Some(BStr::new("dev-master")), BStr::new("__root__")),
+        (None, BStr::new("foo/impl")),
+        (None, BStr::new("foo/impl2")),
+        (None, BStr::new("foo/replaced")),
+        (Some(BStr::new("1.1")), BStr::new("a/provider")),
+        (Some(BStr::new("1.2")), BStr::new("a/provider2")),
+        (Some(BStr::new("2.2")), BStr::new("b/replacer")),
+        (Some(BStr::new("3.0")), BStr::new("c/c")),
     ]
 }
 
-fn optional_string(value: Option<&str>) -> PluginValue {
+fn optional_string(value: Option<&BStr>) -> PluginValue {
     match value {
         Some(value) => PluginValue::string(value),
         None => PluginValue::Null,
@@ -332,31 +349,34 @@ fn test_get_root_package() {
     let set_up = set_up();
 
     let expected = PhpMixed::Array(IndexMap::from([
-        ("name".into(), PhpMixed::string("__root__".to_string())),
+        ("name".into(), PhpMixed::string(BString::from("__root__"))),
         (
             "pretty_version".into(),
-            PhpMixed::string("dev-master".to_string()),
+            PhpMixed::string(BString::from("dev-master")),
         ),
-        ("version".into(), PhpMixed::string("dev-master".to_string())),
+        (
+            "version".into(),
+            PhpMixed::string(BString::from("dev-master")),
+        ),
         (
             "reference".into(),
-            PhpMixed::string("sourceref-by-default".to_string()),
+            PhpMixed::string(BString::from("sourceref-by-default")),
         ),
-        ("type".into(), PhpMixed::string("library".to_string())),
+        ("type".into(), PhpMixed::string(BString::from("library"))),
         (
             "install_path".into(),
             PhpMixed::string(bconcat!(set_up.root(), "/./")),
         ),
         (
             "aliases".into(),
-            PhpMixed::List(vec![PhpMixed::string("1.10.x-dev".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("1.10.x-dev"))]),
         ),
         ("dev".into(), PhpMixed::Bool(true)),
     ]));
 
     assert_eq!(
         PluginValue::from_php_mixed(&expected),
-        call_static("getRootPackage", vec![])
+        call_static(BStr::new("getRootPackage"), vec![])
     );
 }
 
@@ -370,7 +390,7 @@ fn test_get_raw_data() {
 
     assert_eq!(
         fixture_data(set_up.root()),
-        call_static("getRawData", vec![])
+        call_static(BStr::new("getRawData"), vec![])
     );
 }
 
@@ -385,22 +405,32 @@ fn test_get_reference() {
     for (expected, name) in get_reference_provider() {
         assert_eq!(
             optional_string(expected),
-            call_static("getReference", vec![PluginValue::string(name)]),
+            call_static(BStr::new("getReference"), vec![PluginValue::string(name)]),
             "getReference({name})",
+            name = name.display_lossy(),
         );
     }
 }
 
-fn get_reference_provider() -> Vec<(Option<&'static str>, &'static str)> {
+fn get_reference_provider() -> Vec<(Option<&'static BStr>, &'static BStr)> {
     vec![
-        (Some("sourceref-by-default"), "__root__"),
-        (None, "foo/impl"),
-        (None, "foo/impl2"),
-        (None, "foo/replaced"),
-        (Some("distref-as-no-source"), "a/provider"),
-        (Some("distref-as-installed-from-dist"), "a/provider2"),
-        (None, "b/replacer"),
-        (None, "c/c"),
+        (
+            Some(BStr::new("sourceref-by-default")),
+            BStr::new("__root__"),
+        ),
+        (None, BStr::new("foo/impl")),
+        (None, BStr::new("foo/impl2")),
+        (None, BStr::new("foo/replaced")),
+        (
+            Some(BStr::new("distref-as-no-source")),
+            BStr::new("a/provider"),
+        ),
+        (
+            Some(BStr::new("distref-as-installed-from-dist")),
+            BStr::new("a/provider2"),
+        ),
+        (None, BStr::new("b/replacer")),
+        (None, BStr::new("c/c")),
     ]
 }
 
@@ -416,7 +446,7 @@ fn test_get_installed_packages_by_type() {
     assert_eq!(
         string_list(&names),
         call_static(
-            "getInstalledPackagesByType",
+            BStr::new("getInstalledPackagesByType"),
             vec![PluginValue::string("library")]
         )
     );
@@ -431,7 +461,7 @@ fn test_get_install_path() {
     let set_up = set_up();
 
     let root_install_path = string_of(&call_static(
-        "getInstallPath",
+        BStr::new("getInstallPath"),
         vec![PluginValue::string("__root__")],
     ));
     assert_eq!(
@@ -441,11 +471,17 @@ fn test_get_install_path() {
     );
     assert_eq!(
         PluginValue::string("/foo/bar/vendor/c/c"),
-        call_static("getInstallPath", vec![PluginValue::string("c/c")])
+        call_static(
+            BStr::new("getInstallPath"),
+            vec![PluginValue::string("c/c")]
+        )
     );
     assert_eq!(
         PluginValue::Null,
-        call_static("getInstallPath", vec![PluginValue::string("foo/impl")])
+        call_static(
+            BStr::new("getInstallPath"),
+            vec![PluginValue::string("foo/impl")]
+        )
     );
 }
 
@@ -472,25 +508,34 @@ fn test_with_class_loader_loaded() {
 
     assert_eq!(
         PluginValue::Bool(false),
-        call_static("isInstalled", vec![PluginValue::string("foo/bar")])
+        call_static(
+            BStr::new("isInstalled"),
+            vec![PluginValue::string("foo/bar")]
+        )
     );
     let reloaded = PluginValue::Array(IndexMap::from([
-        ("root".into(), call_static("getRootPackage", vec![])),
+        (
+            "root".into(),
+            call_static(BStr::new("getRootPackage"), vec![]),
+        ),
         (
             "versions".into(),
             PluginValue::Array(IndexMap::from([(
                 "foo/bar".into(),
                 PluginValue::from_php_mixed(&PhpMixed::Array(IndexMap::from([
-                    ("version".into(), PhpMixed::string("1.0.0".to_string())),
+                    ("version".into(), PhpMixed::string(BString::from("1.0.0"))),
                     ("dev_requirement".into(), PhpMixed::Bool(false)),
                 ]))),
             )])),
         ),
     ]));
-    call_static("reload", vec![reloaded]);
+    call_static(BStr::new("reload"), vec![reloaded]);
     assert_eq!(
         PluginValue::Bool(true),
-        call_static("isInstalled", vec![PluginValue::string("foo/bar")])
+        call_static(
+            BStr::new("isInstalled"),
+            vec![PluginValue::string("foo/bar")]
+        )
     );
 
     php_eval(

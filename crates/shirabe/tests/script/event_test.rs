@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Script/EventTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
@@ -16,9 +17,9 @@ fn create_composer_instance() -> ComposerHandle {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     composer.borrow_mut().set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-        bstr::BString::from("foo".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0.0".to_string()),
+        BString::from("foo"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0.0"),
     )
     .into();
     composer.borrow_mut().set_package(package);
@@ -31,10 +32,11 @@ fn test_event_sets_originating_event() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let composer = create_composer_instance();
 
-    let originating_event = BaseEvent::new("originatingEvent".to_string(), vec![], IndexMap::new());
+    let originating_event =
+        BaseEvent::new(BString::from("originatingEvent"), vec![], IndexMap::new());
 
     let mut script_event = Event::new(
-        "test".to_string(),
+        BString::from("test"),
         composer.downgrade(),
         io,
         true,
@@ -65,11 +67,14 @@ fn test_event_calculates_nested_originating_event() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let composer = create_composer_instance();
 
-    let originating_event =
-        BaseEvent::new("upperOriginatingEvent".to_string(), vec![], IndexMap::new());
+    let originating_event = BaseEvent::new(
+        BString::from("upperOriginatingEvent"),
+        vec![],
+        IndexMap::new(),
+    );
 
     let mut intermediate_event = Event::new(
-        "intermediate".to_string(),
+        BString::from("intermediate"),
         composer.downgrade(),
         io.clone(),
         true,
@@ -79,7 +84,7 @@ fn test_event_calculates_nested_originating_event() {
     intermediate_event.set_originating_event(OriginatingEvent::Base(originating_event));
 
     let mut script_event = Event::new(
-        "test".to_string(),
+        BString::from("test"),
         composer.downgrade(),
         io,
         true,

@@ -1,10 +1,12 @@
 //! ref: composer/tests/Composer/Test/CacheTest.php
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::BStr;
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::filesystem::Filesystem;
+use shirabe_php_shim::{bconcat, path_from_bytes};
 use std::fs;
 use tempfile::TempDir;
 
@@ -20,7 +22,9 @@ fn set_up() -> SetUp {
     let zeros = "0".repeat(1000);
 
     for i in 0..4 {
-        let path = root.path().join(format!("cached.file{}.zip", i));
+        let path = root
+            .path()
+            .join(path_from_bytes(&bconcat!("cached.file", i, ".zip")));
         fs::write(&path, &zeros).unwrap();
         files.push(path);
     }

@@ -22,70 +22,90 @@ use tempfile::TempDir;
 // PHP mocks `Composer\Downloader\DownloadManager` with getMockBuilder and asserts its
 // install/update/remove calls; here the equivalent mock is injected into the Composer via
 // setDownloadManager.
-mockall::mock! {
-    #[derive(Debug)]
-    pub DownloadManager {}
-    #[async_trait::async_trait(?Send)]
-    impl DownloadManagerInterface for DownloadManager {
-        fn set_prefer_source(&self, prefer_source: bool);
-        fn set_prefer_dist(&self, prefer_dist: bool);
-        fn get_downloader_for_package(
-            &self,
-            package: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>;
-        async fn download(
-            &self,
-            package: PackageInterfaceHandle,
-            target_dir: &std::path::Path,
-            prev_package: Option<PackageInterfaceHandle>,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn prepare(
-            &self,
-            r#type: &bstr::BStr,
-            package: PackageInterfaceHandle,
-            target_dir: &std::path::Path,
-            prev_package: Option<PackageInterfaceHandle>,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn install(
-            &self,
-            package: PackageInterfaceHandle,
-            target_dir: &std::path::Path,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn update(
-            &self,
-            initial: PackageInterfaceHandle,
-            target: PackageInterfaceHandle,
-            target_dir: &std::path::Path,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn remove(
-            &self,
-            package: PackageInterfaceHandle,
-            target_dir: &std::path::Path,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn cleanup(
-            &self,
-            r#type: &bstr::BStr,
-            package: PackageInterfaceHandle,
-            target_dir: &std::path::Path,
-            prev_package: Option<PackageInterfaceHandle>,
-        ) -> anyhow::Result<Option<PhpMixed>>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_download_manager {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub DownloadManager {}
+        #[async_trait::async_trait(?Send)]
+        impl DownloadManagerInterface for DownloadManager {
+            fn set_prefer_source(&self, prefer_source: bool);
+            fn set_prefer_dist(&self, prefer_dist: bool);
+            fn get_downloader_for_package(
+                &self,
+                package: PackageInterfaceHandle,
+            ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>;
+            async fn download(
+                &self,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+                prev_package: Option<PackageInterfaceHandle>,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn prepare(
+                &self,
+                r#type: &bstr::BStr,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+                prev_package: Option<PackageInterfaceHandle>,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn install(
+                &self,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn update(
+                &self,
+                initial: PackageInterfaceHandle,
+                target: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn remove(
+                &self,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn cleanup(
+                &self,
+                r#type: &bstr::BStr,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+                prev_package: Option<PackageInterfaceHandle>,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+        }
     }
 }
+use mock_download_manager::MockDownloadManager;
 
 // PHP mocks `Composer\Installer\BinaryInstaller`; the Rust seam is `BinaryInstallerInterface`.
-mockall::mock! {
-    #[derive(Debug)]
-    pub BinaryInstaller {}
-    impl BinaryInstallerInterface for BinaryInstaller {
-        fn install_binaries(
-            &mut self,
-            package: PackageInterfaceHandle,
-            install_path: &std::path::Path,
-            warn_on_overwrite: bool,
-        ) -> anyhow::Result<()>;
-        fn remove_binaries(&mut self, package: PackageInterfaceHandle);
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_binary_installer {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub BinaryInstaller {}
+        impl BinaryInstallerInterface for BinaryInstaller {
+            fn install_binaries(
+                &mut self,
+                package: PackageInterfaceHandle,
+                install_path: &std::path::Path,
+                warn_on_overwrite: bool,
+            ) -> anyhow::Result<()>;
+            fn remove_binaries(&mut self, package: PackageInterfaceHandle);
+        }
     }
 }
+use mock_binary_installer::MockBinaryInstaller;
 
 /// Mirror of setUp(): builds the Composer/Config over temp root/vendor/bin dirs plus a NullIO and a
 /// DownloadManager mock. `composer_full` keeps the inner Rc alive for the duration of the test since
@@ -264,8 +284,8 @@ fn test_update() {
     let initial = get_package("vendor/package1", "1.0.0");
     let target = get_package("vendor/package1", "2.0.0");
 
-    initial.__set_target_dir(Some(bstr::BString::from("oldtarget".to_string())));
-    target.__set_target_dir(Some(bstr::BString::from("newtarget".to_string())));
+    initial.__set_target_dir(Some(BString::from("oldtarget")));
+    target.__set_target_dir(Some(BString::from("newtarget")));
 
     // PHP mocks Filesystem::rename; here a real Filesystem renames the actual oldtarget
     // dir, so it must exist first. The install path embeds the pretty-name twice because
@@ -393,7 +413,7 @@ fn test_get_install_path_with_target_dir() {
     let mut setup = set_up();
     let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
     let package = get_package("Foo/Bar", "1.0.0");
-    package.__set_target_dir(Some(bstr::BString::from("Some/Namespace".to_string())));
+    package.__set_target_dir(Some(BString::from("Some/Namespace")));
 
     assert_eq!(
         setup
@@ -413,7 +433,7 @@ fn test_ensure_binaries_installed() {
     let mut library = LibraryInstaller::new(
         setup.io.clone(),
         setup.composer.clone(),
-        Some(bstr::BString::from("library".to_string())),
+        Some(BString::from("library")),
         None,
         None,
     );

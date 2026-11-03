@@ -14,30 +14,25 @@ use shirabe::repository::{
     RepositoryInterface, RepositoryInterfaceHandle, RepositorySet, SearchResult,
     SecurityAdvisoryResult,
 };
-use shirabe_php_shim::{PhpMixed, date_create};
+use shirabe_php_shim::{PhpMixed, bconcat, date_create, error_message, str_replace, trim};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::output::output_interface;
 
-fn constraint(operator: &str, version: &str) -> shirabe_semver::constraint::AnyConstraint {
-    SimpleConstraint::new(operator, version.to_string(), None).into()
+fn constraint(operator: &BStr, version: &BStr) -> shirabe_semver::constraint::AnyConstraint {
+    SimpleConstraint::new(operator, bconcat!(version), None).into()
 }
 
 fn full_advisory() -> std::rc::Rc<AnySecurityAdvisory> {
-    let mut source: IndexMap<String, String> = IndexMap::new();
-    source.insert("name".to_string(), "foo".to_string());
-    source.insert("remoteId".to_string(), "remoteID".to_string());
+    let mut source: IndexMap<BString, BString> = IndexMap::new();
+    source.insert(BString::from("name"), BString::from("foo"));
+    source.insert(BString::from("remoteId"), BString::from("remoteID"));
     std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-        bstr::BString::from("foo/bar".to_string()),
-        bstr::BString::from("123".to_string()),
-        constraint("=", "1.0.0.0"),
-        bstr::BString::from("test".to_string()),
-        vec![
-            source
-                .into_iter()
-                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
-                .collect::<indexmap::IndexMap<_, _>>(),
-        ],
+        BString::from("foo/bar"),
+        BString::from("123"),
+        constraint(BStr::new("="), BStr::new("1.0.0.0")),
+        BString::from("test"),
+        vec![source.into_iter().collect::<indexmap::IndexMap<_, _>>()],
         Utc::now(),
         None,
         None,
@@ -45,21 +40,16 @@ fn full_advisory() -> std::rc::Rc<AnySecurityAdvisory> {
     )))
 }
 
-fn full_advisory_with_id(advisory_id: &str) -> std::rc::Rc<AnySecurityAdvisory> {
-    let mut source: IndexMap<String, String> = IndexMap::new();
-    source.insert("name".to_string(), "foo".to_string());
-    source.insert("remoteId".to_string(), "remoteID".to_string());
+fn full_advisory_with_id(advisory_id: &BStr) -> std::rc::Rc<AnySecurityAdvisory> {
+    let mut source: IndexMap<BString, BString> = IndexMap::new();
+    source.insert(BString::from("name"), BString::from("foo"));
+    source.insert(BString::from("remoteId"), BString::from("remoteID"));
     std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-        bstr::BString::from("foo/bar".to_string()),
-        bstr::BString::from(advisory_id.to_string()),
-        constraint("=", "1.0.0.0"),
-        bstr::BString::from("test".to_string()),
-        vec![
-            source
-                .into_iter()
-                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
-                .collect::<indexmap::IndexMap<_, _>>(),
-        ],
+        BString::from("foo/bar"),
+        bconcat!(advisory_id),
+        constraint(BStr::new("="), BStr::new("1.0.0.0")),
+        BString::from("test"),
+        vec![source.into_iter().collect::<indexmap::IndexMap<_, _>>()],
         Utc::now(),
         None,
         None,
@@ -67,15 +57,15 @@ fn full_advisory_with_id(advisory_id: &str) -> std::rc::Rc<AnySecurityAdvisory> 
     )))
 }
 
-fn partial_advisory(advisory_id: &str) -> std::rc::Rc<AnySecurityAdvisory> {
+fn partial_advisory(advisory_id: &BStr) -> std::rc::Rc<AnySecurityAdvisory> {
     std::rc::Rc::new(AnySecurityAdvisory::Partial(PartialSecurityAdvisory::new(
-        bstr::BString::from("foo/bar".to_string()),
-        bstr::BString::from(advisory_id.to_string()),
-        constraint("=", "1.0.0.0"),
+        BString::from("foo/bar"),
+        bconcat!(advisory_id),
+        constraint(BStr::new("="), BStr::new("1.0.0.0")),
     )))
 }
 
-fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<BString, Option<BString>> {
+fn ignore_list(pairs: Vec<(&BStr, Option<&BStr>)>) -> IndexMap<BString, Option<BString>> {
     pairs
         .into_iter()
         .map(|(k, v)| (BString::from(k), v.map(BString::from)))
@@ -92,7 +82,7 @@ enum AdvisorySource {
     /// Returns a fixed advisory map regardless of the request (reachable repo).
     Fixed(IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>),
     /// Throws a `TransportException`, simulating an unreachable repository.
-    Unreachable(String),
+    Unreachable(BString),
 }
 
 #[derive(Debug)]
@@ -208,130 +198,130 @@ fn mock_advisories() -> IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>
         BString::from("vendor1/package1"),
         vec![
             mock_advisory(
-                "vendor1/package1",
-                "ID1",
-                "advisory1",
-                "https://advisory.example.com/advisory1",
-                "CVE1",
-                ">=3,<3.4.3|>=1,<2.5.6",
-                "source1",
-                "RemoteID1",
-                "2022-05-25 13:21:00",
-                "medium",
+                BStr::new("vendor1/package1"),
+                BStr::new("ID1"),
+                BStr::new("advisory1"),
+                BStr::new("https://advisory.example.com/advisory1"),
+                BStr::new("CVE1"),
+                BStr::new(">=3,<3.4.3|>=1,<2.5.6"),
+                BStr::new("source1"),
+                BStr::new("RemoteID1"),
+                BStr::new("2022-05-25 13:21:00"),
+                BStr::new("medium"),
             ),
             mock_advisory(
-                "vendor1/package1",
-                "ID4",
-                "advisory4",
-                "https://advisory.example.com/advisory4",
-                "CVE3",
-                ">=8,<8.2.2|>=1,<2.5.6",
-                "source2",
-                "RemoteID4",
-                "2022-05-25 13:21:00",
-                "high",
+                BStr::new("vendor1/package1"),
+                BStr::new("ID4"),
+                BStr::new("advisory4"),
+                BStr::new("https://advisory.example.com/advisory4"),
+                BStr::new("CVE3"),
+                BStr::new(">=8,<8.2.2|>=1,<2.5.6"),
+                BStr::new("source2"),
+                BStr::new("RemoteID4"),
+                BStr::new("2022-05-25 13:21:00"),
+                BStr::new("high"),
             ),
             mock_advisory(
-                "vendor1/package1",
-                "ID5",
-                "advisory5",
-                "https://advisory.example.com/advisory5",
-                "",
-                ">=8,<8.2.2|>=1,<2.5.6",
-                "source1",
-                "RemoteID3",
-                "2022-05-25 13:21:00",
-                "medium",
+                BStr::new("vendor1/package1"),
+                BStr::new("ID5"),
+                BStr::new("advisory5"),
+                BStr::new("https://advisory.example.com/advisory5"),
+                BStr::new(""),
+                BStr::new(">=8,<8.2.2|>=1,<2.5.6"),
+                BStr::new("source1"),
+                BStr::new("RemoteID3"),
+                BStr::new("2022-05-25 13:21:00"),
+                BStr::new("medium"),
             ),
         ],
     );
     advisories.insert(
         BString::from("vendor1/package2"),
         vec![mock_advisory(
-            "vendor1/package2",
-            "ID2",
-            "advisory2",
-            "https://advisory.example.com/advisory2",
-            "",
-            ">=3,<3.4.3|>=1,<2.5.6",
-            "source1",
-            "RemoteID2",
-            "2022-05-25 13:21:00",
-            "medium",
+            BStr::new("vendor1/package2"),
+            BStr::new("ID2"),
+            BStr::new("advisory2"),
+            BStr::new("https://advisory.example.com/advisory2"),
+            BStr::new(""),
+            BStr::new(">=3,<3.4.3|>=1,<2.5.6"),
+            BStr::new("source1"),
+            BStr::new("RemoteID2"),
+            BStr::new("2022-05-25 13:21:00"),
+            BStr::new("medium"),
         )],
     );
     advisories.insert(
         BString::from("vendorx/packagex"),
         vec![mock_advisory(
-            "vendorx/packagex",
-            "IDx",
-            "advisory17",
-            "https://advisory.example.com/advisory17",
-            "CVE5",
-            ">=3,<3.4.3|>=1,<2.5.6",
-            "source2",
-            "RemoteIDx",
-            "2015-05-25 13:21:00",
-            "medium",
+            BStr::new("vendorx/packagex"),
+            BStr::new("IDx"),
+            BStr::new("advisory17"),
+            BStr::new("https://advisory.example.com/advisory17"),
+            BStr::new("CVE5"),
+            BStr::new(">=3,<3.4.3|>=1,<2.5.6"),
+            BStr::new("source2"),
+            BStr::new("RemoteIDx"),
+            BStr::new("2015-05-25 13:21:00"),
+            BStr::new("medium"),
         )],
     );
     advisories.insert(
         BString::from("vendor2/package1"),
         vec![
             mock_advisory(
-                "vendor2/package1",
-                "ID3",
-                "advisory3",
-                "https://advisory.example.com/advisory3",
-                "CVE2",
-                ">=3,<3.4.3|>=1,<2.5.6",
-                "source2",
-                "RemoteID1",
-                "2022-05-25 13:21:00",
-                "medium",
+                BStr::new("vendor2/package1"),
+                BStr::new("ID3"),
+                BStr::new("advisory3"),
+                BStr::new("https://advisory.example.com/advisory3"),
+                BStr::new("CVE2"),
+                BStr::new(">=3,<3.4.3|>=1,<2.5.6"),
+                BStr::new("source2"),
+                BStr::new("RemoteID1"),
+                BStr::new("2022-05-25 13:21:00"),
+                BStr::new("medium"),
             ),
             mock_advisory(
-                "vendor2/package1",
-                "ID6",
-                "advisory6",
-                "https://advisory.example.com/advisory6",
-                "CVE4",
-                ">=3,<3.4.3|>=1,<2.5.6",
-                "source2",
-                "RemoteID3",
-                "2015-05-25 13:21:00",
-                "medium",
+                BStr::new("vendor2/package1"),
+                BStr::new("ID6"),
+                BStr::new("advisory6"),
+                BStr::new("https://advisory.example.com/advisory6"),
+                BStr::new("CVE4"),
+                BStr::new(">=3,<3.4.3|>=1,<2.5.6"),
+                BStr::new("source2"),
+                BStr::new("RemoteID3"),
+                BStr::new("2015-05-25 13:21:00"),
+                BStr::new("medium"),
             ),
         ],
     );
     advisories.insert(
         BString::from("vendory/packagey"),
         vec![mock_advisory(
-            "vendory/packagey",
-            "IDy",
-            "advisory7",
-            "https://advisory.example.com/advisory7",
-            "CVE5",
-            ">=3,<3.4.3|>=1,<2.5.6",
-            "source2",
-            "RemoteID4",
-            "2015-05-25 13:21:00",
-            "medium",
+            BStr::new("vendory/packagey"),
+            BStr::new("IDy"),
+            BStr::new("advisory7"),
+            BStr::new("https://advisory.example.com/advisory7"),
+            BStr::new("CVE5"),
+            BStr::new(">=3,<3.4.3|>=1,<2.5.6"),
+            BStr::new("source2"),
+            BStr::new("RemoteID4"),
+            BStr::new("2015-05-25 13:21:00"),
+            BStr::new("medium"),
         )],
     );
     advisories.insert(
         BString::from("vendor3/package1"),
         vec![mock_advisory(
-            "vendor3/package1",
-            "ID7",
-            "advisory7",
-            "https://advisory.example.com/advisory7",
-            "CVE5",
-            ">=3,<3.4.3|>=1,<2.5.6",
-            "source2",
-            "RemoteID4",
-            "2015-05-25 13:21:00",
-            "medium",
+            BStr::new("vendor3/package1"),
+            BStr::new("ID7"),
+            BStr::new("advisory7"),
+            BStr::new("https://advisory.example.com/advisory7"),
+            BStr::new("CVE5"),
+            BStr::new(">=3,<3.4.3|>=1,<2.5.6"),
+            BStr::new("source2"),
+            BStr::new("RemoteID4"),
+            BStr::new("2015-05-25 13:21:00"),
+            BStr::new("medium"),
         )],
     );
     advisories
@@ -342,35 +332,30 @@ fn mock_advisories() -> IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>
     reason = "mirrors the PHP advisory data shape"
 )]
 fn mock_advisory(
-    package_name: &str,
-    advisory_id: &str,
-    title: &str,
-    link: &str,
-    cve: &str,
-    affected_versions: &str,
-    source_name: &str,
-    remote_id: &str,
-    reported_at: &str,
-    severity: &str,
+    package_name: &BStr,
+    advisory_id: &BStr,
+    title: &BStr,
+    link: &BStr,
+    cve: &BStr,
+    affected_versions: &BStr,
+    source_name: &BStr,
+    remote_id: &BStr,
+    reported_at: &BStr,
+    severity: &BStr,
 ) -> std::rc::Rc<AnySecurityAdvisory> {
-    let mut source: IndexMap<String, String> = IndexMap::new();
-    source.insert("name".to_string(), source_name.to_string());
-    source.insert("remoteId".to_string(), remote_id.to_string());
+    let mut source: IndexMap<BString, BString> = IndexMap::new();
+    source.insert(BString::from("name"), bconcat!(source_name));
+    source.insert(BString::from("remoteId"), bconcat!(remote_id));
     std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-        bstr::BString::from(package_name.to_string()),
-        bstr::BString::from(advisory_id.to_string()),
+        bconcat!(package_name),
+        bconcat!(advisory_id),
         VersionParser.parse_constraints(affected_versions).unwrap(),
-        bstr::BString::from(title.to_string()),
-        vec![
-            source
-                .into_iter()
-                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
-                .collect::<indexmap::IndexMap<_, _>>(),
-        ],
+        bconcat!(title),
+        vec![source.into_iter().collect::<indexmap::IndexMap<_, _>>()],
         date_create::<Utc>(reported_at).unwrap(),
-        Some(bstr::BString::from(cve.to_string())),
-        Some(bstr::BString::from(link.to_string())),
-        Some(bstr::BString::from(severity.to_string())),
+        Some(bconcat!(cve)),
+        Some(bconcat!(link)),
+        Some(bconcat!(severity)),
     )))
 }
 
@@ -404,12 +389,12 @@ fn test_audit() {
         format: &'static BStr,
         ignore_abandoned: IndexMap<BString, Option<BString>>,
         expected: i64,
-        output: &'static str,
+        output: &'static BStr,
     }
 
     let abandoned_with_replacement = || {
         let p = get_complete_package("vendor/abandoned", "1.0.0");
-        p.set_abandoned(PhpMixed::string("foo/bar".to_string()));
+        p.set_abandoned(PhpMixed::string(BString::from("foo/bar")));
         let handle: PackageInterfaceHandle = p.into();
         handle
     };
@@ -432,7 +417,7 @@ fn test_audit() {
             format: Auditor::FORMAT_PLAIN,
             ignore_abandoned: IndexMap::new(),
             expected: Auditor::STATUS_OK,
-            output: "No security vulnerability advisories found.",
+            output: BStr::new("No security vulnerability advisories found."),
         },
         Case {
             packages: vec![
@@ -446,7 +431,7 @@ fn test_audit() {
             ignore_abandoned: IndexMap::new(),
             expected: Auditor::STATUS_VULNERABLE,
             output:
-                "<warning>Found 2 security vulnerability advisories affecting 1 package:</warning>
+                BStr::new("<warning>Found 2 security vulnerability advisories affecting 1 package:</warning>
 Package: vendor1/package1
 Severity: high
 Advisory ID: ID4
@@ -462,7 +447,7 @@ Advisory ID: ID5
 CVE: \nTitle: advisory5
 URL: https://advisory.example.com/advisory5
 Affected versions: >=8,<8.2.2|>=1,<2.5.6
-Reported at: 2022-05-25T13:21:00+00:00",
+Reported at: 2022-05-25T13:21:00+00:00"),
         },
         Case {
             packages: vec![abandoned_with_replacement(), abandoned_no_replacement()],
@@ -471,16 +456,16 @@ Reported at: 2022-05-25T13:21:00+00:00",
             format: Auditor::FORMAT_PLAIN,
             ignore_abandoned: IndexMap::new(),
             expected: Auditor::STATUS_OK,
-            output: "No security vulnerability advisories found.",
+            output: BStr::new("No security vulnerability advisories found."),
         },
         Case {
             packages: vec![abandoned_with_replacement(), abandoned_no_replacement()],
             warning_only: false,
             abandoned: Auditor::ABANDONED_FAIL,
             format: Auditor::FORMAT_PLAIN,
-            ignore_abandoned: ignore_list(vec![("vendor/*", None)]),
+            ignore_abandoned: ignore_list(vec![(BStr::new("vendor/*"), None)]),
             expected: Auditor::STATUS_OK,
-            output: "No security vulnerability advisories found.",
+            output: BStr::new("No security vulnerability advisories found."),
         },
         Case {
             packages: vec![abandoned_with_replacement(), abandoned_no_replacement()],
@@ -488,23 +473,23 @@ Reported at: 2022-05-25T13:21:00+00:00",
             abandoned: Auditor::ABANDONED_FAIL,
             format: Auditor::FORMAT_PLAIN,
             ignore_abandoned: ignore_list(vec![
-                ("vendor/abandoned", None),
-                ("vendor/abandoned2", None),
+                (BStr::new("vendor/abandoned"), None),
+                (BStr::new("vendor/abandoned2"), None),
             ]),
             expected: Auditor::STATUS_OK,
-            output: "No security vulnerability advisories found.",
+            output: BStr::new("No security vulnerability advisories found."),
         },
         Case {
             packages: vec![abandoned_with_replacement(), abandoned_no_replacement()],
             warning_only: false,
             abandoned: Auditor::ABANDONED_FAIL,
             format: Auditor::FORMAT_PLAIN,
-            ignore_abandoned: ignore_list(vec![("acme/test", Some("ignoring because yolo"))]),
+            ignore_abandoned: ignore_list(vec![(BStr::new("acme/test"), Some(BStr::new("ignoring because yolo")))]),
             expected: Auditor::STATUS_ABANDONED,
-            output: "No security vulnerability advisories found.
+            output: BStr::new("No security vulnerability advisories found.
 Found 2 abandoned packages:
 vendor/abandoned is abandoned. Use foo/bar instead.
-vendor/abandoned2 is abandoned. No replacement was suggested.",
+vendor/abandoned2 is abandoned. No replacement was suggested."),
         },
         Case {
             packages: vec![abandoned_with_replacement(), abandoned_no_replacement()],
@@ -513,10 +498,10 @@ vendor/abandoned2 is abandoned. No replacement was suggested.",
             format: Auditor::FORMAT_PLAIN,
             ignore_abandoned: IndexMap::new(),
             expected: Auditor::STATUS_OK,
-            output: "No security vulnerability advisories found.
+            output: BStr::new("No security vulnerability advisories found.
 Found 2 abandoned packages:
 vendor/abandoned is abandoned. Use foo/bar instead.
-vendor/abandoned2 is abandoned. No replacement was suggested.",
+vendor/abandoned2 is abandoned. No replacement was suggested."),
         },
         Case {
             packages: vec![abandoned_with_replacement(), abandoned_no_replacement()],
@@ -525,14 +510,14 @@ vendor/abandoned2 is abandoned. No replacement was suggested.",
             format: Auditor::FORMAT_TABLE,
             ignore_abandoned: IndexMap::new(),
             expected: Auditor::STATUS_ABANDONED,
-            output: "No security vulnerability advisories found.
+            output: BStr::new("No security vulnerability advisories found.
 Found 2 abandoned packages:
 +-------------------+----------------------------------------------------------------------------------+
 | Abandoned Package | Suggested Replacement                                                            |
 +-------------------+----------------------------------------------------------------------------------+
 | vendor/abandoned  | foo/bar                                                                          |
 | vendor/abandoned2 | none                                                                             |
-+-------------------+----------------------------------------------------------------------------------+",
++-------------------+----------------------------------------------------------------------------------+"),
         },
         Case {
             packages: vec![
@@ -545,7 +530,7 @@ Found 2 abandoned packages:
             format: Auditor::FORMAT_TABLE,
             ignore_abandoned: IndexMap::new(),
             expected: Auditor::STATUS_VULNERABLE | Auditor::STATUS_ABANDONED,
-            output: "Found 2 security vulnerability advisories affecting 1 package:
+            output: BStr::new("Found 2 security vulnerability advisories affecting 1 package:
 +-------------------+----------------------------------------------------------------------------------+
 | Package           | vendor1/package1                                                                 |
 | Severity          | high                                                                             |
@@ -572,7 +557,7 @@ Found 2 abandoned packages:
 +-------------------+----------------------------------------------------------------------------------+
 | vendor/abandoned  | foo/bar                                                                          |
 | vendor/abandoned2 | none                                                                             |
-+-------------------+----------------------------------------------------------------------------------+",
++-------------------+----------------------------------------------------------------------------------+"),
         },
         Case {
             packages: vec![abandoned_with_replacement(), abandoned_no_replacement()],
@@ -581,13 +566,13 @@ Found 2 abandoned packages:
             format: Auditor::FORMAT_JSON,
             ignore_abandoned: IndexMap::new(),
             expected: Auditor::STATUS_ABANDONED,
-            output: "{
+            output: BStr::new("{
     \"advisories\": [],
     \"abandoned\": {
         \"vendor/abandoned\": \"foo/bar\",
         \"vendor/abandoned2\": null
     }
-}",
+}"),
         },
     ];
 
@@ -595,7 +580,8 @@ Found 2 abandoned packages:
         let repo_set = get_repo_set();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(
-                BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+                BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None)
+                    .unwrap(),
             ));
         let auditor = Auditor;
         let result = auditor
@@ -615,15 +601,15 @@ Found 2 abandoned packages:
         assert_eq!(case.expected, result);
         assert_eq!(
             case.output,
-            io.borrow()
-                .as_any()
-                .downcast_ref::<BufferIO>()
-                .unwrap()
-                .get_output()
-                .display_lossy()
-                .to_string()
-                .replace('\r', "")
-                .trim()
+            trim(str_replace(
+                "\r",
+                "",
+                io.borrow()
+                    .as_any()
+                    .downcast_ref::<BufferIO>()
+                    .unwrap()
+                    .get_output()
+            ))
         );
     }
 }
@@ -641,7 +627,7 @@ fn test_audit_with_ignore() {
     let cases: Vec<Case> = vec![
         Case {
             packages: vec![get_package("vendor1/package1", "3.0.0.0")],
-            ignored_ids: ignore_list(vec![("CVE1", None)]),
+            ignored_ids: ignore_list(vec![(BStr::new("CVE1"), None)]),
             exit_code: 0,
             expected_output: vec![
                 Expectation::text(
@@ -659,7 +645,7 @@ fn test_audit_with_ignore() {
         },
         Case {
             packages: vec![get_package("vendor1/package1", "3.0.0.0")],
-            ignored_ids: ignore_list(vec![("CVE1", Some("A good reason"))]),
+            ignored_ids: ignore_list(vec![(BStr::new("CVE1"), Some(BStr::new("A good reason")))]),
             exit_code: 0,
             expected_output: vec![
                 Expectation::text(
@@ -678,7 +664,7 @@ fn test_audit_with_ignore() {
         },
         Case {
             packages: vec![get_package("vendor1/package2", "3.0.0.0")],
-            ignored_ids: ignore_list(vec![("ID2", None)]),
+            ignored_ids: ignore_list(vec![(BStr::new("ID2"), None)]),
             exit_code: 0,
             expected_output: vec![
                 Expectation::text(
@@ -696,7 +682,7 @@ fn test_audit_with_ignore() {
         },
         Case {
             packages: vec![get_package("vendorx/packagex", "3.0.0.0")],
-            ignored_ids: ignore_list(vec![("RemoteIDx", None)]),
+            ignored_ids: ignore_list(vec![(BStr::new("RemoteIDx"), None)]),
             exit_code: 0,
             expected_output: vec![
                 Expectation::text(
@@ -714,7 +700,7 @@ fn test_audit_with_ignore() {
         },
         Case {
             packages: vec![get_package("vendor1/package1", "3.0.0.0")],
-            ignored_ids: ignore_list(vec![("vendor1/package1", None)]),
+            ignored_ids: ignore_list(vec![(BStr::new("vendor1/package1"), None)]),
             exit_code: 0,
             expected_output: vec![
                 Expectation::text(
@@ -733,8 +719,8 @@ fn test_audit_with_ignore() {
         Case {
             packages: vec![get_package("vendor1/package1", "3.0.0.0")],
             ignored_ids: ignore_list(vec![(
-                "vendor1/package1",
-                Some("Package has known safe usage"),
+                BStr::new("vendor1/package1"),
+                Some(BStr::new("Package has known safe usage")),
             )]),
             exit_code: 0,
             expected_output: vec![
@@ -774,7 +760,11 @@ fn test_audit_with_ignore() {
                 get_package("vendorx/packagex", "3.0.0.0"),
                 get_package("vendor2/package1", "3.0.0.0"),
             ],
-            ignored_ids: ignore_list(vec![("RemoteIDx", None), ("ID3", None), ("ID6", None)]),
+            ignored_ids: ignore_list(vec![
+                (BStr::new("RemoteIDx"), None),
+                (BStr::new("ID3"), None),
+                (BStr::new("ID6"), None),
+            ]),
             exit_code: 1,
             expected_output: vec![
                 Expectation::text(
@@ -856,9 +846,9 @@ fn test_audit_with_ignore() {
 fn test_audit_with_ignore_unreachable() {
     let packages = vec![get_package("vendor1/package1", "3.0.0.0")];
 
-    let error_message =
-        "The \"https://example.org/packages.json\" file could not be downloaded: HTTP/1.1 404 Not Found"
-            .to_string();
+    let unreachable_message = BString::from(
+        "The \"https://example.org/packages.json\" file could not be downloaded: HTTP/1.1 404 Not Found",
+    );
 
     let make_repo_set = || {
         let mut fixed: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
@@ -866,44 +856,36 @@ fn test_audit_with_ignore_unreachable() {
             BString::from("vendor1/package1"),
             vec![
                 std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-                    bstr::BString::from("vendor1/package1".to_string()),
-                    bstr::BString::from("CVE-2023-12345".to_string()),
-                    constraint("=", "3.0.0.0"),
-                    bstr::BString::from("First repo advisory".to_string()),
+                    BString::from("vendor1/package1"),
+                    BString::from("CVE-2023-12345"),
+                    constraint(BStr::new("="), BStr::new("3.0.0.0")),
+                    BString::from("First repo advisory"),
                     vec![{
-                        let mut s: IndexMap<String, String> = IndexMap::new();
-                        s.insert("name".to_string(), "test".to_string());
-                        s.insert("remoteId".to_string(), "1".to_string());
-                        s.into_iter()
-                            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
-                            .collect::<indexmap::IndexMap<_, _>>()
+                        let mut s: IndexMap<BString, BString> = IndexMap::new();
+                        s.insert(BString::from("name"), BString::from("test"));
+                        s.insert(BString::from("remoteId"), BString::from("1"));
+                        s.into_iter().collect::<indexmap::IndexMap<_, _>>()
                     }],
                     date_create::<Utc>("2023-01-01").unwrap(),
-                    Some(bstr::BString::from("CVE-2023-12345".to_string())),
-                    Some(bstr::BString::from(
-                        "https://example.com/advisory/1".to_string(),
-                    )),
-                    Some(bstr::BString::from("medium".to_string())),
+                    Some(BString::from("CVE-2023-12345")),
+                    Some(BString::from("https://example.com/advisory/1")),
+                    Some(BString::from("medium")),
                 ))),
                 std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-                    bstr::BString::from("vendor1/package1".to_string()),
-                    bstr::BString::from("CVE-2023-67890".to_string()),
-                    constraint("=", "3.0.0.0"),
-                    bstr::BString::from("Third repo advisory".to_string()),
+                    BString::from("vendor1/package1"),
+                    BString::from("CVE-2023-67890"),
+                    constraint(BStr::new("="), BStr::new("3.0.0.0")),
+                    BString::from("Third repo advisory"),
                     vec![{
-                        let mut s: IndexMap<String, String> = IndexMap::new();
-                        s.insert("name".to_string(), "test".to_string());
-                        s.insert("remoteId".to_string(), "3".to_string());
-                        s.into_iter()
-                            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
-                            .collect::<indexmap::IndexMap<_, _>>()
+                        let mut s: IndexMap<BString, BString> = IndexMap::new();
+                        s.insert(BString::from("name"), BString::from("test"));
+                        s.insert(BString::from("remoteId"), BString::from("3"));
+                        s.into_iter().collect::<indexmap::IndexMap<_, _>>()
                     }],
                     date_create::<Utc>("2023-01-01").unwrap(),
-                    Some(bstr::BString::from("CVE-2023-67890".to_string())),
-                    Some(bstr::BString::from(
-                        "https://example.com/advisory/3".to_string(),
-                    )),
-                    Some(bstr::BString::from("high".to_string())),
+                    Some(BString::from("CVE-2023-67890")),
+                    Some(BString::from("https://example.com/advisory/3")),
+                    Some(BString::from("high")),
                 ))),
             ],
         );
@@ -923,7 +905,7 @@ fn test_audit_with_ignore_unreachable() {
             .unwrap();
         repo_set
             .add_repository(RepositoryInterfaceHandle::new(MockAdvisoryRepository {
-                source: AdvisorySource::Unreachable(error_message.clone()),
+                source: AdvisorySource::Unreachable(unreachable_message.clone()),
             }))
             .unwrap();
         repo_set
@@ -936,7 +918,8 @@ fn test_audit_with_ignore_unreachable() {
         let repo_set = make_repo_set();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(
-                BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+                BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None)
+                    .unwrap(),
             ));
         let err = auditor
             .audit(
@@ -952,7 +935,7 @@ fn test_audit_with_ignore_unreachable() {
                 IndexMap::new(),
             )
             .expect_err("Expected TransportException was not thrown");
-        assert!(err.to_string().contains("HTTP/1.1 404 Not Found"));
+        assert!(error_message(&err).contains_str("HTTP/1.1 404 Not Found"));
     }
 
     // With the ignoreUnreachable flag the advisories from reachable repos are reported.
@@ -960,7 +943,8 @@ fn test_audit_with_ignore_unreachable() {
         let repo_set = make_repo_set();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(
-                BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+                BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None)
+                    .unwrap(),
             ));
         let result = auditor
             .audit(
@@ -997,7 +981,8 @@ fn test_audit_with_ignore_unreachable() {
         let repo_set = make_repo_set();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(
-                BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+                BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None)
+                    .unwrap(),
             ));
         let result = auditor
             .audit(
@@ -1067,7 +1052,7 @@ fn test_audit_with_ignore_severity() {
     let cases: Vec<Case> = vec![
         Case {
             packages: vec![get_package("vendor1/package1", "2.0.0.0")],
-            ignored_severities: ignore_list(vec![("medium", None)]),
+            ignored_severities: ignore_list(vec![(BStr::new("medium"), None)]),
             exit_code: 1,
             expected_output: vec![Expectation::text(
                 "Found 2 ignored security vulnerability advisories affecting 1 package:",
@@ -1075,7 +1060,7 @@ fn test_audit_with_ignore_severity() {
         },
         Case {
             packages: vec![get_package("vendor1/package1", "2.0.0.0")],
-            ignored_severities: ignore_list(vec![("high", None)]),
+            ignored_severities: ignore_list(vec![(BStr::new("high"), None)]),
             exit_code: 1,
             expected_output: vec![Expectation::text(
                 "Found 1 ignored security vulnerability advisory affecting 1 package:",
@@ -1083,7 +1068,10 @@ fn test_audit_with_ignore_severity() {
         },
         Case {
             packages: vec![get_package("vendor1/package1", "2.0.0.0")],
-            ignored_severities: ignore_list(vec![("high", None), ("medium", None)]),
+            ignored_severities: ignore_list(vec![
+                (BStr::new("high"), None),
+                (BStr::new("medium"), None),
+            ]),
             exit_code: 0,
             expected_output: vec![Expectation::text(
                 "Found 3 ignored security vulnerability advisories affecting 1 package:",
@@ -1130,7 +1118,7 @@ fn test_needs_complete_advisory_load() {
         // packagist filters are IDs so work fine with partial advisories
         (
             IndexMap::new(),
-            ignore_list(vec![("PKSA-foo-bar", None)]),
+            ignore_list(vec![(BStr::new("PKSA-foo-bar"), None)]),
             false,
         ),
         // packagist filters are IDs so work fine with partial advisories/2
@@ -1140,17 +1128,20 @@ fn test_needs_complete_advisory_load() {
                     IndexMap::new();
                 m.insert(
                     BString::from("vendor1/package1"),
-                    vec![full_advisory(), partial_advisory("1234")],
+                    vec![full_advisory(), partial_advisory(BStr::new("1234"))],
                 );
                 m
             },
-            ignore_list(vec![("PKSA-foo-bar", Some("this is fine 🔥"))]),
+            ignore_list(vec![(
+                BStr::new("PKSA-foo-bar"),
+                Some(BStr::new("this is fine 🔥")),
+            )]),
             false,
         ),
         // no advisories no need to load any further
         (
             IndexMap::new(),
-            ignore_list(vec![("CVE-2025-1234", None)]),
+            ignore_list(vec![(BStr::new("CVE-2025-1234"), None)]),
             false,
         ),
         // no advisories no need to load any further/2
@@ -1161,7 +1152,7 @@ fn test_needs_complete_advisory_load() {
                 m.insert(BString::from("vendor1/package1"), vec![]);
                 m
             },
-            ignore_list(vec![("CVE-2025-1234", None)]),
+            ignore_list(vec![(BStr::new("CVE-2025-1234"), None)]),
             false,
         ),
         // CVE filter or other non-packagist ones might need to fully load for safety if partial advisories are present
@@ -1171,11 +1162,11 @@ fn test_needs_complete_advisory_load() {
                     IndexMap::new();
                 m.insert(
                     BString::from("vendor1/package1"),
-                    vec![full_advisory(), partial_advisory("1234")],
+                    vec![full_advisory(), partial_advisory(BStr::new("1234"))],
                 );
                 m
             },
-            ignore_list(vec![("CVE-2025-1234", None)]),
+            ignore_list(vec![(BStr::new("CVE-2025-1234"), None)]),
             true,
         ),
         // filter does not trigger load if all advisories are fully loaded
@@ -1186,11 +1177,11 @@ fn test_needs_complete_advisory_load() {
                 m.insert(BString::from("vendor1/package1"), vec![full_advisory()]);
                 m.insert(
                     BString::from("vendor1/package2"),
-                    vec![full_advisory_with_id("1234")],
+                    vec![full_advisory_with_id(BStr::new("1234"))],
                 );
                 m
             },
-            ignore_list(vec![("CVE-2025-1234", None)]),
+            ignore_list(vec![(BStr::new("CVE-2025-1234"), None)]),
             false,
         ),
     ];

@@ -1,4 +1,5 @@
 //! ref: composer/tests/Composer/Test/InstallerTest.php
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 #[path = "common/bootstrap.rs"]
 mod bootstrap;
@@ -7,13 +8,13 @@ mod config_stub;
 #[path = "common/test_case.rs"]
 mod test_case;
 
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, bconcat, implode, path_to_bytes, php_fopen_resource, php_regex,
-    preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind, stream_get_contents,
-    trim, utf8_text,
+    PHP_EOL, PhpMixed, bconcat, error_message, implode, path_to_bytes, php_fopen_resource,
+    php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind,
+    str_replace, stream_get_contents, trim, utf8_text,
 };
 use shirabe_symfony_console::input::{
     InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue, StringInput,
@@ -260,21 +261,17 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
 }
 
 /// ref: TestCase::getPackage with class `Composer\Package\RootPackage`.
-fn root_package(name: &str, version: &str) -> RootPackageHandle {
+fn root_package(name: &BStr, version: &BStr) -> RootPackageHandle {
     let normalized = VersionParser.normalize(version, None).unwrap();
-    RootPackageHandle::new(
-        bstr::BString::from(name.to_string()),
-        normalized,
-        bstr::BString::from(version.to_string()),
-    )
+    RootPackageHandle::new(bconcat!(name), normalized, bconcat!(version))
 }
 
 /// ref: `new Link($source, $target, $constraint, $type, $constraint->getPrettyString())`.
-fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
+fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bstr::BString::from(source.to_string()),
-        bstr::BString::from(target.to_string()),
+        bconcat!(source),
+        bconcat!(target),
         constraint,
         Some(r#type.to_owned()),
         pretty,
@@ -296,34 +293,32 @@ fn provide_installer() -> Vec<InstallerCase> {
 
     // when A requires B and B requires A, and A is a non-published root package
     // the install of B should succeed
-    let a = root_package("A", "1.0.0");
+    let a = root_package(BStr::new("A"), BStr::new("1.0.0"));
     a.set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     let b = get_package("B", "1.0.0");
     b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "B",
-                "A",
+                BStr::new("B"),
+                BStr::new("A"),
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -339,34 +334,32 @@ fn provide_installer() -> Vec<InstallerCase> {
 
     // #480: when A requires B and B requires A, and A is a published root package
     // only B should be installed, as A is the root
-    let a = root_package("A", "1.0.0");
+    let a = root_package(BStr::new("A"), BStr::new("1.0.0"));
     a.set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     let b = get_package("B", "1.0.0");
     b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "B",
-                "A",
+                BStr::new("B"),
+                BStr::new("A"),
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -400,12 +393,12 @@ fn test_installer() {
 
     for case in provide_installer() {
         let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
-            BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
+            BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
         ));
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
 
         let config = ConfigStubBuilder::new()
-            .with("vendor-dir", PhpMixed::string("foo".to_string()))
+            .with("vendor-dir", PhpMixed::string(BString::from("foo")))
             .with("lock", PhpMixed::Bool(true))
             .with("notify-on-install", PhpMixed::Bool(true))
             .build_shared();
@@ -483,20 +476,15 @@ fn test_installer() {
         );
         let result = shirabe::util::sync_executor::block_on(installer.run()).unwrap();
 
-        let output = io_buffer
-            .borrow()
-            .get_output()
-            .display_lossy()
-            .to_string()
-            .replace('\r', "");
-        assert_eq!(0, result, "{}", output);
+        let output = str_replace("\r", "", io_buffer.borrow().get_output());
+        assert_eq!(0, result, "{}", output.display_lossy());
 
         let installed = installation_manager.borrow().__get_installed_packages();
         assert_eq!(
             make_packages_comparable(&case.expected_install),
             make_packages_comparable(&installed),
             "{}",
-            output
+            output.display_lossy()
         );
 
         let updated = installation_manager.borrow().__get_updated_packages();
@@ -508,6 +496,7 @@ fn test_installer() {
 }
 
 /// ref: PHPUnit assertStringMatchesFormat's StringMatchesFormatDescription::createPatternFromFormat.
+#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
 fn create_pattern_from_format(format: &str) -> String {
     let escaped = regex::escape(format);
     let bytes = escaped.as_bytes();
@@ -516,7 +505,7 @@ fn create_pattern_from_format(format: &str) -> String {
     while i < bytes.len() {
         // regex::escape turns "%" into "%" (it is not special) so the format codes survive intact.
         if bytes[i] == b'%' && i + 1 < bytes.len() {
-            let replacement: Option<&str> = match bytes[i + 1] {
+            let replacement = match bytes[i + 1] {
                 b'%' => Some("%"),
                 b'e' => Some("\\/"),
                 b's' => Some("[^\\r\\n]+"),
@@ -602,7 +591,7 @@ fn rename_binary_in_expected_output(expected: BString) -> BString {
         .into()
 }
 
-fn fixtures_dir(path: &str) -> std::path::PathBuf {
+fn fixtures_dir(path: impl AsRef<std::path::Path>) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Fixtures")
         .join(path)
@@ -618,22 +607,22 @@ fn read_test_file(
     let contents = std::fs::read(file).unwrap();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
-    let section_info: [(&str, bool); 13] = [
-        ("TEST", true),
-        ("CONDITION", false),
-        ("COMPOSER", true),
-        ("LOCK", false),
-        ("INSTALLED", false),
-        ("RUN", true),
-        ("EXPECT-LOCK", false),
-        ("EXPECT-INSTALLED", false),
-        ("EXPECT-OUTPUT", false),
-        ("EXPECT-OUTPUT-OPTIMIZED", false),
-        ("EXPECT-EXIT-CODE", false),
-        ("EXPECT-EXCEPTION", false),
-        ("EXPECT", true),
+    let section_info: [(&BStr, bool); 13] = [
+        (BStr::new("TEST"), true),
+        (BStr::new("CONDITION"), false),
+        (BStr::new("COMPOSER"), true),
+        (BStr::new("LOCK"), false),
+        (BStr::new("INSTALLED"), false),
+        (BStr::new("RUN"), true),
+        (BStr::new("EXPECT-LOCK"), false),
+        (BStr::new("EXPECT-INSTALLED"), false),
+        (BStr::new("EXPECT-OUTPUT"), false),
+        (BStr::new("EXPECT-OUTPUT-OPTIMIZED"), false),
+        (BStr::new("EXPECT-EXIT-CODE"), false),
+        (BStr::new("EXPECT-EXCEPTION"), false),
+        (BStr::new("EXPECT"), true),
     ];
-    let known: indexmap::IndexSet<&str> = section_info.iter().map(|(k, _)| *k).collect();
+    let known: indexmap::IndexSet<&BStr> = section_info.iter().map(|(k, _)| *k).collect();
 
     let mut section: Option<BString> = None;
     let mut data: IndexMap<BString, BString> = IndexMap::new();
@@ -661,7 +650,7 @@ fn read_test_file(
                 data.contains_key(B(sec)),
                 "The test file \"{}\" must have a section named \"{}\".",
                 file.display(),
-                sec
+                sec.display_lossy()
             );
         }
     }
@@ -694,7 +683,7 @@ fn collect_test_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) 
 }
 
 /// ref: InstallerTest::loadIntegrationTests
-fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
+fn load_integration_tests(path: impl AsRef<std::path::Path>) -> Vec<IntegrationCase> {
     let dir = fixtures_dir(path);
     let mut files = Vec::new();
     collect_test_files(&dir, &mut files);
@@ -723,7 +712,7 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
             serde_json::from_slice(&test_data[B("COMPOSER")]).unwrap();
 
         if let Some(repositories) = composer.get_mut("repositories") {
-            let fixtures_str = dir.display().to_string().replace('\\', "/");
+            let fixtures_str = str_replace("\\", "/", path_to_bytes(&dir));
             let rewrite = |repo: &mut serde_json::Value| {
                 if repo.get("type").and_then(|t| t.as_str()) != Some("composer") {
                     return;
@@ -731,8 +720,8 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
                 if let Some(url) = repo.get("url").and_then(|u| u.as_str())
                     && preg_is_match(php_regex!(r"{^file://[^/]}"), url)
                 {
-                    let new_url = format!("file://{}/{}", fixtures_str, &url[7..]);
-                    repo["url"] = serde_json::Value::String(new_url);
+                    let new_url = bconcat!("file://", fixtures_str, "/", &url[7..]);
+                    repo["url"] = serde_json::Value::from(utf8_text(&new_url).unwrap());
                 }
             };
             match repositories {
@@ -750,6 +739,7 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
                     shirabe::json::JsonEncodeOptions::none(),
                 )
                 .unwrap();
+                #[expect(clippy::disallowed_macros, reason = "serde_json holds text")]
                 let hash = format!("{:x}", md5::compute(encoded.as_bytes()));
                 lock["hash"] = serde_json::Value::String(hash);
             }
@@ -840,24 +830,27 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
 /// ref: the inline `eval($condition)` in doTestIntegration, ported for the known fixture conditions.
 fn evaluate_condition(condition: &BString) -> bool {
     let condition = trim(condition);
-    match utf8_text(&condition).unwrap_or_default() {
+    match condition.as_bytes() {
         // putenv() returns true on success, so these conditions always run the test (with the env set).
-        "putenv('COMPOSER_FUND=1')" => {
+        b"putenv('COMPOSER_FUND=1')" => {
             Platform::put_env("COMPOSER_FUND", "1");
             true
         }
-        "putenv('COMPOSER_FUND=0')" => {
+        b"putenv('COMPOSER_FUND=0')" => {
             Platform::put_env("COMPOSER_FUND", "0");
             true
         }
         // HHVM is never defined under the Rust port.
-        "!defined('HHVM_VERSION')" => true,
+        b"!defined('HHVM_VERSION')" => true,
         // TODO(php-runtime): unported CONDITION expression (PHP eval has no Rust equivalent).
-        other => panic!("// TODO(php-runtime): unported CONDITION: {}", other),
+        other => panic!(
+            "// TODO(php-runtime): unported CONDITION: {}",
+            other.as_bstr().display_lossy()
+        ),
     }
 }
 
-fn opt_bool(input: &dyn InputInterface, name: &str) -> bool {
+fn opt_bool(input: &dyn InputInterface, name: &BStr) -> bool {
     input
         .get_option(name)
         .ok()
@@ -867,7 +860,7 @@ fn opt_bool(input: &dyn InputInterface, name: &str) -> bool {
 
 /// ref: `$ignorePlatformReqs = true === getOption('ignore-platform-reqs') ?: (getOption('ignore-platform-req') ?: false)`.
 fn ignore_platform_reqs_value(input: &dyn InputInterface) -> PhpMixed {
-    if opt_bool(input, "ignore-platform-reqs") {
+    if opt_bool(input, BStr::new("ignore-platform-reqs")) {
         return PhpMixed::Bool(true);
     }
     let list = input
@@ -894,7 +887,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     }
 
     let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
+        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
     ));
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
 
@@ -919,12 +912,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     if is_exception && let Err(e) = &composer_result {
         let normalized = case.expect.replace("\n", PHP_EOL);
         let normalized = normalized.trim_end().as_bstr();
-        let err = format!("{}", e);
+        let err = error_message(e);
         assert!(
             err.as_bytes().contains_str(normalized),
             "expected exception message containing:\n{}\n--- got ---\n{}",
             normalized.display_lossy(),
-            err
+            err.display_lossy()
         );
         return;
     }
@@ -1000,7 +993,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     )));
 
     // Application with inline install/update commands (setCode closures).
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     application.set_catch_exceptions(false);
 
     let run_result: std::rc::Rc<std::cell::RefCell<Option<anyhow::Result<i64>>>> =
@@ -1053,8 +1046,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         install_ref.set_code(Box::new(move |input, _output| {
             let ignore = ignore_platform_reqs_value(input);
             let mut inst = installer_cl.borrow_mut();
-            inst.set_dev_mode(!opt_bool(input, "no-dev"))
-                .set_dry_run(opt_bool(input, "dry-run"))
+            inst.set_dev_mode(!opt_bool(input, BStr::new("no-dev")))
+                .set_dry_run(opt_bool(input, BStr::new("dry-run")))
                 .set_platform_requirement_filter(
                     PlatformRequirementFilterFactory::from_bool_or_list(ignore).unwrap(),
                 )
@@ -1131,11 +1124,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                 .filter(|p| *p != "lock" && *p != "nothing" && *p != "mirrors")
                 .cloned()
                 .collect();
-            let update_mirrors = opt_bool(input, "lock") || filtered.len() != packages.len();
+            let update_mirrors =
+                opt_bool(input, BStr::new("lock")) || filtered.len() != packages.len();
 
-            let update_allow_transitive = if opt_bool(input, "with-all-dependencies") {
+            let update_allow_transitive = if opt_bool(input, BStr::new("with-all-dependencies")) {
                 UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps
-            } else if opt_bool(input, "with-dependencies") {
+            } else if opt_bool(input, BStr::new("with-dependencies")) {
                 UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire
             } else {
                 UpdateAllowTransitiveDeps::UpdateOnlyListed
@@ -1144,16 +1138,16 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
             let ignore = ignore_platform_reqs_value(input);
 
             let mut inst = installer_cl.borrow_mut();
-            inst.set_dev_mode(!opt_bool(input, "no-dev"))
+            inst.set_dev_mode(!opt_bool(input, BStr::new("no-dev")))
                 .set_update(true)
-                .set_install(!opt_bool(input, "no-install"))
-                .set_dry_run(opt_bool(input, "dry-run"))
+                .set_install(!opt_bool(input, BStr::new("no-install")))
+                .set_dry_run(opt_bool(input, BStr::new("dry-run")))
                 .set_update_mirrors(update_mirrors)
                 .set_update_allow_list(filtered)
                 .set_update_allow_transitive_dependencies(update_allow_transitive)
                 .unwrap()
-                .set_prefer_stable(opt_bool(input, "prefer-stable"))
-                .set_prefer_lowest(opt_bool(input, "prefer-lowest"))
+                .set_prefer_stable(opt_bool(input, BStr::new("prefer-stable")))
+                .set_prefer_lowest(opt_bool(input, BStr::new("prefer-lowest")))
                 .set_platform_requirement_filter(
                     PlatformRequirementFilterFactory::from_bool_or_list(ignore).unwrap(),
                 )
@@ -1165,7 +1159,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                     )
                     .unwrap(),
                 )
-                .set_minimal_update(opt_bool(input, "minimal-changes"));
+                .set_minimal_update(opt_bool(input, BStr::new("minimal-changes")));
             let r = shirabe::util::sync_executor::block_on(inst.run());
             let code = match &r {
                 Ok(c) => *c,
@@ -1208,18 +1202,18 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         let normalized = case.expect.replace("\n", PHP_EOL);
         let normalized = normalized.trim_end().as_bstr();
         let err = match run_result.borrow().as_ref() {
-            Some(Err(e)) => format!("{}", e),
+            Some(Err(e)) => error_message(e),
             _ => app_run
                 .as_ref()
                 .err()
-                .map(|e| format!("{}", e))
+                .map(error_message)
                 .unwrap_or_default(),
         };
         assert!(
             err.as_bytes().contains_str(normalized),
             "expected exception message containing:\n{}\n--- got ---\n{}",
             normalized.display_lossy(),
-            err
+            err.display_lossy()
         );
         return;
     }
@@ -1261,7 +1255,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         if let Some(obj) = expect_lock.as_object_mut() {
             for k in ["stability-flags", "platform", "platform-dev"] {
                 if obj.get(k) == Some(&serde_json::json!([])) {
-                    obj.insert(k.to_string(), serde_json::json!({}));
+                    obj.insert(k.into(), serde_json::json!({}));
                 }
             }
         }

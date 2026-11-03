@@ -32,7 +32,7 @@ fn unescaped_unicode_only() -> JsonEncodeOptions {
     }
 }
 
-fn fixture_path(name: &str) -> std::path::PathBuf {
+fn fixture_path(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Json/Fixtures")
         .join(name)

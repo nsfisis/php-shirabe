@@ -1,3 +1,5 @@
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
+
 #[path = "../common/io_mock.rs"]
 mod io_mock;
 

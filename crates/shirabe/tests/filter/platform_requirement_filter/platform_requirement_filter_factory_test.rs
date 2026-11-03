@@ -1,10 +1,11 @@
 //! ref: composer/tests/Composer/Test/Filter/PlatformRequirementFilter/PlatformRequirementFilterFactoryTest.php
 
+use bstr::BString;
 use shirabe::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, IgnoreListPlatformRequirementFilter,
     IgnoreNothingPlatformRequirementFilter, PlatformRequirementFilterFactory,
 };
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, error_message};
 
 #[test]
 fn test_from_bool_or_list() {
@@ -29,8 +30,8 @@ fn test_from_bool_or_list() {
 
     // 'list creates IgnoreListFilter'
     let filter = PlatformRequirementFilterFactory::from_bool_or_list(PhpMixed::List(vec![
-        PhpMixed::string("php".to_string()),
-        PhpMixed::string("ext-json".to_string()),
+        PhpMixed::string(BString::from("php")),
+        PhpMixed::string(BString::from("ext-json")),
     ]))
     .unwrap();
     assert!(
@@ -47,7 +48,7 @@ fn test_from_bool_throws_exception_if_type_is_unknown() {
     let err = result.unwrap_err();
     assert_eq!(
         "PlatformRequirementFilter: Unknown $boolOrList parameter null. Please report at https://github.com/nsfisis/php-shirabe/issues/new.",
-        err.to_string()
+        error_message(&err)
     );
 }
 

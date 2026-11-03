@@ -2,6 +2,7 @@
 
 use crate::test_case::get_package;
 use base64::Engine;
+use bstr::{BStr, BString};
 use shirabe::installer::BinaryInstaller;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
@@ -50,24 +51,24 @@ fn tear_down(setup: &mut SetUp) {
 }
 
 /// ref: BinaryInstallerTest::executableBinaryProvider
-fn executable_binary_provider() -> Vec<(&'static str, Vec<u8>)> {
+fn executable_binary_provider() -> Vec<(&'static BStr, Vec<u8>)> {
     vec![
         (
-            "simple php file",
+            BStr::new("simple php file"),
             b"<?php\n\necho 'success '.$_SERVER['argv'][1];".to_vec(),
         ),
         (
-            "php file with shebang",
+            BStr::new("php file with shebang"),
             b"#!/usr/bin/env php\n<?php\n\necho 'success '.$_SERVER['argv'][1];".to_vec(),
         ),
         (
-            "phar file",
+            BStr::new("phar file"),
             base64::engine::general_purpose::STANDARD
                 .decode("IyEvdXNyL2Jpbi9lbnYgcGhwCjw/cGhwCgpQaGFyOjptYXBQaGFyKCd0ZXN0LnBoYXInKTsKCnJlcXVpcmUgJ3BoYXI6Ly90ZXN0LnBoYXIvcnVuLnBocCc7CgpfX0hBTFRfQ09NUElMRVIoKTsgPz4NCj4AAAABAAAAEQAAAAEACQAAAHRlc3QucGhhcgAAAAAHAAAAcnVuLnBocCoAAADb9n9hKgAAAMUDDWGkAQAAAAAAADw/cGhwIGVjaG8gInN1Y2Nlc3MgIi4kX1NFUlZFUlsiYXJndiJdWzFdO1SOC0IE3+UN0yzrHIwyspp9slhmAgAAAEdCTUI=")
                 .unwrap(),
         ),
         (
-            "shebang with strict types declare",
+            BStr::new("shebang with strict types declare"),
             b"#!/usr/bin/env php\n<?php declare(strict_types=1);\n\necho 'success '.$_SERVER['argv'][1];".to_vec(),
         ),
     ]
@@ -80,7 +81,7 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
     // PHP mocks Package::getBinaries() to return ['binary']; here a real package is
     // configured via the __set_binaries test helper.
     let package = get_package("foo/bar", "1.0.0");
-    package.__set_binaries(vec![bstr::BString::from("binary".to_string())]);
+    package.__set_binaries(vec![BString::from("binary")]);
 
     let pkg_dir = setup.vendor_dir.join("foo/bar");
     fs::create_dir_all(&pkg_dir).unwrap();
@@ -89,7 +90,7 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
     let mut installer = BinaryInstaller::new(
         setup.io.clone(),
         setup.bin_dir.to_path_buf(),
-        bstr::BString::from("full".to_string()),
+        BString::from("full"),
         Some(std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
             None,
         )))),
