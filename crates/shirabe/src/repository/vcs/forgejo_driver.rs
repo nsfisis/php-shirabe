@@ -539,12 +539,7 @@ impl ForgejoDriver {
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
         match self.get_contents(bstr::BStr::new(&api_url), true)? {
-            Err(_) => {
-                if self.git_driver.is_some() {
-                    return Ok(());
-                }
-                return Err(anyhow::anyhow!("Failed to fetch repository data"));
-            }
+            Err(e) => return Err(e.into()),
             Ok(response) => {
                 let data = response.decode_json()?;
                 if data.is_null() && self.git_driver.is_some() {

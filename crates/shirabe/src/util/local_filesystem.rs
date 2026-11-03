@@ -120,8 +120,7 @@ impl LocalFilesystem {
             let proxy = proxy_manager_guard
                 .as_ref()
                 .expect("ProxyManager instance")
-                .get_proxy_for_request(&file_url)
-                .map_err(|e| anyhow::anyhow!(e))?;
+                .get_proxy_for_request(&file_url)?;
             proxy
                 .get_status(Some(BStr::new(" using proxy (%s)")))
                 .unwrap_or_default()

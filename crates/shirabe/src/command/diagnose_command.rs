@@ -1491,8 +1491,7 @@ impl Command for DiagnoseCommand {
                 let proxy = ProxyManager::get_instance()
                     .as_ref()
                     .unwrap()
-                    .get_proxy_for_request(bconcat!(proto, "://repo.packagist.org"))
-                    .map_err(|e| anyhow::anyhow!(e))?;
+                    .get_proxy_for_request(bconcat!(proto, "://repo.packagist.org"))?;
                 if !proxy.get_status(None)?.is_empty() {
                     let r#type = if proxy.is_secure() { "HTTPS" } else { "HTTP" };
                     io.write_no_newline(bconcat!("Checking ", r#type, " proxy with ", proto, ": "));

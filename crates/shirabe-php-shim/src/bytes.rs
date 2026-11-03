@@ -20,10 +20,13 @@ pub fn display_to_bytes(value: impl std::fmt::Display) -> BString {
     BString::from(out)
 }
 
-/// `bytes` as UTF-8 text, or `None` if they are not valid UTF-8. Only for the shim of a PHP
-/// function that itself requires UTF-8, which reproduces how that function fails, and for a lookup
-/// in data that is valid UTF-8, which other bytes cannot match.
-#[allow(clippy::disallowed_methods)]
+/// `bytes` as UTF-8 text, or `None` if they are not valid UTF-8. Only for a Rust API that has no
+/// byte form, and for the shim of a PHP function that itself requires UTF-8, which reproduces how
+/// that function fails.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the one conversion from bytes to text"
+)]
 #[expect(
     clippy::disallowed_types,
     reason = "the one conversion from bytes to text"
