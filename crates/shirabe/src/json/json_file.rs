@@ -10,8 +10,8 @@ use shirabe_php_shim::{
     JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, dirname,
     display_to_bytes, error_message, file_exists, file_get_contents, file_put_contents, is_dir,
     is_file, json_decode_assoc, json_decode_obj, json_encode_ex, ltrim2, mkdir, path_from_bytes,
-    path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace2, realpath,
-    str_replace, strpos, usleep, utf8_text,
+    path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace2, rawurldecode,
+    realpath, sprintf, str_replace, strpos, usleep, utf8_text,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 use std::path::{Path, PathBuf};
@@ -329,6 +329,7 @@ impl JsonFile {
         if strpos(&schema_file, "://").is_none() {
             schema_file = bconcat!("file://", schema_file);
         }
+        schema_file = encode_file_schema_reference(schema_file.as_bstr());
 
         // PHP: $schemaData = (object) ['$ref' => $schemaFile, '$schema' => "https://json-schema.org/draft-04/schema#"];
         // A string-keyed `PhpMixed::Array` serializes as a JSON object, matching the (object) cast.
@@ -368,14 +369,12 @@ impl JsonFile {
         }
 
         // convert assoc arrays to objects
-        // TODO(bytes): jsonschema takes the schema reference as text, so a schema path that is not
-        // valid UTF-8 fails here, where PHP reads the file.
         let schema_value = serde_json::to_value(&schema_data)?;
         let data_value = serde_json::to_value(data)?;
         let validator = jsonschema::options()
             .with_retriever(SchemaRetriever)
             .build(&schema_value)
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
+            .map_err(|e| RuntimeException::new(display_to_bytes(&e)))?;
 
         let errors: Vec<BString> = validator
             .iter_errors(&data_value)
@@ -556,6 +555,24 @@ impl JsonFile {
     }
 }
 
+/// jsonschema holds a schema reference as a text URI, while PHP reads a `file://` reference as the
+/// path it spells, whatever its bytes. The path is carried percent-encoded, and `SchemaRetriever`
+/// decodes it. `#` still starts a fragment, as it does in `JsonSchema\Uri\UriResolver`.
+fn encode_file_schema_reference(reference: &BStr) -> BString {
+    let Some(path) = reference.strip_prefix(b"file://") else {
+        return reference.to_owned();
+    };
+    let mut encoded = BString::from("file://");
+    for &byte in path {
+        if byte.is_ascii_alphanumeric() || b"-._~/:#".contains(&byte) {
+            encoded.push(byte);
+        } else {
+            encoded.extend_from_slice(&sprintf("%%%02X", &[PhpMixed::Int(i64::from(byte))]));
+        }
+    }
+    encoded
+}
+
 #[derive(Debug)]
 struct SchemaRetriever;
 
@@ -576,7 +593,8 @@ impl jsonschema::Retrieve for SchemaRetriever {
                 Ok(serde_json::from_slice(contents)?)
             }
             "file" => {
-                let file = std::fs::File::open(uri.path().as_str())?;
+                let path = rawurldecode(uri.path().as_str());
+                let file = std::fs::File::open(path_from_bytes(&path))?;
                 Ok(serde_json::from_reader(std::io::BufReader::new(file))?)
             }
             scheme => Err(format!("Unknown scheme {scheme}").into()),
@@ -587,6 +605,38 @@ impl jsonschema::Retrieve for SchemaRetriever {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn schema_path_is_read_whatever_its_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in [&b"sch\xE9ma 100%25.json"[..], &b"caf\xC3\xA9?.json"[..]] {
+            let schema_path = dir.path().join(path_from_bytes(name));
+            std::fs::write(
+                &schema_path,
+                r#"{"type": "object", "properties": {"a": {"type": "string"}}}"#,
+            )
+            .unwrap();
+            let schema_file = BString::from(path_to_bytes(&schema_path));
+
+            let validate = |value: PhpMixed| {
+                let mut data = indexmap::IndexMap::new();
+                data.insert(BString::from("a"), value);
+                JsonFile::validate_json_schema(
+                    BStr::new("x.json"),
+                    &PhpMixed::Object(data),
+                    JsonFile::LAX_SCHEMA,
+                    Some(schema_file.as_bstr()),
+                )
+            };
+
+            assert!(validate(PhpMixed::string("text")).unwrap());
+            assert!(
+                validate(PhpMixed::Int(1))
+                    .unwrap_err()
+                    .is_instanceof::<JsonValidationException>()
+            );
+        }
+    }
 
     // Expected values are the output of PHP 8.5.9 running Composer's JsonFile::parseJson().
     #[test]
