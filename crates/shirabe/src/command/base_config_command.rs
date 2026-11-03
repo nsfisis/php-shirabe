@@ -136,12 +136,15 @@ pub trait BaseConfigCommand: BaseCommand {
         {
             Ok(path_from_bytes(&php_to_string(&config.get("home"))).join("config.json"))
         } else {
-            Ok(input
+            match input
                 .borrow()
                 .get_option("file")?
                 .as_string()
                 .map(|s| path_from_bytes(s).to_path_buf())
-                .unwrap_or_else(|| Factory::get_composer_file().unwrap_or_default()))
+            {
+                Some(file) => Ok(file),
+                None => Factory::get_composer_file(),
+            }
         }
     }
 
