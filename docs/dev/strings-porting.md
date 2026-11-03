@@ -51,9 +51,16 @@ a value that stays UTF-8 says why, where it does. The set of `reason`s can be re
 fn compile(pattern: &str) -> Result<regex::Regex, regex::Error> { ... }
 ```
 
-Literals (`let x = "abc"`), `panic!("{n}")` and types inferred from an API are not flagged. A value
-that gets its type from `.into()`, `.collect()` or a `str` method that returns `String` is flagged
-only where it reaches a signature or a field.
+Literals (`let x = "abc"`), `panic!("{n}")` and types inferred from an API are not flagged.
+`to_string()` and `std::fs::read_to_string()` are flagged by `disallowed_methods`. A value that gets
+its type from `.into()`, `.collect()` or a `str` method that returns `String` is flagged only where
+it reaches a signature or a field.
+
+An impl for `&str` whose only purpose is to accept a Rust string literal where bytes are expected
+(`PhpConcat for str`, `From<&str> for PhpMixed`, ...) records `reason = "a string literal"`.
+
+rustc ignores a lint attribute on a macro statement such as `assert!(...);`, so `#[expect]` goes on
+the enclosing `let`, expression statement or function.
 
 ## Types
 
@@ -87,6 +94,7 @@ Boundaries with Rust APIs:
   fail on invalid UTF-8 the way `json_encode()` does.
 * Process arguments and environment variables: `OsStr`/`OsString`, which hold bytes on Unix.
 * HTTP header values: `HeaderValue::from_bytes()`.
+* Files: `std::fs::read()`.
 
 Text returned by a Rust API, such as the message of an `std::io::Error`, becomes a `BString` where it
 is received, through `display_to_bytes()` when the API only offers `Display`.
@@ -99,6 +107,11 @@ its behaviour. Use the shim of the PHP function:
 * `to_lowercase()`/`to_uppercase()` map Unicode; `strtolower()`/`strtoupper()` map ASCII only.
 * `trim()` strips Unicode whitespace; PHP's `trim()` strips `" \t\n\r\0\x0B"`.
 * `chars()` decodes UTF-8; PHP's string functions work on bytes.
+* `lines()` also splits at `\r\n` and drops a trailing empty line; `explode("\n", ...)` does
+  neither.
+
+The `ByteSlice` methods among these are in `disallowed-methods`. The shim of an `mb_*()` function,
+which decodes UTF-8 as PHP does, records that reason where it calls one.
 
 ## Building strings
 

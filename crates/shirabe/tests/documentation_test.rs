@@ -36,10 +36,12 @@ fn provide_command_cases() -> Vec<std::rc::Rc<std::cell::RefCell<dyn Command>>> 
 
 #[test]
 fn test_command() {
-    let doc_content = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer/doc/03-cli.md"),
-    )
-    .unwrap();
+    let doc_content = bstr::BString::from(
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer/doc/03-cli.md"),
+        )
+        .unwrap(),
+    );
 
     for command in provide_command_cases() {
         assert!(

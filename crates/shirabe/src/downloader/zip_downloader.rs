@@ -10,7 +10,7 @@ use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bconcat, bin2hex, class_exists, error_message, file_exists, file_get_contents,
     filesize, hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex,
-    preg_match, random_int, str_replace, strlen, substr, version_compare,
+    preg_match, random_int, rtrim, str_replace, strlen, substr, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -362,7 +362,7 @@ impl ZipDownloader {
                     .into())
                 }
                 Err(code) => Err(UnexpectedValueException::with_code(
-                    bconcat!(self.get_error_message(code, file).trim_end()),
+                    rtrim(bconcat!(self.get_error_message(code, file), "\n")),
                     code,
                 )
                 .into()),

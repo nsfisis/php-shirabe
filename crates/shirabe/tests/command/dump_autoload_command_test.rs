@@ -320,8 +320,9 @@ fn test_with_custom_autoloader_suffix() {
         .unwrap();
     assert_eq!(0, status_code);
 
-    let contents = std::fs::read_to_string(dir.join("vendor/autoload.php")).unwrap_or_default();
-    assert!(contents.contains("ComposerAutoloaderInitFoobar"));
+    let contents =
+        bstr::BString::from(std::fs::read(dir.join("vendor/autoload.php")).unwrap_or_default());
+    assert!(contents.contains_str("ComposerAutoloaderInitFoobar"));
 
     drop(tear_down);
 }
@@ -371,8 +372,9 @@ fn test_with_existing_composer_lock_and_autoloader_suffix() {
         .unwrap();
     assert_eq!(0, status_code);
 
-    let contents = std::fs::read_to_string(dir.join("vendor/autoload.php")).unwrap_or_default();
-    assert!(contents.contains("ComposerAutoloaderInitFoobar"));
+    let contents =
+        bstr::BString::from(std::fs::read(dir.join("vendor/autoload.php")).unwrap_or_default());
+    assert!(contents.contains_str("ComposerAutoloaderInitFoobar"));
 
     drop(tear_down);
 }
@@ -420,8 +422,9 @@ fn test_with_existing_composer_lock_without_autoloader_suffix() {
         .unwrap();
     assert_eq!(0, status_code);
 
-    let contents = std::fs::read_to_string(dir.join("vendor/autoload.php")).unwrap_or_default();
-    assert!(contents.contains("ComposerAutoloaderInit2d4a6be9a93712c5d6a119b26734a047"));
+    let contents =
+        bstr::BString::from(std::fs::read(dir.join("vendor/autoload.php")).unwrap_or_default());
+    assert!(contents.contains_str("ComposerAutoloaderInit2d4a6be9a93712c5d6a119b26734a047"));
 
     drop(tear_down);
 }

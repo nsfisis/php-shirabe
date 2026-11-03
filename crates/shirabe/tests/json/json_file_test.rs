@@ -240,7 +240,7 @@ fn test_preserve_indentation_after_read() {
 
     assert_eq!(
         "{\n\t\"foo\": \"baz\"\n}\n",
-        std::fs::read_to_string(&dst).unwrap()
+        bstr::BString::from(std::fs::read(&dst).unwrap())
     );
 
     std::fs::remove_file(&dst).unwrap();
@@ -261,7 +261,7 @@ fn test_overwrites_indentation_by_default() {
 
     assert_eq!(
         "{\n    \"foo\": \"baz\"\n}\n",
-        std::fs::read_to_string(&dst).unwrap()
+        bstr::BString::from(std::fs::read(&dst).unwrap())
     );
 
     std::fs::remove_file(&dst).unwrap();
@@ -540,8 +540,9 @@ fn merge_conflict_simple_data() -> PhpMixed {
 #[test]
 fn test_composer_lock_file_merge_conflict_simple() {
     let data = merge_conflict_simple_data();
-    let json =
-        std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-simple.txt")).unwrap();
+    let json = bstr::BString::from(
+        std::fs::read(fixture_path("composer-lock-merge-conflict-simple.txt")).unwrap(),
+    );
     assert_eq!(
         data,
         JsonFile::parse_json(Some(&json), Some(bstr::BStr::new("/path/to/composer.lock"))).unwrap()
@@ -551,8 +552,9 @@ fn test_composer_lock_file_merge_conflict_simple() {
 #[test]
 fn test_composer_lock_file_merge_conflict_simple_crlf() {
     let data = merge_conflict_simple_data();
-    let json =
-        std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-simple.txt")).unwrap();
+    let json = bstr::BString::from(
+        std::fs::read(fixture_path("composer-lock-merge-conflict-simple.txt")).unwrap(),
+    );
     assert_eq!(
         data,
         JsonFile::parse_json(Some(&json), Some(bstr::BStr::new("/path/to/composer.lock"))).unwrap()
@@ -562,8 +564,9 @@ fn test_composer_lock_file_merge_conflict_simple_crlf() {
 #[test]
 fn test_composer_lock_file_merge_conflict_complex() {
     // complex files have multiple conflict markers and can thus not be simply resolved
-    let data =
-        std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-complex.txt")).unwrap();
+    let data = bstr::BString::from(
+        std::fs::read(fixture_path("composer-lock-merge-conflict-complex.txt")).unwrap(),
+    );
 
     let err = JsonFile::parse_json(Some(&data), Some(bstr::BStr::new("/path/to/composer.lock")))
         .unwrap_err();
@@ -573,10 +576,12 @@ fn test_composer_lock_file_merge_conflict_complex() {
 #[test]
 fn test_composer_lock_file_merge_conflict_complex_crlf() {
     // complex files have multiple conflict markers and can thus not be simply resolved
-    let data = std::fs::read_to_string(fixture_path(
-        "composer-lock-merge-conflict-complex-crlf.txt",
-    ))
-    .unwrap();
+    let data = bstr::BString::from(
+        std::fs::read(fixture_path(
+            "composer-lock-merge-conflict-complex-crlf.txt",
+        ))
+        .unwrap(),
+    );
 
     let err = JsonFile::parse_json(Some(&data), Some(bstr::BStr::new("/path/to/composer.lock")))
         .unwrap_err();
@@ -585,8 +590,9 @@ fn test_composer_lock_file_merge_conflict_complex_crlf() {
 
 #[test]
 fn test_composer_lock_file_merge_conflict_extended() {
-    let data =
-        std::fs::read_to_string(fixture_path("composer-lock-merge-conflict-extended.txt")).unwrap();
+    let data = bstr::BString::from(
+        std::fs::read(fixture_path("composer-lock-merge-conflict-extended.txt")).unwrap(),
+    );
 
     let json =
         JsonFile::parse_json(Some(&data), Some(bstr::BStr::new("/path/to/composer.lock"))).unwrap();

@@ -54,6 +54,10 @@ fn list_body(text: &[u8]) -> &BStr {
     text[usage + 1..].as_bstr()
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
 fn lines_starting_with<'a>(text: &'a [u8], prefix: &BStr) -> Vec<&'a BStr> {
     text.lines()
         .map(|line| line.trim_end().as_bstr())

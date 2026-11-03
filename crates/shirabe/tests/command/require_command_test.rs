@@ -282,8 +282,8 @@ fn test_require() {
             // The PHP test builds a regex by quoting the expected and replacing %d with [0-9.]+.
             // Compare line-by-line, treating "%d" as a numeric wildcard.
             let trimmed_expected = trim(expected);
-            let exp_lines: Vec<&[u8]> = trimmed_expected.lines().collect();
-            let got_lines: Vec<&[u8]> = display.lines().collect();
+            let exp_lines: Vec<&[u8]> = trimmed_expected.split_str("\n").collect();
+            let got_lines: Vec<&[u8]> = display.split_str("\n").collect();
             assert_eq!(
                 exp_lines.len(),
                 got_lines.len(),

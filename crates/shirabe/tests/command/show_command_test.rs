@@ -10,7 +10,7 @@ use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::PlatformRepository;
 use shirabe_php_shim::{
-    STR_PAD_RIGHT, bconcat, date_local, error_message, implode, str_pad, trim, utf8_text,
+    STR_PAD_RIGHT, bconcat, date_local, error_message, implode, rtrim, str_pad, trim, utf8_text,
 };
 
 /// Build a `Vec<(ParameterName, InputValue)>` command input from `(key, value)` pairs.
@@ -1676,7 +1676,7 @@ vendor/conflicted <1.0.0
 replaces
 vendor/replaced 3.0.0";
     assert!(
-        display.trim_end().ends_with_str(expected),
+        rtrim(&display).ends_with_str(expected),
         "expected link sections at the end of:\n{}",
         display.display_lossy()
     );

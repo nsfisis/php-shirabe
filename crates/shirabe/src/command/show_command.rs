@@ -204,6 +204,7 @@ impl ShowCommand {
                     // (CJK characters count as width 2). mb_strimwidth counts the trim
                     // marker ('...') in the width parameter, so pass $remaining directly.
                     // TODO(unicode): this counts code points, not display width.
+                    #[expect(clippy::disallowed_methods, reason = "mb_strwidth() decodes UTF-8")]
                     if description.chars().count() > remaining as usize {
                         let end = description
                             .char_indices()

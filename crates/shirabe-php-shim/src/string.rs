@@ -413,6 +413,7 @@ fn canonical_encoding(name: &[u8]) -> BString {
 /// with mbstring's default substitute character `?`.
 // TODO(php-semantics): this substitutes one `?` per maximal invalid subpart, which may not match
 // how mbstring splits an invalid sequence into errors.
+#[expect(clippy::disallowed_methods, reason = "mbstring decodes UTF-8")]
 fn substitute_invalid(s: &[u8], ascii_only: bool) -> BString {
     let mut out = BString::from(Vec::with_capacity(s.len()));
     for (start, end, c) in s.char_indices() {
@@ -451,6 +452,7 @@ pub fn mb_convert_encoding(
 
 // TODO(php-semantics): an invalid UTF-8 sequence counts as one character per maximal invalid
 // subpart, which may not match how mbstring counts it.
+#[expect(clippy::disallowed_methods, reason = "mbstring decodes UTF-8")]
 pub fn mb_strlen(s: impl AsRef<[u8]>, _encoding: impl AsRef<[u8]>) -> i64 {
     s.as_ref().chars().count() as i64
 }
@@ -494,6 +496,7 @@ pub fn mb_strwidth(s: impl AsRef<[u8]>, _encoding: Option<&BStr>) -> i64 {
 /// The byte ranges of the characters of `s`, as mbstring splits a UTF-8 string.
 // TODO(php-semantics): an invalid UTF-8 sequence forms one character per maximal invalid subpart,
 // which may not match how mbstring splits it.
+#[expect(clippy::disallowed_methods, reason = "mbstring decodes UTF-8")]
 fn utf8_char_ranges(s: &[u8]) -> Vec<(usize, usize)> {
     s.char_indices()
         .map(|(start, end, _)| (start, end))
@@ -931,8 +934,9 @@ fn php_to_float(v: &PhpMixed) -> f64 {
             }
         }
         PhpMixed::String(s) => {
-            // PHP's (float) cast reads the leading numeric portion of the string.
-            let bytes = s.trim_start();
+            // PHP's (float) cast reads the leading numeric portion of the string, after any
+            // leading whitespace.
+            let bytes = ltrim2(s, " \t\n\r\x0B\x0C");
             let mut end = 0;
             if end < bytes.len() && (bytes[end] == b'+' || bytes[end] == b'-') {
                 end += 1;

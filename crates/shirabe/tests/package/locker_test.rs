@@ -166,8 +166,9 @@ fn test_set_lock_data() {
 
     // The real JsonFile writes composer.lock; read it back and assert on the persisted structure,
     // standing in for PHPUnit's `->method('write')->with([...])` expectation.
-    let written = std::fs::read_to_string(temp_dir.path().join("composer.lock")).unwrap();
-    let value: serde_json::Value = serde_json::from_str(&written).unwrap();
+    let written =
+        bstr::BString::from(std::fs::read(temp_dir.path().join("composer.lock")).unwrap());
+    let value: serde_json::Value = serde_json::from_slice(&written).unwrap();
 
     assert_eq!(
         value["content-hash"],

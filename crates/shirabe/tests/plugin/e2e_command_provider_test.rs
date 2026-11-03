@@ -43,6 +43,10 @@ fn run_command(work: &Path, program: &BStr, prefix_args: &[&OsStr], args: &[&BSt
     }
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
 fn greet_lines(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
@@ -51,6 +55,10 @@ fn greet_lines(stdout: &[u8]) -> Vec<&BStr> {
         .collect()
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
 fn list_lines_mentioning_greet(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()

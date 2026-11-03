@@ -33,8 +33,8 @@ fn flag(name: &BStr) -> (ParameterName, InputValue) {
 
 /// Reads CWD's composer.json as a `serde_json::Value` (mirrors PHP's `json_decode(..., true)`).
 fn read_composer_json() -> serde_json::Value {
-    let contents = std::fs::read_to_string("composer.json").unwrap();
-    serde_json::from_str(&contents).unwrap()
+    let contents = bstr::BString::from(std::fs::read("composer.json").unwrap());
+    serde_json::from_slice(&contents).unwrap()
 }
 
 struct UpdateCase {

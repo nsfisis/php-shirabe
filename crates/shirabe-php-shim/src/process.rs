@@ -641,7 +641,7 @@ mod tests {
         assert!(pipes.is_empty());
         assert_eq!(proc_close(&process), 0);
 
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "filetest\n");
+        assert_eq!(std::fs::read(&path).unwrap(), b"filetest\n");
         std::fs::remove_file(&path).ok();
     }
 }

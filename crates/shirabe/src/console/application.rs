@@ -1732,6 +1732,10 @@ impl Application {
             let m0 = m.get(0).unwrap_or_default();
             offset += strlen(m0) as usize;
 
+            #[expect(
+                clippy::disallowed_methods,
+                reason = "the match of a /u pattern splits into UTF-8 characters"
+            )]
             for (start, end, _) in m0.char_indices() {
                 let char = &m0[start..end];
                 // test if $char could be appended to current line

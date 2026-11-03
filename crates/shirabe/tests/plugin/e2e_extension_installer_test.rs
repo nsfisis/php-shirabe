@@ -95,6 +95,10 @@ fn run_install(work: &Path, program: &BStr, args: &[&std::ffi::OsStr]) -> Instal
     // Directory walk order is filesystem-dependent; a canonical order keys the comparison.
     artifacts.sort_keys();
     let text = bconcat!(&output.stdout, &output.stderr);
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the test splits a child process's output into lines, which no PHP code does"
+    )]
     let plugin_output = text
         .lines()
         .filter(|line| line.starts_with(b"phpstan/extension-installer:") || line.starts_with(b"> "))

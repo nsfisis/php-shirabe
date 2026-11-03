@@ -22,6 +22,7 @@ impl UnicodeString {
     // with the Unicode width tables to treat wide characters as width 2 and skip zero-width /
     // combining characters; here every character counts as width 1, correct only for ASCII. The
     // ANSI/control-character stripping driven by `ignore_ansi_decoration` is likewise not handled.
+    #[expect(clippy::disallowed_methods, reason = "UnicodeString holds valid UTF-8")]
     pub fn width(&self, _ignore_ansi_decoration: bool) -> i64 {
         let s = str_replace_array(&["\x00", "\x05", "\x07"], &[""], &self.string);
         let s = str_replace_array(&["\r\n", "\r"], &["\n"], &s);

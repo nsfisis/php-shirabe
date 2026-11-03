@@ -15,7 +15,7 @@ use shirabe_symfony_console::input::{InputValue, ParameterName};
 /// ref: TestCase::trimLines — strip trailing spaces from each line, then trim the whole string.
 fn trim_lines(s: &[u8]) -> bstr::BString {
     let stripped = s
-        .lines()
+        .split_str("\n")
         .map(|line| line.trim_end_with(|c| c == ' '))
         .collect::<Vec<_>>();
     trim(bstr::join("\n", stripped))

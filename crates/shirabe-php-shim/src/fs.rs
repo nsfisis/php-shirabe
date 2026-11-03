@@ -960,14 +960,12 @@ pub fn file(filename: impl AsRef<std::path::Path>, flags: i64) -> Option<Vec<BSt
 
 pub fn umask() -> u32 {
     // Linux exposes the current umask via /proc/self/status, which reads it without disturbing it.
-    let from_proc = std::fs::read_to_string("/proc/self/status")
-        .ok()
-        .and_then(|status| {
-            status.lines().find_map(|line| {
-                line.strip_prefix("Umask:")
-                    .and_then(|v| u32::from_str_radix(v.trim(), 8).ok())
-            })
-        });
+    let from_proc = std::fs::read("/proc/self/status").ok().and_then(|status| {
+        status.split(|b| *b == b'\n').find_map(|line| {
+            let value = crate::utf8_text(line.strip_prefix(b"Umask:")?)?;
+            u32::from_str_radix(value.trim(), 8).ok()
+        })
+    });
     if let Some(mask) = from_proc {
         return mask;
     }

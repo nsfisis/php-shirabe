@@ -78,6 +78,10 @@ bin-dir=bin
         upstream.trace
     );
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the test splits a child process's output into lines, which no PHP code does"
+    )]
     let io_line = |run: &Run| -> BString {
         BString::from(
             run.stdout

@@ -175,8 +175,8 @@ fn test_repository_write() {
         .unwrap();
     repository.write(true, &im).unwrap();
 
-    let written = std::fs::read_to_string(&json_path).unwrap();
-    let actual: serde_json::Value = serde_json::from_str(&written).unwrap();
+    let written = bstr::BString::from(std::fs::read(&json_path).unwrap());
+    let actual: serde_json::Value = serde_json::from_slice(&written).unwrap();
     let expected = serde_json::json!({
         "packages": [
             {"name": "mypkg", "type": "library", "version": "0.1.10", "version_normalized": "0.1.10.0", "install-path": "../woop/woop"},
@@ -352,12 +352,14 @@ fn test_repository_writes_installed_php() {
 
     repository.write(true, &im).unwrap();
 
-    let expected = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../composer/tests/Composer/Test/Repository/Fixtures/installed.php"),
-    )
-    .unwrap();
-    let actual = std::fs::read_to_string(dir.join("installed.php")).unwrap();
+    let expected = bstr::BString::from(
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../composer/tests/Composer/Test/Repository/Fixtures/installed.php"),
+        )
+        .unwrap(),
+    );
+    let actual = bstr::BString::from(std::fs::read(dir.join("installed.php")).unwrap());
     assert_eq!(expected, actual);
 }
 

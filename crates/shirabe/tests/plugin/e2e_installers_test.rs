@@ -63,6 +63,10 @@ pub(crate) fn run_command(
 /// prints absolutely when it deletes a package) is replaced by a placeholder, and progress bar
 /// frames are dropped — Shirabe renders those differently from upstream for every install,
 /// including projects with no plugin at all, so they say nothing about this plugin.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
 fn normalize_output(stdout: &[u8], work: &Path) -> Vec<BString> {
     let work = path_to_bytes(work);
     stdout

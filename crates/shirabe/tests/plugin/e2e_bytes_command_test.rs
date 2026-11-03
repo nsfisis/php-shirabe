@@ -44,6 +44,10 @@ fn run_command(
 
 /// The lines naming the fixture's command. The rest of a listing holds the application name and
 /// the built-in commands' help, which Shirabe words differently.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
 fn fixture_lines(text: &[u8]) -> Vec<&BStr> {
     text.lines()
         .map(|line| line.as_bstr())

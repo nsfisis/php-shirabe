@@ -682,8 +682,8 @@ fn test_add_vendor_ignore() {
     let command = InitCommand::new();
     command.__add_vendor_ignore(&ignore_file, BStr::new("/vendor/"));
     assert!(std::path::Path::new(&ignore_file).exists());
-    let content = std::fs::read_to_string(&ignore_file).unwrap();
-    assert!(content.contains("/vendor/"));
+    let content = bstr::BString::from(std::fs::read(&ignore_file).unwrap());
+    assert!(content.contains_str("/vendor/"));
 }
 
 #[test]

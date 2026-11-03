@@ -7,7 +7,7 @@ use bstr::{BStr, BString};
 /// returns `None` rather than guessing, mirroring PHP returning `false` on unrecognized input.
 #[expect(clippy::disallowed_types, reason = "chrono parses text")]
 fn parse_to_fixed(s: &str) -> Option<chrono::DateTime<chrono::FixedOffset>> {
-    let s = s.trim();
+    let s = s.trim_ascii();
     if s.is_empty() {
         return None;
     }
@@ -84,7 +84,7 @@ pub fn date_format_to_strftime(format: &[u8]) -> &'static str {
 /// silently mis-handling an unsupported expression.
 pub fn strtotime(time: impl AsRef<[u8]>) -> Option<i64> {
     // Every format this accepts is ASCII, so bytes that are not UTF-8 cannot parse.
-    let trimmed = crate::utf8_text(time.as_ref())?.trim();
+    let trimmed = crate::utf8_text(time.as_ref())?.trim_ascii();
 
     if trimmed.eq_ignore_ascii_case("now") {
         return Some(self::time());
@@ -101,14 +101,14 @@ pub fn strtotime(time: impl AsRef<[u8]>) -> Option<i64> {
 /// number of seconds. Whitespace between the count and unit is optional, as PHP accepts both.
 #[expect(clippy::disallowed_types, reason = "str::parse() takes text")]
 fn parse_relative(s: &str) -> Option<i64> {
-    let s = s.trim();
+    let s = s.trim_ascii();
     let split = s
         .find(|c: char| c.is_ascii_alphabetic())
         .filter(|&i| i > 0)?;
     let (count_part, unit_part) = s.split_at(split);
-    let count: i64 = count_part.trim().parse().ok()?;
+    let count: i64 = count_part.trim_ascii().parse().ok()?;
 
-    let unit = unit_part.trim().to_ascii_lowercase();
+    let unit = unit_part.trim_ascii().to_ascii_lowercase();
     let per_unit = match unit.as_str() {
         "sec" | "secs" | "second" | "seconds" => 1,
         "min" | "mins" | "minute" | "minutes" => 60,

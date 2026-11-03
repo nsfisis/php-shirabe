@@ -282,7 +282,7 @@ impl Command for RemoveCommand {
 
         let json_file = JsonFile::new(file.clone(), None, None)?;
         let composer_data = json_file.read()?;
-        let composer_backup = std::fs::read_to_string(json_file.get_path())?;
+        let composer_backup = std::fs::read(json_file.get_path())?;
 
         let json_file_for_source = JsonFile::new(file.clone(), None, None)?;
         let mut json = JsonConfigSource::new(

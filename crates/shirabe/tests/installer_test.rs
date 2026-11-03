@@ -12,7 +12,7 @@ use config_stub::ConfigStubBuilder;
 use serial_test::serial;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, bconcat, error_message, implode, path_to_bytes, php_fopen_resource,
-    php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind,
+    php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind, rtrim,
     str_replace, stream_get_contents, trim, utf8_text,
 };
 use shirabe_symfony_console::input::{
@@ -910,10 +910,10 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     // install/update run; check for that here since Rust has no equivalent ambient wrapper.
     if is_exception && let Err(e) = &composer_result {
         let normalized = case.expect.replace("\n", PHP_EOL);
-        let normalized = normalized.trim_end().as_bstr();
+        let normalized = rtrim(&normalized);
         let err = error_message(e);
         assert!(
-            err.as_bytes().contains_str(normalized),
+            err.as_bytes().contains_str(&normalized),
             "expected exception message containing:\n{}\n--- got ---\n{}",
             normalized.display_lossy(),
             err.display_lossy()
@@ -949,7 +949,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     if let Some(lock) = &case.lock {
         write_json(&lock_path, lock);
     }
-    let lock_before = std::fs::read_to_string(&lock_path).ok();
+    let lock_before = std::fs::read(&lock_path).ok().map(bstr::BString::from);
     let lock_json = JsonFile::new(&lock_path, None, None).unwrap();
 
     // The Locker needs a concrete InstallationManager; build a fresh recording mock just for it. The
@@ -1199,7 +1199,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
             unreachable!()
         };
         let normalized = case.expect.replace("\n", PHP_EOL);
-        let normalized = normalized.trim_end().as_bstr();
+        let normalized = rtrim(&normalized);
         let err = match run_result.borrow().as_ref() {
             Some(Err(e)) => error_message(e),
             _ => app_run
@@ -1209,7 +1209,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                 .unwrap_or_default(),
         };
         assert!(
-            err.as_bytes().contains_str(normalized),
+            err.as_bytes().contains_str(&normalized),
             "expected exception message containing:\n{}\n--- got ---\n{}",
             normalized.display_lossy(),
             err.display_lossy()
@@ -1241,8 +1241,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     );
 
     if let ExpectLock::Json(expect_lock) = &case.expect_lock {
-        let actual = std::fs::read_to_string(&lock_path).unwrap();
-        let mut actual_lock: serde_json::Value = serde_json::from_str(&actual).unwrap();
+        let actual = bstr::BString::from(std::fs::read(&lock_path).unwrap());
+        let mut actual_lock: serde_json::Value = serde_json::from_slice(&actual).unwrap();
         if let Some(obj) = actual_lock.as_object_mut() {
             for k in ["hash", "content-hash", "_readme", "plugin-api-version"] {
                 obj.remove(k);
@@ -1260,7 +1260,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         }
         assert_eq!(expect_lock, actual_lock);
     } else if let ExpectLock::Never = &case.expect_lock {
-        let lock_after = std::fs::read_to_string(&lock_path).ok();
+        let lock_after = std::fs::read(&lock_path).ok().map(bstr::BString::from);
         assert_eq!(lock_before, lock_after, "lock file must not be written");
     }
 
@@ -1312,7 +1312,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         .downcast_ref::<InstallationManager>()
         .expect("composer installation manager is the recording mock")
         .__get_trace();
-    assert_eq!(case.expect.trim_end().as_bstr(), implode("\n", &trace));
+    assert_eq!(rtrim(&case.expect), implode("\n", &trace));
 
     if let Some(expect_output) = expect_output
         && !expect_output.is_empty()
@@ -1327,7 +1327,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
             "__inilist__\n",
             &output,
         );
-        assert_string_matches_format(expect_output.trim_end(), output.trim_end(), &output_string);
+        assert_string_matches_format(&rtrim(expect_output), &rtrim(&output), &output_string);
     }
 }
 

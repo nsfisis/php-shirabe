@@ -2230,7 +2230,7 @@ fn require_generated_php_array(file: &Path) -> PhpMixed {
 
     let mut vendor_dir = BString::default();
     let mut base_dir = BString::default();
-    for line in contents.lines() {
+    for line in contents.split_str("\n") {
         let line = trim(line);
         if let Some(rest) = line.strip_prefix(b"$vendorDir = ") {
             vendor_dir = eval_php_path_expr(

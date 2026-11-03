@@ -61,6 +61,10 @@ fn prepared_project(program: &BStr, prefix: &[&OsStr]) -> TempDir {
     work
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
 fn normalize_lines(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
