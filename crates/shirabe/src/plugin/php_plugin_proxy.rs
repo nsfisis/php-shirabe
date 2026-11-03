@@ -45,7 +45,7 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, bconcat, path_from_bytes, path_to_bytes, utf8_text,
+    UnexpectedValueException, bconcat, display_to_bytes, path_from_bytes, path_to_bytes, utf8_text,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -1112,7 +1112,7 @@ fn class_loader_to_php(
     vendor_dir: Option<BString>,
 ) -> anyhow::Result<PluginValue> {
     let handle = new_php_object(
-        "Composer\\Autoload\\ClassLoader",
+        BStr::new("Composer\\Autoload\\ClassLoader"),
         vec![vendor_dir.to_plugin_value()],
     )?;
     let add = |method: &str, prefix: &[u8], paths: &[BString]| {
@@ -3889,7 +3889,7 @@ pub(crate) fn php_class_query(function: &str, args: Vec<PluginValue>) -> anyhow:
 
 /// Instantiates `new $class(...$ctor_args)` in the worker, with the script autoloader active.
 pub(crate) fn new_php_object(
-    class: &str,
+    class: &BStr,
     ctor_args: Vec<PluginValue>,
 ) -> anyhow::Result<PhpObjHandle> {
     crate::event_dispatcher::EventDispatcher::ensure_script_autoloader()?;
@@ -3900,8 +3900,11 @@ pub(crate) fn new_php_object(
     ))?;
     match value {
         PluginValue::PhpHandle(handle) => Ok(handle),
-        other => Err(RuntimeException::new(format!(
-            "`new {class}` returned an unsupported shape over RPC: {other:?}"
+        other => Err(RuntimeException::new(bconcat!(
+            "`new ",
+            class,
+            "` returned an unsupported shape over RPC: ",
+            display_to_bytes(format_args!("{other:?}"))
         ))
         .into()),
     }

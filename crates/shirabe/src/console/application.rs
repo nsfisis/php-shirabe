@@ -23,18 +23,19 @@ use crate::io::{
 };
 use crate::json::JsonValidationException;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
     LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpClass, PhpMixed,
     RuntimeException, STDIN, STR_PAD_RIGHT, basename, bconcat, bin2hex, chdir, defined, dirname,
-    disk_free_space, error_message, exec, explode, explode_limit, extension_loaded, file_exists,
-    file_get_contents, file_put_contents, function_exists, get_debug_type_obj, getcwd, getenv,
-    getmypid, glob, implode, ini_set, intval, is_array, is_dir, is_file, is_numeric_string,
-    is_string, json_decode_assoc, levenshtein, ltrim2, mb_convert_encoding, mb_convert_variables,
-    mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage, microtime,
-    path_from_bytes, path_to_bytes, php_regex, php_to_string, php_truthy, php_uname, posix_getuid,
+    disk_free_space, display_to_bytes, error_message, exec, explode, explode_limit,
+    extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists,
+    get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, ini_set, intval, is_array, is_dir,
+    is_file, is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim2,
+    mb_convert_encoding, mb_convert_variables, mb_detect_encoding, mb_strwidth,
+    memory_get_peak_usage, memory_get_usage, microtime, os_str_from_bytes, path_from_bytes,
+    path_to_bytes, php_regex, php_str, php_to_string, php_truthy, php_uname, posix_getuid,
     preg_grep, preg_match, preg_quote, preg_split, putenv, random_bytes, realpath,
     restore_error_handler, round, sort_natural_flag_case, str_pad, str_repeat, str_replace,
     str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time,
@@ -107,12 +108,15 @@ pub struct Application {
 }
 
 impl Application {
-    const LOGO: &'static str = r#"   _____ __    _            __
+    const LOGO: &'static BStr = php_str(
+        r#"   _____ __    _            __
   / ___// /_  (_)________ _/ /_  ___
   \__ \/ __ \/ / ___/ __ `/ __ \/ _ \
  ___/ / / / / / /  / /_/ / /_/ /  __/
 /____/_/ /_/_/_/   \__,_/_.___/\___/
-"#;
+"#
+        .as_bytes(),
+    );
 
     pub fn new(name: BString, mut version: BString) -> Self {
         if version.is_empty() {
@@ -180,9 +184,10 @@ impl Application {
         if let Some(ref wd) = working_dir
             && !is_dir(wd)
         {
-            return Err(RuntimeException::new(format!(
-                "Invalid working directory specified, {} does not exist.",
-                wd.display()
+            return Err(RuntimeException::new(bconcat!(
+                "Invalid working directory specified, ",
+                wd,
+                " does not exist."
             ))
             .into());
         }
@@ -204,7 +209,7 @@ impl Application {
         }
 
         Silencer::suppress(None);
-        let disk_hint_msg: Option<String> = (|| -> anyhow::Result<Option<String>> {
+        let disk_hint_msg: Option<BString> = (|| -> anyhow::Result<Option<BString>> {
             let composer = self.get_composer(false, Some(true), None)?;
             if let Some(composer) = composer {
                 let composer = composer.borrow_partial();
@@ -233,7 +238,7 @@ impl Application {
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
                 if hit {
-                    return Ok(Some(format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir.display())));
+                    return Ok(Some(bconcat!("<error>The disk hosting ", dir, " has less than 100MiB of free space, this may be the cause of the following exception</error>")));
                 }
             }
             Ok(None)
@@ -464,9 +469,9 @@ impl Application {
     }
 
     pub fn get_long_version(&self) -> BString {
-        let mut branch_alias_string = String::new();
+        let mut branch_alias_string = BString::default();
         if !composer::SHIRABE_BRANCH_ALIAS_VERSION.is_empty() {
-            branch_alias_string = format!(" ({})", composer::SHIRABE_BRANCH_ALIAS_VERSION);
+            branch_alias_string = bconcat!(" (", composer::SHIRABE_BRANCH_ALIAS_VERSION, ")");
         }
 
         bconcat!(
@@ -810,7 +815,7 @@ impl Application {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
         if !self.has(name) {
             return Err(CommandNotFoundException::new(
-                format!("The command \"{}\" does not exist.", name.display_lossy()),
+                bconcat!("The command \"", name, "\" does not exist."),
                 Vec::new(),
                 0,
             )
@@ -820,10 +825,7 @@ impl Application {
         // When the command has a different name than the one used at the command loader level
         if !self.commands.contains_key(name) {
             return Err(CommandNotFoundException::new(
-                format!(
-                    "The \"{}\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\".",
-                    name.display_lossy(),
-                ),
+                bconcat!("The \"", name, "\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\"."),
                 Vec::new(),
                 0,
             )
@@ -919,9 +921,10 @@ impl Application {
             preg_grep(bconcat!("{^", expr, "}"), all_namespaces.iter().cloned()).collect();
 
         if namespaces.is_empty() {
-            let mut message = format!(
-                "There are no commands defined in the \"{}\" namespace.",
-                namespace.display_lossy(),
+            let mut message = bconcat!(
+                "There are no commands defined in the \"",
+                namespace,
+                "\" namespace."
             );
 
             let alternatives = self.find_alternatives(namespace, &all_namespaces);
@@ -932,7 +935,7 @@ impl Application {
                     message.push_str("\n\nDid you mean one of these?\n    ");
                 }
 
-                message.push_str(&implode("\n    ", &alternatives).display_lossy().to_string());
+                message.push_str(implode("\n    ", &alternatives));
             }
 
             return Err(NamespaceNotFoundException::new(message, alternatives, 0).into());
@@ -941,11 +944,12 @@ impl Application {
         let exact = namespaces.iter().any(|n| n.as_bstr() == namespace);
         if namespaces.len() > 1 && !exact {
             return Err(NamespaceNotFoundException::new(
-                format!(
-                    "The namespace \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
-                    namespace.display_lossy(),
-                    self.get_abbreviation_suggestions(&namespaces)
-                        .display_lossy(),
+                bconcat!(
+                    "The namespace \"",
+                    namespace,
+                    "\" is ambiguous.\nDid you mean one of these?\n",
+                    self.get_abbreviation_suggestions(&namespaces),
+                    "."
                 ),
                 namespaces,
                 0,
@@ -1033,7 +1037,7 @@ impl Application {
                 self.find_namespace(&name[..pos])?;
             }
 
-            let mut message = format!("Command \"{}\" is not defined.", name.display_lossy());
+            let mut message = bconcat!("Command \"", name, "\" is not defined.");
 
             let mut alternatives = self.find_alternatives(name, &all_commands);
             if !alternatives.is_empty() {
@@ -1051,7 +1055,7 @@ impl Application {
                 } else {
                     message.push_str("\n\nDid you mean one of these?\n    ");
                 }
-                message.push_str(&implode("\n    ", &alternatives).display_lossy().to_string());
+                message.push_str(implode("\n    ", &alternatives));
             }
 
             return Err(CommandNotFoundException::new(message, alternatives, 0).into());
@@ -1134,10 +1138,12 @@ impl Application {
                     let suggestions = self.get_abbreviation_suggestions(&filtered);
 
                     return Err(CommandNotFoundException::new(
-                        format!(
-                            "Command \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
-                            name.display_lossy(),
-                            suggestions.display_lossy(),
+                        bconcat!(
+                            "Command \"",
+                            name,
+                            "\" is ambiguous.\nDid you mean one of these?\n",
+                            suggestions,
+                            "."
                         ),
                         commands.clone(),
                         0,
@@ -1152,7 +1158,7 @@ impl Application {
 
         if command.borrow().is_hidden() {
             return Err(CommandNotFoundException::new(
-                format!("The command \"{}\" does not exist.", name.display_lossy()),
+                bconcat!("The command \"", name, "\" does not exist."),
                 Vec::new(),
                 0,
             )
@@ -1241,10 +1247,9 @@ impl Application {
         e: &anyhow::Error,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
-        output.borrow().writeln(
-            &[bstr::BString::from("".to_string())],
-            output_interface::VERBOSITY_QUIET,
-        );
+        output
+            .borrow()
+            .writeln(&[BString::from("")], output_interface::VERBOSITY_QUIET);
 
         self.do_render_throwable(e, output.clone());
 
@@ -1261,10 +1266,9 @@ impl Application {
                 )],
                 output_interface::VERBOSITY_QUIET,
             );
-            output.borrow().writeln(
-                &[bstr::BString::from("".to_string())],
-                output_interface::VERBOSITY_QUIET,
-            );
+            output
+                .borrow()
+                .writeln(&[BString::from("")], output_interface::VERBOSITY_QUIET);
         }
     }
 
@@ -1334,11 +1338,11 @@ impl Application {
                 let file = exception
                     .map(|e| basename(e.get_file()))
                     .filter(|file| !file.is_empty())
-                    .unwrap_or_else(|| bstr::BString::from("n/a".to_string()));
+                    .unwrap_or_else(|| BString::from("n/a"));
                 let line = exception
                     .map(AnyThrowable::get_line)
                     .filter(|line| *line != 0)
-                    .map_or_else(|| "n/a".to_string(), |line| line.to_string());
+                    .map_or_else(|| BString::from("n/a"), |line| bconcat!(line));
                 messages.push(bconcat!(
                     "<comment>",
                     OutputFormatter::escape(bconcat!("In ", file, " line ", line, ":")).unwrap(),
@@ -1474,15 +1478,17 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        unsafe { putenv("SHELL_VERBOSITY", shell_verbosity.to_string()) };
-        PHP_ENV
-            .lock()
-            .unwrap()
-            .put("SHELL_VERBOSITY".into(), shell_verbosity.to_string().into());
-        PHP_SERVER
-            .lock()
-            .unwrap()
-            .put("SHELL_VERBOSITY".into(), shell_verbosity.to_string().into());
+        let shell_verbosity_value = bconcat!(shell_verbosity);
+        let shell_verbosity_value = os_str_from_bytes(&shell_verbosity_value);
+        unsafe { putenv("SHELL_VERBOSITY", shell_verbosity_value) };
+        PHP_ENV.lock().unwrap().put(
+            "SHELL_VERBOSITY".into(),
+            shell_verbosity_value.to_os_string(),
+        );
+        PHP_SERVER.lock().unwrap().put(
+            "SHELL_VERBOSITY".into(),
+            shell_verbosity_value.to_os_string(),
+        );
 
         let _ = &mut shell_verbosity;
 
@@ -1504,7 +1510,7 @@ impl Application {
         InputDefinition::new(vec![
             DefinitionItem::InputArgument(
                 InputArgument::new(
-                    "command".to_string(),
+                    BString::from("command"),
                     Some(InputArgument::REQUIRED),
                     "The command to execute",
                     InputValue::Null,
@@ -1820,9 +1826,10 @@ impl ApplicationHandle {
         command.borrow().get_definition();
 
         if command.borrow().get_name().is_none() {
-            return Err(ConsoleLogicException::new(format!(
-                "The command defined in \"{}\" cannot have an empty name.",
-                get_debug_type_obj(&command).display_lossy(),
+            return Err(ConsoleLogicException::new(bconcat!(
+                "The command defined in \"",
+                get_debug_type_obj(&command),
+                "\" cannot have an empty name."
             ))
             .into());
         }
@@ -1914,14 +1921,13 @@ impl ApplicationHandle {
             application.borrow_mut().initial_working_directory = getcwd();
             let cwd = Platform::get_cwd(true).unwrap_or_default();
             io.write_error3(
-                format!(
-                    "Changed CWD to {}",
+                bconcat!(
+                    "Changed CWD to ",
                     if !cwd.as_os_str().is_empty() {
                         cwd
                     } else {
                         nwd.clone()
                     }
-                    .display()
                 ),
                 true,
                 io_interface::DEBUG,
@@ -1993,14 +1999,18 @@ impl ApplicationHandle {
                     if use_parent_dir_if_no_json_available.as_bool() != Some(true)
                         && !io.is_interactive()
                     {
-                        io.write_error(format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir.display_lossy()));
+                        io.write_error(bconcat!(
+                            "<info>No composer.json in current directory, to use the one at ",
+                            dir,
+                            " run interactively or set config.use-parent-dir to true</info>"
+                        ));
                         break;
                     }
                     if use_parent_dir_if_no_json_available.as_bool() == Some(true)
-                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir.display_lossy()), true)?
+                        || io.ask_confirmation(bconcat!("<info>No composer.json in current directory, do you want to use the one at ", dir, "?</info> [<comment>y,n</comment>]? "), true)?
                     {
                         if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
-                            io.write_error(format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir.display_lossy()));
+                            io.write_error(bconcat!("<info>No composer.json in current directory, changing working directory to ", dir, "</info>"));
                         } else {
                             io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
                         }
@@ -2031,7 +2041,7 @@ impl ApplicationHandle {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on
                     // ref. https://github.com/composer/composer/issues/5119
                     let _ = exec(
-                        format!("sudo -u \\#{} sudo -K > /dev/null 2>&1", uid),
+                        bconcat!("sudo -u \\#", uid, " sudo -K > /dev/null 2>&1"),
                         None,
                         None,
                     );
@@ -2163,21 +2173,26 @@ impl ApplicationHandle {
 
         if !is_proxy_command {
             io.write_error3(
-                format!(
-                    "Running Shirabe {} ({}, based on Composer {}) with PHP {} on {} / {}",
+                bconcat!(
+                    "Running Shirabe ",
                     composer::SHIRABE_VERSION,
+                    " (",
                     composer::SHIRABE_RELEASE_DATE,
+                    ", based on Composer ",
                     composer::VERSION,
-                    shirabe_php_rpc::get_php_version().version.display_lossy(),
-                    php_uname("s").display_lossy(),
-                    php_uname("r").display_lossy(),
+                    ") with PHP ",
+                    shirabe_php_rpc::get_php_version().version,
+                    " on ",
+                    php_uname("s"),
+                    " / ",
+                    php_uname("r")
                 ),
                 true,
                 io_interface::DEBUG,
             );
 
             if shirabe_php_rpc::get_php_version().version_id < 70205 {
-                io.write_error(format!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version().version.display_lossy()));
+                io.write_error(bconcat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP ", shirabe_php_rpc::get_php_version().version, ". Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>"));
             }
 
             if shirabe_php_rpc::xdebug::is_xdebug_active()
@@ -2196,17 +2211,13 @@ impl ApplicationHandle {
                     .is_none_or(|name| name != "selfupdate")
                 && time() > dev_warning_time
             {
-                io.write_error(format!(
-                    "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",
-                    std::path::Path::new(
+                io.write_error(bconcat!("<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"", std::path::Path::new(
                         &PHP_SERVER
                             .lock()
                             .unwrap()
                             .get("PHP_SELF")
                             .unwrap_or_default()
-                    )
-                    .display(),
-                ));
+                    ), " self-update\" to get the latest version.</warning>"));
             }
 
             if is_non_allowed_root
@@ -2231,18 +2242,18 @@ impl ApplicationHandle {
             }
 
             // Check system temp folder for usability as it can cause weird runtime issues otherwise
-            let pid = format!("{}-", getmypid());
-            let tempfile = sys_get_temp_dir().join(format!(
-                "temp-{}{}",
+            let pid = bconcat!(getmypid(), "-");
+            let tempfile = sys_get_temp_dir().join(path_from_bytes(&bconcat!(
+                "temp-",
                 pid,
-                bin2hex(random_bytes(5)).display_lossy()
-            ));
+                bin2hex(random_bytes(5))
+            )));
             if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
                 && file_get_contents(&tempfile).as_deref().ok() == Some(file!().as_bytes())
                 && unlink(&tempfile).is_ok()
                 && !file_exists(&tempfile))
             {
-                io.write_error(format!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir().display()));
+                io.write_error(bconcat!("<error>PHP temp directory (", sys_get_temp_dir(), ") does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>"));
             }
 
             // add non-standard scripts as own commands
@@ -2259,7 +2270,7 @@ impl ApplicationHandle {
                             "Composer\\Script\\ScriptEvents::",
                             str_replace("-", "_", strtoupper(script))
                         );
-                        if !defined(script_event_const.display_lossy().to_string()) {
+                        if !defined(&script_event_const) {
                             if application.borrow_mut().has(script.as_ref()) {
                                 io.write_error(bconcat!("<warning>A script named ", script, " would override a Shirabe command and has been skipped</warning>"));
                             } else {
@@ -2382,7 +2393,7 @@ impl ApplicationHandle {
                                         }
 
                                         let handle = crate::plugin::new_php_object(
-                                            &dummy_str.display_lossy().to_string(),
+                                            dummy_str.as_bstr(),
                                             vec![shirabe_php_rpc::PluginValue::string(
                                                 script.clone(),
                                             )],
@@ -2477,10 +2488,12 @@ impl ApplicationHandle {
                 .borrow()
                 .has_parameter_option(&["--version", "-V"], true)
             {
-                io.write_error(format!(
-                    "<info>PHP</info> version <comment>{}</comment> ({})",
-                    shirabe_php_rpc::get_php_version().version.display_lossy(),
-                    shirabe_php_rpc::get_php_binary().display(),
+                io.write_error(bconcat!(
+                    "<info>PHP</info> version <comment>",
+                    shirabe_php_rpc::get_php_version().version,
+                    "</comment> (",
+                    shirabe_php_rpc::get_php_binary(),
+                    ")"
                 ));
                 io.write_error(
                     "Run the \"diagnose\" command to get more detailed diagnostics output.",
@@ -2495,11 +2508,17 @@ impl ApplicationHandle {
             }
 
             if let Some(st) = start_time {
-                io.write_error(format!(
-                    "<info>Memory usage: {}MiB (peak: {}MiB), time: {}s</info>",
-                    round((memory_get_usage() as f64) / 1024.0 / 1024.0, 2),
-                    round((memory_get_peak_usage(false) as f64) / 1024.0 / 1024.0, 2),
-                    round(microtime() - st, 2)
+                io.write_error(bconcat!(
+                    "<info>Memory usage: ",
+                    display_to_bytes(round((memory_get_usage() as f64) / 1024.0 / 1024.0, 2)),
+                    "MiB (peak: ",
+                    display_to_bytes(round(
+                        (memory_get_peak_usage(false) as f64) / 1024.0 / 1024.0,
+                        2
+                    )),
+                    "MiB), time: ",
+                    display_to_bytes(round(microtime() - st, 2)),
+                    "s</info>"
                 ));
             }
 
@@ -2593,8 +2612,8 @@ impl ApplicationHandle {
             let app = application.borrow();
             (app.terminal.get_height(), app.terminal.get_width())
         };
-        unsafe { putenv("LINES", height.to_string()) };
-        unsafe { putenv("COLUMNS", width.to_string()) };
+        unsafe { putenv("LINES", os_str_from_bytes(&bconcat!(height))) };
+        unsafe { putenv("COLUMNS", os_str_from_bytes(&bconcat!(width))) };
 
         let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = match input {
             None => std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(None, None)?)),
@@ -2656,7 +2675,7 @@ impl ApplicationHandle {
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
                 let exit_code = throwable_get_code(AnyThrowable::of(&e)) as i32;
-                if is_numeric_string(exit_code.to_string()) {
+                if is_numeric_string(bconcat!(exit_code)) {
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
                     1
@@ -2729,7 +2748,7 @@ impl ApplicationHandle {
                     .get_description()
                     .to_owned();
                 let new_command_argument = InputArgument::new(
-                    "command".to_string(),
+                    BString::from("command"),
                     Some(InputArgument::OPTIONAL),
                     command_description,
                     InputValue::from(name.clone()),
@@ -2784,10 +2803,9 @@ impl ApplicationHandle {
                 let alternative = single_alternative.unwrap();
 
                 let mut style = SymfonyStyle::new(input.clone(), output.clone());
-                output.borrow().writeln(
-                    &[bstr::BString::from("".to_string())],
-                    output_interface::OUTPUT_NORMAL,
-                );
+                output
+                    .borrow()
+                    .writeln(&[BString::from("")], output_interface::OUTPUT_NORMAL);
                 let formatted_block = FormatterHelper::default().format_block(
                     FormatBlockMessages::String(bconcat!("Command \"", name, "\" is not defined.")),
                     "error".into(),
@@ -2983,9 +3001,10 @@ pub(crate) fn run_worker_reverse_command(name: &BStr, input_line: &BStr) -> anyh
     let application = WORKER_REVERSE_APPLICATION
         .with(|slot| slot.borrow().as_ref().and_then(std::rc::Weak::upgrade))
         .ok_or_else(|| -> anyhow::Error {
-            RuntimeException::new(format!(
-                "cannot run command {}: no application is registered for worker callbacks",
-                name.display_lossy()
+            RuntimeException::new(bconcat!(
+                "cannot run command ",
+                name,
+                ": no application is registered for worker callbacks"
             ))
             .into()
         })?;
@@ -2994,7 +3013,7 @@ pub(crate) fn run_worker_reverse_command(name: &BStr, input_line: &BStr) -> anyh
     // explicit `command` entry, but the merged definition binds the first positional token to
     // the `command` argument, so the name is prepended when the first token is not this
     // command.
-    let trimmed = input_line.trim();
+    let trimmed = trim(input_line);
     let first_token = trimmed.fields().next().unwrap_or_default();
     let is_named = {
         let command = command.borrow();
@@ -3007,7 +3026,7 @@ pub(crate) fn run_worker_reverse_command(name: &BStr, input_line: &BStr) -> anyh
                 .any(|alias| alias.as_slice() == first_token)
     };
     let line = if is_named {
-        BString::from(trimmed)
+        trimmed
     } else if trimmed.is_empty() {
         BString::from(name)
     } else {

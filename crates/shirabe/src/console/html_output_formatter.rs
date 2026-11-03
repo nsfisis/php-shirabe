@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Console/HtmlOutputFormatter.php
 
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, PregMatches, bconcat, explode, intval, preg_replace_callback};
+use shirabe_php_shim::{
+    PhpMixed, PregMatches, bconcat, explode, intval, php_str, preg_replace_callback,
+};
 use shirabe_symfony_console::formatter::{
     OutputFormatter, OutputFormatterInterface, OutputFormatterStyleInterface,
 };
@@ -13,31 +15,31 @@ pub struct HtmlOutputFormatter {
 }
 
 impl HtmlOutputFormatter {
-    const AVAILABLE_FOREGROUND_COLORS: &'static [(i64, &'static str)] = &[
-        (30, "black"),
-        (31, "red"),
-        (32, "green"),
-        (33, "yellow"),
-        (34, "blue"),
-        (35, "magenta"),
-        (36, "cyan"),
-        (37, "white"),
+    const AVAILABLE_FOREGROUND_COLORS: &'static [(i64, &'static BStr)] = &[
+        (30, php_str(b"black")),
+        (31, php_str(b"red")),
+        (32, php_str(b"green")),
+        (33, php_str(b"yellow")),
+        (34, php_str(b"blue")),
+        (35, php_str(b"magenta")),
+        (36, php_str(b"cyan")),
+        (37, php_str(b"white")),
     ];
 
-    const AVAILABLE_BACKGROUND_COLORS: &'static [(i64, &'static str)] = &[
-        (40, "black"),
-        (41, "red"),
-        (42, "green"),
-        (43, "yellow"),
-        (44, "blue"),
-        (45, "magenta"),
-        (46, "cyan"),
-        (47, "white"),
+    const AVAILABLE_BACKGROUND_COLORS: &'static [(i64, &'static BStr)] = &[
+        (40, php_str(b"black")),
+        (41, php_str(b"red")),
+        (42, php_str(b"green")),
+        (43, php_str(b"yellow")),
+        (44, php_str(b"blue")),
+        (45, php_str(b"magenta")),
+        (46, php_str(b"cyan")),
+        (47, php_str(b"white")),
     ];
 
-    const AVAILABLE_OPTIONS: &'static [(i64, &'static str)] = &[
-        (1, "bold"),
-        (4, "underscore"),
+    const AVAILABLE_OPTIONS: &'static [(i64, &'static BStr)] = &[
+        (1, php_str(b"bold")),
+        (4, php_str(b"underscore")),
         //5 => "blink",
         //7 => "reverse",
         //8 => "conceal"
@@ -61,9 +63,12 @@ impl HtmlOutputFormatter {
         // Regex pattern compatibility:
         // The PHP pattern writes the ESC byte as the octal escape `\033`; the `regex` crate reads
         // `\0` as a backreference, so spell ESC as `\x1b` instead.
-        let pattern = format!(
-            "{{\\x1b\\[([0-9;]+)m(.*?)\\x1b\\[(?:{};)*?{}m}}s",
-            clear_escape_codes, clear_escape_codes
+        let pattern = bconcat!(
+            "{\\x1b\\[([0-9;]+)m(.*?)\\x1b\\[(?:",
+            clear_escape_codes,
+            ";)*?",
+            clear_escape_codes,
+            "m}s"
         );
 
         Ok(Some(
@@ -79,7 +84,7 @@ impl HtmlOutputFormatter {
     fn format_html(&self, matches: &PregMatches) -> BString {
         let codes_str = matches.get(1).unwrap_or_default();
         let content = matches.get(2).unwrap_or_default();
-        let mut out = String::from("<span style=\"");
+        let mut out = BString::from("<span style=\"");
 
         for code_str in explode(";", codes_str) {
             let code = intval(&PhpMixed::string(code_str));
@@ -87,18 +92,18 @@ impl HtmlOutputFormatter {
                 .iter()
                 .find(|&&(k, _)| k == code)
             {
-                out.push_str(&format!("color:{};", color));
+                out.push_str(&bconcat!("color:", color, ";"));
             } else if let Some(&(_, color)) = Self::AVAILABLE_BACKGROUND_COLORS
                 .iter()
                 .find(|&&(k, _)| k == code)
             {
-                out.push_str(&format!("background-color:{};", color));
+                out.push_str(&bconcat!("background-color:", color, ";"));
             } else if let Some(&(_, option)) =
                 Self::AVAILABLE_OPTIONS.iter().find(|&&(k, _)| k == code)
             {
-                match option {
-                    "bold" => out.push_str("font-weight:bold;"),
-                    "underscore" => out.push_str("text-decoration:underline;"),
+                match option.as_bytes() {
+                    b"bold" => out.push_str("font-weight:bold;"),
+                    b"underscore" => out.push_str("text-decoration:underline;"),
                     _ => {}
                 }
             }
