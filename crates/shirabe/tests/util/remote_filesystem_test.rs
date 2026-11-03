@@ -202,8 +202,15 @@ fn test_callback_get_file_size() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
-    fs.__callback_get(STREAM_NOTIFY_FILE_SIZE_IS, 0, Some(String::new()), 0, 0, 20)
-        .unwrap();
+    fs.__callback_get(
+        STREAM_NOTIFY_FILE_SIZE_IS,
+        0,
+        Some(BString::default()),
+        0,
+        0,
+        20,
+    )
+    .unwrap();
     assert_eq!(20, fs.__bytes_max().unwrap());
 }
 
@@ -219,8 +226,15 @@ fn test_callback_get_notify_progress() {
     fs.__set_bytes_max(20).unwrap();
     fs.__set_progress(true).unwrap();
 
-    fs.__callback_get(STREAM_NOTIFY_PROGRESS, 0, Some(String::new()), 0, 10, 20)
-        .unwrap();
+    fs.__callback_get(
+        STREAM_NOTIFY_PROGRESS,
+        0,
+        Some(BString::default()),
+        0,
+        10,
+        20,
+    )
+    .unwrap();
     assert_eq!(Some(50), fs.__last_progress().unwrap());
 }
 
@@ -237,7 +251,7 @@ fn test_callback_get_passes_through404() {
     fs.__callback_get(
         STREAM_NOTIFY_FAILURE,
         0,
-        Some("HTTP/1.1 404 Not Found".to_string()),
+        Some(BString::from("HTTP/1.1 404 Not Found")),
         404,
         0,
         0,

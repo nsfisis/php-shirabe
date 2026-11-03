@@ -1,14 +1,14 @@
 //! ref: composer/src/Composer/Util/Filesystem.php
 
 use crate::util::{Platform, ProcessExecutor};
-use bstr::BString;
+use bstr::{BString, ByteVec};
 use shirabe_php_shim::{
     CHILD_FIRST, InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException,
     SELF_FIRST, SKIP_DOTS, array_pop, basename, bconcat, chdir, clearstatcache, clearstatcache2,
-    copy, dirname, explode, fclose, feof, file_exists, file_get_contents, file_put_contents,
-    fileatime, filemtime, filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link,
-    is_readable, lstat, mkdir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_replace, preg_replace_callback, recursive_directory_iterator,
+    copy, dirname, display_to_bytes, explode, fclose, feof, file_exists, file_get_contents,
+    file_put_contents, fileatime, filemtime, filesize, fopen, fread, fwrite, implode, is_dir,
+    is_file, is_link, is_readable, lstat, mkdir, path_from_bytes, path_to_bytes, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_replace_callback, recursive_directory_iterator,
     recursive_iterator_iterator, rename, rmdir, rtrim2, str_repeat, str_replace,
     stream_copy_to_stream, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch,
     unlink, usleep, var_export,
@@ -226,7 +226,11 @@ impl Filesystem {
             php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"),
             path_to_bytes(directory),
         ) {
-            return Err(RuntimeException::new(format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory.display()))
+            return Err(RuntimeException::new(bconcat!(
+                "Aborting an attempted deletion of ",
+                directory,
+                ", this was probably not intended, if it is a real use case please report it."
+            ))
             .into());
         }
 
@@ -278,9 +282,9 @@ impl Filesystem {
         let directory = directory.as_ref();
         if !is_dir(directory) {
             if file_exists(directory) {
-                return Err(RuntimeException::new(format!(
-                    "{} exists and is not a directory.",
-                    directory.display()
+                return Err(RuntimeException::new(bconcat!(
+                    directory,
+                    " exists and is not a directory."
                 ))
                 .into());
             }
@@ -288,19 +292,20 @@ impl Filesystem {
             if is_link(directory)
                 && let Err(last_error) = self.unlink_implementation(directory)
             {
-                return Err(RuntimeException::new(format!(
-                    "Could not delete symbolic link {}: {}",
-                    directory.display(),
-                    last_error
+                return Err(RuntimeException::new(bconcat!(
+                    "Could not delete symbolic link ",
+                    directory,
+                    ": ",
+                    display_to_bytes(&last_error)
                 ))
                 .into());
             }
 
             if let Err(last_error) = mkdir(directory, 0o777, true) {
-                let e = RuntimeException::new(format!(
-                    "{} does not exist and could not be created: {}",
-                    directory.display(),
-                    last_error
+                let e = RuntimeException::new(bconcat!(
+                    directory,
+                    " does not exist and could not be created: ",
+                    display_to_bytes(&last_error)
                 ));
 
                 // in pathological cases with paths like path/to/broken-symlink/../foo is_dir will fail to detect path/to/foo
@@ -333,7 +338,12 @@ impl Filesystem {
             }
 
             if let Err(last_error) = unlinked {
-                let mut message = format!("Could not delete {}: {}", path.display(), last_error);
+                let mut message = bconcat!(
+                    "Could not delete ",
+                    path,
+                    ": ",
+                    display_to_bytes(&last_error)
+                );
                 if Platform::is_windows() {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
                 }
@@ -357,7 +367,12 @@ impl Filesystem {
             }
 
             if let Err(last_error) = deleted {
-                let mut message = format!("Could not delete {}: {}", path.display(), last_error);
+                let mut message = bconcat!(
+                    "Could not delete ",
+                    path,
+                    ": ",
+                    display_to_bytes(&last_error)
+                );
                 if Platform::is_windows() {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
                 }
@@ -522,10 +537,12 @@ impl Filesystem {
     ) -> anyhow::Result<PathBuf> {
         let (from, to) = (from.as_ref(), to.as_ref());
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
-            return Err(InvalidArgumentException::new(format!(
-                "$from ({}) and $to ({}) must be absolute paths.",
-                from.display(),
-                to.display()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "$from (",
+                from,
+                ") and $to (",
+                to,
+                ") must be absolute paths."
             ))
             .into());
         }
@@ -582,10 +599,12 @@ impl Filesystem {
     ) -> anyhow::Result<BString> {
         let (from, to) = (from.as_ref(), to.as_ref());
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
-            return Err(InvalidArgumentException::new(format!(
-                "$from ({}) and $to ({}) must be absolute paths.",
-                from.display(),
-                to.display()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "$from (",
+                from,
+                ") and $to (",
+                to,
+                ") must be absolute paths."
             ))
             .into());
         }
@@ -672,9 +691,7 @@ impl Filesystem {
     pub fn size(&self, path: impl AsRef<Path>) -> anyhow::Result<i64> {
         let path = path.as_ref();
         if !file_exists(path) {
-            return Err(
-                RuntimeException::new(format!("{} does not exist.", path.display())).into(),
-            );
+            return Err(RuntimeException::new(bconcat!(path, " does not exist.")).into());
         }
         if is_dir(path) {
             return self.directory_size(path);
@@ -911,17 +928,19 @@ impl Filesystem {
     ) -> anyhow::Result<()> {
         let (target, junction) = (target.as_ref(), junction.as_ref());
         if !Platform::is_windows() {
-            return Err(LogicException::new(format!(
-                "Function {} is not available on non-Windows platform",
-                "Composer\\Util\\Filesystem"
+            return Err(LogicException::new(bconcat!(
+                "Function ",
+                "Composer\\Util\\Filesystem",
+                " is not available on non-Windows platform"
             ))
             .into());
         }
         if !is_dir(target) {
             return Err(IOException::new(
-                format!(
-                    "Cannot junction to \"{}\" as it is not a directory.",
-                    target.display()
+                bconcat!(
+                    "Cannot junction to \"",
+                    target,
+                    "\" as it is not a directory."
                 ),
                 0,
                 None,
@@ -944,10 +963,12 @@ impl Filesystem {
         let mut output = BString::default();
         if self.get_process().execute(&cmd, &mut output, None)? != 0 {
             return Err(IOException::new(
-                format!(
-                    "Failed to create junction to \"{}\" at \"{}\".",
-                    target.display(),
-                    junction.display()
+                bconcat!(
+                    "Failed to create junction to \"",
+                    target,
+                    "\" at \"",
+                    junction,
+                    "\"."
                 ),
                 0,
                 None,
@@ -1011,9 +1032,9 @@ impl Filesystem {
         ));
         if !self.is_junction(&junction) {
             return Err(IOException::new(
-                format!(
-                    "{} is not a junction and thus cannot be removed as one",
-                    junction.display()
+                bconcat!(
+                    junction,
+                    " is not a junction and thus cannot be removed as one"
                 ),
                 0,
                 None,
@@ -1050,19 +1071,23 @@ impl Filesystem {
             let source_handle = match fopen(source, "r") {
                 Ok(source_handle) => source_handle,
                 Err(_) => {
-                    return Err(anyhow::anyhow!(
-                        "Could not open \"{}\" for reading.",
-                        source.display()
-                    ));
+                    return Err(RuntimeException::new(bconcat!(
+                        "Could not open \"",
+                        source,
+                        "\" for reading."
+                    ))
+                    .into());
                 }
             };
             let target_handle = match fopen(target, "w+") {
                 Ok(target_handle) => target_handle,
                 Err(_) => {
-                    return Err(anyhow::anyhow!(
-                        "Could not open \"{}\" for writing.",
-                        target.display()
-                    ));
+                    return Err(RuntimeException::new(bconcat!(
+                        "Could not open \"",
+                        target,
+                        "\" for writing."
+                    ))
+                    .into());
                 }
             };
 

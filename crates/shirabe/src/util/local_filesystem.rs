@@ -91,10 +91,9 @@ impl LocalFilesystem {
         let mut file_url = file_url.to_owned();
 
         if options.contains_key(B("prevent_ip_access_callable")) {
-            return Err(RuntimeException::new(
-                "RemoteFilesystem doesn't support the 'prevent_ip_access_callable' config."
-                    .to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "RemoteFilesystem doesn't support the 'prevent_ip_access_callable' config.",
+            ))
             .into());
         }
 
@@ -164,7 +163,7 @@ impl LocalFilesystem {
         // TODO(php-semantics): PHP captures the file_get_contents warning via set_error_handler and
         // appends it to the "could not be downloaded" message below; the read failure's reason is
         // not carried into error_message yet.
-        let error_message = String::new();
+        let error_message = BString::default();
         let result = match max_file_size {
             Some(max) => {
                 file_get_contents_with_max_length(path_from_bytes(&file_url), max as usize)
@@ -177,23 +176,26 @@ impl LocalFilesystem {
             && let Some(max) = max_file_size
             && r.len() as i64 >= max
         {
-            return Err(MaxFileSizeExceededException::new(format!(
-                "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
+            return Err(MaxFileSizeExceededException::new(bconcat!(
+                "Maximum allowed download size reached. Downloaded ",
                 r.len(),
-                max
+                " of allowed ",
+                max,
+                " bytes"
             ))
             .into());
         }
 
         if progress && !is_redirect {
             self.io.overwrite_error4(
-                format!(
-                    "Downloading ({})",
+                bconcat!(
+                    "Downloading (",
                     if result.is_none() {
                         "<error>failed</error>"
                     } else {
                         "<comment>100%</comment>"
-                    }
+                    },
+                    ")"
                 ),
                 false,
                 None,
@@ -203,9 +205,10 @@ impl LocalFilesystem {
 
         let Some(result) = result else {
             return Err(TransportException::new(
-                format!(
-                    "The \"{}\" file could not be downloaded: {}",
-                    orig_file_url.display_lossy(),
+                bconcat!(
+                    "The \"",
+                    orig_file_url,
+                    "\" file could not be downloaded: ",
                     error_message
                 ),
                 0,
@@ -218,9 +221,10 @@ impl LocalFilesystem {
         {
             if result.is_empty() {
                 return Err(TransportException::new(
-                    format!(
-                        "\"{}\" appears broken, and returned an empty 200 response",
-                        orig_file_url.display_lossy()
+                    bconcat!(
+                        "\"",
+                        orig_file_url,
+                        "\" appears broken, and returned an empty 200 response"
                     ),
                     0,
                 )
@@ -231,10 +235,12 @@ impl LocalFilesystem {
             // and appends it to the message below; the write failure's reason is not carried yet.
             if file_put_contents(file_name, &result).is_none() {
                 return Err(TransportException::new(
-                    format!(
-                        "The \"{}\" file could not be written to {}: ",
-                        orig_file_url.display_lossy(),
-                        file_name.display()
+                    bconcat!(
+                        "The \"",
+                        orig_file_url,
+                        "\" file could not be written to ",
+                        file_name,
+                        ": "
                     ),
                     0,
                 )

@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
     array_map, bconcat, display_to_bytes, escapeshellarg, explode, implode, in_array_strict,
-    intval, is_dir, is_numeric, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    intval, is_dir, is_numeric, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match,
     preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim2,
     str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
@@ -111,17 +111,62 @@ pub struct ProcessForwardOutput;
 impl ProcessExecutor {
     pub const FORWARD_OUTPUT: ProcessForwardOutput = ProcessForwardOutput;
 
-    const BUILTIN_CMD_COMMANDS: [&'static str; 47] = [
-        "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del", "dir",
-        "echo", "endlocal", "erase", "exit", "for", "ftype", "goto", "help", "if", "label", "md",
-        "mkdir", "mklink", "move", "path", "pause", "popd", "prompt", "pushd", "rd", "rem", "ren",
-        "rename", "rmdir", "set", "setlocal", "shift", "start", "time", "title", "type", "ver",
-        "vol", // unused slots to make 47 above explicit
-        "", "", "",
+    const BUILTIN_CMD_COMMANDS: [&'static BStr; 47] = [
+        php_str(b"assoc"),
+        php_str(b"break"),
+        php_str(b"call"),
+        php_str(b"cd"),
+        php_str(b"chdir"),
+        php_str(b"cls"),
+        php_str(b"color"),
+        php_str(b"copy"),
+        php_str(b"date"),
+        php_str(b"del"),
+        php_str(b"dir"),
+        php_str(b"echo"),
+        php_str(b"endlocal"),
+        php_str(b"erase"),
+        php_str(b"exit"),
+        php_str(b"for"),
+        php_str(b"ftype"),
+        php_str(b"goto"),
+        php_str(b"help"),
+        php_str(b"if"),
+        php_str(b"label"),
+        php_str(b"md"),
+        php_str(b"mkdir"),
+        php_str(b"mklink"),
+        php_str(b"move"),
+        php_str(b"path"),
+        php_str(b"pause"),
+        php_str(b"popd"),
+        php_str(b"prompt"),
+        php_str(b"pushd"),
+        php_str(b"rd"),
+        php_str(b"rem"),
+        php_str(b"ren"),
+        php_str(b"rename"),
+        php_str(b"rmdir"),
+        php_str(b"set"),
+        php_str(b"setlocal"),
+        php_str(b"shift"),
+        php_str(b"start"),
+        php_str(b"time"),
+        php_str(b"title"),
+        php_str(b"type"),
+        php_str(b"ver"),
+        php_str(b"vol"), // unused slots to make 47 above explicit
+        php_str(b""),
+        php_str(b""),
+        php_str(b""),
     ];
 
-    const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static str]] =
-        &[&["show"], &["log"], &["branch"], &["remote", "set-url"]];
+    const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static BStr]] = &[
+        &[php_str(b"show")],
+        &[php_str(b"log")],
+        &[php_str(b"branch")],
+        &[php_str(b"remote"), php_str(b"set-url")],
+    ];
 
     pub fn new(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) -> Self {
         let this = Self {
@@ -263,9 +308,10 @@ impl ProcessExecutor {
             && let Some(io) = &self.io
         {
             io.write_error3(
-                format!(
-                    "Received {}, aborting when child process is done",
-                    signals.last_signal().as_str()
+                bconcat!(
+                    "Received ",
+                    signals.last_signal().as_str(),
+                    ", aborting when child process is done"
                 ),
                 true,
                 io_interface::DEBUG,
@@ -587,7 +633,7 @@ impl ProcessExecutor {
 
         Box::pin(async move {
             if !allow_async {
-                return Err(LogicException::new("You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string())
+                return Err(LogicException::new(BString::from("You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes"))
                 .into());
             }
 
@@ -760,11 +806,15 @@ impl ProcessExecutor {
             "--password '***' ",
             &safe_command,
         );
-        io.as_ref().unwrap().write_error(format!(
-            "Executing{} command ({}): {}",
+        io.as_ref().unwrap().write_error(bconcat!(
+            "Executing",
             if r#async { " async" } else { "" },
-            cwd.map_or("CWD".into(), |cwd| cwd.display().to_string()),
-            safe_command.display_lossy()
+            " command (",
+            cwd.map_or(BString::from("CWD"), |cwd| BString::from(path_to_bytes(
+                cwd
+            ))),
+            "): ",
+            safe_command
         ));
     }
 
@@ -782,20 +832,20 @@ impl ProcessExecutor {
         // New lines break cmd.exe command parsing
         // and special chars like the fullwidth quote can be used to break out
         // of parameter encoding via "Best Fit" encoding conversion
-        let mut translation: IndexMap<&str, &str> = IndexMap::new();
-        translation.insert("\n", " ");
-        translation.insert("\u{ff02}", "\"");
-        translation.insert("\u{02ba}", "\"");
-        translation.insert("\u{301d}", "\"");
-        translation.insert("\u{301e}", "\"");
-        translation.insert("\u{030e}", "\"");
-        translation.insert("\u{ff1a}", ":");
-        translation.insert("\u{0589}", ":");
-        translation.insert("\u{2236}", ":");
-        translation.insert("\u{ff0f}", "/");
-        translation.insert("\u{2044}", "/");
-        translation.insert("\u{2215}", "/");
-        translation.insert("\u{00b4}", "/");
+        let mut translation: IndexMap<&BStr, &BStr> = IndexMap::new();
+        translation.insert(BStr::new("\n"), BStr::new(" "));
+        translation.insert(BStr::new("\u{ff02}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{02ba}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{301d}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{301e}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{030e}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{ff1a}"), BStr::new(":"));
+        translation.insert(BStr::new("\u{0589}"), BStr::new(":"));
+        translation.insert(BStr::new("\u{2236}"), BStr::new(":"));
+        translation.insert(BStr::new("\u{ff0f}"), BStr::new("/"));
+        translation.insert(BStr::new("\u{2044}"), BStr::new("/"));
+        translation.insert(BStr::new("\u{2215}"), BStr::new("/"));
+        translation.insert(BStr::new("\u{00b4}"), BStr::new("/"));
         argument = strtr_array(&argument, &translation);
 
         // In addition to whitespace, commas need quoting to preserve paths

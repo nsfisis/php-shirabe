@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/Zip.php
 
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, ZipArchive, bconcat, dirname, extension_loaded, implode, stream_get_contents,
@@ -11,9 +11,9 @@ pub struct Zip;
 impl Zip {
     pub fn get_composer_json(path_to_zip: &std::path::Path) -> anyhow::Result<Option<BString>> {
         if !extension_loaded("zip") {
-            return Err(RuntimeException::new(
-                "The Zip Util requires PHP's zip extension".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "The Zip Util requires PHP's zip extension",
+            ))
             .into());
         }
 
@@ -27,7 +27,7 @@ impl Zip {
             return Ok(None);
         }
 
-        let found_file_index = Self::locate_file(&zip, "composer.json")?;
+        let found_file_index = Self::locate_file(&zip, BStr::new("composer.json"))?;
 
         let mut content: Option<BString> = None;
         let configuration_file_name = zip.get_name_index(found_file_index);
@@ -42,7 +42,7 @@ impl Zip {
         Ok(content)
     }
 
-    fn locate_file(zip: &ZipArchive, filename: &str) -> anyhow::Result<i64> {
+    fn locate_file(zip: &ZipArchive, filename: &BStr) -> anyhow::Result<i64> {
         // return root composer.json if it is there and is a file
         if let Some(index) = zip.locate_name(filename)
             && zip.get_from_index(index).is_some()
@@ -64,10 +64,7 @@ impl Zip {
             if dir_name == "." {
                 top_level_paths.insert(name, true);
                 if top_level_paths.len() > 1 {
-                    return Err(RuntimeException::new(format!(
-                        "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                        implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>()).display_lossy()
-                    ))
+                    return Err(RuntimeException::new(bconcat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: ", implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())))
                     .into());
                 }
                 continue;
@@ -77,10 +74,7 @@ impl Zip {
             if !dir_name.contains_str("\\") && !dir_name.contains_str("/") {
                 top_level_paths.insert(bconcat!(&dir_name, "/"), true);
                 if top_level_paths.len() > 1 {
-                    return Err(RuntimeException::new(format!(
-                        "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                        implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>()).display_lossy()
-                    ))
+                    return Err(RuntimeException::new(bconcat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: ", implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())))
                     .into());
                 }
             }
@@ -95,10 +89,9 @@ impl Zip {
             }
         }
 
-        Err(RuntimeException::new(
-            "No composer.json found either at the top level or within the topmost directory"
-                .to_string(),
-        )
+        Err(RuntimeException::new(BString::from(
+            "No composer.json found either at the top level or within the topmost directory",
+        ))
         .into())
     }
 }

@@ -28,9 +28,10 @@ use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreA
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, bconcat, implode, in_array_loose, in_array_strict, json_decode_assoc,
-    parse_url, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_quote, preg_replace,
-    rename, stripos, strlen, strpos, strtolower, substr, unlink_silent, utf8_text,
+    PHP_EOL, PhpMixed, bconcat, display_to_bytes, implode, in_array_loose, in_array_strict,
+    json_decode_assoc, parse_url, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_quote, preg_replace, rename, stripos, strlen, strpos, strtolower, substr, trim,
+    unlink_silent, utf8_text,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -299,10 +300,12 @@ impl NativeHttpDownloader {
                         attributes.insert("ipResolve".into(), PhpMixed::Int(4));
                     }
                     self.io.write_error3(
-                        format!(
-                            "Retrying ({}) {} due to connection error",
+                        bconcat!(
+                            "Retrying (",
                             retries + 1,
-                            Url::sanitize(url).display_lossy()
+                            ") ",
+                            Url::sanitize(url),
+                            " due to connection error"
                         ),
                         true,
                         crate::io::DEBUG,
@@ -328,9 +331,10 @@ impl NativeHttpDownloader {
                 }
                 return Ok(Decision::Failed(
                     TransportException::new(
-                        format!(
-                            "curl error while downloading {}: {}",
-                            Url::sanitize(url).display_lossy(),
+                        bconcat!(
+                            "curl error while downloading ",
+                            Url::sanitize(url),
+                            ": ",
                             transport_err.message
                         ),
                         0,
@@ -344,7 +348,7 @@ impl NativeHttpDownloader {
         let native_response = response.into_native_http_response(url);
 
         self.io.write_error3(
-            format!("[{}] {}", status_code, Url::sanitize(url).display_lossy()),
+            bconcat!("[", status_code, "] ", Url::sanitize(url)),
             true,
             crate::io::DEBUG,
         );
@@ -353,7 +357,7 @@ impl NativeHttpDownloader {
         if native_response.inner.get_status_code() >= 300
             && native_response
                 .inner
-                .get_header("content-type")
+                .get_header(BStr::new("content-type"))
                 .is_some_and(|content_type| content_type == "application/json")
             && let Some(body) = native_response.inner.get_body()
         {
@@ -377,7 +381,7 @@ impl NativeHttpDownloader {
                     "storeAuth".into(),
                     match prompt.store_auth {
                         StoreAuth::Bool(b) => PhpMixed::Bool(b),
-                        StoreAuth::Prompt => PhpMixed::string("prompt".to_string()),
+                        StoreAuth::Prompt => PhpMixed::string(BString::from("prompt")),
                     },
                 );
                 let retries = attributes
@@ -438,10 +442,12 @@ impl NativeHttpDownloader {
                 && retries < self.max_retries
             {
                 self.io.write_error3(
-                    format!(
-                        "Retrying ({}) {} due to status code {}",
+                    bconcat!(
+                        "Retrying (",
                         retries + 1,
-                        Url::sanitize(url).display_lossy(),
+                        ") ",
+                        Url::sanitize(url),
+                        " due to status code ",
                         status_code
                     ),
                     true,
@@ -530,7 +536,7 @@ impl NativeHttpDownloader {
         // as a transport error, where curl would send its bytes.
         let Some(url) = utf8_text(url) else {
             return Err(TransportError {
-                message: format!("URL is not valid UTF-8: {:?}", url),
+                message: display_to_bytes(format_args!("URL is not valid UTF-8: {:?}", url)),
                 retryable: false,
                 is_connect: false,
                 was_timeout: false,
@@ -541,11 +547,11 @@ impl NativeHttpDownloader {
         for header in &headers {
             if let Some((name, value)) = header.split_once_str(":") {
                 // Skip the Connection header reqwest manages itself.
-                let name = name.trim();
+                let name = trim(name);
                 if name.eq_ignore_ascii_case(b"connection") {
                     continue;
                 }
-                builder = builder.header(name, value.trim());
+                builder = builder.header(name.as_slice(), trim(value).as_slice());
             }
         }
         builder = builder.timeout(std::time::Duration::from_secs(timeout_secs as u64));
@@ -554,7 +560,7 @@ impl NativeHttpDownloader {
         }
 
         let resp = builder.send().await.map_err(|e| TransportError {
-            message: e.to_string(),
+            message: display_to_bytes(&e),
             retryable: e.is_timeout() || e.is_connect() || e.is_request(),
             is_connect: e.is_connect(),
             was_timeout: e.is_timeout(),
@@ -562,8 +568,8 @@ impl NativeHttpDownloader {
         })?;
 
         let status = resp.status().as_u16() as i64;
-        let status_line = BString::from(format!(
-            "HTTP/{} {}",
+        let status_line = bconcat!(
+            "HTTP/",
             match resp.version() {
                 reqwest::Version::HTTP_09 => "0.9",
                 reqwest::Version::HTTP_10 => "1.0",
@@ -572,8 +578,9 @@ impl NativeHttpDownloader {
                 reqwest::Version::HTTP_3 => "3",
                 _ => "1.1",
             },
-            resp.status()
-        ));
+            " ",
+            display_to_bytes(resp.status())
+        );
         // Header lines start with the status line so Response::get_status_message can find it.
         let mut headers_out: Vec<BString> = vec![status_line];
         for (k, v) in resp.headers().iter() {
@@ -603,7 +610,7 @@ impl NativeHttpDownloader {
         mut resp: reqwest::Response,
         max_file_size: Option<u64>,
         filename: Option<&std::path::Path>,
-    ) -> Result<Body, (String, bool)> {
+    ) -> Result<Body, (BString, bool)> {
         use tokio::io::AsyncWriteExt as _;
 
         let mut written: u64 = 0;
@@ -615,7 +622,7 @@ impl NativeHttpDownloader {
             Some(f) => Sink::File(
                 tokio::fs::File::create(Self::temp_file(f))
                     .await
-                    .map_err(|e| (e.to_string(), false))?,
+                    .map_err(|e| (display_to_bytes(&e), false))?,
             ),
             None => Sink::Memory(Vec::new()),
         };
@@ -624,16 +631,19 @@ impl NativeHttpDownloader {
             let chunk = match resp.chunk().await {
                 Ok(Some(chunk)) => chunk,
                 Ok(None) => break,
-                Err(e) => return Err((e.to_string(), false)),
+                Err(e) => return Err((display_to_bytes(&e), false)),
             };
             written += chunk.len() as u64;
             if let Some(max) = max_file_size
                 && written > max
             {
                 return Err((
-                    format!(
-                        "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
-                        written, max
+                    bconcat!(
+                        "Maximum allowed download size reached. Downloaded ",
+                        written,
+                        " of allowed ",
+                        max,
+                        " bytes"
                     ),
                     true,
                 ));
@@ -642,7 +652,7 @@ impl NativeHttpDownloader {
                 Sink::File(f) => f
                     .write_all(&chunk)
                     .await
-                    .map_err(|e| (e.to_string(), false))?,
+                    .map_err(|e| (display_to_bytes(&e), false))?,
                 Sink::Memory(buf) => buf.extend_from_slice(&chunk),
             }
         }
@@ -652,7 +662,7 @@ impl NativeHttpDownloader {
                 // tokio's File returns from write_all once the blocking write is queued, so the
                 // tail of the body can still be in flight after the loop above. flush waits for it
                 // and reports its error; without it the caller renames and copies a short file.
-                f.flush().await.map_err(|e| (e.to_string(), false))?;
+                f.flush().await.map_err(|e| (display_to_bytes(&e), false))?;
                 Body::File
             }
             Sink::Memory(buf) => Body::Memory(buf),
@@ -666,7 +676,7 @@ impl NativeHttpDownloader {
         response: &NativeHttpResponse,
     ) -> anyhow::Result<Result<BString, Box<TransportException>>> {
         let mut target_url = BString::default();
-        if let Some(location_header) = response.inner.get_header("location")
+        if let Some(location_header) = response.inner.get_header(BStr::new("location"))
             && !location_header.is_empty()
         {
             let location_parsed = parse_url(&location_header);
@@ -715,14 +725,15 @@ impl NativeHttpDownloader {
 
         if !target_url.is_empty() {
             self.io.write_error3(
-                format!(
-                    "Following redirect ({}) {}",
+                bconcat!(
+                    "Following redirect (",
                     attributes
                         .get(B("redirects"))
                         .and_then(|v| v.as_int())
                         .unwrap_or(0)
                         + 1,
-                    Url::sanitize(target_url.clone()).display_lossy(),
+                    ") ",
+                    Url::sanitize(target_url.clone())
                 ),
                 true,
                 crate::io::DEBUG,
@@ -732,14 +743,12 @@ impl NativeHttpDownloader {
         }
 
         Ok(Err(Box::new(TransportException::new(
-            format!(
-                "The \"{}\" file could not be downloaded, got redirect without Location ({})",
-                url.display_lossy(),
-                response
-                    .inner
-                    .get_status_message()
-                    .unwrap_or_default()
-                    .display_lossy()
+            bconcat!(
+                "The \"",
+                url,
+                "\" file could not be downloaded, got redirect without Location (",
+                response.inner.get_status_message().unwrap_or_default(),
+                ")"
             ),
             0,
         ))))
@@ -783,8 +792,8 @@ impl NativeHttpDownloader {
             }
         }
 
-        let location_header = response.inner.get_header("location");
-        let mut needs_auth_retry: Option<&'static str> = None;
+        let location_header = response.inner.get_header(BStr::new("location"));
+        let mut needs_auth_retry: Option<&'static BStr> = None;
 
         // check for bitbucket login page asking to authenticate
         if origin == "bitbucket.org"
@@ -796,11 +805,13 @@ impl NativeHttpDownloader {
                 php_regex!(r"{^text/html\b}i"),
                 response
                     .inner
-                    .get_header("content-type")
+                    .get_header(BStr::new("content-type"))
                     .unwrap_or_default(),
             )
         {
-            needs_auth_retry = Some("Bitbucket requires authentication and it was not provided");
+            needs_auth_retry = Some(BStr::new(
+                "Bitbucket requires authentication and it was not provided",
+            ));
         }
 
         // check for gitlab 404 when downloading archives
@@ -813,7 +824,9 @@ impl NativeHttpDownloader {
             && in_array_strict(PhpMixed::string(origin), &gitlab_domains_list)
             && strpos(url, "archive.zip").is_some()
         {
-            needs_auth_retry = Some("GitLab requires authentication and it was not provided");
+            needs_auth_retry = Some(BStr::new(
+                "GitLab requires authentication and it was not provided",
+            ));
         }
 
         if let Some(msg) = needs_auth_retry {
@@ -875,7 +888,7 @@ impl NativeHttpDownloader {
             strtolower(
                 response
                     .inner
-                    .get_header("content-type")
+                    .get_header(BStr::new("content-type"))
                     .unwrap_or_default()
             )
             .as_slice(),
@@ -940,7 +953,7 @@ impl NativeHttpDownloader {
 
 /// A transport-layer failure approximating the curl errno branches PHP inspected.
 struct TransportError {
-    message: String,
+    message: BString,
     retryable: bool,
     is_connect: bool,
     was_timeout: bool,

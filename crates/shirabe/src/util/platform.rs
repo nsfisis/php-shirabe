@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Platform.php
 
 use crate::util::ProcessExecutor;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, bconcat,
     defined, file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
@@ -34,9 +34,9 @@ impl Platform {
                 return Ok(std::path::PathBuf::new());
             }
 
-            return Err(RuntimeException::new(
-                "Could not determine the current working directory".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "Could not determine the current working directory",
+            ))
             .into());
         }
 
@@ -142,7 +142,7 @@ impl Platform {
             return Ok(BString::from(path_to_bytes(&info.dir)));
         }
 
-        Err(RuntimeException::new("Could not determine user directory".to_string()).into())
+        Err(RuntimeException::new(BString::from("Could not determine user directory")).into())
     }
 
     pub fn is_windows_subsystem_for_linux() -> bool {
@@ -297,7 +297,7 @@ impl Platform {
                 let process = ProcessExecutor::new(None);
                 let mut output = BString::default();
                 let result: anyhow::Result<()> = (|| {
-                    if process.execute(&["lsmod".to_string()], &mut output, None)? == 0
+                    if process.execute(&[BString::from("lsmod")], &mut output, None)? == 0
                         && output.contains_str("vboxguest")
                     {
                         *cached = Some(true);
@@ -315,11 +315,11 @@ impl Platform {
         cached.unwrap_or(false)
     }
 
-    pub fn get_dev_null() -> &'static str {
+    pub fn get_dev_null() -> &'static BStr {
         if Self::is_windows() {
-            return "NUL";
+            return BStr::new("NUL");
         }
 
-        "/dev/null"
+        BStr::new("/dev/null")
     }
 }

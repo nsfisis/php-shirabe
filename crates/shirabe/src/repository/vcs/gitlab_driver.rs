@@ -1000,7 +1000,7 @@ impl GitLabDriver {
     }
 
     fn get_next_page(&self, response: &Response) -> Option<BString> {
-        let header = response.get_header("link").unwrap_or_default();
+        let header = response.get_header(BStr::new("link")).unwrap_or_default();
 
         let links = explode(",", &header);
         for link in links.iter() {

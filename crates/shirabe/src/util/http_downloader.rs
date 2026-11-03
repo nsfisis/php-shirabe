@@ -207,14 +207,13 @@ impl HttpDownloader {
             return self.mock_get(url, &options);
         }
         if url.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "$url must not be an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "$url must not be an empty string",
+            ))
             .into());
         }
         if !sync && !self.allow_async {
-            return Err(LogicException::new("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"
-                .to_string())
+            return Err(LogicException::new(BString::from("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"))
             .into());
         }
 
@@ -261,9 +260,10 @@ impl HttpDownloader {
 
     /// The exception PHP's canceler raises for a job that had started.
     pub(crate) fn canceled(url: &BStr) -> IrrecoverableDownloadException {
-        IrrecoverableDownloadException::new(format!(
-            "Download of {} canceled",
-            Url::sanitize(url).display_lossy()
+        IrrecoverableDownloadException::new(bconcat!(
+            "Download of ",
+            Url::sanitize(url),
+            " canceled"
         ))
     }
 
@@ -308,14 +308,13 @@ impl HttpDownloader {
             ));
         }
         if url.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "$url must not be an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "$url must not be an empty string",
+            ))
             .into());
         }
         if !self.allow_async {
-            return Err(LogicException::new("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"
-                .to_string())
+            return Err(LogicException::new(BString::from("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"))
             .into());
         }
 
@@ -404,10 +403,7 @@ impl HttpDownloader {
             }
 
             let mut e = TransportException::new(
-                format!(
-                    "Network disabled, request canceled: {}",
-                    Url::sanitize(&url).display_lossy()
-                ),
+                bconcat!("Network disabled, request canceled: ", Url::sanitize(&url)),
                 499,
             );
             e.set_status_code(Some(499));
@@ -510,7 +506,7 @@ impl HttpDownloader {
                 continue;
             }
 
-            let versions_key = format!("{}-versions", r#type);
+            let versions_key = bconcat!(r#type, "-versions");
             if let Some(versions_value) = data.get(B(&versions_key))
                 && !empty(versions_value)
             {
@@ -527,13 +523,18 @@ impl HttpDownloader {
                 }
             }
 
-            io.write_error(format!(
-                "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
-                tp = r#type,
-                capitalized = ucfirst(r#type).display_lossy(),
-                url = Url::sanitize(url).display_lossy(),
-                msg =
-                    clean_message(entry.unwrap().as_string().unwrap_or_default())?.display_lossy()
+            io.write_error(bconcat!(
+                "<",
+                r#type,
+                ">",
+                ucfirst(r#type),
+                " from ",
+                Url::sanitize(url),
+                ": ",
+                clean_message(entry.unwrap().as_string().unwrap_or_default())?,
+                "</",
+                r#type,
+                ">"
             ));
         }
 
@@ -564,18 +565,23 @@ impl HttpDownloader {
                             continue;
                         }
 
-                        io.write_error(format!(
-                            "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
-                            tp = r#type.display_lossy(),
-                            capitalized = ucfirst(&r#type).display_lossy(),
-                            url = Url::sanitize(url).display_lossy(),
-                            msg = clean_message(
+                        io.write_error(bconcat!(
+                            "<",
+                            r#type,
+                            ">",
+                            ucfirst(&r#type),
+                            " from ",
+                            Url::sanitize(url),
+                            ": ",
+                            clean_message(
                                 spec_map
                                     .get(B("message"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default()
-                            )?
-                            .display_lossy()
+                            )?,
+                            "</",
+                            r#type,
+                            ">"
                         ));
                     }
                 }
@@ -721,7 +727,7 @@ impl HttpDownloader {
         options: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Response> {
         if file_url.is_empty() {
-            return Err(LogicException::new("url cannot be an empty string".to_string()).into());
+            return Err(LogicException::new(BString::from("url cannot be an empty string")).into());
         }
 
         let mock = self

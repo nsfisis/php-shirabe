@@ -336,8 +336,12 @@ pub(crate) fn set_up() -> SetUp {
         .into(),
     );
     {
-        let json_file =
-            JsonFile::new(Platform::get_dev_null(), None, Some(io_dyn.clone())).unwrap();
+        let json_file = JsonFile::new(
+            path_from_bytes(Platform::get_dev_null()),
+            None,
+            Some(io_dyn.clone()),
+        )
+        .unwrap();
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io_dyn.clone(),
         ))));

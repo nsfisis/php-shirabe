@@ -103,20 +103,25 @@ impl StreamContextFactory {
                 if proxy.is_secure() {
                     if !extension_loaded("openssl") {
                         return Err(Box::new(TransportException::new(
-                            "You must enable the openssl extension to use a secure proxy."
-                                .to_string(),
+                            BString::from(
+                                "You must enable the openssl extension to use a secure proxy.",
+                            ),
                             0,
                         )));
                     }
                     if is_https_request {
                         return Err(Box::new(TransportException::new(
-                            "You must enable the curl extension to make https requests through a secure proxy.".to_string(),
+                            BString::from(
+                                "You must enable the curl extension to make https requests through a secure proxy.",
+                            ),
                             0,
                         )));
                     }
                 } else if is_https_request && !extension_loaded("openssl") {
                     return Err(Box::new(TransportException::new(
-                        "You must enable the openssl extension to make https requests through a proxy.".to_string(),
+                        BString::from(
+                            "You must enable the openssl extension to make https requests through a proxy.",
+                        ),
                         0,
                     )));
                 }
@@ -146,7 +151,7 @@ impl StreamContextFactory {
         }
 
         let php = shirabe_php_rpc::get_php_version();
-        let php_version = format!("PHP {}.{}.{}", php.major, php.minor, php.release);
+        let php_version = bconcat!("PHP ", php.major, ".", php.minor, ".", php.release);
 
         let http_version = if for_curl {
             // PHP reports `cURL <version>` here. Shirabe's "curl" transport is backed by reqwest,
@@ -328,7 +333,7 @@ impl StreamContextFactory {
             && (!Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger))
         {
             return Err(Box::new(TransportException::new(
-                "The configured cafile was not valid or could not be read.".to_string(),
+                BString::from("The configured cafile was not valid or could not be read."),
                 0,
             )));
         }
@@ -343,7 +348,7 @@ impl StreamContextFactory {
             && (!is_dir(capath) || !Filesystem::is_readable(capath))
         {
             return Err(Box::new(TransportException::new(
-                "The configured capath was not valid or could not be read.".to_string(),
+                BString::from("The configured capath was not valid or could not be read."),
                 0,
             )));
         }

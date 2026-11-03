@@ -26,7 +26,7 @@ impl<'a> DownloaderOrManager<'a> {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -34,12 +34,12 @@ impl<'a> DownloaderOrManager<'a> {
         match self {
             Self::Interface(d) => {
                 d.borrow_mut()
-                    .prepare(BStr::new(r#type), package, path, prev_package)
+                    .prepare(r#type, package, path, prev_package)
                     .await
             }
             Self::Manager(d) => {
                 d.borrow()
-                    .prepare(BStr::new(r#type), package, path, prev_package)
+                    .prepare(r#type, package, path, prev_package)
                     .await
             }
         }
@@ -70,7 +70,7 @@ impl<'a> DownloaderOrManager<'a> {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
@@ -78,12 +78,12 @@ impl<'a> DownloaderOrManager<'a> {
         match self {
             Self::Interface(d) => {
                 d.borrow_mut()
-                    .cleanup(BStr::new(r#type), package, path, prev_package)
+                    .cleanup(r#type, package, path, prev_package)
                     .await
             }
             Self::Manager(d) => {
                 d.borrow()
-                    .cleanup(BStr::new(r#type), package, path, prev_package)
+                    .cleanup(r#type, package, path, prev_package)
                     .await
             }
         }
@@ -101,9 +101,9 @@ impl SyncHelper {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         let r#type = if prev_package.is_some() {
-            "update"
+            BStr::new("update")
         } else {
-            "install"
+            BStr::new("install")
         };
 
         let result: anyhow::Result<()> = async {

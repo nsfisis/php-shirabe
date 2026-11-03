@@ -37,25 +37,27 @@ impl ForgejoRepositoryData {
     }
 
     pub fn from_remote_data(data: &IndexMap<BString, PhpMixed>) -> anyhow::Result<Self> {
-        let get_string = |key: &str| {
+        let get_string = |key: &BStr| {
             data.get(B(key))
                 .and_then(|v| v.as_string())
                 .map(BStr::to_owned)
-                .ok_or_else(|| anyhow::anyhow!("missing or invalid string field: {key}"))
+                .ok_or_else(|| {
+                    anyhow::anyhow!("missing or invalid string field: {}", key.display_lossy())
+                })
         };
-        let get_bool = |key: &str| {
-            data.get(B(key))
-                .and_then(|v| v.as_bool())
-                .ok_or_else(|| anyhow::anyhow!("missing or invalid bool field: {key}"))
+        let get_bool = |key: &BStr| {
+            data.get(B(key)).and_then(|v| v.as_bool()).ok_or_else(|| {
+                anyhow::anyhow!("missing or invalid bool field: {}", key.display_lossy())
+            })
         };
         Ok(Self::new(
-            get_string("html_url")?,
-            get_string("clone_url")?,
-            get_string("ssh_url")?,
-            get_bool("private")?,
-            get_string("default_branch")?,
-            get_bool("has_issues")?,
-            get_bool("archived")?,
+            get_string(BStr::new("html_url"))?,
+            get_string(BStr::new("clone_url"))?,
+            get_string(BStr::new("ssh_url"))?,
+            get_bool(BStr::new("private"))?,
+            get_string(BStr::new("default_branch"))?,
+            get_bool(BStr::new("has_issues"))?,
+            get_bool(BStr::new("archived"))?,
         ))
     }
 }

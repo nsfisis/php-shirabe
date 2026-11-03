@@ -560,7 +560,7 @@ impl ForgejoDriver {
     }
 
     fn get_next_page(&self, response: &Response) -> Option<BString> {
-        let header = response.get_header("link")?;
+        let header = response.get_header(BStr::new("link"))?;
 
         let links = explode(",", &header);
         for link in links {

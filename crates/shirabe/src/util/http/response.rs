@@ -54,7 +54,7 @@ impl Response {
         &self.headers
     }
 
-    pub fn get_header(&self, name: &str) -> Option<BString> {
+    pub fn get_header(&self, name: &BStr) -> Option<BString> {
         Self::find_header_value(&self.headers, name)
     }
 
@@ -73,7 +73,7 @@ impl Response {
         self.body = None;
     }
 
-    pub fn find_header_value(headers: &[BString], name: &str) -> Option<BString> {
+    pub fn find_header_value(headers: &[BString], name: &BStr) -> Option<BString> {
         let mut value = None;
         let pattern = bconcat!("{^", preg_quote(name, None), ":\\s*(.+?)\\s*$}i");
         for header in headers {

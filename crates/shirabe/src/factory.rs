@@ -744,7 +744,7 @@ impl Factory {
                                     if lock_enabled {
                                         lock_file
                                     } else {
-                                        PathBuf::from(Platform::get_dev_null())
+                                        path_from_bytes(Platform::get_dev_null()).to_path_buf()
                                     },
                                     None,
                                     Some(io.clone()),
@@ -764,7 +764,11 @@ impl Factory {
                             ))?;
                             let locker = Locker::new(
                                 io.clone(),
-                                JsonFile::new(Platform::get_dev_null(), None, Some(io.clone()))?,
+                                JsonFile::new(
+                                    path_from_bytes(Platform::get_dev_null()),
+                                    None,
+                                    Some(io.clone()),
+                                )?,
                                 im,
                                 &lock_contents,
                                 process,

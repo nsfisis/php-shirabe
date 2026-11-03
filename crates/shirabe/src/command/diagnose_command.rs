@@ -430,7 +430,8 @@ impl DiagnoseCommand {
             .get(&url, opts)
         {
             Ok(response) => {
-                let expiration = response.get_header("github-authentication-token-expiration");
+                let expiration =
+                    response.get_header(BStr::new("github-authentication-token-expiration"));
 
                 if expiration.is_none() {
                     return Ok(CheckResult::Message(BString::from(

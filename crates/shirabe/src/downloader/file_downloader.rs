@@ -505,7 +505,7 @@ impl DownloaderInterface for FileDownloader {
                             Some(size) => PhpMixed::Int(size),
                             None => PhpMixed::string(
                                 response
-                                    .get_header("Content-Length")
+                                    .get_header(BStr::new("Content-Length"))
                                     .unwrap_or_else(|| "?".into()),
                             ),
                         };

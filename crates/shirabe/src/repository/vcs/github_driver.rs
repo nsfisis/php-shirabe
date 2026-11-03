@@ -1048,13 +1048,14 @@ impl GitHubDriver {
                         let headers = e.get_headers().cloned().unwrap_or_default();
                         if !headers.is_empty() {
                             if let Some(scopes) =
-                                Response::find_header_value(&headers, "X-OAuth-Scopes")
+                                Response::find_header_value(&headers, BStr::new("X-OAuth-Scopes"))
                             {
                                 scopes_issued = explode(" ", &scopes).to_vec();
                             }
-                            if let Some(scopes) =
-                                Response::find_header_value(&headers, "X-Accepted-OAuth-Scopes")
-                            {
+                            if let Some(scopes) = Response::find_header_value(
+                                &headers,
+                                BStr::new("X-Accepted-OAuth-Scopes"),
+                            ) {
                                 scopes_needed = explode(" ", &scopes).to_vec();
                             }
                         }
@@ -1278,7 +1279,7 @@ impl GitHubDriver {
     }
 
     fn get_next_page(&self, response: &Response) -> Option<BString> {
-        let header = response.get_header("link")?;
+        let header = response.get_header(BStr::new("link"))?;
         if header.is_empty() {
             return None;
         }

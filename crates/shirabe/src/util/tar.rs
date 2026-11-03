@@ -28,10 +28,7 @@ impl Tar {
             if folder_file.is_dir() {
                 top_level_paths.insert(name, true);
                 if top_level_paths.len() > 1 {
-                    return Err(RuntimeException::new(format!(
-                        "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                        implode(",", &top_level_paths.keys().collect::<Vec<_>>()).display_lossy()
-                    )).into());
+                    return Err(RuntimeException::new(bconcat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: ", implode(",", &top_level_paths.keys().collect::<Vec<_>>()))).into());
                 }
             }
         }
@@ -46,10 +43,9 @@ impl Tar {
             return Ok(file.get_content().into());
         }
 
-        Err(RuntimeException::new(
-            "No composer.json found either at the top level or within the topmost directory"
-                .to_string(),
-        )
+        Err(RuntimeException::new(BString::from(
+            "No composer.json found either at the top level or within the topmost directory",
+        ))
         .into())
     }
 }

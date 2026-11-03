@@ -2848,7 +2848,8 @@ impl ComposerRepository {
                     && !self.cache.borrow().is_read_only()
                 {
                     if store_last_modified_time
-                        && let Some(last_modified_date) = response.get_header("last-modified")
+                        && let Some(last_modified_date) =
+                            response.get_header(BStr::new("last-modified"))
                     {
                         data_local
                             .insert("last-modified".into(), PhpMixed::string(last_modified_date));
@@ -3018,7 +3019,7 @@ impl ComposerRepository {
                 .unwrap_or_default();
             HttpDownloader::output_warnings(self.io.clone(), &self.url, &data);
 
-            let last_modified_date = response.get_header("last-modified");
+            let last_modified_date = response.get_header(BStr::new("last-modified"));
             response.collect();
             if let Some(ref lmd) = last_modified_date {
                 data.insert("last-modified".into(), PhpMixed::string(lmd.clone()));
@@ -3197,7 +3198,7 @@ impl ComposerRepository {
             .unwrap_or_default();
         HttpDownloader::output_warnings(self.io.clone(), &self.url, &data);
 
-        let last_modified_date = response.get_header("last-modified");
+        let last_modified_date = response.get_header(BStr::new("last-modified"));
         response.collect();
         if let Some(lmd) = last_modified_date {
             data.insert("last-modified".into(), PhpMixed::string(lmd));

@@ -1,5 +1,8 @@
 //! ref: composer/src/Composer/Util/IniHelper.php
 
+use bstr::BString;
+use shirabe_php_shim::bconcat;
+
 pub struct IniHelper;
 
 impl IniHelper {
@@ -14,7 +17,7 @@ impl IniHelper {
     }
 
     /// Describes the location of the loaded php.ini file(s).
-    pub fn get_message() -> String {
+    pub fn get_message() -> BString {
         let mut paths = Self::get_all();
 
         if paths.first().is_some_and(|s| s.as_os_str().is_empty()) {
@@ -28,16 +31,15 @@ impl IniHelper {
         };
 
         if ini.as_os_str().is_empty() {
-            return "A php.ini file does not exist. You will have to create one.".to_string();
+            return BString::from("A php.ini file does not exist. You will have to create one.");
         }
 
         if !paths.is_empty() {
-            return "Your command-line PHP is using multiple ini files. Run `php --ini` to show them.".to_string();
+            return BString::from(
+                "Your command-line PHP is using multiple ini files. Run `php --ini` to show them.",
+            );
         }
 
-        format!(
-            "The php.ini used by your command-line PHP is: {}",
-            ini.display()
-        )
+        bconcat!("The php.ini used by your command-line PHP is: ", ini)
     }
 }

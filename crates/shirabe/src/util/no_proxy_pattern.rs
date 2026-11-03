@@ -3,8 +3,8 @@
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, array_key_exists, bconcat, explode, filter_var_int_with_range, filter_var_ip,
-    inet_pton, ltrim2, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
+    RuntimeException, bconcat, explode, filter_var_int_with_range, filter_var_ip, inet_pton,
+    ltrim2, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
     substr_count, utf8_text,
 };
 
@@ -149,23 +149,23 @@ impl NoProxyPattern {
         let mask = network.netmask.as_deref().unwrap_or_default();
         let ip = target.ip.as_slice();
         if net.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse network IP {}",
-                net.as_bstr().display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse network IP ",
+                net.as_bstr()
             ))
             .into());
         }
         if mask.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse netmask {}",
-                mask.as_bstr().display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse netmask ",
+                mask.as_bstr()
             ))
             .into());
         }
         if ip.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse target IP {}",
-                ip.as_bstr().display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse target IP ",
+                ip.as_bstr()
             ))
             .into());
         }
@@ -184,13 +184,7 @@ impl NoProxyPattern {
 
     /// Finds or creates rule data for a hostname
     fn get_rule(&mut self, index: i64, host_name: &BStr) -> anyhow::Result<Option<UrlData>> {
-        if array_key_exists(&index.to_string(), &{
-            let mut m: IndexMap<String, ()> = IndexMap::new();
-            for k in self.rules.keys() {
-                m.insert(k.to_string(), ());
-            }
-            m
-        }) {
+        if self.rules.contains_key(&index) {
             return Ok(self.rules.get(&index).and_then(|v| v.clone()));
         }
 
@@ -306,16 +300,16 @@ impl NoProxyPattern {
 
         // Get the network from the address and mask
         if netmask.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse netmask {}",
-                netmask.as_bstr().display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse netmask ",
+                netmask.as_bstr()
             ))
             .into());
         }
         if range_ip.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse range IP {}",
-                range_ip.as_bstr().display_lossy()
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse range IP ",
+                range_ip.as_bstr()
             ))
             .into());
         }
