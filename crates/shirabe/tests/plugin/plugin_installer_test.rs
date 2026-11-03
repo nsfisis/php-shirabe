@@ -386,7 +386,7 @@ fn plugin_property(
     let proxy = plugin
         .__as_php_plugin_proxy()
         .expect("registered plugins are PHP-backed proxies");
-    match proxy.__get_property(name).unwrap() {
+    match proxy.__get_property(BStr::new(name)).unwrap() {
         PhpMixed::String(s) => s,
         other => panic!("property `{name}` is not a string: {other:?}"),
     }
@@ -617,7 +617,7 @@ fn set_plugin_api_version_with_plugins(
         DisablePlugins::None,
     )));
     pm.borrow_mut()
-        .__set_plugin_api_version(new_plugin_api_version);
+        .__set_plugin_api_version(BStr::new(new_plugin_api_version));
     set_up.composer.borrow_mut().set_plugin_manager(pm.clone());
 
     let plug_api_internal_package: PackageInterfaceHandle = CompletePackageHandle::new(
@@ -730,14 +730,20 @@ fn test_command_provider_capability() {
 
     let mut ctor_args = IndexMap::new();
     ctor_args.insert(
-        "composer".to_string(),
+        BString::from("composer"),
         composer_handle_value(&set_up.composer),
     );
-    ctor_args.insert("io".to_string(), io_handle_value(&set_up.io_dyn).unwrap());
+    ctor_args.insert(
+        BString::from("io"),
+        io_handle_value(&set_up.io_dyn).unwrap(),
+    );
     let caps = set_up
         .pm
         .borrow()
-        .get_plugin_capabilities("Composer\\Plugin\\Capability\\CommandProvider", ctor_args)
+        .get_plugin_capabilities(
+            BStr::new("Composer\\Plugin\\Capability\\CommandProvider"),
+            ctor_args,
+        )
         .unwrap();
     assert_eq!(1, caps.len());
     // PHP: assertInstanceOf('Composer\Plugin\Capability\CommandProvider', $caps[0]).
@@ -783,8 +789,8 @@ impl PluginInterface for NoopPlugin {
         Ok(())
     }
 
-    fn get_class_name(&self) -> String {
-        "NoopPlugin".to_string()
+    fn get_class_name(&self) -> BString {
+        BString::from("NoopPlugin")
     }
 }
 
@@ -797,7 +803,7 @@ fn test_incapable_plugin_is_correctly_detected() {
     let result = set_up
         .pm
         .borrow()
-        .get_plugin_capability(&plugin, "Fake\\Ability", IndexMap::new())
+        .get_plugin_capability(&plugin, BStr::new("Fake\\Ability"), IndexMap::new())
         .unwrap();
     assert!(result.is_none());
 }
@@ -845,10 +851,10 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
         .borrow()
         .get_plugin_capability(
             &plugin,
-            capability_api,
+            BStr::new(capability_api),
             IndexMap::from([
-                ("a".to_string(), PluginValue::Int(1)),
-                ("b".to_string(), PluginValue::Int(2)),
+                (BString::from("a"), PluginValue::Int(1)),
+                (BString::from("b"), PluginValue::Int(2)),
             ]),
         )
         .unwrap()
@@ -874,7 +880,7 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
             ("b".into(), PluginValue::Int(2)),
             ("plugin".into(), plugin_handle_value(&plugin)),
         ])),
-        capability.__get_property("args").unwrap()
+        capability.__get_property(BStr::new("args")).unwrap()
     );
     // PHP: ->expects($this->once())->method('getCapabilities').
     assert_eq!(1, *get_capabilities_calls.borrow());
@@ -914,15 +920,14 @@ fn assert_querying_with_invalid_capability_class_name_throws(
             get_capabilities_calls: get_capabilities_calls.clone(),
         }));
 
-    let err =
-        match set_up
-            .pm
-            .borrow()
-            .get_plugin_capability(&plugin, capability_api, IndexMap::new())
-        {
-            Err(err) => err,
-            Ok(_) => panic!("expected {expect_name} for {invalid_implementation_class_names:?}"),
-        };
+    let err = match set_up.pm.borrow().get_plugin_capability(
+        &plugin,
+        BStr::new(capability_api),
+        IndexMap::new(),
+    ) {
+        Err(err) => err,
+        Ok(_) => panic!("expected {expect_name} for {invalid_implementation_class_names:?}"),
+    };
     assert!(
         expect(&err),
         "expected {expect_name} for {invalid_implementation_class_names:?}, got: {err}"
@@ -978,8 +983,8 @@ impl PluginInterface for CapablePlugin {
         Ok(())
     }
 
-    fn get_class_name(&self) -> String {
-        "CapablePlugin".to_string()
+    fn get_class_name(&self) -> BString {
+        BString::from("CapablePlugin")
     }
 
     fn as_capable(&self) -> Option<&dyn Capable> {
@@ -1010,7 +1015,7 @@ fn test_querying_non_provided_capability_returns_null_safely() {
         .borrow()
         .get_plugin_capability(
             &plugin,
-            "Composer\\Plugin\\Capability\\MadeUpCapability",
+            BStr::new("Composer\\Plugin\\Capability\\MadeUpCapability"),
             IndexMap::new(),
         )
         .unwrap();

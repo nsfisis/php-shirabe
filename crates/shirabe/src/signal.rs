@@ -138,7 +138,7 @@ mod tests {
 
     /// Runs this test binary again with `SIGNAL_TEST_CHILD` set, so that the signal may kill the
     /// child instead of the test runner.
-    fn rerun_self(test_name: &str) -> std::process::ExitStatus {
+    fn rerun_self(test_name: impl AsRef<std::ffi::OsStr>) -> std::process::ExitStatus {
         std::process::Command::new(std::env::current_exe().unwrap())
             .arg(test_name)
             .arg("--exact")

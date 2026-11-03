@@ -5,7 +5,7 @@ mod bootstrap;
 #[path = "common/test_case.rs"]
 mod test_case;
 
-use bstr::ByteSlice;
+use bstr::{BStr, ByteSlice};
 use serial_test::serial;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
 use test_case::init_temp_composer;
@@ -208,14 +208,14 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
         composer
             .get_plugin_manager()
             .borrow()
-            .are_plugins_disabled("local"),
+            .are_plugins_disabled(BStr::new("local")),
         "Plugins should be disabled when --no-plugins is used"
     );
     assert!(
         composer
             .get_plugin_manager()
             .borrow()
-            .are_plugins_disabled("global"),
+            .are_plugins_disabled(BStr::new("global")),
         "Global plugins should be disabled when --no-plugins is used"
     );
 }

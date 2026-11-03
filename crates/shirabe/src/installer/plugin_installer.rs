@@ -93,7 +93,7 @@ impl InstallerInterface for PluginInstaller {
             && !self
                 .get_plugin_manager()
                 .borrow()
-                .are_plugins_disabled("local")
+                .are_plugins_disabled(BStr::new("local"))
         {
             let plugin_optional = package
                 .get_extra()

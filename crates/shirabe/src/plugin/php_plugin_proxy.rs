@@ -45,7 +45,8 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, bconcat, display_to_bytes, path_from_bytes, path_to_bytes, utf8_text,
+    UnexpectedValueException, bconcat, display_to_bytes, error_chain_message, path_from_bytes,
+    path_to_bytes, php_str,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -181,55 +182,65 @@ pub(crate) fn config_handle_value(
 }
 
 /// A `RustHandle` wire descriptor for a freshly registered (or re-interned) entity.
-pub(crate) fn rust_handle_value(rhandle: u64, class: &str) -> PluginValue {
+pub(crate) fn rust_handle_value(rhandle: u64, class: impl AsRef<[u8]>) -> PluginValue {
     PluginValue::RustHandle(RustObjHandle {
         rhandle,
-        class: bconcat!(class),
+        class: BString::from(class.as_ref()),
         epoch: 0,
         snapshot: None,
     })
 }
 
 /// The proxy stub class matching a package's concrete variant.
-fn package_stub_class(package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>) -> &'static str {
+fn package_stub_class(package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>) -> &'static BStr {
     match &*package.borrow() {
-        AnyPackage::Package(_) => "Composer\\Package\\Package",
-        AnyPackage::CompletePackage(_) => "Composer\\Package\\CompletePackage",
-        AnyPackage::RootPackage(_) => "Composer\\Package\\RootPackage",
-        AnyPackage::AliasPackage(_) => "Composer\\Package\\AliasPackage",
-        AnyPackage::CompleteAliasPackage(_) => "Composer\\Package\\CompleteAliasPackage",
-        AnyPackage::RootAliasPackage(_) => "Composer\\Package\\RootAliasPackage",
+        AnyPackage::Package(_) => php_str(b"Composer\\Package\\Package"),
+        AnyPackage::CompletePackage(_) => php_str(b"Composer\\Package\\CompletePackage"),
+        AnyPackage::RootPackage(_) => php_str(b"Composer\\Package\\RootPackage"),
+        AnyPackage::AliasPackage(_) => php_str(b"Composer\\Package\\AliasPackage"),
+        AnyPackage::CompleteAliasPackage(_) => php_str(b"Composer\\Package\\CompleteAliasPackage"),
+        AnyPackage::RootAliasPackage(_) => php_str(b"Composer\\Package\\RootAliasPackage"),
     }
 }
 
 /// The proxy stub class matching a repository's concrete type.
-fn repository_stub_class(repository: &RepositoryInterfaceHandle) -> Result<&'static str, PhpThrow> {
+fn repository_stub_class(
+    repository: &RepositoryInterfaceHandle,
+) -> Result<&'static BStr, PhpThrow> {
     if repository.is::<InstalledFilesystemRepository>() {
-        Ok("Composer\\Repository\\InstalledFilesystemRepository")
+        Ok(php_str(
+            b"Composer\\Repository\\InstalledFilesystemRepository",
+        ))
     } else if repository.is::<InstalledArrayRepository>() {
-        Ok("Composer\\Repository\\InstalledArrayRepository")
+        Ok(php_str(b"Composer\\Repository\\InstalledArrayRepository"))
     } else if repository.is::<LockArrayRepository>() {
-        Ok("Composer\\Repository\\LockArrayRepository")
+        Ok(php_str(b"Composer\\Repository\\LockArrayRepository"))
     } else {
         // TODO(plugin): the remaining repository classes get stubs on demand, driven by
         // explicit errors from real plugins.
         Err(runtime_throw(
-            "no proxy stub class is available for this repository over RPC yet".to_string(),
+            "no proxy stub class is available for this repository over RPC yet",
         ))
     }
 }
 
 /// The proxy stub class matching a solver operation's concrete type.
-fn operation_stub_class(operation: &AnyOperation) -> &'static str {
+fn operation_stub_class(operation: &AnyOperation) -> &'static BStr {
     match operation {
-        AnyOperation::Install(_) => "Composer\\DependencyResolver\\Operation\\InstallOperation",
-        AnyOperation::Update(_) => "Composer\\DependencyResolver\\Operation\\UpdateOperation",
-        AnyOperation::Uninstall(_) => "Composer\\DependencyResolver\\Operation\\UninstallOperation",
+        AnyOperation::Install(_) => {
+            php_str(b"Composer\\DependencyResolver\\Operation\\InstallOperation")
+        }
+        AnyOperation::Update(_) => {
+            php_str(b"Composer\\DependencyResolver\\Operation\\UpdateOperation")
+        }
+        AnyOperation::Uninstall(_) => {
+            php_str(b"Composer\\DependencyResolver\\Operation\\UninstallOperation")
+        }
         AnyOperation::MarkAliasInstalled(_) => {
-            "Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation"
+            php_str(b"Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation")
         }
         AnyOperation::MarkAliasUninstalled(_) => {
-            "Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation"
+            php_str(b"Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation")
         }
     }
 }
@@ -250,8 +261,8 @@ pub fn plugin_handle_value(
     // as one of these two classes, so `instanceof EventSubscriberInterface` is false in the
     // child; Composer's own subscriber dispatch runs on the Rust side and never asks.
     let class = match plugin.borrow().as_capable() {
-        Some(_) => "Shirabe\\RustCapablePluginStub",
-        None => "Shirabe\\RustPluginStub",
+        Some(_) => php_str(b"Shirabe\\RustCapablePluginStub"),
+        None => php_str(b"Shirabe\\RustPluginStub"),
     };
     let rhandle = register_entity(RustEntity::Plugin(plugin.clone()));
     rust_handle_value(rhandle, class)
@@ -260,9 +271,9 @@ pub fn plugin_handle_value(
 /// Registers a transaction and returns its wire descriptor.
 pub(crate) fn transaction_handle_value(transaction: &std::rc::Rc<AnyTransaction>) -> PluginValue {
     let class = match &**transaction {
-        AnyTransaction::Transaction(_) => "Composer\\DependencyResolver\\Transaction",
+        AnyTransaction::Transaction(_) => php_str(b"Composer\\DependencyResolver\\Transaction"),
         AnyTransaction::LocalRepoTransaction(_) => {
-            "Composer\\DependencyResolver\\LocalRepoTransaction"
+            php_str(b"Composer\\DependencyResolver\\LocalRepoTransaction")
         }
     };
     let rhandle = register_entity(RustEntity::Transaction(transaction.clone()));
@@ -280,21 +291,21 @@ pub(crate) fn operation_handle_value(operation: &std::rc::Rc<AnyOperation>) -> P
 /// its handle descriptor.
 pub(crate) fn io_stub_class(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) -> anyhow::Result<&'static str> {
+) -> anyhow::Result<&'static BStr> {
     let borrowed = io.borrow();
     let any = borrowed.as_any();
     if any
         .downcast_ref::<crate::io::buffer_io::BufferIO>()
         .is_some()
     {
-        Ok("Composer\\IO\\BufferIO")
+        Ok(BStr::new("Composer\\IO\\BufferIO"))
     } else if any
         .downcast_ref::<crate::io::console_io::ConsoleIO>()
         .is_some()
     {
-        Ok("Composer\\IO\\ConsoleIO")
+        Ok(BStr::new("Composer\\IO\\ConsoleIO"))
     } else if any.downcast_ref::<crate::io::null_io::NullIO>().is_some() {
-        Ok("Composer\\IO\\NullIO")
+        Ok(BStr::new("Composer\\IO\\NullIO"))
     } else {
         // TODO(plugin): only IO implementations with a generated proxy stub can cross the
         // boundary; the rest are an explicit error until stubs of their own are generated.
@@ -345,8 +356,6 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
         _out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
-        let method_name = method_name.display_lossy().to_string();
-        let method_name = method_name.as_str();
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
                 let class = arg::<BString>(method_name, &args, 0)?;
@@ -360,7 +369,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
                     input_line.as_ref(),
                 ) {
                     Ok(code) => Ok(code.to_plugin_value()),
-                    Err(e) => Err(runtime_throw(format!("{e:#}"))),
+                    Err(e) => Err(runtime_throw(bconcat!(error_chain_message(&e)))),
                 };
             }
             if method_name == "__shirabeConstruct" {
@@ -372,15 +381,17 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             if let Some(answer) = dispatch_job_service_method(method_name, &args) {
                 return answer;
             }
-            return Err(runtime_throw(format!(
-                "unknown runtime service method `{method_name}`"
+            return Err(runtime_throw(bconcat!(
+                "unknown runtime service method `",
+                method_name,
+                "`"
             )));
         }
 
         if let Some((event_rhandle, ref mut event)) = self.event
             && event_rhandle == rhandle
         {
-            return dispatch_event_method(&mut **event, BStr::new(method_name), &args);
+            return dispatch_event_method(&mut **event, method_name, &args);
         }
 
         dispatch_r_table_method(rhandle, method_name, &args, out_params)
@@ -391,23 +402,21 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
 /// every dispatcher: the worker reports on a job whenever the promise behind it settles or is
 /// cancelled, whichever call happens to be in flight then. `None` for any other method.
 pub(crate) fn dispatch_job_service_method(
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Option<Result<PluginValue, PhpThrow>> {
     let job_id = || arg::<i64>(method_name, args, 0).map(|id| id as u64);
-    Some(match method_name {
-        "__shirabeResolveJob" => job_id().map(|id| {
+    Some(match method_name.as_bytes() {
+        b"__shirabeResolveJob" => job_id().map(|id| {
             let value = args.get(1).cloned().unwrap_or(PluginValue::Null);
             job_registry::settle_php_job(id, Ok(value));
             PluginValue::Null
         }),
-        "__shirabeRejectJob" => (|| {
+        b"__shirabeRejectJob" => (|| {
             let id = job_id()?;
             let mut throw = PhpThrow::new(
-                arg::<String>(method_name, args, 1)?,
-                arg::<BString>(method_name, args, 2)?
-                    .display_lossy()
-                    .to_string(),
+                arg::<BString>(method_name, args, 1)?,
+                arg::<BString>(method_name, args, 2)?,
                 arg::<i64>(method_name, args, 3)?,
             );
             *throw.properties = match args.get(4) {
@@ -420,11 +429,11 @@ pub(crate) fn dispatch_job_service_method(
             job_registry::settle_php_job(id, Err(throw));
             Ok(PluginValue::Null)
         })(),
-        "__shirabeCancelJob" => job_id().map(|id| match job_registry::cancel(id) {
+        b"__shirabeCancelJob" => job_id().map(|id| match job_registry::cancel(id) {
             Some(throw) => PluginValue::List(job_registry::throw_fields(throw)),
             None => PluginValue::Null,
         }),
-        "__shirabeAbortJobs" => {
+        b"__shirabeAbortJobs" => {
             job_registry::abort_internal_jobs(None);
             Ok(PluginValue::Null)
         }
@@ -454,7 +463,7 @@ const PROCESS_EXECUTOR_TICK_CAP: std::time::Duration = std::time::Duration::from
 fn dispatch_tick_method(
     owner: JobOwner,
     cap: std::time::Duration,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let index = match args.first() {
@@ -473,7 +482,7 @@ fn dispatch_tick_method(
 /// minted it.
 pub(crate) fn dispatch_r_table_method(
     rhandle: u64,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
     out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
@@ -481,13 +490,16 @@ pub(crate) fn dispatch_r_table_method(
     if method_name == "__shirabeClone" {
         return match entity {
             Some(entity) => clone_entity(&entity),
-            None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+            None => Err(runtime_throw(bconcat!("unknown Rust handle ", rhandle))),
         };
     }
-    if matches!(method_name, "__get" | "__set" | "__isset" | "__unset") {
+    if matches!(
+        method_name.as_bytes(),
+        b"__get" | b"__set" | b"__isset" | b"__unset"
+    ) {
         return match entity {
             Some(entity) => dispatch_property_access(&entity, method_name, args),
-            None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+            None => Err(runtime_throw(bconcat!("unknown Rust handle ", rhandle))),
         };
     }
     match entity {
@@ -529,7 +541,7 @@ pub(crate) fn dispatch_r_table_method(
             dispatch_http_downloader_method(&downloader, method_name, args)
         }
         Some(RustEntity::Process(process)) => dispatch_process_method(&process, method_name),
-        None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+        None => Err(runtime_throw(bconcat!("unknown Rust handle ", rhandle))),
     }
 }
 
@@ -547,37 +559,34 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             (class, &Vec::new())
         }
         other => {
-            return Err(runtime_throw(format!(
-                "__shirabeConstruct expects a class name and an argument list, got {other:?}"
+            return Err(runtime_throw(bconcat!(
+                "__shirabeConstruct expects a class name and an argument list, got ",
+                display_to_bytes(format_args!("{other:?}"))
             )));
         }
     };
-    let class_name = class.display_lossy().to_string();
-    let string_arg = |position: usize| arg::<BString>(&class_name, ctor_args, position);
+    let class_name = class.as_bstr();
+    let string_arg = |position: usize| arg::<BString>(class_name, ctor_args, position);
     let package_arg =
-        |position: usize| arg::<PackageInterfaceHandle>(&class_name, ctor_args, position);
+        |position: usize| arg::<PackageInterfaceHandle>(class_name, ctor_args, position);
     let io_arg = |position: usize| {
-        arg::<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>(&class_name, ctor_args, position)
+        arg::<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>(class_name, ctor_args, position)
     };
     let process_executor_arg = |position: usize| {
         arg::<std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>>(
-            &class_name,
-            ctor_args,
-            position,
+            class_name, ctor_args, position,
         )
     };
     let config_arg = |position: usize| {
         arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(
-            &class_name,
-            ctor_args,
-            position,
+            class_name, ctor_args, position,
         )
     };
     let alias_package_arg =
         |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
             package_arg(position)?
                 .as_alias()
-                .ok_or_else(|| runtime_throw(format!("{class_name} expects an AliasPackage")))
+                .ok_or_else(|| runtime_throw(bconcat!(class_name, " expects an AliasPackage")))
         };
     let package = match class.as_slice() {
         b"Composer\\Package\\Package" => AnyPackage::Package(crate::package::Package::new(
@@ -592,7 +601,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // an alias has no Rust representation, so its narrowing is an explicit error too.
         b"Composer\\Package\\AliasPackage" => {
             let alias_of = package_arg(0)?.as_package().ok_or_else(|| {
-                runtime_throw(format!("{class_name} expects a real Package to alias"))
+                runtime_throw(bconcat!(class_name, " expects a real Package to alias"))
             })?;
             AnyPackage::AliasPackage(crate::package::AliasPackage::new(
                 alias_of,
@@ -602,8 +611,9 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
         b"Composer\\Package\\CompleteAliasPackage" => {
             let alias_of = package_arg(0)?.as_complete_package().ok_or_else(|| {
-                runtime_throw(format!(
-                    "{class_name} expects a real CompletePackage to alias"
+                runtime_throw(bconcat!(
+                    class_name,
+                    " expects a real CompletePackage to alias"
                 ))
             })?;
             AnyPackage::CompleteAliasPackage(crate::package::CompleteAliasPackage::new(
@@ -614,7 +624,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
         b"Composer\\Package\\RootAliasPackage" => {
             let alias_of = package_arg(0)?.as_root_package().ok_or_else(|| {
-                runtime_throw(format!("{class_name} expects a real RootPackage to alias"))
+                runtime_throw(bconcat!(class_name, " expects a real RootPackage to alias"))
             })?;
             AnyPackage::RootAliasPackage(crate::package::RootAliasPackage::new(
                 alias_of,
@@ -695,12 +705,12 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                     io_arg(0)?,
                     config_arg(1)?,
                     arg_or::<IndexMap<BString, PhpMixed>>(
-                        &class_name,
+                        class_name,
                         ctor_args,
                         2,
                         IndexMap::new(),
                     )?,
-                    arg_or::<bool>(&class_name, ctor_args, 3, false)?,
+                    arg_or::<bool>(class_name, ctor_args, 3, false)?,
                 )),
             )));
             return Ok(construction_result(rhandle));
@@ -710,8 +720,10 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // plugin-built instance means for the Rust-side graph, which is why none of them is
         // answered generically here.
         _ => {
-            return Err(runtime_throw(format!(
-                "Shirabe does not support constructing {class_name} inside the plugin process yet"
+            return Err(runtime_throw(bconcat!(
+                "Shirabe does not support constructing ",
+                class_name,
+                " inside the plugin process yet"
             )));
         }
     };
@@ -763,7 +775,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::HttpDownloader(_)
         | RustEntity::Process(_) => {
             return Err(runtime_throw(
-                "cloning this Rust-side entity over RPC is not supported".to_string(),
+                "cloning this Rust-side entity over RPC is not supported",
             ));
         }
     };
@@ -776,7 +788,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
 /// Serves the `__get`/`__set`/`__isset`/`__unset` forwarders every proxy stub carries.
 fn dispatch_property_access(
     entity: &RustEntity,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let property = arg::<BString>(method_name, args, 0)?;
@@ -784,65 +796,69 @@ fn dispatch_property_access(
     if let RustEntity::Package(package) = entity
         && property == "id"
     {
-        return match method_name {
-            "__get" => Ok(package
+        return match method_name.as_bytes() {
+            b"__get" => Ok(package
                 .borrow()
                 .as_package_interface()
                 .get_id()
                 .to_plugin_value()),
-            "__isset" => Ok(PluginValue::Bool(true)),
-            "__set" => {
+            b"__isset" => Ok(PluginValue::Bool(true)),
+            b"__set" => {
                 let id = arg::<i64>(method_name, args, 1)?;
                 package.borrow_mut().as_package_interface_mut().set_id(id);
                 Ok(PluginValue::Null)
             }
             _ => Err(runtime_throw(
-                "the package property `id` cannot be unset over RPC".to_string(),
+                "the package property `id` cannot be unset over RPC",
             )),
         };
     }
     // TODO(plugin): the instance properties the proxied classes expose are widened on demand,
     // driven by these explicit errors from real plugins. Each one has to decide how the state
     // the real class keeps in that property is served from the Rust-side entity.
-    Err(runtime_throw(format!(
-        "the property `{}` is not available over RPC yet",
-        property.display_lossy()
+    Err(runtime_throw(bconcat!(
+        "the property `",
+        property,
+        "` is not available over RPC yet"
     )))
 }
 
 fn dispatch_plugin_method(
     plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
-    method_name: &str,
+    method_name: &BStr,
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getCapabilities" => {
+    match method_name.as_bytes() {
+        b"getCapabilities" => {
             let plugin = plugin.borrow();
             let capable = plugin.as_capable().ok_or_else(|| {
-                runtime_throw(format!(
-                    "plugin {} does not implement Capable",
-                    plugin.get_class_name()
+                runtime_throw(bconcat!(
+                    "plugin ",
+                    plugin.get_class_name(),
+                    " does not implement Capable"
                 ))
             })?;
             let capabilities = capable
                 .get_capabilities()
-                .map_err(|error| error_throw("getCapabilities failed", &error))?;
+                .map_err(|error| error_throw(b"getCapabilities failed", &error))?;
             Ok(capabilities.to_plugin_value())
         }
         // TODO(plugin): the lifecycle methods would have to turn the `$composer`/`$io` stubs the
         // child passes back into the Rust handles they stand for; nothing calls them, because
         // Composer activates a Rust-implemented plugin on the Rust side.
-        other => Err(runtime_throw(format!(
-            "the plugin method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the plugin method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
 
 fn dispatch_composer_method(
     composer: &ComposerHandle,
-    method_name: &str,
+    method_name: &BStr,
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getRepositoryManager" => {
+    match method_name.as_bytes() {
+        b"getRepositoryManager" => {
             let rm = composer.borrow().get_repository_manager();
             let rhandle = register_entity(RustEntity::RepositoryManager(rm));
             Ok(rust_handle_value(
@@ -850,7 +866,7 @@ fn dispatch_composer_method(
                 "Composer\\Repository\\RepositoryManager",
             ))
         }
-        "getInstallationManager" => {
+        b"getInstallationManager" => {
             let im = composer.borrow().get_installation_manager();
             let rhandle = register_entity(RustEntity::InstallationManager(im));
             Ok(rust_handle_value(
@@ -858,11 +874,11 @@ fn dispatch_composer_method(
                 "Composer\\Installer\\InstallationManager",
             ))
         }
-        "getPackage" => {
+        b"getPackage" => {
             let package = composer.borrow().get_package().as_rc().clone();
             Ok(package_handle_value(&package))
         }
-        "getEventDispatcher" => {
+        b"getEventDispatcher" => {
             let dispatcher = composer.borrow().get_event_dispatcher();
             let rhandle = register_entity(RustEntity::EventDispatcher(dispatcher));
             Ok(rust_handle_value(
@@ -870,8 +886,8 @@ fn dispatch_composer_method(
                 "Composer\\EventDispatcher\\EventDispatcher",
             ))
         }
-        "getConfig" => Ok(config_handle_value(&composer.borrow().get_config())),
-        "getAutoloadGenerator" => {
+        b"getConfig" => Ok(config_handle_value(&composer.borrow().get_config())),
+        b"getAutoloadGenerator" => {
             let generator = composer.borrow().get_autoload_generator();
             let rhandle = register_entity(RustEntity::AutoloadGenerator(generator));
             Ok(rust_handle_value(
@@ -879,7 +895,7 @@ fn dispatch_composer_method(
                 "Composer\\Autoload\\AutoloadGenerator",
             ))
         }
-        "getDownloadManager" => {
+        b"getDownloadManager" => {
             let dm = composer.borrow().get_download_manager();
             let rhandle = register_entity(RustEntity::DownloadManager(dm));
             Ok(rust_handle_value(
@@ -889,7 +905,7 @@ fn dispatch_composer_method(
         }
         // `getLoop()` itself never reaches here: the Loop is a two-world class, and the stub builds
         // the worker-side one over the two services the Rust-side Loop drives.
-        "__shirabeLoopServices" => {
+        b"__shirabeLoopServices" => {
             let r#loop = composer.borrow().get_loop();
             let downloader = r#loop.borrow().get_http_downloader().clone();
             let process = r#loop.borrow().get_process_executor().cloned();
@@ -907,39 +923,41 @@ fn dispatch_composer_method(
                 },
             ]))
         }
-        "getLocker" => {
+        b"getLocker" => {
             let locker = composer.borrow().get_locker();
             let rhandle = register_entity(RustEntity::Locker(locker));
             Ok(rust_handle_value(rhandle, "Composer\\Package\\Locker"))
         }
         // TODO(plugin): the remaining Composer object graph (getPluginManager, ...)
         // becomes reachable over RPC on demand, driven by explicit errors from real plugins.
-        other => Err(runtime_throw(format!(
-            "the Composer method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the Composer method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
 
 fn dispatch_autoload_generator_method(
     generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let flag = |position: usize| arg_or::<bool>(method_name, args, position, true);
-    match method_name {
-        "setDevMode" => generator.borrow().set_dev_mode(flag(0)?),
-        "setClassMapAuthoritative" => {
+    match method_name.as_bytes() {
+        b"setDevMode" => generator.borrow().set_dev_mode(flag(0)?),
+        b"setClassMapAuthoritative" => {
             generator
                 .borrow()
                 .set_class_map_authoritative(arg::<bool>(method_name, args, 0)?)
         }
-        "setApcu" => generator.borrow().set_apcu(
+        b"setApcu" => generator.borrow().set_apcu(
             arg::<bool>(method_name, args, 0)?,
             arg::<Option<BString>>(method_name, args, 1)?,
         ),
-        "setRunScripts" => generator.borrow().set_run_scripts(flag(0)?),
-        "setDryRun" => generator.borrow().set_dry_run(flag(0)?),
-        "setIgnorePlatformRequirements" => {
+        b"setRunScripts" => generator.borrow().set_run_scripts(flag(0)?),
+        b"setDryRun" => generator.borrow().set_dry_run(flag(0)?),
+        b"setIgnorePlatformRequirements" => {
             // TODO(php-runtime): upstream raises an E_USER_DEPRECATED here
             // ("AutoloadGenerator::setIgnorePlatformRequirements is deprecated since Composer 2.2,
             // use setPlatformRequirementFilter instead."), which Composer's ErrorHandler prints as
@@ -949,10 +967,10 @@ fn dispatch_autoload_generator_method(
                 args,
                 0,
             )?)
-            .map_err(|error| error_throw("setIgnorePlatformRequirements failed", &error))?;
+            .map_err(|error| error_throw(b"setIgnorePlatformRequirements failed", &error))?;
             generator.borrow().set_platform_requirement_filter(filter);
         }
-        "dump" => {
+        b"dump" => {
             let config = arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(
                 method_name,
                 args,
@@ -985,10 +1003,10 @@ fn dispatch_autoload_generator_method(
                     locker,
                     strict_ambiguous,
                 )
-                .map_err(|error| error_throw("dump failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"dump failed over RPC", &error))?;
             return Ok(class_map_to_wire(&class_map));
         }
-        "buildPackageMap" => {
+        b"buildPackageMap" => {
             let installation_manager = arg::<
                 std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
             >(method_name, args, 0)?;
@@ -999,10 +1017,10 @@ fn dispatch_autoload_generator_method(
             let package_map = generator
                 .borrow()
                 .build_package_map(installation_manager, root_package, packages)
-                .map_err(|error| error_throw("buildPackageMap failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"buildPackageMap failed over RPC", &error))?;
             return Ok(package_map_value(package_map));
         }
-        "parseAutoloads" => {
+        b"parseAutoloads" => {
             let package_map = package_map_arg(method_name, args, 0)?;
             let root_package = root_package_arg(method_name, args, 1)?;
             let filtered_dev_packages =
@@ -1012,28 +1030,29 @@ fn dispatch_autoload_generator_method(
                 .parse_autoloads(package_map, root_package, filtered_dev_packages)
                 .to_plugin_value());
         }
-        "createLoader" => {
+        b"createLoader" => {
             let autoloads = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
             let vendor_dir = arg::<Option<BString>>(method_name, args, 1)?;
             let loader = generator
                 .borrow()
                 .create_loader(&autoloads, vendor_dir.clone())
-                .map_err(|error| error_throw("createLoader failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"createLoader failed over RPC", &error))?;
             return class_loader_to_php(&loader, vendor_dir)
-                .map_err(|error| error_throw("createLoader failed over RPC", &error));
+                .map_err(|error| error_throw(b"createLoader failed over RPC", &error));
         }
         // TODO(plugin): no PlatformRequirementFilterInterface implementation crosses the boundary:
         // the factory's filters are guarded in the worker, and a plugin-implemented filter has no
         // Rust-side adapter.
-        "setPlatformRequirementFilter" => {
+        b"setPlatformRequirementFilter" => {
             return Err(runtime_throw(
-                "AutoloadGenerator::setPlatformRequirementFilter() cannot take a filter over RPC yet"
-                    .to_string(),
+                "AutoloadGenerator::setPlatformRequirementFilter() cannot take a filter over RPC yet",
             ));
         }
         other => {
-            return Err(runtime_throw(format!(
-                "the AutoloadGenerator method `{other}` is not available over RPC yet"
+            return Err(runtime_throw(bconcat!(
+                "the AutoloadGenerator method `",
+                other,
+                "` is not available over RPC yet"
             )));
         }
     }
@@ -1042,7 +1061,7 @@ fn dispatch_autoload_generator_method(
 
 /// Resolves a package argument the PHP signature types as a root package.
 fn root_package_arg(
-    method: &str,
+    method: &BStr,
     args: &[PluginValue],
     position: usize,
 ) -> Result<RootPackageInterfaceHandle, PhpThrow> {
@@ -1061,7 +1080,7 @@ fn root_package_arg(
 /// Decodes the `array{0: PackageInterface, 1: string|null}[]` package map `buildPackageMap()`
 /// returns.
 fn package_map_arg(
-    method: &str,
+    method: &BStr,
     args: &[PluginValue],
     position: usize,
 ) -> Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>, PhpThrow> {
@@ -1115,10 +1134,10 @@ fn class_loader_to_php(
         BStr::new("Composer\\Autoload\\ClassLoader"),
         vec![vendor_dir.to_plugin_value()],
     )?;
-    let add = |method: &str, prefix: &[u8], paths: &[BString]| {
+    let add = |method: &[u8], prefix: &[u8], paths: &[BString]| {
         call_php_entity_method(
             &handle,
-            method,
+            BStr::new(method),
             vec![
                 PluginValue::string(prefix),
                 paths.to_vec().to_plugin_value(),
@@ -1127,21 +1146,21 @@ fn class_loader_to_php(
         .map(|_| ())
     };
     for (prefix, paths) in loader.get_prefixes() {
-        add("add", &prefix, &paths)?;
+        add(b"add", prefix.as_ref(), &paths)?;
     }
     if !loader.get_fallback_dirs().is_empty() {
-        add("add", b"", loader.get_fallback_dirs())?;
+        add(b"add", b"".as_slice(), loader.get_fallback_dirs())?;
     }
     for (prefix, paths) in loader.get_prefixes_psr4() {
-        add("addPsr4", prefix, paths)?;
+        add(b"addPsr4", prefix.as_ref(), paths)?;
     }
     if !loader.get_fallback_dirs_psr4().is_empty() {
-        add("addPsr4", b"", loader.get_fallback_dirs_psr4())?;
+        add(b"addPsr4", b"".as_slice(), loader.get_fallback_dirs_psr4())?;
     }
     if !loader.get_class_map().is_empty() {
         call_php_entity_method(
             &handle,
-            "addClassMap",
+            BStr::new("addClassMap"),
             vec![loader.get_class_map().clone().to_plugin_value()],
         )?;
     }
@@ -1150,34 +1169,34 @@ fn class_loader_to_php(
 
 fn dispatch_config_method(
     config: &std::rc::Rc<std::cell::RefCell<crate::config::Config>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let key = |position: usize| arg::<String>(method_name, args, position);
+    let key = |position: usize| arg::<BString>(method_name, args, position);
     let flags = |position: usize| arg_or::<i64>(method_name, args, position, 0);
-    match method_name {
-        "get" => {
+    match method_name.as_bytes() {
+        b"get" => {
             let value = config
                 .borrow()
                 .get_with_flags(&key(0)?, flags(1)?)
-                .map_err(|error| error_throw("get failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"get failed over RPC", &error))?;
             Ok(value.to_plugin_value())
         }
-        "all" => {
+        b"all" => {
             let all = config
                 .borrow_mut()
                 .all(flags(0)?)
-                .map_err(|error| error_throw("all failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"all failed over RPC", &error))?;
             Ok(all.to_plugin_value())
         }
-        "raw" => Ok(config.borrow().raw().to_plugin_value()),
-        "has" => Ok(config.borrow().has(&key(0)?).to_plugin_value()),
-        "getRepositories" => Ok(config.borrow().get_repositories().to_plugin_value()),
-        "getSourceOfValue" => Ok(config
+        b"raw" => Ok(config.borrow().raw().to_plugin_value()),
+        b"has" => Ok(config.borrow().has(&key(0)?).to_plugin_value()),
+        b"getRepositories" => Ok(config.borrow().get_repositories().to_plugin_value()),
+        b"getSourceOfValue" => Ok(config
             .borrow_mut()
             .get_source_of_value(&key(0)?)
             .to_plugin_value()),
-        "merge" => {
+        b"merge" => {
             let values = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
             let source = arg_or::<BString>(
                 method_name,
@@ -1192,8 +1211,10 @@ fn dispatch_config_method(
         // needs proxy stubs for ConfigSourceInterface implementations, and prohibitUrlByConfig
         // needs the IO argument decoded back into the Rust-side instance; both are widened on
         // demand, driven by explicit errors from real plugins.
-        other => Err(runtime_throw(format!(
-            "the Config method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the Config method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
@@ -1203,10 +1224,10 @@ fn dispatch_config_method(
 /// answers with the job's pending promise.
 fn dispatch_download_manager_method(
     dm: &std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let string_arg = |position: usize| arg::<String>(method_name, args, position);
+    let string_arg = |position: usize| arg::<BString>(method_name, args, position);
     let path_arg = |position: usize| {
         arg::<bstr::BString>(method_name, args, position)
             .map(|path| std::path::PathBuf::from(path_from_bytes(&path)))
@@ -1216,8 +1237,8 @@ fn dispatch_download_manager_method(
         |position: usize| arg::<Option<PackageInterfaceHandle>>(method_name, args, position);
     let future: std::pin::Pin<
         Box<dyn std::future::Future<Output = anyhow::Result<Option<PhpMixed>>>>,
-    > = match method_name {
-        "setPreferSource" | "setPreferDist" => {
+    > = match method_name.as_bytes() {
+        b"setPreferSource" | b"setPreferDist" => {
             let preferred = arg::<bool>(method_name, args, 0)?;
             if method_name == "setPreferSource" {
                 dm.borrow().set_prefer_source(preferred);
@@ -1226,7 +1247,7 @@ fn dispatch_download_manager_method(
             }
             return Ok(PluginValue::Null);
         }
-        "download" => {
+        b"download" => {
             let (dm, package, path, prev) = (
                 dm.clone(),
                 package_arg(0)?,
@@ -1235,7 +1256,7 @@ fn dispatch_download_manager_method(
             );
             Box::pin(async move { dm.borrow().download(package, &path, prev).await })
         }
-        "prepare" => {
+        b"prepare" => {
             let (dm, r#type, package, path, prev) = (
                 dm.clone(),
                 string_arg(0)?,
@@ -1249,20 +1270,20 @@ fn dispatch_download_manager_method(
                     .await
             })
         }
-        "install" => {
+        b"install" => {
             let (dm, package, path) = (dm.clone(), package_arg(0)?, path_arg(1)?);
             Box::pin(async move { dm.borrow().install(package, &path).await })
         }
-        "update" => {
+        b"update" => {
             let (dm, initial, target, path) =
                 (dm.clone(), package_arg(0)?, package_arg(1)?, path_arg(2)?);
             Box::pin(async move { dm.borrow().update(initial, target, &path).await })
         }
-        "remove" => {
+        b"remove" => {
             let (dm, package, path) = (dm.clone(), package_arg(0)?, path_arg(1)?);
             Box::pin(async move { dm.borrow().remove(package, &path).await })
         }
-        "cleanup" => {
+        b"cleanup" => {
             let (dm, r#type, package, path, prev) = (
                 dm.clone(),
                 string_arg(0)?,
@@ -1280,8 +1301,10 @@ fn dispatch_download_manager_method(
         // getDownloaderForPackage / getDownloaderType) needs proxy stubs for
         // DownloaderInterface implementations before it can cross.
         other => {
-            return Err(runtime_throw(format!(
-                "the DownloadManager method `{other}` is not available over RPC yet"
+            return Err(runtime_throw(bconcat!(
+                "the DownloadManager method `",
+                other,
+                "` is not available over RPC yet"
             )));
         }
     };
@@ -1291,7 +1314,7 @@ fn dispatch_download_manager_method(
     // this job is done.
     let downloader = graph_http_downloader(dm)?;
     let started = std::rc::Rc::new(std::cell::Cell::new(false));
-    let method = method_name.to_string();
+    let method = method_name.to_owned();
     Ok(job_registry::register(
         JobOwner::http_downloader(&downloader),
         downloader,
@@ -1299,9 +1322,11 @@ fn dispatch_download_manager_method(
         // TODO(async): Composer's cancel reaches the request or the process at the root of the
         // chain and rejects with that job's own exception; the root is not known here.
         error_throw(
-            "",
-            &crate::exception::IrrecoverableDownloadException::new(format!(
-                "DownloadManager::{method_name}() canceled"
+            BStr::new(""),
+            &crate::exception::IrrecoverableDownloadException::new(bconcat!(
+                "DownloadManager::",
+                method_name,
+                "() canceled"
             ))
             .into(),
         ),
@@ -1310,7 +1335,7 @@ fn dispatch_download_manager_method(
             future
                 .await
                 .map(|resolved| resolved.to_plugin_value())
-                .map_err(|error| error_throw(&format!("{method} failed over RPC"), &error))
+                .map_err(|error| error_throw(bconcat!(method, " failed over RPC"), &error))
         }),
     ))
 }
@@ -1337,7 +1362,7 @@ fn graph_http_downloader(
         }
     }
     Err(runtime_throw(
-        "this DownloadManager belongs to no Composer instance the plugin process holds".to_string(),
+        "this DownloadManager belongs to no Composer instance the plugin process holds",
     ))
 }
 
@@ -1352,8 +1377,9 @@ fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
     ) {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(runtime_throw(format!(
-            "creating a resolved promise in the plugin process failed: {error:#}"
+        Err(error) => Err(runtime_throw(bconcat!(
+            "creating a resolved promise in the plugin process failed: ",
+            error_chain_message(&error)
         ))),
     }
 }
@@ -1369,8 +1395,9 @@ fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
     ) {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(runtime_throw(format!(
-            "creating a rejected promise in the plugin process failed: {error:#}"
+        Err(error) => Err(runtime_throw(bconcat!(
+            "creating a rejected promise in the plugin process failed: ",
+            error_chain_message(&error)
         ))),
     }
 }
@@ -1379,14 +1406,16 @@ fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
 /// behind it, read in one round trip.
 fn dispatch_process_method(
     process: &std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>>,
-    method_name: &str,
+    method_name: &BStr,
 ) -> Result<PluginValue, PhpThrow> {
     if method_name != "__shirabeFacts" {
-        return Err(runtime_throw(format!(
-            "unknown Process method `{method_name}`"
+        return Err(runtime_throw(bconcat!(
+            "unknown Process method `",
+            method_name,
+            "`"
         )));
     }
-    let failed = |error: anyhow::Error| error_throw("reading the process failed", &error);
+    let failed = |error: anyhow::Error| error_throw(b"reading the process failed", &error);
     let mut process = process.borrow_mut();
     let facts = [
         ("exitCode", process.get_exit_code().to_plugin_value()),
@@ -1452,33 +1481,33 @@ fn dispatch_process_method(
 
 fn dispatch_filesystem_method(
     fs: &std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let path_arg = |position: usize| {
         arg::<BString>(method_name, args, position)
             .map(|path| std::path::PathBuf::from(path_from_bytes(&path)))
     };
-    let failed = |error: anyhow::Error| error_throw(&format!("{method_name} failed"), &error);
-    match method_name {
-        "remove" => Ok(fs
+    let failed = |error: anyhow::Error| error_throw(bconcat!(method_name, " failed"), &error);
+    match method_name.as_bytes() {
+        b"remove" => Ok(fs
             .borrow_mut()
             .remove(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "isDirEmpty" => Ok(fs.borrow().is_dir_empty(&path_arg(0)?).to_plugin_value()),
-        "emptyDirectory" => {
+        b"isDirEmpty" => Ok(fs.borrow().is_dir_empty(&path_arg(0)?).to_plugin_value()),
+        b"emptyDirectory" => {
             fs.borrow_mut()
                 .empty_directory(&path_arg(0)?, arg::<bool>(method_name, args, 1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "removeDirectory" => Ok(fs
+        b"removeDirectory" => Ok(fs
             .borrow_mut()
             .remove_directory(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "removeDirectoryAsync" => {
+        b"removeDirectoryAsync" => {
             let directory = path_arg(0)?;
             let executor = fs.borrow_mut().get_process_handle();
             let fs = fs.clone();
@@ -1497,55 +1526,55 @@ fn dispatch_filesystem_method(
                     JobOwner::process_executor(&executor),
                     executor,
                     std::rc::Rc::new(std::cell::Cell::new(true)),
-                    runtime_throw("Aborted process".to_string()),
+                    runtime_throw("Aborted process"),
                     Box::pin(async move {
                         future
                             .await
                             .map(|removed| removed.to_plugin_value())
-                            .map_err(|error| error_throw("removeDirectoryAsync failed", &error))
+                            .map_err(|error| error_throw(b"removeDirectoryAsync failed", &error))
                     }),
                 )),
             }
         }
-        "removeDirectoryPhp" => Ok(fs
+        b"removeDirectoryPhp" => Ok(fs
             .borrow_mut()
             .remove_directory_php(&path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "ensureDirectoryExists" => {
+        b"ensureDirectoryExists" => {
             fs.borrow_mut()
                 .ensure_directory_exists(&path_arg(0)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "unlink" => Ok(fs
+        b"unlink" => Ok(fs
             .borrow()
             .unlink(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "rmdir" => Ok(fs
+        b"rmdir" => Ok(fs
             .borrow()
             .rmdir(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "copyThenRemove" => {
+        b"copyThenRemove" => {
             fs.borrow_mut()
                 .copy_then_remove(&path_arg(0)?, &path_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "copy" => Ok(fs
+        b"copy" => Ok(fs
             .borrow_mut()
             .copy(&path_arg(0)?, &path_arg(1)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "rename" => {
+        b"rename" => {
             fs.borrow_mut()
                 .rename(path_arg(0)?, path_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "findShortestPath" | "findShortestPathCode" => {
+        b"findShortestPath" | b"findShortestPathCode" => {
             let from = path_arg(0)?;
             let to = path_arg(1)?;
             let fs = fs.borrow();
@@ -1570,50 +1599,52 @@ fn dispatch_filesystem_method(
                 .to_plugin_value()
             })
         }
-        "isAbsolutePath" => Ok(fs
+        b"isAbsolutePath" => Ok(fs
             .borrow()
             .is_absolute_path(&path_arg(0)?)
             .to_plugin_value()),
-        "size" => Ok(fs
+        b"size" => Ok(fs
             .borrow()
             .size(path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "normalizePath" => Ok(fs.borrow().normalize_path(&path_arg(0)?).to_plugin_value()),
-        "relativeSymlink" => Ok(fs
+        b"normalizePath" => Ok(fs.borrow().normalize_path(&path_arg(0)?).to_plugin_value()),
+        b"relativeSymlink" => Ok(fs
             .borrow()
             .relative_symlink(&path_arg(0)?, &path_arg(1)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "isSymlinkedDirectory" => Ok(fs
+        b"isSymlinkedDirectory" => Ok(fs
             .borrow()
             .is_symlinked_directory(&path_arg(0)?)
             .to_plugin_value()),
-        "junction" => {
+        b"junction" => {
             fs.borrow_mut()
                 .junction(&path_arg(0)?, &path_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "isJunction" => Ok(fs.borrow().is_junction(&path_arg(0)?).to_plugin_value()),
-        "removeJunction" => Ok(fs
+        b"isJunction" => Ok(fs.borrow().is_junction(&path_arg(0)?).to_plugin_value()),
+        b"removeJunction" => Ok(fs
             .borrow_mut()
             .remove_junction(&path_arg(0)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "filePutContentsIfModified" => Ok(fs
+        b"filePutContentsIfModified" => Ok(fs
             .borrow()
             .file_put_contents_if_modified(&path_arg(0)?, arg::<BString>(method_name, args, 1)?)
             .map_err(failed)?
             .to_plugin_value()),
-        "safeCopy" => {
+        b"safeCopy" => {
             fs.borrow()
                 .safe_copy(&path_arg(0)?, &path_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        other => Err(runtime_throw(format!(
-            "the Filesystem method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the Filesystem method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
@@ -1624,11 +1655,11 @@ fn dispatch_filesystem_method(
 /// single-sourced across the boundary instead of forking a copy per world.
 fn dispatch_process_executor_method(
     process: &std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
     out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
-    let failed = |error: anyhow::Error| error_throw(&format!("{method_name} failed"), &error);
+    let failed = |error: anyhow::Error| error_throw(bconcat!(method_name, " failed"), &error);
     let cwd_arg = |position: usize| -> Result<Option<std::path::PathBuf>, PhpThrow> {
         match args.get(position) {
             None | Some(PluginValue::Null) => Ok(None),
@@ -1636,8 +1667,8 @@ fn dispatch_process_executor_method(
                 .map(|cwd| Some(std::path::PathBuf::from(path_from_bytes(&cwd)))),
         }
     };
-    match method_name {
-        "execute" => {
+    match method_name.as_bytes() {
+        b"execute" => {
             let command = exec_command_arg(method_name, args, 0)?;
             let cwd = cwd_arg(2)?;
             // PHP selects the output handling with `func_num_args() > 1` and `is_callable($output)`;
@@ -1681,7 +1712,7 @@ fn dispatch_process_executor_method(
             }
             Ok(code.to_plugin_value())
         }
-        "executeTty" => Ok(process
+        b"executeTty" => Ok(process
             .borrow()
             .execute_tty(
                 exec_command_arg(method_name, args, 0)?,
@@ -1689,7 +1720,7 @@ fn dispatch_process_executor_method(
             )
             .map_err(failed)?
             .to_plugin_value()),
-        "splitLines" => {
+        b"splitLines" => {
             let output = match args.first() {
                 None | Some(PluginValue::Null) => BString::default(),
                 _ => arg::<BString>(method_name, args, 0)?,
@@ -1703,26 +1734,26 @@ fn dispatch_process_executor_method(
                     .collect(),
             ))
         }
-        "getErrorOutput" => Ok(PluginValue::string(process.borrow().get_error_output())),
-        "requiresGitDirEnv" => Ok(process
+        b"getErrorOutput" => Ok(PluginValue::string(process.borrow().get_error_output())),
+        b"requiresGitDirEnv" => Ok(process
             .borrow()
             .requires_git_dir_env(&exec_command_arg(method_name, args, 0)?)
             .to_plugin_value()),
-        "setMaxJobs" => {
+        b"setMaxJobs" => {
             process
                 .borrow()
                 .set_max_jobs(arg::<i64>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
-        "resetMaxJobs" => {
+        b"resetMaxJobs" => {
             process.borrow().reset_max_jobs();
             Ok(PluginValue::Null)
         }
-        "enableAsync" => {
+        b"enableAsync" => {
             process.borrow().enable_async();
             Ok(PluginValue::Null)
         }
-        "executeAsync" => {
+        b"executeAsync" => {
             let command = exec_command_arg(method_name, args, 0)?;
             let cwd = cwd_arg(1)?;
             let started = std::rc::Rc::new(std::cell::Cell::new(false));
@@ -1735,7 +1766,7 @@ fn dispatch_process_executor_method(
                     register_entity(RustEntity::Process(std::rc::Rc::new(
                         std::cell::RefCell::new(child),
                     ))),
-                    "Shirabe\\RustProcessStub",
+                    BStr::new("Shirabe\\RustProcessStub"),
                 )
             };
             let future: std::pin::Pin<
@@ -1754,7 +1785,7 @@ fn dispatch_process_executor_method(
                     future
                         .await
                         .map(resolve)
-                        .map_err(|error| error_throw("executeAsync failed", &error))
+                        .map_err(|error| error_throw(b"executeAsync failed", &error))
                 }),
             };
             Ok(job_registry::register(
@@ -1763,18 +1794,20 @@ fn dispatch_process_executor_method(
                 started,
                 // TODO(async): cancelling drops the future and the `Process` in it, whose drop
                 // stops the child with SIGTERM; PHP sends SIGINT first and then calls `stop(1)`.
-                runtime_throw("Aborted process".to_string()),
+                runtime_throw("Aborted process"),
                 future,
             ))
         }
-        "wait" | "countActiveJobs" => dispatch_tick_method(
+        b"wait" | b"countActiveJobs" => dispatch_tick_method(
             JobOwner::process_executor(process),
             PROCESS_EXECUTOR_TICK_CAP,
             method_name,
             args,
         ),
-        other => Err(runtime_throw(format!(
-            "unknown ProcessExecutor method `{other}`"
+        other => Err(runtime_throw(bconcat!(
+            "unknown ProcessExecutor method `",
+            other,
+            "`"
         ))),
     }
 }
@@ -1785,29 +1818,29 @@ fn dispatch_process_executor_method(
 /// defaults and the parallel-request budget single-sourced across the boundary.
 fn dispatch_http_downloader_method(
     downloader: &std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getOptions" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
+    match method_name.as_bytes() {
+        b"getOptions" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
             downloader.borrow().get_options().clone(),
         ))),
-        "setOptions" => {
+        b"setOptions" => {
             let options = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
             downloader.borrow_mut().set_options(options);
             Ok(PluginValue::Null)
         }
-        "get" => {
+        b"get" => {
             let url = arg::<BString>(method_name, args, 0)?;
             let options =
                 arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 1, IndexMap::new())?;
             let response = downloader
                 .borrow()
                 .get(&url, options)
-                .map_err(|error| error_throw("get failed", &error))?;
+                .map_err(|error| error_throw(b"get failed", &error))?;
             Ok(response_to_wire(&response))
         }
-        "copy" => {
+        b"copy" => {
             let url = arg::<BString>(method_name, args, 0)?;
             let to = arg::<BString>(method_name, args, 1)?;
             let options =
@@ -1815,10 +1848,10 @@ fn dispatch_http_downloader_method(
             let response = downloader
                 .borrow()
                 .copy(&url, path_from_bytes(&to), options)
-                .map_err(|error| error_throw("copy failed", &error))?;
+                .map_err(|error| error_throw(b"copy failed", &error))?;
             Ok(response_to_wire(&response))
         }
-        "add" | "addCopy" => {
+        b"add" | b"addCopy" => {
             let url = arg::<BString>(method_name, args, 0)?;
             let (to, options_position) = if method_name == "add" {
                 (None, 1)
@@ -1832,7 +1865,7 @@ fn dispatch_http_downloader_method(
                 IndexMap::new(),
             )?;
             let failed =
-                |error: anyhow::Error| error_throw(&format!("{method_name} failed"), &error);
+                |error: anyhow::Error| error_throw(bconcat!(method_name, " failed"), &error);
             let started = std::rc::Rc::new(std::cell::Cell::new(false));
             // PHP raises the empty-url check and the async gate out of `add()`/`addCopy()`
             // itself, before the promise exists; only a failed request becomes a rejection.
@@ -1853,55 +1886,46 @@ fn dispatch_http_downloader_method(
                     rejected_promise(failed(error))
                 }
                 crate::util::http_downloader::HttpDownloaderJob::Pending(future) => {
-                    let method = method_name.to_string();
+                    let method = method_name.to_owned();
                     Ok(job_registry::register(
                         JobOwner::http_downloader(downloader),
                         downloader.clone(),
                         started,
                         error_throw(
-                            "",
+                            BStr::new(""),
                             &crate::util::HttpDownloader::canceled(url.as_bstr()).into(),
                         ),
                         Box::pin(async move {
                             future
                                 .await
                                 .map(|response| response_to_wire(&response))
-                                .map_err(|error| error_throw(&format!("{method} failed"), &error))
+                                .map_err(|error| error_throw(bconcat!(method, " failed"), &error))
                         }),
                     ))
                 }
             }
         }
-        "enableAsync" => {
+        b"enableAsync" => {
             downloader.borrow_mut().enable_async();
             Ok(PluginValue::Null)
         }
-        "wait" | "countActiveJobs" => dispatch_tick_method(
+        b"wait" | b"countActiveJobs" => dispatch_tick_method(
             JobOwner::http_downloader(downloader),
             HTTP_DOWNLOADER_TICK_CAP,
             method_name,
             args,
         ),
-        other => Err(runtime_throw(format!(
-            "unknown HttpDownloader method `{other}`"
+        other => Err(runtime_throw(bconcat!(
+            "unknown HttpDownloader method `",
+            other,
+            "`"
         ))),
     }
 }
 
-/// `name` as the RPC layer carries a class or method name, which is text. PHP accepts any bytes in
-/// such a name; one that is not valid UTF-8 cannot be sent.
-pub(crate) fn rpc_name(name: &bstr::BStr) -> anyhow::Result<&str> {
-    utf8_text(name).ok_or_else(|| {
-        RuntimeException::new(format!(
-            "the PHP name {name:?} is not valid UTF-8 and cannot be sent to the PHP worker"
-        ))
-        .into()
-    })
-}
-
 /// Decodes the `string|non-empty-list<string>` a process executor takes as its command.
 fn exec_command_arg(
-    method: &str,
+    method: &BStr,
     args: &[PluginValue],
     position: usize,
 ) -> Result<crate::util::process_executor::CommandLine, PhpThrow> {
@@ -1917,9 +1941,15 @@ fn exec_command_arg(
                         parts.push(bytes.clone());
                     }
                     other => {
-                        return Err(runtime_throw(format!(
-                            "{method} expects a list of strings at position {position}, \
-                             but element {index} is {other:?}"
+                        return Err(runtime_throw(bconcat!(
+                            method,
+                            " expects a list of strings at position ",
+                            position,
+                            ", \
+                             but element ",
+                            index,
+                            " is ",
+                            display_to_bytes(format_args!("{other:?}"))
                         )));
                     }
                 }
@@ -1954,9 +1984,11 @@ fn is_php_callable(value: &PluginValue) -> anyhow::Result<bool> {
             ))?;
             match answer {
                 PluginValue::Bool(answer) => Ok(answer),
-                other => Err(anyhow::anyhow!(
-                    "is_callable did not return a bool over RPC: {other:?}"
-                )),
+                other => Err(RuntimeException::new(bconcat!(
+                    "is_callable did not return a bool over RPC: ",
+                    display_to_bytes(format_args!("{other:?}"))
+                ))
+                .into()),
             }
         }
         _ => Ok(false),
@@ -1995,14 +2027,15 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
             None | Some(PluginValue::Array(_)),
         ) => (class, method, Vec::new()),
         other => {
-            return Err(runtime_throw(format!(
+            return Err(runtime_throw(bconcat!(
                 "__shirabeCallStatic expects a class name, a method name and an argument list, \
-                 got {other:?}"
+                 got ",
+                display_to_bytes(format_args!("{other:?}"))
             )));
         }
     };
-    let name = format!("{}::{}", class.display_lossy(), method.display_lossy());
-    let string_arg = |position: usize| arg::<BString>(&name, &call_args, position);
+    let name = bconcat!(class, "::", method);
+    let string_arg = |position: usize| arg::<BString>(name.as_bstr(), &call_args, position);
     match (class.as_slice(), method.as_slice()) {
         (b"Composer\\Util\\Filesystem", b"isLocalPath") => {
             Ok(crate::util::Filesystem::is_local_path(&string_arg(0)?).to_plugin_value())
@@ -2013,13 +2046,13 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
         (b"Composer\\Package\\Locker", b"getContentHash") => {
             crate::package::Locker::get_content_hash(string_arg(0)?)
                 .map(PluginValue::string)
-                .map_err(|error| error_throw("getContentHash failed over RPC", &error))
+                .map_err(|error| error_throw(b"getContentHash failed over RPC", &error))
         }
         (b"Composer\\Util\\ProcessExecutor", b"getTimeout") => {
             Ok(crate::util::ProcessExecutor::get_timeout().to_plugin_value())
         }
         (b"Composer\\Util\\ProcessExecutor", b"setTimeout") => {
-            crate::util::ProcessExecutor::set_timeout(arg::<i64>(&name, &call_args, 0)?);
+            crate::util::ProcessExecutor::set_timeout(arg::<i64>(name.as_bstr(), &call_args, 0)?);
             Ok(PluginValue::Null)
         }
         // `escape(string|false|null $argument)` casts its argument to string first, which turns
@@ -2035,8 +2068,10 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
                 &argument,
             )))
         }
-        _ => Err(runtime_throw(format!(
-            "Shirabe does not support calling {name} from the plugin process yet"
+        _ => Err(runtime_throw(bconcat!(
+            "Shirabe does not support calling ",
+            name,
+            " from the plugin process yet"
         ))),
     }
 }
@@ -2045,20 +2080,21 @@ fn dispatch_event_dispatcher_method(
     dispatcher: &std::rc::Rc<
         std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>,
     >,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "dispatch" => {
+    match method_name.as_bytes() {
+        b"dispatch" => {
             let name = arg::<BString>(method_name, args, 0)?;
             let probe = crate::event_dispatcher::Event::from_name(name.clone());
             if dispatcher.borrow_mut().has_event_listeners(&probe) {
                 // TODO(plugin): dispatching a worker-constructed event through the Rust-side
                 // dispatcher needs the event object (and the console input it carries) proxied
                 // back into this process, so only the no-listener case is answered here.
-                return Err(runtime_throw(format!(
-                    "dispatching `{}` from the plugin process is not supported yet while listeners are registered for it",
-                    name.display_lossy()
+                return Err(runtime_throw(bconcat!(
+                    "dispatching `",
+                    name,
+                    "` from the plugin process is not supported yet while listeners are registered for it"
                 )));
             }
             // TODO(plugin): answering 0 here skips what `do_dispatch` does before it reaches the
@@ -2067,85 +2103,87 @@ fn dispatch_event_dispatcher_method(
             // (a nested dispatch of the same event name throws there even with no listeners).
             Ok(PluginValue::Int(0))
         }
-        other => Err(runtime_throw(format!(
-            "the EventDispatcher method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the EventDispatcher method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
 
 fn dispatch_locker_method(
     locker: &std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let failed =
-        |error: anyhow::Error| error_throw(&format!("{method_name} failed over RPC"), &error);
+        |error: anyhow::Error| error_throw(bconcat!(method_name, " failed over RPC"), &error);
     let with_dev_reqs = || arg_or::<bool>(method_name, args, 0, false);
-    match method_name {
-        "isLocked" => Ok(locker.borrow_mut().is_locked().to_plugin_value()),
-        "isFresh" => Ok(locker
+    match method_name.as_bytes() {
+        b"isLocked" => Ok(locker.borrow_mut().is_locked().to_plugin_value()),
+        b"isFresh" => Ok(locker
             .borrow_mut()
             .is_fresh()
             .map_err(failed)?
             .to_plugin_value()),
-        "getLockedRepository" => {
+        b"getLockedRepository" => {
             let repository = locker
                 .borrow_mut()
                 .get_locked_repository(with_dev_reqs()?)
                 .map_err(failed)?;
             repository_handle_value(&repository.into())
         }
-        "getDevPackageNames" => Ok(locker
+        b"getDevPackageNames" => Ok(locker
             .borrow_mut()
             .get_dev_package_names()
             .map_err(failed)?
             .to_plugin_value()),
-        "getPlatformRequirements" => Ok(locker
+        b"getPlatformRequirements" => Ok(locker
             .borrow_mut()
             .get_platform_requirements(with_dev_reqs()?)
             .map_err(failed)?
             .to_plugin_value()),
-        "getMinimumStability" => Ok(locker
+        b"getMinimumStability" => Ok(locker
             .borrow_mut()
             .get_minimum_stability()
             .map_err(failed)?
             .to_plugin_value()),
-        "getStabilityFlags" => Ok(locker
+        b"getStabilityFlags" => Ok(locker
             .borrow_mut()
             .get_stability_flags()
             .map_err(failed)?
             .to_plugin_value()),
-        "getPreferStable" => Ok(locker
+        b"getPreferStable" => Ok(locker
             .borrow_mut()
             .get_prefer_stable()
             .map_err(failed)?
             .to_plugin_value()),
-        "getPreferLowest" => Ok(locker
+        b"getPreferLowest" => Ok(locker
             .borrow_mut()
             .get_prefer_lowest()
             .map_err(failed)?
             .to_plugin_value()),
-        "getPlatformOverrides" => Ok(locker
+        b"getPlatformOverrides" => Ok(locker
             .borrow_mut()
             .get_platform_overrides()
             .map_err(failed)?
             .to_plugin_value()),
-        "getAliases" => Ok(locker
+        b"getAliases" => Ok(locker
             .borrow_mut()
             .get_aliases()
             .map_err(failed)?
             .to_plugin_value()),
-        "getPluginApi" => Ok(locker
+        b"getPluginApi" => Ok(locker
             .borrow_mut()
             .get_plugin_api()
             .map_err(failed)?
             .to_plugin_value()),
-        "getLockData" => Ok(locker
+        b"getLockData" => Ok(locker
             .borrow_mut()
             .get_lock_data()
             .map_err(failed)?
             .to_plugin_value()),
-        "setLockData" => {
+        b"setLockData" => {
             let written = locker
                 .borrow_mut()
                 .set_lock_data(
@@ -2164,7 +2202,7 @@ fn dispatch_locker_method(
                 .map_err(failed)?;
             Ok(written.to_plugin_value())
         }
-        "getMissingRequirementInfo" => {
+        b"getMissingRequirementInfo" => {
             let package = root_package_arg(method_name, args, 0)?;
             let include_dev = arg::<bool>(method_name, args, 1)?;
             Ok(locker
@@ -2175,50 +2213,58 @@ fn dispatch_locker_method(
         }
         // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out and
         // no plugin holds a JsonFile it could pass to `updateHash()`.
-        "getJsonFile" | "updateHash" => Err(runtime_throw(format!(
-            "the Locker method `{method_name}` is not available over RPC yet: JsonFile cannot cross the boundary"
+        b"getJsonFile" | b"updateHash" => Err(runtime_throw(bconcat!(
+            "the Locker method `",
+            method_name,
+            "` is not available over RPC yet: JsonFile cannot cross the boundary"
         ))),
-        other => Err(runtime_throw(format!(
-            "the Locker method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the Locker method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
 
 fn dispatch_repository_manager_method(
     rm: &std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
-    method_name: &str,
+    method_name: &BStr,
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getLocalRepository" => repository_handle_value(&rm.borrow().get_local_repository()),
+    match method_name.as_bytes() {
+        b"getLocalRepository" => repository_handle_value(&rm.borrow().get_local_repository()),
         // TODO(plugin): the remaining RepositoryManager surface is widened on demand, driven
         // by explicit errors from real plugins.
-        other => Err(runtime_throw(format!(
-            "the RepositoryManager method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the RepositoryManager method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
 
 fn dispatch_repository_method(
     repository: &RepositoryInterfaceHandle,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "hasPackage" => {
+    match method_name.as_bytes() {
+        b"hasPackage" => {
             let package = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
             let has = repository
                 .has_package(package)
-                .map_err(|error| error_throw("hasPackage failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"hasPackage failed over RPC", &error))?;
             Ok(has.to_plugin_value())
         }
-        "addPackage" | "removePackage" => {
+        b"addPackage" | b"removePackage" => {
             let package = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
             let mut borrowed = repository.borrow_mut();
             let writable = borrowed
                 .as_writable_repository_interface_mut()
                 .ok_or_else(|| {
-                    runtime_throw(format!(
-                        "the repository behind this handle is not writable, so `{method_name}` cannot be called on it"
+                    runtime_throw(bconcat!(
+                        "the repository behind this handle is not writable, so `",
+                        method_name,
+                        "` cannot be called on it"
                     ))
                 })?;
             let outcome = if method_name == "addPackage" {
@@ -2227,39 +2273,38 @@ fn dispatch_repository_method(
                 writable.remove_package(package)
             };
             outcome
-                .map_err(|error| error_throw(&format!("{method_name} failed over RPC"), &error))?;
+                .map_err(|error| error_throw(bconcat!(method_name, " failed over RPC"), &error))?;
             Ok(PluginValue::Null)
         }
-        "getPackages" => {
+        b"getPackages" => {
             let packages = repository
                 .borrow_mut()
                 .get_packages()
-                .map_err(|error| error_throw("getPackages failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"getPackages failed over RPC", &error))?;
             let mut items = Vec::with_capacity(packages.len());
             for package in packages {
                 items.push(package_handle_value(package.as_rc()));
             }
             Ok(PluginValue::List(items))
         }
-        "getCanonicalPackages" => {
+        b"getCanonicalPackages" => {
             let mut borrowed = repository.borrow_mut();
             let writable = borrowed
                 .as_writable_repository_interface_mut()
                 .ok_or_else(|| {
-                    runtime_throw(
-                        "the repository behind this handle is not writable, so `getCanonicalPackages` cannot be called on it"
-                            .to_string(),
-                    )
+                    runtime_throw("the repository behind this handle is not writable, so `getCanonicalPackages` cannot be called on it")
                 })?;
             let packages = writable
                 .get_canonical_packages()
-                .map_err(|error| error_throw("getCanonicalPackages failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"getCanonicalPackages failed over RPC", &error))?;
             Ok(packages.to_plugin_value())
         }
         // TODO(plugin): the remaining RepositoryInterface surface is widened on demand,
         // driven by explicit errors from real plugins.
-        other => Err(runtime_throw(format!(
-            "the repository method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the repository method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
@@ -2268,7 +2313,7 @@ fn dispatch_repository_method(
 /// way PHP's `null` does; a parameter's own default belongs to `arg_or`.
 trait FromPluginArg: Sized {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow>;
@@ -2281,7 +2326,7 @@ pub(crate) trait ToPluginValue {
 
 /// Decodes the argument at `position`.
 fn arg<T: FromPluginArg>(
-    method: &str,
+    method: &BStr,
     args: &[PluginValue],
     position: usize,
 ) -> Result<T, PhpThrow> {
@@ -2291,7 +2336,7 @@ fn arg<T: FromPluginArg>(
 /// Decodes the argument at `position` for a parameter whose PHP declaration carries a default:
 /// an omitted argument, and the `null` PHP passes in its place, take `default`.
 fn arg_or<T: FromPluginArg>(
-    method: &str,
+    method: &BStr,
     args: &[PluginValue],
     position: usize,
     default: T,
@@ -2303,19 +2348,25 @@ fn arg_or<T: FromPluginArg>(
 }
 
 fn arg_throw(
-    method: &str,
+    method: &BStr,
     position: usize,
-    expected: &str,
+    expected: impl AsRef<[u8]>,
     value: Option<&PluginValue>,
 ) -> PhpThrow {
-    runtime_throw(format!(
-        "{method} expects {expected} at position {position}, got {value:?}"
+    runtime_throw(bconcat!(
+        method,
+        " expects ",
+        expected.as_ref(),
+        " at position ",
+        position,
+        ", got ",
+        display_to_bytes(format_args!("{value:?}"))
     ))
 }
 
 impl FromPluginArg for bool {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2328,7 +2379,7 @@ impl FromPluginArg for bool {
 
 impl FromPluginArg for i64 {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2339,26 +2390,9 @@ impl FromPluginArg for i64 {
     }
 }
 
-/// For an argument that is text by contract, such as a class, event or setting name. Invalid
-/// UTF-8 is refused; data arguments decode as `BString`.
-impl FromPluginArg for String {
-    fn from_arg(
-        method: &str,
-        position: usize,
-        value: Option<&PluginValue>,
-    ) -> Result<Self, PhpThrow> {
-        match value {
-            Some(PluginValue::String(bytes)) => utf8_text(bytes)
-                .map(str::to_owned)
-                .ok_or_else(|| arg_throw(method, position, "valid UTF-8 text", value)),
-            other => Err(arg_throw(method, position, "a string", other)),
-        }
-    }
-}
-
 impl FromPluginArg for bstr::BString {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2371,15 +2405,19 @@ impl FromPluginArg for bstr::BString {
 
 impl FromPluginArg for PhpMixed {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
         match value {
             None => Ok(PhpMixed::Null),
             Some(value) => value.to_php_mixed().map_err(|error| {
-                runtime_throw(format!(
-                    "{method} could not decode its argument at position {position}: {error:#}"
+                runtime_throw(bconcat!(
+                    method,
+                    " could not decode its argument at position ",
+                    position,
+                    ": ",
+                    error_chain_message(&error)
                 ))
             }),
         }
@@ -2388,7 +2426,7 @@ impl FromPluginArg for PhpMixed {
 
 impl<T: FromPluginArg> FromPluginArg for Option<T> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2403,7 +2441,7 @@ impl<T: FromPluginArg> FromPluginArg for Option<T> {
 /// documented.
 impl<T: FromPluginArg> FromPluginArg for Vec<T> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2423,7 +2461,7 @@ impl<T: FromPluginArg> FromPluginArg for Vec<T> {
 /// the wire, so it decodes here as an empty map; a non-empty list decodes under its int keys.
 impl<T: FromPluginArg> FromPluginArg for IndexMap<BString, T> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2434,7 +2472,7 @@ impl<T: FromPluginArg> FromPluginArg for IndexMap<BString, T> {
             Some(PluginValue::List(items)) => items
                 .iter()
                 .enumerate()
-                .map(|(index, item)| (index.to_string().into(), item))
+                .map(|(index, item)| (bconcat!(index), item))
                 .collect(),
             other => return Err(arg_throw(method, position, "an array", other)),
         };
@@ -2447,7 +2485,7 @@ impl<T: FromPluginArg> FromPluginArg for IndexMap<BString, T> {
 
 impl FromPluginArg for crate::package::Link {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2460,7 +2498,7 @@ impl FromPluginArg for crate::package::Link {
 
 impl FromPluginArg for crate::package::Mirror {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2471,8 +2509,10 @@ impl FromPluginArg for crate::package::Mirror {
         let url = match row.get(b"url".as_slice()) {
             Some(PluginValue::String(url)) => url.clone(),
             other => {
-                return Err(runtime_throw(format!(
-                    "{method} expects a string `url` in every mirror, got {other:?}"
+                return Err(runtime_throw(bconcat!(
+                    method,
+                    " expects a string `url` in every mirror, got ",
+                    display_to_bytes(format_args!("{other:?}"))
                 )));
             }
         };
@@ -2487,7 +2527,7 @@ impl FromPluginArg for crate::package::Mirror {
 /// Resolves a package argument back to the Rust-side entity its proxy stub stands for.
 impl FromPluginArg for PackageInterfaceHandle {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2497,8 +2537,9 @@ impl FromPluginArg for PackageInterfaceHandle {
                     Some(RustEntity::Package(package)) => {
                         Ok(PackageInterfaceHandle::from_rc_unchecked(package))
                     }
-                    _ => Err(runtime_throw(format!(
-                        "{method} expects a package handle, got Rust handle {}",
+                    _ => Err(runtime_throw(bconcat!(
+                        method,
+                        " expects a package handle, got Rust handle ",
                         handle.rhandle
                     ))),
                 }
@@ -2511,7 +2552,7 @@ impl FromPluginArg for PackageInterfaceHandle {
 /// Resolves an IO argument back to the Rust-side entity its proxy stub stands for.
 impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2519,8 +2560,9 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
             Some(PluginValue::RustHandle(handle)) => {
                 match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
                     Some(RustEntity::Io(io)) => Ok(io),
-                    _ => Err(runtime_throw(format!(
-                        "{method} expects an IO handle, got Rust handle {}",
+                    _ => Err(runtime_throw(bconcat!(
+                        method,
+                        " expects an IO handle, got Rust handle ",
                         handle.rhandle
                     ))),
                 }
@@ -2533,7 +2575,7 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 /// Resolves a config argument back to the Rust-side entity its proxy stub stands for.
 impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2541,8 +2583,9 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
             Some(PluginValue::RustHandle(handle)) => {
                 match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
                     Some(RustEntity::Config(config)) => Ok(config),
-                    _ => Err(runtime_throw(format!(
-                        "{method} expects a Config handle, got Rust handle {}",
+                    _ => Err(runtime_throw(bconcat!(
+                        method,
+                        " expects a Config handle, got Rust handle ",
                         handle.rhandle
                     ))),
                 }
@@ -2556,7 +2599,7 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
 /// for.
 impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2564,8 +2607,9 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInt
             Some(PluginValue::RustHandle(handle)) => {
                 match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
                     Some(RustEntity::InstallationManager(im)) => Ok(im),
-                    _ => Err(runtime_throw(format!(
-                        "{method} expects an InstallationManager handle, got Rust handle {}",
+                    _ => Err(runtime_throw(bconcat!(
+                        method,
+                        " expects an InstallationManager handle, got Rust handle ",
                         handle.rhandle
                     ))),
                 }
@@ -2577,7 +2621,7 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInt
 
 impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2585,8 +2629,9 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
             Some(PluginValue::RustHandle(handle)) => {
                 match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
                     Some(RustEntity::Locker(locker)) => Ok(locker),
-                    _ => Err(runtime_throw(format!(
-                        "{method} expects a Locker handle, got Rust handle {}",
+                    _ => Err(runtime_throw(bconcat!(
+                        method,
+                        " expects a Locker handle, got Rust handle ",
                         handle.rhandle
                     ))),
                 }
@@ -2599,7 +2644,7 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
 /// Resolves a downloader argument back to the Rust-side entity its proxy stub stands for.
 impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2607,8 +2652,9 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloade
             Some(PluginValue::RustHandle(handle)) => {
                 match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
                     Some(RustEntity::HttpDownloader(downloader)) => Ok(downloader),
-                    _ => Err(runtime_throw(format!(
-                        "{method} expects an HttpDownloader handle, got Rust handle {}",
+                    _ => Err(runtime_throw(bconcat!(
+                        method,
+                        " expects an HttpDownloader handle, got Rust handle ",
                         handle.rhandle
                     ))),
                 }
@@ -2621,7 +2667,7 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloade
 /// Resolves a process executor argument back to the Rust-side entity its proxy stub stands for.
 impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2629,8 +2675,9 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecut
             Some(PluginValue::RustHandle(handle)) => {
                 match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
                     Some(RustEntity::ProcessExecutor(process)) => Ok(process),
-                    _ => Err(runtime_throw(format!(
-                        "{method} expects a ProcessExecutor handle, got Rust handle {}",
+                    _ => Err(runtime_throw(bconcat!(
+                        method,
+                        " expects a ProcessExecutor handle, got Rust handle ",
                         handle.rhandle
                     ))),
                 }
@@ -2643,7 +2690,7 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecut
 /// Resolves a repository argument back to the Rust-side entity its proxy stub stands for.
 impl FromPluginArg for RepositoryInterfaceHandle {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2651,8 +2698,9 @@ impl FromPluginArg for RepositoryInterfaceHandle {
             Some(PluginValue::RustHandle(handle)) => {
                 match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
                     Some(RustEntity::Repository(repository)) => Ok(repository),
-                    _ => Err(runtime_throw(format!(
-                        "{method} expects a repository handle, got Rust handle {}",
+                    _ => Err(runtime_throw(bconcat!(
+                        method,
+                        " expects a repository handle, got Rust handle ",
                         handle.rhandle
                     ))),
                 }
@@ -2664,7 +2712,7 @@ impl FromPluginArg for RepositoryInterfaceHandle {
 
 impl FromPluginArg for chrono::DateTime<chrono::Utc> {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2677,7 +2725,7 @@ impl FromPluginArg for chrono::DateTime<chrono::Utc> {
 
 impl FromPluginArg for PhpObjHandle {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2690,7 +2738,7 @@ impl FromPluginArg for PhpObjHandle {
 
 impl FromPluginArg for DisplayMode {
     fn from_arg(
-        method: &str,
+        method: &BStr,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
@@ -2726,12 +2774,6 @@ impl ToPluginValue for i64 {
     }
 }
 
-impl ToPluginValue for String {
-    fn to_plugin_value(self) -> PluginValue {
-        PluginValue::string(self)
-    }
-}
-
 impl ToPluginValue for BString {
     fn to_plugin_value(self) -> PluginValue {
         PluginValue::String(self)
@@ -2753,12 +2795,6 @@ impl ToPluginValue for std::path::PathBuf {
 impl ToPluginValue for &std::path::Path {
     fn to_plugin_value(self) -> PluginValue {
         PluginValue::string(path_to_bytes(self))
-    }
-}
-
-impl ToPluginValue for &str {
-    fn to_plugin_value(self) -> PluginValue {
-        PluginValue::string(self)
     }
 }
 
@@ -2835,61 +2871,63 @@ impl ToPluginValue for chrono::DateTime<chrono::Utc> {
 /// does not carry. `None` means the method belongs to the base surface below.
 fn dispatch_complete_package_getter(
     package: &AnyPackage,
-    method_name: &str,
+    method_name: &BStr,
 ) -> Result<Option<PluginValue>, PhpThrow> {
     let unavailable = || {
-        runtime_throw(format!(
-            "`{method_name}` is not available on this package over RPC"
+        runtime_throw(bconcat!(
+            "`",
+            method_name,
+            "` is not available on this package over RPC"
         ))
     };
-    let value = match method_name {
-        "getScripts"
-        | "getRepositories"
-        | "getLicense"
-        | "getKeywords"
-        | "getDescription"
-        | "getHomepage"
-        | "getAuthors"
-        | "getSupport"
-        | "getFunding"
-        | "isAbandoned"
-        | "getReplacementPackage"
-        | "getArchiveName"
-        | "getArchiveExcludes" => {
+    let value = match method_name.as_bytes() {
+        b"getScripts"
+        | b"getRepositories"
+        | b"getLicense"
+        | b"getKeywords"
+        | b"getDescription"
+        | b"getHomepage"
+        | b"getAuthors"
+        | b"getSupport"
+        | b"getFunding"
+        | b"isAbandoned"
+        | b"getReplacementPackage"
+        | b"getArchiveName"
+        | b"getArchiveExcludes" => {
             let package = package
                 .as_complete_package_interface()
                 .ok_or_else(unavailable)?;
-            match method_name {
-                "getScripts" => package.get_scripts().to_plugin_value(),
-                "getRepositories" => package.get_repositories().to_plugin_value(),
-                "getLicense" => package.get_license().to_plugin_value(),
-                "getKeywords" => package.get_keywords().to_plugin_value(),
-                "getDescription" => package.get_description().to_plugin_value(),
-                "getHomepage" => package.get_homepage().to_plugin_value(),
-                "getAuthors" => package.get_authors().to_plugin_value(),
-                "getSupport" => package.get_support().to_plugin_value(),
-                "getFunding" => package.get_funding().to_plugin_value(),
-                "isAbandoned" => PluginValue::Bool(package.is_abandoned()),
-                "getReplacementPackage" => package.get_replacement_package().to_plugin_value(),
-                "getArchiveName" => package.get_archive_name().to_plugin_value(),
+            match method_name.as_bytes() {
+                b"getScripts" => package.get_scripts().to_plugin_value(),
+                b"getRepositories" => package.get_repositories().to_plugin_value(),
+                b"getLicense" => package.get_license().to_plugin_value(),
+                b"getKeywords" => package.get_keywords().to_plugin_value(),
+                b"getDescription" => package.get_description().to_plugin_value(),
+                b"getHomepage" => package.get_homepage().to_plugin_value(),
+                b"getAuthors" => package.get_authors().to_plugin_value(),
+                b"getSupport" => package.get_support().to_plugin_value(),
+                b"getFunding" => package.get_funding().to_plugin_value(),
+                b"isAbandoned" => PluginValue::Bool(package.is_abandoned()),
+                b"getReplacementPackage" => package.get_replacement_package().to_plugin_value(),
+                b"getArchiveName" => package.get_archive_name().to_plugin_value(),
                 _ => package.get_archive_excludes().to_plugin_value(),
             }
         }
-        "getAliases"
-        | "getMinimumStability"
-        | "getStabilityFlags"
-        | "getReferences"
-        | "getPreferStable"
-        | "getConfig" => {
+        b"getAliases"
+        | b"getMinimumStability"
+        | b"getStabilityFlags"
+        | b"getReferences"
+        | b"getPreferStable"
+        | b"getConfig" => {
             let package = package
                 .as_root_package_interface()
                 .ok_or_else(unavailable)?;
-            match method_name {
-                "getAliases" => package.get_aliases().to_plugin_value(),
-                "getMinimumStability" => PluginValue::string(package.get_minimum_stability()),
-                "getStabilityFlags" => package.get_stability_flags().to_plugin_value(),
-                "getReferences" => package.get_references().to_plugin_value(),
-                "getPreferStable" => PluginValue::Bool(package.get_prefer_stable()),
+            match method_name.as_bytes() {
+                b"getAliases" => package.get_aliases().to_plugin_value(),
+                b"getMinimumStability" => PluginValue::string(package.get_minimum_stability()),
+                b"getStabilityFlags" => package.get_stability_flags().to_plugin_value(),
+                b"getReferences" => package.get_references().to_plugin_value(),
+                b"getPreferStable" => PluginValue::Bool(package.get_prefer_stable()),
                 _ => package.get_config().to_plugin_value(),
             }
         }
@@ -2900,39 +2938,39 @@ fn dispatch_complete_package_getter(
 
 fn dispatch_package_method(
     package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "setId" => {
+    match method_name.as_bytes() {
+        b"setId" => {
             let id = arg::<i64>(method_name, args, 0)?;
             package.borrow_mut().as_package_interface_mut().set_id(id);
             return Ok(PluginValue::Null);
         }
-        "setInstallationSource"
-        | "setSourceReference"
-        | "setSourceUrl"
-        | "setDistUrl"
-        | "setDistType"
-        | "setDistReference"
-        | "setSourceDistReferences" => {
+        b"setInstallationSource"
+        | b"setSourceReference"
+        | b"setSourceUrl"
+        | b"setDistUrl"
+        | b"setDistType"
+        | b"setDistReference"
+        | b"setSourceDistReferences" => {
             let value = arg::<Option<BString>>(method_name, args, 0)?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_interface_mut();
-            match method_name {
-                "setInstallationSource" => package.set_installation_source(value),
-                "setSourceReference" => package.set_source_reference(value),
-                "setSourceUrl" => package.set_source_url(value),
-                "setDistUrl" => package.set_dist_url(value),
-                "setDistType" => package.set_dist_type(value),
-                "setDistReference" => package.set_dist_reference(value),
+            match method_name.as_bytes() {
+                b"setInstallationSource" => package.set_installation_source(value),
+                b"setSourceReference" => package.set_source_reference(value),
+                b"setSourceUrl" => package.set_source_url(value),
+                b"setDistUrl" => package.set_dist_url(value),
+                b"setDistType" => package.set_dist_type(value),
+                b"setDistReference" => package.set_dist_reference(value),
                 _ => package.set_source_dist_references(value.ok_or_else(|| {
-                    runtime_throw("setSourceDistReferences expects a reference string".to_string())
+                    runtime_throw("setSourceDistReferences expects a reference string")
                 })?),
             }
             return Ok(PluginValue::Null);
         }
-        "setSourceMirrors" | "setDistMirrors" => {
+        b"setSourceMirrors" | b"setDistMirrors" => {
             let mirrors = arg::<Option<Vec<crate::package::Mirror>>>(method_name, args, 0)?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_interface_mut();
@@ -2943,16 +2981,16 @@ fn dispatch_package_method(
             }
             return Ok(PluginValue::Null);
         }
-        "setRepository" => {
+        b"setRepository" => {
             let repository = arg::<RepositoryInterfaceHandle>(method_name, args, 0)?;
             package
                 .borrow_mut()
                 .as_package_interface_mut()
                 .set_repository(repository)
-                .map_err(|error| error_throw("setRepository failed", &error))?;
+                .map_err(|error| error_throw(b"setRepository failed", &error))?;
             return Ok(PluginValue::Null);
         }
-        "setTransportOptions" => {
+        b"setTransportOptions" => {
             let options =
                 arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 0, IndexMap::new())?;
             package
@@ -2972,21 +3010,21 @@ fn dispatch_package_method(
         // equivalent only while that impl keeps delegating to the base package, and nothing
         // checks it. Method names repeated in the base-package arm below make the answer depend
         // on arm order, and a new variant compiles into the wrong body without a diagnostic.
-        "setRequires" | "setDevRequires" | "setConflicts" | "setProvides" | "setReplaces"
-        | "setAutoload" | "setDevAutoload" | "setSuggests" | "setExtra"
+        b"setRequires" | b"setDevRequires" | b"setConflicts" | b"setProvides" | b"setReplaces"
+        | b"setAutoload" | b"setDevAutoload" | b"setSuggests" | b"setExtra"
             if package.borrow().is_root() =>
         {
             let mut borrowed = package.borrow_mut();
             let package = borrowed
                 .as_root_package_interface_mut()
                 .expect("a root package exposes RootPackageInterface");
-            match method_name {
-                "setRequires" => package.set_requires(arg_or::<
+            match method_name.as_bytes() {
+                b"setRequires" => package.set_requires(arg_or::<
                     IndexMap<BString, crate::package::Link>,
                 >(
                     method_name, args, 0, IndexMap::new()
                 )?),
-                "setDevRequires" => {
+                b"setDevRequires" => {
                     package.set_dev_requires(arg_or::<IndexMap<BString, crate::package::Link>>(
                         method_name,
                         args,
@@ -2994,30 +3032,30 @@ fn dispatch_package_method(
                         IndexMap::new(),
                     )?)
                 }
-                "setConflicts" => package.set_conflicts(arg_or::<
+                b"setConflicts" => package.set_conflicts(arg_or::<
                     IndexMap<BString, crate::package::Link>,
                 >(
                     method_name, args, 0, IndexMap::new()
                 )?),
-                "setProvides" => package.set_provides(arg_or::<
+                b"setProvides" => package.set_provides(arg_or::<
                     IndexMap<BString, crate::package::Link>,
                 >(
                     method_name, args, 0, IndexMap::new()
                 )?),
-                "setReplaces" => package.set_replaces(arg_or::<
+                b"setReplaces" => package.set_replaces(arg_or::<
                     IndexMap<BString, crate::package::Link>,
                 >(
                     method_name, args, 0, IndexMap::new()
                 )?),
-                "setAutoload" => {
+                b"setAutoload" => {
                     package.set_autoload(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<BString, PhpMixed>>(
+                b"setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<BString, PhpMixed>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setSuggests" => {
+                b"setSuggests" => {
                     package.set_suggests(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
                 }
                 _ => package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?),
@@ -3027,64 +3065,66 @@ fn dispatch_package_method(
         // `Package`'s own setters. The concrete subclasses inherit them (their PHP overrides in
         // `RootPackage` delegate to the same base state), so the base package answers for every
         // real variant.
-        "setType"
-        | "setTargetDir"
-        | "setExtra"
-        | "setBinaries"
-        | "setSourceType"
-        | "setDistSha1Checksum"
-        | "setSuggests"
-        | "setAutoload"
-        | "setDevAutoload"
-        | "setIncludePaths"
-        | "setPhpExt"
-        | "setNotificationUrl"
-        | "setIsDefaultBranch"
-        | "replaceVersion" => {
+        b"setType"
+        | b"setTargetDir"
+        | b"setExtra"
+        | b"setBinaries"
+        | b"setSourceType"
+        | b"setDistSha1Checksum"
+        | b"setSuggests"
+        | b"setAutoload"
+        | b"setDevAutoload"
+        | b"setIncludePaths"
+        | b"setPhpExt"
+        | b"setNotificationUrl"
+        | b"setIsDefaultBranch"
+        | b"replaceVersion" => {
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
-                runtime_throw(format!(
-                    "`{method_name}` is not available on an alias package over RPC"
+                runtime_throw(bconcat!(
+                    "`",
+                    method_name,
+                    "` is not available on an alias package over RPC"
                 ))
             })?;
-            match method_name {
-                "setType" => package.set_type(arg::<BString>(method_name, args, 0)?),
-                "setTargetDir" => {
+            match method_name.as_bytes() {
+                b"setType" => package.set_type(arg::<BString>(method_name, args, 0)?),
+                b"setTargetDir" => {
                     package.set_target_dir(arg::<Option<BString>>(method_name, args, 0)?)
                 }
-                "setExtra" => {
+                b"setExtra" => {
                     package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setBinaries" => package.set_binaries(arg::<Vec<BString>>(method_name, args, 0)?),
-                "setSourceType" => {
+                b"setBinaries" => package.set_binaries(arg::<Vec<BString>>(method_name, args, 0)?),
+                b"setSourceType" => {
                     package.set_source_type(arg::<Option<BString>>(method_name, args, 0)?)
                 }
-                "setDistSha1Checksum" => {
+                b"setDistSha1Checksum" => {
                     package.set_dist_sha1_checksum(arg::<Option<BString>>(method_name, args, 0)?)
                 }
-                "setSuggests" => {
+                b"setSuggests" => {
                     package.set_suggests(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
                 }
-                "setAutoload" => {
+                b"setAutoload" => {
                     package.set_autoload(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<BString, PhpMixed>>(
+                b"setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<BString, PhpMixed>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setIncludePaths" => {
+                b"setIncludePaths" => {
                     package.set_include_paths(arg::<Vec<BString>>(method_name, args, 0)?)
                 }
-                "setPhpExt" => package.set_php_ext(arg::<Option<IndexMap<BString, PhpMixed>>>(
+                b"setPhpExt" => package.set_php_ext(arg::<Option<IndexMap<BString, PhpMixed>>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setNotificationUrl" => {
+                b"setNotificationUrl" => {
                     package.set_notification_url(arg::<BString>(method_name, args, 0)?)
                 }
-                "setIsDefaultBranch" => {
+                b"setIsDefaultBranch" => {
                     package.set_is_default_branch(arg::<bool>(method_name, args, 0)?)
                 }
                 _ => package.replace_version(
@@ -3094,7 +3134,7 @@ fn dispatch_package_method(
             }
             return Ok(PluginValue::Null);
         }
-        "setRequires" | "setConflicts" | "setProvides" | "setReplaces" | "setDevRequires" => {
+        b"setRequires" | b"setConflicts" | b"setProvides" | b"setReplaces" | b"setDevRequires" => {
             let links = arg_or::<IndexMap<BString, crate::package::Link>>(
                 method_name,
                 args,
@@ -3103,101 +3143,116 @@ fn dispatch_package_method(
             )?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
-                runtime_throw(format!(
-                    "`{method_name}` is not available on an alias package over RPC"
+                runtime_throw(bconcat!(
+                    "`",
+                    method_name,
+                    "` is not available on an alias package over RPC"
                 ))
             })?;
-            match method_name {
-                "setRequires" => package.set_requires(links),
-                "setConflicts" => package.set_conflicts(links),
-                "setProvides" => package.set_provides(links),
-                "setReplaces" => package.set_replaces(links),
+            match method_name.as_bytes() {
+                b"setRequires" => package.set_requires(links),
+                b"setConflicts" => package.set_conflicts(links),
+                b"setProvides" => package.set_provides(links),
+                b"setReplaces" => package.set_replaces(links),
                 _ => package.set_dev_requires(links),
             }
             return Ok(PluginValue::Null);
         }
-        "setReleaseDate" => {
+        b"setReleaseDate" => {
             let date = arg::<Option<chrono::DateTime<chrono::Utc>>>(method_name, args, 0)?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
-                runtime_throw(
-                    "`setReleaseDate` is not available on an alias package over RPC".to_string(),
-                )
+                runtime_throw("`setReleaseDate` is not available on an alias package over RPC")
             })?;
             package.set_release_date(date);
             return Ok(PluginValue::Null);
         }
-        "setScripts" | "setRepositories" | "setLicense" | "setKeywords" | "setDescription"
-        | "setHomepage" | "setAuthors" | "setSupport" | "setFunding" | "setAbandoned"
-        | "setArchiveName" | "setArchiveExcludes" => {
+        b"setScripts"
+        | b"setRepositories"
+        | b"setLicense"
+        | b"setKeywords"
+        | b"setDescription"
+        | b"setHomepage"
+        | b"setAuthors"
+        | b"setSupport"
+        | b"setFunding"
+        | b"setAbandoned"
+        | b"setArchiveName"
+        | b"setArchiveExcludes" => {
             let mut borrowed = package.borrow_mut();
             let package = borrowed
                 .as_complete_package_interface_mut()
                 .ok_or_else(|| {
-                    runtime_throw(format!(
-                        "`{method_name}` is not available on this package over RPC"
+                    runtime_throw(bconcat!(
+                        "`",
+                        method_name,
+                        "` is not available on this package over RPC"
                     ))
                 })?;
-            match method_name {
-                "setScripts" => package.set_scripts(arg::<IndexMap<BString, Vec<BString>>>(
+            match method_name.as_bytes() {
+                b"setScripts" => package.set_scripts(arg::<IndexMap<BString, Vec<BString>>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setRepositories" => package.set_repositories(arg::<IndexMap<BString, PhpMixed>>(
+                b"setRepositories" => package.set_repositories(arg::<IndexMap<BString, PhpMixed>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setLicense" => package.set_license(arg::<Vec<BString>>(method_name, args, 0)?),
-                "setKeywords" => package.set_keywords(arg::<Vec<BString>>(method_name, args, 0)?),
-                "setDescription" => package.set_description(arg::<BString>(method_name, args, 0)?),
-                "setHomepage" => package.set_homepage(arg::<BString>(method_name, args, 0)?),
-                "setAuthors" => package.set_authors(arg::<Vec<IndexMap<BString, BString>>>(
+                b"setLicense" => package.set_license(arg::<Vec<BString>>(method_name, args, 0)?),
+                b"setKeywords" => package.set_keywords(arg::<Vec<BString>>(method_name, args, 0)?),
+                b"setDescription" => package.set_description(arg::<BString>(method_name, args, 0)?),
+                b"setHomepage" => package.set_homepage(arg::<BString>(method_name, args, 0)?),
+                b"setAuthors" => package.set_authors(arg::<Vec<IndexMap<BString, BString>>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setSupport" => {
+                b"setSupport" => {
                     package.set_support(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
                 }
-                "setFunding" => package.set_funding(arg::<Vec<IndexMap<BString, PhpMixed>>>(
+                b"setFunding" => package.set_funding(arg::<Vec<IndexMap<BString, PhpMixed>>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setAbandoned" => package.set_abandoned(arg::<PhpMixed>(method_name, args, 0)?),
-                "setArchiveName" => package.set_archive_name(arg::<BString>(method_name, args, 0)?),
+                b"setAbandoned" => package.set_abandoned(arg::<PhpMixed>(method_name, args, 0)?),
+                b"setArchiveName" => {
+                    package.set_archive_name(arg::<BString>(method_name, args, 0)?)
+                }
                 _ => package.set_archive_excludes(arg::<Vec<BString>>(method_name, args, 0)?),
             }
             return Ok(PluginValue::Null);
         }
-        "setStabilityFlags"
-        | "setMinimumStability"
-        | "setPreferStable"
-        | "setConfig"
-        | "setReferences"
-        | "setAliases" => {
+        b"setStabilityFlags"
+        | b"setMinimumStability"
+        | b"setPreferStable"
+        | b"setConfig"
+        | b"setReferences"
+        | b"setAliases" => {
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_root_package_interface_mut().ok_or_else(|| {
-                runtime_throw(format!(
-                    "`{method_name}` is not available on this package over RPC"
+                runtime_throw(bconcat!(
+                    "`",
+                    method_name,
+                    "` is not available on this package over RPC"
                 ))
             })?;
-            match method_name {
-                "setStabilityFlags" => package.set_stability_flags(arg::<IndexMap<BString, i64>>(
+            match method_name.as_bytes() {
+                b"setStabilityFlags" => package.set_stability_flags(arg::<IndexMap<BString, i64>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setMinimumStability" => {
+                b"setMinimumStability" => {
                     package.set_minimum_stability(arg::<BString>(method_name, args, 0)?)
                 }
-                "setPreferStable" => package.set_prefer_stable(arg::<bool>(method_name, args, 0)?),
-                "setConfig" => {
+                b"setPreferStable" => package.set_prefer_stable(arg::<bool>(method_name, args, 0)?),
+                b"setConfig" => {
                     package.set_config(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setReferences" => {
+                b"setReferences" => {
                     package.set_references(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
                 }
                 _ => package.set_aliases(arg::<Vec<IndexMap<BString, BString>>>(
@@ -3208,36 +3263,35 @@ fn dispatch_package_method(
             }
             return Ok(PluginValue::Null);
         }
-        "equals" => {
+        b"equals" => {
             let other = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
             let this = PackageInterfaceHandle::from_rc_unchecked(package.clone());
             return Ok(this.equals(&other).to_plugin_value());
         }
         // The subclasses narrow `getAliasOf`'s return type to their own alias target, but every
         // variant holds the one entity.
-        "getAliasOf" | "isRootPackageAlias" | "hasSelfVersionRequires" => {
+        b"getAliasOf" | b"isRootPackageAlias" | b"hasSelfVersionRequires" => {
             let borrowed = package.borrow();
             let alias = borrowed.as_alias_package().ok_or_else(|| {
-                runtime_throw(format!(
-                    "`{method_name}` is not available on this package over RPC"
+                runtime_throw(bconcat!(
+                    "`",
+                    method_name,
+                    "` is not available on this package over RPC"
                 ))
             })?;
-            return Ok(match method_name {
-                "getAliasOf" => package_handle_value(alias.get_alias_of().as_rc()),
-                "isRootPackageAlias" => alias.is_root_package_alias().to_plugin_value(),
+            return Ok(match method_name.as_bytes() {
+                b"getAliasOf" => package_handle_value(alias.get_alias_of().as_rc()),
+                b"isRootPackageAlias" => alias.is_root_package_alias().to_plugin_value(),
                 _ => alias.has_self_version_requires().to_plugin_value(),
             });
         }
-        "setRootPackageAlias" => {
+        b"setRootPackageAlias" => {
             let value = arg::<bool>(method_name, args, 0)?;
             package
                 .borrow_mut()
                 .as_alias_package_mut()
                 .ok_or_else(|| {
-                    runtime_throw(
-                        "`setRootPackageAlias` is not available on this package over RPC"
-                            .to_string(),
-                    )
+                    runtime_throw("`setRootPackageAlias` is not available on this package over RPC")
                 })?
                 .set_root_package_alias(value);
             return Ok(PluginValue::Null);
@@ -3251,33 +3305,33 @@ fn dispatch_package_method(
 
     let borrowed = package.borrow();
     let package = borrowed.as_package_interface();
-    match method_name {
-        "getName" => Ok(package.get_name().to_plugin_value()),
-        "getPrettyName" => Ok(package.get_pretty_name().to_plugin_value()),
-        "getNames" => {
+    match method_name.as_bytes() {
+        b"getName" => Ok(package.get_name().to_plugin_value()),
+        b"getPrettyName" => Ok(package.get_pretty_name().to_plugin_value()),
+        b"getNames" => {
             let provides = arg_or::<bool>(method_name, args, 0, true)?;
             Ok(package.get_names(provides).to_plugin_value())
         }
-        "getId" => Ok(package.get_id().to_plugin_value()),
-        "isDev" => Ok(package.is_dev().to_plugin_value()),
-        "getType" => Ok(package.get_type().to_plugin_value()),
-        "getTargetDir" => Ok(package.get_target_dir().to_plugin_value()),
-        "getExtra" => Ok(package.get_extra().to_plugin_value()),
-        "getInstallationSource" => Ok(package.get_installation_source().to_plugin_value()),
-        "getSourceType" => Ok(package.get_source_type().to_plugin_value()),
-        "getSourceUrl" => Ok(package.get_source_url().to_plugin_value()),
-        "getSourceUrls" => Ok(package.get_source_urls().to_plugin_value()),
-        "getSourceReference" => Ok(package.get_source_reference().to_plugin_value()),
-        "getSourceMirrors" => Ok(package.get_source_mirrors().to_plugin_value()),
-        "getDistType" => Ok(package.get_dist_type().to_plugin_value()),
-        "getDistUrl" => Ok(package.get_dist_url().to_plugin_value()),
-        "getDistUrls" => Ok(package.get_dist_urls().to_plugin_value()),
-        "getDistReference" => Ok(package.get_dist_reference().to_plugin_value()),
-        "getDistSha1Checksum" => Ok(package.get_dist_sha1_checksum().to_plugin_value()),
-        "getDistMirrors" => Ok(package.get_dist_mirrors().to_plugin_value()),
-        "getVersion" => Ok(package.get_version().to_plugin_value()),
-        "getPrettyVersion" => Ok(package.get_pretty_version().to_plugin_value()),
-        "getFullPrettyVersion" => {
+        b"getId" => Ok(package.get_id().to_plugin_value()),
+        b"isDev" => Ok(package.is_dev().to_plugin_value()),
+        b"getType" => Ok(package.get_type().to_plugin_value()),
+        b"getTargetDir" => Ok(package.get_target_dir().to_plugin_value()),
+        b"getExtra" => Ok(package.get_extra().to_plugin_value()),
+        b"getInstallationSource" => Ok(package.get_installation_source().to_plugin_value()),
+        b"getSourceType" => Ok(package.get_source_type().to_plugin_value()),
+        b"getSourceUrl" => Ok(package.get_source_url().to_plugin_value()),
+        b"getSourceUrls" => Ok(package.get_source_urls().to_plugin_value()),
+        b"getSourceReference" => Ok(package.get_source_reference().to_plugin_value()),
+        b"getSourceMirrors" => Ok(package.get_source_mirrors().to_plugin_value()),
+        b"getDistType" => Ok(package.get_dist_type().to_plugin_value()),
+        b"getDistUrl" => Ok(package.get_dist_url().to_plugin_value()),
+        b"getDistUrls" => Ok(package.get_dist_urls().to_plugin_value()),
+        b"getDistReference" => Ok(package.get_dist_reference().to_plugin_value()),
+        b"getDistSha1Checksum" => Ok(package.get_dist_sha1_checksum().to_plugin_value()),
+        b"getDistMirrors" => Ok(package.get_dist_mirrors().to_plugin_value()),
+        b"getVersion" => Ok(package.get_version().to_plugin_value()),
+        b"getPrettyVersion" => Ok(package.get_pretty_version().to_plugin_value()),
+        b"getFullPrettyVersion" => {
             let truncate = arg_or::<bool>(method_name, args, 0, true)?;
             let display_mode =
                 arg_or::<DisplayMode>(method_name, args, 1, DisplayMode::SourceRefIfDev)?;
@@ -3285,79 +3339,84 @@ fn dispatch_package_method(
                 .get_full_pretty_version(truncate, display_mode)
                 .to_plugin_value())
         }
-        "getStability" => Ok(package.get_stability().to_plugin_value()),
-        "getRequires" => Ok((*package.get_requires()).clone().to_plugin_value()),
-        "getConflicts" => Ok((*package.get_conflicts()).clone().to_plugin_value()),
-        "getProvides" => Ok((*package.get_provides()).clone().to_plugin_value()),
-        "getReplaces" => Ok((*package.get_replaces()).clone().to_plugin_value()),
-        "getDevRequires" => Ok((*package.get_dev_requires()).clone().to_plugin_value()),
-        "getSuggests" => Ok(package.get_suggests().to_plugin_value()),
-        "getAutoload" => Ok(package.get_autoload().to_plugin_value()),
-        "getDevAutoload" => Ok(package.get_dev_autoload().to_plugin_value()),
-        "getIncludePaths" => Ok(package.get_include_paths().to_plugin_value()),
-        "getPhpExt" => Ok(match package.get_php_ext() {
+        b"getStability" => Ok(package.get_stability().to_plugin_value()),
+        b"getRequires" => Ok((*package.get_requires()).clone().to_plugin_value()),
+        b"getConflicts" => Ok((*package.get_conflicts()).clone().to_plugin_value()),
+        b"getProvides" => Ok((*package.get_provides()).clone().to_plugin_value()),
+        b"getReplaces" => Ok((*package.get_replaces()).clone().to_plugin_value()),
+        b"getDevRequires" => Ok((*package.get_dev_requires()).clone().to_plugin_value()),
+        b"getSuggests" => Ok(package.get_suggests().to_plugin_value()),
+        b"getAutoload" => Ok(package.get_autoload().to_plugin_value()),
+        b"getDevAutoload" => Ok(package.get_dev_autoload().to_plugin_value()),
+        b"getIncludePaths" => Ok(package.get_include_paths().to_plugin_value()),
+        b"getPhpExt" => Ok(match package.get_php_ext() {
             Some(config) => config.to_plugin_value(),
             None => PluginValue::Null,
         }),
-        "getRepository" => match package.get_repository() {
+        b"getRepository" => match package.get_repository() {
             Some(repository) => repository_handle_value(&repository),
             None => Ok(PluginValue::Null),
         },
-        "getBinaries" => Ok(package.get_binaries().to_plugin_value()),
-        "getUniqueName" => Ok(package.get_unique_name().to_plugin_value()),
-        "getNotificationUrl" => Ok(package.get_notification_url().to_plugin_value()),
-        "__toString" => Ok(package.get_unique_name().to_plugin_value()),
-        "getPrettyString" => Ok(package.get_pretty_string().to_plugin_value()),
-        "isDefaultBranch" => Ok(package.is_default_branch().to_plugin_value()),
+        b"getBinaries" => Ok(package.get_binaries().to_plugin_value()),
+        b"getUniqueName" => Ok(package.get_unique_name().to_plugin_value()),
+        b"getNotificationUrl" => Ok(package.get_notification_url().to_plugin_value()),
+        b"__toString" => Ok(package.get_unique_name().to_plugin_value()),
+        b"getPrettyString" => Ok(package.get_pretty_string().to_plugin_value()),
+        b"isDefaultBranch" => Ok(package.is_default_branch().to_plugin_value()),
         // `BasePackage`'s concrete methods are not forwarded by `PackageInterface`, so both are
         // computed from the interface here, as `VersionSelector` already does for the second.
-        "isPlatform" => Ok(package
+        b"isPlatform" => Ok(package
             .get_repository()
             .is_some_and(|repository| repository.is::<crate::repository::PlatformRepository>())
             .to_plugin_value()),
-        "getStabilityPriority" => Ok(crate::package::stability_priority(package.get_stability())
+        b"getStabilityPriority" => Ok(crate::package::stability_priority(package.get_stability())
             .unwrap_or(crate::package::base_package::STABILITY_STABLE)
             .to_plugin_value()),
-        "getTransportOptions" => Ok(package.get_transport_options().to_plugin_value()),
-        "getReleaseDate" => Ok(package.get_release_date().to_plugin_value()),
-        other => Err(runtime_throw(format!(
-            "the package method `{other}` is not available over RPC yet"
+        b"getTransportOptions" => Ok(package.get_transport_options().to_plugin_value()),
+        b"getReleaseDate" => Ok(package.get_release_date().to_plugin_value()),
+        other => Err(runtime_throw(bconcat!(
+            "the package method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
 
 fn dispatch_operation_method(
     operation: &AnyOperation,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match (method_name, operation) {
-        ("getOperationType", _) => Ok(operation.get_operation_type().to_plugin_value()),
-        ("show", _) => Ok(operation
+    match (method_name.as_bytes(), operation) {
+        (b"getOperationType", _) => Ok(operation.get_operation_type().to_plugin_value()),
+        (b"show", _) => Ok(operation
             .show(arg::<bool>(method_name, args, 0)?)
             .to_plugin_value()),
-        ("__toString", _) => Ok(operation.to_string().to_plugin_value()),
-        ("getPackage", AnyOperation::Install(op)) => {
+        (b"__toString", _) => Ok(operation.show(false).to_plugin_value()),
+        (b"getPackage", AnyOperation::Install(op)) => {
             Ok(package_handle_value(op.get_package().as_rc()))
         }
-        ("getPackage", AnyOperation::Uninstall(op)) => {
+        (b"getPackage", AnyOperation::Uninstall(op)) => {
             Ok(package_handle_value(op.get_package().as_rc()))
         }
-        ("getPackage", AnyOperation::MarkAliasInstalled(op)) => {
+        (b"getPackage", AnyOperation::MarkAliasInstalled(op)) => {
             Ok(package_handle_value(op.get_package().as_rc()))
         }
-        ("getPackage", AnyOperation::MarkAliasUninstalled(op)) => {
+        (b"getPackage", AnyOperation::MarkAliasUninstalled(op)) => {
             Ok(package_handle_value(op.get_package().as_rc()))
         }
-        ("getInitialPackage", AnyOperation::Update(op)) => {
+        (b"getInitialPackage", AnyOperation::Update(op)) => {
             Ok(package_handle_value(op.get_initial_package().as_rc()))
         }
-        ("getTargetPackage", AnyOperation::Update(op)) => {
+        (b"getTargetPackage", AnyOperation::Update(op)) => {
             Ok(package_handle_value(op.get_target_package().as_rc()))
         }
-        (other, _) => Err(runtime_throw(format!(
-            "the operation method `{other}` is not available on a {} over RPC yet",
-            operation_stub_class(operation)
+        (other, _) => Err(runtime_throw(bconcat!(
+            "the operation method `",
+            other,
+            "` is not available on a ",
+            operation_stub_class(operation),
+            " over RPC yet"
         ))),
     }
 }
@@ -3365,35 +3424,37 @@ fn dispatch_operation_method(
 /// Serves the methods `PreFileDownloadEvent` declares beyond the base event's.
 pub(crate) fn dispatch_pre_file_download_event_method(
     event: &mut PreFileDownloadEvent,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getHttpDownloader" => Ok(rust_handle_value(
+    match method_name.as_bytes() {
+        b"getHttpDownloader" => Ok(rust_handle_value(
             register_entity(RustEntity::HttpDownloader(
                 event.get_http_downloader().clone(),
             )),
-            "Composer\\Util\\HttpDownloader",
+            BStr::new("Composer\\Util\\HttpDownloader"),
         )),
-        "getProcessedUrl" => Ok(event.get_processed_url().to_plugin_value()),
-        "setProcessedUrl" => {
+        b"getProcessedUrl" => Ok(event.get_processed_url().to_plugin_value()),
+        b"setProcessedUrl" => {
             event.set_processed_url(arg::<BString>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
-        "getCustomCacheKey" => Ok(event.get_custom_cache_key().to_plugin_value()),
-        "setCustomCacheKey" => {
+        b"getCustomCacheKey" => Ok(event.get_custom_cache_key().to_plugin_value()),
+        b"setCustomCacheKey" => {
             event.set_custom_cache_key(arg::<Option<BString>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
-        "getType" => Ok(event.get_type().to_plugin_value()),
-        "getContext" => file_download_context_value(event.get_context()),
-        "getTransportOptions" => Ok(event.get_transport_options().clone().to_plugin_value()),
-        "setTransportOptions" => {
+        b"getType" => Ok(event.get_type().to_plugin_value()),
+        b"getContext" => file_download_context_value(event.get_context()),
+        b"getTransportOptions" => Ok(event.get_transport_options().clone().to_plugin_value()),
+        b"setTransportOptions" => {
             event.set_transport_options(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
-        other => Err(runtime_throw(format!(
-            "the Event method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the Event method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
@@ -3401,17 +3462,19 @@ pub(crate) fn dispatch_pre_file_download_event_method(
 /// Serves the methods `PostFileDownloadEvent` declares beyond the base event's.
 pub(crate) fn dispatch_post_file_download_event_method(
     event: &PostFileDownloadEvent,
-    method_name: &str,
+    method_name: &BStr,
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getFileName" => Ok(event.get_file_name().to_plugin_value()),
-        "getChecksum" => Ok(event.get_checksum().to_plugin_value()),
-        "getUrl" => Ok(event.get_url().to_plugin_value()),
-        "getContext" => file_download_context_value(event.get_context()),
-        "getPackage" => Ok(event.get_package().to_plugin_value()),
-        "getType" => Ok(event.get_type().to_plugin_value()),
-        other => Err(runtime_throw(format!(
-            "the Event method `{other}` is not available over RPC yet"
+    match method_name.as_bytes() {
+        b"getFileName" => Ok(event.get_file_name().to_plugin_value()),
+        b"getChecksum" => Ok(event.get_checksum().to_plugin_value()),
+        b"getUrl" => Ok(event.get_url().to_plugin_value()),
+        b"getContext" => file_download_context_value(event.get_context()),
+        b"getPackage" => Ok(event.get_package().to_plugin_value()),
+        b"getType" => Ok(event.get_type().to_plugin_value()),
+        other => Err(runtime_throw(bconcat!(
+            "the Event method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
@@ -3419,11 +3482,11 @@ pub(crate) fn dispatch_post_file_download_event_method(
 /// Serves the methods `PrePoolCreateEvent` declares beyond the base event's.
 pub(crate) fn dispatch_pre_pool_create_event_method(
     event: &mut PrePoolCreateEvent,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getRepositories" => Ok(PluginValue::List(
+    match method_name.as_bytes() {
+        b"getRepositories" => Ok(PluginValue::List(
             event
                 .get_repositories()
                 .iter()
@@ -3432,25 +3495,25 @@ pub(crate) fn dispatch_pre_pool_create_event_method(
         )),
         // TODO(plugin): Request has no proxy stub, so the request a listener would inspect or
         // change cannot cross the boundary yet.
-        "getRequest" => Err(runtime_throw(
-            "the Request of a PrePoolCreateEvent is not available over RPC yet".to_string(),
+        b"getRequest" => Err(runtime_throw(
+            "the Request of a PrePoolCreateEvent is not available over RPC yet",
         )),
-        "getAcceptableStabilities" => {
+        b"getAcceptableStabilities" => {
             Ok(event.get_acceptable_stabilities().clone().to_plugin_value())
         }
-        "getStabilityFlags" => Ok(event.get_stability_flags().clone().to_plugin_value()),
-        "getRootAliases" => Ok(event.get_root_aliases().clone().to_plugin_value()),
-        "getRootReferences" => Ok(event.get_root_references().clone().to_plugin_value()),
-        "getPackages" => Ok(event.get_packages().clone().to_plugin_value()),
-        "getUnacceptableFixedPackages" => Ok(event
+        b"getStabilityFlags" => Ok(event.get_stability_flags().clone().to_plugin_value()),
+        b"getRootAliases" => Ok(event.get_root_aliases().clone().to_plugin_value()),
+        b"getRootReferences" => Ok(event.get_root_references().clone().to_plugin_value()),
+        b"getPackages" => Ok(event.get_packages().clone().to_plugin_value()),
+        b"getUnacceptableFixedPackages" => Ok(event
             .get_unacceptable_fixed_packages()
             .clone()
             .to_plugin_value()),
-        "setPackages" => {
+        b"setPackages" => {
             event.set_packages(arg::<Vec<PackageInterfaceHandle>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
-        "setUnacceptableFixedPackages" => {
+        b"setUnacceptableFixedPackages" => {
             event.set_unacceptable_fixed_packages(arg::<Vec<PackageInterfaceHandle>>(
                 method_name,
                 args,
@@ -3458,8 +3521,10 @@ pub(crate) fn dispatch_pre_pool_create_event_method(
             )?);
             Ok(PluginValue::Null)
         }
-        other => Err(runtime_throw(format!(
-            "the Event method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the Event method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
@@ -3474,45 +3539,52 @@ fn file_download_context_value(
         // TODO(plugin): the array a repository passes names the repository itself, which cannot
         // cross the boundary yet.
         Some(FileDownloadContext::Repository) => Err(runtime_throw(
-            "the repository context of a file download event is not available over RPC yet"
-                .to_string(),
+            "the repository context of a file download event is not available over RPC yet",
         )),
     }
 }
 
 fn dispatch_transaction_method(
     transaction: &AnyTransaction,
-    method_name: &str,
+    method_name: &BStr,
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getOperations" => Ok(PluginValue::List(
+    match method_name.as_bytes() {
+        b"getOperations" => Ok(PluginValue::List(
             transaction
                 .get_operations()
                 .iter()
                 .map(operation_handle_value)
                 .collect(),
         )),
-        other => Err(runtime_throw(format!(
-            "the Transaction method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the Transaction method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
 
 fn dispatch_installation_manager_method(
     im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getInstallPath" => {
+    match method_name.as_bytes() {
+        b"getInstallPath" => {
             let package = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
             Ok(im.borrow().get_install_path(package).to_plugin_value())
         }
-        "addInstaller" | "removeInstaller" => {
+        b"addInstaller" | b"removeInstaller" => {
             let handle = arg::<PhpObjHandle>(method_name, args, 0)?;
-            if !php_is_a(&handle, "Composer\\Installer\\InstallerInterface").map_err(|error| {
-                runtime_throw(format!(
-                    "{method_name} could not type-check its argument: {error:#}"
+            if !php_is_a(
+                &handle,
+                BStr::new("Composer\\Installer\\InstallerInterface"),
+            )
+            .map_err(|error| {
+                runtime_throw(bconcat!(
+                    method_name,
+                    " could not type-check its argument: ",
+                    error_chain_message(&error)
                 ))
             })? {
                 return Err(runtime_throw(bconcat!(
@@ -3533,19 +3605,21 @@ fn dispatch_installation_manager_method(
         }
         // TODO(plugin): the remaining InstallationManager surface is widened on demand,
         // driven by explicit errors from real plugins.
-        other => Err(runtime_throw(format!(
-            "the InstallationManager method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the InstallationManager method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
 
 fn dispatch_io_method(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "write" | "writeError" => {
+    match method_name.as_bytes() {
+        b"write" | b"writeError" => {
             let (messages, newline, verbosity) = decode_write_args(method_name, args)?;
             let borrowed = io.borrow();
             for message in &messages {
@@ -3557,15 +3631,17 @@ fn dispatch_io_method(
             }
             Ok(PluginValue::Null)
         }
-        "isInteractive" => Ok(io.borrow().is_interactive().to_plugin_value()),
-        "isVerbose" => Ok(io.borrow().is_verbose().to_plugin_value()),
-        "isVeryVerbose" => Ok(io.borrow().is_very_verbose().to_plugin_value()),
-        "isDebug" => Ok(io.borrow().is_debug().to_plugin_value()),
-        "isDecorated" => Ok(io.borrow().is_decorated().to_plugin_value()),
+        b"isInteractive" => Ok(io.borrow().is_interactive().to_plugin_value()),
+        b"isVerbose" => Ok(io.borrow().is_verbose().to_plugin_value()),
+        b"isVeryVerbose" => Ok(io.borrow().is_very_verbose().to_plugin_value()),
+        b"isDebug" => Ok(io.borrow().is_debug().to_plugin_value()),
+        b"isDecorated" => Ok(io.borrow().is_decorated().to_plugin_value()),
         // TODO(plugin): the remaining IOInterface surface (ask*, authentications, ...) is
         // widened on demand, driven by explicit errors from real plugins.
-        other => Err(runtime_throw(format!(
-            "the IO method `{other}` is not available over RPC yet"
+        other => Err(runtime_throw(bconcat!(
+            "the IO method `",
+            other,
+            "` is not available over RPC yet"
         ))),
     }
 }
@@ -3573,7 +3649,7 @@ fn dispatch_io_method(
 /// Decodes `($messages, bool $newline, int $verbosity)`: `$messages` is a string or a list of
 /// strings in PHP.
 fn decode_write_args(
-    method_name: &str,
+    method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<(Vec<BString>, bool, i64), PhpThrow> {
     let messages = match args.first() {
@@ -3593,10 +3669,10 @@ fn runtime_throw(message: impl Into<BString>) -> PhpThrow {
 /// exception keeps that exception's class, code and declared state, so a plugin catches what it
 /// would catch under Composer; one carrying no exception keeps the `RuntimeException` shape,
 /// with `context` naming the call that failed.
-fn error_throw(context: &str, error: &anyhow::Error) -> PhpThrow {
+fn error_throw(context: impl AsRef<[u8]>, error: &anyhow::Error) -> PhpThrow {
     match AnyThrowable::of(error) {
         Some(exception) => exception_into_throw(exception, error),
-        None => runtime_throw(format!("{context}: {error:#}")),
+        None => runtime_throw(bconcat!(context.as_ref(), ": ", error_chain_message(error))),
     }
 }
 
@@ -3622,7 +3698,7 @@ impl PhpPluginProxy {
 
     fn forward_lifecycle_call(
         &self,
-        method: &str,
+        method: &BStr,
         composer: &ComposerHandle,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
@@ -3641,7 +3717,7 @@ impl PhpPluginProxy {
 
     /// For testing only: reads a public property of the plugin entity in the child, mirroring
     /// PHPUnit assertions like `$plugins[0]->version`.
-    pub fn __get_property(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    pub fn __get_property(&self, name: &BStr) -> anyhow::Result<PhpMixed> {
         let outcome = shirabe_php_rpc::call_function(
             "__shirabe_get_property",
             vec![
@@ -3666,7 +3742,7 @@ impl PluginInterface for PhpPluginProxy {
         composer: ComposerHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
-        self.forward_lifecycle_call("activate", &composer, &io)
+        self.forward_lifecycle_call(BStr::new("activate"), &composer, &io)
     }
 
     fn deactivate(
@@ -3674,7 +3750,7 @@ impl PluginInterface for PhpPluginProxy {
         composer: ComposerHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
-        self.forward_lifecycle_call("deactivate", &composer, &io)
+        self.forward_lifecycle_call(BStr::new("deactivate"), &composer, &io)
     }
 
     fn uninstall(
@@ -3682,11 +3758,11 @@ impl PluginInterface for PhpPluginProxy {
         composer: ComposerHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
-        self.forward_lifecycle_call("uninstall", &composer, &io)
+        self.forward_lifecycle_call(BStr::new("uninstall"), &composer, &io)
     }
 
-    fn get_class_name(&self) -> String {
-        self.class.display_lossy().to_string()
+    fn get_class_name(&self) -> BString {
+        self.class.to_owned()
     }
 
     fn as_event_subscriber(&self) -> Option<&dyn EventSubscriberInterface> {
@@ -3731,7 +3807,7 @@ impl EventSubscriberInterface for PhpPluginProxy {
             Ok(value) => value,
             Err(throw) => return Err(throw_into_error(throw)),
         };
-        decode_subscribed_events(&self.class.display_lossy().to_string(), value)
+        decode_subscribed_events(self.class.as_bstr(), value)
     }
 
     fn subscriber_handle(&self) -> PhpObjHandle {
@@ -3767,7 +3843,7 @@ impl Capable for PhpPluginProxy {
             PluginValue::List(items) => items
                 .into_iter()
                 .enumerate()
-                .map(|(i, v)| Ok((i.to_string().into(), v.to_php_mixed()?)))
+                .map(|(i, v)| Ok((bconcat!(i), v.to_php_mixed()?)))
                 .collect::<anyhow::Result<_>>()?,
             scalar => IndexMap::from([("0".into(), scalar.to_php_mixed()?)]),
         };
@@ -3779,7 +3855,7 @@ impl Capable for PhpPluginProxy {
 /// distinguishes: `'method'`, `['method', priority]`, and `[['method', priority], ...]`.
 /// A shape outside these is an explicit error, never a silently dropped listener.
 fn decode_subscribed_events(
-    class: &str,
+    class: &BStr,
     value: PluginValue,
 ) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>> {
     let entries = match value {
@@ -3832,7 +3908,7 @@ fn decode_subscribed_events(
 }
 
 fn decode_listener_priority(
-    class: &str,
+    class: &BStr,
     value: Option<&PluginValue>,
 ) -> anyhow::Result<Option<i64>> {
     match value {
@@ -3842,9 +3918,11 @@ fn decode_listener_priority(
     }
 }
 
-fn subscribed_events_shape_error(class: &str, value: &PluginValue) -> anyhow::Error {
-    RuntimeException::new(format!(
-        "{class}::getSubscribedEvents() returned an unsupported shape over RPC: {value:?}"
+fn subscribed_events_shape_error(class: &BStr, value: &PluginValue) -> anyhow::Error {
+    RuntimeException::new(bconcat!(
+        class,
+        "::getSubscribedEvents() returned an unsupported shape over RPC: ",
+        display_to_bytes(format_args!("{value:?}"))
     ))
     .into()
 }
@@ -3872,7 +3950,7 @@ pub fn io_handle_value(
 /// Runs a boolean class query (`class_exists`, `is_subclass_of`, ...) in the worker with the
 /// script autoloader active, so a class named by `composer.json` resolves through the Rust-side
 /// [`ClassLoader`]s.
-pub(crate) fn php_class_query(function: &str, args: Vec<PluginValue>) -> anyhow::Result<bool> {
+pub(crate) fn php_class_query(function: &BStr, args: Vec<PluginValue>) -> anyhow::Result<bool> {
     crate::event_dispatcher::EventDispatcher::ensure_script_autoloader()?;
     let value = unwrap_php_result(call_function_with_dispatcher(
         function,
@@ -3881,9 +3959,13 @@ pub(crate) fn php_class_query(function: &str, args: Vec<PluginValue>) -> anyhow:
     ))?;
     match value {
         PluginValue::Bool(value) => Ok(value),
-        other => Err(anyhow::anyhow!(
-            "PHP class query `{function}` did not return a bool: {other:?}"
-        )),
+        other => Err(RuntimeException::new(bconcat!(
+            "PHP class query `",
+            function,
+            "` did not return a bool: ",
+            display_to_bytes(format_args!("{other:?}"))
+        ))
+        .into()),
     }
 }
 
@@ -3913,7 +3995,7 @@ pub(crate) fn new_php_object(
 /// Calls `$obj->$method(...$args)` on a worker-side entity.
 pub(crate) fn call_php_entity_method(
     handle: &PhpObjHandle,
-    method: &str,
+    method: &BStr,
     args: Vec<PluginValue>,
 ) -> anyhow::Result<PluginValue> {
     unwrap_php_result(call_php_method(
@@ -3926,7 +4008,7 @@ pub(crate) fn call_php_entity_method(
 
 /// `is_a($obj, $class)` evaluated in the worker: the child's own class table answers, so
 /// parent classes are covered (a `PhpObjHandle`'s `implements` lists interfaces only).
-pub(crate) fn php_is_a(handle: &PhpObjHandle, class: &str) -> anyhow::Result<bool> {
+pub(crate) fn php_is_a(handle: &PhpObjHandle, class: &BStr) -> anyhow::Result<bool> {
     let value = unwrap_php_result(call_function_with_dispatcher(
         "is_a",
         vec![
@@ -3960,7 +4042,7 @@ impl PhpInstallerProxy {
         Self { handle }
     }
 
-    fn call(&self, method: &str, args: Vec<PluginValue>) -> anyhow::Result<PluginValue> {
+    fn call(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<PluginValue> {
         unwrap_php_result(call_php_method(
             self.handle.phandle,
             method,
@@ -3989,7 +4071,7 @@ impl PhpInstallerProxy {
     /// here as the PHP-owned job it crossed the boundary as.
     async fn promise_result(
         &self,
-        method: &str,
+        method: &BStr,
         value: PluginValue,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let id = match value {
@@ -4003,10 +4085,13 @@ impl PhpInstallerProxy {
         }
     }
 
-    fn unsupported_shape(&self, method: &str, value: &PluginValue) -> anyhow::Error {
-        RuntimeException::new(format!(
-            "{}::{method}() returned an unsupported shape over RPC: {value:?}",
-            self.handle.class.display_lossy()
+    fn unsupported_shape(&self, method: &BStr, value: &PluginValue) -> anyhow::Error {
+        RuntimeException::new(bconcat!(
+            self.handle.class,
+            "::",
+            method,
+            "() returned an unsupported shape over RPC: ",
+            display_to_bytes(format_args!("{value:?}"))
         ))
         .into()
     }
@@ -4015,9 +4100,12 @@ impl PhpInstallerProxy {
 #[async_trait::async_trait(?Send)]
 impl crate::installer::InstallerInterface for PhpInstallerProxy {
     fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
-        match self.call("supports", vec![PluginValue::string(package_type)])? {
+        match self.call(
+            BStr::new("supports"),
+            vec![PluginValue::string(package_type)],
+        )? {
             PluginValue::Bool(supports) => Ok(supports),
-            other => Err(self.unsupported_shape("supports", &other)),
+            other => Err(self.unsupported_shape(BStr::new("supports"), &other)),
         }
     }
 
@@ -4027,9 +4115,9 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
-        match self.call("isInstalled", args)? {
+        match self.call(BStr::new("isInstalled"), args)? {
             PluginValue::Bool(installed) => Ok(installed),
-            other => Err(self.unsupported_shape("isInstalled", &other)),
+            other => Err(self.unsupported_shape(BStr::new("isInstalled"), &other)),
         }
     }
 
@@ -4042,8 +4130,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             Self::package_arg(&package),
             Self::optional_package_arg(&prev_package),
         ];
-        let value = self.call("download", args)?;
-        self.promise_result("download", value).await
+        let value = self.call(BStr::new("download"), args)?;
+        self.promise_result(BStr::new("download"), value).await
     }
 
     async fn prepare(
@@ -4057,8 +4145,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             Self::package_arg(&package),
             Self::optional_package_arg(&prev_package),
         ];
-        let value = self.call("prepare", args)?;
-        self.promise_result("prepare", value).await
+        let value = self.call(BStr::new("prepare"), args)?;
+        self.promise_result(BStr::new("prepare"), value).await
     }
 
     async fn install(
@@ -4067,8 +4155,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
-        let value = self.call("install", args)?;
-        self.promise_result("install", value).await
+        let value = self.call(BStr::new("install"), args)?;
+        self.promise_result(BStr::new("install"), value).await
     }
 
     async fn update(
@@ -4082,8 +4170,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             Self::package_arg(&initial),
             Self::package_arg(&target),
         ];
-        let value = self.call("update", args)?;
-        self.promise_result("update", value).await
+        let value = self.call(BStr::new("update"), args)?;
+        self.promise_result(BStr::new("update"), value).await
     }
 
     async fn uninstall(
@@ -4092,8 +4180,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
-        let value = self.call("uninstall", args)?;
-        self.promise_result("uninstall", value).await
+        let value = self.call(BStr::new("uninstall"), args)?;
+        self.promise_result(BStr::new("uninstall"), value).await
     }
 
     async fn cleanup(
@@ -4107,8 +4195,8 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             Self::package_arg(&package),
             Self::optional_package_arg(&prev_package),
         ];
-        let value = self.call("cleanup", args)?;
-        self.promise_result("cleanup", value).await
+        let value = self.call(BStr::new("cleanup"), args)?;
+        self.promise_result(BStr::new("cleanup"), value).await
     }
 
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
@@ -4116,16 +4204,21 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         // infallible signature cannot carry, so it aborts rather than answering a path that
         // would silently install the package in the wrong place.
         let args = vec![Self::package_arg(&package)];
-        let value = self.call("getInstallPath", args).unwrap_or_else(|error| {
-            panic!(
-                "{}::getInstallPath failed over RPC: {error:#}",
-                self.handle.class.display_lossy()
-            )
-        });
+        let value = self
+            .call(BStr::new("getInstallPath"), args)
+            .unwrap_or_else(|error| {
+                panic!(
+                    "{}::getInstallPath failed over RPC: {error:#}",
+                    self.handle.class.display_lossy()
+                )
+            });
         match value {
             PluginValue::Null => None,
             PluginValue::String(path) => Some(std::path::PathBuf::from(path_from_bytes(&path))),
-            other => panic!("{}", self.unsupported_shape("getInstallPath", &other)),
+            other => panic!(
+                "{}",
+                self.unsupported_shape(BStr::new("getInstallPath"), &other)
+            ),
         }
     }
 }
@@ -4191,7 +4284,7 @@ impl PhpCapabilityProxy {
     /// For testing only: reads a public property of the capability entity in the child. Unlike
     /// `PhpPluginProxy::__get_property` the value keeps its wire form, so a test can assert the
     /// object identity behind a handle instead of only the plain data around it.
-    pub fn __get_property(&self, name: &str) -> anyhow::Result<PluginValue> {
+    pub fn __get_property(&self, name: &BStr) -> anyhow::Result<PluginValue> {
         let outcome = shirabe_php_rpc::call_function(
             "__shirabe_get_property",
             vec![
@@ -4268,7 +4361,7 @@ impl CommandProvider for PhpCommandProviderProxy {
                 PluginValue::PhpHandle(handle) => handle,
                 _ => return Err(invalid_command_error(&self.handle)),
             };
-            if !php_is_a(&command_handle, "Composer\\Command\\BaseCommand")? {
+            if !php_is_a(&command_handle, BStr::new("Composer\\Command\\BaseCommand"))? {
                 return Err(invalid_command_error(&self.handle));
             }
             commands.push(std::rc::Rc::new(std::cell::RefCell::new(
@@ -4398,7 +4491,11 @@ pub(crate) fn extend_console_application_commands(
         .expect("only an application that published the handoff extends it");
     for handle in handles {
         if let Some(app) = context.app.borrow().as_ref() {
-            call_php_entity_method(app, "add", vec![PluginValue::PhpHandle(handle.clone())])?;
+            call_php_entity_method(
+                app,
+                BStr::new("add"),
+                vec![PluginValue::PhpHandle(handle.clone())],
+            )?;
         }
         context.plugin_commands.borrow_mut().push(handle);
     }
@@ -4463,11 +4560,11 @@ impl PhpConsoleApplicationContext {
         let app = match value {
             PluginValue::PhpHandle(app) => app,
             other => {
-                return Err(RuntimeException::new(
-                    format!(
-                        "__shirabe_console_application_boot returned an unsupported shape over RPC: {other:?}"
-                    )
-                ).into());
+                return Err(RuntimeException::new(bconcat!(
+                    "__shirabe_console_application_boot returned an unsupported shape over RPC: ",
+                    display_to_bytes(format_args!("{other:?}"))
+                ))
+                .into());
             }
         };
         *self.app.borrow_mut() = Some(app.clone());
@@ -4497,9 +4594,16 @@ pub struct PhpCommandProxy {
 
 impl PhpCommandProxy {
     fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
-        let proxy_command = match Self::call_metadata_getter(&handle, "isProxyCommand")? {
+        let proxy_command = match Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))?
+        {
             PluginValue::Bool(proxy_command) => proxy_command,
-            other => return Err(Self::unsupported_shape(&handle, "isProxyCommand", &other)),
+            other => {
+                return Err(Self::unsupported_shape(
+                    &handle,
+                    BStr::new("isProxyCommand"),
+                    &other,
+                ));
+            }
         };
         Self::build(handle, proxy_command)
     }
@@ -4507,10 +4611,16 @@ impl PhpCommandProxy {
     /// A command class named by a `composer.json` script only has to extend Symfony's `Command`,
     /// so `isProxyCommand()` is asked for only when it also extends Composer's `BaseCommand`.
     pub(crate) fn new_script_command(handle: PhpObjHandle) -> anyhow::Result<Self> {
-        let proxy_command = if php_is_a(&handle, "Composer\\Command\\BaseCommand")? {
-            match Self::call_metadata_getter(&handle, "isProxyCommand")? {
+        let proxy_command = if php_is_a(&handle, BStr::new("Composer\\Command\\BaseCommand"))? {
+            match Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))? {
                 PluginValue::Bool(proxy_command) => proxy_command,
-                other => return Err(Self::unsupported_shape(&handle, "isProxyCommand", &other)),
+                other => {
+                    return Err(Self::unsupported_shape(
+                        &handle,
+                        BStr::new("isProxyCommand"),
+                        &other,
+                    ));
+                }
             }
         } else {
             false
@@ -4520,26 +4630,44 @@ impl PhpCommandProxy {
 
     fn build(handle: PhpObjHandle, proxy_command: bool) -> anyhow::Result<Self> {
         let data = crate::command::BaseCommandData::new(None);
-        let name = Self::call_metadata_getter(&handle, "getName")?;
+        let name = Self::call_metadata_getter(&handle, BStr::new("getName"))?;
         match name {
             PluginValue::Null => {}
             PluginValue::String(bytes) => {
                 Command::set_name(&data, bytes.as_bstr())?;
             }
-            other => return Err(Self::unsupported_shape(&handle, "getName", &other)),
+            other => {
+                return Err(Self::unsupported_shape(
+                    &handle,
+                    BStr::new("getName"),
+                    &other,
+                ));
+            }
         }
-        let description = Self::call_metadata_getter(&handle, "getDescription")?;
+        let description = Self::call_metadata_getter(&handle, BStr::new("getDescription"))?;
         match description {
             PluginValue::String(bytes) => {
                 Command::set_description(&data, bytes.as_bstr());
             }
-            other => return Err(Self::unsupported_shape(&handle, "getDescription", &other)),
+            other => {
+                return Err(Self::unsupported_shape(
+                    &handle,
+                    BStr::new("getDescription"),
+                    &other,
+                ));
+            }
         }
-        let aliases = Self::call_metadata_getter(&handle, "getAliases")?;
+        let aliases = Self::call_metadata_getter(&handle, BStr::new("getAliases"))?;
         let alias_items = match aliases {
             PluginValue::List(items) => items,
             PluginValue::Array(map) => map.into_values().collect(),
-            other => return Err(Self::unsupported_shape(&handle, "getAliases", &other)),
+            other => {
+                return Err(Self::unsupported_shape(
+                    &handle,
+                    BStr::new("getAliases"),
+                    &other,
+                ));
+            }
         };
         let mut alias_names = Vec::new();
         for alias in alias_items {
@@ -4547,16 +4675,28 @@ impl PhpCommandProxy {
                 PluginValue::String(bytes) => {
                     alias_names.push(bytes);
                 }
-                other => return Err(Self::unsupported_shape(&handle, "getAliases", &other)),
+                other => {
+                    return Err(Self::unsupported_shape(
+                        &handle,
+                        BStr::new("getAliases"),
+                        &other,
+                    ));
+                }
             }
         }
         Command::set_aliases(&data, alias_names)?;
-        let hidden = Self::call_metadata_getter(&handle, "isHidden")?;
+        let hidden = Self::call_metadata_getter(&handle, BStr::new("isHidden"))?;
         match hidden {
             PluginValue::Bool(hidden) => {
                 Command::set_hidden(&data, hidden);
             }
-            other => return Err(Self::unsupported_shape(&handle, "isHidden", &other)),
+            other => {
+                return Err(Self::unsupported_shape(
+                    &handle,
+                    BStr::new("isHidden"),
+                    &other,
+                ));
+            }
         }
         Self::read_back_definition(&handle, &data)?;
         PENDING_COMMAND_HANDLES.with(|handles| handles.borrow_mut().push(handle.clone()));
@@ -4584,9 +4724,15 @@ impl PhpCommandProxy {
         ))?;
         let mut map = match value {
             PluginValue::Array(map) => map,
-            other => return Err(Self::unsupported_shape(handle, "getDefinition", &other)),
+            other => {
+                return Err(Self::unsupported_shape(
+                    handle,
+                    BStr::new("getDefinition"),
+                    &other,
+                ));
+            }
         };
-        let field = |row: &mut IndexMap<BString, PluginValue>, key: &str| -> PluginValue {
+        let field = |row: &mut IndexMap<BString, PluginValue>, key: &BStr| -> PluginValue {
             row.shift_remove(key.as_bytes())
                 .unwrap_or(PluginValue::Null)
         };
@@ -4599,22 +4745,40 @@ impl PhpCommandProxy {
         };
 
         let mut items: Vec<DefinitionItem> = Vec::new();
-        for row in as_rows(field(&mut map, "arguments")) {
+        for row in as_rows(field(&mut map, BStr::new("arguments"))) {
             let mut row = match row {
                 PluginValue::Array(row) => row,
-                other => return Err(Self::unsupported_shape(handle, "getDefinition", &other)),
+                other => {
+                    return Err(Self::unsupported_shape(
+                        handle,
+                        BStr::new("getDefinition"),
+                        &other,
+                    ));
+                }
             };
-            let (name, description) =
-                match (field(&mut row, "name"), field(&mut row, "description")) {
-                    (PluginValue::String(name), PluginValue::String(description)) => {
-                        (name, description)
-                    }
-                    (other, _) => {
-                        return Err(Self::unsupported_shape(handle, "getDefinition", &other));
-                    }
-                };
-            let required = matches!(field(&mut row, "required"), PluginValue::Bool(true));
-            let is_array = matches!(field(&mut row, "isArray"), PluginValue::Bool(true));
+            let (name, description) = match (
+                field(&mut row, BStr::new("name")),
+                field(&mut row, BStr::new("description")),
+            ) {
+                (PluginValue::String(name), PluginValue::String(description)) => {
+                    (name, description)
+                }
+                (other, _) => {
+                    return Err(Self::unsupported_shape(
+                        handle,
+                        BStr::new("getDefinition"),
+                        &other,
+                    ));
+                }
+            };
+            let required = matches!(
+                field(&mut row, BStr::new("required")),
+                PluginValue::Bool(true)
+            );
+            let is_array = matches!(
+                field(&mut row, BStr::new("isArray")),
+                PluginValue::Bool(true)
+            );
             let mut mode = if required {
                 InputArgument::REQUIRED
             } else {
@@ -4623,7 +4787,8 @@ impl PhpCommandProxy {
             if is_array {
                 mode |= InputArgument::IS_ARRAY;
             }
-            let default = InputValue::from_php_mixed(&field(&mut row, "default").to_php_mixed()?);
+            let default =
+                InputValue::from_php_mixed(&field(&mut row, BStr::new("default")).to_php_mixed()?);
             items.push(DefinitionItem::InputArgument(InputArgument::new(
                 name,
                 Some(mode),
@@ -4631,23 +4796,41 @@ impl PhpCommandProxy {
                 default,
             )?));
         }
-        for row in as_rows(field(&mut map, "options")) {
+        for row in as_rows(field(&mut map, BStr::new("options"))) {
             let mut row = match row {
                 PluginValue::Array(row) => row,
-                other => return Err(Self::unsupported_shape(handle, "getDefinition", &other)),
+                other => {
+                    return Err(Self::unsupported_shape(
+                        handle,
+                        BStr::new("getDefinition"),
+                        &other,
+                    ));
+                }
             };
-            let (name, description) =
-                match (field(&mut row, "name"), field(&mut row, "description")) {
-                    (PluginValue::String(name), PluginValue::String(description)) => {
-                        (name, description)
-                    }
-                    (other, _) => {
-                        return Err(Self::unsupported_shape(handle, "getDefinition", &other));
-                    }
-                };
-            let accept_value = matches!(field(&mut row, "acceptValue"), PluginValue::Bool(true));
+            let (name, description) = match (
+                field(&mut row, BStr::new("name")),
+                field(&mut row, BStr::new("description")),
+            ) {
+                (PluginValue::String(name), PluginValue::String(description)) => {
+                    (name, description)
+                }
+                (other, _) => {
+                    return Err(Self::unsupported_shape(
+                        handle,
+                        BStr::new("getDefinition"),
+                        &other,
+                    ));
+                }
+            };
+            let accept_value = matches!(
+                field(&mut row, BStr::new("acceptValue")),
+                PluginValue::Bool(true)
+            );
             let mut mode = if accept_value {
-                if matches!(field(&mut row, "isValueRequired"), PluginValue::Bool(true)) {
+                if matches!(
+                    field(&mut row, BStr::new("isValueRequired")),
+                    PluginValue::Bool(true)
+                ) {
                     InputOption::VALUE_REQUIRED
                 } else {
                     InputOption::VALUE_OPTIONAL
@@ -4655,20 +4838,26 @@ impl PhpCommandProxy {
             } else {
                 InputOption::VALUE_NONE
             };
-            if matches!(field(&mut row, "isArray"), PluginValue::Bool(true)) {
+            if matches!(
+                field(&mut row, BStr::new("isArray")),
+                PluginValue::Bool(true)
+            ) {
                 mode |= InputOption::VALUE_IS_ARRAY;
             }
-            if matches!(field(&mut row, "isNegatable"), PluginValue::Bool(true)) {
+            if matches!(
+                field(&mut row, BStr::new("isNegatable")),
+                PluginValue::Bool(true)
+            ) {
                 mode |= InputOption::VALUE_NEGATABLE;
             }
-            let shortcut = match field(&mut row, "shortcut").to_php_mixed()? {
+            let shortcut = match field(&mut row, BStr::new("shortcut")).to_php_mixed()? {
                 PhpMixed::String(shortcut) => Some(shortcut),
                 _ => None,
             };
             // `getDefault()` exposes the stored representation (`false` for VALUE_NONE), while
             // the constructor only accepts null there; mirror the constructor's normalization.
             let default = if accept_value {
-                InputValue::from_php_mixed(&field(&mut row, "default").to_php_mixed()?)
+                InputValue::from_php_mixed(&field(&mut row, BStr::new("default")).to_php_mixed()?)
             } else {
                 InputValue::Null
             };
@@ -4686,24 +4875,36 @@ impl PhpCommandProxy {
             )?),
         );
 
-        match field(&mut map, "help") {
+        match field(&mut map, BStr::new("help")) {
             PluginValue::String(help) => {
                 Command::set_help(data, help.as_bstr());
             }
-            other => return Err(Self::unsupported_shape(handle, "getHelp", &other)),
+            other => {
+                return Err(Self::unsupported_shape(
+                    handle,
+                    BStr::new("getHelp"),
+                    &other,
+                ));
+            }
         }
-        for usage in as_rows(field(&mut map, "usages")) {
+        for usage in as_rows(field(&mut map, BStr::new("usages"))) {
             match usage {
                 PluginValue::String(usage) => {
                     Command::add_usage(data, usage.as_bstr());
                 }
-                other => return Err(Self::unsupported_shape(handle, "getUsages", &other)),
+                other => {
+                    return Err(Self::unsupported_shape(
+                        handle,
+                        BStr::new("getUsages"),
+                        &other,
+                    ));
+                }
             }
         }
         Ok(())
     }
 
-    fn call_metadata_getter(handle: &PhpObjHandle, method: &str) -> anyhow::Result<PluginValue> {
+    fn call_metadata_getter(handle: &PhpObjHandle, method: &BStr) -> anyhow::Result<PluginValue> {
         unwrap_php_result(call_php_method(
             handle.phandle,
             method,
@@ -4714,12 +4915,15 @@ impl PhpCommandProxy {
 
     fn unsupported_shape(
         handle: &PhpObjHandle,
-        method: &str,
+        method: &BStr,
         value: &PluginValue,
     ) -> anyhow::Error {
-        RuntimeException::new(format!(
-            "{}::{method}() returned an unsupported shape over RPC: {value:?}",
-            handle.class.display_lossy()
+        RuntimeException::new(bconcat!(
+            handle.class,
+            "::",
+            method,
+            "() returned an unsupported shape over RPC: ",
+            display_to_bytes(format_args!("{value:?}"))
         ))
         .into()
     }
@@ -4756,7 +4960,11 @@ impl Command for PhpCommandProxy {
         ))?;
         match value {
             PluginValue::Int(code) => Ok(code),
-            other => Err(Self::unsupported_shape(&self.handle, "run", &other)),
+            other => Err(Self::unsupported_shape(
+                &self.handle,
+                BStr::new("run"),
+                &other,
+            )),
         }
     }
 
@@ -4807,19 +5015,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_data_argument_keeps_its_bytes_and_a_text_argument_refuses_invalid_utf8() {
+    fn a_data_argument_keeps_its_bytes() {
         let bytes = BString::from(b"vendor/\xffname".as_slice());
         let args = [PluginValue::String(bytes.clone())];
 
-        assert_eq!(bytes, arg::<BString>("method", &args, 0).unwrap());
-        assert!(arg::<String>("method", &args, 0).is_err());
+        assert_eq!(
+            bytes,
+            arg::<BString>(BStr::new("method"), &args, 0).unwrap()
+        );
     }
 
     #[test]
     fn a_process_command_keeps_its_bytes() {
         let bytes = BString::from(b"echo \xff".as_slice());
 
-        match exec_command_arg("execute", &[PluginValue::String(bytes.clone())], 0).unwrap() {
+        match exec_command_arg(
+            BStr::new("execute"),
+            &[PluginValue::String(bytes.clone())],
+            0,
+        )
+        .unwrap()
+        {
             crate::util::process_executor::CommandLine::Shell(command) => {
                 assert_eq!(bytes, command)
             }
@@ -4831,7 +5047,7 @@ mod tests {
     fn a_listener_method_name_that_is_not_utf8_keeps_its_bytes() {
         let method = BString::from(b"on\xffEvent".as_slice());
         let events = decode_subscribed_events(
-            "Plugin",
+            BStr::new("Plugin"),
             PluginValue::Array(IndexMap::from([
                 (BString::from("a"), PluginValue::String(method.clone())),
                 (
@@ -4863,7 +5079,7 @@ mod tests {
     fn an_event_name_that_is_not_utf8_keeps_its_bytes() {
         let name = BString::from(b"event\xE9".as_slice());
         let events = decode_subscribed_events(
-            "Vendor\\Plugin",
+            BStr::new("Vendor\\Plugin"),
             PluginValue::Array(IndexMap::from([(
                 name.clone(),
                 PluginValue::String(BString::from("method")),
@@ -4871,6 +5087,18 @@ mod tests {
         )
         .unwrap();
         assert!(events.contains_key(&name));
+    }
+
+    #[test]
+    fn a_method_name_that_is_not_utf8_reaches_the_error_unchanged() {
+        let name = b"method\xff";
+        let throw = PluginRpcDispatcher::default()
+            .dispatch(0, BStr::new(name), Vec::new(), &[], &mut IndexMap::new())
+            .unwrap_err();
+        assert_eq!(
+            BStr::new(b"unknown runtime service method `method\xff`"),
+            throw.message.as_bstr()
+        );
     }
 
     #[test]

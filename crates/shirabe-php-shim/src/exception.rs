@@ -235,6 +235,22 @@ pub fn error_message(error: &anyhow::Error) -> BString {
     }
 }
 
+/// What `{:#}` renders for a Rust error, the message of the error and of each cause joined by
+/// `: `, with the bytes of every exception in the chain kept.
+pub fn error_chain_message(error: &anyhow::Error) -> BString {
+    let mut message = BString::default();
+    for (index, cause) in error.chain().enumerate() {
+        if index != 0 {
+            message.extend_from_slice(b": ");
+        }
+        match cause.downcast_ref::<AnyThrowable>() {
+            Some(exception) => message.extend_from_slice(exception.get_message()),
+            None => message.extend_from_slice(&crate::display_to_bytes(cause)),
+        }
+    }
+    message
+}
+
 /// PHP's `catch` applied to a Rust error.
 pub trait Catch {
     /// The exception the error carries, seen as an instance of `T`, or `None` if it carries no
@@ -785,6 +801,24 @@ mod tests {
                 .and_then(|previous| previous.catch::<RuntimeException>())
                 .map(|previous| previous.get_message().to_owned()),
             Some(BString::from("first"))
+        );
+    }
+
+    #[test]
+    fn the_chain_message_keeps_the_bytes_of_every_exception() {
+        let previous = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new(
+            b"cause \xff".as_slice(),
+        )));
+        let error: anyhow::Error =
+            Exception::with_code_and_previous(b"boom \xfe".as_slice(), 0, Some(previous)).into();
+
+        assert_eq!(
+            BStr::new(b"boom \xfe: cause \xff"),
+            error_chain_message(&error).as_bstr()
+        );
+        assert_eq!(
+            BStr::new(b"raised by the port"),
+            error_chain_message(&anyhow::anyhow!("raised by the port")).as_bstr()
         );
     }
 

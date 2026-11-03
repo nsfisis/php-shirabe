@@ -16,26 +16,27 @@
 use crate::package::Link;
 use crate::plugin::php_plugin_proxy::ToPluginValue;
 use crate::util::http::Response;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_rpc::{PhpObject, PhpThrow, PluginValue};
-use shirabe_php_shim::{bconcat, utf8_text};
+use shirabe_php_shim::{bconcat, display_to_bytes, php_str, utf8_text};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
 
-const LINK_CLASS: &str = "Composer\\Package\\Link";
-const RESPONSE_CLASS: &str = "Composer\\Util\\Http\\Response";
-const CLASS_MAP_CLASS: &str = "Composer\\ClassMapGenerator\\ClassMap";
-const CONSTRAINT_CLASS: &str = "Composer\\Semver\\Constraint\\Constraint";
-const MULTI_CONSTRAINT_CLASS: &str = "Composer\\Semver\\Constraint\\MultiConstraint";
-const MATCH_ALL_CLASS: &str = "Composer\\Semver\\Constraint\\MatchAllConstraint";
-const MATCH_NONE_CLASS: &str = "Composer\\Semver\\Constraint\\MatchNoneConstraint";
-const DATE_TIME_IMMUTABLE_CLASS: &str = "DateTimeImmutable";
-const DATE_TIME_CLASS: &str = "DateTime";
+const LINK_CLASS: &BStr = php_str(b"Composer\\Package\\Link");
+const RESPONSE_CLASS: &BStr = php_str(b"Composer\\Util\\Http\\Response");
+const CLASS_MAP_CLASS: &BStr = php_str(b"Composer\\ClassMapGenerator\\ClassMap");
+const CONSTRAINT_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\Constraint");
+const MULTI_CONSTRAINT_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\MultiConstraint");
+const MATCH_ALL_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\MatchAllConstraint");
+const MATCH_NONE_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\MatchNoneConstraint");
+const DATE_TIME_IMMUTABLE_CLASS: &BStr = php_str(b"DateTimeImmutable");
+const DATE_TIME_CLASS: &BStr = php_str(b"DateTime");
 
 /// The wall clock of a PHP date, at the microsecond precision the other side can represent.
+#[expect(clippy::disallowed_types, reason = "chrono takes a text format")]
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S%.6f";
 
 /// PHP's `timezone_type` for a date carrying a named zone rather than an offset or an
@@ -44,7 +45,7 @@ const TIMEZONE_TYPE_IDENTIFIER: i64 = 3;
 
 /// The only zone a date may cross in: this port holds instants as `DateTime<Utc>` and carries no
 /// timezone database, so the worker rebases every date on UTC before it is serialized.
-const TIMEZONE_UTC: &str = "UTC";
+const TIMEZONE_UTC: &BStr = php_str(b"UTC");
 
 fn throw(message: impl Into<BString>) -> PhpThrow {
     PhpThrow::runtime(message)
@@ -64,10 +65,17 @@ fn optional_string(value: Option<&PluginValue>) -> Option<BString> {
     }
 }
 
-fn required_string(context: &str, value: Option<&PluginValue>) -> Result<BString, PhpThrow> {
+fn required_string(
+    context: impl AsRef<[u8]>,
+    value: Option<&PluginValue>,
+) -> Result<BString, PhpThrow> {
     match value {
         Some(PluginValue::String(bytes)) => Ok(bytes.clone()),
-        other => Err(throw(format!("{context} expects a string, got {other:?}"))),
+        other => Err(throw(bconcat!(
+            context.as_ref(),
+            " expects a string, got ",
+            display_to_bytes(format_args!("{other:?}"))
+        ))),
     }
 }
 
@@ -125,34 +133,37 @@ fn constraint_to_wire(constraint: &AnyConstraint) -> PluginValue {
 
 fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
-        throw(format!(
-            "expected a semver constraint from the plugin, got {value:?}"
+        throw(bconcat!(
+            "expected a semver constraint from the plugin, got ",
+            display_to_bytes(format_args!("{value:?}"))
         ))
     })?;
     let pretty_string = optional_string(object.protected("prettyString"));
-    let class = object.class.display_lossy().to_string();
-    Ok(match class.as_str() {
-        CONSTRAINT_CLASS => {
+    let class = object.class.as_bstr();
+    Ok(match class {
+        class if class == CONSTRAINT_CLASS => {
             let operator = match object.protected("operator") {
                 Some(PluginValue::Int(code)) => SimpleConstraint::from_operator_constant(*code)
                     .ok_or_else(|| {
-                        throw(format!(
-                            "a semver constraint has an unknown operator: {code}"
+                        throw(bconcat!(
+                            "a semver constraint has an unknown operator: ",
+                            code
                         ))
                     })?,
                 other => {
-                    return Err(throw(format!(
-                        "a semver constraint operator is not an int, got {other:?}"
+                    return Err(throw(bconcat!(
+                        "a semver constraint operator is not an int, got ",
+                        display_to_bytes(format_args!("{other:?}"))
                     )));
                 }
             };
             AnyConstraint::Simple(SimpleConstraint::new(
-                operator.to_string(),
+                display_to_bytes(operator),
                 required_string("a semver constraint version", object.protected("version"))?,
                 pretty_string,
             ))
         }
-        MULTI_CONSTRAINT_CLASS => {
+        class if class == MULTI_CONSTRAINT_CLASS => {
             let constraints = match object.protected("constraints") {
                 Some(PluginValue::List(items)) => items
                     .iter()
@@ -164,21 +175,21 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
                     .map(constraint_from_wire)
                     .collect::<Result<Vec<_>, _>>()?,
                 other => {
-                    return Err(throw(format!(
-                        "a MultiConstraint expects a list of constraints, got {other:?}"
+                    return Err(throw(bconcat!(
+                        "a MultiConstraint expects a list of constraints, got ",
+                        display_to_bytes(format_args!("{other:?}"))
                     )));
                 }
             };
             if constraints.len() < 2 {
-                return Err(throw(
-                    "a MultiConstraint needs at least two constraints".to_string(),
-                ));
+                return Err(throw("a MultiConstraint needs at least two constraints"));
             }
             let conjunctive = match object.protected("conjunctive") {
                 Some(PluginValue::Bool(conjunctive)) => *conjunctive,
                 other => {
-                    return Err(throw(format!(
-                        "a MultiConstraint expects a bool conjunctive flag, got {other:?}"
+                    return Err(throw(bconcat!(
+                        "a MultiConstraint expects a bool conjunctive flag, got ",
+                        display_to_bytes(format_args!("{other:?}"))
                     )));
                 }
             };
@@ -188,8 +199,12 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
                 pretty_string,
             ))
         }
-        MATCH_ALL_CLASS => AnyConstraint::MatchAll(MatchAllConstraint::new(pretty_string)),
-        MATCH_NONE_CLASS => AnyConstraint::MatchNone(MatchNoneConstraint::new(pretty_string)),
+        class if class == MATCH_ALL_CLASS => {
+            AnyConstraint::MatchAll(MatchAllConstraint::new(pretty_string))
+        }
+        class if class == MATCH_NONE_CLASS => {
+            AnyConstraint::MatchNone(MatchNoneConstraint::new(pretty_string))
+        }
         // TODO(plugin): a plugin-defined ConstraintInterface implementation has no Rust
         // counterpart; the four composer/semver classes are the whole vocabulary here.
         other => {
@@ -302,8 +317,12 @@ pub(crate) fn link_to_wire(link: &Link) -> PluginValue {
 }
 
 pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
-    let object = as_object(value)
-        .ok_or_else(|| throw(format!("expected a Link from the plugin, got {value:?}")))?;
+    let object = as_object(value).ok_or_else(|| {
+        throw(bconcat!(
+            "expected a Link from the plugin, got ",
+            display_to_bytes(format_args!("{value:?}"))
+        ))
+    })?;
     if object.class != LINK_CLASS {
         // TODO(plugin): Link subclasses have no Rust counterpart; the port models links as a
         // single value type.
@@ -316,7 +335,7 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     let constraint = constraint_from_wire(
         object
             .protected("constraint")
-            .ok_or_else(|| throw("a Link expects a constraint".to_string()))?,
+            .ok_or_else(|| throw("a Link expects a constraint"))?,
     )?;
     // TODO(plugin): PHP's Link leaves $prettyConstraint nullable and throws from
     // getPrettyConstraint() when it was never given, but this port stores a string, so a link
@@ -336,7 +355,7 @@ pub(crate) fn date_time_to_wire(date: &DateTime<Utc>) -> PluginValue {
     let mut object = PhpObject::new(DATE_TIME_IMMUTABLE_CLASS);
     object.set_public(
         "date",
-        PluginValue::string(date.format(DATE_FORMAT).to_string()),
+        PluginValue::string(display_to_bytes(date.format(DATE_FORMAT))),
     );
     object.set_public("timezone_type", PluginValue::Int(TIMEZONE_TYPE_IDENTIFIER));
     object.set_public("timezone", PluginValue::string(TIMEZONE_UTC));
@@ -344,8 +363,12 @@ pub(crate) fn date_time_to_wire(date: &DateTime<Utc>) -> PluginValue {
 }
 
 pub(crate) fn date_time_from_wire(value: &PluginValue) -> Result<DateTime<Utc>, PhpThrow> {
-    let object = as_object(value)
-        .ok_or_else(|| throw(format!("expected a date from the plugin, got {value:?}")))?;
+    let object = as_object(value).ok_or_else(|| {
+        throw(bconcat!(
+            "expected a date from the plugin, got ",
+            display_to_bytes(format_args!("{value:?}"))
+        ))
+    })?;
     if object.class != DATE_TIME_IMMUTABLE_CLASS && object.class != DATE_TIME_CLASS {
         return Err(throw(bconcat!(
             "the class `",
@@ -357,16 +380,27 @@ pub(crate) fn date_time_from_wire(value: &PluginValue) -> Result<DateTime<Utc>, 
     if object.public("timezone_type") != Some(&PluginValue::Int(TIMEZONE_TYPE_IDENTIFIER))
         || zone.as_ref().is_none_or(|zone| zone != TIMEZONE_UTC)
     {
-        return Err(throw(format!(
-            "a date crosses the plugin boundary rebased on {TIMEZONE_UTC}, got the zone {zone:?}"
+        return Err(throw(bconcat!(
+            "a date crosses the plugin boundary rebased on ",
+            TIMEZONE_UTC,
+            ", got the zone ",
+            display_to_bytes(format_args!("{zone:?}"))
         )));
     }
     let rendered = required_string("a date", object.public("date"))?;
-    let rendered = utf8_text(&rendered)
-        .ok_or_else(|| throw(format!("the date {rendered:?} from the plugin is not text")))?;
+    let rendered = utf8_text(&rendered).ok_or_else(|| {
+        throw(bconcat!(
+            "the date ",
+            display_to_bytes(format_args!("{rendered:?}")),
+            " from the plugin is not text"
+        ))
+    })?;
     let parsed = NaiveDateTime::parse_from_str(rendered, DATE_FORMAT).map_err(|e| {
-        throw(format!(
-            "the date `{rendered}` from the plugin is not in the expected format: {e}"
+        throw(bconcat!(
+            "the date `",
+            rendered,
+            "` from the plugin is not in the expected format: ",
+            display_to_bytes(e)
         ))
     })?;
     Ok(Utc.from_utc_datetime(&parsed))
@@ -379,11 +413,11 @@ mod tests {
     use chrono::Timelike;
     use shirabe_php_rpc::value::serialize;
 
-    fn simple(operator: &str, version: &str, pretty_string: Option<&str>) -> AnyConstraint {
+    fn simple(operator: &BStr, version: &BStr, pretty_string: Option<&BStr>) -> AnyConstraint {
         AnyConstraint::Simple(SimpleConstraint::new(
             operator,
-            version.to_string(),
-            pretty_string.map(str::to_string).map(bstr::BString::from),
+            version.to_owned(),
+            pretty_string.map(BString::from),
         ))
     }
 
@@ -394,11 +428,11 @@ mod tests {
     #[test]
     fn a_link_is_written_as_php_writes_it() {
         let link = Link::new(
-            bstr::BString::from("a/b".to_string()),
-            bstr::BString::from("c/d".to_string()),
-            simple(">=", "1.0.0", None),
-            Some(bstr::BString::from("requires".to_string())),
-            bstr::BString::from("^1.0".to_string()),
+            BString::from("a/b"),
+            BString::from("c/d"),
+            simple(BStr::new(">="), BStr::new("1.0.0"), None),
+            Some(BString::from("requires")),
+            BString::from("^1.0"),
         );
         assert_eq!(
             BStr::new(&serialize(&link_to_wire(&link))),
@@ -424,9 +458,12 @@ mod tests {
     #[test]
     fn a_multi_constraint_is_written_as_php_writes_it() {
         let constraint = AnyConstraint::Multi(MultiConstraint::new(
-            vec![simple(">=", "1.0.0", None), simple("<", "2.0.0", None)],
+            vec![
+                simple(BStr::new(">="), BStr::new("1.0.0"), None),
+                simple(BStr::new("<"), BStr::new("2.0.0"), None),
+            ],
             true,
-            Some(bstr::BString::from("^1.0".to_string())),
+            Some(BString::from("^1.0")),
         ));
         assert_eq!(
             BStr::new(&serialize(&constraint_to_wire(&constraint))),
@@ -472,32 +509,37 @@ mod tests {
     #[test]
     fn every_constraint_shape_round_trips() {
         let constraints = [
-            simple(">=", "1.0.0.0", None),
-            simple("!=", "2.0.0.0", Some("!=2.0")),
+            simple(BStr::new(">="), BStr::new("1.0.0.0"), None),
+            simple(
+                BStr::new("!="),
+                BStr::new("2.0.0.0"),
+                Some(BStr::new("!=2.0")),
+            ),
             AnyConstraint::Multi(MultiConstraint::new(
                 vec![
-                    simple("<", "1.0.0.0", None),
+                    simple(BStr::new("<"), BStr::new("1.0.0.0"), None),
                     AnyConstraint::Multi(MultiConstraint::new(
-                        vec![simple(">=", "3.0.0.0", None), simple("<", "4.0.0.0", None)],
+                        vec![
+                            simple(BStr::new(">="), BStr::new("3.0.0.0"), None),
+                            simple(BStr::new("<"), BStr::new("4.0.0.0"), None),
+                        ],
                         true,
                         None,
                     )),
                 ],
                 false,
-                Some(bstr::BString::from("<1.0 || ^3.0".to_string())),
+                Some(BString::from("<1.0 || ^3.0")),
             )),
             AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-            AnyConstraint::MatchNone(MatchNoneConstraint::new(Some(bstr::BString::from(
-                "nothing".to_string(),
-            )))),
+            AnyConstraint::MatchNone(MatchNoneConstraint::new(Some(BString::from("nothing")))),
         ];
         for constraint in constraints {
             let link = Link::new(
-                bstr::BString::from("Vendor/Root".to_string()),
-                bstr::BString::from("Vendor/Dep".to_string()),
+                BString::from("Vendor/Root"),
+                BString::from("Vendor/Dep"),
                 constraint,
                 Some(Link::TYPE_DEV_REQUIRE.to_owned()),
-                bstr::BString::from("^1.0".to_string()),
+                BString::from("^1.0"),
             );
             let decoded = link_from_wire(&link_to_wire(&link)).expect("decode failed");
             assert_eq!(link.to_php_string(), decoded.to_php_string());

@@ -118,7 +118,7 @@ fn test_remove_plugin_removes_its_subscribed_listeners() {
         .find(|p| {
             p.borrow()
                 .get_class_name()
-                .starts_with("Subscriber\\Plugin")
+                .starts_with(b"Subscriber\\Plugin")
         })
         .expect("the subscriber plugin is registered")
         .clone();

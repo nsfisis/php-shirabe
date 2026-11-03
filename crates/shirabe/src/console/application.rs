@@ -554,14 +554,17 @@ impl Application {
                 .as_full()
                 .expect("Factory::create and Factory::create_global build a full Composer");
             let pm = composer.borrow().get_plugin_manager();
-            let mut ctor_args: IndexMap<String, shirabe_php_rpc::PluginValue> = IndexMap::new();
+            let mut ctor_args: IndexMap<BString, shirabe_php_rpc::PluginValue> = IndexMap::new();
             ctor_args.insert(
-                "composer".to_string(),
+                BString::from("composer"),
                 crate::plugin::composer_handle_value(&composer),
             );
-            ctor_args.insert("io".to_string(), crate::plugin::io_handle_value(&self.io)?);
+            ctor_args.insert(
+                BString::from("io"),
+                crate::plugin::io_handle_value(&self.io)?,
+            );
             let capabilities = pm.borrow().get_plugin_capabilities(
-                "Composer\\Plugin\\Capability\\CommandProvider",
+                BStr::new("Composer\\Plugin\\Capability\\CommandProvider"),
                 ctor_args,
             )?;
             for capability in capabilities {
@@ -2364,10 +2367,10 @@ impl ApplicationHandle {
                                             path_from_bytes(&cache_dir),
                                         )?;
                                         crate::plugin::php_class_query(
-                                            "class_exists",
+                                            BStr::new("class_exists"),
                                             vec![shirabe_php_rpc::PluginValue::string(dummy_str)],
                                         )? && crate::plugin::php_class_query(
-                                            "is_subclass_of",
+                                            BStr::new("is_subclass_of"),
                                             vec![
                                                 shirabe_php_rpc::PluginValue::string(dummy_str),
                                                 shirabe_php_rpc::PluginValue::string(
@@ -2380,7 +2383,7 @@ impl ApplicationHandle {
                                 let cmd: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> =
                                     if is_command_class {
                                         if crate::plugin::php_class_query(
-                                            "is_subclass_of",
+                                            BStr::new("is_subclass_of"),
                                             vec![
                                                 shirabe_php_rpc::PluginValue::string(dummy_str),
                                                 shirabe_php_rpc::PluginValue::string(
@@ -2402,7 +2405,7 @@ impl ApplicationHandle {
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
                                         let cmd_name = crate::plugin::call_php_entity_method(
                                             &handle,
-                                            "getName",
+                                            BStr::new("getName"),
                                             vec![],
                                         )?;
                                         if let shirabe_php_rpc::PluginValue::String(ref bytes) =
@@ -2414,7 +2417,7 @@ impl ApplicationHandle {
                                             // override it with the defined script name
                                             crate::plugin::call_php_entity_method(
                                                 &handle,
-                                                "setName",
+                                                BStr::new("setName"),
                                                 vec![shirabe_php_rpc::PluginValue::string(
                                                     script.clone(),
                                                 )],
@@ -2424,7 +2427,7 @@ impl ApplicationHandle {
                                         let cmd_description =
                                             crate::plugin::call_php_entity_method(
                                                 &handle,
-                                                "getDescription",
+                                                BStr::new("getDescription"),
                                                 vec![],
                                             )?;
                                         if matches!(
@@ -2434,7 +2437,7 @@ impl ApplicationHandle {
                                         ) {
                                             crate::plugin::call_php_entity_method(
                                                 &handle,
-                                                "setDescription",
+                                                BStr::new("setDescription"),
                                                 vec![shirabe_php_rpc::PluginValue::string(
                                                     description,
                                                 )],
@@ -3014,7 +3017,10 @@ pub(crate) fn run_worker_reverse_command(name: &BStr, input_line: &BStr) -> anyh
     // the `command` argument, so the name is prepended when the first token is not this
     // command.
     let trimmed = trim(input_line);
-    let first_token = trimmed.fields().next().unwrap_or_default();
+    let first_token = trimmed
+        .split(u8::is_ascii_whitespace)
+        .find(|token| !token.is_empty())
+        .unwrap_or_default();
     let is_named = {
         let command = command.borrow();
         command

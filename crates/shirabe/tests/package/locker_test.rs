@@ -190,7 +190,11 @@ fn test_set_lock_data() {
     assert_eq!(value["prefer-lowest"], serde_json::json!(false));
     assert_eq!(
         value["plugin-api-version"],
-        serde_json::json!(plugin_interface::PLUGIN_API_VERSION)
+        serde_json::json!(
+            plugin_interface::PLUGIN_API_VERSION
+                .display_lossy()
+                .to_string()
+        )
     );
     assert_eq!(
         value["_readme"],

@@ -9,7 +9,7 @@ use crate::event_dispatcher::{
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
-use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, rpc_name};
+use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
@@ -1216,8 +1216,8 @@ try {
             event: Some((rhandle, event)),
         };
         let outcome = call_static_method(
-            rpc_name(class_name)?,
-            rpc_name(method_name)?,
+            class_name,
+            method_name,
             vec![PluginValue::RustHandle(RustObjHandle {
                 rhandle,
                 class: bconcat!(stub_class),
@@ -1698,10 +1698,13 @@ try {
         ))?;
         match value {
             PluginValue::Bool(value) => Ok(value),
-            other => Err(anyhow::anyhow!(
-                "PHP runtime query `{}` did not return a bool: {other:?}",
-                function.display_lossy()
-            )),
+            other => Err(RuntimeException::new(bconcat!(
+                "PHP runtime query `",
+                function,
+                "` did not return a bool: ",
+                display_to_bytes(format_args!("{other:?}"))
+            ))
+            .into()),
         }
     }
 
@@ -1780,10 +1783,9 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             if method_name == "__shirabeCallStatic" {
                 return crate::plugin::php_plugin_proxy::call_static_entity(&args);
             }
-            if let Some(answer) = crate::plugin::php_plugin_proxy::dispatch_job_service_method(
-                &method_name.display_lossy().to_string(),
-                &args,
-            ) {
+            if let Some(answer) =
+                crate::plugin::php_plugin_proxy::dispatch_job_service_method(method_name, &args)
+            {
                 return answer;
             }
             return Err(runtime_throw(bconcat!(
@@ -1798,7 +1800,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             }
             _ => crate::plugin::php_plugin_proxy::dispatch_r_table_method(
                 rhandle,
-                &method_name.display_lossy().to_string(),
+                method_name,
                 &args,
                 out_params,
             ),
@@ -1863,7 +1865,7 @@ pub(crate) fn dispatch_event_method(
             let rhandle = crate::plugin::php_plugin_proxy::register_composer_entity(&composer);
             Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
                 rhandle,
-                "Composer\\Composer",
+                BStr::new("Composer\\Composer"),
             ))
         }
         b"getIO" => {
@@ -1968,13 +1970,13 @@ pub(crate) fn dispatch_event_method(
             if let Some(event) = event.as_any().downcast_ref::<PostFileDownloadEvent>() {
                 return crate::plugin::php_plugin_proxy::dispatch_post_file_download_event_method(
                     event,
-                    &BStr::new(other).display_lossy().to_string(),
+                    BStr::new(other),
                 );
             }
             if let Some(event) = event.as_any_mut().downcast_mut::<PrePoolCreateEvent>() {
                 return crate::plugin::php_plugin_proxy::dispatch_pre_pool_create_event_method(
                     event,
-                    &BStr::new(other).display_lossy().to_string(),
+                    BStr::new(other),
                     args,
                 );
             }
@@ -1982,7 +1984,7 @@ pub(crate) fn dispatch_event_method(
                 Some(event) => {
                     crate::plugin::php_plugin_proxy::dispatch_pre_file_download_event_method(
                         event,
-                        &BStr::new(other).display_lossy().to_string(),
+                        BStr::new(other),
                         args,
                     )
                 }

@@ -57,8 +57,7 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
             .get(position)
             .and_then(PhpMixed::as_string)
             .unwrap_or_default()
-            .display_lossy()
-            .to_string()
+            .to_owned()
     };
     let int = |position: usize| fields.get(position).and_then(PhpMixed::as_int).unwrap_or(0);
     let mut throw = PhpThrow::new(string(0), string(1), int(2));
@@ -88,7 +87,7 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
 fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
     let message = throw.message.clone();
     let code = throw.code;
-    let property = |name: &str| {
+    let property = |name: &BStr| {
         throw
             .properties
             .get(bstr::B(name))
@@ -99,18 +98,7 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
             })
             .unwrap_or(PhpMixed::Null)
     };
-    let string_item = |item: &PhpMixed| {
-        item.as_string()
-            .unwrap_or_default()
-            .display_lossy()
-            .to_string()
-    };
-    let strings = |name: &str| match property(name) {
-        PhpMixed::List(items) => items.iter().map(string_item).collect(),
-        PhpMixed::Array(items) => items.values().map(string_item).collect(),
-        _ => Vec::new(),
-    };
-    let byte_strings = |name: &str| -> Vec<BString> {
+    let byte_strings = |name: &BStr| -> Vec<BString> {
         match property(name) {
             PhpMixed::List(items) => items
                 .iter()
@@ -136,7 +124,7 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
         b"BadMethodCallException" => BadMethodCallException::new(message).into(),
         br"Composer\Downloader\TransportException" => {
             let mut exception = TransportException::new(message, code);
-            match property("headers") {
+            match property(BStr::new("headers")) {
                 PhpMixed::List(items) => exception.set_headers(
                     items
                         .iter()
@@ -151,9 +139,13 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
                 ),
                 _ => {}
             }
-            exception.set_response(property("response").as_string().map(|s| s.to_vec()));
-            exception.set_status_code(property("statusCode").as_int());
-            exception.set_response_info(match property("responseInfo") {
+            exception.set_response(
+                property(BStr::new("response"))
+                    .as_string()
+                    .map(|s| s.to_vec()),
+            );
+            exception.set_status_code(property(BStr::new("statusCode")).as_int());
+            exception.set_response_info(match property(BStr::new("responseInfo")) {
                 PhpMixed::List(items) => items,
                 PhpMixed::Array(items) => items.into_values().collect(),
                 _ => Vec::new(),
@@ -177,12 +169,12 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
             ScriptExecutionException::new(message, code).into()
         }
         br"Composer\Json\JsonValidationException" => {
-            JsonValidationException::new(message, byte_strings("errors")).into()
+            JsonValidationException::new(message, byte_strings(BStr::new("errors"))).into()
         }
         br"Composer\Package\Loader\InvalidPackageException" => InvalidPackageException::new(
-            byte_strings("errors"),
-            byte_strings("warnings"),
-            match property("data") {
+            byte_strings(BStr::new("errors")),
+            byte_strings(BStr::new("warnings")),
+            match property(BStr::new("data")) {
                 PhpMixed::Array(data) => data,
                 _ => IndexMap::new(),
             },
@@ -198,7 +190,7 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
         br"Symfony\Component\Console\Exception\CommandNotFoundException" => {
             shirabe_symfony_console::exception::CommandNotFoundException::new(
                 message,
-                byte_strings("alternatives"),
+                byte_strings(BStr::new("alternatives")),
                 code,
             )
             .into()
@@ -206,7 +198,7 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
         br"Symfony\Component\Console\Exception\NamespaceNotFoundException" => {
             shirabe_symfony_console::exception::NamespaceNotFoundException::new(
                 message,
-                byte_strings("alternatives"),
+                byte_strings(BStr::new("alternatives")),
                 code,
             )
             .into()
@@ -267,9 +259,6 @@ pub(crate) fn exception_into_throw(exception: &AnyThrowable, error: &anyhow::Err
 /// SolverProblemsException is the Process or the solver problems, which do not cross, and an
 /// exception of a class the port has no type for keeps none of its own.
 fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, PluginValue> {
-    let strings = |items: &[String]| {
-        PluginValue::List(items.iter().cloned().map(PluginValue::string).collect())
-    };
     let byte_strings = |items: &[BString]| {
         PluginValue::List(items.iter().cloned().map(PluginValue::string).collect())
     };
@@ -335,9 +324,9 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
 mod tests {
     use super::*;
 
-    fn throw(class: &str, parents: &[&str]) -> PhpThrow {
+    fn throw(class: &BStr, parents: &[&BStr]) -> PhpThrow {
         let mut throw = PhpThrow::new(class, "boom", 7);
-        throw.file = bstr::BString::from("/project/src/Thrower.php".to_string());
+        throw.file = BString::from("/project/src/Thrower.php");
         throw.line = 12;
         throw.parents = parents
             .iter()
@@ -349,8 +338,8 @@ mod tests {
     #[test]
     fn a_ported_class_comes_back_as_itself() {
         let error = throw_into_error(throw(
-            "InvalidArgumentException",
-            &["LogicException", "Exception"],
+            BStr::new("InvalidArgumentException"),
+            &[BStr::new("LogicException"), BStr::new("Exception")],
         ));
 
         assert!(error.is_class::<InvalidArgumentException>());
@@ -364,8 +353,12 @@ mod tests {
     #[test]
     fn an_unported_class_comes_back_as_its_nearest_ported_superclass() {
         let error = throw_into_error(throw(
-            r"Vendor\PluginException",
-            &["UnexpectedValueException", "RuntimeException", "Exception"],
+            BStr::new(r"Vendor\PluginException"),
+            &[
+                BStr::new("UnexpectedValueException"),
+                BStr::new("RuntimeException"),
+                BStr::new("Exception"),
+            ],
         ));
 
         let exception = AnyThrowable::of(&error).unwrap();
@@ -382,17 +375,15 @@ mod tests {
     #[test]
     fn the_state_of_a_ported_class_crosses_both_ways() {
         let mut thrown = throw(
-            r"Composer\Downloader\TransportException",
-            &["RuntimeException", "Exception"],
+            BStr::new(r"Composer\Downloader\TransportException"),
+            &[BStr::new("RuntimeException"), BStr::new("Exception")],
         );
-        thrown.properties.insert(
-            bstr::BString::from("statusCode".to_string()),
-            PluginValue::Int(404),
-        );
-        thrown.properties.insert(
-            bstr::BString::from("response".to_string()),
-            PluginValue::string("missing"),
-        );
+        thrown
+            .properties
+            .insert(BString::from("statusCode"), PluginValue::Int(404));
+        thrown
+            .properties
+            .insert(BString::from("response"), PluginValue::string("missing"));
         let error = throw_into_error(thrown);
 
         let exception = error.catch::<TransportException>().unwrap();
