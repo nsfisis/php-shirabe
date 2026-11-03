@@ -296,7 +296,10 @@ where
 // anything run through `preg_quote`, which escapes `<` and `>`) keep their original meaning. A `\\`
 // escapes the following backslash, so `\\<` is left untouched. Without the `u` modifier PCRE reads
 // the pattern as bytes, so a non-ASCII character is written as the `\xNN` escapes of its UTF-8
-// bytes, which also keeps it valid inside a character class.
+// bytes, which also keeps it valid inside a character class. PCRE reads `\0` and up to two more
+// octal digits (`preg_quote` writes NUL as `\000`) as an octal escape, which is rewritten to `\xNN`:
+// the `regex` crate's octal mode would also read a backreference such as `\1` as an octal escape and
+// so hide that backreferences are unsupported.
 #[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
 #[expect(clippy::disallowed_macros, reason = "regex takes a text pattern")]
 fn translate_pcre_literals(inner: &str, utf8: bool) -> String {
@@ -311,6 +314,18 @@ fn translate_pcre_literals(inner: &str, utf8: bool) -> String {
                 Some('\\') => {
                     out.push('\\');
                     out.push(chars.next().unwrap());
+                }
+                Some('0') => {
+                    chars.next();
+                    let mut value = 0;
+                    for _ in 0..2 {
+                        let Some(digit) = chars.peek().and_then(|d| d.to_digit(8)) else {
+                            break;
+                        };
+                        value = value * 8 + digit;
+                        chars.next();
+                    }
+                    out.push_str(&format!("\\x{value:02X}"));
                 }
                 _ => out.push('\\'),
             }
@@ -364,7 +379,6 @@ fn compile_php_pattern_uncached(pattern: &str) -> anyhow::Result<CompiledPattern
     let (source, utf8) = translate_php_pattern(pattern)?;
     let regex = regex::bytes::RegexBuilder::new(&source)
         .unicode(utf8)
-        .octal(true)
         .build()?;
     Ok(CompiledPattern { regex, utf8 })
 }
@@ -605,6 +619,20 @@ mod tests {
         let pattern = crate::bconcat!("/^", preg_quote(b"a.\xff", None), "$/");
         assert!(preg_is_match(&pattern, b"a.\xff"));
         assert!(!preg_is_match(&pattern, b"a.\xfe"));
+    }
+
+    #[test]
+    fn a_quoted_nul_matches_itself() {
+        let pattern = crate::bconcat!("/^", preg_quote(b"a\0b", None), "$/");
+        assert!(preg_is_match(&pattern, b"a\0b"));
+        assert!(preg_is_match("/^a\\0b$/", b"a\0b"));
+        assert!(preg_is_match("/^\\012$/", b"\n"));
+    }
+
+    #[test]
+    #[should_panic(expected = "backreferences are not supported")]
+    fn a_backreference_is_rejected() {
+        preg_is_match(r#"{^(['"])(.*)\1$}"#, "'a'");
     }
 
     #[test]
