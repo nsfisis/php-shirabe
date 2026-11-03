@@ -4,17 +4,18 @@ use crate::test_case::{
     RunOptions, create_installed_json, get_application_tester, get_complete_package,
     init_temp_composer,
 };
+use bstr::BStr;
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::trim;
+use shirabe_php_shim::{bconcat, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: HomeCommandTest::testHomeCommandWithShowFlag
 fn run_use_case(
     composer_json: serde_json::Value,
     command: Vec<(ParameterName, InputValue)>,
-    expected: &str,
-    urls: &[(&str, &str)],
+    expected: &BStr,
+    urls: &[(&BStr, &BStr)],
 ) {
     let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
 
@@ -23,10 +24,10 @@ fn run_use_case(
 
     for (pkg, url) in urls {
         if *pkg == "vendor/package" {
-            package.set_homepage(bstr::BString::from(url.to_string()));
+            package.set_homepage(bconcat!(url));
         }
         if *pkg == "vendor/devpackage" {
-            dev_package.set_homepage(bstr::BString::from(url.to_string()));
+            dev_package.set_homepage(bconcat!(url));
         }
     }
 
@@ -43,7 +44,7 @@ fn run_use_case(
     input.extend(command);
     app_tester.run(input, RunOptions::default()).unwrap();
 
-    assert_eq!(expected.trim(), trim(app_tester.get_display()));
+    assert_eq!(trim(expected), trim(app_tester.get_display()));
 }
 
 /// ref: useCaseProvider 'Invalid or missing repository URL'
@@ -68,7 +69,7 @@ fn test_home_command_with_show_flag_invalid_or_missing_repository_url() {
             ParameterName::of("packages"),
             InputValue::Array(vec!["vendor/package".into()]),
         )],
-        "<warning>Invalid or missing repository URL for vendor/package</warning>",
+        BStr::new("<warning>Invalid or missing repository URL for vendor/package</warning>"),
         &[],
     );
 }
@@ -80,8 +81,10 @@ fn test_home_command_with_show_flag_no_packages_provided() {
     run_use_case(
         serde_json::json!({ "repositories": [] }),
         vec![],
-        "No package specified, opening homepage for the root package\n\
+        BStr::new(
+            "No package specified, opening homepage for the root package\n\
          <warning>Invalid or missing repository URL for __root__</warning>",
+        ),
         &[],
     );
 }
@@ -96,8 +99,10 @@ fn test_home_command_with_show_flag_package_not_found() {
             ParameterName::of("packages"),
             InputValue::Array(vec!["vendor/anotherpackage".into()]),
         )],
-        "<warning>Package vendor/anotherpackage not found</warning>\n\
+        BStr::new(
+            "<warning>Package vendor/anotherpackage not found</warning>\n\
          <warning>Invalid or missing repository URL for vendor/anotherpackage</warning>",
+        ),
         &[],
     );
 }
@@ -112,8 +117,11 @@ fn test_home_command_with_show_flag_a_valid_package_url() {
             ParameterName::of("packages"),
             InputValue::Array(vec!["vendor/package".into()]),
         )],
-        "https://example.org",
-        &[("vendor/package", "https://example.org")],
+        BStr::new("https://example.org"),
+        &[(
+            BStr::new("vendor/package"),
+            BStr::new("https://example.org"),
+        )],
     );
 }
 
@@ -127,7 +135,10 @@ fn test_home_command_with_show_flag_a_valid_dev_package_url() {
             ParameterName::of("packages"),
             InputValue::Array(vec!["vendor/devpackage".into()]),
         )],
-        "https://example.org/dev",
-        &[("vendor/devpackage", "https://example.org/dev")],
+        BStr::new("https://example.org/dev"),
+        &[(
+            BStr::new("vendor/devpackage"),
+            BStr::new("https://example.org/dev"),
+        )],
     );
 }

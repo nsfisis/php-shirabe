@@ -3,6 +3,7 @@
 use crate::test_case::{
     RunOptions, create_composer_lock, get_application_tester, init_temp_composer,
 };
+use bstr::BStr;
 use serial_test::serial;
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{chmod, function_exists, posix_getuid, trim};
@@ -39,10 +40,10 @@ fn validate_input(command: Vec<(ParameterName, InputValue)>) -> Vec<(ParameterNa
 }
 
 struct ValidateCase {
-    name: &'static str,
+    name: &'static BStr,
     composer_json: serde_json::Value,
     command: Vec<(ParameterName, InputValue)>,
-    expected: &'static str,
+    expected: &'static BStr,
 }
 
 /// ref: provideValidateTests
@@ -67,10 +68,12 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
 
     vec![
         ValidateCase {
-            name: "validation passing",
+            name: BStr::new("validation passing"),
             composer_json: minimal_valid_configuration(),
             command: vec![],
-            expected: "<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid",
+            expected: BStr::new(
+                "<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid",
+            ),
         },
         ValidateCase {
             // WORDING NOTE: upstream asserts justinrainbow's property-prefixed strings
@@ -79,19 +82,23 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
             // prefix is reconstructed, so the shape matches:
             // "- name : \"name\" is a required property". Matches the divergence already accepted in
             // json_file_test.
-            name: "passing but with warnings",
+            name: BStr::new("passing but with warnings"),
             composer_json: publish_data_stripped.clone(),
             command: vec![],
-            expected: "./composer.json is valid for simple usage with Composer but has\nstrict errors that make it unable to be published as a package\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n# Publish errors\n- name : \"name\" is a required property\n- description : \"description\" is a required property\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
+            expected: BStr::new(
+                "./composer.json is valid for simple usage with Composer but has\nstrict errors that make it unable to be published as a package\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n# Publish errors\n- name : \"name\" is a required property\n- description : \"description\" is a required property\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
+            ),
         },
         ValidateCase {
-            name: "passing without publish-check",
+            name: BStr::new("passing without publish-check"),
             composer_json: publish_data_stripped,
             command: vec![(
                 ParameterName::of("--no-check-publish"),
                 InputValue::Bool(true),
             )],
-            expected: "./composer.json is valid, but with a few warnings\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
+            expected: BStr::new(
+                "./composer.json is valid, but with a few warnings\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
+            ),
         },
     ]
 }
@@ -108,7 +115,7 @@ fn test_validate() {
             .unwrap_or_else(|e| panic!("case {:?}: run failed: {:?}", case.name, e));
 
         assert_eq!(
-            case.expected.trim(),
+            trim(case.expected),
             trim(app_tester.get_display()),
             "case {:?}",
             case.name
@@ -145,7 +152,7 @@ fn test_with_composer_lock() {
 
     let expected = "<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n<warning>Shirabe could not detect the root package (test/suite) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version</warning>\n./composer.json is valid but your composer.lock has some errors\n# Lock file errors\n- Required package \"root/req\" is not present in the lock file.\nThis usually happens when composer files are incorrectly merged or the composer.json file is manually edited.\nRead more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md\nand prefer using the \"require\" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r";
 
-    assert_eq!(expected.trim(), trim(app_tester.get_display()));
+    assert_eq!(trim(expected), trim(app_tester.get_display()));
 
     drop(tear_down);
 }

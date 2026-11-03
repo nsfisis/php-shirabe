@@ -4,13 +4,13 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
-use bstr::ByteSlice;
+use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::json::JsonFile;
-use shirabe_php_shim::trim;
+use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
-fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
         .map(|(k, v)| (ParameterName::of(k), v))
@@ -36,21 +36,23 @@ fn test_require_throws_if_none_matches() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("require")),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("packages", InputValue::Array(vec!["required/pkg".into()])),
+                (BStr::new("command"), InputValue::from("require")),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["required/pkg".into()]),
+                ),
             ]),
             RunOptions::default(),
         )
         .expect_err("expected InvalidArgumentException for incompatible platform requirements");
 
     assert!(
-        err.to_string().contains(
+        error_message(&err).contains_str(
             "Package required/pkg has requirements incompatible with your PHP version, PHP extensions and Composer version:"
-        ) && err
-            .to_string()
-            .contains("- required/pkg 1.0.0 requires ext-foobar ^1 but it is not present."),
+        ) && error_message(&err)
+            .contains_str("- required/pkg 1.0.0 requires ext-foobar ^1 but it is not present."),
         "got: {err}"
     );
 }
@@ -76,14 +78,17 @@ fn test_require_warns_if_resolved_to_feature_branch() {
     let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["n".to_string()]);
+    app_tester.set_inputs(vec![BString::from("n")]);
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("require")),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("packages", InputValue::Array(vec!["required/pkg".into()])),
+                (BStr::new("command"), InputValue::from("require")),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["required/pkg".into()]),
+                ),
             ]),
             RunOptions {
                 interactive: Some(true),
@@ -115,14 +120,14 @@ Are you sure you want to use this constraint (y) or would you rather abort (n) t
 
 /// ref: RequireCommandTest::provideRequire
 fn provide_require() -> Vec<(
-    &'static str,
+    &'static BStr,
     serde_json::Value,
-    Vec<(&'static str, InputValue)>,
-    &'static str,
+    Vec<(&'static BStr, InputValue)>,
+    &'static BStr,
 )> {
     vec![
         (
-            "warn once for missing ext but a lower package matches",
+            BStr::new("warn once for missing ext but a lower package matches"),
             serde_json::json!({
                 "repositories": { "packages": { "type": "package", "package": [
                     { "name": "required/pkg", "version": "1.2.0", "require": { "ext-foobar": "^1" } },
@@ -130,8 +135,8 @@ fn provide_require() -> Vec<(
                     { "name": "required/pkg", "version": "1.0.0" },
                 ] } },
             }),
-            vec![("packages", InputValue::Array(vec!["required/pkg".into()]))],
-            "<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
+            vec![(BStr::new("packages"), InputValue::Array(vec!["required/pkg".into()]))],
+            BStr::new("<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
 ./composer.json has been updated
 Running shirabe update required/pkg
 Loading composer repositories with package information
@@ -141,10 +146,10 @@ Lock file operations: 1 install, 0 updates, 0 removals
 Installing dependencies from lock file (including require-dev)
 Package operations: 1 install, 0 updates, 0 removals
   - Installing required/pkg (1.0.0)
-Using version ^1.0 for required/pkg",
+Using version ^1.0 for required/pkg"),
         ),
         (
-            "warn multiple times when verbose",
+            BStr::new("warn multiple times when verbose"),
             serde_json::json!({
                 "repositories": { "packages": { "type": "package", "package": [
                     { "name": "required/pkg", "version": "1.2.0", "require": { "ext-foobar": "^1" } },
@@ -153,11 +158,11 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".into()])),
-                ("--no-install", InputValue::from(true)),
-                ("-v", InputValue::from(true)),
+                (BStr::new("packages"), InputValue::Array(vec!["required/pkg".into()])),
+                (BStr::new("--no-install"), InputValue::from(true)),
+                (BStr::new("-v"), InputValue::from(true)),
             ],
-            "<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
+            BStr::new("<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
 <warning>Cannot use required/pkg 1.1.0 as it requires ext-foobar ^1 which is missing from your platform.
 ./composer.json has been updated
 Running shirabe update required/pkg
@@ -169,10 +174,10 @@ Analyzed %d rules to resolve dependencies
 Lock file operations: 1 install, 0 updates, 0 removals
 Installs: required/pkg:1.0.0
   - Locking required/pkg (1.0.0)
-Using version ^1.0 for required/pkg",
+Using version ^1.0 for required/pkg"),
         ),
         (
-            "warn for not satisfied req which is satisfied by lower version",
+            BStr::new("warn for not satisfied req which is satisfied by lower version"),
             serde_json::json!({
                 "repositories": { "packages": { "type": "package", "package": [
                     { "name": "required/pkg", "version": "1.1.0", "require": { "php": "^20" } },
@@ -180,20 +185,20 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".into()])),
-                ("--no-install", InputValue::from(true)),
+                (BStr::new("packages"), InputValue::Array(vec!["required/pkg".into()])),
+                (BStr::new("--no-install"), InputValue::from(true)),
             ],
-            "<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
+            BStr::new("<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
 ./composer.json has been updated
 Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 1 install, 0 updates, 0 removals
   - Locking required/pkg (1.0.0)
-Using version ^1.0 for required/pkg",
+Using version ^1.0 for required/pkg"),
         ),
         (
-            "version selection happens early even if not completely accurate if no update is requested",
+            BStr::new("version selection happens early even if not completely accurate if no update is requested"),
             serde_json::json!({
                 "repositories": { "packages": { "type": "package", "package": [
                     { "name": "required/pkg", "version": "1.1.0", "require": { "php": "^20" } },
@@ -201,15 +206,15 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".into()])),
-                ("--no-update", InputValue::from(true)),
+                (BStr::new("packages"), InputValue::Array(vec!["required/pkg".into()])),
+                (BStr::new("--no-update"), InputValue::from(true)),
             ],
-            "<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
+            BStr::new("<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
 Using version ^1.0 for required/pkg
-./composer.json has been updated",
+./composer.json has been updated"),
         ),
         (
-            "pick best matching version when not provided",
+            BStr::new("pick best matching version when not provided"),
             serde_json::json!({
                 "repositories": { "packages": { "type": "package", "package": [
                     { "name": "existing/dep", "version": "1.1.0", "require": { "required/pkg": "^1" } },
@@ -220,20 +225,20 @@ Using version ^1.0 for required/pkg
                 "require": { "existing/dep": "^1" },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".into()])),
-                ("--no-install", InputValue::from(true)),
+                (BStr::new("packages"), InputValue::Array(vec!["required/pkg".into()])),
+                (BStr::new("--no-install"), InputValue::from(true)),
             ],
-            "./composer.json has been updated
+            BStr::new("./composer.json has been updated
 Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
   - Locking existing/dep (1.1.0)
   - Locking required/pkg (1.1.0)
-Using version ^1.1 for required/pkg",
+Using version ^1.1 for required/pkg"),
         ),
         (
-            "use exact constraint with --fixed",
+            BStr::new("use exact constraint with --fixed"),
             serde_json::json!({
                 "type": "project",
                 "repositories": { "packages": { "type": "package", "package": [
@@ -241,17 +246,17 @@ Using version ^1.1 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".into()])),
-                ("--no-install", InputValue::from(true)),
-                ("--fixed", InputValue::from(true)),
+                (BStr::new("packages"), InputValue::Array(vec!["required/pkg".into()])),
+                (BStr::new("--no-install"), InputValue::from(true)),
+                (BStr::new("--fixed"), InputValue::from(true)),
             ],
-            "./composer.json has been updated
+            BStr::new("./composer.json has been updated
 Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 1 install, 0 updates, 0 removals
   - Locking required/pkg (1.1.0)
-Using version 1.1.0 for required/pkg",
+Using version 1.1.0 for required/pkg"),
         ),
     ]
 }
@@ -264,66 +269,89 @@ fn test_require() {
 
         let mut app_tester = get_application_tester();
         let mut args = vec![
-            ("command", InputValue::from("require")),
-            ("--dry-run", InputValue::from(true)),
-            ("--no-audit", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("require")),
+            (BStr::new("--dry-run"), InputValue::from(true)),
+            (BStr::new("--no-audit"), InputValue::from(true)),
         ];
         args.extend(command);
         app_tester.run(input(args), RunOptions::default()).unwrap();
 
         let display = app_tester.get_display();
         let display = trim(&display);
-        if expected.contains("%d") {
+        if expected.contains_str("%d") {
             // The PHP test builds a regex by quoting the expected and replacing %d with [0-9.]+.
             // Compare line-by-line, treating "%d" as a numeric wildcard.
-            let exp_lines: Vec<&str> = expected.trim().lines().collect();
+            let trimmed_expected = trim(expected);
+            let exp_lines: Vec<&[u8]> = trimmed_expected.lines().collect();
             let got_lines: Vec<&[u8]> = display.lines().collect();
             assert_eq!(
                 exp_lines.len(),
                 got_lines.len(),
                 "case: {label}\n--- expected ---\n{expected}\n--- got ---\n{}",
-                display.display_lossy()
+                display.display_lossy(),
+                label = label.display_lossy(),
+                expected = expected.display_lossy()
             );
             for (exp, got) in exp_lines.iter().zip(got_lines.iter()) {
-                if exp.contains("%d") {
+                if exp.contains_str("%d") {
                     let prefix = &exp[..exp.find("%d").unwrap()];
                     assert!(
-                        got.starts_with(prefix.as_bytes()),
-                        "case: {label}\nexpected line prefix {prefix:?}, got {:?}",
-                        got.as_bstr()
+                        got.starts_with(prefix),
+                        "case: {label}\nexpected line prefix {:?}, got {:?}",
+                        prefix.as_bstr(),
+                        got.as_bstr(),
+                        label = label.display_lossy()
                     );
                 } else {
-                    assert_eq!(exp.as_bytes().as_bstr(), got.as_bstr(), "case: {label}");
+                    assert_eq!(
+                        exp.as_bstr(),
+                        got.as_bstr(),
+                        "case: {label}",
+                        label = label.display_lossy()
+                    );
                 }
             }
         } else {
-            assert_eq!(expected.trim(), display, "case: {label}");
+            assert_eq!(
+                trim(expected),
+                display,
+                "case: {label}",
+                label = label.display_lossy()
+            );
         }
     }
 }
 
 /// ref: RequireCommandTest::provideInconsistentRequireKeys
-fn provide_inconsistent_require_keys() -> Vec<(bool, bool, &'static str)> {
+fn provide_inconsistent_require_keys() -> Vec<(bool, bool, &'static BStr)> {
     vec![
         (
             true,
             false,
-            "<warning>required/pkg is currently present in the require key and you ran the command with the --dev flag, which will move it to the require-dev key.</warning>",
+            BStr::new(
+                "<warning>required/pkg is currently present in the require key and you ran the command with the --dev flag, which will move it to the require-dev key.</warning>",
+            ),
         ),
         (
             false,
             false,
-            "<warning>required/pkg is currently present in the require-dev key and you ran the command without the --dev flag, which will move it to the require key.</warning>",
+            BStr::new(
+                "<warning>required/pkg is currently present in the require-dev key and you ran the command without the --dev flag, which will move it to the require key.</warning>",
+            ),
         ),
         (
             true,
             true,
-            "<warning>required/pkg is currently present in the require key and you ran the command with the --dev flag, which will move it to the require-dev key.</warning>",
+            BStr::new(
+                "<warning>required/pkg is currently present in the require key and you ran the command with the --dev flag, which will move it to the require-dev key.</warning>",
+            ),
         ),
         (
             false,
             true,
-            "<warning>required/pkg is currently present in the require-dev key and you ran the command without the --dev flag, which will move it to the require key.</warning>",
+            BStr::new(
+                "<warning>required/pkg is currently present in the require-dev key and you ran the command without the --dev flag, which will move it to the require key.</warning>",
+            ),
         ),
     ]
 }
@@ -355,16 +383,19 @@ fn test_inconsistent_require_keys() {
 
         let mut app_tester = get_application_tester();
         let mut command = vec![
-            ("command", InputValue::from("require")),
-            ("--no-audit", InputValue::from(true)),
-            ("--dev", InputValue::from(is_dev)),
-            ("--no-install", InputValue::from(true)),
-            ("packages", InputValue::Array(vec!["required/pkg".into()])),
+            (BStr::new("command"), InputValue::from("require")),
+            (BStr::new("--no-audit"), InputValue::from(true)),
+            (BStr::new("--dev"), InputValue::from(is_dev)),
+            (BStr::new("--no-install"), InputValue::from(true)),
+            (
+                BStr::new("packages"),
+                InputValue::Array(vec!["required/pkg".into()]),
+            ),
         ];
         if is_interactive {
-            app_tester.set_inputs(vec!["yes".to_string()]);
+            app_tester.set_inputs(vec![BString::from("yes")]);
         } else {
-            command.push(("--no-interaction", InputValue::from(true)));
+            command.push((BStr::new("--no-interaction"), InputValue::from(true)));
         }
 
         app_tester

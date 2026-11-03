@@ -3,6 +3,7 @@
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use bstr::ByteSlice;
 use serial_test::serial;
+use shirabe_php_shim::{bconcat, str_replace};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: RunScriptCommandTest::testDetectAndPassDevModeToEventAndToDispatching
@@ -112,7 +113,7 @@ fn test_can_define_aliases() {
 
     let expected: Vec<serde_json::Value> = expected_aliases
         .iter()
-        .map(|s| serde_json::Value::String(s.to_string()))
+        .map(|s| serde_json::Value::from(*s))
         .collect();
     assert_eq!(
         expected, actual_aliases,
@@ -260,7 +261,7 @@ class MyCommand extends Command
             config produces ('./MyCommand.php') only resolves when the test runs first in the binary"]
 fn test_execution_of_symfony_command_with_configuration() {
     let cmd_name = "custom-cmd-123";
-    let cmd_alias = format!("{}-alias", cmd_name);
+    let cmd_alias = bconcat!(cmd_name, "-alias");
     let cmd_desc = "This is a Symfony command with custom configuration";
     let wrong_desc = "this should be ignored";
 
@@ -285,7 +286,10 @@ fn test_execution_of_symfony_command_with_configuration() {
 
     std::fs::write(
         "MyCommandWithDefinitions.php",
-        r#"<?php
+        str_replace(
+            "__CMD_ALIAS__",
+            &cmd_alias,
+            str_replace("__CMD_DESC__", cmd_desc, r#"<?php
 
 namespace Test;
 
@@ -310,9 +314,8 @@ class MyCommandWithDefinitions extends Command
         return Command::SUCCESS;
     }
 }
-"#
-        .replace("__CMD_DESC__", cmd_desc)
-        .replace("__CMD_ALIAS__", &cmd_alias),
+"#),
+        ),
     )
     .unwrap();
 
@@ -336,7 +339,7 @@ class MyCommandWithDefinitions extends Command
             vec![
                 (
                     ParameterName::of("command"),
-                    InputValue::from(cmd_alias.as_str()),
+                    InputValue::from(cmd_alias.as_bstr()),
                 ),
                 (ParameterName::of("req-arg"), InputValue::from("lala")),
             ],

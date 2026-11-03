@@ -1,8 +1,9 @@
 //! ref: composer/tests/Composer/Test/Command/SearchCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::{BStr, ByteSlice};
 use serial_test::serial;
-use shirabe_php_shim::trim;
+use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn repositories_json() -> serde_json::Value {
@@ -23,7 +24,7 @@ fn repositories_json() -> serde_json::Value {
 }
 
 /// ref: SearchCommandTest::testSearch (data provider rolled into one body).
-fn run_search_case(command: Vec<(ParameterName, InputValue)>, expected: &str) {
+fn run_search_case(command: Vec<(ParameterName, InputValue)>, expected: &BStr) {
     let _tear_down = init_temp_composer(Some(&repositories_json()), None, None, true);
 
     let mut input: Vec<(ParameterName, InputValue)> =
@@ -32,7 +33,7 @@ fn run_search_case(command: Vec<(ParameterName, InputValue)>, expected: &str) {
 
     let mut app_tester = get_application_tester();
     app_tester.run(input, RunOptions::default()).unwrap();
-    assert_eq!(expected.trim(), trim(app_tester.get_display()));
+    assert_eq!(trim(expected), trim(app_tester.get_display()));
 }
 
 #[test]
@@ -44,7 +45,9 @@ fn test_search() {
             ParameterName::of("tokens"),
             InputValue::Array(vec!["fancy".into()]),
         )],
-        "bar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
+        BStr::new(
+            "bar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
+        ),
     );
 
     // 'by name and description with multiple tokens'
@@ -53,7 +56,9 @@ fn test_search() {
             ParameterName::of("tokens"),
             InputValue::Array(vec!["fancy".into(), "vendor".into()]),
         )],
-        "vendor-1/package-1     generic description\nbar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
+        BStr::new(
+            "vendor-1/package-1     generic description\nbar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
+        ),
     );
 
     // 'by name only'
@@ -65,7 +70,7 @@ fn test_search() {
             ),
             (ParameterName::of("--only-name"), InputValue::from(true)),
         ],
-        "vendor-2/fancy-package",
+        BStr::new("vendor-2/fancy-package"),
     );
 
     // 'by vendor only'
@@ -77,7 +82,7 @@ fn test_search() {
             ),
             (ParameterName::of("--only-vendor"), InputValue::from(true)),
         ],
-        "bar",
+        BStr::new("bar"),
     );
 
     // 'by type'
@@ -89,7 +94,7 @@ fn test_search() {
             ),
             (ParameterName::of("--type"), InputValue::from("foo")),
         ],
-        "vendor-2/fancy-package",
+        BStr::new("vendor-2/fancy-package"),
     );
 
     // 'json format'
@@ -101,7 +106,9 @@ fn test_search() {
             ),
             (ParameterName::of("--format"), InputValue::from("json")),
         ],
-        "[\n    {\n        \"name\": \"vendor-2/fancy-package\",\n        \"description\": null\n    }\n]",
+        BStr::new(
+            "[\n    {\n        \"name\": \"vendor-2/fancy-package\",\n        \"description\": null\n    }\n]",
+        ),
     );
 
     // 'no results'
@@ -110,7 +117,7 @@ fn test_search() {
             ParameterName::of("tokens"),
             InputValue::Array(vec!["invalid-package-name".into()]),
         )],
-        "",
+        BStr::new(""),
     );
 }
 
@@ -174,8 +181,7 @@ fn test_invalid_flags() {
         )
         .expect_err("expected InvalidArgumentException");
     assert!(
-        err.to_string()
-            .contains("--only-name and --only-vendor cannot be used together"),
+        error_message(&err).contains_str("--only-name and --only-vendor cannot be used together"),
         "got: {:?}",
         err
     );

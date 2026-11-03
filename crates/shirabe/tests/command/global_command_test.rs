@@ -4,10 +4,10 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, get_package, init_temp_composer,
 };
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use serial_test::serial;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::path_to_bytes;
+use shirabe_php_shim::{bconcat, error_message, path_to_bytes};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -75,9 +75,10 @@ fn test_global() {
     let display = app_tester.get_display();
 
     assert_eq!(
-        format!(
-            "Changed current directory to {}\nCOMPOSER SCRIPT OUTPUT: \n",
-            composer_home_str.display()
+        bconcat!(
+            "Changed current directory to ",
+            composer_home_str,
+            "\nCOMPOSER SCRIPT OUTPUT: \n"
         ),
         display
     );
@@ -116,10 +117,7 @@ fn test_cannot_create_home() {
         .expect_err("expected RuntimeException for a non-directory COMPOSER_HOME");
 
     assert!(
-        err.to_string().contains(&format!(
-            "{} exists and is not a directory.",
-            filename_str.display()
-        )),
+        error_message(&err).contains_str(bconcat!(filename_str, " exists and is not a directory.")),
         "got: {}",
         err
     );
@@ -153,7 +151,7 @@ fn test_global_show() {
     let composer_home_str = tear_down.working_dir().to_path_buf();
 
     let pkg = get_complete_package("vendor/global-tool", "1.0.0");
-    pkg.set_description(bstr::BString::from("A globally installed tool".to_string()));
+    pkg.set_description(BString::from("A globally installed tool"));
     create_installed_json(&[pkg.into()], &[], true);
 
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
@@ -161,7 +159,7 @@ fn test_global_show() {
     let _test_dir = chdir_unique_tmp_directory();
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["".to_string()]);
+    app_tester.set_inputs(vec![BString::from("")]);
     let _ = app_tester.run(
         vec![
             (ParameterName::of("command"), InputValue::from("global")),
@@ -200,7 +198,7 @@ fn test_global_show_without_packages() {
     let _test_dir = chdir_unique_tmp_directory();
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["".to_string()]);
+    app_tester.set_inputs(vec![BString::from("")]);
     let status_code = app_tester
         .run(
             vec![
@@ -248,7 +246,7 @@ fn test_global_require() {
     let _test_dir = chdir_unique_tmp_directory();
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["".to_string()]);
+    app_tester.set_inputs(vec![BString::from("")]);
     let status_code = app_tester
         .run(
             vec![
@@ -312,7 +310,7 @@ fn test_global_update() {
     let _test_dir = chdir_unique_tmp_directory();
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["".to_string()]);
+    app_tester.set_inputs(vec![BString::from("")]);
     let status_code = app_tester
         .run(
             vec![
@@ -351,7 +349,7 @@ fn test_global_changes_directory() {
     let _test_dir = chdir_unique_tmp_directory();
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["".to_string()]);
+    app_tester.set_inputs(vec![BString::from("")]);
     let _ = app_tester.run(
         vec![
             (ParameterName::of("command"), InputValue::from("global")),
@@ -366,10 +364,7 @@ fn test_global_changes_directory() {
 
     let output = app_tester.get_display();
     assert!(
-        output.contains_str(format!(
-            "Changed current directory to {}",
-            composer_home_str.display()
-        )),
+        output.contains_str(bconcat!("Changed current directory to ", composer_home_str)),
         "got: {}",
         output.display_lossy()
     );
@@ -388,7 +383,7 @@ fn test_global_missing_command_name() {
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["".to_string()]);
+    app_tester.set_inputs(vec![BString::from("")]);
     let err = app_tester
         .run(
             vec![(ParameterName::of("command"), InputValue::from("global"))],
@@ -397,8 +392,7 @@ fn test_global_missing_command_name() {
         .expect_err("expected a RuntimeException for the missing command-name argument");
 
     assert!(
-        err.to_string()
-            .contains("Not enough arguments (missing: \"command-name\")"),
+        error_message(&err).contains_str("Not enough arguments (missing: \"command-name\")"),
         "got: {}",
         err
     );

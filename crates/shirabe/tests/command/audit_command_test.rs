@@ -7,7 +7,7 @@ use crate::test_case::{
 use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::trim;
+use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 #[test]
@@ -50,7 +50,7 @@ fn test_error_auditing_lock_file_when_it_is_missing() {
         )
         .expect_err("expected UnexpectedValueException");
     assert!(
-        err.to_string().contains(
+        error_message(&err).contains_str(
             "Valid composer.json and composer.lock files are required to run this command with --locked"
         ),
         "unexpected error: {err}"

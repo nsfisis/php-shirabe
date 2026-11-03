@@ -4,15 +4,17 @@ use crate::test_case::{
     RunOptions, get_application_tester, get_complete_package, get_package, get_version_constraint,
     init_temp_composer,
 };
-use bstr::ByteSlice;
+use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::PlatformRepository;
-use shirabe_php_shim::{bconcat, date_local, trim};
+use shirabe_php_shim::{
+    STR_PAD_RIGHT, bconcat, date_local, error_message, implode, str_pad, trim, utf8_text,
+};
 
 /// Build a `Vec<(ParameterName, InputValue)>` command input from `(key, value)` pairs.
-fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
         .map(|(k, v)| (ParameterName::of(k), v))
@@ -53,15 +55,13 @@ fn show_composer_json(requires: serde_json::Value) -> serde_json::Value {
 /// ref: ShowCommandTest::testShow (one data-provider case).
 fn run_show_case(
     command: Vec<(ParameterName, InputValue)>,
-    expected: &str,
+    expected: &BStr,
     requires: serde_json::Value,
 ) {
     let _tear_down = init_temp_composer(Some(&show_composer_json(requires)), None, None, true);
 
     let pkg = get_complete_package("vendor/package", "v1.0.0");
-    pkg.set_description(bstr::BString::from(
-        "description of installed package".to_string(),
-    ));
+    pkg.set_description(BString::from("description of installed package"));
     let major = get_complete_package("outdated/major", "v1.0.0");
     major.set_release_date(Some(chrono::Utc::now()));
     let minor = get_complete_package("outdated/minor", "1.0.0");
@@ -74,14 +74,12 @@ fn run_show_case(
     create_installed_json(&packages, &[], true);
 
     let locked = get_complete_package("vendor/locked", "3.0.0");
-    locked.set_description(bstr::BString::from(
-        "description of locked package".to_string(),
-    ));
+    locked.set_description(BString::from("description of locked package"));
     create_composer_lock(&[locked.into()], &[]);
 
     let mut app_tester = get_application_tester();
     app_tester.run(command, RunOptions::default()).unwrap();
-    assert_eq!(expected.trim(), trim(app_tester.get_display()));
+    assert_eq!(trim(expected), trim(app_tester.get_display()));
 }
 
 use crate::test_case::{create_composer_lock, create_installed_json};
@@ -91,11 +89,13 @@ use shirabe_symfony_console::input::{InputValue, ParameterName};
 #[serial]
 fn test_show_default_shows_installed_with_version_and_description() {
     run_show_case(
-        input(vec![("command", InputValue::from("show"))]),
-        "outdated/major 1.0.0
+        input(vec![(BStr::new("command"), InputValue::from("show"))]),
+        BStr::new(
+            "outdated/major 1.0.0
 outdated/minor 1.0.0
 outdated/patch 1.0.0
 vendor/package 1.0.0 description of installed package",
+        ),
         serde_json::json!({}),
     );
 }
@@ -105,15 +105,17 @@ vendor/package 1.0.0 description of installed package",
 fn test_show_with_installed_and_self() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("show")),
-            ("--installed", InputValue::from(true)),
-            ("--self", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("show")),
+            (BStr::new("--installed"), InputValue::from(true)),
+            (BStr::new("--self"), InputValue::from(true)),
         ]),
-        "outdated/major 1.0.0
+        BStr::new(
+            "outdated/major 1.0.0
 outdated/minor 1.0.0
 outdated/patch 1.0.0
 root/pkg       1.2.3
 vendor/package 1.0.0 description of installed package",
+        ),
         serde_json::json!({}),
     );
 }
@@ -123,12 +125,14 @@ vendor/package 1.0.0 description of installed package",
 fn test_show_with_locked_and_self() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("show")),
-            ("--locked", InputValue::from(true)),
-            ("--self", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("show")),
+            (BStr::new("--locked"), InputValue::from(true)),
+            (BStr::new("--self"), InputValue::from(true)),
         ]),
-        "root/pkg      1.2.3
+        BStr::new(
+            "root/pkg      1.2.3
 vendor/locked 3.0.0 description of locked package",
+        ),
         serde_json::json!({}),
     );
 }
@@ -138,13 +142,15 @@ vendor/locked 3.0.0 description of locked package",
 fn test_show_with_available() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("show")),
-            ("-a", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("show")),
+            (BStr::new("-a"), InputValue::from(true)),
         ]),
-        "outdated/major outdated/major v2.0.0 description
+        BStr::new(
+            "outdated/major outdated/major v2.0.0 description
 outdated/minor outdated/minor v1.1.1 description
 outdated/patch outdated/patch v1.0.1 description
 vendor/package generic description",
+        ),
         serde_json::json!({}),
     );
 }
@@ -154,10 +160,10 @@ vendor/package generic description",
 fn test_show_with_direct_shows_nothing_if_no_deps() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("show")),
-            ("--direct", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("show")),
+            (BStr::new("--direct"), InputValue::from(true)),
         ]),
-        "",
+        BStr::new(""),
         serde_json::json!({}),
     );
 }
@@ -167,10 +173,10 @@ fn test_show_with_direct_shows_nothing_if_no_deps() {
 fn test_show_with_direct_shows_only_root_deps() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("show")),
-            ("--direct", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("show")),
+            (BStr::new("--direct"), InputValue::from(true)),
         ]),
-        "outdated/major 1.0.0",
+        BStr::new("outdated/major 1.0.0"),
         serde_json::json!({"outdated/major": "*"}),
     );
 }
@@ -179,8 +185,9 @@ fn test_show_with_direct_shows_only_root_deps() {
 #[serial]
 fn test_show_outdated_deps() {
     run_show_case(
-        input(vec![("command", InputValue::from("outdated"))]),
-        "Legend:
+        input(vec![(BStr::new("command"), InputValue::from("outdated"))]),
+        BStr::new(
+            "Legend:
 ! patch or minor release available - update recommended
 ~ major release available - update possible
 
@@ -191,6 +198,7 @@ Transitive dependencies not required in composer.json:
 outdated/major 1.0.0 ~ 2.0.0
 outdated/minor 1.0.0 <highlight>! 1.1.1</highlight>
 outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
+        ),
         serde_json::json!({}),
     );
 }
@@ -205,10 +213,11 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 fn test_show_outdated_deps_sorting_by_age() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("outdated")),
-            ("--sort-by-age", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("outdated")),
+            (BStr::new("--sort-by-age"), InputValue::from(true)),
         ]),
-        "Legend:
+        BStr::new(
+            "Legend:
 ! patch or minor release available - update recommended
 ~ major release available - update possible
 
@@ -219,6 +228,7 @@ Transitive dependencies not required in composer.json:
 outdated/minor 1.0.0 <highlight>! 1.1.1</highlight> 2 years old
 outdated/patch 1.0.0 <highlight>! 1.0.1</highlight> 2 weeks old
 outdated/major 1.0.0 ~ 2.0.0 from today",
+        ),
         serde_json::json!({}),
     );
 }
@@ -228,13 +238,15 @@ outdated/major 1.0.0 ~ 2.0.0 from today",
 fn test_show_outdated_deps_with_direct_only_show_direct_deps_with_updated() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("outdated")),
-            ("--direct", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("outdated")),
+            (BStr::new("--direct"), InputValue::from(true)),
         ]),
-        "Legend:
+        BStr::new(
+            "Legend:
 ! patch or minor release available - update recommended
 ~ major release available - update possible
 outdated/major 1.0.0 ~ 2.0.0",
+        ),
         serde_json::json!({
             "vendor/package": "*",
             "outdated/major": "*",
@@ -247,10 +259,10 @@ outdated/major 1.0.0 ~ 2.0.0",
 fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("outdated")),
-            ("--direct", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("outdated")),
+            (BStr::new("--direct"), InputValue::from(true)),
         ]),
-        "All your direct dependencies are up to date",
+        BStr::new("All your direct dependencies are up to date"),
         serde_json::json!({"vendor/package": "*"}),
     );
 }
@@ -260,10 +272,11 @@ fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
 fn test_show_outdated_deps_with_major_only() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("outdated")),
-            ("--major-only", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("outdated")),
+            (BStr::new("--major-only"), InputValue::from(true)),
         ]),
-        "Legend:
+        BStr::new(
+            "Legend:
 ! patch or minor release available - update recommended
 ~ major release available - update possible
 
@@ -272,6 +285,7 @@ Everything up to date
 
 Transitive dependencies not required in composer.json:
 outdated/major 1.0.0 ~ 2.0.0",
+        ),
         serde_json::json!({}),
     );
 }
@@ -281,10 +295,11 @@ outdated/major 1.0.0 ~ 2.0.0",
 fn test_show_outdated_deps_with_minor_only() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("outdated")),
-            ("--minor-only", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("outdated")),
+            (BStr::new("--minor-only"), InputValue::from(true)),
         ]),
-        "Legend:
+        BStr::new(
+            "Legend:
 ! patch or minor release available - update recommended
 ~ major release available - update possible
 
@@ -294,6 +309,7 @@ outdated/minor 1.0.0 <highlight>! 1.1.1</highlight>
 Transitive dependencies not required in composer.json:
 outdated/major 1.0.0 <highlight>! 1.1.1</highlight>
 outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
+        ),
         serde_json::json!({"outdated/minor": "*"}),
     );
 }
@@ -303,10 +319,11 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 fn test_show_outdated_deps_with_patch_only() {
     run_show_case(
         input(vec![
-            ("command", InputValue::from("outdated")),
-            ("--patch-only", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("outdated")),
+            (BStr::new("--patch-only"), InputValue::from(true)),
         ]),
-        "Legend:
+        BStr::new(
+            "Legend:
 ! patch or minor release available - update recommended
 ~ major release available - update possible
 
@@ -317,6 +334,7 @@ Transitive dependencies not required in composer.json:
 outdated/major 1.0.0 <highlight>! 1.0.1</highlight>
 outdated/minor 1.0.0 <highlight>! 1.0.1</highlight>
 outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
+        ),
         serde_json::json!({}),
     );
 }
@@ -348,7 +366,7 @@ fn test_outdated_filters_according_to_platform_reqs_and_warns() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            input(vec![("command", InputValue::from("outdated"))]),
+            input(vec![(BStr::new("command"), InputValue::from("outdated"))]),
             RunOptions::default(),
         )
         .unwrap();
@@ -370,8 +388,8 @@ vendor/package 1.1.0 ~ 1.0.0",
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("outdated")),
-                ("--verbose", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("outdated")),
+                (BStr::new("--verbose"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -420,7 +438,7 @@ fn test_outdated_filters_according_to_platform_reqs_without_warning_for_higher_v
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            input(vec![("command", InputValue::from("outdated"))]),
+            input(vec![(BStr::new("command"), InputValue::from("outdated"))]),
             RunOptions::default(),
         )
         .unwrap();
@@ -469,15 +487,15 @@ fn test_show_direct_with_name_does_not_show_transient_dependencies() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--direct", InputValue::from(true)),
-                ("package", InputValue::from("vendor/package")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--direct"), InputValue::from(true)),
+                (BStr::new("package"), InputValue::from("vendor/package")),
             ]),
             RunOptions::default(),
         )
         .expect_err("expected an InvalidArgumentException");
     assert!(
-        err.to_string().contains(
+        error_message(&err).contains_str(
             "Package \"vendor/package\" is installed but not a direct dependent of the root package."
         ),
         "unexpected error: {}",
@@ -516,9 +534,9 @@ fn test_show_direct_with_name_only_shows_direct_dependents() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--direct", InputValue::from(true)),
-                ("package", InputValue::from("direct/dependent")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--direct"), InputValue::from(true)),
+                (BStr::new("package"), InputValue::from("direct/dependent")),
             ]),
             RunOptions::default(),
         )
@@ -534,9 +552,9 @@ fn test_show_direct_with_name_only_shows_direct_dependents() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--direct", InputValue::from(true)),
-                ("package", InputValue::from("direct/dependent2")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--direct"), InputValue::from(true)),
+                (BStr::new("package"), InputValue::from("direct/dependent2")),
             ]),
             RunOptions::default(),
         )
@@ -597,8 +615,8 @@ fn test_show_platform_only_shows_platform_packages() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("-p", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("-p"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -619,8 +637,8 @@ fn test_show_platform_works_without_composer_json() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("-p", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("-p"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -632,9 +650,9 @@ fn test_show_platform_works_without_composer_json() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("-p", InputValue::from(true)),
-                ("package", InputValue::from("php")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("-p"), InputValue::from(true)),
+                (BStr::new("package"), InputValue::from("php")),
             ]),
             RunOptions::default(),
         )
@@ -644,10 +662,10 @@ fn test_show_platform_works_without_composer_json() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("-p", InputValue::from(true)),
-                ("-f", InputValue::from("json")),
-                ("package", InputValue::from("php")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("-p"), InputValue::from(true)),
+                (BStr::new("-f"), InputValue::from("json")),
+                (BStr::new("package"), InputValue::from("php")),
             ]),
             RunOptions::default(),
         )
@@ -702,9 +720,9 @@ fn test_outdated_with_zero_major() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("outdated")),
-                ("--direct", InputValue::from(true)),
-                ("--patch-only", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("outdated")),
+                (BStr::new("--direct"), InputValue::from(true)),
+                (BStr::new("--patch-only"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -721,9 +739,9 @@ zero/patch 0.1.2 <highlight>! 0.1.2.1</highlight>",
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("outdated")),
-                ("--direct", InputValue::from(true)),
-                ("--minor-only", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("outdated")),
+                (BStr::new("--direct"), InputValue::from(true)),
+                (BStr::new("--minor-only"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -741,9 +759,9 @@ zero/patch 0.1.2 <highlight>! 0.1.2.1</highlight>",
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("outdated")),
-                ("--direct", InputValue::from(true)),
-                ("--major-only", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("outdated")),
+                (BStr::new("--direct"), InputValue::from(true)),
+                (BStr::new("--major-only"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -778,23 +796,19 @@ fn test_show_all_shows_all_sections() {
     );
 
     let pkg = get_complete_package("vendor/installed", "2.0.0");
-    pkg.set_description(bstr::BString::from(
-        "description of installed package".to_string(),
-    ));
+    pkg.set_description(BString::from("description of installed package"));
     create_installed_json(&[pkg.into()], &[], true);
 
     let locked = get_complete_package("vendor/locked", "3.0.0");
-    locked.set_description(bstr::BString::from(
-        "description of locked package".to_string(),
-    ));
+    locked.set_description(BString::from("description of locked package"));
     create_composer_lock(&[locked.into()], &[]);
 
     let mut app_tester = get_application_tester();
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--all", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--all"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -828,14 +842,14 @@ fn test_locked_requires_valid_lock_file() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--locked", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--locked"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .expect_err("expected an exception");
     assert!(
-        err.to_string().contains(
+        error_message(&err).contains_str(
             "A valid composer.json and composer.lock files is required to run this command with --locked"
         ),
         "unexpected error: {}",
@@ -849,17 +863,15 @@ fn test_locked_shows_all_locked() {
     let _tear_down = init_temp_composer(None, None, None, true);
 
     let pkg = get_complete_package("vendor/locked", "3.0.0");
-    pkg.set_description(bstr::BString::from(
-        "description of locked package".to_string(),
-    ));
+    pkg.set_description(BString::from("description of locked package"));
     create_composer_lock(&[pkg.clone().into()], &[]);
 
     let mut app_tester = get_application_tester();
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--locked", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--locked"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -870,17 +882,15 @@ fn test_locked_shows_all_locked() {
     );
 
     let pkg2 = get_complete_package("vendor/locked2", "2.0.0");
-    pkg2.set_description(bstr::BString::from(
-        "description of locked2 package".to_string(),
-    ));
+    pkg2.set_description(BString::from("description of locked2 package"));
     create_composer_lock(&[pkg.into(), pkg2.into()], &[]);
 
     let mut app_tester = get_application_tester();
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--locked", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--locked"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -895,57 +905,57 @@ vendor/locked2 2.0.0 description of locked2 package",
 #[test]
 #[serial]
 fn test_invalid_option_combinations() {
-    let combos: Vec<Vec<(&str, InputValue)>> = vec![
+    let combos: Vec<Vec<(&BStr, InputValue)>> = vec![
         vec![
-            ("--direct", InputValue::from(true)),
-            ("--all", InputValue::from(true)),
+            (BStr::new("--direct"), InputValue::from(true)),
+            (BStr::new("--all"), InputValue::from(true)),
         ],
         vec![
-            ("--direct", InputValue::from(true)),
-            ("--available", InputValue::from(true)),
+            (BStr::new("--direct"), InputValue::from(true)),
+            (BStr::new("--available"), InputValue::from(true)),
         ],
         vec![
-            ("--direct", InputValue::from(true)),
-            ("--platform", InputValue::from(true)),
+            (BStr::new("--direct"), InputValue::from(true)),
+            (BStr::new("--platform"), InputValue::from(true)),
         ],
         vec![
-            ("--tree", InputValue::from(true)),
-            ("--all", InputValue::from(true)),
+            (BStr::new("--tree"), InputValue::from(true)),
+            (BStr::new("--all"), InputValue::from(true)),
         ],
         vec![
-            ("--tree", InputValue::from(true)),
-            ("--available", InputValue::from(true)),
+            (BStr::new("--tree"), InputValue::from(true)),
+            (BStr::new("--available"), InputValue::from(true)),
         ],
         vec![
-            ("--tree", InputValue::from(true)),
-            ("--latest", InputValue::from(true)),
+            (BStr::new("--tree"), InputValue::from(true)),
+            (BStr::new("--latest"), InputValue::from(true)),
         ],
         vec![
-            ("--tree", InputValue::from(true)),
-            ("--path", InputValue::from(true)),
+            (BStr::new("--tree"), InputValue::from(true)),
+            (BStr::new("--path"), InputValue::from(true)),
         ],
         vec![
-            ("--patch-only", InputValue::from(true)),
-            ("--minor-only", InputValue::from(true)),
+            (BStr::new("--patch-only"), InputValue::from(true)),
+            (BStr::new("--minor-only"), InputValue::from(true)),
         ],
         vec![
-            ("--patch-only", InputValue::from(true)),
-            ("--major-only", InputValue::from(true)),
+            (BStr::new("--patch-only"), InputValue::from(true)),
+            (BStr::new("--major-only"), InputValue::from(true)),
         ],
         vec![
-            ("--minor-only", InputValue::from(true)),
-            ("--major-only", InputValue::from(true)),
+            (BStr::new("--minor-only"), InputValue::from(true)),
+            (BStr::new("--major-only"), InputValue::from(true)),
         ],
         vec![
-            ("--minor-only", InputValue::from(true)),
-            ("--major-only", InputValue::from(true)),
-            ("--patch-only", InputValue::from(true)),
+            (BStr::new("--minor-only"), InputValue::from(true)),
+            (BStr::new("--major-only"), InputValue::from(true)),
+            (BStr::new("--patch-only"), InputValue::from(true)),
         ],
-        vec![("--format", InputValue::from("test"))],
+        vec![(BStr::new("--format"), InputValue::from("test"))],
     ];
 
     for combo in combos {
-        let mut pairs = vec![("command", InputValue::from("show"))];
+        let mut pairs = vec![(BStr::new("command"), InputValue::from("show"))];
         pairs.extend(combo.clone());
         let mut app_tester = get_application_tester();
         let status_code = app_tester.run(input(pairs), RunOptions::default()).unwrap();
@@ -962,8 +972,8 @@ fn test_ignored_option_combinations() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--installed", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--installed"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -978,8 +988,11 @@ fn test_ignored_option_combinations() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--ignore", InputValue::Array(vec!["vendor/package".into()])),
+                (BStr::new("command"), InputValue::from("show")),
+                (
+                    BStr::new("--ignore"),
+                    InputValue::Array(vec!["vendor/package".into()]),
+                ),
             ]),
             RunOptions::default(),
         )
@@ -1005,9 +1018,9 @@ fn test_self_and_name_only() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--self", InputValue::from(true)),
-                ("--name-only", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--self"), InputValue::from(true)),
+                (BStr::new("--name-only"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1028,9 +1041,9 @@ fn test_self_and_package_combination() {
     let mut app_tester = get_application_tester();
     let result = app_tester.run(
         input(vec![
-            ("command", InputValue::from("show")),
-            ("--self", InputValue::from(true)),
-            ("package", InputValue::from("vendor/package")),
+            (BStr::new("command"), InputValue::from("show")),
+            (BStr::new("--self"), InputValue::from(true)),
+            (BStr::new("package"), InputValue::from("vendor/package")),
         ]),
         RunOptions::default(),
     );
@@ -1049,7 +1062,7 @@ fn test_self() {
         Some(&serde_json::json!({
             "name": "vendor/package",
             "version": "1.2.3",
-            "time": today.display_lossy().to_string(),
+            "time": utf8_text(&today).unwrap(),
         })),
         None,
         None,
@@ -1060,35 +1073,31 @@ fn test_self() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--self", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--self"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .unwrap();
 
-    let expected: Vec<(&str, String)> = vec![
-        ("name", "vendor/package".to_string()),
-        ("descrip.", "".to_string()),
-        ("keywords", "".to_string()),
-        ("versions", "* 1.2.3".to_string()),
-        (
-            "released",
-            bconcat!(today, ", today").display_lossy().to_string(),
-        ),
-        ("type", "library".to_string()),
-        ("homepage", "".to_string()),
-        ("source", "[]  ".to_string()),
-        ("dist", "[]  ".to_string()),
-        ("path", "".to_string()),
-        ("names", "vendor/package".to_string()),
+    let expected: Vec<(&BStr, BString)> = vec![
+        (BStr::new("name"), BString::from("vendor/package")),
+        (BStr::new("descrip."), BString::from("")),
+        (BStr::new("keywords"), BString::from("")),
+        (BStr::new("versions"), BString::from("* 1.2.3")),
+        (BStr::new("released"), bconcat!(today, ", today").to_owned()),
+        (BStr::new("type"), BString::from("library")),
+        (BStr::new("homepage"), BString::from("")),
+        (BStr::new("source"), BString::from("[]  ")),
+        (BStr::new("dist"), BString::from("[]  ")),
+        (BStr::new("path"), BString::from("")),
+        (BStr::new("names"), BString::from("vendor/package")),
     ];
-    let expected_string = expected
+    let lines: Vec<BString> = expected
         .iter()
-        .map(|(k, v)| format!("{:<8} : {}", k, v))
-        .collect::<Vec<_>>()
-        .join("\n")
-        + "\n";
+        .map(|(k, v)| bconcat!(str_pad(k, 8, " ", STR_PAD_RIGHT), " : ", v))
+        .collect();
+    let expected_string = bconcat!(implode("\n", &lines), "\n");
 
     assert_eq!(expected_string, app_tester.get_display());
 }
@@ -1109,7 +1118,7 @@ fn test_not_installed_error() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            input(vec![("command", InputValue::from("show"))]),
+            input(vec![(BStr::new("command"), InputValue::from("show"))]),
             RunOptions::default(),
         )
         .unwrap();
@@ -1145,8 +1154,8 @@ fn test_no_dev_option() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--no-dev", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--no-dev"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1185,14 +1194,14 @@ fn test_package_filter() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("package", InputValue::from("vendor/package")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("package"), InputValue::from("vendor/package")),
             ]),
             RunOptions::default(),
         )
         .unwrap();
     let output = app_tester.get_display();
-    let output = output.trim();
+    let output = trim(&output);
     assert!(output.contains_str("vendor/package"));
     assert!(!output.contains_str("vendor/other-package"));
     assert!(!output.contains_str("company/package"));
@@ -1202,15 +1211,15 @@ fn test_package_filter() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("package", InputValue::from("company/*")),
-                ("--name-only", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("package"), InputValue::from("company/*")),
+                (BStr::new("--name-only"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .unwrap();
     let output = app_tester.get_display();
-    let output = output.trim();
+    let output = trim(&output);
     assert!(!output.contains_str("vendor/package"));
     assert!(!output.contains_str("vendor/other-package"));
     assert!(output.contains_str("company/package"));
@@ -1218,7 +1227,11 @@ fn test_package_filter() {
 }
 
 /// ref: ShowCommandTest::testNotExistingPackage (one data-provider case).
-fn run_not_existing_package_case(package: &str, options: Vec<(&str, InputValue)>, expected: &str) {
+fn run_not_existing_package_case(
+    package: &BStr,
+    options: Vec<(&BStr, InputValue)>,
+    expected: &BStr,
+) {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
             "require": {"vendor/package": "1.0.0"},
@@ -1232,8 +1245,8 @@ fn run_not_existing_package_case(package: &str, options: Vec<(&str, InputValue)>
     create_composer_lock(&[pkg], &[]);
 
     let mut pairs = vec![
-        ("command", InputValue::from("show")),
-        ("package", InputValue::from(package)),
+        (BStr::new("command"), InputValue::from("show")),
+        (BStr::new("package"), InputValue::from(package)),
     ];
     pairs.extend(options);
 
@@ -1242,7 +1255,7 @@ fn run_not_existing_package_case(package: &str, options: Vec<(&str, InputValue)>
         .run(input(pairs), RunOptions::default())
         .expect_err("expected an exception");
     assert!(
-        err.to_string().contains(expected),
+        error_message(&err).contains_str(expected),
         "expected message starting with {:?}, got: {}",
         expected,
         err
@@ -1253,9 +1266,11 @@ fn run_not_existing_package_case(package: &str, options: Vec<(&str, InputValue)>
 #[serial]
 fn test_not_existing_package_with_no_options() {
     run_not_existing_package_case(
-        "not/existing",
+        BStr::new("not/existing"),
         vec![],
-        "Package \"not/existing\" not found, try using --available (-a) to show all available packages.",
+        BStr::new(
+            "Package \"not/existing\" not found, try using --available (-a) to show all available packages.",
+        ),
     );
 }
 
@@ -1263,9 +1278,9 @@ fn test_not_existing_package_with_no_options() {
 #[serial]
 fn test_not_existing_package_with_all_option() {
     run_not_existing_package_case(
-        "not/existing",
-        vec![("--all", InputValue::from(true))],
-        "Package \"not/existing\" not found.",
+        BStr::new("not/existing"),
+        vec![(BStr::new("--all"), InputValue::from(true))],
+        BStr::new("Package \"not/existing\" not found."),
     );
 }
 
@@ -1273,9 +1288,11 @@ fn test_not_existing_package_with_all_option() {
 #[serial]
 fn test_not_existing_package_with_locked_option() {
     run_not_existing_package_case(
-        "not/existing",
-        vec![("--locked", InputValue::from(true))],
-        "Package \"not/existing\" not found in lock file, try using --available (-a) to show all available packages.",
+        BStr::new("not/existing"),
+        vec![(BStr::new("--locked"), InputValue::from(true))],
+        BStr::new(
+            "Package \"not/existing\" not found in lock file, try using --available (-a) to show all available packages.",
+        ),
     );
 }
 
@@ -1283,9 +1300,11 @@ fn test_not_existing_package_with_locked_option() {
 #[serial]
 fn test_not_existing_platform_with_platform_option() {
     run_not_existing_package_case(
-        "ext-nonexisting",
-        vec![("--platform", InputValue::from(true))],
-        "Package \"ext-nonexisting\" not found, try using --available (-a) to show all available packages.",
+        BStr::new("ext-nonexisting"),
+        vec![(BStr::new("--platform"), InputValue::from(true))],
+        BStr::new(
+            "Package \"ext-nonexisting\" not found, try using --available (-a) to show all available packages.",
+        ),
     );
 }
 
@@ -1293,9 +1312,11 @@ fn test_not_existing_platform_with_platform_option() {
 #[serial]
 fn test_not_existing_platform_without_platform_option() {
     run_not_existing_package_case(
-        "ext-nonexisting",
+        BStr::new("ext-nonexisting"),
         vec![],
-        "Package \"ext-nonexisting\" not found, try using --platform (-p) to show platform packages, try using --available (-a) to show all available packages.",
+        BStr::new(
+            "Package \"ext-nonexisting\" not found, try using --platform (-p) to show platform packages, try using --available (-a) to show all available packages.",
+        ),
     );
 }
 
@@ -1313,27 +1334,28 @@ fn test_not_existing_package_with_working_dir() {
     let dir = tear_down.working_dir();
     create_installed_json(&[get_package("vendor/package", "1.0.0")], &[], true);
 
-    let expected = format!(
-        "Package \"not/existing\" not found in {}/composer.json, try using --available (-a) to show all available packages.",
-        dir.display()
+    let expected = bconcat!(
+        "Package \"not/existing\" not found in ",
+        dir,
+        "/composer.json, try using --available (-a) to show all available packages."
     );
 
     let mut app_tester = get_application_tester();
     let err = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("package", InputValue::from("not/existing")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("package"), InputValue::from("not/existing")),
                 (
-                    "--working-dir",
-                    InputValue::from(dir.display().to_string().as_str()),
+                    BStr::new("--working-dir"),
+                    InputValue::from(bconcat!(dir).as_bstr()),
                 ),
             ]),
             RunOptions::default(),
         )
         .expect_err("expected an exception");
     assert!(
-        err.to_string().contains(&expected),
+        error_message(&err).contains_str(&expected),
         "expected message starting with {:?}, got: {}",
         expected,
         err
@@ -1345,8 +1367,8 @@ fn test_not_existing_package_with_working_dir() {
 /// ref: ShowCommandTest::testSpecificPackageAndTree (one data-provider case).
 fn run_specific_package_and_tree_case(
     packages: Vec<PackageInterfaceHandle>,
-    options: Vec<(&str, InputValue)>,
-    expected: &str,
+    options: Vec<(&BStr, InputValue)>,
+    expected: &BStr,
 ) {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -1360,9 +1382,9 @@ fn run_specific_package_and_tree_case(
     create_installed_json(&packages, &[], true);
 
     let mut pairs = vec![
-        ("command", InputValue::from("show")),
-        ("package", InputValue::from("vendor/package")),
-        ("--tree", InputValue::from(true)),
+        (BStr::new("command"), InputValue::from("show")),
+        (BStr::new("package"), InputValue::from("vendor/package")),
+        (BStr::new("--tree"), InputValue::from(true)),
     ];
     pairs.extend(options);
 
@@ -1375,7 +1397,7 @@ fn run_specific_package_and_tree_case(
 #[serial]
 fn test_specific_package_and_tree_just_package() {
     let pkg = get_package("vendor/package", "1.0.0");
-    run_specific_package_and_tree_case(vec![pkg], vec![], "vendor/package 1.0.0");
+    run_specific_package_and_tree_case(vec![pkg], vec![], BStr::new("vendor/package 1.0.0"));
 }
 
 #[test]
@@ -1384,26 +1406,23 @@ fn test_specific_package_and_tree_with_one_package_requirement() {
     let pkg = get_complete_package("vendor/package", "1.0.0");
     let mut requires = indexmap::IndexMap::new();
     requires.insert(
-        "vendor/required-package".to_string(),
+        BString::from("vendor/required-package"),
         Link::new(
-            bstr::BString::from("vendor/package".to_string()),
-            bstr::BString::from("vendor/required-package".to_string()),
+            BString::from("vendor/package"),
+            BString::from("vendor/required-package"),
             get_version_constraint("=", "1.0.0"),
             Some(Link::TYPE_REQUIRE.to_owned()),
-            bstr::BString::from("1.0.0".to_string()),
+            BString::from("1.0.0"),
         ),
     );
-    pkg.__set_requires(
-        requires
-            .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), v))
-            .collect::<indexmap::IndexMap<_, _>>(),
-    );
+    pkg.__set_requires(requires.into_iter().collect::<indexmap::IndexMap<_, _>>());
     run_specific_package_and_tree_case(
         vec![pkg.into()],
         vec![],
-        "vendor/package 1.0.0
+        BStr::new(
+            "vendor/package 1.0.0
 `--vendor/required-package 1.0.0",
+        ),
     );
 }
 
@@ -1413,26 +1432,23 @@ fn test_specific_package_and_tree_with_platform_requirement() {
     let pkg = get_complete_package("vendor/package", "1.0.0");
     let mut requires = indexmap::IndexMap::new();
     requires.insert(
-        "php".to_string(),
+        BString::from("php"),
         Link::new(
-            bstr::BString::from("vendor/package".to_string()),
-            bstr::BString::from("php".to_string()),
+            BString::from("vendor/package"),
+            BString::from("php"),
             get_version_constraint("=", "8.2.0"),
             Some(Link::TYPE_REQUIRE.to_owned()),
-            bstr::BString::from("8.2.0".to_string()),
+            BString::from("8.2.0"),
         ),
     );
-    pkg.__set_requires(
-        requires
-            .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), v))
-            .collect::<indexmap::IndexMap<_, _>>(),
-    );
+    pkg.__set_requires(requires.into_iter().collect::<indexmap::IndexMap<_, _>>());
     run_specific_package_and_tree_case(
         vec![pkg.into()],
         vec![],
-        "vendor/package 1.0.0
+        BStr::new(
+            "vendor/package 1.0.0
 `--php 8.2.0",
+        ),
     );
 }
 
@@ -1442,8 +1458,9 @@ fn test_specific_package_and_tree_with_json_format() {
     let pkg = get_package("vendor/package", "1.0.0");
     run_specific_package_and_tree_case(
         vec![pkg],
-        vec![("--format", InputValue::from("json"))],
-        "{
+        vec![(BStr::new("--format"), InputValue::from("json"))],
+        BStr::new(
+            "{
     \"installed\": [
         {
             \"name\": \"vendor/package\",
@@ -1452,6 +1469,7 @@ fn test_specific_package_and_tree_with_json_format() {
         }
     ]
 }",
+        ),
     );
 }
 
@@ -1493,8 +1511,8 @@ fn test_name_only_prints_no_trailing_whitespace() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("-N", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("-N"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1510,9 +1528,9 @@ vendor/somepackage",
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("--outdated", InputValue::from(true)),
-                ("-N", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("--outdated"), InputValue::from(true)),
+                (BStr::new("-N"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1529,67 +1547,83 @@ vendor/longpackagename",
 
 /// A `vendor/package` fixture carrying one link of every type `show <package>` renders.
 fn package_with_every_link_type() -> PackageInterfaceHandle {
-    let link = |target: &str, operator: &str, version: &str, pretty: &str, r#type: &bstr::BStr| {
-        indexmap::IndexMap::from([(
-            target.to_string(),
-            Link::new(
-                bstr::BString::from("vendor/package".to_string()),
-                bstr::BString::from(target.to_string()),
-                get_version_constraint(operator, version),
-                Some(r#type.to_owned()),
-                bstr::BString::from(pretty.to_string()),
-            ),
-        )])
-    };
+    let link =
+        |target: &BStr, operator: &BStr, version: &BStr, pretty: &BStr, r#type: &bstr::BStr| {
+            indexmap::IndexMap::from([(
+                bconcat!(target),
+                Link::new(
+                    BString::from("vendor/package"),
+                    bconcat!(target),
+                    get_version_constraint(operator, version),
+                    Some(r#type.to_owned()),
+                    bconcat!(pretty),
+                ),
+            )])
+        };
 
     let pkg = get_complete_package("vendor/package", "1.0.0");
     pkg.__set_requires(
-        link("vendor/required", "=", "1.0.0", "1.0.0", Link::TYPE_REQUIRE)
-            .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), v))
-            .collect::<indexmap::IndexMap<_, _>>(),
+        link(
+            BStr::new("vendor/required"),
+            BStr::new("="),
+            BStr::new("1.0.0"),
+            BStr::new("1.0.0"),
+            Link::TYPE_REQUIRE,
+        )
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
     );
     pkg.__set_dev_requires(
         link(
-            "vendor/dev-required",
-            "=",
-            "2.0.0",
-            "2.0.0",
+            BStr::new("vendor/dev-required"),
+            BStr::new("="),
+            BStr::new("2.0.0"),
+            BStr::new("2.0.0"),
             Link::TYPE_DEV_REQUIRE,
         )
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     pkg.__set_provides(
-        link("vendor/provided", "=", "1.0.0", "1.0.0", Link::TYPE_PROVIDE)
-            .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), v))
-            .collect::<indexmap::IndexMap<_, _>>(),
+        link(
+            BStr::new("vendor/provided"),
+            BStr::new("="),
+            BStr::new("1.0.0"),
+            BStr::new("1.0.0"),
+            Link::TYPE_PROVIDE,
+        )
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
     );
     pkg.__set_conflicts(
         link(
-            "vendor/conflicted",
-            "<",
-            "1.0.0",
-            "<1.0.0",
+            BStr::new("vendor/conflicted"),
+            BStr::new("<"),
+            BStr::new("1.0.0"),
+            BStr::new("<1.0.0"),
             Link::TYPE_CONFLICT,
         )
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     pkg.__set_replaces(
-        link("vendor/replaced", "=", "3.0.0", "3.0.0", Link::TYPE_REPLACE)
-            .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), v))
-            .collect::<indexmap::IndexMap<_, _>>(),
+        link(
+            BStr::new("vendor/replaced"),
+            BStr::new("="),
+            BStr::new("3.0.0"),
+            BStr::new("3.0.0"),
+            Link::TYPE_REPLACE,
+        )
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
     );
     pkg.__set_suggests(
-        indexmap::IndexMap::from([("vendor/suggested".to_string(), "for testing".to_string())])
-            .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
-            .collect::<indexmap::IndexMap<_, _>>(),
+        indexmap::IndexMap::from([(
+            BString::from("vendor/suggested"),
+            BString::from("for testing"),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
     );
     pkg.into()
 }
@@ -1616,8 +1650,8 @@ fn test_show_package_prints_every_link_section() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("package", InputValue::from("vendor/package")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("package"), InputValue::from("vendor/package")),
             ]),
             RunOptions::default(),
         )
@@ -1657,9 +1691,9 @@ fn test_show_package_as_json_includes_every_link_type() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("show")),
-                ("package", InputValue::from("vendor/package")),
-                ("--format", InputValue::from("json")),
+                (BStr::new("command"), InputValue::from("show")),
+                (BStr::new("package"), InputValue::from("vendor/package")),
+                (BStr::new("--format"), InputValue::from("json")),
             ]),
             RunOptions::default(),
         )

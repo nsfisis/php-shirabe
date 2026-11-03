@@ -4,13 +4,13 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, get_package, init_temp_composer,
 };
-use bstr::ByteSlice;
+use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::trim;
+use shirabe_php_shim::{bconcat, path_from_bytes, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
-fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
         .map(|(k, v)| (ParameterName::of(k), v))
@@ -28,7 +28,7 @@ fn test_no_local_changes() {
     );
 
     let package = get_complete_package("root/req", "1.0.0");
-    package.__set_type(bstr::BString::from("metapackage".to_string()));
+    package.__set_type(BString::from("metapackage"));
 
     let packages: Vec<PackageInterfaceHandle> = vec![package.into()];
 
@@ -50,47 +50,35 @@ fn test_no_local_changes() {
 
 /// ref: StatusCommandTest::locallyModifiedPackagesUseCaseProvider entry.
 struct LocallyModifiedPackageData {
-    name: &'static str,
-    version: &'static str,
-    installation_source: &'static str,
-    r#type: &'static str,
-    url: &'static str,
-    reference: Option<&'static str>,
+    name: &'static BStr,
+    version: &'static BStr,
+    installation_source: &'static BStr,
+    r#type: &'static BStr,
+    url: &'static BStr,
+    reference: Option<&'static BStr>,
 }
 
 /// ref: StatusCommandTest::testLocallyModifiedPackages (data provider rolled into a helper).
 fn run_locally_modified_packages_case(
     composer_json: serde_json::Value,
-    command_flags: Vec<(&str, InputValue)>,
+    command_flags: Vec<(&BStr, InputValue)>,
     package_data: LocallyModifiedPackageData,
 ) {
     let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
 
     let package = get_package(package_data.name, package_data.version);
-    package.set_installation_source(Some(bstr::BString::from(
-        package_data.installation_source.to_string(),
-    )));
+    package.set_installation_source(Some(bconcat!(package_data.installation_source)));
 
     if package_data.installation_source == "source" {
-        package.__set_source_type(Some(bstr::BString::from(package_data.r#type.to_string())));
-        package.set_source_url(Some(bstr::BString::from(package_data.url.to_string())));
-        package.set_source_reference(
-            package_data
-                .reference
-                .map(str::to_string)
-                .map(bstr::BString::from),
-        );
+        package.__set_source_type(Some(bconcat!(package_data.r#type)));
+        package.set_source_url(Some(bconcat!(package_data.url)));
+        package.set_source_reference(package_data.reference.map(|reference| reference.to_owned()));
     }
 
     if package_data.installation_source == "dist" {
-        package.set_dist_type(Some(bstr::BString::from(package_data.r#type.to_string())));
-        package.set_dist_url(Some(bstr::BString::from(package_data.url.to_string())));
-        package.set_dist_reference(
-            package_data
-                .reference
-                .map(str::to_string)
-                .map(bstr::BString::from),
-        );
+        package.set_dist_type(Some(bconcat!(package_data.r#type)));
+        package.set_dist_url(Some(bconcat!(package_data.url)));
+        package.set_dist_reference(package_data.reference.map(|reference| reference.to_owned()));
     }
 
     create_composer_lock(&[package], &[]);
@@ -98,7 +86,7 @@ fn run_locally_modified_packages_case(
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            input(vec![("command", InputValue::from("install"))]),
+            input(vec![(BStr::new("command"), InputValue::from("install"))]),
             RunOptions::default(),
         )
         .unwrap();
@@ -107,13 +95,13 @@ fn run_locally_modified_packages_case(
         std::env::current_dir()
             .unwrap()
             .join("vendor")
-            .join(package_data.name)
+            .join(path_from_bytes(&package_data.name))
             .join("composer.json"),
         "{}",
     )
     .unwrap();
 
-    let mut status_input = vec![("command", InputValue::from("status"))];
+    let mut status_input = vec![(BStr::new("command"), InputValue::from("status"))];
     status_input.extend(command_flags);
     app_tester
         .run(input(status_input), RunOptions::default())
@@ -121,7 +109,7 @@ fn run_locally_modified_packages_case(
 
     let expected = "You have changes in the following dependencies:";
     let actual = app_tester.get_display();
-    let actual = actual.trim();
+    let actual = trim(&actual);
 
     assert!(actual.contains_str(expected));
     assert!(actual.contains_str(package_data.name));
@@ -134,12 +122,12 @@ fn test_locally_modified_packages_from_source() {
         serde_json::json!({ "require": { "composer/class-map-generator": "^1.0" } }),
         vec![],
         LocallyModifiedPackageData {
-            name: "composer/class-map-generator",
-            version: "1.1",
-            installation_source: "source",
-            r#type: "git",
-            url: "https://github.com/composer/class-map-generator.git",
-            reference: Some("953cc4ea32e0c31f2185549c7d216d7921f03da9"),
+            name: BStr::new("composer/class-map-generator"),
+            version: BStr::new("1.1"),
+            installation_source: BStr::new("source"),
+            r#type: BStr::new("git"),
+            url: BStr::new("https://github.com/composer/class-map-generator.git"),
+            reference: Some(BStr::new("953cc4ea32e0c31f2185549c7d216d7921f03da9")),
         },
     );
 }
@@ -149,13 +137,13 @@ fn test_locally_modified_packages_from_source() {
 fn test_locally_modified_packages_from_dist() {
     run_locally_modified_packages_case(
         serde_json::json!({ "require": { "smarty/smarty": "^3.1" } }),
-        vec![("--verbose", InputValue::from(true))],
+        vec![(BStr::new("--verbose"), InputValue::from(true))],
         LocallyModifiedPackageData {
-            name: "smarty/smarty",
-            version: "3.1.7",
-            installation_source: "dist",
-            r#type: "zip",
-            url: "https://www.smarty.net/files/Smarty-3.1.7.zip",
+            name: BStr::new("smarty/smarty"),
+            version: BStr::new("3.1.7"),
+            installation_source: BStr::new("dist"),
+            r#type: BStr::new("zip"),
+            url: BStr::new("https://www.smarty.net/files/Smarty-3.1.7.zip"),
             reference: None,
         },
     );

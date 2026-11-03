@@ -16,7 +16,7 @@ use shirabe::repository::{
     InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use shirabe::util::Platform;
-use shirabe_php_shim::{PhpMixed, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
@@ -24,75 +24,105 @@ use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};
 
 // PHP mocks `Composer\Package\Archiver\ArchiveManager` with
 // getMockBuilder(...)->disableOriginalConstructor().
-mockall::mock! {
-    #[derive(Debug)]
-    pub ArchiveManager {}
-    #[async_trait::async_trait(?Send)]
-    impl ArchiveManagerInterface for ArchiveManager {
-        async fn archive(
-            &mut self,
-            package: CompletePackageInterfaceHandle,
-            format: bstr::BString,
-            target_dir: std::path::PathBuf,
-            file_name: Option<bstr::BString>,
-            ignore_filters: bool,
-        ) -> anyhow::Result<std::path::PathBuf>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_archive_manager {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub ArchiveManager {}
+        #[async_trait::async_trait(?Send)]
+        impl ArchiveManagerInterface for ArchiveManager {
+            async fn archive(
+                &mut self,
+                package: CompletePackageInterfaceHandle,
+                format: bstr::BString,
+                target_dir: std::path::PathBuf,
+                file_name: Option<bstr::BString>,
+                ignore_filters: bool,
+            ) -> anyhow::Result<std::path::PathBuf>;
+        }
     }
 }
+use mock_archive_manager::MockArchiveManager;
 
 // PHP mocks `Composer\Repository\RepositoryManager` with
 // getMockBuilder(...)->disableOriginalConstructor().
-mockall::mock! {
-    #[derive(Debug)]
-    pub RepositoryManager {}
-    impl RepositoryManagerInterface for RepositoryManager {
-        fn get_local_repository(&self) -> RepositoryInterfaceHandle;
-        fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
-        fn create_repository<'a>(
-            &self,
-            r#type: &BStr,
-            config: IndexMap<BString, PhpMixed>,
-            name: Option<&'a bstr::BStr>,
-        ) -> anyhow::Result<RepositoryInterfaceHandle>;
-        fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
-        fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_repository_manager {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub RepositoryManager {}
+        impl RepositoryManagerInterface for RepositoryManager {
+            fn get_local_repository(&self) -> RepositoryInterfaceHandle;
+            fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+            fn create_repository<'a>(
+                &self,
+                r#type: &BStr,
+                config: IndexMap<BString, PhpMixed>,
+                name: Option<&'a bstr::BStr>,
+            ) -> anyhow::Result<RepositoryInterfaceHandle>;
+            fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
+            fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+        }
     }
 }
+use mock_repository_manager::MockRepositoryManager;
 
 // PHP mocks `Composer\EventDispatcher\EventDispatcher` with
 // getMockBuilder(...)->disableOriginalConstructor() and no method stubs.
-mockall::mock! {
-    #[derive(Debug)]
-    pub EventDispatcher {}
-    impl EventDispatcherInterface for EventDispatcher {
-        fn dispatch<'a, 'b>(
-            &mut self,
-            event_name: Option<&'a bstr::BStr>,
-            event: Option<&'b mut dyn EventInterface>,
-        ) -> anyhow::Result<i64>;
-        fn dispatch_script(
-            &mut self,
-            event_name: &bstr::BStr,
-            dev_mode: bool,
-            additional_args: Vec<bstr::BString>,
-            flags: IndexMap<BString, PhpMixed>,
-        ) -> anyhow::Result<i64>;
-        fn dispatch_installer_event(
-            &mut self,
-            event_name: &bstr::BStr,
-            dev_mode: bool,
-            execute_operations: bool,
-            transaction: std::rc::Rc<AnyTransaction>,
-        ) -> anyhow::Result<i64>;
-        fn add_listener(&mut self, event_name: &bstr::BStr, listener: Callable, priority: i64);
-        fn add_subscriber<'a>(
-            &mut self,
-            subscriber: &'a dyn shirabe::event_dispatcher::EventSubscriberInterface,
-        ) -> anyhow::Result<()>;
-        fn remove_listener<'a>(&mut self, listener: &'a shirabe_php_rpc::PhpObjHandle);
-        fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_event_dispatcher {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub EventDispatcher {}
+        impl EventDispatcherInterface for EventDispatcher {
+            fn dispatch<'a, 'b>(
+                &mut self,
+                event_name: Option<&'a bstr::BStr>,
+                event: Option<&'b mut dyn EventInterface>,
+            ) -> anyhow::Result<i64>;
+            fn dispatch_script(
+                &mut self,
+                event_name: &bstr::BStr,
+                dev_mode: bool,
+                additional_args: Vec<bstr::BString>,
+                flags: IndexMap<BString, PhpMixed>,
+            ) -> anyhow::Result<i64>;
+            fn dispatch_installer_event(
+                &mut self,
+                event_name: &bstr::BStr,
+                dev_mode: bool,
+                execute_operations: bool,
+                transaction: std::rc::Rc<AnyTransaction>,
+            ) -> anyhow::Result<i64>;
+            fn add_listener(&mut self, event_name: &bstr::BStr, listener: Callable, priority: i64);
+            fn add_subscriber<'a>(
+                &mut self,
+                subscriber: &'a dyn shirabe::event_dispatcher::EventSubscriberInterface,
+            ) -> anyhow::Result<()>;
+            fn remove_listener<'a>(&mut self, listener: &'a shirabe_php_rpc::PhpObjHandle);
+            fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
+        }
     }
 }
+use mock_event_dispatcher::MockEventDispatcher;
 
 /// A `getMockBuilder(EventDispatcher::class)->disableOriginalConstructor()` mock with no
 /// behavioral expectations: the dispatch methods ArchiveCommand calls are permissive no-ops.
@@ -105,13 +135,9 @@ fn noop_event_dispatcher() -> MockEventDispatcher {
     event_dispatcher
 }
 
-fn root_package(name: &str, version: &str) -> RootPackageHandle {
+fn root_package(name: &BStr, version: &BStr) -> RootPackageHandle {
     let normalized = VersionParser.normalize(version, None).unwrap();
-    RootPackageHandle::new(
-        bstr::BString::from(name.to_string()),
-        normalized,
-        bstr::BString::from(version.to_string()),
-    )
+    RootPackageHandle::new(bconcat!(name), normalized, bconcat!(version))
 }
 
 fn full_composer(composer: Composer) -> PartialComposerHandle {
@@ -151,7 +177,7 @@ fn test_uses_config_from_composer_object() {
         })
         .returning(move |_, _, _, _, _| Ok(cwd.clone()));
 
-    let package = root_package("archive/test", "1.0.0");
+    let package = root_package(BStr::new("archive/test"), BStr::new("1.0.0"));
 
     let mut composer = Composer::new();
     composer.set_config(config);
@@ -238,7 +264,7 @@ fn test_uses_config_from_composer_object_with_package_name() {
         })
         .returning(move |_, _, _, _, _| Ok(cwd.clone()));
 
-    let package = root_package("foo/bar", "1.0.0");
+    let package = root_package(BStr::new("foo/bar"), BStr::new("1.0.0"));
 
     let mut repository_manager = MockRepositoryManager::new();
     // PHP: ->expects($this->once())->method('getLocalRepository')->willReturn($installedRepository).
@@ -248,7 +274,7 @@ fn test_uses_config_from_composer_object_with_package_name() {
         .expect_get_local_repository()
         .times(1)
         .returning(|| {
-            let package = root_package("foo/bar", "1.0.0");
+            let package = root_package(BStr::new("foo/bar"), BStr::new("1.0.0"));
             let installed =
                 InstalledArrayRepository::new_with_packages(vec![package.into()]).unwrap();
             RepositoryInterfaceHandle::new(installed)

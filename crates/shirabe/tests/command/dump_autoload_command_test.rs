@@ -4,6 +4,7 @@ use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use bstr::ByteSlice;
 use regex::bytes::Regex;
 use serial_test::serial;
+use shirabe_php_shim::error_message;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: DumpAutoloadCommandTest::testDumpAutoload
@@ -255,7 +256,7 @@ fn test_strict_psr_does_not_work_without_optimized_autoloader() {
             RunOptions::default(),
         )
         .expect_err("expected --strict-psr without optimize to error");
-    assert!(err.to_string().contains(
+    assert!(error_message(&err).contains_str(
         "--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value."
     ));
 
@@ -283,8 +284,9 @@ fn test_dev_and_no_dev_cannot_be_combined() {
         )
         .expect_err("expected --dev and --no-dev combination to error");
     assert!(
-        err.to_string()
-            .contains("You can not use both --no-dev and --dev as they conflict with each other.")
+        error_message(&err).contains_str(
+            "You can not use both --no-dev and --dev as they conflict with each other."
+        )
     );
 
     drop(tear_down);

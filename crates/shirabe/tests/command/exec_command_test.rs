@@ -1,8 +1,9 @@
 //! ref: composer/tests/Composer/Test/Command/ExecCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::ByteSlice;
 use serial_test::serial;
-use shirabe_php_shim::trim;
+use shirabe_php_shim::{bconcat, error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: ExecCommandTest::testListThrowsIfNoBinariesExist
@@ -26,12 +27,13 @@ fn test_list_throws_if_no_binaries_exist() {
         .expect_err("exec --list with no binaries should raise a RuntimeException");
 
     assert!(
-        err.to_string().contains(&format!(
-            "No binaries found in composer.json or in bin-dir ({})",
-            composer_bin_dir.display()
+        error_message(&err).contains_str(bconcat!(
+            "No binaries found in composer.json or in bin-dir (",
+            composer_bin_dir,
+            ")"
         )),
         "expected RuntimeException about no binaries, got: {:?}",
-        err.to_string(),
+        error_message(&err),
     );
 
     drop(tear_down);

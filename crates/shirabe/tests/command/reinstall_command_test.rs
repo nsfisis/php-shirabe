@@ -4,11 +4,12 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
+use bstr::{BStr, BString};
 use serial_test::serial;
 use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
-fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
         .map(|(k, v)| (ParameterName::of(k), v))
@@ -16,25 +17,35 @@ fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
 }
 
 /// ref: ReinstallCommandTest::caseProvider
-fn cases() -> Vec<(&'static str, Vec<(&'static str, InputValue)>, &'static str)> {
+fn cases() -> Vec<(
+    &'static BStr,
+    Vec<(&'static BStr, InputValue)>,
+    &'static BStr,
+)> {
     vec![
         (
-            "reinstall a package by name",
+            BStr::new("reinstall a package by name"),
             vec![(
-                "packages",
+                BStr::new("packages"),
                 InputValue::Array(vec!["root/req".into(), "root/anotherreq*".into()]),
             )],
-            "- Removing root/req (1.0.0)
+            BStr::new(
+                "- Removing root/req (1.0.0)
   - Removing root/anotherreq2 (1.0.0)
   - Removing root/anotherreq (1.0.0)
   - Installing root/anotherreq (1.0.0)
   - Installing root/anotherreq2 (1.0.0)
   - Installing root/req (1.0.0)",
+            ),
         ),
         (
-            "reinstall packages by type",
-            vec![("--type", InputValue::Array(vec!["metapackage".into()]))],
-            "- Removing root/req (1.0.0)
+            BStr::new("reinstall packages by type"),
+            vec![(
+                BStr::new("--type"),
+                InputValue::Array(vec!["metapackage".into()]),
+            )],
+            BStr::new(
+                "- Removing root/req (1.0.0)
   - Removing root/lala (1.0.0)
   - Removing root/anotherreq2 (1.0.0)
   - Removing root/anotherreq (1.0.0)
@@ -42,15 +53,18 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, InputValue)>, &'static str)>
   - Installing root/anotherreq2 (1.0.0)
   - Installing root/lala (1.0.0)
   - Installing root/req (1.0.0)",
+            ),
         ),
         (
-            "reinstall a package that is not installed",
+            BStr::new("reinstall a package that is not installed"),
             vec![(
-                "packages",
+                BStr::new("packages"),
                 InputValue::Array(vec!["root/unknownreq".into()]),
             )],
-            r#"<warning>Pattern "root/unknownreq" does not match any currently installed packages.</warning>
+            BStr::new(
+                r#"<warning>Pattern "root/unknownreq" does not match any currently installed packages.</warning>
 <warning>Found no packages to reinstall, aborting.</warning>"#,
+            ),
         ),
     ]
 }
@@ -73,10 +87,10 @@ fn test_reinstall_command() {
         let another_req_package = get_package("root/anotherreq", "1.0.0");
         let another_req_package2 = get_package("root/anotherreq2", "1.0.0");
         let another_req_package3 = get_package("root/lala", "1.0.0");
-        root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
-        another_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
-        another_req_package2.__set_type(bstr::BString::from("metapackage".to_string()));
-        another_req_package3.__set_type(bstr::BString::from("metapackage".to_string()));
+        root_req_package.__set_type(BString::from("metapackage"));
+        another_req_package.__set_type(BString::from("metapackage"));
+        another_req_package2.__set_type(BString::from("metapackage"));
+        another_req_package3.__set_type(BString::from("metapackage"));
 
         let dev = [
             another_req_package.clone(),
@@ -88,13 +102,18 @@ fn test_reinstall_command() {
 
         let mut app_tester = get_application_tester();
         let mut args = vec![
-            ("command", InputValue::from("reinstall")),
-            ("--no-progress", InputValue::from(true)),
-            ("--no-plugins", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("reinstall")),
+            (BStr::new("--no-progress"), InputValue::from(true)),
+            (BStr::new("--no-plugins"), InputValue::from(true)),
         ];
         args.extend(options);
         app_tester.run(input(args), RunOptions::default()).unwrap();
 
-        assert_eq!(expected, trim(app_tester.get_display()), "case: {label}");
+        assert_eq!(
+            expected,
+            trim(app_tester.get_display()),
+            "case: {label}",
+            label = label.display_lossy()
+        );
     }
 }
