@@ -13,7 +13,10 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::BasePackageHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{array_shift, array_unshift, microtime, spl_object_hash};
+use shirabe_php_shim::{
+    PhpMixed, array_shift, array_unshift, bconcat, display_to_bytes, microtime, spl_object_hash,
+    sprintf,
+};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -252,9 +255,9 @@ impl Solver {
         self.run_sat()?;
         self.io.write_error3("", true, crate::io::DEBUG);
         self.io.write_error3(
-            format!(
-                "Dependency resolution completed in {:.3} seconds",
-                microtime() - before,
+            sprintf(
+                "Dependency resolution completed in %.3f seconds",
+                &[PhpMixed::Float(microtime() - before)],
             ),
             true,
             crate::io::VERBOSE,
@@ -370,9 +373,12 @@ impl Solver {
             let (learn_literal, new_level, new_rule, why) = self.analyze(level, rule)?;
 
             if new_level <= 0 || new_level >= level {
-                return Err(SolverBugException::new(format!(
-                    "Trying to revert to invalid level {} from level {}.",
-                    new_level, level
+                return Err(SolverBugException::new(bconcat!(
+                    "Trying to revert to invalid level ",
+                    new_level,
+                    " from level ",
+                    level,
+                    "."
                 ))
                 .into());
             }
@@ -495,12 +501,16 @@ impl Solver {
 
                 let inner_literal = loop {
                     if decision_id <= 0 {
-                        return Err(SolverBugException::new(format!(
-                            "Reached invalid decision id {} while looking through {} for a literal present in the analyzed rule {}.",
+                        return Err(SolverBugException::new(bconcat!(
+                            "Reached invalid decision id ",
                             decision_id,
-                            rule.borrow(),
-                            analyzed_rule.borrow()
-                        )).into());
+                            " while looking through ",
+                            display_to_bytes(&*rule.borrow()),
+                            " for a literal present in the analyzed rule ",
+                            display_to_bytes(&*analyzed_rule.borrow()),
+                            "."
+                        ))
+                        .into());
                     }
 
                     decision_id -= 1;
@@ -577,9 +587,10 @@ impl Solver {
         let learned_literal = match learned_literal {
             Some(l) => l,
             None => {
-                return Err(SolverBugException::new(format!(
-                    "Did not find a learnable literal in analyzed rule {}.",
-                    analyzed_rule.borrow()
+                return Err(SolverBugException::new(bconcat!(
+                    "Did not find a learnable literal in analyzed rule ",
+                    display_to_bytes(&*analyzed_rule.borrow()),
+                    "."
                 ))
                 .into());
             }
@@ -765,18 +776,20 @@ impl Solver {
                 if i == rules_count {
                     if 1 == pass {
                         self.io.write_error3(
-                            format!(
-                                "Something's changed, looking at all rules again (pass #{})",
-                                pass
+                            bconcat!(
+                                "Something's changed, looking at all rules again (pass #",
+                                pass,
+                                ")"
                             ),
                             false,
                             crate::io::DEBUG,
                         );
                     } else {
                         self.io.overwrite_error4(
-                            format!(
-                                "Something's changed, looking at all rules again (pass #{})",
-                                pass
+                            bconcat!(
+                                "Something's changed, looking at all rules again (pass #",
+                                pass,
+                                ")"
                             ),
                             false,
                             None,

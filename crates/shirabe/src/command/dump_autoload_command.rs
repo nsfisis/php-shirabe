@@ -248,7 +248,7 @@ impl Command for DumpAutoloadCommand {
             local_repo_handle,
             package,
             installation_manager,
-            "composer",
+            BStr::new("composer"),
             optimize,
             None,
             Some(locker),

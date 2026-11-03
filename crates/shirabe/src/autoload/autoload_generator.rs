@@ -111,9 +111,9 @@ impl AutoloadGenerator {
         local_repo: crate::repository::RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-        target_dir: &str,
+        target_dir: &BStr,
         scan_psr_packages: bool,
-        suffix: Option<String>,
+        suffix: Option<BString>,
         locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
@@ -201,9 +201,9 @@ impl AutoloadGenerator {
         );
         let use_global_include_path = config.get("use-include-path").as_bool().unwrap_or(false);
         let prepend_autoloader = if config.get("prepend-autoloader").as_bool() == Some(false) {
-            "false"
+            BStr::new("false")
         } else {
-            "true"
+            BStr::new("true")
         };
         let target_dir = PathBuf::from(path_from_bytes(&bconcat!(vendor_path, "/", target_dir)));
         filesystem.ensure_directory_exists(&target_dir)?;
@@ -430,7 +430,7 @@ impl AutoloadGenerator {
                 for (namespace, paths) in &map {
                     let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
                     entry.insert("paths".into(), paths.clone());
-                    entry.insert("type".into(), PhpMixed::string(psr_type.to_string()));
+                    entry.insert("type".into(), PhpMixed::string(bconcat!(psr_type)));
                     namespaces_to_scan
                         .entry(namespace.clone())
                         .or_default()
@@ -501,27 +501,31 @@ impl AutoloadGenerator {
         };
         for (class_name, ambiguous_paths) in &ambiguous_classes {
             if ambiguous_paths.len() > 1 {
-                self.io.write_error(format!(
-                    "<warning>Warning: Ambiguous class resolution, \"{}\" was found {}x: in \"{}\" and \"{}\", the first will be used.</warning>",
-                    class_name.display_lossy(),
+                self.io.write_error(bconcat!(
+                    "<warning>Warning: Ambiguous class resolution, \"",
+                    class_name,
+                    "\" was found ",
                     ambiguous_paths.len() + 1,
-                    class_map.get_class_path(class_name)?.display_lossy(),
-                    implode("\", \"", ambiguous_paths).display_lossy()
+                    "x: in \"",
+                    class_map.get_class_path(class_name)?,
+                    "\" and \"",
+                    implode("\", \"", ambiguous_paths),
+                    "\", the first will be used.</warning>"
                 ));
             } else {
-                self.io.write_error(format!(
-                    "<warning>Warning: Ambiguous class resolution, \"{}\" was found in both \"{}\" and \"{}\", the first will be used.</warning>",
-                    class_name.display_lossy(),
-                    class_map.get_class_path(class_name)?.display_lossy(),
-                    implode("\", \"", ambiguous_paths).display_lossy()
+                self.io.write_error(bconcat!(
+                    "<warning>Warning: Ambiguous class resolution, \"",
+                    class_name,
+                    "\" was found in both \"",
+                    class_map.get_class_path(class_name)?,
+                    "\" and \"",
+                    implode("\", \"", ambiguous_paths),
+                    "\", the first will be used.</warning>"
                 ));
             }
         }
         if !ambiguous_classes.is_empty() {
-            self.io.write_error(format!(
-                "<info>To resolve ambiguity in classes not under your control you can ignore them by path using <href={}>exclude-from-classmap</>",
-                OutputFormatter::escape("https://getcomposer.org/doc/04-schema.md#exclude-files-from-classmaps")?.display_lossy()
-            ));
+            self.io.write_error(bconcat!("<info>To resolve ambiguity in classes not under your control you can ignore them by path using <href=", OutputFormatter::escape("https://getcomposer.org/doc/04-schema.md#exclude-files-from-classmaps")?, ">exclude-from-classmap</>"));
         }
 
         // output PSR violations which are not coming from the vendor dir
@@ -558,7 +562,7 @@ impl AutoloadGenerator {
         }
         classmap_file.extend_from_slice(b");\n");
 
-        let mut suffix: Option<BString> = suffix.map(BString::from);
+        let mut suffix: Option<BString> = suffix;
         if suffix.as_ref().is_some_and(|s| s.is_empty()) {
             suffix = None;
         }
@@ -605,15 +609,20 @@ impl AutoloadGenerator {
         }
 
         let target_file =
-            |name: &str| PathBuf::from(path_from_bytes(&bconcat!(target_dir, "/", name)));
+            |name: &BStr| PathBuf::from(path_from_bytes(&bconcat!(target_dir, "/", name)));
         filesystem.file_put_contents_if_modified(
-            target_file("autoload_namespaces.php"),
+            target_file(BStr::new("autoload_namespaces.php")),
             &namespaces_file,
         )?;
-        filesystem.file_put_contents_if_modified(target_file("autoload_psr4.php"), &psr4_file)?;
-        filesystem
-            .file_put_contents_if_modified(target_file("autoload_classmap.php"), &classmap_file)?;
-        let include_path_file_path = target_file("include_paths.php");
+        filesystem.file_put_contents_if_modified(
+            target_file(BStr::new("autoload_psr4.php")),
+            &psr4_file,
+        )?;
+        filesystem.file_put_contents_if_modified(
+            target_file(BStr::new("autoload_classmap.php")),
+            &classmap_file,
+        )?;
+        let include_path_file_path = target_file(BStr::new("include_paths.php"));
         let include_path_file_contents = self.get_include_paths_file(
             &package_map,
             &filesystem,
@@ -627,7 +636,7 @@ impl AutoloadGenerator {
         } else if file_exists(&include_path_file_path) {
             unlink(&include_path_file_path);
         }
-        let include_files_file_path = target_file("autoload_files.php");
+        let include_files_file_path = target_file(BStr::new("autoload_files.php"));
         let files_map = autoloads
             .get(B("files"))
             .and_then(|v| v.as_array())
@@ -651,7 +660,7 @@ impl AutoloadGenerator {
             unlink(&include_files_file_path);
         }
         filesystem.file_put_contents_if_modified(
-            target_file("autoload_static.php"),
+            target_file(BStr::new("autoload_static.php")),
             self.get_static_file(suffix.as_bstr(), &target_dir, &vendor_path, &base_path)?,
         )?;
         let mut check_platform = config.get("platform-check").as_bool() != Some(false)
@@ -674,18 +683,18 @@ impl AutoloadGenerator {
         }
         if check_platform {
             filesystem.file_put_contents_if_modified(
-                target_file("platform_check.php"),
+                target_file(BStr::new("platform_check.php")),
                 platform_check_content.as_ref().unwrap(),
             )?;
-        } else if file_exists(target_file("platform_check.php")) {
-            unlink(target_file("platform_check.php"));
+        } else if file_exists(target_file(BStr::new("platform_check.php"))) {
+            unlink(target_file(BStr::new("platform_check.php")));
         }
         filesystem.file_put_contents_if_modified(
             path_from_bytes(&bconcat!(vendor_path, "/autoload.php")),
             self.get_autoload_file(vendor_path_to_target_dir_code.as_bstr(), suffix.as_bstr()),
         )?;
         filesystem.file_put_contents_if_modified(
-            target_file("autoload_real.php"),
+            target_file(BStr::new("autoload_real.php")),
             self.get_autoload_real_file(
                 true,
                 include_path_file_contents.is_some(),
@@ -704,11 +713,11 @@ impl AutoloadGenerator {
         // tree at run time, so they are embedded at build time, as InstalledVersions.php is in
         // FilesystemRepository.
         filesystem.file_put_contents_if_modified(
-            target_file("ClassLoader.php"),
+            target_file(BStr::new("ClassLoader.php")),
             include_str!("../../../../composer/src/Composer/Autoload/ClassLoader.php"),
         )?;
         filesystem.file_put_contents_if_modified(
-            target_file("LICENSE"),
+            target_file(BStr::new("LICENSE")),
             include_str!("../../../../composer/LICENSE"),
         )?;
 
@@ -834,13 +843,19 @@ impl AutoloadGenerator {
         {
             let name = package.get_name();
             let _ = package.get_target_dir();
-            return Err(InvalidArgumentException::new(format!("PSR-4 autoloading is incompatible with the target-dir property, remove the target-dir in package '{}'.", name.display_lossy()))
+            return Err(InvalidArgumentException::new(bconcat!("PSR-4 autoloading is incompatible with the target-dir property, remove the target-dir in package '", name, "'."))
             .into());
         }
         if let Some(psr4) = autoload.get(B("psr-4")).and_then(|v| v.as_array()) {
             for (namespace, _dirs) in psr4 {
                 if !namespace.is_empty() && !namespace.ends_with(b"\\") {
-                    return Err(InvalidArgumentException::new(format!("psr-4 namespaces must end with a namespace separator, '{}' does not, use '{}\\'.", namespace.display_lossy(), namespace.display_lossy()))
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        "psr-4 namespaces must end with a namespace separator, '",
+                        namespace,
+                        "' does not, use '",
+                        namespace,
+                        "\\'."
+                    ))
                     .into());
                 }
             }
@@ -882,18 +897,34 @@ impl AutoloadGenerator {
 
         // reverse-sorted means root first, then dependents, then their dependents, etc.
         // which makes sense to allow root to override classmap or psr-0/4 entries with higher precedence rules
-        let mut psr0 =
-            self.parse_autoloads_type(&reverse_sorted_map, "psr-0", root_package.clone());
-        let mut psr4 =
-            self.parse_autoloads_type(&reverse_sorted_map, "psr-4", root_package.clone());
-        let classmap =
-            self.parse_autoloads_type(&reverse_sorted_map, "classmap", root_package.clone());
+        let mut psr0 = self.parse_autoloads_type(
+            &reverse_sorted_map,
+            BStr::new("psr-0"),
+            root_package.clone(),
+        );
+        let mut psr4 = self.parse_autoloads_type(
+            &reverse_sorted_map,
+            BStr::new("psr-4"),
+            root_package.clone(),
+        );
+        let classmap = self.parse_autoloads_type(
+            &reverse_sorted_map,
+            BStr::new("classmap"),
+            root_package.clone(),
+        );
 
         // sorted (i.e. dependents first) for files to ensure that dependencies are loaded/available once a file is included
-        let files = self.parse_autoloads_type(&sorted_package_map, "files", root_package.clone());
+        let files = self.parse_autoloads_type(
+            &sorted_package_map,
+            BStr::new("files"),
+            root_package.clone(),
+        );
         // using sorted here but it does not really matter as all are excluded equally
-        let exclude =
-            self.parse_autoloads_type(&sorted_package_map, "exclude-from-classmap", root_package);
+        let exclude = self.parse_autoloads_type(
+            &sorted_package_map,
+            BStr::new("exclude-from-classmap"),
+            root_package,
+        );
 
         psr0.sort_by(|k1, _, k2, _| k2.cmp(k1));
         psr4.sort_by(|k1, _, k2, _| k2.cmp(k1));
@@ -1080,10 +1111,8 @@ impl AutoloadGenerator {
                 }
             }
             for duplicate_file in array_unique(&duplicates) {
-                self.io.write_error(format!(
-                    "<warning> - {}</warning>",
-                    duplicate_file.display_lossy()
-                ));
+                self.io
+                    .write_error(bconcat!("<warning> - ", duplicate_file, "</warning>"));
             }
         }
 
@@ -1442,7 +1471,7 @@ require_once "#,
         _app_base_dir_code: &BStr,
         suffix: &BStr,
         use_global_include_path: bool,
-        prepend_autoloader: &str,
+        prepend_autoloader: &BStr,
         check_platform: bool,
     ) -> BString {
         let mut file = bconcat!(
@@ -1592,7 +1621,7 @@ require_once "#,
 
         let mut loader = ClassLoader::new(None);
         let target_file =
-            |name: &str| PathBuf::from(path_from_bytes(&bconcat!(target_dir, "/", name)));
+            |name: &BStr| PathBuf::from(path_from_bytes(&bconcat!(target_dir, "/", name)));
         let path_list = |path: &PhpMixed| -> Vec<BString> {
             if let PhpMixed::List(items) = path {
                 items
@@ -1605,21 +1634,22 @@ require_once "#,
         };
 
         // PHP: $map = require $targetDir . '/autoload_namespaces.php';
-        let map = require_generated_php_array(&target_file("autoload_namespaces.php"));
+        let map = require_generated_php_array(&target_file(BStr::new("autoload_namespaces.php")));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
                 loader.set(namespace, path_list(path));
             }
         }
 
-        let map = require_generated_php_array(&target_file("autoload_psr4.php"));
+        let map = require_generated_php_array(&target_file(BStr::new("autoload_psr4.php")));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
                 loader.set_psr4(namespace, path_list(path)).unwrap_or(());
             }
         }
 
-        let class_map = require_generated_php_array(&target_file("autoload_classmap.php"));
+        let class_map =
+            require_generated_php_array(&target_file(BStr::new("autoload_classmap.php")));
         if class_map.as_bool() != Some(false)
             && !class_map.is_null()
             && let Some(cm) = class_map.as_array()
@@ -1676,10 +1706,10 @@ require_once "#,
         let prefix = "\0Composer\\Autoload\\ClassLoader\0";
         let prefix_len = strlen(prefix);
         let mut maps: IndexMap<BString, PhpMixed> = IndexMap::new();
-        if file_exists(target_file("autoload_files.php")) {
+        if file_exists(target_file(BStr::new("autoload_files.php"))) {
             maps.insert(
                 "files".into(),
-                require_generated_php_array(&target_file("autoload_files.php")),
+                require_generated_php_array(&target_file(BStr::new("autoload_files.php"))),
             );
         }
 
@@ -1738,7 +1768,7 @@ require_once "#,
     fn parse_autoloads_type(
         &self,
         package_map: &Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
-        r#type: &str,
+        r#type: &BStr,
         root_package: RootPackageInterfaceHandle,
     ) -> IndexMap<BString, PhpMixed> {
         let mut autoloads: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -1794,12 +1824,12 @@ require_once "#,
                 PhpMixed::List(l) => l
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| (i.to_string().into(), v.clone()))
+                    .map(|(i, v)| (bconcat!(i), v.clone()))
                     .collect(),
                 _ => IndexMap::new(),
             };
             for (namespace, paths) in type_arr {
-                let namespace = if ["psr-4", "psr-0"].contains(&r#type) {
+                let namespace = if [B("psr-4"), B("psr-0")].contains(&r#type.as_bytes()) {
                     // normalize namespaces to ensure "\" becomes "" and others do not have leading separators as they are not needed
                     ltrim2(&namespace, "\\")
                 } else {
@@ -1870,9 +1900,9 @@ require_once "#,
 
                         // add support for wildcards * and **
                         let p = strtr_array(&p, &{
-                            let mut m: IndexMap<&str, &str> = IndexMap::new();
-                            m.insert("\\*\\*", ".+?");
-                            m.insert("\\*", "[^/]+?");
+                            let mut m: IndexMap<&BStr, &BStr> = IndexMap::new();
+                            m.insert(BStr::new("\\*\\*"), BStr::new(".+?"));
+                            m.insert(BStr::new("\\*"), BStr::new("[^/]+?"));
                             m
                         });
 
@@ -1881,7 +1911,7 @@ require_once "#,
                             std::cell::RefCell::new(None);
                         let p = preg_replace_callback(
                             php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
-                            |matches: &PregMatches| -> anyhow::Result<String> {
+                            |matches: &PregMatches| -> anyhow::Result<BString> {
                                 // undo preg_quote for the matched string
                                 *updir_cell.borrow_mut() = Some(str_replace(
                                     "\\.",
@@ -1889,7 +1919,7 @@ require_once "#,
                                     matches.get(1).unwrap_or_default(),
                                 ));
 
-                                Ok(String::new())
+                                Ok(BString::default())
                             },
                             &p,
                         )
@@ -1919,7 +1949,7 @@ require_once "#,
                             p,
                             "($|/)"
                         );
-                        autoloads.insert(numeric_index.to_string().into(), PhpMixed::string(entry));
+                        autoloads.insert(bconcat!(numeric_index), PhpMixed::string(entry));
                         numeric_index += 1;
                         continue;
                     }
@@ -1942,10 +1972,7 @@ require_once "#,
                         continue;
                     }
                     if r#type == "classmap" {
-                        autoloads.insert(
-                            numeric_index.to_string().into(),
-                            PhpMixed::string(relative_path),
-                        );
+                        autoloads.insert(bconcat!(numeric_index), PhpMixed::string(relative_path));
                         numeric_index += 1;
                         continue;
                     }
@@ -2078,9 +2105,9 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         local_repo: crate::repository::RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-        target_dir: &str,
+        target_dir: &BStr,
         scan_psr_packages: bool,
-        suffix: Option<String>,
+        suffix: Option<BString>,
         locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap>;
@@ -2138,9 +2165,9 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         local_repo: crate::repository::RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-        target_dir: &str,
+        target_dir: &BStr,
         scan_psr_packages: bool,
-        suffix: Option<String>,
+        suffix: Option<BString>,
         locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {

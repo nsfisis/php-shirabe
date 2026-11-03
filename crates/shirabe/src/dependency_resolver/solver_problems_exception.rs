@@ -21,9 +21,10 @@ impl SolverProblemsException {
         problems: Vec<Problem>,
         learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> Self {
-        let message = format!(
-            "Failed resolving dependencies with {} problems, call getPrettyString to get formatted details",
-            problems.len()
+        let message = bconcat!(
+            "Failed resolving dependencies with ",
+            problems.len(),
+            " problems, call getPrettyString to get formatted details"
         );
         Self {
             inner: RuntimeException::with_code(message, Self::ERROR_DEPENDENCY_RESOLUTION_FAILED),

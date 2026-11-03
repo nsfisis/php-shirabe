@@ -10,6 +10,7 @@ use crate::dependency_resolver::operation::{
     UninstallOperation, UpdateOperation,
 };
 use crate::package::PackageInterfaceHandle;
+use bstr::BStr;
 
 /// Any solver operation.
 #[derive(Debug, Clone)]
@@ -22,7 +23,7 @@ pub enum AnyOperation {
 }
 
 impl AnyOperation {
-    pub fn get_operation_type(&self) -> &'static str {
+    pub fn get_operation_type(&self) -> &'static BStr {
         match self {
             Self::Install(_) => InstallOperation::TYPE,
             Self::Update(_) => UpdateOperation::TYPE,

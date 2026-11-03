@@ -5,7 +5,7 @@ use crate::dependency_resolver::{Pool, Request};
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
 use crate::repository::{LockArrayRepository, PlatformRepository, RepositorySet};
-use bstr::{B, BStr, BString, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, bconcat, extension_loaded, implode, loosely_compare,
@@ -76,9 +76,9 @@ impl Problem {
             let rule_ref = rule.borrow();
 
             if rule_ref.get_reason() != rule::RULE_ROOT_REQUIRE {
-                return Err(LogicException::new(
-                    "Single reason problems must contain a root require rule.".to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "Single reason problems must contain a root require rule.",
+                ))
                 .into());
             }
 
@@ -123,7 +123,7 @@ impl Problem {
 
         Self::format_deduplicated_rules(
             &reasons,
-            "    ",
+            BStr::new("    "),
             repository_set,
             request,
             pool,
@@ -163,7 +163,7 @@ impl Problem {
                 &rule
                     .get_literals()
                     .iter()
-                    .map(|l| l.to_string())
+                    .map(|l| bconcat!(l))
                     .collect::<Vec<_>>(),
             ),
             _ => {
@@ -190,7 +190,7 @@ impl Problem {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn format_deduplicated_rules(
         rules: &Vec<std::rc::Rc<std::cell::RefCell<Rule>>>,
-        indent: &str,
+        indent: &BStr,
         repository_set: &RepositorySet,
         request: &Request,
         pool: &mut Pool,
@@ -239,8 +239,8 @@ impl Problem {
                     .or_default()
                     .insert(version_key, m2.clone());
                 let source_package = rule_ref.get_source_package(pool).unwrap();
-                for (version, pretty_version) in
-                    pool.get_removed_versions_by_package(&source_package.ptr_id().to_string())
+                for (version, pretty_version) in pool
+                    .get_removed_versions_by_package(bconcat!(source_package.ptr_id()).as_bstr())
                 {
                     templates
                         .get_mut(&template)
@@ -940,7 +940,7 @@ impl Problem {
                     package_name,
                     &packages,
                     &all_repos_packages,
-                    "minimum-stability",
+                    BStr::new("minimum-stability"),
                     constraint,
                 );
             }
@@ -986,7 +986,7 @@ impl Problem {
                     package_name,
                     &packages,
                     &all_repos_packages,
-                    "constraint",
+                    BStr::new("constraint"),
                     constraint,
                 );
             }
@@ -1132,7 +1132,7 @@ impl Problem {
                 && use_removed_version_group
             {
                 for (version, pretty_version) in
-                    pool.get_removed_versions_by_package(&package.ptr_id().to_string())
+                    pool.get_removed_versions_by_package(bconcat!(package.ptr_id()).as_bstr())
                 {
                     entry.versions.insert(version, pretty_version);
                 }
@@ -1305,7 +1305,7 @@ impl Problem {
         package_name: &BStr,
         higher_repo_packages: &Vec<BasePackageHandle>,
         all_repos_packages: &Vec<BasePackageHandle>,
-        reason: &str,
+        reason: &BStr,
         constraint: Option<&AnyConstraint>,
     ) -> anyhow::Result<(BString, BString)> {
         let mut next_repo_packages: Vec<BasePackageHandle> = Vec::new();

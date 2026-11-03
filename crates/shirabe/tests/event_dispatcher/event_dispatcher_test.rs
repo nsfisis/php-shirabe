@@ -492,9 +492,9 @@ mockall::mock! {
             local_repo: shirabe::repository::RepositoryInterfaceHandle,
             root_package: RootPackageInterfaceHandle,
             installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-            target_dir: &str,
+            target_dir: &bstr::BStr,
             scan_psr_packages: bool,
-            suffix: Option<String>,
+            suffix: Option<bstr::BString>,
             locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
             strict_ambiguous: bool,
         ) -> anyhow::Result<ClassMap>;

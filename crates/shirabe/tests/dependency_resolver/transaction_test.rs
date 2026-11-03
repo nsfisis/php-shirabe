@@ -6,7 +6,7 @@ use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::dependency_resolver::transaction::Transaction;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, utf8_text};
 
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
@@ -70,7 +70,9 @@ fn check_transaction_operations(transaction: &Transaction, expected: Vec<Operati
             });
         } else {
             result.push(OperationEntry::Job {
-                job: operation.get_operation_type().to_string(),
+                job: utf8_text(operation.get_operation_type())
+                    .unwrap()
+                    .to_owned(),
                 package: operation.get_target_package(),
             });
         }

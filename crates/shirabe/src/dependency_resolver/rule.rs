@@ -160,7 +160,7 @@ impl Rule {
 
     pub fn disable(&mut self) -> anyhow::Result<()> {
         if let Rule::MultiConflict(_) = self {
-            return Err(RuntimeException::new("Disabling multi conflict rules is not possible. Please contact composer at https://github.com/composer/composer to let us debug what lead to this situation.".to_string())
+            return Err(RuntimeException::new(BString::from("Disabling multi conflict rules is not possible. Please contact composer at https://github.com/composer/composer to let us debug what lead to this situation."))
             .into());
         }
         *self.bitfield_mut() =
@@ -282,7 +282,7 @@ impl Rule {
                 Ok(source_package)
             }
 
-            _ => Err(LogicException::new("Not implemented".to_string()).into()),
+            _ => Err(LogicException::new(BString::from("Not implemented")).into()),
         }
     }
 
@@ -402,18 +402,18 @@ impl Rule {
                 // if the conflict is not directly against the package but something it provides/replaces,
                 // we try to find that link to display a better message
                 if link.get_target() != package1.get_name() {
-                    let mut provide_type: Option<&str> = None;
+                    let mut provide_type: Option<&BStr> = None;
                     let mut provided: Option<BString> = None;
                     for provide in package1.get_provides().values() {
                         if provide.get_target() == link.get_target() {
-                            provide_type = Some("provides");
+                            provide_type = Some(BStr::new("provides"));
                             provided = Some(BString::from(provide.get_pretty_constraint()));
                             break;
                         }
                     }
                     for replace in package1.get_replaces().values() {
                         if replace.get_target() == link.get_target() {
-                            provide_type = Some("replaces");
+                            provide_type = Some(BStr::new("replaces"));
                             provided = Some(BString::from(replace.get_pretty_constraint()));
                             break;
                         }
@@ -528,7 +528,7 @@ impl Rule {
                     let mut installed_packages: Vec<BasePackageHandle> = vec![];
                     let mut removable_packages: Vec<BasePackageHandle> = vec![];
                     for literal in &literals {
-                        if installed_map.contains_key(literal.abs().to_string().as_bytes()) {
+                        if installed_map.contains_key(bconcat!(literal.abs()).as_bytes()) {
                             installed_packages.push(pool.literal_to_package(*literal));
                         } else {
                             removable_packages.push(pool.literal_to_package(*literal));
@@ -583,22 +583,22 @@ impl Rule {
                 let rule_text = if literals.len() == 1 {
                     pool.literal_to_pretty_string(literals[0], installed_map)
                 } else {
-                    let mut groups: IndexMap<String, Vec<BasePackageHandle>> = IndexMap::new();
+                    let mut groups: IndexMap<BString, Vec<BasePackageHandle>> = IndexMap::new();
                     for literal in &literals {
                         let package = pool.literal_to_package(*literal);
-                        let group =
-                            if installed_map.contains_key(package.id().to_string().as_bytes()) {
-                                if *literal > 0 { "keep" } else { "remove" }
+                        let group = if installed_map.contains_key(bconcat!(package.id()).as_bytes())
+                        {
+                            if *literal > 0 { "keep" } else { "remove" }
+                        } else {
+                            if *literal > 0 {
+                                "install"
                             } else {
-                                if *literal > 0 {
-                                    "install"
-                                } else {
-                                    "don't install"
-                                }
-                            };
+                                "don't install"
+                            }
+                        };
 
                         groups
-                            .entry(group.to_string())
+                            .entry(bconcat!(group))
                             .or_default()
                             .push(self.deduplicate_default_branch_alias(package.clone()));
                     }

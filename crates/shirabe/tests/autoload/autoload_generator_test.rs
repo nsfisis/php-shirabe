@@ -391,9 +391,9 @@ fn dump(
         repository.clone(),
         package,
         im.clone(),
-        "composer",
+        BStr::new("composer"),
         scan_psr_packages,
-        Some(suffix.to_string()),
+        Some(bconcat!(suffix)),
         None,
         false,
     )
@@ -2198,9 +2198,9 @@ fn test_vendor_dir_excluded_from_working_dir() {
             s.repository.clone(),
             package.into(),
             im,
-            "composer",
+            BStr::new("composer"),
             true,
-            Some("_13".to_string()),
+            Some(BString::from("_13")),
             None,
             false,
         )

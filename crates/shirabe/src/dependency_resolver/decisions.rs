@@ -101,8 +101,8 @@ impl Decisions {
 
         panic!(
             "{}",
-            LogicException::new(format!(
-                "Did not find a decision rule using {}",
+            LogicException::new(bconcat!(
+                "Did not find a decision rule using ",
                 literal_or_package_id
             ))
             .get_message()
@@ -163,12 +163,16 @@ impl Decisions {
             let package = pool.literal_to_package(literal);
             panic!(
                 "{}",
-                SolverBugException::new(format!(
-                    "Trying to decide {} on level {}, even though {} was previously decided as {}.",
-                    literal_string.display_lossy(),
+                SolverBugException::new(bconcat!(
+                    "Trying to decide ",
+                    literal_string,
+                    " on level ",
                     level,
-                    package.to_php_string().display_lossy(),
-                    previous_decision
+                    ", even though ",
+                    package.to_php_string(),
+                    " was previously decided as ",
+                    previous_decision,
+                    "."
                 ))
                 .0
                 .get_message()
@@ -191,7 +195,7 @@ impl Decisions {
             let key = if let Some(pool) = pool {
                 pool.literal_to_package(*package_id).to_php_string()
             } else {
-                BString::from(package_id.to_string())
+                bconcat!(package_id)
             };
             str.push_str(bconcat!(key, ":", *level, ","));
         }

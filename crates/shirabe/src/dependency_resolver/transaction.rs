@@ -83,7 +83,7 @@ impl Transaction {
                     .push(package.clone());
             }
             self.result_package_map
-                .insert(bstr::BString::from(package.ptr_id().to_string()), package);
+                .insert(bconcat!(package.ptr_id()), package);
         }
 
         uasort_map(&mut self.result_package_map, package_sort);
@@ -123,12 +123,12 @@ impl Transaction {
         while !stack.is_empty() {
             let package = array_pop(&mut stack).unwrap();
 
-            if processed.contains_key(package.ptr_id().to_string().as_bytes()) {
+            if processed.contains_key(bconcat!(package.ptr_id()).as_slice()) {
                 continue;
             }
 
-            if !visited.contains_key(package.ptr_id().to_string().as_bytes()) {
-                visited.insert(bstr::BString::from(package.ptr_id().to_string()), true);
+            if !visited.contains_key(bconcat!(package.ptr_id()).as_slice()) {
+                visited.insert(bconcat!(package.ptr_id()), true);
 
                 stack.push(package.clone());
                 if let Some(alias) = package.as_alias() {
@@ -142,8 +142,8 @@ impl Transaction {
                         }
                     }
                 }
-            } else if !processed.contains_key(package.ptr_id().to_string().as_bytes()) {
-                processed.insert(bstr::BString::from(package.ptr_id().to_string()), true);
+            } else if !processed.contains_key(bconcat!(package.ptr_id()).as_slice()) {
+                processed.insert(bconcat!(package.ptr_id()), true);
 
                 if let Some(alias) = package.as_alias() {
                     let alias_key = bconcat!(package.get_name(), "::", package.get_version());
@@ -226,8 +226,8 @@ impl Transaction {
 
                 for require in possible_requires {
                     // PHP: if ($require !== $package) — strict reference inequality
-                    if require.ptr_id().to_string() != package.ptr_id().to_string() {
-                        roots.shift_remove(require.ptr_id().to_string().as_bytes());
+                    if bconcat!(require.ptr_id()) != bconcat!(package.ptr_id()) {
+                        roots.shift_remove(bconcat!(require.ptr_id()).as_slice());
                     }
                 }
             }

@@ -75,7 +75,10 @@ impl Pool {
         &self.removed_versions
     }
 
-    pub fn get_removed_versions_by_package(&self, object_hash: &str) -> IndexMap<BString, BString> {
+    pub fn get_removed_versions_by_package(
+        &self,
+        object_hash: &BStr,
+    ) -> IndexMap<BString, BString> {
         let Some(versions) = self.removed_versions_by_package.get(bstr::B(object_hash)) else {
             return IndexMap::new();
         };
@@ -252,7 +255,7 @@ impl Pool {
     ) -> BString {
         let package = self.literal_to_package(literal);
 
-        let prefix = if installed_map.contains_key(bstr::B(&package.id().to_string())) {
+        let prefix = if installed_map.contains_key(bstr::B(&bconcat!(package.id()))) {
             if literal > 0 { "keep" } else { "remove" }
         } else {
             if literal > 0 {
@@ -341,16 +344,17 @@ impl Pool {
 
 impl fmt::Display for Pool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut str = String::from("Pool:\n");
+        writeln!(f, "Pool:")?;
 
         for package in &self.packages {
-            str.push_str(&format!(
-                "- {}: {}\n",
-                str_pad(package.id().to_string(), 6, " ", STR_PAD_LEFT).display_lossy(),
+            writeln!(
+                f,
+                "- {}: {}",
+                str_pad(bconcat!(package.id()), 6, " ", STR_PAD_LEFT).display_lossy(),
                 package.get_name().display_lossy()
-            ));
+            )?;
         }
 
-        write!(f, "{}", str)
+        Ok(())
     }
 }

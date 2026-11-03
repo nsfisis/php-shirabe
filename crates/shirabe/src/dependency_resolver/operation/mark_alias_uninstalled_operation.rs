@@ -2,7 +2,8 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::AliasPackageHandle;
-use shirabe_php_shim::bconcat;
+use bstr::BStr;
+use shirabe_php_shim::{bconcat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct MarkAliasUninstalledOperation {
@@ -37,7 +38,7 @@ impl MarkAliasUninstalledOperation {
 }
 
 impl SolverOperation for MarkAliasUninstalledOperation {
-    const TYPE: &'static str = "markAliasUninstalled";
+    const TYPE: &'static BStr = php_str(b"markAliasUninstalled");
 }
 
 impl std::fmt::Display for MarkAliasUninstalledOperation {

@@ -1,6 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/Rule2Literals.php
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
+use bstr::BString;
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug)]
 pub struct Rule2Literals {
@@ -32,8 +34,8 @@ impl Rule2Literals {
         &mut self.inner
     }
 
-    pub fn get_hash(&self) -> String {
-        format!("{},{}", self.literal1, self.literal2)
+    pub fn get_hash(&self) -> BString {
+        bconcat!(self.literal1, ",", self.literal2)
     }
 
     pub fn equals(&self, rule: &Rule) -> bool {

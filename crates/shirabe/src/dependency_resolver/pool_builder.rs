@@ -15,8 +15,8 @@ use crate::repository::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, array_map, bconcat, in_array_strict, microtime, number_format,
-    preg_is_match, round, strpos,
+    CmpOp, LogicException, PhpMixed, array_map, bconcat, display_to_bytes, in_array_strict,
+    microtime, number_format, preg_is_match, round, sprintf, strpos,
 };
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
@@ -141,9 +141,9 @@ impl PoolBuilder {
             self.warn_about_non_matching_update_allow_list(request)?;
 
             if request.get_locked_repository().is_none() {
-                return Err(LogicException::new(
-                    "No lock repo present and yet a partial update was requested.".to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "No lock repo present and yet a partial update was requested.",
+                ))
                 .into());
             }
 
@@ -274,8 +274,7 @@ impl PoolBuilder {
 
                     let mut package_and_aliases: Vec<(i64, BasePackageHandle)> = Vec::new();
                     package_and_aliases.push((i, package.clone()));
-                    if let Some(aliases) =
-                        self.alias_map.get(package.ptr_id().to_string().as_bytes())
+                    if let Some(aliases) = self.alias_map.get(bconcat!(package.ptr_id()).as_bytes())
                     {
                         for (idx, alias) in aliases {
                             package_and_aliases.push((*idx, alias.clone().into()));
@@ -308,7 +307,7 @@ impl PoolBuilder {
             std::mem::take(&mut self.unacceptable_fixed_or_locked_packages);
         if let Some(event_dispatcher) = self.event_dispatcher.clone() {
             let mut pre_pool_create_event = PrePoolCreateEvent::new(
-                PluginEvents::PRE_POOL_CREATE.to_string(),
+                bconcat!(PluginEvents::PRE_POOL_CREATE),
                 repositories.clone(),
                 std::mem::replace(request, Request::new(None)),
                 self.acceptable_stabilities.clone(),
@@ -623,9 +622,7 @@ impl PoolBuilder {
 
         if let Some(alias) = package.as_alias() {
             self.alias_map
-                .entry(bstr::BString::from(
-                    alias.get_alias_of().ptr_id().to_string(),
-                ))
+                .entry(bconcat!(alias.get_alias_of().ptr_id()))
                 .or_default()
                 .insert(index, alias);
         }
@@ -683,9 +680,7 @@ impl PoolBuilder {
             self.index_counter += 1;
             self.packages.insert(new_index, alias_handle.clone().into());
             self.alias_map
-                .entry(bstr::BString::from(
-                    alias_handle.get_alias_of().ptr_id().to_string(),
-                ))
+                .entry(bconcat!(alias_handle.get_alias_of().ptr_id()))
                 .or_default()
                 .insert(new_index, alias_handle);
         }
@@ -717,7 +712,7 @@ impl PoolBuilder {
                         for root_require in &skipped_root_requires {
                             if !self.update_allow_warned.contains_key(root_require) {
                                 self.update_allow_warned.insert(root_require.clone(), true);
-                                self.io.write_error(format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require.display_lossy()));
+                                self.io.write_error(bconcat!("<warning>Dependency ", root_require, " is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>"));
                             }
                         }
                     }
@@ -754,7 +749,7 @@ impl PoolBuilder {
                         for root_require in &skipped_root_requires {
                             if !self.update_allow_warned.contains_key(root_require) {
                                 self.update_allow_warned.insert(root_require.clone(), true);
-                                self.io.write_error(format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require.display_lossy()));
+                                self.io.write_error(bconcat!("<warning>Dependency ", root_require, " is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>"));
                             }
                         }
                     }
@@ -831,9 +826,9 @@ impl PoolBuilder {
 
     fn warn_about_non_matching_update_allow_list(&self, request: &Request) -> anyhow::Result<()> {
         if request.get_locked_repository().is_none() {
-            return Err(LogicException::new(
-                "No lock repo present and yet a partial update was requested.".to_string(),
-            )
+            return Err(LogicException::new(BString::from(
+                "No lock repo present and yet a partial update was requested.",
+            ))
             .into());
         }
 
@@ -863,19 +858,18 @@ impl PoolBuilder {
                 }
             }
             if matched_platform_package {
-                self.io.write_error(format!(
-                    "<warning>Pattern \"{}\" listed for update matches platform packages, but these cannot be updated by Shirabe.</warning>",
-                    pattern.display_lossy()
-                ));
+                self.io.write_error(bconcat!("<warning>Pattern \"", pattern, "\" listed for update matches platform packages, but these cannot be updated by Shirabe.</warning>"));
             } else if strpos(pattern, "*").is_some() {
-                self.io.write_error(format!(
-                    "<warning>Pattern \"{}\" listed for update does not match any locked packages.</warning>",
-                    pattern.display_lossy()
+                self.io.write_error(bconcat!(
+                    "<warning>Pattern \"",
+                    pattern,
+                    "\" listed for update does not match any locked packages.</warning>"
                 ));
             } else {
-                self.io.write_error(format!(
-                    "<warning>Package \"{}\" listed for update is not locked.</warning>",
-                    pattern.display_lossy()
+                self.io.write_error(bconcat!(
+                    "<warning>Package \"",
+                    pattern,
+                    "\" listed for update is not locked.</warning>"
                 ));
             }
         }
@@ -1069,7 +1063,7 @@ impl PoolBuilder {
             name_map.shift_remove(&package.get_version());
         }
         self.packages.shift_remove(&index);
-        let object_hash = package.ptr_id().to_string();
+        let object_hash = bconcat!(package.ptr_id());
         if let Some(aliases) = self.alias_map.shift_remove(bstr::B(&object_hash)) {
             for (alias_index, alias_package) in &aliases {
                 if repo_index >= 0
@@ -1106,19 +1100,22 @@ impl PoolBuilder {
         }
 
         self.io.write3(
-            format!(
-                "Pool optimizer completed in {:.3} seconds",
-                (microtime() - before),
+            sprintf(
+                "Pool optimizer completed in %.3f seconds",
+                &[PhpMixed::Float(microtime() - before)],
             ),
             true,
             io_interface::VERY_VERBOSE,
         );
         self.io.write3(
-            format!(
-                "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were optimized away.</info>",
-                number_format(total, 0, ".", ",").display_lossy(),
-                number_format(filtered, 0, ".", ",").display_lossy(),
-                round(100.0 / total * filtered, 0),
+            bconcat!(
+                "<info>Found ",
+                number_format(total, 0, ".", ","),
+                " package versions referenced in your dependency graph. ",
+                number_format(filtered, 0, ".", ","),
+                " (",
+                display_to_bytes(round(100.0 / total * filtered, 0)),
+                "%) were optimized away.</info>"
             ),
             true,
             io_interface::VERY_VERBOSE,
@@ -1156,19 +1153,22 @@ impl PoolBuilder {
         }
 
         self.io.write3(
-            format!(
-                "Security advisory pool filter completed in {:.3} seconds",
-                (microtime() - before),
+            sprintf(
+                "Security advisory pool filter completed in %.3f seconds",
+                &[PhpMixed::Float(microtime() - before)],
             ),
             true,
             io_interface::VERY_VERBOSE,
         );
         self.io.write3(
-            format!(
-                "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were filtered away.</info>",
-                number_format(total, 0, ".", ",").display_lossy(),
-                number_format(filtered, 0, ".", ",").display_lossy(),
-                round(100.0 / total * filtered, 0),
+            bconcat!(
+                "<info>Found ",
+                number_format(total, 0, ".", ","),
+                " package versions referenced in your dependency graph. ",
+                number_format(filtered, 0, ".", ","),
+                " (",
+                display_to_bytes(round(100.0 / total * filtered, 0)),
+                "%) were filtered away.</info>"
             ),
             true,
             io_interface::VERY_VERBOSE,

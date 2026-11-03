@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/SolverTest.php
 
 use crate::test_case::{get_alias_package, get_package, get_version_constraint};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::PolicyInterface;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
@@ -17,7 +17,7 @@ use shirabe::repository::array_repository::ArrayRepository;
 use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::{bconcat, utf8_text};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 
 #[allow(dead_code)]
@@ -152,12 +152,12 @@ fn check_solver_result_repo_set(
             ));
             result_ids.push(("update".to_string(), vec![from.ptr_id(), to.ptr_id()]));
         } else {
-            let job = match operation.get_operation_type() {
-                "markAliasInstalled" => "markAliasInstalled",
-                "markAliasUninstalled" => "markAliasUninstalled",
-                "uninstall" => "remove",
-                "install" => "install",
-                other => panic!("Unexpected operation: {}", other),
+            let job = match operation.get_operation_type().as_bytes() {
+                b"markAliasInstalled" => "markAliasInstalled",
+                b"markAliasUninstalled" => "markAliasUninstalled",
+                b"uninstall" => "remove",
+                b"install" => "install",
+                other => panic!("Unexpected operation: {}", BStr::new(other).display_lossy()),
             };
             let package = operation.get_target_package();
             result_readable.push((job.to_string(), package.get_unique_name()));
@@ -2716,7 +2716,7 @@ fn test_learn_positive_literal() {
             let job = if op_type == "uninstall" {
                 "remove".to_string()
             } else {
-                op_type.to_string()
+                utf8_text(op_type).unwrap().to_owned()
             };
             result.push((job, operation.get_target_package().get_unique_name()));
         }

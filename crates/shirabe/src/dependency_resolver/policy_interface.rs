@@ -2,10 +2,10 @@
 
 use crate::dependency_resolver::Pool;
 use crate::package::BasePackageHandle;
-use bstr::BString;
+use bstr::{BStr, BString};
 
 pub trait PolicyInterface: std::fmt::Debug {
-    fn version_compare(&self, a: BasePackageHandle, b: BasePackageHandle, operator: &str) -> bool;
+    fn version_compare(&self, a: BasePackageHandle, b: BasePackageHandle, operator: &BStr) -> bool;
 
     fn select_preferred_packages(
         &self,

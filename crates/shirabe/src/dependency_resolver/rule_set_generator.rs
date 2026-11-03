@@ -11,7 +11,7 @@ use crate::filter::platform_requirement_filter::{
 use crate::package::PackageInterfaceHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::LogicException;
+use shirabe_php_shim::{LogicException, bconcat};
 use std::collections::VecDeque;
 
 #[derive(Debug)]
@@ -308,9 +308,10 @@ impl RuleSetGenerator {
                 }
 
                 // otherwise, looks like a bug
-                return Err(LogicException::new(format!(
-                    "Fixed package {} was not added to solver pool.",
-                    package.get_pretty_string().display_lossy()
+                return Err(LogicException::new(bconcat!(
+                    "Fixed package ",
+                    package.get_pretty_string(),
+                    " was not added to solver pool."
                 ))
                 .into());
             }

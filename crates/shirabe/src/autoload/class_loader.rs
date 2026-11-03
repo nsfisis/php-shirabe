@@ -161,9 +161,9 @@ impl ClassLoader {
             // Register directories for a new namespace.
             let length = strlen(prefix);
             if "\\" != substr(prefix, length - 1, Some(1)) {
-                return Err(InvalidArgumentException::new(
-                    "A non-empty PSR-4 prefix must end with a namespace separator.".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "A non-empty PSR-4 prefix must end with a namespace separator.",
+                ))
                 .into());
             }
             self.prefix_lengths_psr4
@@ -212,9 +212,9 @@ impl ClassLoader {
         } else {
             let length = strlen(prefix);
             if "\\" != substr(prefix, length - 1, Some(1)) {
-                return Err(InvalidArgumentException::new(
-                    "A non-empty PSR-4 prefix must end with a namespace separator.".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "A non-empty PSR-4 prefix must end with a namespace separator.",
+                ))
                 .into());
             }
             self.prefix_lengths_psr4
@@ -315,7 +315,7 @@ impl ClassLoader {
         // TODO(php-runtime): PHP also looks for a Hack file (`.hh`) when it runs on HHVM. Only the
         // worker, which is the runtime that includes the file, can answer whether it is HHVM, and
         // asking boots it, while this lookup is what decides whether it is needed at all.
-        let file = self.find_file_with_extension(class, ".php");
+        let file = self.find_file_with_extension(class, BStr::new(".php"));
 
         if let Some(apcu_prefix) = &self.apcu_prefix {
             // No-op; APCu is not available in Rust.
@@ -334,7 +334,7 @@ impl ClassLoader {
         REGISTERED_LOADERS.lock().unwrap().clone()
     }
 
-    fn find_file_with_extension(&self, class: &BStr, ext: &str) -> Option<BString> {
+    fn find_file_with_extension(&self, class: &BStr, ext: &BStr) -> Option<BString> {
         // PSR-4 lookup
         let logical_path_psr4 = bconcat!(strtr(class, "\\", std::path::MAIN_SEPARATOR_STR), ext);
 
@@ -418,21 +418,21 @@ impl ClassLoader {
     /// `"\0Composer\Autoload\ClassLoader\0<propertyName>"` using the original camelCase names, in
     /// declaration order.
     pub fn as_array_iter(&self) -> Vec<(BString, PhpMixed)> {
-        let key = |name: &str| bconcat!("\0Composer\\Autoload\\ClassLoader\0", name);
+        let key = |name: &BStr| bconcat!("\0Composer\\Autoload\\ClassLoader\0", name);
         let str_list = |v: &Vec<BString>| {
             PhpMixed::List(v.iter().map(|s| PhpMixed::string(s.clone())).collect())
         };
 
         vec![
             (
-                key("vendorDir"),
+                key(BStr::new("vendorDir")),
                 match &self.vendor_dir {
                     Some(s) => PhpMixed::string(s.clone()),
                     None => PhpMixed::Null,
                 },
             ),
             (
-                key("prefixLengthsPsr4"),
+                key(BStr::new("prefixLengthsPsr4")),
                 PhpMixed::Array(
                     self.prefix_lengths_psr4
                         .iter()
@@ -451,7 +451,7 @@ impl ClassLoader {
                 ),
             ),
             (
-                key("prefixDirsPsr4"),
+                key(BStr::new("prefixDirsPsr4")),
                 PhpMixed::Array(
                     self.prefix_dirs_psr4
                         .iter()
@@ -459,9 +459,12 @@ impl ClassLoader {
                         .collect(),
                 ),
             ),
-            (key("fallbackDirsPsr4"), str_list(&self.fallback_dirs_psr4)),
             (
-                key("prefixesPsr0"),
+                key(BStr::new("fallbackDirsPsr4")),
+                str_list(&self.fallback_dirs_psr4),
+            ),
+            (
+                key(BStr::new("prefixesPsr0")),
                 PhpMixed::Array(
                     self.prefixes_psr0
                         .iter()
@@ -479,10 +482,16 @@ impl ClassLoader {
                         .collect(),
                 ),
             ),
-            (key("fallbackDirsPsr0"), str_list(&self.fallback_dirs_psr0)),
-            (key("useIncludePath"), PhpMixed::Bool(self.use_include_path)),
             (
-                key("classMap"),
+                key(BStr::new("fallbackDirsPsr0")),
+                str_list(&self.fallback_dirs_psr0),
+            ),
+            (
+                key(BStr::new("useIncludePath")),
+                PhpMixed::Bool(self.use_include_path),
+            ),
+            (
+                key(BStr::new("classMap")),
                 PhpMixed::Array(
                     self.class_map
                         .iter()
@@ -491,11 +500,11 @@ impl ClassLoader {
                 ),
             ),
             (
-                key("classMapAuthoritative"),
+                key(BStr::new("classMapAuthoritative")),
                 PhpMixed::Bool(self.class_map_authoritative),
             ),
             (
-                key("missingClasses"),
+                key(BStr::new("missingClasses")),
                 PhpMixed::Array(
                     self.missing_classes
                         .iter()
@@ -504,7 +513,7 @@ impl ClassLoader {
                 ),
             ),
             (
-                key("apcuPrefix"),
+                key(BStr::new("apcuPrefix")),
                 match &self.apcu_prefix {
                     Some(s) => PhpMixed::string(s.clone()),
                     None => PhpMixed::Null,

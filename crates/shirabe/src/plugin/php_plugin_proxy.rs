@@ -963,9 +963,9 @@ fn dispatch_autoload_generator_method(
             let installation_manager = arg::<
                 std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
             >(method_name, args, 3)?;
-            let target_dir = arg::<String>(method_name, args, 4)?;
+            let target_dir = arg::<BString>(method_name, args, 4)?;
             let scan_psr_packages = arg_or::<bool>(method_name, args, 5, false)?;
-            let suffix = arg::<Option<String>>(method_name, args, 6)?;
+            let suffix = arg::<Option<BString>>(method_name, args, 6)?;
             let locker = arg::<Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>>(
                 method_name,
                 args,
@@ -979,7 +979,7 @@ fn dispatch_autoload_generator_method(
                     local_repo,
                     root_package,
                     installation_manager,
-                    &target_dir,
+                    target_dir.as_bstr(),
                     scan_psr_packages,
                     suffix,
                     locker,

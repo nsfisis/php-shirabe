@@ -3,9 +3,9 @@
 use crate::dependency_resolver::{PolicyInterface, Pool};
 use crate::package::{BasePackageHandle, stability_priority};
 use crate::util::Platform;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, PhpMixed, bconcat};
+use shirabe_php_shim::{CmpOp, PhpMixed, bconcat, implode};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -109,7 +109,7 @@ impl DefaultPolicy {
             }
         }
 
-        let operator = if self.prefer_lowest { "<" } else { ">" };
+        let operator = BStr::new(if self.prefer_lowest { "<" } else { ">" });
         let mut best_literals = vec![literals[0]];
         let mut best_package = pool.literal_to_package(literals[0]);
         for (i, &literal) in literals.iter().enumerate() {
@@ -120,7 +120,7 @@ impl DefaultPolicy {
             if self.version_compare(package.clone(), best_package.clone(), operator) {
                 best_package = package;
                 best_literals = vec![literal];
-            } else if self.version_compare(package.clone(), best_package.clone(), "==") {
+            } else if self.version_compare(package.clone(), best_package.clone(), BStr::new("==")) {
                 best_literals.push(literal);
             }
         }
@@ -167,7 +167,7 @@ impl DefaultPolicy {
 }
 
 impl PolicyInterface for DefaultPolicy {
-    fn version_compare(&self, a: BasePackageHandle, b: BasePackageHandle, operator: &str) -> bool {
+    fn version_compare(&self, a: BasePackageHandle, b: BasePackageHandle, operator: &BStr) -> bool {
         if self.prefer_stable {
             let stab_a = a.get_stability();
             let stab_b = b.get_stability();
@@ -179,10 +179,10 @@ impl PolicyInterface for DefaultPolicy {
                     && "stable" != stab_b
                 {
                     if stab_a == "dev" {
-                        stab_a = bstr::BString::from("stable".to_string());
+                        stab_a = BString::from("stable");
                     }
                     if stab_b == "dev" {
-                        stab_b = bstr::BString::from("stable".to_string());
+                        stab_b = BString::from("stable");
                     }
                 }
                 return stability_priority(&stab_a).unwrap_or(0)
@@ -213,11 +213,10 @@ impl PolicyInterface for DefaultPolicy {
     ) -> Vec<i64> {
         literals.sort();
         let result_cache_key = bconcat!(
-            literals
-                .iter()
-                .map(|l| l.to_string())
-                .collect::<Vec<_>>()
-                .join(","),
+            implode(
+                ",",
+                &literals.iter().map(|l| bconcat!(l)).collect::<Vec<_>>()
+            ),
             required_package.clone().unwrap_or_default()
         );
         let pool_id = pool as *const Pool as i64;

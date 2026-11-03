@@ -4,7 +4,7 @@ use crate::package::BasePackageHandle;
 use crate::repository::{LockArrayRepositoryHandle, RepositoryInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, strtolower};
+use shirabe_php_shim::{LogicException, bconcat, strtolower};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions
@@ -46,11 +46,14 @@ impl Request {
         let package_name = BString::from(&strtolower(package_name)[..]);
         let constraint = constraint.unwrap_or_else(|| MatchAllConstraint::new(None).into());
         if self.requires.contains_key(&package_name) {
-            return Err(LogicException::new(format!(
-                "Overwriting requires seems like a bug ({} {} => {}, check why it is happening, might be a root alias",
-                package_name.display_lossy(),
-                self.requires[&package_name].get_pretty_string().display_lossy(),
-                constraint.get_pretty_string().display_lossy()
+            return Err(LogicException::new(bconcat!(
+                "Overwriting requires seems like a bug (",
+                package_name,
+                " ",
+                self.requires[&package_name].get_pretty_string(),
+                " => ",
+                constraint.get_pretty_string(),
+                ", check why it is happening, might be a root alias"
             ))
             .into());
         }
@@ -64,9 +67,8 @@ impl Request {
     /// their installation is generated for dependency resolution. Partial updates with dependencies
     /// cannot in any way modify these packages.
     pub fn fix_package(&mut self, package: BasePackageHandle) {
-        let hash = package.ptr_id().to_string();
-        self.fixed_packages
-            .insert(bstr::BString::from(hash), package);
+        let hash = bconcat!(package.ptr_id());
+        self.fixed_packages.insert(hash, package);
     }
 
     /// Mark a package as locked to a specific version but removable.
@@ -80,9 +82,8 @@ impl Request {
     /// a partial update these packages can be unlocked, meaning other versions can be installed if
     /// explicitly requested as part of the update.
     pub fn lock_package(&mut self, package: BasePackageHandle) {
-        let hash = package.ptr_id().to_string();
-        self.locked_packages
-            .insert(bstr::BString::from(hash), package);
+        let hash = bconcat!(package.ptr_id());
+        self.locked_packages.insert(hash, package);
     }
 
     /// Marks a locked package fixed. So it's treated irremovable like a platform package.
@@ -92,16 +93,14 @@ impl Request {
     /// be marked fixed, as error reporting would then report them as platform packages, so this
     /// still marks them as locked packages at the same time.
     pub fn fix_locked_package(&mut self, package: BasePackageHandle) {
-        let hash = package.ptr_id().to_string();
-        self.fixed_packages
-            .insert(bstr::BString::from(hash.clone()), package.clone());
-        self.fixed_locked_packages
-            .insert(bstr::BString::from(hash), package);
+        let hash = bconcat!(package.ptr_id());
+        self.fixed_packages.insert(hash.clone(), package.clone());
+        self.fixed_locked_packages.insert(hash, package);
     }
 
     pub fn unlock_package(&mut self, package: BasePackageHandle) {
         self.locked_packages
-            .shift_remove(package.ptr_id().to_string().as_bytes());
+            .shift_remove(bconcat!(package.ptr_id()).as_slice());
     }
 
     pub fn set_update_allow_list(
@@ -138,7 +137,7 @@ impl Request {
 
     pub fn is_fixed_package(&self, package: BasePackageHandle) -> bool {
         self.fixed_packages
-            .contains_key(package.ptr_id().to_string().as_bytes())
+            .contains_key(bconcat!(package.ptr_id()).as_slice())
     }
 
     pub fn get_locked_packages(&self) -> &IndexMap<BString, BasePackageHandle> {
@@ -146,7 +145,7 @@ impl Request {
     }
 
     pub fn is_locked_package(&self, package: BasePackageHandle) -> bool {
-        let hash = package.ptr_id().to_string();
+        let hash = bconcat!(package.ptr_id());
         self.locked_packages.contains_key(bstr::B(&hash))
             || self.fixed_locked_packages.contains_key(bstr::B(&hash))
     }
@@ -179,21 +178,21 @@ impl Request {
             for package in RepositoryInterface::get_packages(&mut *locked_repository.borrow_mut())?
             {
                 let key = if package_ids {
-                    package.get_id().to_string()
+                    bconcat!(package.get_id())
                 } else {
-                    package.ptr_id().to_string()
+                    bconcat!(package.ptr_id())
                 };
-                present_map.insert(bstr::BString::from(key), package);
+                present_map.insert(key, package);
             }
         }
 
         for (_, package) in &self.fixed_packages {
             let key = if package_ids {
-                package.get_id().to_string()
+                bconcat!(package.get_id())
             } else {
-                package.ptr_id().to_string()
+                bconcat!(package.ptr_id())
             };
-            present_map.insert(bstr::BString::from(key), package.clone());
+            present_map.insert(key, package.clone());
         }
 
         Ok(present_map)

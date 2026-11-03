@@ -408,7 +408,13 @@ impl InstallationManager {
             let op_type = operation.get_operation_type();
 
             // ignoring alias ops as they don't need to execute anything at this stage
-            if !["update", "install", "uninstall"].contains(&op_type) {
+            if ![
+                BStr::new("update"),
+                BStr::new("install"),
+                BStr::new("uninstall"),
+            ]
+            .contains(&op_type)
+            {
                 continue;
             }
 
@@ -447,7 +453,7 @@ impl InstallationManager {
                         Box<dyn std::future::Future<Output = anyhow::Result<()>>>,
                     > = Box::pin(async move {
                         installer
-                            .cleanup(BStr::new(op_type), package, initial_package)
+                            .cleanup(op_type, package, initial_package)
                             .await
                             .map(|_| ())
                     });
@@ -565,7 +571,13 @@ impl InstallationManager {
             let op_type = operation.get_operation_type();
 
             // ignoring alias ops as they don't need to execute anything
-            if !["update", "install", "uninstall"].contains(&op_type) {
+            if ![
+                BStr::new("update"),
+                BStr::new("install"),
+                BStr::new("uninstall"),
+            ]
+            .contains(&op_type)
+            {
                 // output alias ops in debug verbosity as they have no output otherwise
                 if self.io.is_debug() {
                     self.io.write_error3(
@@ -593,10 +605,10 @@ impl InstallationManager {
                 _ => None,
             };
 
-            let event_name = match op_type {
-                "install" => PackageEvents::PRE_PACKAGE_INSTALL,
-                "update" => PackageEvents::PRE_PACKAGE_UPDATE,
-                "uninstall" => PackageEvents::PRE_PACKAGE_UNINSTALL,
+            let event_name = match op_type.as_bytes() {
+                b"install" => PackageEvents::PRE_PACKAGE_INSTALL,
+                b"update" => PackageEvents::PRE_PACKAGE_UPDATE,
+                b"uninstall" => PackageEvents::PRE_PACKAGE_UNINSTALL,
                 _ => BStr::new(""),
             };
 
@@ -622,7 +634,7 @@ impl InstallationManager {
             promises.push(Box::pin(async move {
                 let chain_result: anyhow::Result<()> = async {
                     installer
-                        .prepare(BStr::new(op_type), package.clone(), initial_package.clone())
+                        .prepare(op_type, package.clone(), initial_package.clone())
                         .await?;
 
                     match &*executed_operation {
@@ -669,10 +681,10 @@ impl InstallationManager {
                 Ok(())
             }));
 
-            let event_name = match op_type {
-                "install" => PackageEvents::POST_PACKAGE_INSTALL,
-                "update" => PackageEvents::POST_PACKAGE_UPDATE,
-                "uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
+            let event_name = match op_type.as_bytes() {
+                b"install" => PackageEvents::POST_PACKAGE_INSTALL,
+                b"update" => PackageEvents::POST_PACKAGE_UPDATE,
+                b"uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
                 _ => BStr::new(""),
             };
 

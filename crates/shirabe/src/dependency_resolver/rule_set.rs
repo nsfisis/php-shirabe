@@ -2,9 +2,11 @@
 
 use crate::dependency_resolver::{Pool, Request, Rule, RuleSetIterator};
 use crate::repository::RepositorySet;
-use bstr::{BString, ByteVec};
+use bstr::{BStr, BString, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::{OutOfBoundsException, php_to_string};
+use shirabe_php_shim::{
+    OutOfBoundsException, STR_PAD_RIGHT, bconcat, display_to_bytes, php_to_string, str_pad,
+};
 
 #[derive(Debug)]
 pub struct RuleSet {
@@ -25,11 +27,11 @@ impl RuleSet {
     pub const TYPE_REQUEST: i64 = 1;
     pub const TYPE_LEARNED: i64 = 4;
 
-    pub fn types() -> IndexMap<i64, &'static str> {
+    pub fn types() -> IndexMap<i64, &'static BStr> {
         let mut map = IndexMap::new();
-        map.insert(Self::TYPE_PACKAGE, "PACKAGE");
-        map.insert(Self::TYPE_REQUEST, "REQUEST");
-        map.insert(Self::TYPE_LEARNED, "LEARNED");
+        map.insert(Self::TYPE_PACKAGE, BStr::new("PACKAGE"));
+        map.insert(Self::TYPE_REQUEST, BStr::new("REQUEST"));
+        map.insert(Self::TYPE_LEARNED, BStr::new("LEARNED"));
         map
     }
 
@@ -57,7 +59,7 @@ impl RuleSet {
     ) -> anyhow::Result<()> {
         let types = Self::types();
         if !types.contains_key(&r#type) {
-            return Err(OutOfBoundsException::new(format!("Unknown rule type: {}", r#type)).into());
+            return Err(OutOfBoundsException::new(bconcat!("Unknown rule type: ", r#type)).into());
         }
 
         let hash = php_to_string(&rule.borrow().get_hash()?);
@@ -137,7 +139,15 @@ impl RuleSet {
         let dummy_installed_map = IndexMap::new();
         let dummy_learned_pool = Vec::new();
         for (r#type, rules) in &self.rules {
-            string.push_str(format!("{:<8}: ", types.get(r#type).expect("unknown type")));
+            string.push_str(bconcat!(
+                str_pad(
+                    types.get(r#type).expect("unknown type"),
+                    8,
+                    " ",
+                    STR_PAD_RIGHT
+                ),
+                ": "
+            ));
             for rule in rules {
                 if let Some(repository_set) = repository_set
                     && let Some(request) = request
@@ -152,7 +162,7 @@ impl RuleSet {
                         &dummy_learned_pool,
                     )?);
                 } else {
-                    string.push_str(rule.borrow().to_string());
+                    string.push_str(display_to_bytes(&*rule.borrow()));
                 }
                 string.push(b'\n');
             }

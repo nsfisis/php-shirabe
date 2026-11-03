@@ -3,7 +3,8 @@
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
-use shirabe_php_shim::bconcat;
+use bstr::BStr;
+use shirabe_php_shim::{bconcat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct UpdateOperation {
@@ -86,7 +87,7 @@ impl UpdateOperation {
 }
 
 impl SolverOperation for UpdateOperation {
-    const TYPE: &'static str = "update";
+    const TYPE: &'static BStr = php_str(b"update");
 }
 
 impl std::fmt::Display for UpdateOperation {

@@ -306,7 +306,7 @@ impl Command for ReinstallCommand {
                 local_repo.clone(),
                 package.clone(),
                 installation_manager.clone(),
-                "composer",
+                BStr::new("composer"),
                 optimize,
                 None,
                 Some(locker.clone()),

@@ -17,7 +17,7 @@ mod suggested_packages_reporter;
 
 pub use binary_installer::*;
 pub use binary_presence_interface::*;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 pub use installation_manager::*;
 pub use installer_event::*;
 pub use installer_events::*;
@@ -389,7 +389,7 @@ impl Installer {
                 local_repo_handle,
                 self.package.clone(),
                 self.installation_manager.clone(),
-                "composer",
+                BStr::new("composer"),
                 self.optimize_autoloader,
                 None,
                 Some(self.locker.clone()),

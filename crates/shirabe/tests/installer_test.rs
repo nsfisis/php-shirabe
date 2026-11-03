@@ -224,9 +224,9 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         _installation_manager: std::rc::Rc<
             std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>,
         >,
-        _target_dir: &str,
+        _target_dir: &bstr::BStr,
         _scan_psr_packages: bool,
-        _suffix: Option<String>,
+        _suffix: Option<bstr::BString>,
         _locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         _strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {

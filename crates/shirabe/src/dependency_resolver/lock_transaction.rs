@@ -44,9 +44,9 @@ impl LockTransaction {
 
     pub fn set_result_packages(&mut self, pool: &Pool, decisions: &Decisions) {
         let mut result_packages: IndexMap<BString, Vec<PackageInterfaceHandle>> = IndexMap::new();
-        result_packages.insert(bstr::BString::from("all".to_string()), vec![]);
-        result_packages.insert(bstr::BString::from("non-dev".to_string()), vec![]);
-        result_packages.insert(bstr::BString::from("dev".to_string()), vec![]);
+        result_packages.insert(BString::from("all"), vec![]);
+        result_packages.insert(BString::from("non-dev"), vec![]);
+        result_packages.insert(BString::from("dev"), vec![]);
 
         for decision in decisions.decision_queue.iter() {
             let literal = decision.0;
@@ -77,10 +77,9 @@ impl LockTransaction {
             .result_packages
             .shift_remove(b"non-dev".as_slice())
             .unwrap_or_default();
+        self.result_packages.insert(BString::from("dev"), non_dev);
         self.result_packages
-            .insert(bstr::BString::from("dev".to_string()), non_dev);
-        self.result_packages
-            .insert(bstr::BString::from("non-dev".to_string()), vec![]);
+            .insert(BString::from("non-dev"), vec![]);
 
         let mut remaining_dev = self
             .result_packages
@@ -101,7 +100,7 @@ impl LockTransaction {
             }
         }
         self.result_packages
-            .insert(bstr::BString::from("dev".to_string()), remaining_dev);
+            .insert(BString::from("dev"), remaining_dev);
     }
 
     pub fn get_new_lock_packages(
@@ -125,7 +124,7 @@ impl LockTransaction {
             if update_mirrors
                 && !self
                     .present_map
-                    .contains_key(package.ptr_id().to_string().as_bytes())
+                    .contains_key(bconcat!(package.ptr_id()).as_bytes())
             {
                 let updated = self.update_mirror_and_urls(package.clone());
                 packages.push(updated);

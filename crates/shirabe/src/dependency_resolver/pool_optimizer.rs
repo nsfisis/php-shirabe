@@ -334,21 +334,21 @@ impl PoolOptimizer {
     fn calculate_dependency_hash(&self, package: BasePackageHandle) -> BString {
         let mut hash = BString::default();
 
-        let hash_relevant_links: Vec<(&str, Vec<crate::package::Link>)> = vec![
+        let hash_relevant_links: Vec<(&BStr, Vec<crate::package::Link>)> = vec![
             (
-                "requires",
+                BStr::new("requires"),
                 package.get_requires().values().cloned().collect(),
             ),
             (
-                "conflicts",
+                BStr::new("conflicts"),
                 package.get_conflicts().values().cloned().collect(),
             ),
             (
-                "replaces",
+                BStr::new("replaces"),
                 package.get_replaces().values().cloned().collect(),
             ),
             (
-                "provides",
+                BStr::new("provides"),
                 package.get_provides().values().cloned().collect(),
             ),
         ];
@@ -359,7 +359,7 @@ impl PoolOptimizer {
             }
 
             // start new hash section
-            hash.push_str(format!("{}:", key));
+            hash.push_str(bconcat!(key, ":"));
 
             let mut subhash: IndexMap<BString, BString> = IndexMap::new();
 
@@ -447,7 +447,7 @@ impl PoolOptimizer {
                             pkg.clone()
                         };
                         self.removed_versions_by_package
-                            .entry(bstr::BString::from(package.ptr_id().to_string()))
+                            .entry(bconcat!(package.ptr_id()))
                             .or_default()
                             .insert(
                                 BString::from(&pkg.get_version()[..]),
