@@ -9,7 +9,8 @@ use crate::util::Platform;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, chmod, path_from_bytes, php_to_string, touch,
+    PhpMixed, RuntimeException, bconcat, chmod, dirname, path_from_bytes, path_to_bytes,
+    php_to_string, touch,
 };
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
@@ -164,8 +165,11 @@ pub trait BaseConfigCommand: BaseCommand {
             Ok(path_from_bytes(&php_to_string(&config.get("home"))).join("auth.json"))
         } else {
             let composer_config = self.get_composer_config_file(input, config)?;
-            let parent = composer_config.parent().unwrap_or(std::path::Path::new(""));
-            Ok(path_from_bytes(&bconcat!(parent, "/auth.json")).to_path_buf())
+            Ok(path_from_bytes(&bconcat!(
+                dirname(path_to_bytes(&composer_config)),
+                "/auth.json"
+            ))
+            .to_path_buf())
         }
     }
 }
