@@ -2493,7 +2493,11 @@ fn test_add_list_item() {
     ];
     for (from, to, main_node, value, append) in cases {
         let mut manipulator = JsonManipulator::new(from).unwrap();
-        assert!(manipulator.add_list_item(main_node, value, append).unwrap());
+        assert!(
+            manipulator
+                .add_list_item(bstr::BStr::new(main_node), value, append)
+                .unwrap()
+        );
         assert_eq!(to, manipulator.get_contents());
     }
 }
@@ -2605,7 +2609,7 @@ fn test_remove_list_item() {
         let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(
             manipulator
-                .remove_list_item(main_node, index_to_remove)
+                .remove_list_item(bstr::BStr::new(main_node), index_to_remove)
                 .unwrap()
         );
         assert_eq!(to, manipulator.get_contents());
@@ -2742,7 +2746,7 @@ fn test_insert_list_item() {
         let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(
             manipulator
-                .insert_list_item(main_node, value, index_to_insert_at)
+                .insert_list_item(bstr::BStr::new(main_node), value, index_to_insert_at)
                 .unwrap()
         );
         assert_eq!(to, manipulator.get_contents());

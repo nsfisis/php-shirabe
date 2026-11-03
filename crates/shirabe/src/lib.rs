@@ -1,3 +1,4 @@
+use bstr::BString;
 use shirabe_php_shim::{path_from_bytes, path_to_bytes, realpath};
 pub mod advisory;
 pub mod autoload;
@@ -51,7 +52,7 @@ pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
         .unwrap_or_default(),
     );
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), String::new())?;
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::default())?;
     let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?));
     application.run(Some(input), None).await
 }

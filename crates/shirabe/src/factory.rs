@@ -86,8 +86,7 @@ impl Factory {
                 .map(|s| s.is_empty())
                 .unwrap_or(true)
             {
-                return Err(RuntimeException::new("The APPDATA or COMPOSER_HOME environment variable must be set for composer to run correctly"
-                            .to_string()).into());
+                return Err(RuntimeException::new(BString::from("The APPDATA or COMPOSER_HOME environment variable must be set for composer to run correctly")).into());
             }
 
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
@@ -238,7 +237,7 @@ impl Factory {
         if file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
-                    format!("Loading config file {}", file.get_path().display()),
+                    bconcat!("Loading config file ", file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -288,7 +287,7 @@ impl Factory {
         if auth_file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
-                    format!("Loading config file {}", auth_file.get_path().display()),
+                    bconcat!("Loading config file ", auth_file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -327,10 +326,7 @@ impl Factory {
             if !env_trimmed.is_empty() {
                 let env_trimmed = path_from_bytes(&env_trimmed);
                 if is_dir(env_trimmed) {
-                    return Err(RuntimeException::new(format!(
-                        "The COMPOSER environment variable is set to {} which is a directory, this variable should point to a composer.json or be left unset.",
-                        env_trimmed.display()
-                    )).into());
+                    return Err(RuntimeException::new(bconcat!("The COMPOSER environment variable is set to ", env_trimmed, " which is a directory, this variable should point to a composer.json or be left unset.")).into());
                 }
 
                 return Ok(env_trimmed.to_path_buf());
@@ -428,12 +424,9 @@ impl Factory {
                 let message = if path.as_os_str() == "./composer.json"
                     || path.as_os_str() == "composer.json"
                 {
-                    format!(
-                        "Shirabe could not find a composer.json file in {}",
-                        cwd.display()
-                    )
+                    bconcat!("Shirabe could not find a composer.json file in ", cwd)
                 } else {
-                    format!("Shirabe could not find the config file: {}", path.display())
+                    bconcat!("Shirabe could not find the config file: ", path)
                 };
                 let instructions = if full_load {
                     "To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage"
@@ -486,10 +479,12 @@ impl Factory {
 
         if let Some(ref composer_file_path) = composer_file {
             io.write_error3(
-                format!(
-                    "Loading config file {} ({})",
-                    composer_file_path.display(),
-                    realpath(composer_file_path).unwrap_or_default().display()
+                bconcat!(
+                    "Loading config file ",
+                    composer_file_path,
+                    " (",
+                    realpath(composer_file_path).unwrap_or_default(),
+                    ")"
                 ),
                 true,
                 crate::io::DEBUG,
@@ -513,10 +508,7 @@ impl Factory {
             )?;
             if local_auth_file.exists() {
                 io.write_error3(
-                    format!(
-                        "Loading config file {}",
-                        local_auth_file.get_path().display()
-                    ),
+                    bconcat!("Loading config file ", local_auth_file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -627,7 +619,7 @@ impl Factory {
                     // guessing it adds no value and only takes time
                     if !full_load && !local_config_data.contains_key(B("version")) {
                         local_config_data
-                            .insert("version".into(), PhpMixed::string("1.0.0".to_string()));
+                            .insert("version".into(), PhpMixed::string(BString::from("1.0.0")));
                     }
 
                     // load package
@@ -729,10 +721,7 @@ impl Factory {
                                 .unwrap_or(true);
                             if !lock_enabled && file_exists(&lock_file) {
                                 io.write_error3(
-                                    format!(
-                                        "<warning>{} is present but ignored as the \"lock\" config option is disabled.</warning>",
-                                        lock_file.display()
-                                    ),
+                                    bconcat!("<warning>", lock_file, " is present but ignored as the \"lock\" config option is disabled.</warning>"),
                                     true,
                                     crate::io::NORMAL,
                                 );
@@ -857,7 +846,7 @@ impl Factory {
         if full_load {
             // The back-reference is now upgradeable, so dispatching the INIT event (which may read
             // the Composer through the dispatcher) is safe only after the Rc has been constructed.
-            let mut init_event = Event::from_name(PluginEvents::INIT.to_string());
+            let mut init_event = Event::from_name(bconcat!(PluginEvents::INIT));
             let init_event_name = init_event.get_name().to_owned();
             let dispatcher = composer.borrow().get_event_dispatcher();
             dispatcher
@@ -1352,7 +1341,7 @@ impl Factory {
             factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
         // fullLoad=true guarantees a full Composer; narrow PartialComposer -> Composer (PHP `: Composer`).
         composer.as_full().ok_or_else(|| {
-            RuntimeException::new("Composer expected with fullLoad=true".to_string()).into()
+            RuntimeException::new(BString::from("Composer expected with fullLoad=true")).into()
         })
     }
 
@@ -1385,7 +1374,7 @@ impl Factory {
         let composer =
             factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
         composer.as_full().ok_or_else(|| {
-            RuntimeException::new("Composer expected with fullLoad=true".to_string()).into()
+            RuntimeException::new(BString::from("Composer expected with fullLoad=true")).into()
         })
     }
 
@@ -1397,11 +1386,12 @@ impl Factory {
 
         let mut config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
 
-        let home = std::env::temp_dir().join(format!(
-            "shirabe-test-{}-{}",
+        let home = std::env::temp_dir().join(path_from_bytes(&bconcat!(
+            "shirabe-test-",
             std::process::id(),
+            "-",
             NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
+        )));
         let _ = std::fs::create_dir_all(&home);
 
         let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -1450,8 +1440,7 @@ impl Factory {
             unsafe { WARNED = true };
             disable_tls = true;
         } else if !extension_loaded("openssl") {
-            return Err(NoSslException::new("The openssl extension is required for SSL/TLS protection but is not available. If you can not enable the openssl extension, you can disable this error, at your own risk, by setting the 'disable-tls' option to true."
-                        .to_string()).into());
+            return Err(NoSslException::new(BString::from("The openssl extension is required for SSL/TLS protection but is not available. If you can not enable the openssl extension, you can disable this error, at your own risk, by setting the 'disable-tls' option to true.")).into());
         }
         let mut http_downloader_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         if !disable_tls {
@@ -1526,10 +1515,9 @@ impl Factory {
 
         let auth_data = json_decode_obj(&composer_auth_env_str)?;
         if matches!(auth_data, PhpMixed::Null) {
-            return Err(UnexpectedValueException::new(
-                "COMPOSER_AUTH environment variable is malformed, should be a valid JSON object"
-                    .to_string(),
-            )
+            return Err(UnexpectedValueException::new(BString::from(
+                "COMPOSER_AUTH environment variable is malformed, should be a valid JSON object",
+            ))
             .into());
         }
 
@@ -1574,8 +1562,7 @@ impl Factory {
     fn get_user_dir() -> anyhow::Result<BString> {
         let home = Platform::get_env("HOME").unwrap_or_default();
         if home.is_empty() {
-            return Err(RuntimeException::new("The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly"
-                        .to_string()).into());
+            return Err(RuntimeException::new(BString::from("The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly")).into());
         }
 
         Ok(rtrim2(strtr(&home, "\\", "/"), "/"))
@@ -1595,10 +1582,9 @@ impl Factory {
             ValidateJsonInput::File(file) => file.validate_schema(schema, None),
             ValidateJsonInput::Data(data) => {
                 let source = source.ok_or_else(|| -> anyhow::Error {
-                    InvalidArgumentException::new(
-                        "$source is required to be provided if $fileOrData is arbitrary data"
-                            .to_string(),
-                    )
+                    InvalidArgumentException::new(BString::from(
+                        "$source is required to be provided if $fileOrData is arbitrary data",
+                    ))
                     .into()
                 })?;
                 JsonFile::validate_json_schema(source, &data, schema, None)

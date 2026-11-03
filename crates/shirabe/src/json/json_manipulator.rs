@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, bconcat, empty, explode, implode, in_array_loose, intval, is_array, is_int,
-    is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_truthy, preg_is_match,
+    is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_str, php_truthy, preg_is_match,
     preg_match, preg_quote, preg_replace, preg_replace2, rtrim2, str_repeat, str_replace, strlen,
     strnatcmp, strpos, substr, trim2, uksort,
 };
@@ -21,7 +21,8 @@ pub struct JsonManipulator {
 }
 
 impl JsonManipulator {
-    const DEFINES: &'static str = "(?(DEFINE)
+    const DEFINES: &'static BStr = php_str(
+        b"(?(DEFINE)
        (?<number>    -? (?= [1-9]|0(?!\\d) ) \\d++ (?:\\.\\d++)? (?:[eE] [+-]?+ \\d++)? )
        (?<boolean>   true | false | null )
        (?<string>    \" (?:[^\"\\\\]*+ | \\\\ [\"\\\\bfnrt\\/] | \\\\ u [0-9A-Fa-f]{4} )* \" )
@@ -29,7 +30,8 @@ impl JsonManipulator {
        (?<pair>      \\s*+ (?&string) \\s*+ : (?&json) \\s*+ )
        (?<object>    \\{  (?:  (?&pair)  (?: , (?&pair)  )*+  )?+  \\s*+ \\} )
        (?<json>      \\s*+ (?: (?&number) | (?&boolean) | (?&string) | (?&array) | (?&object) ) )
-    )";
+    )",
+    );
 
     pub fn new(contents: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         let mut contents = trim2(contents, " \t\n\r\0\u{0B}");
@@ -37,9 +39,9 @@ impl JsonManipulator {
             contents = BString::from("{}");
         }
         if !preg_is_match(php_regex!("#^\\{(.*)\\}$#s"), &contents) {
-            return Err(InvalidArgumentException::new(
-                "The json file must be an object ({})".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "The json file must be an object ({})",
+            ))
             .into());
         }
         let newline = BString::from(if strpos(&contents, "\r\n").is_some() {
@@ -228,7 +230,7 @@ impl JsonManipulator {
                 config
             };
 
-        self.add_list_item("repositories", final_config, append)
+        self.add_list_item(BStr::new("repositories"), final_config, append)
     }
 
     fn do_convert_repositories_from_assoc_to_list(&mut self) -> anyhow::Result<bool> {
@@ -256,7 +258,7 @@ impl JsonManipulator {
                 }
             }
 
-            self.change_empty_main_key_from_assoc_to_list("repositories")?;
+            self.change_empty_main_key_from_assoc_to_list(BStr::new("repositories"))?;
 
             // re-add in order
             for (repository_name, repository) in &repos_arr {
@@ -264,11 +266,11 @@ impl JsonManipulator {
                 if !is_obj {
                     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
                     m.insert(repository_name.clone(), repository.clone());
-                    if !self.add_list_item("repositories", PhpMixed::Array(m), true)? {
+                    if !self.add_list_item(BStr::new("repositories"), PhpMixed::Array(m), true)? {
                         return Ok(false);
                     }
                 } else if is_numeric(&PhpMixed::String(repository_name.clone())) {
-                    if !self.add_list_item("repositories", repository.clone(), true)? {
+                    if !self.add_list_item(BStr::new("repositories"), repository.clone(), true)? {
                         return Ok(false);
                     }
                 } else {
@@ -285,7 +287,11 @@ impl JsonManipulator {
                             prepended.insert(k.clone(), v.clone());
                         }
                     }
-                    if !self.add_list_item("repositories", PhpMixed::Array(prepended), true)? {
+                    if !self.add_list_item(
+                        BStr::new("repositories"),
+                        PhpMixed::Array(prepended),
+                        true,
+                    )? {
                         return Ok(false);
                     }
                 }
@@ -317,7 +323,7 @@ impl JsonManipulator {
             if let Some(list) = repos_value.as_ref().and_then(|v| v.as_list()) {
                 list.iter()
                     .enumerate()
-                    .map(|(i, v)| (BString::from(i.to_string()), v.clone()))
+                    .map(|(i, v)| (bconcat!(i), v.clone()))
                     .collect()
             } else {
                 repos_value
@@ -513,7 +519,11 @@ impl JsonManipulator {
                 config
             };
 
-        self.insert_list_item("repositories", final_config, index_to_insert + offset)
+        self.insert_list_item(
+            BStr::new("repositories"),
+            final_config,
+            index_to_insert + offset,
+        )
     }
 
     pub fn remove_repository(&mut self, name: impl AsRef<[u8]>) -> anyhow::Result<bool> {
@@ -539,7 +549,7 @@ impl JsonManipulator {
             } else if let Some(l) = repositories_value.as_ref().and_then(|v| v.as_list()) {
                 l.iter()
                     .enumerate()
-                    .map(|(i, v)| (BString::from(i.to_string()), v.clone()))
+                    .map(|(i, v)| (bconcat!(i), v.clone()))
                     .collect()
             } else {
                 Vec::new()
@@ -565,7 +575,7 @@ impl JsonManipulator {
                     }
                 } else {
                     let idx = intval(&PhpMixed::string(repository_index.clone()));
-                    if !self.remove_list_item("repositories", idx)? {
+                    if !self.remove_list_item(BStr::new("repositories"), idx)? {
                         return Ok(false);
                     }
                 }
@@ -595,7 +605,7 @@ impl JsonManipulator {
                     && 1 == repository_as_array.len()
                 {
                     let idx = intval(&PhpMixed::string(repository_index.clone()));
-                    if !self.remove_list_item("repositories", idx)? {
+                    if !self.remove_list_item(BStr::new("repositories"), idx)? {
                         return Ok(false);
                     }
 
@@ -682,9 +692,9 @@ impl JsonManipulator {
         if in_array_loose(
             main_node,
             &[
-                PhpMixed::string("config".to_string()),
-                PhpMixed::string("extra".to_string()),
-                PhpMixed::string("scripts".to_string()),
+                PhpMixed::string(BString::from("config")),
+                PhpMixed::string(BString::from("extra")),
+                PhpMixed::string(BString::from("scripts")),
             ],
         ) && strpos(name, ".").is_some()
         {
@@ -845,11 +855,9 @@ impl JsonManipulator {
                     );
                 }
             } else {
-                return Err(LogicException::new(format!(
-                    "Nothing matched above for: {}",
-                    children.display_lossy()
-                ))
-                .into());
+                return Err(
+                    LogicException::new(bconcat!("Nothing matched above for: ", children)).into(),
+                );
             }
         }
 
@@ -897,9 +905,9 @@ impl JsonManipulator {
         if in_array_loose(
             main_node,
             &[
-                PhpMixed::string("config".to_string()),
-                PhpMixed::string("extra".to_string()),
-                PhpMixed::string("scripts".to_string()),
+                PhpMixed::string(BString::from("config")),
+                PhpMixed::string(BString::from("extra")),
+                PhpMixed::string(BString::from("scripts")),
             ],
         ) && strpos(name, ".").is_some()
         {
@@ -969,7 +977,7 @@ impl JsonManipulator {
             children_clean = Some(children.clone());
         }
 
-        let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/nsfisis/php-shirabe/issues/new.".to_string()))?;
+        let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new(BString::from("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/nsfisis/php-shirabe/issues/new.")))?;
 
         // no child data left, $name was the only key in
         if let Some(empty_match) = preg_match(
@@ -1035,7 +1043,7 @@ impl JsonManipulator {
 
     pub fn add_list_item(
         &mut self,
-        main_node: &str,
+        main_node: &BStr,
         value: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
@@ -1135,11 +1143,9 @@ impl JsonManipulator {
                 );
             }
         } else {
-            return Err(LogicException::new(format!(
-                "Nothing matched above for: {}",
-                children.display_lossy()
-            ))
-            .into());
+            return Err(
+                LogicException::new(bconcat!("Nothing matched above for: ", children)).into(),
+            );
         }
 
         self.contents = bconcat!(node_start, children, node_end);
@@ -1149,14 +1155,14 @@ impl JsonManipulator {
 
     pub fn insert_list_item(
         &mut self,
-        main_node: &str,
+        main_node: &BStr,
         value: PhpMixed,
         index: i64,
     ) -> anyhow::Result<bool> {
         if index < 0 {
-            return Err(InvalidArgumentException::new(
-                "Index can only be positive integer".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "Index can only be positive integer",
+            ))
             .into());
         }
 
@@ -1237,7 +1243,7 @@ impl JsonManipulator {
         Ok(true)
     }
 
-    pub fn remove_list_item(&mut self, main_node: &str, node_index: i64) -> anyhow::Result<bool> {
+    pub fn remove_list_item(&mut self, main_node: &BStr, node_index: i64) -> anyhow::Result<bool> {
         // invalid index, that cannot be removed anyway
         if node_index < 0 {
             return Ok(true);
@@ -1452,7 +1458,7 @@ impl JsonManipulator {
 
             self.contents = bconcat!(start, end);
             if preg_is_match(php_regex!("#^\\{\\s*\\}\\s*$#"), &self.contents) {
-                self.contents = bstr::BString::from("{\n}".to_string());
+                self.contents = BString::from("{\n}");
             }
 
             return Ok(true);
@@ -1461,7 +1467,7 @@ impl JsonManipulator {
         Ok(false)
     }
 
-    pub fn change_empty_main_key_from_assoc_to_list(&mut self, key: &str) -> anyhow::Result<bool> {
+    pub fn change_empty_main_key_from_assoc_to_list(&mut self, key: &BStr) -> anyhow::Result<bool> {
         let decoded =
             JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();

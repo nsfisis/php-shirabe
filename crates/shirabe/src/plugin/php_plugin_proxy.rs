@@ -380,7 +380,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
         if let Some((event_rhandle, ref mut event)) = self.event
             && event_rhandle == rhandle
         {
-            return dispatch_event_method(&mut **event, method_name, &args);
+            return dispatch_event_method(&mut **event, BStr::new(method_name), &args);
         }
 
         dispatch_r_table_method(rhandle, method_name, &args, out_params)

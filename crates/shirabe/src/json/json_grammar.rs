@@ -260,42 +260,46 @@ pub fn find_top_level_key(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bstr::BStr;
 
-    fn full(scan: fn(&[u8], usize) -> Option<usize>, s: &str) -> bool {
-        scan(s.as_bytes(), 0) == Some(s.len())
+    fn full(scan: fn(&[u8], usize) -> Option<usize>, s: &BStr) -> bool {
+        scan(s, 0) == Some(s.len())
     }
 
     #[test]
     fn strings() {
-        assert!(full(scan_string, r#""hello""#));
-        assert!(full(scan_string, r#""a\"b""#));
-        assert!(full(scan_string, r#""é""#));
-        assert!(full(scan_string, r#""""#));
+        assert!(full(scan_string, BStr::new(r#""hello""#)));
+        assert!(full(scan_string, BStr::new(r#""a\"b""#)));
+        assert!(full(scan_string, BStr::new(r#""é""#)));
+        assert!(full(scan_string, BStr::new(r#""""#)));
         assert_eq!(scan_string(br#""abc"#, 0), None); // unterminated
         assert_eq!(scan_string(br#""\x""#, 0), None); // invalid escape
     }
 
     #[test]
     fn numbers() {
-        assert!(full(scan_number, "0"));
-        assert!(full(scan_number, "-1"));
-        assert!(full(scan_number, "12.5"));
-        assert!(full(scan_number, "1e10"));
-        assert!(full(scan_number, "-3.14E-2"));
+        assert!(full(scan_number, BStr::new("0")));
+        assert!(full(scan_number, BStr::new("-1")));
+        assert!(full(scan_number, BStr::new("12.5")));
+        assert!(full(scan_number, BStr::new("1e10")));
+        assert!(full(scan_number, BStr::new("-3.14E-2")));
         assert_eq!(scan_number(b"01", 0), None); // leading zero
         assert_eq!(scan_number(b"1.", 0), Some(1)); // ".": no fraction digits -> number is just "1"
     }
 
     #[test]
     fn values_and_containers() {
-        assert!(full(scan_value, "  true"));
-        assert!(full(scan_value, "[1, 2, 3]"));
-        assert!(full(scan_value, "[]"));
-        assert!(full(scan_value, r#"{"a": 1, "b": [true, null]}"#));
-        assert!(full(scan_value, "{}"));
+        assert!(full(scan_value, BStr::new("  true")));
+        assert!(full(scan_value, BStr::new("[1, 2, 3]")));
+        assert!(full(scan_value, BStr::new("[]")));
         assert!(full(
             scan_value,
-            "{\n    \"a\": {\n        \"b\": \"c\"\n    }\n}"
+            BStr::new(r#"{"a": 1, "b": [true, null]}"#)
+        ));
+        assert!(full(scan_value, BStr::new("{}")));
+        assert!(full(
+            scan_value,
+            BStr::new("{\n    \"a\": {\n        \"b\": \"c\"\n    }\n}")
         ));
         assert_eq!(scan_value(br#"{"a": }"#, 0), None); // missing value
         assert_eq!(scan_value(br#"{"a" 1}"#, 0), None); // missing colon
