@@ -1,5 +1,3 @@
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
-
 #[path = "../common/async_runtime.rs"]
 mod async_runtime;
 #[path = "../common/config_stub.rs"]

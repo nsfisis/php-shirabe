@@ -1,5 +1,3 @@
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
-
 pub mod exception;
 pub mod executable_finder;
 pub mod php_executable_finder;

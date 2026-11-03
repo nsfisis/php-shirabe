@@ -4,7 +4,6 @@
 //! the PHP worker against the copy `FilesystemRepository::write` dumps. These tests drive the real
 //! PHP class there, autoloaded from the Composer checkout's vendor directory just as PHPUnit
 //! autoloads it upstream, so `$selfDir` and the registered `ClassLoader` match the upstream run.
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 #[path = "common/php_worker.rs"]
 mod php_worker;

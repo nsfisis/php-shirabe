@@ -1,5 +1,3 @@
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
-
 #[path = "../common/config_stub.rs"]
 mod config_stub;
 

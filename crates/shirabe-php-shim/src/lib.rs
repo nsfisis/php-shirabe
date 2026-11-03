@@ -1,5 +1,3 @@
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
-
 mod array;
 mod bytes;
 mod compress;

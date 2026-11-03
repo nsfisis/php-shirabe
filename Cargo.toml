@@ -68,9 +68,9 @@ unused_variables = "allow"
 
 [workspace.lints.clippy]
 await_holding_refcell_ref = "allow"
-disallowed_macros = "allow"
+disallowed_macros = "deny"
 disallowed_methods = "deny"
-disallowed_types = "allow"
+disallowed_types = "deny"
 diverging_sub_expression = "allow"
 if_same_then_else = "allow"
 large_enum_variant = "allow"

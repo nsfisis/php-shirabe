@@ -1,5 +1,3 @@
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
-
 pub mod application;
 pub mod attribute;
 pub mod color;

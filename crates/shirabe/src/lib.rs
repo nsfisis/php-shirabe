@@ -1,5 +1,3 @@
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
-
 use bstr::BString;
 use shirabe_php_shim::{path_from_bytes, path_to_bytes, realpath};
 pub mod advisory;

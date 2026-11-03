@@ -1,5 +1,4 @@
 //! ref: composer/tests/Composer/Test/FactoryTest.php
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use indexmap::IndexMap;
 use serial_test::serial;

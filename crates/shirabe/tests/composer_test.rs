@@ -1,5 +1,4 @@
 //! ref: composer/tests/Composer/Test/ComposerTest.php
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::BString;
 use indexmap::IndexMap;

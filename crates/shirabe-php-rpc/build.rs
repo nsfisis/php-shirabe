@@ -3,8 +3,11 @@
 //!
 //! ref: composer/src/Composer/Compiler.php
 
-// The file generates Rust source, which rustc reads as text.
-#![allow(clippy::disallowed_types, clippy::disallowed_macros)]
+#![allow(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the file generates Rust source, which rustc reads as text"
+)]
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};

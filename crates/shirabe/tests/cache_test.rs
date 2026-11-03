@@ -1,5 +1,4 @@
 //! ref: composer/tests/Composer/Test/CacheTest.php
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::BStr;
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};

@@ -5,7 +5,6 @@
 //! produced by PHP `serialize()` must decode into a `PluginValue` whose re-encoding is
 //! byte-identical. Floats (serialize_precision), non-UTF-8 byte strings and deep nesting are the
 //! focus areas.
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::BString;
 use indexmap::IndexMap;

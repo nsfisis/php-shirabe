@@ -1,5 +1,4 @@
 //! ref: composer/tests/Composer/Test/DocumentationTest.php
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::{BString, ByteSlice};
 use shirabe::console::application::ApplicationHandle;

@@ -1,5 +1,4 @@
 //! ref: composer/tests/Composer/Test/ApplicationTest.php
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 #[path = "common/bootstrap.rs"]
 mod bootstrap;

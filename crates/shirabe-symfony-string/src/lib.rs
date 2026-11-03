@@ -1,5 +1,3 @@
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
-
 pub mod byte_string;
 pub mod code_point_string;
 pub mod exception;

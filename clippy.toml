@@ -19,9 +19,8 @@ disallowed-methods = [
     { path = "bstr::ByteVec::into_string_lossy", reason = "use display_lossy() for a message; see docs/dev/strings-porting.md" },
 ]
 
-# Every string is bytes unless it has a reason to be UTF-8. These are `allow` in the workspace lints
-# until every crate has been converted; a converted crate denies them itself. A site that has a
-# reason says so: `#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]`.
+# Every string is bytes unless it has a reason to be UTF-8. A site that has a reason says so:
+# `#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]`.
 disallowed-types = [
     { path = "std::string::String", reason = "use BString unless the value has a reason to be UTF-8; see docs/dev/strings-porting.md" },
     { path = "str", reason = "use &BStr unless the value has a reason to be UTF-8; see docs/dev/strings-porting.md" },

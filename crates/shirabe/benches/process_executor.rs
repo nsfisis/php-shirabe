@@ -1,5 +1,4 @@
 //! Benchmarks for `ProcessExecutor::execute_async`.
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use shirabe::util::process_executor::ProcessExecutor;

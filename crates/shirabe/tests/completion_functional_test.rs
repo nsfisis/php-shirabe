@@ -8,7 +8,6 @@
 //! data-provider entry is ported as its own test so the entries that cannot run here can be
 //! ignored individually (currently only `exec `, whose expectations require a fully
 //! installed vendor/bin).
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 #[path = "common/bootstrap.rs"]
 mod bootstrap;

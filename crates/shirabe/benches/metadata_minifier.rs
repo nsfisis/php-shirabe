@@ -4,7 +4,6 @@
 //! inspected, but only the ones accepted by the constraint and stability filters are kept. The
 //! `keep` parameter is that acceptance rate, which is what decides how much of the expansion has
 //! to be copied out.
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::{BStr, BString, ByteSlice};
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};

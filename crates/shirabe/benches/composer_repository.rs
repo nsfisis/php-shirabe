@@ -5,7 +5,6 @@
 //! minified metadata, filter by constraint and stability, and build the accepted packages. The
 //! constraint decides how many versions survive that filter, which is what the lazy expansion is
 //! meant to exploit.
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use bstr::{BStr, BString, ByteSlice};
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};

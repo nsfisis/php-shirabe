@@ -1,5 +1,4 @@
 //! Rust-to-PHP RPC over a Unix domain socket. See `docs/dev/php-rpc.md`.
-#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 pub mod composer_runtime;
 mod env;
