@@ -91,6 +91,8 @@ pub fn preg_quote(str: impl AsRef<[u8]>, delimiter: Option<u8>) -> BString {
 /// `Composer\Pcre\Preg`'s failure for a search whose pattern has the `u` modifier: PCRE refuses a
 /// `subject` that is not valid UTF-8 with `PREG_BAD_UTF8_ERROR`. The `preg_*` shims stand for PHP's
 /// own functions, which report that as no match, so a port of a `Preg::` call checks here first.
+/// The shims that rewrite or split a subject panic on such a subject, since they cannot return the
+/// `null` or `false` of PHP's functions.
 pub fn pcre_check_utf8_subject(
     function: impl AsRef<[u8]>,
     pattern: impl AsRef<[u8]>,
@@ -117,6 +119,15 @@ pub fn pcre_check_utf8_subject(
 /// `subject` is not valid UTF-8.
 fn searchable<'h>(pattern: &CompiledPattern, subject: &'h [u8]) -> Option<&'h [u8]> {
     (!pattern.utf8 || subject.is_utf8()).then_some(subject)
+}
+
+/// The subject a compiled pattern can rewrite or split. PHP's function fails with `null` or `false`
+/// when the pattern has the `u` modifier and `subject` is not valid UTF-8, which the shims cannot
+/// return, so the caller rules that out with `pcre_check_utf8_subject` first.
+fn rewritable<'h>(pattern: &CompiledPattern, subject: &'h [u8]) -> &'h [u8] {
+    searchable(pattern, subject).expect(
+        "a subject rewritten with a `u` pattern is valid UTF-8; check it with pcre_check_utf8_subject",
+    )
 }
 
 // Whether the pattern matches, for the call sites that ignore the capture groups.
@@ -185,9 +196,7 @@ pub fn preg_split_delim_capture(
 fn preg_split_impl(pattern: impl PregPattern, subject: &[u8], delim_capture: bool) -> Vec<BString> {
     let resolved = pattern.resolve();
     let pattern = resolved.pattern();
-    let Some(subject) = searchable(pattern, subject) else {
-        return vec![BString::from(subject)];
-    };
+    let subject = rewritable(pattern, subject);
 
     let mut result: Vec<BString> = Vec::new();
     let mut last = 0usize;
@@ -230,7 +239,7 @@ pub fn preg_replace2(
 ) -> BString {
     let resolved = pattern.resolve();
     let pattern = resolved.pattern();
-    let subject = subject.as_ref();
+    let subject = rewritable(pattern, subject.as_ref());
     let limit = if limit < 0 {
         usize::MAX
     } else {
@@ -240,17 +249,15 @@ pub fn preg_replace2(
     let mut out: Vec<u8> = Vec::new();
     let mut last = 0usize;
     let mut n = 0usize;
-    if let Some(subject) = searchable(pattern, subject) {
-        for caps in pattern.regex.captures_iter(subject) {
-            if n >= limit {
-                break;
-            }
-            let m = caps.get(0).unwrap();
-            out.extend_from_slice(&subject[last..m.start()]);
-            php_replacement_expand(replacement.as_ref(), &caps, &mut out);
-            last = m.end();
-            n += 1;
+    for caps in pattern.regex.captures_iter(subject) {
+        if n >= limit {
+            break;
         }
+        let m = caps.get(0).unwrap();
+        out.extend_from_slice(&subject[last..m.start()]);
+        php_replacement_expand(replacement.as_ref(), &caps, &mut out);
+        last = m.end();
+        n += 1;
     }
     out.extend_from_slice(&subject[last..]);
 
@@ -272,18 +279,16 @@ where
 {
     let resolved = pattern.resolve();
     let pattern = resolved.pattern();
-    let subject = subject.as_ref();
+    let subject = rewritable(pattern, subject.as_ref());
 
     let mut out: Vec<u8> = Vec::new();
     let mut last = 0usize;
-    if let Some(subject) = searchable(pattern, subject) {
-        for caps in pattern.regex.captures_iter(subject) {
-            let m = caps.get(0).unwrap();
-            out.extend_from_slice(&subject[last..m.start()]);
-            let matches = PregMatches::new(caps);
-            out.extend_from_slice(callback(&matches)?.as_ref());
-            last = m.end();
-        }
+    for caps in pattern.regex.captures_iter(subject) {
+        let m = caps.get(0).unwrap();
+        out.extend_from_slice(&subject[last..m.start()]);
+        let matches = PregMatches::new(caps);
+        out.extend_from_slice(callback(&matches)?.as_ref());
+        last = m.end();
     }
     out.extend_from_slice(&subject[last..]);
 
@@ -670,5 +675,23 @@ mod pcre_check_utf8_subject_tests {
             "preg_match(): failed executing \"{^a$}u\": Malformed UTF-8 characters, possibly incorrectly encoded"
         );
         assert_eq!(error.get_code(), 4);
+    }
+
+    #[test]
+    #[should_panic(expected = "check it with pcre_check_utf8_subject")]
+    fn preg_replace_refuses_an_unchecked_subject() {
+        preg_replace("{a}u", "b", b"caf\xE9");
+    }
+
+    #[test]
+    #[should_panic(expected = "check it with pcre_check_utf8_subject")]
+    fn preg_split_refuses_an_unchecked_subject() {
+        preg_split("{a}u", b"caf\xE9");
+    }
+
+    #[test]
+    #[should_panic(expected = "check it with pcre_check_utf8_subject")]
+    fn preg_replace_callback_refuses_an_unchecked_subject() {
+        let _ = preg_replace_callback("{a}u", |_| Ok("b"), b"caf\xE9".as_slice());
     }
 }
