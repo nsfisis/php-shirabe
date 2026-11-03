@@ -5,8 +5,8 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interfac
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, implode, parse_url, path_to_bytes, php_regex,
-    preg_match, stripos, strpos, trim,
+    LogicException, PhpMixed, RuntimeException, bconcat, implode, parse_url, path_to_bytes,
+    php_regex, preg_match, stripos, strpos, trim,
 };
 use std::path::Path;
 use std::sync::Mutex;
@@ -147,7 +147,7 @@ impl Svn {
             && stripos(&full_output, "svn: E170001:").is_none()
             && stripos(&full_output, "svn: E215004:").is_none()
         {
-            return Err(RuntimeException::new(full_output.display_lossy().to_string()).into());
+            return Err(RuntimeException::new(full_output.to_owned()).into());
         }
 
         if !self.has_auth() {
@@ -162,11 +162,10 @@ impl Svn {
             return self.execute_with_auth_retry(svn_command, cwd, url, path, verbose);
         }
 
-        Err(RuntimeException::new(format!(
-            "wrong credentials provided ({})",
-            full_output.display_lossy()
-        ))
-        .into())
+        Err(
+            RuntimeException::new(bconcat!("wrong credentials provided (", full_output, ")"))
+                .into(),
+        )
     }
 
     pub fn set_cache_credentials(&mut self, cache_credentials: bool) {
@@ -177,16 +176,17 @@ impl Svn {
     fn do_auth_dance(&mut self) -> anyhow::Result<&mut Self> {
         // cannot ask for credentials in non interactive mode
         if !self.io.is_interactive() {
-            return Err(RuntimeException::new(
-                "can not ask for authentication in non interactive mode".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "can not ask for authentication in non interactive mode",
+            ))
             .into());
         }
 
         self.io.write_error3(
-            format!(
-                "The Subversion server ({}) requested credentials:",
-                self.url.display_lossy(),
+            bconcat!(
+                "The Subversion server (",
+                self.url,
+                ") requested credentials:"
             ),
             true,
             io_interface::NORMAL,
@@ -266,7 +266,7 @@ impl Svn {
     /// Get the password for the svn command. Can be empty.
     fn get_password(&self) -> anyhow::Result<BString> {
         if self.credentials.is_none() {
-            return Err(LogicException::new("No svn auth detected.".to_string()).into());
+            return Err(LogicException::new(BString::from("No svn auth detected.")).into());
         }
 
         Ok(self.credentials.as_ref().unwrap().password.clone())
@@ -275,7 +275,7 @@ impl Svn {
     /// Get the username for the svn command.
     fn get_username(&self) -> anyhow::Result<BString> {
         if self.credentials.is_none() {
-            return Err(LogicException::new("No svn auth detected.".to_string()).into());
+            return Err(LogicException::new(BString::from("No svn auth detected.")).into());
         }
 
         Ok(self.credentials.as_ref().unwrap().username.clone())

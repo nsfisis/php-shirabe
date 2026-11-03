@@ -114,7 +114,7 @@ impl Perforce {
         if let Some(value) = repo_config.get(B("p4user")).and_then(|v| v.as_string()) {
             self.p4_user = Some(value.to_owned());
         } else {
-            self.p4_user = self.get_p4_variable("P4USER");
+            self.p4_user = self.get_p4_variable(BStr::new("P4USER"));
         }
         if let Some(value) = repo_config.get(B("p4password")).and_then(|v| v.as_string()) {
             self.p4_password = Some(value.to_owned());
@@ -242,7 +242,7 @@ impl Perforce {
         if strlen(self.p4_user.clone().unwrap_or_default()) > 0 {
             return Ok(());
         }
-        self.p4_user = self.get_p4_variable("P4USER");
+        self.p4_user = self.get_p4_variable(BStr::new("P4USER"));
         if strlen(self.p4_user.clone().unwrap_or_default()) > 0 {
             return Ok(());
         }
@@ -268,7 +268,7 @@ impl Perforce {
         Ok(())
     }
 
-    fn get_p4_variable(&mut self, name: &str) -> Option<BString> {
+    fn get_p4_variable(&mut self, name: &BStr) -> Option<BString> {
         if self.windows_flag {
             let command = bconcat!(Self::get_p4_executable(), " set");
             self.execute_command(CommandLine::Shell(command));
@@ -306,11 +306,12 @@ impl Perforce {
         if let Some(ref p) = self.p4_password {
             return Ok(Some(p.clone()));
         }
-        let mut password = self.get_p4_variable("P4PASSWD");
+        let mut password = self.get_p4_variable(BStr::new("P4PASSWD"));
         if strlen(password.clone().unwrap_or_default()) <= 0 {
-            password = self.io.ask_and_hide_answer(format!(
-                "Enter password for Perforce user {}: ",
-                self.get_user().unwrap_or_default().display_lossy()
+            password = self.io.ask_and_hide_answer(bconcat!(
+                "Enter password for Perforce user ",
+                self.get_user().unwrap_or_default(),
+                ": "
             ))?;
         }
         self.p4_password = password.clone();
@@ -352,15 +353,13 @@ impl Perforce {
                 if index.is_none() {
                     return Ok(false);
                 }
-                return Err(Exception::new(format!(
-                    "p4 command not found in path: {}",
-                    error_output.display_lossy()
+                return Err(Exception::new(bconcat!(
+                    "p4 command not found in path: ",
+                    error_output
                 ))
                 .into());
             }
-            return Err(
-                Exception::new(format!("Invalid user name: {}", user.display_lossy())).into(),
-            );
+            return Err(Exception::new(bconcat!("Invalid user name: ", user)).into());
         }
 
         Ok(true)
@@ -532,9 +531,9 @@ impl Perforce {
                 process.run(None, indexmap::IndexMap::new())?;
 
                 if !process.is_successful() {
-                    return Err(Exception::new(format!(
-                        "Error logging in:{}",
-                        self.process.borrow().get_error_output().display_lossy()
+                    return Err(Exception::new(bconcat!(
+                        "Error logging in:",
+                        self.process.borrow().get_error_output()
                     ))
                     .into());
                 }

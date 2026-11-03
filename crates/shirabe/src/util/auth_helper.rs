@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{Bitbucket, GitHub, GitLab};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, array_merge, base64_encode, bconcat, explode,
@@ -16,7 +16,7 @@ use shirabe_php_shim::{
 pub struct AuthHelper {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    displayed_origin_authentications: IndexMap<BString, String>,
+    displayed_origin_authentications: IndexMap<BString, BString>,
     bitbucket_retry: IndexMap<BString, bool>,
 }
 
@@ -53,10 +53,12 @@ impl AuthHelper {
             store = Some(());
         } else if matches!(store_auth, StoreAuth::Prompt) {
             let answer = self.io.ask_and_validate(
-                format!(
-                    "Do you want to store credentials for {} in {} ? [Yn] ",
-                    origin.display_lossy(),
-                    config_source.get_name().display_lossy(),
+                bconcat!(
+                    "Do you want to store credentials for ",
+                    origin,
+                    " in ",
+                    config_source.get_name(),
+                    " ? [Yn] "
                 ),
                 Box::new(|value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     let input = strtolower(substr(
@@ -67,16 +69,16 @@ impl AuthHelper {
                     if in_array_loose(
                         input.clone(),
                         &[
-                            PhpMixed::string("y".to_string()),
-                            PhpMixed::string("n".to_string()),
+                            PhpMixed::string(BString::from("y")),
+                            PhpMixed::string(BString::from("n")),
                         ],
                     ) {
                         return Ok(PhpMixed::string(input));
                     }
-                    Err(RuntimeException::new("Please answer (y)es or (n)o".to_string()).into())
+                    Err(RuntimeException::new(BString::from("Please answer (y)es or (n)o")).into())
                 }),
                 None,
-                PhpMixed::string("y".to_string()),
+                PhpMixed::string(BString::from("y")),
             )?;
 
             if answer.as_string() == Some("y".into()) {
@@ -132,21 +134,22 @@ impl AuthHelper {
 
         if in_github_domains {
             let mut git_hub_util = GitHub::new(self.io.clone(), self.config.clone(), None, None)?;
-            let mut message = "\n".to_string();
+            let mut message = BString::from("\n");
 
             let rate_limited = git_hub_util.is_rate_limited(&headers);
             let requires_sso = git_hub_util.requires_sso(&headers);
 
             if requires_sso {
                 let sso_url = git_hub_util.get_sso_url(&headers);
-                message = format!(
-                    "GitHub API token requires SSO authorization. Authorize this token at {}\n",
-                    sso_url.unwrap_or_default().display_lossy(),
+                message = bconcat!(
+                    "GitHub API token requires SSO authorization. Authorize this token at ",
+                    sso_url.unwrap_or_default(),
+                    "\n"
                 );
                 self.io.write_error3(&message, true, io_interface::NORMAL);
                 if !self.io.is_interactive() {
                     return Err(TransportException::new(
-                        format!("Could not authenticate against {}", origin.display_lossy()),
+                        bconcat!("Could not authenticate against ", origin),
                         403,
                     )
                     .into());
@@ -165,26 +168,30 @@ impl AuthHelper {
             if rate_limited {
                 let rate_limit = git_hub_util.get_rate_limit(&headers);
                 if self.io.has_authentication(origin) {
-                    message = "Review your configured GitHub OAuth token or enter a new one to go over the API rate limit.".to_string();
+                    message = BString::from(
+                        "Review your configured GitHub OAuth token or enter a new one to go over the API rate limit.",
+                    );
                 } else {
                     message =
-                        "Create a GitHub OAuth token to go over the API rate limit.".to_string();
+                        BString::from("Create a GitHub OAuth token to go over the API rate limit.");
                 }
 
-                message = format!(
-                    "GitHub API limit ({} calls/hr) is exhausted, could not fetch {}. {} You can also wait until {} for the rate limit to reset.\n",
+                message = bconcat!(
+                    "GitHub API limit (",
                     rate_limit
                         .get(B("limit"))
                         .map(php_to_string)
-                        .unwrap_or_default()
-                        .display_lossy(),
-                    url.display_lossy(),
+                        .unwrap_or_default(),
+                    " calls/hr) is exhausted, could not fetch ",
+                    url,
+                    ". ",
                     message,
+                    " You can also wait until ",
                     rate_limit
                         .get(B("reset"))
                         .map(php_to_string)
-                        .unwrap_or_default()
-                        .display_lossy(),
+                        .unwrap_or_default(),
+                    " for the rate limit to reset.\n"
                 );
             } else {
                 // Try to extract a more specific error message from GitHub's API response
@@ -201,13 +208,9 @@ impl AuthHelper {
                 }
 
                 if let Some(api_message) = git_hub_api_message {
-                    message.push_str(&format!(
-                        "Could not fetch {}: {}",
-                        url.display_lossy(),
-                        api_message.display_lossy()
-                    ));
+                    message.push_str(&bconcat!("Could not fetch ", url, ": ", api_message));
                 } else {
-                    message.push_str(&format!("Could not fetch {}, please ", url.display_lossy()));
+                    message.push_str(&bconcat!("Could not fetch ", url, ", please "));
                     if self.io.has_authentication(origin) {
                         message.push_str(
                             "review your configured GitHub OAuth token or enter a new one to access private repos",
@@ -224,21 +227,23 @@ impl AuthHelper {
                         .authorize_oauth_interactively(origin, Some(BStr::new(&message)))?)
             {
                 return Err(TransportException::new(
-                    format!("Could not authenticate against {}", origin.display_lossy()),
+                    bconcat!("Could not authenticate against ", origin),
                     401,
                 )
                 .into());
             }
         } else if in_gitlab_domains {
-            let message = format!(
-                "\nCould not fetch {}, enter your {} credentials {}",
-                url.display_lossy(),
-                origin.display_lossy(),
+            let message = bconcat!(
+                "\nCould not fetch ",
+                url,
+                ", enter your ",
+                origin,
+                " credentials ",
                 if status_code == 401 {
                     "to access private repos"
                 } else {
                     "to go over the API rate limit"
-                },
+                }
             );
             let mut git_lab_util = GitLab::new(self.io.clone(), self.config.clone(), None, None)?;
 
@@ -255,10 +260,7 @@ impl AuthHelper {
                     b"gitlab-ci-token" | b"private-token" | b"oauth2"
                 ) {
                     return Err(TransportException::new(
-                        format!(
-                            "Invalid credentials for '{}', aborting.",
-                            url.display_lossy()
-                        ),
+                        bconcat!("Invalid credentials for '", url, "', aborting."),
                         status_code,
                     )
                     .into());
@@ -275,7 +277,7 @@ impl AuthHelper {
                     )?)
             {
                 return Err(TransportException::new(
-                    format!("Could not authenticate against {}", origin.display_lossy()),
+                    bconcat!("Could not authenticate against ", origin),
                     401,
                 )
                 .into());
@@ -287,10 +289,7 @@ impl AuthHelper {
                 let current_auth = self.io.get_authentication(origin);
                 if prev_auth == current_auth {
                     return Err(TransportException::new(
-                        format!(
-                            "Invalid credentials for '{}', aborting.",
-                            url.display_lossy()
-                        ),
+                        bconcat!("Invalid credentials for '", url, "', aborting."),
                         status_code,
                     )
                     .into());
@@ -333,7 +332,7 @@ impl AuthHelper {
                     self.bitbucket_retry.insert(url.into(), true);
                 } else {
                     return Err(TransportException::new(
-                        format!("Could not authenticate against {}", origin.display_lossy()),
+                        bconcat!("Could not authenticate against ", origin),
                         401,
                     )
                     .into());
@@ -341,14 +340,15 @@ impl AuthHelper {
             }
 
             if ask_for_oauth_token {
-                let message = format!(
-                    "\nCould not fetch {}, please create a bitbucket OAuth token to {}",
-                    url.display_lossy(),
+                let message = bconcat!(
+                    "\nCould not fetch ",
+                    url,
+                    ", please create a bitbucket OAuth token to ",
                     if status_code == 401 || status_code == 403 {
                         "access private repos"
                     } else {
                         "go over the API rate limit"
-                    },
+                    }
                 );
                 let mut bit_bucket_util =
                     Bitbucket::new(self.io.clone(), self.config.clone(), None, None, None)?;
@@ -358,7 +358,7 @@ impl AuthHelper {
                             .authorize_oauth_interactively(origin, Some(BStr::new(&message)))?)
                 {
                     return Err(TransportException::new(
-                        format!("Could not authenticate against {}", origin.display_lossy()),
+                        bconcat!("Could not authenticate against ", origin),
                         401,
                     )
                     .into());
@@ -376,21 +376,24 @@ impl AuthHelper {
             // fail if the console is not interactive
             if !self.io.is_interactive() {
                 let message = if status_code == 401 {
-                    format!(
-                        "The '{}' URL required authentication (HTTP 401).\nYou must be using the interactive console to authenticate",
-                        url.display_lossy(),
+                    bconcat!(
+                        "The '",
+                        url,
+                        "' URL required authentication (HTTP 401).\nYou must be using the interactive console to authenticate"
                     )
                 } else if status_code == 403 {
-                    format!(
-                        "The '{}' URL could not be accessed (HTTP 403): {}",
-                        url.display_lossy(),
-                        reason.unwrap_or_default().display_lossy(),
+                    bconcat!(
+                        "The '",
+                        url,
+                        "' URL could not be accessed (HTTP 403): ",
+                        reason.unwrap_or_default()
                     )
                 } else {
-                    format!(
-                        "Unknown error code '{}', reason: {}",
+                    bconcat!(
+                        "Unknown error code '",
                         status_code,
-                        reason.unwrap_or_default().display_lossy(),
+                        "', reason: ",
+                        reason.unwrap_or_default()
                     )
                 };
 
@@ -409,10 +412,12 @@ impl AuthHelper {
                 }
 
                 return Err(TransportException::new(
-                    format!(
-                        "Invalid credentials (HTTP {}) for '{}', aborting.",
+                    bconcat!(
+                        "Invalid credentials (HTTP ",
                         status_code,
-                        url.display_lossy(),
+                        ") for '",
+                        url,
+                        "', aborting."
                     ),
                     status_code,
                 )
@@ -420,10 +425,7 @@ impl AuthHelper {
             }
 
             self.io.write_error3(
-                format!(
-                    "    Authentication required (<info>{}</info>):",
-                    origin.display_lossy()
-                ),
+                bconcat!("    Authentication required (<info>", origin, "</info>):"),
                 true,
                 io_interface::NORMAL,
             );
@@ -512,7 +514,7 @@ impl AuthHelper {
         };
 
         if self.io.has_authentication(origin) {
-            let mut authentication_display_message: Option<String> = None;
+            let mut authentication_display_message: Option<BString> = None;
             let auth = self.io.get_authentication(origin);
             let password = auth
                 .get(bstr::B("password"))
@@ -544,8 +546,9 @@ impl AuthHelper {
                             headers.push(header.clone());
                         }
                     }
-                    authentication_display_message =
-                        Some("Using custom HTTP headers for authentication".to_string());
+                    authentication_display_message = Some(BString::from(
+                        "Using custom HTTP headers for authentication",
+                    ));
                 }
             } else if origin == "github.com" && password == "x-oauth-basic" {
                 // only add the access_token if it is actually a github API URL
@@ -555,7 +558,7 @@ impl AuthHelper {
                         username
                     )));
                     authentication_display_message =
-                        Some("Using GitHub token authentication".to_string());
+                        Some(BString::from("Using GitHub token authentication"));
                 }
             } else if matches!(
                 password.as_slice(),
@@ -574,11 +577,11 @@ impl AuthHelper {
                         username
                     )));
                     authentication_display_message =
-                        Some("Using GitLab OAuth token authentication".to_string());
+                        Some(BString::from("Using GitLab OAuth token authentication"));
                 } else {
                     headers.push(PhpMixed::string(bconcat!("PRIVATE-TOKEN: ", username)));
                     authentication_display_message =
-                        Some("Using GitLab private token authentication".to_string());
+                        Some(BString::from("Using GitLab private token authentication"));
                 }
             } else if origin == "bitbucket.org"
                 && url != Bitbucket::OAUTH2_ACCESS_TOKEN_URL
@@ -590,7 +593,7 @@ impl AuthHelper {
                         password
                     )));
                     authentication_display_message =
-                        Some("Using Bitbucket OAuth token authentication".to_string());
+                        Some(BString::from("Using Bitbucket OAuth token authentication"));
                 }
             } else if username == "client-certificate" {
                 // PHP: $options['ssl'] = array_merge($options['ssl'] ?? [], json_decode_assoc((string) $auth['password']));
@@ -600,16 +603,18 @@ impl AuthHelper {
                     .unwrap_or(PhpMixed::Array(IndexMap::new()));
                 let decoded = json_decode_assoc(&password)?;
                 options.insert("ssl".into(), array_merge(existing_ssl, decoded));
-                authentication_display_message = Some("Using SSL client certificate".to_string());
+                authentication_display_message =
+                    Some(BString::from("Using SSL client certificate"));
             } else {
                 let auth_str = base64_encode(bconcat!(username, ":", password));
                 headers.push(PhpMixed::string(bconcat!(
                     "Authorization: Basic ",
                     auth_str
                 )));
-                authentication_display_message = Some(format!(
-                    "Using HTTP basic authentication with username \"{}\"",
-                    username.display_lossy(),
+                authentication_display_message = Some(bconcat!(
+                    "Using HTTP basic authentication with username \"",
+                    username,
+                    "\""
                 ));
             }
 

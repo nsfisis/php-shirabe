@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{ProcessExecutor, Url};
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, php_regex, preg_match, rawurlencode};
+use shirabe_php_shim::{RuntimeException, bconcat, php_regex, preg_match, rawurlencode};
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -135,19 +135,16 @@ impl Hg {
 
     fn throw_exception(&self, message: &BStr, url: &BStr) -> anyhow::Result<()> {
         if Self::get_version(&self.process)?.is_none() {
-            anyhow::bail!(
-                "{}",
-                Url::sanitize(bconcat!(
-                    "Failed to clone ",
-                    url,
-                    ", hg was not found, check that it is installed and in your PATH env.\n\n",
-                    self.process.borrow().get_error_output()
-                ))
-                .display_lossy()
-            );
+            return Err(RuntimeException::new(Url::sanitize(bconcat!(
+                "Failed to clone ",
+                url,
+                ", hg was not found, check that it is installed and in your PATH env.\n\n",
+                self.process.borrow().get_error_output()
+            )))
+            .into());
         }
 
-        anyhow::bail!("{}", Url::sanitize(message).display_lossy());
+        Err(RuntimeException::new(Url::sanitize(message)).into())
     }
 
     pub fn get_version(
@@ -158,7 +155,7 @@ impl Hg {
             *version = Some(None);
             let mut output = BString::default();
             if process.borrow_mut().execute(
-                &["hg".to_string(), "--version".to_string()],
+                &[BString::from("hg"), BString::from("--version")],
                 &mut output,
                 None,
             )? == 0

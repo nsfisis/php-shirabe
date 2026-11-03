@@ -195,10 +195,7 @@ impl Git {
         };
 
         if preg_is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url) {
-            return Err(InvalidArgumentException::new(format!(
-                "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
-                url.display_lossy()
-            ))
+            return Err(InvalidArgumentException::new(bconcat!("The source URL ", url, " is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port."))
             .into());
         }
 
@@ -300,7 +297,7 @@ impl Git {
                 ":(.+?)\\.git$}i"
             ),
             url,
-        ) && !in_array_strict("ssh".to_string(), protocols.values());
+        ) && !in_array_strict(BString::from("ssh"), protocols.values());
 
         let mut auth: Option<IndexMap<BString, Option<BString>>> = None;
         let mut credentials: Vec<BString> = vec![];
@@ -673,15 +670,12 @@ impl Git {
                     }
 
                     self.io.write_error3(
-                        format!(
-                            "    Authentication required (<info>{}</info>):",
-                            m2.display_lossy()
-                        ),
+                        bconcat!("    Authentication required (<info>", m2, "</info>):"),
                         true,
                         io_interface::NORMAL,
                     );
                     self.io.write_error3(
-                        format!("<warning>{}</warning>", trim(&error_msg).display_lossy()),
+                        bconcat!("<warning>", trim(&error_msg), "</warning>"),
                         true,
                         io_interface::VERBOSE,
                     );
@@ -787,9 +781,10 @@ impl Git {
                 .is_none_or(|v| v != "prime")
         {
             self.io.write_error3(
-                format!(
-                    "<warning>Aborting git mirror sync of {} as network is disabled</warning>",
-                    url.display_lossy()
+                bconcat!(
+                    "<warning>Aborting git mirror sync of ",
+                    url,
+                    " as network is disabled</warning>"
                 ),
                 true,
                 io_interface::NORMAL,
@@ -1234,15 +1229,14 @@ impl Git {
     }
 
     pub fn get_github_domains_regex(config: &Config) -> BString {
-        Self::get_domains_regex(config, "github-domains")
+        Self::get_domains_regex(config, BStr::new("github-domains"))
     }
 
     pub fn get_gitlab_domains_regex(config: &Config) -> BString {
-        Self::get_domains_regex(config, "gitlab-domains")
+        Self::get_domains_regex(config, BStr::new("gitlab-domains"))
     }
 
-    #[expect(clippy::disallowed_types, reason = "Config::get takes a text key")]
-    fn get_domains_regex(config: &Config, key: &str) -> BString {
+    fn get_domains_regex(config: &Config, key: &BStr) -> BString {
         let domains: Vec<BString> = match config.get(key) {
             PhpMixed::List(l) => l
                 .iter()
@@ -1272,8 +1266,7 @@ impl Git {
                     ", git was not found, check that it is installed and in your PATH env.\n\n",
                     self.process.borrow().get_error_output()
                 ))
-                .display_lossy()
-                .to_string(),
+                .to_owned(),
             )
             .into());
         }

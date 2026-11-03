@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/ForgejoUrl.php
 
 use bstr::{BStr, BString};
-use shirabe_php_shim::{InvalidArgumentException, bconcat, preg_match, strtolower};
+use shirabe_php_shim::{InvalidArgumentException, bconcat, php_str, preg_match, strtolower};
 
 #[derive(Debug)]
 pub struct ForgejoUrl {
@@ -12,8 +12,9 @@ pub struct ForgejoUrl {
 }
 
 impl ForgejoUrl {
-    pub const URL_REGEX: &'static str =
-        r"{^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$}";
+    pub const URL_REGEX: &'static BStr = php_str(
+        r"{^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$}".as_bytes(),
+    );
 
     fn new(owner: BString, repository: BString, origin_url: BString, api_url: BString) -> Self {
         Self {
@@ -27,9 +28,9 @@ impl ForgejoUrl {
     pub fn create(repo_url: &BStr) -> anyhow::Result<Self> {
         match Self::try_from(Some(repo_url)) {
             Some(url) => Ok(url),
-            None => Err(InvalidArgumentException::new(format!(
-                "This is not a valid Forgejo URL: {}",
-                repo_url.display_lossy()
+            None => Err(InvalidArgumentException::new(bconcat!(
+                "This is not a valid Forgejo URL: ",
+                repo_url
             ))
             .into()),
         }

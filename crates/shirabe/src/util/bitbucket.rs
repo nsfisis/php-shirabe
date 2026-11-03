@@ -7,7 +7,9 @@ use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, bconcat, json_encode, time, trim};
+use shirabe_php_shim::{
+    Catch as _, LogicException, PhpMixed, bconcat, json_encode, php_str, time, trim,
+};
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
     err.catch::<TransportException>().map(|te| te.get_code())
@@ -24,8 +26,8 @@ pub struct Bitbucket {
 }
 
 impl Bitbucket {
-    pub const OAUTH2_ACCESS_TOKEN_URL: &'static str =
-        "https://bitbucket.org/site/oauth2/access_token";
+    pub const OAUTH2_ACCESS_TOKEN_URL: &'static BStr =
+        php_str(b"https://bitbucket.org/site/oauth2/access_token");
 
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -94,10 +96,10 @@ impl Bitbucket {
 
     fn request_access_token(&mut self) -> anyhow::Result<bool> {
         let mut http = IndexMap::new();
-        http.insert("method".into(), PhpMixed::string("POST".to_string()));
+        http.insert("method".into(), PhpMixed::string(BString::from("POST")));
         http.insert(
             "content".into(),
-            PhpMixed::string("grant_type=client_credentials".to_string()),
+            PhpMixed::string(BString::from("grant_type=client_credentials")),
         );
         let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
         options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
@@ -202,12 +204,14 @@ impl Bitbucket {
         self.io.write_error3(url, true, io_interface::NORMAL);
         let local_name_prefix = local_auth_config_name
             .as_ref()
-            .map(|name| format!("{} OR ", name.display_lossy()))
+            .map(|name| bconcat!(name, " OR "))
             .unwrap_or_default();
         self.io.write_error3(
-            format!(
-                "to create a consumer. It will be stored in \"{}\" for future use by Composer.",
-                local_name_prefix + &auth_config_source_name.display_lossy().to_string()
+            bconcat!(
+                "to create a consumer. It will be stored in \"",
+                local_name_prefix,
+                auth_config_source_name,
+                "\" for future use by Composer."
             ),
             true,
             io_interface::NORMAL,
@@ -334,7 +338,9 @@ impl Bitbucket {
 
         match access_token {
             Some(t) => Ok(t),
-            None => Err(LogicException::new("Failed to initialize token above".to_string()).into()),
+            None => {
+                Err(LogicException::new(BString::from("Failed to initialize token above")).into())
+            }
         }
     }
 
@@ -351,9 +357,9 @@ impl Bitbucket {
             .remove_config_setting(bstr::BStr::new(&bconcat!("bitbucket-oauth.", origin_url)))?;
 
         let token = self.token.as_ref().ok_or_else(|| {
-            LogicException::new(
-                "Expected a token configured with expires_in present, got null".to_string(),
-            )
+            LogicException::new(BString::from(
+                "Expected a token configured with expires_in present, got null",
+            ))
         })?;
         let expires_in = token
             .get(B("expires_in"))

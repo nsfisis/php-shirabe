@@ -66,9 +66,9 @@ impl GitLab {
         let mut output = BString::default();
         if self.process.borrow_mut().execute(
             &[
-                "git".to_string(),
-                "config".to_string(),
-                "gitlab.accesstoken".to_string(),
+                BString::from("git"),
+                BString::from("config"),
+                BString::from("gitlab.accesstoken"),
             ],
             &mut output,
             None,
@@ -87,18 +87,18 @@ impl GitLab {
         let mut token_password = BString::default();
         if self.process.borrow_mut().execute(
             &[
-                "git".to_string(),
-                "config".to_string(),
-                "gitlab.deploytoken.user".to_string(),
+                BString::from("git"),
+                BString::from("config"),
+                BString::from("gitlab.deploytoken.user"),
             ],
             &mut token_user,
             None,
         )? == 0
             && self.process.borrow_mut().execute(
                 &[
-                    "git".to_string(),
-                    "config".to_string(),
-                    "gitlab.deploytoken.token".to_string(),
+                    BString::from("git"),
+                    BString::from("config"),
+                    BString::from("gitlab.deploytoken.token"),
                 ],
                 &mut token_password,
                 None,
@@ -189,30 +189,22 @@ impl GitLab {
             .get_local_auth_config_source()
             .map(|c| c.get_name());
         let has_local_auth_config = local_auth_config_name.is_some();
-        let personal_access_token_link = format!(
-            "{}://{}/-/user_settings/personal_access_tokens",
-            scheme.display_lossy(),
-            origin_url.display_lossy()
+        let personal_access_token_link = bconcat!(
+            scheme,
+            "://",
+            origin_url,
+            "/-/user_settings/personal_access_tokens"
         );
-        let revoke_link = format!(
-            "{}://{}/-/user_settings/applications",
-            scheme.display_lossy(),
-            origin_url.display_lossy()
-        );
+        let revoke_link = bconcat!(scheme, "://", origin_url, "/-/user_settings/applications");
         self.io.write_error3(
-            format!(
-                "A token will be created and stored in \"{}\", your password will never be stored",
+            bconcat!(
+                "A token will be created and stored in \"",
                 local_auth_config_name
                     .as_ref()
-                    .map(|name| format!("{} OR ", name.display_lossy()))
-                    .unwrap_or_default()
-                    + &self
-                        .config
-                        .borrow()
-                        .get_auth_config_source()
-                        .get_name()
-                        .display_lossy()
-                        .to_string()
+                    .map(|name| bconcat!(name, " OR "))
+                    .unwrap_or_default(),
+                self.config.borrow().get_auth_config_source().get_name(),
+                "\", your password will never be stored"
             ),
             true,
             io_interface::NORMAL,
@@ -304,9 +296,10 @@ impl GitLab {
                                 io_interface::NORMAL,
                             );
                             self.io.write_error3(
-                                format!(
-                                    "Add it using \"shirabe config --global --auth gitlab-token.{} <token>\"",
-                                    origin_url.display_lossy()
+                                bconcat!(
+                                    "Add it using \"shirabe config --global --auth gitlab-token.",
+                                    origin_url,
+                                    " <token>\""
                                 ),
                                 true,
                                 io_interface::NORMAL,
@@ -373,9 +366,9 @@ impl GitLab {
             return Ok(true);
         }
 
-        Err(RuntimeException::new(
-            "Invalid GitLab credentials 5 times in a row, aborting.".to_string(),
-        )
+        Err(RuntimeException::new(BString::from(
+            "Invalid GitLab credentials 5 times in a row, aborting.",
+        ))
         .into())
     }
 
@@ -436,7 +429,9 @@ impl GitLab {
             .ask_and_hide_answer("Password: ")?
             .unwrap_or_default();
 
-        let headers = vec!["Content-Type: application/x-www-form-urlencoded".to_string()];
+        let headers = vec![BString::from(
+            "Content-Type: application/x-www-form-urlencoded",
+        )];
 
         let api_url = origin_url;
         let data = http_build_query(&[
@@ -445,7 +440,7 @@ impl GitLab {
             (B("grant_type"), B("password")),
         ]);
         let mut http_inner: IndexMap<BString, PhpMixed> = IndexMap::new();
-        http_inner.insert("method".into(), PhpMixed::string("POST".to_string()));
+        http_inner.insert("method".into(), PhpMixed::string(BString::from("POST")));
         http_inner.insert(
             "header".into(),
             PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
@@ -498,22 +493,25 @@ impl GitLab {
         let refresh_token = match refresh_token {
             Some(t) => t,
             None => {
-                return Err(RuntimeException::new(format!(
-                    "No GitLab refresh token present for {}.",
-                    origin_url.display_lossy()
+                return Err(RuntimeException::new(bconcat!(
+                    "No GitLab refresh token present for ",
+                    origin_url,
+                    "."
                 ))
                 .into());
             }
         };
 
-        let headers = vec!["Content-Type: application/x-www-form-urlencoded".to_string()];
+        let headers = vec![BString::from(
+            "Content-Type: application/x-www-form-urlencoded",
+        )];
 
         let data = http_build_query(&[
             (B("refresh_token"), refresh_token.as_slice()),
             (B("grant_type"), B("refresh_token")),
         ]);
         let mut http_inner = IndexMap::new();
-        http_inner.insert("method".into(), PhpMixed::string("POST".to_string()));
+        http_inner.insert("method".into(), PhpMixed::string(BString::from("POST")));
         http_inner.insert(
             "header".into(),
             PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
@@ -538,10 +536,12 @@ impl GitLab {
             io_interface::VERY_VERBOSE,
         );
         self.io.write_error3(
-            format!(
-                "To revoke access to this token you can visit {}://{}/-/user_settings/applications",
-                scheme.display_lossy(),
-                origin_url.display_lossy()
+            bconcat!(
+                "To revoke access to this token you can visit ",
+                scheme,
+                "://",
+                origin_url,
+                "/-/user_settings/applications"
             ),
             true,
             io_interface::VERY_VERBOSE,

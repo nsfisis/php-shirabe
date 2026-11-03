@@ -37,10 +37,7 @@ impl Forgejo {
             self.io.write_error3(message, true, io_interface::NORMAL);
         }
 
-        let url = format!(
-            "https://{}/user/settings/applications",
-            origin_url.display_lossy()
-        );
+        let url = bconcat!("https://", origin_url, "/user/settings/applications");
         self.io.write_error3(
             "Setup a personal access token with repository:read permissions on:",
             true,
@@ -54,15 +51,16 @@ impl Forgejo {
             (local.clone().unwrap_or_default(), local.is_some(), auth)
         };
         let local_prefix = if has_local_auth {
-            format!("{} OR ", local_auth_name.display_lossy())
+            bconcat!(local_auth_name, " OR ")
         } else {
-            String::new()
+            BString::default()
         };
         self.io.write_error3(
-            format!(
-                "Tokens will be stored in plain text in \"{}{}\" for future use by Composer.",
+            bconcat!(
+                "Tokens will be stored in plain text in \"",
                 local_prefix,
-                auth_name.display_lossy()
+                auth_name,
+                "\" for future use by Composer."
             ),
             true,
             io_interface::NORMAL,
@@ -93,9 +91,10 @@ impl Forgejo {
             .map(trim)
             .unwrap_or_default();
 
-        let add_token_manually = format!(
-            "You can also add it manually later by using \"shirabe config --global --auth forgejo-token.{} <username> <token>\"",
-            origin_url.display_lossy()
+        let add_token_manually = bconcat!(
+            "You can also add it manually later by using \"shirabe config --global --auth forgejo-token.",
+            origin_url,
+            " <username> <token>\""
         );
         if token.is_empty() || username.is_empty() {
             self.io.write_error3(

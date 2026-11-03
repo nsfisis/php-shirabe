@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
-use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, json_encode, time};
+use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, json_encode, time, utf8_text};
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
 // shared with the AuthHelper under test. The IOMockGuard runs assert_complete on drop.
@@ -362,7 +362,7 @@ fn add_authentication_header_with_basic_http_authentication(
 #[test]
 fn test_add_authentication_header_with_basic_http_authentication() {
     add_authentication_header_with_basic_http_authentication(
-        Bitbucket::OAUTH2_ACCESS_TOKEN_URL,
+        utf8_text(Bitbucket::OAUTH2_ACCESS_TOKEN_URL).unwrap(),
         "bitbucket.org",
         "x-token-auth",
         "my_password",

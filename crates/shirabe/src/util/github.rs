@@ -7,8 +7,9 @@ use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, bconcat, date_local, explode_limit, in_array_loose, intval, php_regex,
-    preg_is_match, preg_match, rawurlencode, str_replace, stripos, strtolower, trim,
+    Catch as _, PhpMixed, bconcat, date_local, explode_limit, implode, in_array_loose, intval,
+    php_regex, php_str, preg_is_match, preg_match, rawurlencode, str_replace, stripos, strtolower,
+    trim,
 };
 
 #[derive(Debug)]
@@ -20,8 +21,8 @@ pub struct GitHub {
 }
 
 impl GitHub {
-    pub const GITHUB_TOKEN_REGEX: &'static str =
-        r"{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_]+|github_pat_[a-zA-Z0-9_]+)$}";
+    pub const GITHUB_TOKEN_REGEX: &'static BStr =
+        php_str(r"{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_]+|github_pat_[a-zA-Z0-9_]+)$}".as_bytes());
 
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -59,9 +60,9 @@ impl GitHub {
         let mut output = BString::default();
         if self.process.borrow_mut().execute(
             &[
-                "git".to_string(),
-                "config".to_string(),
-                "github.accesstoken".to_string(),
+                BString::from("git"),
+                BString::from("config"),
+                BString::from("github.accesstoken"),
             ],
             &mut output,
             None,
@@ -99,7 +100,7 @@ impl GitHub {
             if self
                 .process
                 .borrow_mut()
-                .execute(&["hostname".to_string()], &mut output, None)?
+                .execute(&[BString::from("hostname")], &mut output, None)?
                 == 0
             {
                 note = bconcat!(note, " on ", trim(&output));
@@ -116,67 +117,89 @@ impl GitHub {
         };
         let prefix = local_name
             .as_ref()
-            .map(|n| format!("{} OR ", n.display_lossy()))
+            .map(|n| bconcat!(n, " OR "))
             .unwrap_or_default();
         let lines = [
-            "You need to provide a GitHub access token.".to_string(),
-            format!(
-                "Tokens will be stored in plain text in \"{}{}\" for future use by Composer.",
+            BString::from("You need to provide a GitHub access token."),
+            bconcat!(
+                "Tokens will be stored in plain text in \"",
                 prefix,
-                auth_name.display_lossy()
+                auth_name,
+                "\" for future use by Composer."
             ),
-            "Due to the security risk of tokens being exfiltrated, use tokens with short expiration times and only the minimum permissions necessary.".to_string(),
-            String::new(),
-            "Carefully consider the following options in order:".to_string(),
-            String::new(),
+            BString::from(
+                "Due to the security risk of tokens being exfiltrated, use tokens with short expiration times and only the minimum permissions necessary.",
+            ),
+            BString::default(),
+            BString::from("Carefully consider the following options in order:"),
+            BString::default(),
         ];
         self.io
-            .write_error3(lines.join("\n"), true, io_interface::NORMAL);
+            .write_error3(implode("\n", &lines), true, io_interface::NORMAL);
 
         let encoded_note = str_replace("%20", "+", rawurlencode(&note));
         let lines = [
-            "1. When you don't use 'vcs'  type 'repositories'  in composer.json and do not need to clone source or download dist files".to_string(),
-            "from private GitHub repositories over HTTPS, use a fine-grained token with read-only access to public information.".to_string(),
-            "Use the following URL to create such a token:".to_string(),
-            format!(
-                "https://{}/settings/personal-access-tokens/new?name={}",
-                origin_url.display_lossy(),
-                encoded_note.display_lossy()
+            BString::from(
+                "1. When you don't use 'vcs'  type 'repositories'  in composer.json and do not need to clone source or download dist files",
             ),
-            String::new(),
+            BString::from(
+                "from private GitHub repositories over HTTPS, use a fine-grained token with read-only access to public information.",
+            ),
+            BString::from("Use the following URL to create such a token:"),
+            bconcat!(
+                "https://",
+                origin_url,
+                "/settings/personal-access-tokens/new?name=",
+                encoded_note
+            ),
+            BString::default(),
         ];
         self.io
-            .write_error3(lines.join("\n"), true, io_interface::NORMAL);
+            .write_error3(implode("\n", &lines), true, io_interface::NORMAL);
 
         let lines = [
-            "2. When all relevant _private_ GitHub repositories belong to a single user or organisation, use a fine-grained token with".to_string(),
-            "repository \"content\" read-only permissions. You can start with the following URL, but you may need to change the resource owner".to_string(),
-            "to the right user or organisation. Additionally, you can scope permissions down to apply only to selected repositories.".to_string(),
-            format!(
-                "https://{}/settings/personal-access-tokens/new?contents=read&name={}",
-                origin_url.display_lossy(),
-                encoded_note.display_lossy()
+            BString::from(
+                "2. When all relevant _private_ GitHub repositories belong to a single user or organisation, use a fine-grained token with",
             ),
-            String::new(),
+            BString::from(
+                "repository \"content\" read-only permissions. You can start with the following URL, but you may need to change the resource owner",
+            ),
+            BString::from(
+                "to the right user or organisation. Additionally, you can scope permissions down to apply only to selected repositories.",
+            ),
+            bconcat!(
+                "https://",
+                origin_url,
+                "/settings/personal-access-tokens/new?contents=read&name=",
+                encoded_note
+            ),
+            BString::default(),
         ];
         self.io
-            .write_error3(lines.join("\n"), true, io_interface::NORMAL);
+            .write_error3(implode("\n", &lines), true, io_interface::NORMAL);
 
         let mut lines3 = vec![
-            "3. A \"classic\" token grants broad permissions on your behalf to all repositories accessible by you.".to_string(),
-            "This may include write permissions, even though not needed by Composer. Use it only when you need to access".to_string(),
-            "private repositories across multiple organisations at the same time and using directory-specific authentication sources".to_string(),
-            "is not an option. You can generate a classic token here:".to_string(),
-            format!(
-                "https://{}/settings/tokens/new?scopes=repo&description={}",
-                origin_url.display_lossy(),
-                encoded_note.display_lossy()
+            BString::from(
+                "3. A \"classic\" token grants broad permissions on your behalf to all repositories accessible by you.",
             ),
-            String::new(),
+            BString::from(
+                "This may include write permissions, even though not needed by Composer. Use it only when you need to access",
+            ),
+            BString::from(
+                "private repositories across multiple organisations at the same time and using directory-specific authentication sources",
+            ),
+            BString::from("is not an option. You can generate a classic token here:"),
+            bconcat!(
+                "https://",
+                origin_url,
+                "/settings/tokens/new?scopes=repo&description=",
+                encoded_note
+            ),
+            BString::default(),
         ];
         let _ = &mut lines3;
         self.io
-            .write_error3(lines3.join("\n"), true, io_interface::NORMAL);
+            .write_error3(implode("\n", &lines3), true, io_interface::NORMAL);
 
         self.io.write_error3(
             "For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#github-oauth",
