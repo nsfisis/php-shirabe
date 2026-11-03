@@ -3,7 +3,7 @@
 use crate::async_runtime::run;
 use crate::http_downloader_mock::get_http_downloader_mock;
 use crate::io_mock::{Expectation, get_io_mock};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::cache::{Cache, CacheMock};
@@ -18,20 +18,15 @@ use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
-    path_to_bytes,
+    bconcat, error_message, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
-fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
+fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(
-        bstr::BString::from(name.to_string()),
-        norm_version,
-        bstr::BString::from(version.to_string()),
-    )
-    .into()
+    CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(version)).into()
 }
 
 /// ref: TestCase::getConfig
@@ -82,7 +77,7 @@ fn get_downloader(
 #[test]
 #[serial]
 fn test_download_for_package_without_dist_reference() {
-    let package = get_package("dummy/pkg", "1.0.0");
+    let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, None);
     let result = run(downloader.download(package, std::path::Path::new("/path"), None, true));
@@ -97,8 +92,8 @@ fn test_download_for_package_without_dist_reference() {
 #[test]
 #[serial]
 fn test_download_to_existing_file() {
-    let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some(bstr::BString::from("url".to_string())));
+    let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
+    package.set_dist_url(Some(BString::from("url")));
 
     // createTempFile(getUniqueTmpDirectory()): a regular file used as the download target path.
     let tmp_dir = TempDir::new().unwrap();
@@ -116,7 +111,7 @@ fn test_download_to_existing_file() {
         "expected RuntimeException, got: {e}"
     );
     assert!(
-        e.to_string().contains("exists and is not a directory"),
+        error_message(&e).contains_str("exists and is not a directory"),
         "unexpected message: {e}"
     );
 }
@@ -124,13 +119,14 @@ fn test_download_to_existing_file() {
 #[test]
 #[serial]
 fn test_get_file_name() {
-    let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some(bstr::BString::from(
-        "http://example.com/script.js".to_string(),
-    )));
+    let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
+    package.set_dist_url(Some(BString::from("http://example.com/script.js")));
 
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_options.insert("vendor-dir".into(), PhpMixed::string("/vendor".to_string()));
+    config_options.insert(
+        "vendor-dir".into(),
+        PhpMixed::string(BString::from("/vendor")),
+    );
     let config = get_config(config_options);
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, Some(config));
@@ -147,10 +143,8 @@ fn test_get_file_name() {
 #[test]
 #[serial]
 fn test_download_but_file_is_unsaved() {
-    let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some(bstr::BString::from(
-        "http://example.com/script.js".to_string(),
-    )));
+    let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
+    package.set_dist_url(Some(BString::from("http://example.com/script.js")));
 
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
@@ -181,7 +175,7 @@ fn test_download_but_file_is_unsaved() {
         "expected UnexpectedValueException, got: {e}"
     );
     assert!(
-        e.to_string().contains("could not be saved to"),
+        error_message(&e).contains_str("could not be saved to"),
         "unexpected message: {e}"
     );
 }
@@ -216,11 +210,11 @@ fn test_cache_garbage_collection_is_called() {
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
         "cache-files-ttl".into(),
-        PhpMixed::string("99999999".to_string()),
+        PhpMixed::string(BString::from("99999999")),
     );
     config_options.insert(
         "cache-files-maxsize".into(),
-        PhpMixed::string("500M".to_string()),
+        PhpMixed::string(BString::from("500M")),
     );
     let config = get_config(config_options);
 
@@ -270,11 +264,9 @@ fn test_cache_garbage_collection_is_called() {
 #[test]
 #[serial]
 fn test_download_file_with_invalid_checksum() {
-    let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some(bstr::BString::from(
-        "http://example.com/script.js".to_string(),
-    )));
-    package.__set_dist_sha1_checksum(Some(bstr::BString::from("invalid".to_string())));
+    let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
+    package.set_dist_url(Some(BString::from("http://example.com/script.js")));
+    package.__set_dist_sha1_checksum(Some(BString::from("invalid")));
 
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
@@ -310,7 +302,7 @@ fn test_download_file_with_invalid_checksum() {
         "expected UnexpectedValueException, got: {e}"
     );
     assert!(
-        e.to_string().contains("checksum verification"),
+        error_message(&e).contains_str("checksum verification"),
         "unexpected message: {e}"
     );
 }
@@ -318,11 +310,9 @@ fn test_download_file_with_invalid_checksum() {
 #[test]
 #[serial]
 fn test_downgrade_shows_appropriate_message() {
-    let old_package = get_package("dummy/pkg", "1.2.0");
-    let new_package = get_package("dummy/pkg", "1.0.0");
-    new_package.set_dist_url(Some(bstr::BString::from(
-        "http://example.com/script.js".to_string(),
-    )));
+    let old_package = get_package(BStr::new("dummy/pkg"), BStr::new("1.2.0"));
+    let new_package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
+    new_package.set_dist_url(Some(BString::from("http://example.com/script.js")));
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
     io_mock

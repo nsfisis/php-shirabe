@@ -4,7 +4,7 @@ use crate::async_runtime::run;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::get_process_executor_mock;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::VcsDownloader;
@@ -14,35 +14,45 @@ use shirabe::io::io_interface::NORMAL;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::{PhpMixed, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 // A getMockBuilder('Composer\Util\Perforce') stand-in: the seam trait extracted from the
 // concrete `Perforce` struct, mocked so the downloader's workflow can be verified.
-mockall::mock! {
-    #[derive(Debug)]
-    pub Perforce {}
-    impl shirabe::util::PerforceInterface for Perforce {
-        fn initialize_path(&mut self, path: &std::path::Path);
-        fn set_stream(&mut self, stream: &bstr::BStr);
-        fn p4_login(&mut self) -> anyhow::Result<()>;
-        fn check_stream(&mut self) -> bool;
-        fn write_p4_client_spec(&mut self) -> anyhow::Result<()>;
-        fn connect_client(&mut self) -> anyhow::Result<()>;
-        fn sync_code_base(&mut self, source_reference: Option<BString>) -> anyhow::Result<()>;
-        fn cleanup_client_spec(&mut self);
-        fn get_commit_logs(&mut self, from_reference: &bstr::BStr, to_reference: &bstr::BStr) -> Option<BString>;
-        fn get_file_content(&mut self, file: &bstr::BStr, identifier: &bstr::BStr) -> Option<BString>;
-        fn get_branches(&mut self) -> IndexMap<BString, BString>;
-        fn get_tags(&mut self) -> IndexMap<BString, BString>;
-        fn get_user(&self) -> Option<BString>;
-        fn get_composer_information(
-            &mut self,
-            identifier: &bstr::BStr,
-        ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_perforce {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub Perforce {}
+        impl shirabe::util::PerforceInterface for Perforce {
+            fn initialize_path(&mut self, path: &std::path::Path);
+            fn set_stream(&mut self, stream: &bstr::BStr);
+            fn p4_login(&mut self) -> anyhow::Result<()>;
+            fn check_stream(&mut self) -> bool;
+            fn write_p4_client_spec(&mut self) -> anyhow::Result<()>;
+            fn connect_client(&mut self) -> anyhow::Result<()>;
+            fn sync_code_base(&mut self, source_reference: Option<BString>) -> anyhow::Result<()>;
+            fn cleanup_client_spec(&mut self);
+            fn get_commit_logs(&mut self, from_reference: &bstr::BStr, to_reference: &bstr::BStr) -> Option<BString>;
+            fn get_file_content(&mut self, file: &bstr::BStr, identifier: &bstr::BStr) -> Option<BString>;
+            fn get_branches(&mut self) -> IndexMap<BString, BString>;
+            fn get_tags(&mut self) -> IndexMap<BString, BString>;
+            fn get_user(&self) -> Option<BString>;
+            fn get_composer_information(
+                &mut self,
+                identifier: &bstr::BStr,
+            ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
+        }
     }
 }
+use mock_perforce::MockPerforce;
 
 /// ref: PerforceDownloaderTest::getConfig (seeds `home` with the temp dir)
 fn get_config(test_path: &std::path::Path) -> Config {
@@ -57,18 +67,14 @@ fn get_config(test_path: &std::path::Path) -> Config {
 
 /// ref: PerforceDownloaderTest::getMockPackageInterface. A real CompletePackage stands in for
 /// the PHPUnit PackageInterface mock; the source reference is returned by getSourceReference.
-fn make_package(source_reference: Option<&str>) -> PackageInterfaceHandle {
+fn make_package(source_reference: Option<&BStr>) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package = CompletePackageHandle::new(
-        bstr::BString::from("test/pkg".to_string()),
+        BString::from("test/pkg"),
         norm_version,
-        bstr::BString::from("1.0.0".to_string()),
+        BString::from("1.0.0"),
     );
-    package.set_source_reference(
-        source_reference
-            .map(|s| s.to_string())
-            .map(bstr::BString::from),
-    );
+    package.set_source_reference(source_reference.map(|s| bconcat!(s)));
     package.into()
 }
 
@@ -116,17 +122,17 @@ fn test_init_perforce_does_nothing_if_perforce_already_set() {
 
 #[test]
 fn test_do_install_with_tag() {
-    do_install_workflow("SOURCE_REF@123", Some("123".into()));
+    do_install_workflow(BStr::new("SOURCE_REF@123"), Some("123".into()));
 }
 
 #[test]
 fn test_do_install_with_no_tag() {
-    do_install_workflow("SOURCE_REF", None);
+    do_install_workflow(BStr::new("SOURCE_REF"), None);
 }
 
 // Shared body for testDoInstallWithTag / testDoInstallWithNoTag: enforce the install workflow
 // against a mocked Perforce, asserting each step is invoked exactly once.
-fn do_install_workflow(source_ref: &'static str, expected_label: Option<BString>) {
+fn do_install_workflow(source_ref: &'static BStr, expected_label: Option<BString>) {
     let test_path = TempDir::new().unwrap();
     let test_path_str = test_path.path().to_path_buf();
 
@@ -134,7 +140,7 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<BString>
     io_mock
         .borrow_mut()
         .expects(
-            vec![Expectation::text_regex(format!("Cloning {}", source_ref))],
+            vec![Expectation::text_regex(bconcat!("Cloning ", source_ref))],
             false,
         )
         .unwrap();

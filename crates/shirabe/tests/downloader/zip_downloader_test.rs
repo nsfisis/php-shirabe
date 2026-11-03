@@ -2,7 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -14,7 +14,9 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::MockHandler;
 use shirabe::util::{HttpDownloader, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock, path_to_bytes};
+use shirabe_php_shim::{
+    PhpMixed, ZipArchive, ZipArchiveMock, bconcat, error_message, path_to_bytes,
+};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -47,9 +49,9 @@ fn set_up() -> SetUp {
 
     let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package: PackageInterfaceHandle = CompletePackageHandle::new(
-        bstr::BString::from("test/pkg".to_string()),
+        BString::from("test/pkg"),
         norm_version,
-        bstr::BString::from("1.0.0".to_string()),
+        BString::from("1.0.0"),
     )
     .into();
 
@@ -145,15 +147,15 @@ fn test_error_messages() {
     )));
 
     // $distUrl = 'file://'.__FILE__: an existing, non-zip file referenced by a file:// URL.
-    let dist_url = format!("file://{}/Cargo.toml", env!("CARGO_MANIFEST_DIR"));
+    let dist_url = bconcat!("file://", env!("CARGO_MANIFEST_DIR"), "/Cargo.toml");
     let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package: PackageInterfaceHandle = CompletePackageHandle::new(
-        bstr::BString::from("test/pkg".to_string()),
+        BString::from("test/pkg"),
         norm_version,
-        bstr::BString::from("1.0.0".to_string()),
+        BString::from("1.0.0"),
     )
     .into();
-    package.set_dist_url(Some(bstr::BString::from(dist_url)));
+    package.set_dist_url(Some(dist_url));
 
     let filesystem = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
@@ -195,7 +197,10 @@ fn test_error_messages() {
     })();
 
     let e = result.expect_err("Download of invalid zip files should throw an exception");
-    assert!(e.to_string().contains("is not a zip archive"), "got: {e}");
+    assert!(
+        error_message(&e).contains_str("is not a zip archive"),
+        "got: {e}"
+    );
 }
 
 #[test]
@@ -222,8 +227,7 @@ fn test_zip_archive_only_failed() {
 
     let e = result.expect_err("expected RuntimeException");
     assert!(
-        e.to_string()
-            .contains("There was an error extracting the ZIP file"),
+        error_message(&e).contains_str("There was an error extracting the ZIP file"),
         "got: {e}"
     );
 }
@@ -252,7 +256,7 @@ fn test_zip_archive_extract_only_failed() {
 
     let e = result.expect_err("expected RuntimeException");
     assert!(
-        e.to_string().contains(
+        error_message(&e).contains_str(
             "The archive for \"test/pkg\" may contain identical file names with different \
              capitalization (which fails on case insensitive filesystems): Not a directory"
         ),
@@ -326,8 +330,7 @@ fn test_system_unzip_only_failed() {
 
     let e = result.expect_err("expected RuntimeException");
     assert!(
-        e.to_string()
-            .contains("Failed to extract test/pkg: (1) unzip"),
+        error_message(&e).contains_str("Failed to extract test/pkg: (1) unzip"),
         "got: {e}"
     );
 }
@@ -439,8 +442,7 @@ fn test_non_windows_fallback_failed() {
 
     let e = result.expect_err("expected RuntimeException");
     assert!(
-        e.to_string()
-            .contains("There was an error extracting the ZIP file"),
+        error_message(&e).contains_str("There was an error extracting the ZIP file"),
         "got: {e}"
     );
 }
