@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ArchiveManagerTest.php
 
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::{DownloadManager, GitDownloader};
@@ -80,9 +81,9 @@ impl TestCase {
     // ref: ArchiverTestCase::setupPackage.
     fn setup_package(&self) -> CompletePackageInterfaceHandle {
         let package = CompletePackageHandle::new(
-            bstr::BString::from("archivertest/archivertest".to_string()),
-            bstr::BString::from("master".to_string()),
-            bstr::BString::from("master".to_string()),
+            BString::from("archivertest/archivertest"),
+            BString::from("master"),
+            BString::from("master"),
         );
         package.set_source_url(Some(bstr::BString::from(
             realpath(&self.test_dir)
@@ -90,8 +91,8 @@ impl TestCase {
                 .map(path_to_bytes)
                 .unwrap_or_default(),
         )));
-        package.set_source_reference(Some(bstr::BString::from("master".to_string())));
-        package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+        package.set_source_reference(Some(BString::from("master")));
+        package.__set_source_type(Some(BString::from("git")));
 
         package.into()
     }
@@ -100,7 +101,7 @@ impl TestCase {
     fn get_target_name(
         &self,
         package: CompletePackageInterfaceHandle,
-        format: &str,
+        format: &BStr,
     ) -> std::path::PathBuf {
         let package_name = self.manager.get_package_filename(package).unwrap();
         self.target_dir
@@ -197,7 +198,7 @@ fn test_archive_tar() {
     ))
     .unwrap();
 
-    let target = test_case.get_target_name(package.clone(), "tar");
+    let target = test_case.get_target_name(package.clone(), BStr::new("tar"));
     assert!(file_exists(&target));
 
     let tmppath = sys_get_temp_dir()
@@ -233,7 +234,9 @@ fn test_archive_custom_file_name() {
     ))
     .unwrap();
 
-    let target = test_case.target_dir.join(format!("{}.tar", file_name));
+    let target = test_case
+        .target_dir
+        .join(path_from_bytes(&bconcat!(file_name, ".tar")));
 
     assert!(file_exists(&target));
 

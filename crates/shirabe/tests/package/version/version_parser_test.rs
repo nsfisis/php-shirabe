@@ -1,18 +1,18 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionParserTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::package::version::version_parser::VersionParser;
-use shirabe_php_shim::utf8_text;
+use shirabe_php_shim::bconcat;
 
-fn pairs(items: &[&str]) -> Vec<String> {
-    items.iter().map(|s| s.to_string()).collect()
+fn pairs(items: &[&BStr]) -> Vec<BString> {
+    items.iter().map(|s| bconcat!(s)).collect()
 }
 
-fn entry(fields: &[(&str, &str)]) -> IndexMap<String, String> {
+fn entry(fields: &[(&BStr, &BStr)]) -> IndexMap<BString, BString> {
     fields
         .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .map(|(k, v)| (bconcat!(k), bconcat!(v)))
         .collect()
 }
 
@@ -30,47 +30,62 @@ fn test_parse_name_version_pairs() {
                 .iter()
                 .map(|m| {
                     m.iter()
-                        .map(|(k, v)| (BString::from(k.as_str()), BString::from(v.as_str())))
+                        .map(|(k, v)| (BString::from(k.as_bstr()), BString::from(v.as_bstr())))
                         .collect::<IndexMap<_, _>>()
                 })
                 .collect::<Vec<_>>(),
             version_parser
-                .parse_name_version_pairs(
-                    input
-                        .into_iter()
-                        .map(bstr::BString::from)
-                        .collect::<Vec<_>>()
-                )
+                .parse_name_version_pairs(input.into_iter().collect::<Vec<_>>())
                 .unwrap()
         );
     }
 }
 
-fn provide_parse_name_version_pairs_data() -> Vec<(Vec<String>, Vec<IndexMap<String, String>>)> {
+fn provide_parse_name_version_pairs_data() -> Vec<(Vec<BString>, Vec<IndexMap<BString, BString>>)> {
     vec![
         (
-            pairs(&["php:^7.0"]),
-            vec![entry(&[("name", "php"), ("version", "^7.0")])],
+            pairs(&[BStr::new("php:^7.0")]),
+            vec![entry(&[
+                (BStr::new("name"), BStr::new("php")),
+                (BStr::new("version"), BStr::new("^7.0")),
+            ])],
         ),
         (
-            pairs(&["php", "^7.0"]),
-            vec![entry(&[("name", "php"), ("version", "^7.0")])],
+            pairs(&[BStr::new("php"), BStr::new("^7.0")]),
+            vec![entry(&[
+                (BStr::new("name"), BStr::new("php")),
+                (BStr::new("version"), BStr::new("^7.0")),
+            ])],
         ),
         (
-            pairs(&["php", "ext-apcu"]),
-            vec![entry(&[("name", "php")]), entry(&[("name", "ext-apcu")])],
-        ),
-        (
-            pairs(&["foo/*", "bar*", "acme/baz", "*@dev"]),
+            pairs(&[BStr::new("php"), BStr::new("ext-apcu")]),
             vec![
-                entry(&[("name", "foo/*")]),
-                entry(&[("name", "bar*")]),
-                entry(&[("name", "acme/baz"), ("version", "*@dev")]),
+                entry(&[(BStr::new("name"), BStr::new("php"))]),
+                entry(&[(BStr::new("name"), BStr::new("ext-apcu"))]),
             ],
         ),
         (
-            pairs(&["php", "*"]),
-            vec![entry(&[("name", "php"), ("version", "*")])],
+            pairs(&[
+                BStr::new("foo/*"),
+                BStr::new("bar*"),
+                BStr::new("acme/baz"),
+                BStr::new("*@dev"),
+            ]),
+            vec![
+                entry(&[(BStr::new("name"), BStr::new("foo/*"))]),
+                entry(&[(BStr::new("name"), BStr::new("bar*"))]),
+                entry(&[
+                    (BStr::new("name"), BStr::new("acme/baz")),
+                    (BStr::new("version"), BStr::new("*@dev")),
+                ]),
+            ],
+        ),
+        (
+            pairs(&[BStr::new("php"), BStr::new("*")]),
+            vec![entry(&[
+                (BStr::new("name"), BStr::new("php")),
+                (BStr::new("version"), BStr::new("*")),
+            ])],
         ),
     ]
 }
@@ -82,35 +97,27 @@ fn test_is_upgrade() {
     }
 }
 
-fn provide_is_upgrade_tests() -> Vec<(String, String, bool)> {
+fn provide_is_upgrade_tests() -> Vec<(BString, BString, bool)> {
     vec![
-        ("0.9.0.0".to_string(), "1.0.0.0".to_string(), true),
-        ("1.0.0.0".to_string(), "0.9.0.0".to_string(), false),
+        (BString::from("0.9.0.0"), BString::from("1.0.0.0"), true),
+        (BString::from("1.0.0.0"), BString::from("0.9.0.0"), false),
         (
-            "1.0.0.0".to_string(),
-            utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS)
-                .unwrap()
-                .to_string(),
+            BString::from("1.0.0.0"),
+            VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
             true,
         ),
         (
-            utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS)
-                .unwrap()
-                .to_string(),
-            utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS)
-                .unwrap()
-                .to_string(),
+            VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
+            VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
             true,
         ),
         (
-            utf8_text(VersionParser::DEFAULT_BRANCH_ALIAS)
-                .unwrap()
-                .to_string(),
-            "1.0.0.0".to_string(),
+            VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
+            BString::from("1.0.0.0"),
             false,
         ),
-        ("1.0.0.0".to_string(), "dev-foo".to_string(), true),
-        ("dev-foo".to_string(), "dev-foo".to_string(), true),
-        ("dev-foo".to_string(), "1.0.0.0".to_string(), true),
+        (BString::from("1.0.0.0"), BString::from("dev-foo"), true),
+        (BString::from("dev-foo"), BString::from("dev-foo"), true),
+        (BString::from("dev-foo"), BString::from("1.0.0.0"), true),
     ]
 }

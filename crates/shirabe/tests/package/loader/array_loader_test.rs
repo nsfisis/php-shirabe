@@ -1,32 +1,32 @@
 //! ref: composer/tests/Composer/Test/Package/Loader/ArrayLoaderTest.php
 
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
 use shirabe::package::{ArrayDumper, Link};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, error_message};
 
 fn set_up() -> ArrayLoader {
     ArrayLoader::new(None, false)
 }
 
-fn s(value: &str) -> PhpMixed {
-    PhpMixed::string(value.to_string())
+fn s(value: &BStr) -> PhpMixed {
+    PhpMixed::string(bconcat!(value))
 }
 
-fn map(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {
+fn map(entries: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string().into(), v);
+        m.insert(bconcat!(k), v);
     }
     PhpMixed::Array(m)
 }
 
-fn make_config(entries: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+fn make_config(entries: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string().into(), v);
+        m.insert(bconcat!(k), v);
     }
     m
 }
@@ -38,67 +38,114 @@ fn list(items: Vec<PhpMixed>) -> PhpMixed {
 /// ref: ArrayLoaderTest::parseDumpProvider valid config
 fn valid_config() -> IndexMap<BString, PhpMixed> {
     make_config(vec![
-        ("name", s("A/B")),
-        ("version", s("1.2.3")),
-        ("version_normalized", s("1.2.3.0")),
-        ("description", s("Foo bar")),
-        ("type", s("library")),
-        ("keywords", list(vec![s("a"), s("b"), s("c")])),
-        ("homepage", s("http://example.com")),
-        ("license", list(vec![s("MIT"), s("GPLv3")])),
+        (BStr::new("name"), s(BStr::new("A/B"))),
+        (BStr::new("version"), s(BStr::new("1.2.3"))),
+        (BStr::new("version_normalized"), s(BStr::new("1.2.3.0"))),
+        (BStr::new("description"), s(BStr::new("Foo bar"))),
+        (BStr::new("type"), s(BStr::new("library"))),
         (
-            "authors",
-            list(vec![map(vec![
-                ("name", s("Bob")),
-                ("email", s("bob@example.org")),
-                ("homepage", s("example.org")),
-                ("role", s("Developer")),
-            ])]),
-        ),
-        (
-            "funding",
-            list(vec![map(vec![
-                ("type", s("example")),
-                ("url", s("https://example.org/fund")),
-            ])]),
-        ),
-        ("require", map(vec![("foo/bar", s("1.0"))])),
-        ("require-dev", map(vec![("foo/baz", s("1.0"))])),
-        ("replace", map(vec![("foo/qux", s("1.0"))])),
-        ("conflict", map(vec![("foo/quux", s("1.0"))])),
-        ("provide", map(vec![("foo/quuux", s("1.0"))])),
-        (
-            "autoload",
-            map(vec![
-                ("psr-0", map(vec![("Ns\\Prefix", s("path"))])),
-                ("classmap", list(vec![s("path"), s("path2")])),
+            BStr::new("keywords"),
+            list(vec![
+                s(BStr::new("a")),
+                s(BStr::new("b")),
+                s(BStr::new("c")),
             ]),
         ),
-        ("include-path", list(vec![s("path3"), s("path4")])),
-        ("target-dir", s("some/prefix")),
+        (BStr::new("homepage"), s(BStr::new("http://example.com"))),
         (
-            "extra",
-            map(vec![(
-                "random",
-                map(vec![("things", s("of")), ("any", s("shape"))]),
-            )]),
-        ),
-        ("bin", list(vec![s("bin1"), s("bin/foo")])),
-        (
-            "archive",
-            map(vec![(
-                "exclude",
-                list(vec![s("/foo/bar"), s("baz"), s("!/foo/bar/baz")]),
-            )]),
+            BStr::new("license"),
+            list(vec![s(BStr::new("MIT")), s(BStr::new("GPLv3"))]),
         ),
         (
-            "transport-options",
+            BStr::new("authors"),
+            list(vec![map(vec![
+                (BStr::new("name"), s(BStr::new("Bob"))),
+                (BStr::new("email"), s(BStr::new("bob@example.org"))),
+                (BStr::new("homepage"), s(BStr::new("example.org"))),
+                (BStr::new("role"), s(BStr::new("Developer"))),
+            ])]),
+        ),
+        (
+            BStr::new("funding"),
+            list(vec![map(vec![
+                (BStr::new("type"), s(BStr::new("example"))),
+                (BStr::new("url"), s(BStr::new("https://example.org/fund"))),
+            ])]),
+        ),
+        (
+            BStr::new("require"),
+            map(vec![(BStr::new("foo/bar"), s(BStr::new("1.0")))]),
+        ),
+        (
+            BStr::new("require-dev"),
+            map(vec![(BStr::new("foo/baz"), s(BStr::new("1.0")))]),
+        ),
+        (
+            BStr::new("replace"),
+            map(vec![(BStr::new("foo/qux"), s(BStr::new("1.0")))]),
+        ),
+        (
+            BStr::new("conflict"),
+            map(vec![(BStr::new("foo/quux"), s(BStr::new("1.0")))]),
+        ),
+        (
+            BStr::new("provide"),
+            map(vec![(BStr::new("foo/quuux"), s(BStr::new("1.0")))]),
+        ),
+        (
+            BStr::new("autoload"),
+            map(vec![
+                (
+                    BStr::new("psr-0"),
+                    map(vec![(BStr::new("Ns\\Prefix"), s(BStr::new("path")))]),
+                ),
+                (
+                    BStr::new("classmap"),
+                    list(vec![s(BStr::new("path")), s(BStr::new("path2"))]),
+                ),
+            ]),
+        ),
+        (
+            BStr::new("include-path"),
+            list(vec![s(BStr::new("path3")), s(BStr::new("path4"))]),
+        ),
+        (BStr::new("target-dir"), s(BStr::new("some/prefix"))),
+        (
+            BStr::new("extra"),
             map(vec![(
-                "ssl",
-                map(vec![("local_cert", s("/opt/certs/test.pem"))]),
+                BStr::new("random"),
+                map(vec![
+                    (BStr::new("things"), s(BStr::new("of"))),
+                    (BStr::new("any"), s(BStr::new("shape"))),
+                ]),
             )]),
         ),
-        ("abandoned", s("foo/bar")),
+        (
+            BStr::new("bin"),
+            list(vec![s(BStr::new("bin1")), s(BStr::new("bin/foo"))]),
+        ),
+        (
+            BStr::new("archive"),
+            map(vec![(
+                BStr::new("exclude"),
+                list(vec![
+                    s(BStr::new("/foo/bar")),
+                    s(BStr::new("baz")),
+                    s(BStr::new("!/foo/bar/baz")),
+                ]),
+            )]),
+        ),
+        (
+            BStr::new("transport-options"),
+            map(vec![(
+                BStr::new("ssl"),
+                map(vec![(
+                    BStr::new("local_cert"),
+                    s(BStr::new("/opt/certs/test.pem")),
+                )]),
+            )]),
+        ),
+        (BStr::new("abandoned"), s(BStr::new("foo/bar"))),
     ])
 }
 
@@ -115,9 +162,12 @@ fn fix_config_when_load_config_is_false(
 fn test_self_version() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("1.2.3.4")),
-        ("replace", map(vec![("foo", s("self.version"))])),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("1.2.3.4"))),
+        (
+            BStr::new("replace"),
+            map(vec![(BStr::new("foo"), s(BStr::new("self.version")))]),
+        ),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -135,15 +185,18 @@ fn test_self_version() {
 #[test]
 fn test_type_default() {
     let loader = set_up();
-    let config = make_config(vec![("name", s("A")), ("version", s("1.0"))]);
+    let config = make_config(vec![
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("1.0"))),
+    ]);
 
     let package = loader.load(config, None).unwrap();
     assert_eq!("library", package.get_type());
 
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("1.0")),
-        ("type", s("foo")),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("1.0"))),
+        (BStr::new("type"), s(BStr::new("foo"))),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -153,15 +206,18 @@ fn test_type_default() {
 #[test]
 fn test_normalized_version_optimization() {
     let loader = set_up();
-    let config = make_config(vec![("name", s("A")), ("version", s("1.2.3"))]);
+    let config = make_config(vec![
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("1.2.3"))),
+    ]);
 
     let package = loader.load(config, None).unwrap();
     assert_eq!("1.2.3.0", package.get_version());
 
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("1.2.3")),
-        ("version_normalized", s("1.2.3.4")),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("1.2.3"))),
+        (BStr::new("version_normalized"), s(BStr::new("1.2.3.4"))),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -202,13 +258,13 @@ fn test_parse_dump_false_load_config() {
 fn test_package_with_branch_alias() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("dev-master")),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("dev-master"))),
         (
-            "extra",
+            BStr::new("extra"),
             map(vec![(
-                "branch-alias",
-                map(vec![("dev-master", s("1.0.x-dev"))]),
+                BStr::new("branch-alias"),
+                map(vec![(BStr::new("dev-master"), s(BStr::new("1.0.x-dev")))]),
             )]),
         ),
     ]);
@@ -219,13 +275,13 @@ fn test_package_with_branch_alias() {
     assert_eq!("1.0.x-dev", package.get_pretty_version());
 
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("dev-master")),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("dev-master"))),
         (
-            "extra",
+            BStr::new("extra"),
             map(vec![(
-                "branch-alias",
-                map(vec![("dev-master", s("1.0-dev"))]),
+                BStr::new("branch-alias"),
+                map(vec![(BStr::new("dev-master"), s(BStr::new("1.0-dev")))]),
             )]),
         ),
     ]);
@@ -236,13 +292,13 @@ fn test_package_with_branch_alias() {
     assert_eq!("1.0.x-dev", package.get_pretty_version());
 
     let config = make_config(vec![
-        ("name", s("B")),
-        ("version", s("4.x-dev")),
+        (BStr::new("name"), s(BStr::new("B"))),
+        (BStr::new("version"), s(BStr::new("4.x-dev"))),
         (
-            "extra",
+            BStr::new("extra"),
             map(vec![(
-                "branch-alias",
-                map(vec![("4.x-dev", s("4.0.x-dev"))]),
+                BStr::new("branch-alias"),
+                map(vec![(BStr::new("4.x-dev"), s(BStr::new("4.0.x-dev")))]),
             )]),
         ),
     ]);
@@ -253,11 +309,14 @@ fn test_package_with_branch_alias() {
     assert_eq!("4.0.x-dev", package.get_pretty_version());
 
     let config = make_config(vec![
-        ("name", s("B")),
-        ("version", s("4.x-dev")),
+        (BStr::new("name"), s(BStr::new("B"))),
+        (BStr::new("version"), s(BStr::new("4.x-dev"))),
         (
-            "extra",
-            map(vec![("branch-alias", map(vec![("4.x-dev", s("4.0-dev"))]))]),
+            BStr::new("extra"),
+            map(vec![(
+                BStr::new("branch-alias"),
+                map(vec![(BStr::new("4.x-dev"), s(BStr::new("4.0-dev")))]),
+            )]),
         ),
     ]);
 
@@ -267,13 +326,13 @@ fn test_package_with_branch_alias() {
     assert_eq!("4.0.x-dev", package.get_pretty_version());
 
     let config = make_config(vec![
-        ("name", s("C")),
-        ("version", s("4.x-dev")),
+        (BStr::new("name"), s(BStr::new("C"))),
+        (BStr::new("version"), s(BStr::new("4.x-dev"))),
         (
-            "extra",
+            BStr::new("extra"),
             map(vec![(
-                "branch-alias",
-                map(vec![("4.x-dev", s("3.4.x-dev"))]),
+                BStr::new("branch-alias"),
+                map(vec![(BStr::new("4.x-dev"), s(BStr::new("3.4.x-dev")))]),
             )]),
         ),
     ]);
@@ -289,9 +348,9 @@ fn test_package_aliasing_without_branch_alias() {
     let loader = set_up();
     // non-numeric gets a default alias
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("dev-main")),
-        ("default-branch", PhpMixed::Bool(true)),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("dev-main"))),
+        (BStr::new("default-branch"), PhpMixed::Bool(true)),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -304,9 +363,9 @@ fn test_package_aliasing_without_branch_alias() {
 
     // non-default branch gets no alias even if non-numeric
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("dev-main")),
-        ("default-branch", PhpMixed::Bool(false)),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("dev-main"))),
+        (BStr::new("default-branch"), PhpMixed::Bool(false)),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -316,9 +375,9 @@ fn test_package_aliasing_without_branch_alias() {
 
     // default branch gets no alias if already numeric
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("2.x-dev")),
-        ("default-branch", PhpMixed::Bool(true)),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("2.x-dev"))),
+        (BStr::new("default-branch"), PhpMixed::Bool(true)),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -328,9 +387,9 @@ fn test_package_aliasing_without_branch_alias() {
 
     // default branch gets no alias if already numeric, with v prefix
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("v2.x-dev")),
-        ("default-branch", PhpMixed::Bool(true)),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("v2.x-dev"))),
+        (BStr::new("default-branch"), PhpMixed::Bool(true)),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -343,9 +402,9 @@ fn test_package_aliasing_without_branch_alias() {
 fn test_abandoned() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("A")),
-        ("version", s("1.2.3.4")),
-        ("abandoned", s("foo/bar")),
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("1.2.3.4"))),
+        (BStr::new("abandoned"), s(BStr::new("foo/bar"))),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -357,7 +416,10 @@ fn test_abandoned() {
 #[test]
 fn test_not_abandoned() {
     let loader = set_up();
-    let config = make_config(vec![("name", s("A")), ("version", s("1.2.3.4"))]);
+    let config = make_config(vec![
+        (BStr::new("name"), s(BStr::new("A"))),
+        (BStr::new("version"), s(BStr::new("1.2.3.4"))),
+    ]);
 
     let package = loader.load(config, None).unwrap();
     let package = package.as_complete().unwrap();
@@ -365,23 +427,23 @@ fn test_not_abandoned() {
 }
 
 /// ref: ArrayLoaderTest::providePluginApiVersions
-fn provide_plugin_api_versions() -> Vec<&'static str> {
+fn provide_plugin_api_versions() -> Vec<&'static BStr> {
     vec![
-        "1.0",
-        "1.0.0",
-        "1.0.0.0",
-        "1",
-        "=1.0.0",
-        "==1.0",
-        "~1.0.0",
-        "*",
-        "3.0.*",
-        "@stable",
-        "1.0.0@stable",
-        "^5.1",
-        ">=1.0.0 <2.5",
-        "x",
-        "1.0.0-dev",
+        BStr::new("1.0"),
+        BStr::new("1.0.0"),
+        BStr::new("1.0.0.0"),
+        BStr::new("1"),
+        BStr::new("=1.0.0"),
+        BStr::new("==1.0"),
+        BStr::new("~1.0.0"),
+        BStr::new("*"),
+        BStr::new("3.0.*"),
+        BStr::new("@stable"),
+        BStr::new("1.0.0@stable"),
+        BStr::new("^5.1"),
+        BStr::new(">=1.0.0 <2.5"),
+        BStr::new("x"),
+        BStr::new("1.0.0-dev"),
     ]
 }
 
@@ -394,7 +456,7 @@ fn test_plugin_api_version_are_kept_as_declared() {
                 bstr::BStr::new("Plugin"),
                 bstr::BStr::new("9.9.9"),
                 Link::TYPE_REQUIRE,
-                make_config(vec![("composer-plugin-api", s(api_version))]),
+                make_config(vec![(BStr::new("composer-plugin-api"), s(api_version))]),
             )
             .unwrap();
 
@@ -418,7 +480,10 @@ fn test_plugin_api_version_does_support_self_version() {
             bstr::BStr::new("Plugin"),
             bstr::BStr::new("6.6.6"),
             Link::TYPE_REQUIRE,
-            make_config(vec![("composer-plugin-api", s("self.version"))]),
+            make_config(vec![(
+                BStr::new("composer-plugin-api"),
+                s(BStr::new("self.version")),
+            )]),
         )
         .unwrap();
 
@@ -441,7 +506,7 @@ fn test_parse_links_integer_target() {
             bstr::BStr::new("Plugin"),
             bstr::BStr::new("9.9.9"),
             Link::TYPE_REQUIRE,
-            make_config(vec![("1", s("dev-main"))]),
+            make_config(vec![(BStr::new("1"), s(BStr::new("dev-main")))]),
         )
         .unwrap();
 
@@ -456,12 +521,15 @@ fn test_parse_links_invalid_version() {
             bstr::BStr::new("Plugin"),
             bstr::BStr::new("9.9.9"),
             Link::TYPE_REQUIRE,
-            make_config(vec![("composer-plugin-api", s("^^^"))]),
+            make_config(vec![(
+                BStr::new("composer-plugin-api"),
+                s(BStr::new("^^^")),
+            )]),
         )
         .unwrap_err();
     assert_eq!(
         "Link constraint in Plugin requires > composer-plugin-api should be a valid version constraint, got \"^^^\"",
-        err.to_string()
+        error_message(&err)
     );
 }
 
@@ -469,8 +537,8 @@ fn test_parse_links_invalid_version() {
 fn test_none_string_version() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("acme/package")),
-        ("version", PhpMixed::Int(1)),
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), PhpMixed::Int(1)),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -481,22 +549,22 @@ fn test_none_string_version() {
 fn test_none_string_source_dist_reference() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("acme/package")),
-        ("version", s("dev-main")),
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), s(BStr::new("dev-main"))),
         (
-            "source",
+            BStr::new("source"),
             map(vec![
-                ("type", s("svn")),
-                ("url", s("https://example.org/")),
-                ("reference", PhpMixed::Int(2019)),
+                (BStr::new("type"), s(BStr::new("svn"))),
+                (BStr::new("url"), s(BStr::new("https://example.org/"))),
+                (BStr::new("reference"), PhpMixed::Int(2019)),
             ]),
         ),
         (
-            "dist",
+            BStr::new("dist"),
             map(vec![
-                ("type", s("zip")),
-                ("url", s("https://example.org/")),
-                ("reference", PhpMixed::Int(2019)),
+                (BStr::new("type"), s(BStr::new("zip"))),
+                (BStr::new("url"), s(BStr::new("https://example.org/"))),
+                (BStr::new("reference"), PhpMixed::Int(2019)),
             ]),
         ),
     ]);
@@ -510,15 +578,21 @@ fn test_none_string_source_dist_reference() {
 fn test_branch_alias_integer_index() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("acme/package")),
-        ("version", s("dev-1")),
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), s(BStr::new("dev-1"))),
         (
-            "extra",
-            map(vec![("branch-alias", map(vec![("1", s("1.3-dev"))]))]),
+            BStr::new("extra"),
+            map(vec![(
+                BStr::new("branch-alias"),
+                map(vec![(BStr::new("1"), s(BStr::new("1.3-dev")))]),
+            )]),
         ),
         (
-            "dist",
-            map(vec![("type", s("zip")), ("url", s("https://example.org/"))]),
+            BStr::new("dist"),
+            map(vec![
+                (BStr::new("type"), s(BStr::new("zip"))),
+                (BStr::new("url"), s(BStr::new("https://example.org/"))),
+            ]),
         ),
     ]);
 
@@ -529,9 +603,12 @@ fn test_branch_alias_integer_index() {
 fn test_package_links_require() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("acme/package")),
-        ("version", s("dev-1")),
-        ("require", map(vec![("foo/bar", s("1.0"))])),
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), s(BStr::new("dev-1"))),
+        (
+            BStr::new("require"),
+            map(vec![(BStr::new("foo/bar"), s(BStr::new("1.0")))]),
+        ),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -551,11 +628,14 @@ fn test_package_links_require() {
 fn test_package_links_require_invalid() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("acme/package")),
-        ("version", s("dev-1")),
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), s(BStr::new("dev-1"))),
         (
-            "require",
-            map(vec![("foo/bar", map(vec![("random-string", s("1.0"))]))]),
+            BStr::new("require"),
+            map(vec![(
+                BStr::new("foo/bar"),
+                map(vec![(BStr::new("random-string"), s(BStr::new("1.0")))]),
+            )]),
         ),
     ]);
 
@@ -567,9 +647,15 @@ fn test_package_links_require_invalid() {
 fn test_package_links_replace() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("acme/package")),
-        ("version", s("dev-1")),
-        ("replace", map(vec![("coyote/package", s("self.version"))])),
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), s(BStr::new("dev-1"))),
+        (
+            BStr::new("replace"),
+            map(vec![(
+                BStr::new("coyote/package"),
+                s(BStr::new("self.version")),
+            )]),
+        ),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -593,9 +679,9 @@ fn test_package_links_replace() {
 fn test_package_links_replace_invalid() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("acme/package")),
-        ("version", s("dev-1")),
-        ("replace", s("coyote/package")),
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), s(BStr::new("dev-1"))),
+        (BStr::new("replace"), s(BStr::new("coyote/package"))),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -606,9 +692,9 @@ fn test_package_links_replace_invalid() {
 fn test_support_string_value() {
     let loader = set_up();
     let config = make_config(vec![
-        ("name", s("acme/package")),
-        ("version", s("dev-1")),
-        ("support", s("https://example.org")),
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), s(BStr::new("dev-1"))),
+        (BStr::new("support"), s(BStr::new("https://example.org"))),
     ]);
 
     let package = loader.load(config, None).unwrap();
@@ -619,11 +705,14 @@ fn test_support_string_value() {
 #[test]
 fn test_invalid_version() {
     let loader = set_up();
-    let config = make_config(vec![("name", s("acme/package")), ("version", s("AA"))]);
+    let config = make_config(vec![
+        (BStr::new("name"), s(BStr::new("acme/package"))),
+        (BStr::new("version"), s(BStr::new("AA"))),
+    ]);
 
     let err = loader.load(config, None).unwrap_err();
     assert_eq!(
         "Failed to normalize version for package \"acme/package\": Invalid version string \"AA\"",
-        err.to_string()
+        error_message(&err)
     );
 }

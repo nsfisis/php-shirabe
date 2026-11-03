@@ -1,3 +1,5 @@
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
+
 #[path = "../common/bootstrap.rs"]
 mod bootstrap;
 #[path = "../common/test_case.rs"]

@@ -9,7 +9,7 @@
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::path_to_bytes;
+use shirabe_php_shim::{os_str_from_bytes, path_to_bytes};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -23,10 +23,10 @@ struct CommandRun {
     stdout: BString,
 }
 
-fn run_command(work: &Path, program: &str, prefix_args: &[&OsStr], args: &[&str]) -> CommandRun {
-    let output = std::process::Command::new(program)
+fn run_command(work: &Path, program: &BStr, prefix_args: &[&OsStr], args: &[&BStr]) -> CommandRun {
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
-        .args(args)
+        .args(args.iter().map(os_str_from_bytes))
         .current_dir(work.join("project"))
         .env("COMPOSER_HOME", work.join("home"))
         .env("COMPOSER_CACHE_DIR", work.join("cache"))
@@ -74,10 +74,10 @@ fn installer_lines(stdout: &[u8]) -> Vec<&BStr> {
 }
 
 /// Runs `install` in a fresh copy of the fixture and returns the run plus the resulting tree.
-fn install(program: &str, prefix: &[&OsStr]) -> (CommandRun, Vec<(BString, BString)>, TempDir) {
+fn install(program: &BStr, prefix: &[&OsStr]) -> (CommandRun, Vec<(BString, BString)>, TempDir) {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
-    let run = run_command(work.path(), program, prefix, &["install"]);
+    let run = run_command(work.path(), program, prefix, &[BStr::new("install")]);
     let tree = tree(&work.path().join("project"));
     (run, tree, work)
 }
@@ -92,8 +92,10 @@ fn test_plugin_provided_installer_matches_upstream_composer() {
     };
     let _worker = lock_php_worker();
 
-    let (upstream, upstream_tree, _upstream_work) = install("php", &[composer_bin.as_os_str()]);
-    let (shirabe, shirabe_tree, _shirabe_work) = install(env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let (upstream, upstream_tree, _upstream_work) =
+        install(BStr::new("php"), &[composer_bin.as_os_str()]);
+    let (shirabe, shirabe_tree, _shirabe_work) =
+        install(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(0, upstream.exit_code, "upstream install must succeed");
     assert_eq!(upstream.exit_code, shirabe.exit_code);
@@ -131,22 +133,22 @@ fn test_plugin_provided_installer_call_order_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let implementations: [(&str, Vec<&OsStr>); 2] = [
-        ("php", vec![composer_bin.as_os_str()]),
-        (env!("CARGO_BIN_EXE_shirabe"), vec![]),
+    let implementations: [(&BStr, Vec<&OsStr>); 2] = [
+        (BStr::new("php"), vec![composer_bin.as_os_str()]),
+        (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ];
 
     let mut results = Vec::new();
     for (program, prefix) in &implementations {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
-        let first = run_command(work.path(), program, prefix, &["install"]);
-        let second = run_command(work.path(), program, prefix, &["install"]);
+        let first = run_command(work.path(), program, prefix, &[BStr::new("install")]);
+        let second = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let remove = run_command(
             work.path(),
             program,
             prefix,
-            &["remove", "shirabe-test/asset-a"],
+            &[BStr::new("remove"), BStr::new("shirabe-test/asset-a")],
         );
         let tree = tree(&work.path().join("project"));
         results.push((first, second, remove, tree));

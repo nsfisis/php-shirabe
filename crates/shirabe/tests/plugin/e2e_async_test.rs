@@ -8,7 +8,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
-use shirabe_php_shim::bconcat;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{bconcat, os_str_from_bytes, path_from_bytes, utf8_text};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -20,9 +21,9 @@ fn fixture_dir() -> PathBuf {
 struct Run {
     exit_code: i32,
     output: bstr::BString,
-    trace: String,
-    installer_trace: String,
-    asset: String,
+    trace: BString,
+    installer_trace: BString,
+    asset: BString,
 }
 
 /// PHP's built-in web server over the fixture's `server/` directory, killed when dropped. A
@@ -30,7 +31,7 @@ struct Run {
 /// resolves without the network.
 struct HttpServer {
     child: std::process::Child,
-    base_url: String,
+    base_url: BString,
 }
 
 impl HttpServer {
@@ -42,10 +43,10 @@ impl HttpServer {
             .local_addr()
             .unwrap()
             .port();
-        let address = format!("127.0.0.1:{port}");
+        let address = bconcat!("127.0.0.1:", port);
         let child = std::process::Command::new("php")
             .arg("-S")
-            .arg(&address)
+            .arg(os_str_from_bytes(&address))
             .arg("-t")
             .arg(fixture_dir().join("server"))
             // The two requests of a group are in flight together, and a cancelled one keeps its
@@ -57,13 +58,18 @@ impl HttpServer {
             .unwrap();
         let server = Self {
             child,
-            base_url: format!("http://{address}"),
+            base_url: bconcat!("http://", address),
         };
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-        while std::net::TcpStream::connect(&address).is_err() {
+        while std::net::TcpStream::connect(
+            utf8_text(&address).expect("the fixture server prints a text address"),
+        )
+        .is_err()
+        {
             assert!(
                 std::time::Instant::now() < deadline,
-                "the fixture HTTP server did not come up on {address}"
+                "the fixture HTTP server did not come up on {address}",
+                address = address.display_lossy()
             );
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
@@ -80,29 +86,31 @@ impl Drop for HttpServer {
 
 /// Runs `install` in a fresh copy of the fixture and returns the exit code with the plugin's
 /// traces.
-fn install(program: &str, prefix_args: &[&OsStr], http_base_url: &str) -> Run {
+fn install(program: &BStr, prefix_args: &[&OsStr], http_base_url: &BStr) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
-    let output = std::process::Command::new(program)
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
         .arg("install")
         .current_dir(&project)
         .env("COMPOSER_HOME", work.path().join("home"))
         .env("COMPOSER_CACHE_DIR", work.path().join("cache"))
         .env("COMPOSER_NO_INTERACTION", "1")
-        .env("SHIRABE_E2E_ASYNC_HTTP", http_base_url)
+        .env("SHIRABE_E2E_ASYNC_HTTP", os_str_from_bytes(&http_base_url))
         .env("COLUMNS", "120")
         .env("LINES", "30")
         .output()
         .unwrap();
-    let read = |name: &str| std::fs::read_to_string(project.join(name)).unwrap_or_default();
+    let read = |name: &BStr| {
+        BString::from(std::fs::read(project.join(path_from_bytes(name))).unwrap_or_default())
+    };
     Run {
         exit_code: output.status.code().unwrap_or(-1),
         output: bconcat!(&output.stdout, &output.stderr),
-        trace: read("async-trace.txt"),
-        installer_trace: read("async-installer-trace.txt"),
-        asset: read("assets/shirabe-test/async-asset-a/asset.txt"),
+        trace: read(BStr::new("async-trace.txt")),
+        installer_trace: read(BStr::new("async-installer-trace.txt")),
+        asset: read(BStr::new("assets/shirabe-test/async-asset-a/asset.txt")),
     }
 }
 
@@ -117,8 +125,16 @@ fn test_async_surface_matches_upstream_composer() {
     let _worker = lock_php_worker();
 
     let server = HttpServer::start();
-    let upstream = install("php", &[composer_bin.as_os_str()], &server.base_url);
-    let shirabe = install(env!("CARGO_BIN_EXE_shirabe"), &[], &server.base_url);
+    let upstream = install(
+        BStr::new("php"),
+        &[composer_bin.as_os_str()],
+        server.base_url.as_bstr(),
+    );
+    let shirabe = install(
+        BStr::new(env!("CARGO_BIN_EXE_shirabe")),
+        &[],
+        server.base_url.as_bstr(),
+    );
 
     assert_eq!(
         0,

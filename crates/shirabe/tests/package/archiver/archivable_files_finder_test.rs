@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ArchivableFilesFinderTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::archiver::ArchivableFilesFinder;
 use shirabe::util::Filesystem;
@@ -185,7 +185,7 @@ fn test_manual_excludes() {
 /// leaf files; `ZipArchive` entry enumeration (skipping directory entries) is the faithful
 /// equivalent. Each entry is rebuilt into the `phar://.../archive.zip/archive/...` virtual path
 /// PHP would stringify, then the `archive` prefix is stripped.
-fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<BString> {
+fn get_archived_files(set_up: &SetUp, command: &BStr) -> Vec<BString> {
     let mut process = Process::from_shell_commandline(
         command,
         Some(std::path::Path::new(&set_up.sources)),
@@ -284,7 +284,8 @@ fn test_git_excludes() {
 
     let expected = get_archived_files(
         &set_up,
-        "git init && \
+        BStr::new(
+            "git init && \
          git config user.email \"you@example.com\" && \
          git config user.name \"Your Name\" && \
          git config commit.gpgsign false && \
@@ -293,6 +294,7 @@ fn test_git_excludes() {
          git add . && \
          git commit -m \"init\" && \
          git archive --format=zip --prefix=archive/ -o archive.zip HEAD",
+        ),
     );
     assert_archivable_files(&set_up, finder, &expected);
 }

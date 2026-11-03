@@ -1,10 +1,12 @@
 //! ref: composer/tests/Composer/Test/Package/BasePackageTest.php
 
 use crate::test_case::get_package;
+use bstr::{BStr, BString};
 use shirabe::package::DisplayMode;
 use shirabe::package::base_package::package_names_to_regexp;
 use shirabe::package::handle::PackageHandle;
 use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle};
+use shirabe_php_shim::bconcat;
 use shirabe_semver::VersionParser;
 
 fn empty_repository() -> RepositoryInterfaceHandle {
@@ -38,29 +40,37 @@ fn test_set_another_repository() {
 // isDev() true, while the pretty version is an independent constructor argument.
 #[test]
 fn test_format_version_for_dev_package() {
-    let cases: Vec<(&str, bool, &str)> = vec![
-        ("v2.1.0-RC2", true, "PrettyVersion v2.1.0-RC2"),
+    let cases: Vec<(&BStr, bool, &BStr)> = vec![
         (
-            "bbf527a27356414bfa9bf520f018c5cb7af67c77",
+            BStr::new("v2.1.0-RC2"),
             true,
-            "PrettyVersion bbf527a",
+            BStr::new("PrettyVersion v2.1.0-RC2"),
         ),
-        ("v1.0.0", false, "PrettyVersion v1.0.0"),
         (
-            "bbf527a27356414bfa9bf520f018c5cb7af67c77",
+            BStr::new("bbf527a27356414bfa9bf520f018c5cb7af67c77"),
+            true,
+            BStr::new("PrettyVersion bbf527a"),
+        ),
+        (
+            BStr::new("v1.0.0"),
             false,
-            "PrettyVersion bbf527a27356414bfa9bf520f018c5cb7af67c77",
+            BStr::new("PrettyVersion v1.0.0"),
+        ),
+        (
+            BStr::new("bbf527a27356414bfa9bf520f018c5cb7af67c77"),
+            false,
+            BStr::new("PrettyVersion bbf527a27356414bfa9bf520f018c5cb7af67c77"),
         ),
     ];
 
     for (source_reference, truncate, expected) in cases {
         let package = PackageHandle::new(
-            bstr::BString::from("dummy/pkg".to_string()),
+            BString::from("dummy/pkg"),
             bstr::BString::from(&VersionParser.normalize("dev-master", None).unwrap()[..]),
-            bstr::BString::from("PrettyVersion".to_string()),
+            BString::from("PrettyVersion"),
         );
-        package.__set_source_type(Some(bstr::BString::from("git".to_string())));
-        package.set_source_reference(Some(bstr::BString::from(source_reference.to_string())));
+        package.__set_source_type(Some(BString::from("git")));
+        package.set_source_reference(Some(bconcat!(source_reference)));
 
         assert_eq!(
             expected,
@@ -74,7 +84,7 @@ fn test_package_names_to_regexp() {
     // The PHP data provider yields a single row whose extra elements are ignored,
     // so only the first (packageNames, wrap, expected) triple is exercised.
     let regexp = package_names_to_regexp(
-        &["ext-*".to_string(), "monolog/monolog".to_string()],
+        &[BString::from("ext-*"), BString::from("monolog/monolog")],
         "{^%s$}i",
     );
 

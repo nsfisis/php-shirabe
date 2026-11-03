@@ -7,6 +7,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString};
+use shirabe_php_shim::os_str_from_bytes;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -17,23 +19,26 @@ fn fixture_dir() -> PathBuf {
 
 struct Run {
     exit_codes: Vec<i32>,
-    trace: String,
+    trace: BString,
 }
 
 /// Runs `install` and then `require shirabe-test/lib-b:1.0.0` in a fresh copy of the fixture: the
 /// plugin is only active once the first command has installed it, so the event it records is the
 /// one the second command dispatches.
-fn install_then_require(program: &str, prefix_args: &[&OsStr]) -> Run {
+fn install_then_require(program: &BStr, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
-    let commands: [&[&str]; 2] = [&["install"], &["require", "shirabe-test/lib-b:1.0.0"]];
+    let commands: [&[&BStr]; 2] = [
+        &[BStr::new("install")],
+        &[BStr::new("require"), BStr::new("shirabe-test/lib-b:1.0.0")],
+    ];
     let exit_codes = commands
         .iter()
         .map(|args| {
-            std::process::Command::new(program)
+            std::process::Command::new(os_str_from_bytes(&program))
                 .args(prefix_args)
-                .args(*args)
+                .args(args.iter().map(os_str_from_bytes))
                 .current_dir(&project)
                 .env("COMPOSER_HOME", work.path().join("home"))
                 .env("COMPOSER_CACHE_DIR", work.path().join("cache"))
@@ -49,8 +54,9 @@ fn install_then_require(program: &str, prefix_args: &[&OsStr]) -> Run {
         .collect();
     Run {
         exit_codes,
-        trace: std::fs::read_to_string(project.join("installer-event-trace.txt"))
-            .unwrap_or_default(),
+        trace: BString::from(
+            std::fs::read(project.join("installer-event-trace.txt")).unwrap_or_default(),
+        ),
     }
 }
 
@@ -64,8 +70,8 @@ fn test_installer_events_match_upstream_composer() {
     };
     let _worker = lock_php_worker();
 
-    let upstream = install_then_require("php", &[composer_bin.as_os_str()]);
-    let shirabe = install_then_require(env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream = install_then_require(BStr::new("php"), &[composer_bin.as_os_str()]);
+    let shirabe = install_then_require(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(
         vec![0, 0],

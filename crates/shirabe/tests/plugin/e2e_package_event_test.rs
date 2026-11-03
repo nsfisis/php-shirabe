@@ -7,6 +7,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{os_str_from_bytes, path_from_bytes};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -17,17 +19,17 @@ fn fixture_dir() -> PathBuf {
 
 struct Run {
     exit_code: i32,
-    trace: String,
-    repo_trace: String,
+    trace: BString,
+    repo_trace: BString,
 }
 
 /// Runs `install` in a fresh copy of the fixture and returns the exit code with the traces the
 /// plugin wrote.
-fn install(program: &str, prefix_args: &[&OsStr]) -> Run {
+fn install(program: &BStr, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
-    let output = std::process::Command::new(program)
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
         .arg("install")
         .current_dir(&project)
@@ -38,11 +40,13 @@ fn install(program: &str, prefix_args: &[&OsStr]) -> Run {
         .env("LINES", "30")
         .output()
         .unwrap();
-    let read = |name: &str| std::fs::read_to_string(project.join(name)).unwrap_or_default();
+    let read = |name: &BStr| {
+        BString::from(std::fs::read(project.join(path_from_bytes(name))).unwrap_or_default())
+    };
     Run {
         exit_code: output.status.code().unwrap_or(-1),
-        trace: read("package-event-trace.txt"),
-        repo_trace: read("package-event-repo-trace.txt"),
+        trace: read(BStr::new("package-event-trace.txt")),
+        repo_trace: read(BStr::new("package-event-repo-trace.txt")),
     }
 }
 
@@ -56,8 +60,8 @@ fn test_package_events_match_upstream_composer() {
     };
     let _worker = lock_php_worker();
 
-    let upstream = install("php", &[composer_bin.as_os_str()]);
-    let shirabe = install(env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream = install(BStr::new("php"), &[composer_bin.as_os_str()]);
+    let shirabe = install(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(0, upstream.exit_code, "upstream install must succeed");
     assert_eq!(upstream.exit_code, shirabe.exit_code);
@@ -97,8 +101,8 @@ fn test_local_repository_seen_by_package_events_matches_upstream_composer() {
     };
     let _worker = lock_php_worker();
 
-    let upstream = install("php", &[composer_bin.as_os_str()]);
-    let shirabe = install(env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream = install(BStr::new("php"), &[composer_bin.as_os_str()]);
+    let shirabe = install(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(upstream.repo_trace, shirabe.repo_trace);
 }

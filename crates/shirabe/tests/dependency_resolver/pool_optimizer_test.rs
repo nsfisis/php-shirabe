@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php
 
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
 use shirabe::dependency_resolver::pool::Pool;
@@ -68,7 +68,12 @@ fn read_test_file(
     let contents = file_get_contents(file).unwrap();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
-    let section_info: Vec<&str> = vec!["TEST", "REQUEST", "POOL-BEFORE", "POOL-AFTER"];
+    let section_info: Vec<&BStr> = vec![
+        BStr::new("TEST"),
+        BStr::new("REQUEST"),
+        BStr::new("POOL-BEFORE"),
+        BStr::new("POOL-AFTER"),
+    ];
 
     let mut section: Option<BString> = None;
     let mut data: IndexMap<BString, BString> = IndexMap::new();
@@ -98,7 +103,7 @@ fn read_test_file(
             panic!(
                 "The test file \"{}\" must have a section named \"{}\".",
                 str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file)).display_lossy(),
-                required_section
+                required_section.display_lossy()
             );
         }
     }

@@ -21,7 +21,7 @@ use shirabe::repository::RepositoryManager;
 use shirabe::util::Git as GitUtil;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
@@ -65,28 +65,38 @@ fn make_manager(
     )))
 }
 
-fn require_map(entries: &[(&str, &str)]) -> PhpMixed {
+fn require_map(entries: &[(&BStr, &BStr)]) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string().into(), PhpMixed::string(v.to_string()));
+        m.insert(bconcat!(k), PhpMixed::string(bconcat!(v)));
     }
     PhpMixed::Array(m)
 }
 
 // A test double for the concrete VersionGuesser, supplied through the VersionGuesserInterface seam.
-mockall::mock! {
-    #[derive(Debug)]
-    pub VersionGuesser {}
-    impl VersionGuesserInterface for VersionGuesser {
-        fn guess_version(
-            &mut self,
-            package_config: &IndexMap<BString, PhpMixed>,
-            path: &std::path::Path,
-        ) -> anyhow::Result<Option<VersionData>>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_version_guesser {
+    use super::*;
 
-        fn get_root_version_from_env(&self) -> anyhow::Result<BString>;
+    mockall::mock! {
+        #[derive(Debug)]
+        pub VersionGuesser {}
+        impl VersionGuesserInterface for VersionGuesser {
+            fn guess_version(
+                &mut self,
+                package_config: &IndexMap<BString, PhpMixed>,
+                path: &std::path::Path,
+            ) -> anyhow::Result<Option<VersionData>>;
+
+            fn get_root_version_from_env(&self) -> anyhow::Result<BString>;
+        }
     }
 }
+use mock_version_guesser::MockVersionGuesser;
 
 #[test]
 fn test_stability_flags_parsing() {
@@ -131,39 +141,42 @@ fn test_stability_flags_parsing() {
             let mut m = IndexMap::new();
             m.insert(
                 "foo/bar".into(),
-                PhpMixed::string("~2.1.0-beta2".to_string()),
+                PhpMixed::string(BString::from("~2.1.0-beta2")),
             );
             m.insert(
                 "bar/baz".into(),
-                PhpMixed::string("1.0.x-dev as 1.2.0".to_string()),
+                PhpMixed::string(BString::from("1.0.x-dev as 1.2.0")),
             );
-            m.insert("qux/quux".into(), PhpMixed::string("1.0.*@rc".to_string()));
+            m.insert(
+                "qux/quux".into(),
+                PhpMixed::string(BString::from("1.0.*@rc")),
+            );
             m.insert(
                 "zux/complex".into(),
-                PhpMixed::string("~1.0,>=1.0.2@dev".to_string()),
+                PhpMixed::string(BString::from("~1.0,>=1.0.2@dev")),
             );
             m.insert(
                 "or/op".into(),
-                PhpMixed::string("^2.0@dev || ^2.0@dev".to_string()),
+                PhpMixed::string(BString::from("^2.0@dev || ^2.0@dev")),
             );
             m.insert(
                 "multi/lowest-wins".into(),
-                PhpMixed::string("^2.0@rc || >=3.0@dev , ~3.5@alpha".to_string()),
+                PhpMixed::string(BString::from("^2.0@rc || >=3.0@dev , ~3.5@alpha")),
             );
             m.insert(
                 "or/op-without-flags".into(),
-                PhpMixed::string("dev-master || 2.0 , ~3.5-alpha".to_string()),
+                PhpMixed::string(BString::from("dev-master || 2.0 , ~3.5-alpha")),
             );
             m.insert(
                 "or/op-without-flags2".into(),
-                PhpMixed::string("3.0-beta || 2.0 , ~3.5-alpha".to_string()),
+                PhpMixed::string(BString::from("3.0-beta || 2.0 , ~3.5-alpha")),
             );
             m
         }),
     );
     data.insert(
         "minimum-stability".into(),
-        PhpMixed::string("alpha".to_string()),
+        PhpMixed::string(BString::from("alpha")),
     );
 
     let package = loader
@@ -286,7 +299,7 @@ fn test_feature_branch_pretty_version() {
     let mut data = IndexMap::new();
     data.insert(
         "require".into(),
-        require_map(&[("foo/bar", "self.version")]),
+        require_map(&[(BStr::new("foo/bar"), BStr::new("self.version"))]),
     );
 
     let package = loader
@@ -324,11 +337,11 @@ fn test_non_feature_branch_pretty_version() {
     let mut data = IndexMap::new();
     data.insert(
         "require".into(),
-        require_map(&[("foo/bar", "self.version")]),
+        require_map(&[(BStr::new("foo/bar"), BStr::new("self.version"))]),
     );
     data.insert(
         "non-feature-branches".into(),
-        PhpMixed::List(vec![PhpMixed::string("latest-.*".to_string())]),
+        PhpMixed::List(vec![PhpMixed::string(BString::from("latest-.*"))]),
     );
 
     let package = loader

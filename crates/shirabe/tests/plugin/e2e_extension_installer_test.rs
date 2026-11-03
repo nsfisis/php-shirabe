@@ -9,9 +9,9 @@
 //! everything from local repositories.
 
 use crate::php_worker::{lock_php_worker, php_runtime_available};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, getenv, path_to_bytes};
+use shirabe_php_shim::{bconcat, getenv, os_str_from_bytes, path_to_bytes};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -75,10 +75,10 @@ struct InstallRun {
     artifacts: IndexMap<BString, Vec<u8>>,
 }
 
-fn run_install(work: &Path, program: &str, args: &[&std::ffi::OsStr]) -> InstallRun {
+fn run_install(work: &Path, program: &BStr, args: &[&std::ffi::OsStr]) -> InstallRun {
     let project = work.join("project");
     copy_dir(&fixture_dir(), work);
-    let output = std::process::Command::new(program)
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(args)
         .arg("install")
         .current_dir(&project)
@@ -128,8 +128,8 @@ fn test_extension_installer_install_matches_upstream_composer() {
     let _worker = lock_php_worker();
 
     let work = TempDir::new().unwrap();
-    let upstream = run_install(work.path(), "php", &[composer_bin.as_os_str()]);
-    let shirabe = run_install(work.path(), env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream = run_install(work.path(), BStr::new("php"), &[composer_bin.as_os_str()]);
+    let shirabe = run_install(work.path(), BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(0, upstream.exit_code, "upstream Composer must succeed");
     assert_eq!(upstream.exit_code, shirabe.exit_code);

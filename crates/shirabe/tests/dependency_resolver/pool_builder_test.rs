@@ -20,8 +20,8 @@ use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_factory::RepositoryFactory;
 use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
 use shirabe_php_shim::{
-    PhpMixed, bconcat, file_get_contents, path_to_bytes, php_regex, preg_is_match,
-    preg_split_delim_capture, str_replace, utf8_text,
+    PhpMixed, bconcat, display_to_bytes, file_get_contents, path_to_bytes, php_regex,
+    preg_is_match, preg_split_delim_capture, str_replace, utf8_text,
 };
 use std::path::PathBuf;
 
@@ -64,14 +64,14 @@ fn read_test_file(
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
     // PHP section_info is a map of name => required flag.
-    let section_info: Vec<(&str, bool)> = vec![
-        ("TEST", true),
-        ("ROOT", false),
-        ("REQUEST", true),
-        ("FIXED", false),
-        ("PACKAGE-REPOS", true),
-        ("EXPECT", true),
-        ("EXPECT-OPTIMIZED", false),
+    let section_info: Vec<(&BStr, bool)> = vec![
+        (BStr::new("TEST"), true),
+        (BStr::new("ROOT"), false),
+        (BStr::new("REQUEST"), true),
+        (BStr::new("FIXED"), false),
+        (BStr::new("PACKAGE-REPOS"), true),
+        (BStr::new("EXPECT"), true),
+        (BStr::new("EXPECT-OPTIMIZED"), false),
     ];
 
     let mut section: Option<BString> = None;
@@ -102,7 +102,7 @@ fn read_test_file(
             panic!(
                 "The test file \"{}\" must have a section named \"{}\".",
                 str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file)).display_lossy(),
-                section
+                section.display_lossy()
             );
         }
     }
@@ -195,16 +195,14 @@ fn php_sort_mixed(values: &mut [PhpMixed]) {
             match m {
                 PhpMixed::Int(i) => Some(*i as f64),
                 PhpMixed::Float(f) => Some(*f),
-                PhpMixed::String(s) => {
-                    utf8_text(s).and_then(|s: &str| s.trim().parse::<f64>().ok())
-                }
+                PhpMixed::String(s) => utf8_text(s).and_then(|s| s.trim().parse::<f64>().ok()),
                 _ => None,
             }
         };
         let str_of = |m: &PhpMixed| -> BString {
             match m {
-                PhpMixed::Int(i) => i.to_string().into(),
-                PhpMixed::Float(f) => f.to_string().into(),
+                PhpMixed::Int(i) => bconcat!(i),
+                PhpMixed::Float(f) => display_to_bytes(f),
                 PhpMixed::String(s) => s.clone(),
                 _ => BString::default(),
             }
@@ -320,7 +318,7 @@ fn run_test_pool_builder(
 ) {
     // PHP: $root is array; empty checks against keys.
     let root_map = root.as_array();
-    let get_root = |key: &str| -> Option<&PhpMixed> { root_map.and_then(|m| m.get(B(key))) };
+    let get_root = |key: &BStr| -> Option<&PhpMixed> { root_map.and_then(|m| m.get(B(key))) };
     let is_empty = |v: Option<&PhpMixed>| -> bool {
         match v {
             None => true,
@@ -336,21 +334,22 @@ fn run_test_pool_builder(
     };
 
     // PHP: $rootAliases = !empty($root['aliases']) ? $root['aliases'] : [];
-    let root_aliases_data: Vec<IndexMap<BString, PhpMixed>> = if !is_empty(get_root("aliases")) {
-        get_root("aliases")
-            .and_then(|v| v.as_list())
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_array().cloned())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default()
-    } else {
-        vec![]
-    };
+    let root_aliases_data: Vec<IndexMap<BString, PhpMixed>> =
+        if !is_empty(get_root(BStr::new("aliases"))) {
+            get_root(BStr::new("aliases"))
+                .and_then(|v| v.as_list())
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_array().cloned())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        } else {
+            vec![]
+        };
 
-    let minimum_stability: BString = if !is_empty(get_root("minimum-stability")) {
-        get_root("minimum-stability")
+    let minimum_stability: BString = if !is_empty(get_root(BStr::new("minimum-stability"))) {
+        get_root(BStr::new("minimum-stability"))
             .and_then(|v| v.as_string())
             .unwrap_or("stable".into())
             .to_owned()
@@ -359,32 +358,33 @@ fn run_test_pool_builder(
     };
 
     // PHP: $stabilityFlags map of name => stability string.
-    let stability_flags_data: IndexMap<BString, BString> = if !is_empty(get_root("stability-flags"))
-    {
-        get_root("stability-flags")
-            .and_then(|v| v.as_array())
-            .map(|m| {
-                m.iter()
-                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_owned())))
-                    .collect()
-            })
-            .unwrap_or_default()
-    } else {
-        IndexMap::new()
-    };
+    let stability_flags_data: IndexMap<BString, BString> =
+        if !is_empty(get_root(BStr::new("stability-flags"))) {
+            get_root(BStr::new("stability-flags"))
+                .and_then(|v| v.as_array())
+                .map(|m| {
+                    m.iter()
+                        .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_owned())))
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            IndexMap::new()
+        };
 
-    let root_references: IndexMap<BString, BString> = if !is_empty(get_root("references")) {
-        get_root("references")
-            .and_then(|v| v.as_array())
-            .map(|m| {
-                m.iter()
-                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_owned())))
-                    .collect()
-            })
-            .unwrap_or_default()
-    } else {
-        IndexMap::new()
-    };
+    let root_references: IndexMap<BString, BString> =
+        if !is_empty(get_root(BStr::new("references"))) {
+            get_root(BStr::new("references"))
+                .and_then(|v| v.as_array())
+                .map(|m| {
+                    m.iter()
+                        .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_owned())))
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            IndexMap::new()
+        };
 
     // PHP: array_map over stability flags, mapping to BasePackage::STABILITIES[$stability].
     let mut stability_flags: IndexMap<BString, i64> = IndexMap::new();

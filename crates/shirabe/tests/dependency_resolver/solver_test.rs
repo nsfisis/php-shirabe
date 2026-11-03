@@ -17,7 +17,7 @@ use shirabe::repository::array_repository::ArrayRepository;
 use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
-use shirabe_php_shim::{bconcat, utf8_text};
+use shirabe_php_shim::bconcat;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 
 #[allow(dead_code)]
@@ -55,11 +55,11 @@ fn set_up() -> Fixtures {
 
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
-fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
+fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bstr::BString::from(source.to_string()),
-        bstr::BString::from(target.to_string()),
+        bconcat!(source),
+        bconcat!(target),
         constraint,
         Some(r#type.to_owned()),
         pretty,
@@ -68,18 +68,18 @@ fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &bstr::BS
 
 /// PHP `new Link($source, $target, $constraint, $type, $prettyConstraint)`.
 fn link_pretty(
-    source: &str,
-    target: &str,
+    source: &BStr,
+    target: &BStr,
     constraint: AnyConstraint,
     r#type: &bstr::BStr,
-    pretty: &str,
+    pretty: &BStr,
 ) -> Link {
     Link::new(
-        bstr::BString::from(source.to_string()),
-        bstr::BString::from(target.to_string()),
+        bconcat!(source),
+        bconcat!(target),
         constraint,
         Some(r#type.to_owned()),
-        bstr::BString::from(pretty.to_string()),
+        bconcat!(pretty),
     )
 }
 
@@ -90,7 +90,7 @@ fn multi(constraints: Vec<AnyConstraint>) -> AnyConstraint {
 /// One expected solver job. Mirrors the PHP `['job' => ..., 'package'|'from'|'to' => ...]` rows.
 enum ExpectedJob {
     Single {
-        job: &'static str,
+        job: &'static BStr,
         package: PackageInterfaceHandle,
     },
     Update {
@@ -140,17 +140,17 @@ fn check_solver_result_repo_set(
 
     // Build readable (unique-name) and identity (ptr) representations of the result and
     // the expectation, mirroring the dual assertEquals in the PHP helper.
-    let mut result_readable: Vec<(String, bstr::BString)> = Vec::new();
-    let mut result_ids: Vec<(String, Vec<usize>)> = Vec::new();
+    let mut result_readable: Vec<(BString, bstr::BString)> = Vec::new();
+    let mut result_ids: Vec<(BString, Vec<usize>)> = Vec::new();
     for operation in transaction.get_operations() {
         if let AnyOperation::Update(update) = &**operation {
             let from = update.get_initial_package();
             let to = update.get_target_package();
             result_readable.push((
-                "update".to_string(),
+                BString::from("update"),
                 bconcat!(from.get_unique_name(), " => ", to.get_unique_name()),
             ));
-            result_ids.push(("update".to_string(), vec![from.ptr_id(), to.ptr_id()]));
+            result_ids.push((BString::from("update"), vec![from.ptr_id(), to.ptr_id()]));
         } else {
             let job = match operation.get_operation_type().as_bytes() {
                 b"markAliasInstalled" => "markAliasInstalled",
@@ -160,25 +160,25 @@ fn check_solver_result_repo_set(
                 other => panic!("Unexpected operation: {}", BStr::new(other).display_lossy()),
             };
             let package = operation.get_target_package();
-            result_readable.push((job.to_string(), package.get_unique_name()));
-            result_ids.push((job.to_string(), vec![package.ptr_id()]));
+            result_readable.push((bconcat!(job), package.get_unique_name()));
+            result_ids.push((bconcat!(job), vec![package.ptr_id()]));
         }
     }
 
-    let mut expected_readable: Vec<(String, bstr::BString)> = Vec::new();
-    let mut expected_ids: Vec<(String, Vec<usize>)> = Vec::new();
+    let mut expected_readable: Vec<(BString, bstr::BString)> = Vec::new();
+    let mut expected_ids: Vec<(BString, Vec<usize>)> = Vec::new();
     for job in &expected {
         match job {
             ExpectedJob::Single { job, package } => {
-                expected_readable.push((job.to_string(), package.get_unique_name()));
-                expected_ids.push((job.to_string(), vec![package.ptr_id()]));
+                expected_readable.push((bconcat!(job), package.get_unique_name()));
+                expected_ids.push((bconcat!(job), vec![package.ptr_id()]));
             }
             ExpectedJob::Update { from, to } => {
                 expected_readable.push((
-                    "update".to_string(),
+                    BString::from("update"),
                     bconcat!(from.get_unique_name(), " => ", to.get_unique_name()),
                 ));
-                expected_ids.push(("update".to_string(), vec![from.ptr_id(), to.ptr_id()]));
+                expected_ids.push((BString::from("update"), vec![from.ptr_id(), to.ptr_id()]));
             }
         }
     }
@@ -256,7 +256,7 @@ fn test_solver_install_single() {
         fixtures.repo_locked,
         request,
         vec![ExpectedJob::Single {
-            job: "install",
+            job: BStr::new("install"),
             package: package_a,
         }],
     );
@@ -274,7 +274,7 @@ fn test_solver_remove_if_not_requested() {
         fixtures.repo_locked,
         fixtures.request,
         vec![ExpectedJob::Single {
-            job: "remove",
+            job: BStr::new("remove"),
             package: package_a,
         }],
     );
@@ -353,7 +353,7 @@ fn test_solver_install_same_package_from_different_repositories() {
         fixtures.repo_locked,
         request,
         vec![ExpectedJob::Single {
-            job: "install",
+            job: BStr::new("install"),
             package: foo1,
         }],
     );
@@ -371,16 +371,15 @@ fn test_solver_install_with_deps() {
 
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("<", "1.1"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -394,11 +393,11 @@ fn test_solver_install_with_deps() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
         ],
@@ -421,10 +420,10 @@ fn test_solver_install_honours_not_equal_operator() {
 
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 multi(vec![
                     get_version_constraint("<=", "1.3"),
                     get_version_constraint("<>", "1.3"),
@@ -434,7 +433,6 @@ fn test_solver_install_honours_not_equal_operator() {
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -448,11 +446,11 @@ fn test_solver_install_honours_not_equal_operator() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: new_package_b11,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
         ],
@@ -472,40 +470,38 @@ fn test_solver_install_with_deps_in_order() {
     package_b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([
             (
-                "a".to_string(),
+                BString::from("a"),
                 link(
-                    "B",
-                    "A",
+                    BStr::new("B"),
+                    BStr::new("A"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "c".to_string(),
+                BString::from("c"),
                 link(
-                    "B",
-                    "C",
+                    BStr::new("B"),
+                    BStr::new("C"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_c.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "C",
-                "A",
+                BStr::new("C"),
+                BStr::new("A"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -521,15 +517,15 @@ fn test_solver_install_with_deps_in_order() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_c,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
         ],
@@ -550,10 +546,10 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
 
     ext_for_php74.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "ourcustom/php".to_string(),
+            BString::from("ourcustom/php"),
             link(
-                "ourcustom/ext-foobar",
-                "ourcustom/PHP",
+                BStr::new("ourcustom/ext-foobar"),
+                BStr::new("ourcustom/PHP"),
                 multi(vec![
                     get_version_constraint(">=", "7.4.0"),
                     get_version_constraint("<", "7.5.0"),
@@ -562,15 +558,14 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     ext_for_php80.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "ourcustom/php".to_string(),
+            BString::from("ourcustom/php"),
             link(
-                "ourcustom/ext-foobar",
-                "ourcustom/PHP",
+                BStr::new("ourcustom/ext-foobar"),
+                BStr::new("ourcustom/PHP"),
                 multi(vec![
                     get_version_constraint(">=", "8.0.0"),
                     get_version_constraint("<", "8.1.0"),
@@ -579,7 +574,6 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -605,11 +599,11 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: php80,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: ext_for_php80,
             },
         ],
@@ -629,11 +623,11 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: php74,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: ext_for_php74,
             },
         ],
@@ -656,10 +650,10 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
 
     ext_for_php80.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "ourcustom/php".to_string(),
+            BString::from("ourcustom/php"),
             link(
-                "ourcustom/ext-foobar",
-                "ourcustom/PHP",
+                BStr::new("ourcustom/ext-foobar"),
+                BStr::new("ourcustom/PHP"),
                 multi(vec![
                     get_version_constraint(">=", "8.0.0"),
                     get_version_constraint("<", "8.1.0"),
@@ -668,15 +662,14 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     ext_for_php74.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "ourcustom/php".to_string(),
+            BString::from("ourcustom/php"),
             link(
-                "ourcustom/ext-foobar",
-                "ourcustom/PHP",
+                BStr::new("ourcustom/ext-foobar"),
+                BStr::new("ourcustom/PHP"),
                 multi(vec![
                     get_version_constraint(">=", "7.4.0"),
                     get_version_constraint("<", "7.5.0"),
@@ -685,7 +678,6 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -711,11 +703,11 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: php80.clone(),
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: ext_for_php80.clone(),
             },
         ],
@@ -735,11 +727,11 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: php80,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: ext_for_php80,
             },
         ],
@@ -795,16 +787,15 @@ fn test_solver_update_does_only_update() {
 
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0.0.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -866,30 +857,28 @@ fn test_solver_update_all() {
 
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 MatchAllConstraint::new(None).into(),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     new_package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 MatchAllConstraint::new(None).into(),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1047,7 +1036,7 @@ fn test_solver_update_fully_constrained_prunes_installed_packages() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "remove",
+                job: BStr::new("remove"),
                 package: package_b,
             },
             ExpectedJob::Update {
@@ -1080,16 +1069,15 @@ fn test_solver_all_jobs() {
     fixtures.repo.add_package(get_package("D", "1.0")).unwrap();
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("<", "1.1"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1104,15 +1092,15 @@ fn test_solver_all_jobs() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "remove",
+                job: BStr::new("remove"),
                 package: package_d,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
             ExpectedJob::Update {
@@ -1136,30 +1124,28 @@ fn test_solver_three_alternative_require_and_conflict() {
     fixtures.repo.add_package(old_package_b).unwrap();
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("<", "1.1"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_a.as_complete_package().unwrap().__set_conflicts(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("<", "1.0"),
                 Link::TYPE_CONFLICT,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1173,11 +1159,11 @@ fn test_solver_three_alternative_require_and_conflict() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: middle_package_b,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
         ],
@@ -1193,16 +1179,15 @@ fn test_solver_obsolete() {
     fixtures.repo.add_package(package_b.clone()).unwrap();
     package_b.as_complete_package().unwrap().__set_replaces(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "B",
-                "A",
+                BStr::new("B"),
+                BStr::new("A"),
                 MatchAllConstraint::new(None).into(),
                 Link::TYPE_REPLACE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1216,11 +1201,11 @@ fn test_solver_obsolete() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "remove",
+                job: BStr::new("remove"),
                 package: package_a,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
         ],
@@ -1244,7 +1229,7 @@ fn test_install_one_of_two_alternatives() {
         fixtures.repo_locked,
         request,
         vec![ExpectedJob::Single {
-            job: "install",
+            job: BStr::new("install"),
             package: package_a,
         }],
     );
@@ -1259,30 +1244,28 @@ fn test_install_provider() {
     fixtures.repo.add_package(package_q.clone()).unwrap();
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_q.as_complete_package().unwrap().__set_provides(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "Q",
-                "B",
+                BStr::new("Q"),
+                BStr::new("B"),
                 get_version_constraint("=", "1.0"),
                 Link::TYPE_PROVIDE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1309,30 +1292,28 @@ fn test_skip_replacer_of_existing_package() {
     fixtures.repo.add_package(package_b.clone()).unwrap();
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_q.as_complete_package().unwrap().__set_replaces(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "Q",
-                "B",
+                BStr::new("Q"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REPLACE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1346,11 +1327,11 @@ fn test_skip_replacer_of_existing_package() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
         ],
@@ -1366,30 +1347,28 @@ fn test_no_install_replacer_of_missing_package() {
     fixtures.repo.add_package(package_q.clone()).unwrap();
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_q.as_complete_package().unwrap().__set_replaces(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "Q",
-                "B",
+                BStr::new("Q"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REPLACE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1415,30 +1394,28 @@ fn test_skip_replaced_package_if_replacer_is_selected() {
     fixtures.repo.add_package(package_b).unwrap();
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_q.as_complete_package().unwrap().__set_replaces(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "Q",
-                "B",
+                BStr::new("Q"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REPLACE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1453,11 +1430,11 @@ fn test_skip_replaced_package_if_replacer_is_selected() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_q,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
         ],
@@ -1472,26 +1449,25 @@ fn test_pick_older_if_newer_conflicts() {
     package_x.as_complete_package().unwrap().__set_requires(
         IndexMap::from([
             (
-                "a".to_string(),
+                BString::from("a"),
                 link(
-                    "X",
-                    "A",
+                    BStr::new("X"),
+                    BStr::new("A"),
                     get_version_constraint(">=", "2.0.0.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "b".to_string(),
+                BString::from("b"),
                 link(
-                    "X",
-                    "B",
+                    BStr::new("X"),
+                    BStr::new("B"),
                     get_version_constraint(">=", "2.0.0.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1504,16 +1480,15 @@ fn test_pick_older_if_newer_conflicts() {
 
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "2.0.0.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1521,16 +1496,15 @@ fn test_pick_older_if_newer_conflicts() {
     // => new package A is not installable
     new_package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "2.2.0.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1542,26 +1516,25 @@ fn test_pick_older_if_newer_conflicts() {
     package_s.as_complete_package().unwrap().__set_replaces(
         IndexMap::from([
             (
-                "a".to_string(),
+                BString::from("a"),
                 link(
-                    "S",
-                    "A",
+                    BStr::new("S"),
+                    BStr::new("A"),
                     get_version_constraint(">=", "2.0.0.0"),
                     Link::TYPE_REPLACE,
                 ),
             ),
             (
-                "b".to_string(),
+                BString::from("b"),
                 link(
-                    "S",
-                    "B",
+                    BStr::new("S"),
+                    BStr::new("B"),
                     get_version_constraint(">=", "2.0.0.0"),
                     Link::TYPE_REPLACE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1575,15 +1548,15 @@ fn test_pick_older_if_newer_conflicts() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: new_package_b,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_x,
             },
         ],
@@ -1601,30 +1574,28 @@ fn test_install_circular_require() {
     fixtures.repo.add_package(package_b2.clone()).unwrap();
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_b2.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "B",
-                "A",
+                BStr::new("B"),
+                BStr::new("A"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1638,11 +1609,11 @@ fn test_install_circular_require() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b2,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
         ],
@@ -1662,87 +1633,81 @@ fn test_install_alternative_with_circular_require() {
     fixtures.repo.add_package(package_d.clone()).unwrap();
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "virtual".to_string(),
+            BString::from("virtual"),
             link(
-                "B",
-                "Virtual",
+                BStr::new("B"),
+                BStr::new("Virtual"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_c.as_complete_package().unwrap().__set_provides(
         IndexMap::from([(
-            "virtual".to_string(),
+            BString::from("virtual"),
             link(
-                "C",
-                "Virtual",
+                BStr::new("C"),
+                BStr::new("Virtual"),
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_PROVIDE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_d.as_complete_package().unwrap().__set_provides(
         IndexMap::from([(
-            "virtual".to_string(),
+            BString::from("virtual"),
             link(
-                "D",
-                "Virtual",
+                BStr::new("D"),
+                BStr::new("Virtual"),
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_PROVIDE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_c.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "C",
-                "A",
+                BStr::new("C"),
+                BStr::new("A"),
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_d.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "D",
-                "A",
+                BStr::new("D"),
+                BStr::new("A"),
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1757,15 +1722,15 @@ fn test_install_alternative_with_circular_require() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_c,
             },
         ],
@@ -1787,78 +1752,75 @@ fn test_use_replacer_if_necessary() {
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([
             (
-                "b".to_string(),
+                BString::from("b"),
                 link(
-                    "A",
-                    "B",
+                    BStr::new("A"),
+                    BStr::new("B"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "c".to_string(),
+                BString::from("c"),
                 link(
-                    "A",
-                    "C",
+                    BStr::new("A"),
+                    BStr::new("C"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_d.as_complete_package().unwrap().__set_replaces(
         IndexMap::from([
             (
-                "b".to_string(),
+                BString::from("b"),
                 link(
-                    "D",
-                    "B",
+                    BStr::new("D"),
+                    BStr::new("B"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REPLACE,
                 ),
             ),
             (
-                "c".to_string(),
+                BString::from("c"),
                 link(
-                    "D",
-                    "C",
+                    BStr::new("D"),
+                    BStr::new("C"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REPLACE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_d2.as_complete_package().unwrap().__set_replaces(
         IndexMap::from([
             (
-                "b".to_string(),
+                BString::from("b"),
                 link(
-                    "D",
-                    "B",
+                    BStr::new("D"),
+                    BStr::new("B"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REPLACE,
                 ),
             ),
             (
-                "c".to_string(),
+                BString::from("c"),
                 link(
-                    "D",
-                    "C",
+                    BStr::new("D"),
+                    BStr::new("C"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REPLACE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -1873,11 +1835,11 @@ fn test_use_replacer_if_necessary() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_d2,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
         ],
@@ -1905,96 +1867,91 @@ fn test_issue265() {
     package_c.as_complete_package().unwrap().__set_requires(
         IndexMap::from([
             (
-                "a".to_string(),
+                BString::from("a"),
                 link(
-                    "C",
-                    "A",
+                    BStr::new("C"),
+                    BStr::new("A"),
                     get_version_constraint(">=", "2.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "d".to_string(),
+                BString::from("d"),
                 link(
-                    "C",
-                    "D",
+                    BStr::new("C"),
+                    BStr::new("D"),
                     get_version_constraint(">=", "2.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_d.as_complete_package().unwrap().__set_requires(
         IndexMap::from([
             (
-                "a".to_string(),
+                BString::from("a"),
                 link(
-                    "D",
-                    "A",
+                    BStr::new("D"),
+                    BStr::new("A"),
                     get_version_constraint(">=", "2.1"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "b".to_string(),
+                BString::from("b"),
                 link(
-                    "D",
-                    "B",
+                    BStr::new("D"),
+                    BStr::new("B"),
                     get_version_constraint(">=", "2.0-dev"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_b1.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "B",
-                "A",
+                BStr::new("B"),
+                BStr::new("A"),
                 get_version_constraint("==", "2.1.0.0-dev"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_b2.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "B",
-                "A",
+                BStr::new("B"),
+                BStr::new("A"),
                 get_version_constraint("==", "2.1.0.0-dev"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_b2.as_complete_package().unwrap().__set_replaces(
         IndexMap::from([(
-            "d".to_string(),
+            BString::from("d"),
             link(
-                "B",
-                "D",
+                BStr::new("B"),
+                BStr::new("D"),
                 get_version_constraint("==", "2.0.9.0"),
                 Link::TYPE_REPLACE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -2023,16 +1980,15 @@ fn test_conflict_result_empty() {
     fixtures.repo.add_package(package_b).unwrap();
     package_a.as_complete_package().unwrap().__set_conflicts(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_CONFLICT,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -2040,13 +1996,13 @@ fn test_conflict_result_empty() {
     request
         .require_name(
             bstr::BStr::new("A"),
-            Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
+            Some(MatchAllConstraint::new(Some(BString::from("*"))).into()),
         )
         .unwrap();
     request
         .require_name(
             bstr::BStr::new("B"),
-            Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
+            Some(MatchAllConstraint::new(Some(BString::from("*"))).into()),
         )
         .unwrap();
 
@@ -2083,16 +2039,15 @@ fn test_unsatisfiable_requires() {
 
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "2.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -2137,58 +2092,54 @@ fn test_require_mismatch_exception() {
 
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "c".to_string(),
+            BString::from("c"),
             link(
-                "B",
-                "C",
+                BStr::new("B"),
+                BStr::new("C"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_c.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "d".to_string(),
+            BString::from("d"),
             link(
-                "C",
-                "D",
+                BStr::new("C"),
+                BStr::new("D"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_d.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link(
-                "D",
-                "B",
+                BStr::new("D"),
+                BStr::new("B"),
                 get_version_constraint("<", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -2196,7 +2147,7 @@ fn test_require_mismatch_exception() {
     request
         .require_name(
             bstr::BStr::new("A"),
-            Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
+            Some(MatchAllConstraint::new(Some(BString::from("*"))).into()),
         )
         .unwrap();
 
@@ -2245,16 +2196,15 @@ fn test_learn_literals_with_sorted_rule_literals() {
         .unwrap()
         .__set_requires(
             IndexMap::from([(
-                "twig/twig".to_string(),
+                BString::from("twig/twig"),
                 link(
-                    "symfony/twig-bridge",
-                    "twig/twig",
+                    BStr::new("symfony/twig-bridge"),
+                    BStr::new("twig/twig"),
                     get_version_constraint("<", "2.0"),
                     Link::TYPE_REQUIRE,
                 ),
             )])
             .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), v))
             .collect::<indexmap::IndexMap<_, _>>(),
         );
 
@@ -2263,16 +2213,15 @@ fn test_learn_literals_with_sorted_rule_literals() {
         .unwrap()
         .__set_replaces(
             IndexMap::from([(
-                "symfony/twig-bridge".to_string(),
+                BString::from("symfony/twig-bridge"),
                 link(
-                    "symfony/symfony",
-                    "symfony/twig-bridge",
+                    BStr::new("symfony/symfony"),
+                    BStr::new("symfony/twig-bridge"),
                     get_version_constraint("==", "2.0"),
                     Link::TYPE_REPLACE,
                 ),
             )])
             .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), v))
             .collect::<indexmap::IndexMap<_, _>>(),
         );
 
@@ -2291,11 +2240,11 @@ fn test_learn_literals_with_sorted_rule_literals() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_twig16,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_twig_bridge,
             },
         ],
@@ -2314,31 +2263,29 @@ fn test_install_recursive_alias_dependencies() {
 
     package_a2.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "b".to_string(),
+            BString::from("b"),
             link_pretty(
-                "A",
-                "B",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("==", "2.0"),
                 Link::TYPE_REQUIRE,
-                "== 2.0",
+                BStr::new("== 2.0"),
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "B",
-                "A",
+                BStr::new("B"),
+                BStr::new("A"),
                 get_version_constraint(">=", "2.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -2360,15 +2307,15 @@ fn test_install_recursive_alias_dependencies() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a2,
             },
             ExpectedJob::Single {
-                job: "markAliasInstalled",
+                job: BStr::new("markAliasInstalled"),
                 package: package_a2_alias,
             },
         ],
@@ -2385,16 +2332,15 @@ fn test_install_dev_alias() {
 
     package_b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "a".to_string(),
+            BString::from("a"),
             link(
-                "B",
-                "A",
+                BStr::new("B"),
+                BStr::new("A"),
                 get_version_constraint("<", "2.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -2417,15 +2363,15 @@ fn test_install_dev_alias() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
             ExpectedJob::Single {
-                job: "markAliasInstalled",
+                job: BStr::new("markAliasInstalled"),
                 package: package_a_alias,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
         ],
@@ -2487,27 +2433,27 @@ fn test_install_root_aliases_if_alias_of_is_installed() {
         request,
         vec![
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_a,
             },
             ExpectedJob::Single {
-                job: "markAliasInstalled",
+                job: BStr::new("markAliasInstalled"),
                 package: package_a_alias,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_b,
             },
             ExpectedJob::Single {
-                job: "markAliasInstalled",
+                job: BStr::new("markAliasInstalled"),
                 package: package_b_alias,
             },
             ExpectedJob::Single {
-                job: "install",
+                job: BStr::new("install"),
                 package: package_c,
             },
             ExpectedJob::Single {
-                job: "markAliasInstalled",
+                job: BStr::new("markAliasInstalled"),
                 package: package_c_alias,
             },
         ],
@@ -2543,120 +2489,114 @@ fn test_learn_positive_literal() {
     package_a.as_complete_package().unwrap().__set_requires(
         IndexMap::from([
             (
-                "b".to_string(),
+                BString::from("b"),
                 link(
-                    "A",
-                    "B",
+                    BStr::new("A"),
+                    BStr::new("B"),
                     get_version_constraint("==", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "c".to_string(),
+                BString::from("c"),
                 link(
-                    "A",
-                    "C",
+                    BStr::new("A"),
+                    BStr::new("C"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "d".to_string(),
+                BString::from("d"),
                 link(
-                    "A",
-                    "D",
+                    BStr::new("A"),
+                    BStr::new("D"),
                     get_version_constraint("==", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "e".to_string(),
+            BString::from("e"),
             link(
-                "B",
-                "E",
+                BStr::new("B"),
+                BStr::new("E"),
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_c1.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "f".to_string(),
+            BString::from("f"),
             link(
-                "C",
-                "F",
+                BStr::new("C"),
+                BStr::new("F"),
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
     package_c2.as_complete_package().unwrap().__set_requires(
         IndexMap::from([
             (
-                "f".to_string(),
+                BString::from("f"),
                 link(
-                    "C",
-                    "F",
+                    BStr::new("C"),
+                    BStr::new("F"),
                     get_version_constraint("==", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "g".to_string(),
+                BString::from("g"),
                 link(
-                    "C",
-                    "G",
+                    BStr::new("C"),
+                    BStr::new("G"),
                     get_version_constraint(">=", "1.0"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
         ])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_d.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "f".to_string(),
+            BString::from("f"),
             link(
-                "D",
-                "F",
+                BStr::new("D"),
+                BStr::new("F"),
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
     package_e.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
-            "g".to_string(),
+            BString::from("g"),
             link(
-                "E",
-                "G",
+                BStr::new("E"),
+                BStr::new("G"),
                 get_version_constraint("<=", "2.0"),
                 Link::TYPE_REQUIRE,
             ),
         )])
         .into_iter()
-        .map(|(k, v)| (bstr::BString::from(k), v))
         .collect::<indexmap::IndexMap<_, _>>(),
     );
 
@@ -2692,19 +2632,19 @@ fn test_learn_positive_literal() {
     let transaction = solver.solve(&request, None).unwrap().unwrap();
 
     let expected = vec![
-        ("install".to_string(), package_f1.get_unique_name()),
-        ("install".to_string(), package_d.get_unique_name()),
-        ("install".to_string(), package_g2.get_unique_name()),
-        ("install".to_string(), package_c2.get_unique_name()),
-        ("install".to_string(), package_e.get_unique_name()),
-        ("install".to_string(), package_b.get_unique_name()),
-        ("install".to_string(), package_a.get_unique_name()),
+        (BString::from("install"), package_f1.get_unique_name()),
+        (BString::from("install"), package_d.get_unique_name()),
+        (BString::from("install"), package_g2.get_unique_name()),
+        (BString::from("install"), package_c2.get_unique_name()),
+        (BString::from("install"), package_e.get_unique_name()),
+        (BString::from("install"), package_b.get_unique_name()),
+        (BString::from("install"), package_a.get_unique_name()),
     ];
-    let mut result: Vec<(String, BString)> = Vec::new();
+    let mut result: Vec<(BString, BString)> = Vec::new();
     for operation in transaction.get_operations() {
         if let AnyOperation::Update(update) = &**operation {
             result.push((
-                "update".to_string(),
+                BString::from("update"),
                 bconcat!(
                     update.get_initial_package().get_unique_name(),
                     " => ",
@@ -2714,9 +2654,9 @@ fn test_learn_positive_literal() {
         } else {
             let op_type = operation.get_operation_type();
             let job = if op_type == "uninstall" {
-                "remove".to_string()
+                BString::from("remove")
             } else {
-                utf8_text(op_type).unwrap().to_owned()
+                op_type.to_owned()
             };
             result.push((job, operation.get_target_package().get_unique_name()));
         }

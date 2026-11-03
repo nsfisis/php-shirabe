@@ -7,8 +7,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
-use bstr::{BString, ByteSlice};
-use shirabe_php_shim::path_to_bytes;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{os_str_from_bytes, path_to_bytes};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -24,10 +24,10 @@ fn plugin_fetched() -> bool {
 }
 
 /// The two implementations under comparison: upstream Composer first, Shirabe second.
-pub(crate) fn implementations(composer_bin: &OsStr) -> [(&str, Vec<&OsStr>); 2] {
+pub(crate) fn implementations(composer_bin: &OsStr) -> [(&BStr, Vec<&OsStr>); 2] {
     [
-        ("php", vec![composer_bin]),
-        (env!("CARGO_BIN_EXE_shirabe"), vec![]),
+        (BStr::new("php"), vec![composer_bin]),
+        (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ]
 }
 
@@ -38,13 +38,13 @@ pub(crate) struct CommandRun {
 
 pub(crate) fn run_command(
     work: &Path,
-    program: &str,
+    program: &BStr,
     prefix_args: &[&OsStr],
-    args: &[&str],
+    args: &[&BStr],
 ) -> CommandRun {
-    let output = std::process::Command::new(program)
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
-        .args(args)
+        .args(args.iter().map(os_str_from_bytes))
         .current_dir(work.join("project"))
         .env("COMPOSER_HOME", work.join("home"))
         .env("COMPOSER_CACHE_DIR", work.join("cache"))
@@ -99,9 +99,12 @@ fn collect(root: &Path, dir: &Path, files: &mut Vec<(BString, BString)>) {
     }
 }
 
-fn edit(path: &Path, from: &str, to: &str) {
-    let text = std::fs::read_to_string(path).unwrap();
-    assert!(text.contains(from), "{path:?} does not contain {from:?}");
+fn edit(path: &Path, from: &BStr, to: &BStr) {
+    let text = BString::from(std::fs::read(path).unwrap());
+    assert!(
+        text.contains_str(from),
+        "{path:?} does not contain {from:?}"
+    );
     std::fs::write(path, text.replace(from, to)).unwrap();
 }
 
@@ -124,7 +127,7 @@ fn test_composer_installers_matches_upstream_composer() {
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
-        let run = run_command(work.path(), program, prefix, &["install"]);
+        let run = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let tree = tree(&work.path().join("project"));
         results.push((run, tree, work));
     }
@@ -164,33 +167,33 @@ fn test_composer_installers_update_and_remove_match_upstream_composer() {
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
-        let install = run_command(work.path(), program, prefix, &["install"]);
+        let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
 
         let module = work.path().join("packages/hello-module");
         edit(
             &module.join("composer.json"),
-            "\"version\": \"1.0.0\"",
-            "\"version\": \"1.1.0\"",
+            BStr::new("\"version\": \"1.0.0\""),
+            BStr::new("\"version\": \"1.1.0\""),
         );
         std::fs::write(module.join("src/hello.txt"), "hello module payload v1.1\n").unwrap();
         edit(
             &work.path().join("project/composer.json"),
-            "\"acme/hello-module\": \"1.0.0\"",
-            "\"acme/hello-module\": \"1.1.0\"",
+            BStr::new("\"acme/hello-module\": \"1.0.0\""),
+            BStr::new("\"acme/hello-module\": \"1.1.0\""),
         );
 
         let update = run_command(
             work.path(),
             program,
             prefix,
-            &["update", "acme/hello-module"],
+            &[BStr::new("update"), BStr::new("acme/hello-module")],
         );
-        let reinstall = run_command(work.path(), program, prefix, &["install"]);
+        let reinstall = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let remove = run_command(
             work.path(),
             program,
             prefix,
-            &["remove", "acme/hello-theme"],
+            &[BStr::new("remove"), BStr::new("acme/hello-theme")],
         );
         let tree = tree(&work.path().join("project"));
         results.push((install, update, reinstall, remove, tree, work));
@@ -230,17 +233,21 @@ fn test_composer_installers_custom_paths_match_upstream_composer() {
         copy_dir(&fixture_dir(), work.path());
         edit(
             &work.path().join("project/composer.json"),
-            "    \"require\": {",
-            "    \"extra\": {\n        \"installer-paths\": {\n            \
+            BStr::new("    \"require\": {"),
+            BStr::new(
+                "    \"extra\": {\n        \"installer-paths\": {\n            \
              \"web/custom/{$name}/\": [\"type:drupal-theme\"],\n            \
              \"web/mods/{$name}/\": [\"acme/hello-module\"]\n        }\n    },\n    \"require\": {",
+            ),
         );
         edit(
             &work.path().join("packages/hello-module/composer.json"),
-            "    \"type\": \"drupal-module\",",
-            "    \"type\": \"drupal-module\",\n    \"extra\": {\"installer-name\": \"renamed-mod\"},",
+            BStr::new("    \"type\": \"drupal-module\","),
+            BStr::new(
+                "    \"type\": \"drupal-module\",\n    \"extra\": {\"installer-name\": \"renamed-mod\"},",
+            ),
         );
-        let run = run_command(work.path(), program, prefix, &["install"]);
+        let run = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let tree = tree(&work.path().join("project"));
         results.push((run, tree, work));
     }

@@ -8,6 +8,7 @@
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
 use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::os_str_from_bytes;
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -20,11 +21,11 @@ fn fixture_dir() -> PathBuf {
 /// One composer-CLI invocation inside the prepared project, returning its exit code and stdout.
 fn run_command(
     work: &Path,
-    program: &str,
+    program: &BStr,
     prefix_args: &[&OsStr],
     args: &[&[u8]],
 ) -> (i32, BString) {
-    let output = std::process::Command::new(program)
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
         .args(args.iter().map(|arg| OsStr::from_bytes(arg)))
         .current_dir(work)
@@ -59,9 +60,9 @@ fn test_non_utf8_command_metadata_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let implementations: [(&str, Vec<&OsStr>); 2] = [
-        ("php", vec![composer_bin.as_os_str()]),
-        (env!("CARGO_BIN_EXE_shirabe"), vec![]),
+    let implementations: [(&BStr, Vec<&OsStr>); 2] = [
+        (BStr::new("php"), vec![composer_bin.as_os_str()]),
+        (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ];
     let cases: [&[&[u8]]; 13] = [
         &[b"list"],
@@ -84,7 +85,12 @@ fn test_non_utf8_command_metadata_matches_upstream_composer() {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let (install, _) = run_command(work.path(), program, prefix, &[b"install"]);
-        assert_eq!(0, install, "{program}: install must succeed");
+        assert_eq!(
+            0,
+            install,
+            "{program}: install must succeed",
+            program = program.display_lossy()
+        );
         results.push(
             cases
                 .iter()

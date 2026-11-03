@@ -6,12 +6,12 @@
 use crate::async_runtime::run;
 use crate::php_worker::{lock_php_worker, php_runtime_available};
 use crate::plugin_installer_test::{new_installer, set_up};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{Link, PackageInterfaceHandle};
-use shirabe_php_shim::path_to_bytes;
+use shirabe_php_shim::{bconcat, display_to_bytes, implode, path_to_bytes};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -27,106 +27,116 @@ fn values_fixture_package() -> PackageInterfaceHandle {
         .unwrap()
 }
 
-fn simple(operator: &str, version: &str, pretty_string: Option<&str>) -> AnyConstraint {
+fn simple(operator: &BStr, version: &BStr, pretty_string: Option<&BStr>) -> AnyConstraint {
     AnyConstraint::Simple(SimpleConstraint::new(
         operator,
-        version.to_string(),
-        pretty_string.map(str::to_string).map(bstr::BString::from),
+        bconcat!(version),
+        pretty_string.map(|s| s.to_owned()),
     ))
 }
 
-fn link(target: &str, constraint: AnyConstraint, pretty_constraint: &str) -> Link {
+fn link(target: &BStr, constraint: AnyConstraint, pretty_constraint: &BStr) -> Link {
     Link::new(
-        bstr::BString::from("dummy/root".to_string()),
-        bstr::BString::from(target.to_string()),
+        BString::from("dummy/root"),
+        bconcat!(target),
         constraint,
         Some(Link::TYPE_REQUIRE.to_owned()),
-        bstr::BString::from(pretty_constraint.to_string()),
+        bconcat!(pretty_constraint),
     )
 }
 
 /// Every constraint shape the codec knows, so the rendering the plugin writes covers all four
 /// classes and both the set and the unset pretty string.
-fn seeded_requires() -> IndexMap<String, Link> {
+fn seeded_requires() -> IndexMap<BString, Link> {
     let mut requires = IndexMap::new();
     requires.insert(
-        "foo/simple".to_string(),
-        link("foo/simple", simple(">=", "1.0.0.0", None), ">=1.0"),
+        BString::from("foo/simple"),
+        link(
+            BStr::new("foo/simple"),
+            simple(BStr::new(">="), BStr::new("1.0.0.0"), None),
+            BStr::new(">=1.0"),
+        ),
     );
     requires.insert(
-        "foo/multi".to_string(),
+        BString::from("foo/multi"),
         link(
-            "foo/multi",
+            BStr::new("foo/multi"),
             AnyConstraint::Multi(MultiConstraint::new(
                 vec![
-                    simple(">=", "1.0.0.0", None),
-                    simple("<", "2.0.0.0", Some("<2.0")),
+                    simple(BStr::new(">="), BStr::new("1.0.0.0"), None),
+                    simple(
+                        BStr::new("<"),
+                        BStr::new("2.0.0.0"),
+                        Some(BStr::new("<2.0")),
+                    ),
                 ],
                 true,
-                Some(bstr::BString::from("^1.0".to_string())),
+                Some(BString::from("^1.0")),
             )),
-            "^1.0",
+            BStr::new("^1.0"),
         ),
     );
     requires.insert(
-        "foo/all".to_string(),
+        BString::from("foo/all"),
         link(
-            "foo/all",
+            BStr::new("foo/all"),
             AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-            "*",
+            BStr::new("*"),
         ),
     );
     requires.insert(
-        "foo/none".to_string(),
+        BString::from("foo/none"),
         link(
-            "foo/none",
-            AnyConstraint::MatchNone(MatchNoneConstraint::new(Some(bstr::BString::from(
-                "nothing".to_string(),
-            )))),
-            "",
+            BStr::new("foo/none"),
+            AnyConstraint::MatchNone(MatchNoneConstraint::new(Some(BString::from("nothing")))),
+            BStr::new(""),
         ),
     );
     requires
 }
 
-fn describe(constraint: &AnyConstraint) -> String {
+fn describe(constraint: &AnyConstraint) -> BString {
     let shape = match constraint {
         AnyConstraint::Simple(c) => {
-            format!(
-                "Constraint({} {})",
-                c.get_operator(),
-                c.get_version().display_lossy()
+            bconcat!(
+                "Constraint(",
+                display_to_bytes(c.get_operator()),
+                " ",
+                c.get_version(),
+                ")"
             )
         }
-        AnyConstraint::Multi(c) => format!(
-            "MultiConstraint({}: {})",
+        AnyConstraint::Multi(c) => bconcat!(
+            "MultiConstraint(",
             if c.is_conjunctive() { "and" } else { "or" },
-            c.get_constraints()
-                .iter()
-                .map(describe)
-                .collect::<Vec<_>>()
-                .join(", ")
+            ": ",
+            implode(
+                ", ",
+                &c.get_constraints().iter().map(describe).collect::<Vec<_>>()
+            ),
+            ")"
         ),
-        AnyConstraint::MatchAll(_) => "MatchAllConstraint()".to_string(),
-        AnyConstraint::MatchNone(_) => "MatchNoneConstraint()".to_string(),
+        AnyConstraint::MatchAll(_) => BString::from("MatchAllConstraint()"),
+        AnyConstraint::MatchNone(_) => BString::from("MatchNoneConstraint()"),
     };
-    format!(
-        "{shape} pretty={}",
-        constraint.get_pretty_string().display_lossy()
-    )
+    bconcat!(shape, " pretty=", constraint.get_pretty_string())
 }
 
-fn describe_links(links: &IndexMap<BString, Link>) -> Vec<String> {
+fn describe_links(links: &IndexMap<BString, Link>) -> Vec<BString> {
     links
         .iter()
         .map(|(name, link)| {
-            format!(
-                "{} | {} | {} | {} | {} | {}",
-                name.display_lossy(),
-                link.get_source().display_lossy(),
-                link.get_target().display_lossy(),
-                link.get_description().display_lossy(),
-                link.get_pretty_constraint().display_lossy(),
+            bconcat!(
+                name,
+                " | ",
+                link.get_source(),
+                " | ",
+                link.get_target(),
+                " | ",
+                link.get_description(),
+                " | ",
+                link.get_pretty_constraint(),
+                " | ",
                 describe(link.get_constraint())
             )
         })
@@ -144,7 +154,6 @@ fn test_links_and_release_date_round_trip_through_the_plugin() {
     package.set_requires(
         seeded_requires()
             .into_iter()
-            .map(|(k, v)| (bstr::BString::from(k), v))
             .collect::<indexmap::IndexMap<_, _>>(),
     );
 

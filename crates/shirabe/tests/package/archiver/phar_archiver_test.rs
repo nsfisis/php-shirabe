@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/PharArchiverTest.php
 
+use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::archiver::{ArchiverInterface, PharArchiver};
 use shirabe::package::handle::CompletePackageHandle;
@@ -29,9 +30,9 @@ impl ArchiverTestCase {
 
     fn setup_package(&self) -> CompletePackageHandle {
         let package = CompletePackageHandle::new(
-            bstr::BString::from("archivertest/archivertest".to_string()),
-            bstr::BString::from("master".to_string()),
-            bstr::BString::from("master".to_string()),
+            BString::from("archivertest/archivertest"),
+            BString::from("master"),
+            BString::from("master"),
         );
         package.set_source_url(Some(bstr::BString::from(
             realpath(&self.test_dir)
@@ -39,8 +40,8 @@ impl ArchiverTestCase {
                 .map(path_to_bytes)
                 .unwrap_or_default(),
         )));
-        package.set_source_reference(Some(bstr::BString::from("master".to_string())));
-        package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+        package.set_source_reference(Some(BString::from("master")));
+        package.__set_source_type(Some(BString::from("git")));
 
         package
     }
@@ -49,21 +50,37 @@ impl ArchiverTestCase {
         let current_work_dir = Platform::get_cwd(false).unwrap();
         std::env::set_current_dir(&self.test_dir).unwrap();
 
-        self.write_file("file.txt", "content", &current_work_dir);
-        self.write_file("foo/bar/baz", "content", &current_work_dir);
-        self.write_file("foo/bar/ignoreme", "content", &current_work_dir);
-        self.write_file("x/baz", "content", &current_work_dir);
-        self.write_file("x/includeme", "content", &current_work_dir);
+        self.write_file(
+            BStr::new("file.txt"),
+            BStr::new("content"),
+            &current_work_dir,
+        );
+        self.write_file(
+            BStr::new("foo/bar/baz"),
+            BStr::new("content"),
+            &current_work_dir,
+        );
+        self.write_file(
+            BStr::new("foo/bar/ignoreme"),
+            BStr::new("content"),
+            &current_work_dir,
+        );
+        self.write_file(BStr::new("x/baz"), BStr::new("content"), &current_work_dir);
+        self.write_file(
+            BStr::new("x/includeme"),
+            BStr::new("content"),
+            &current_work_dir,
+        );
 
         std::env::set_current_dir(&current_work_dir).unwrap();
     }
 
-    fn write_file(&self, path: &str, content: &str, current_work_dir: &std::path::Path) {
+    fn write_file(&self, path: &BStr, content: &BStr, current_work_dir: &std::path::Path) {
         if !file_exists(path_from_bytes(&dirname(path))) {
             mkdir(path_from_bytes(&dirname(path)), 0o777, true);
         }
 
-        let result = file_put_contents(path, content.as_bytes());
+        let result = file_put_contents(path_from_bytes(&path), content.as_bytes());
         if result.is_none() {
             std::env::set_current_dir(current_work_dir).unwrap();
             panic!("Could not save file.");

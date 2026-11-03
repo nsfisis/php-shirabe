@@ -8,6 +8,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::os_str_from_bytes;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -18,24 +20,27 @@ fn fixture_dir() -> PathBuf {
 
 struct Run {
     exit_codes: Vec<i32>,
-    trace: String,
-    composer_json: String,
+    trace: BString,
+    composer_json: BString,
 }
 
 /// Runs `install` and then `require shirabe-test/pool-lib` in a fresh copy of the fixture: the
 /// plugin is only active once the first command has installed it, so the event it records is the
 /// one the second command dispatches.
-fn install_then_require(program: &str, prefix_args: &[&OsStr]) -> Run {
+fn install_then_require(program: &BStr, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
-    let commands: [&[&str]; 2] = [&["install"], &["require", "shirabe-test/pool-lib"]];
+    let commands: [&[&BStr]; 2] = [
+        &[BStr::new("install")],
+        &[BStr::new("require"), BStr::new("shirabe-test/pool-lib")],
+    ];
     let exit_codes = commands
         .iter()
         .map(|args| {
-            std::process::Command::new(program)
+            std::process::Command::new(os_str_from_bytes(&program))
                 .args(prefix_args)
-                .args(*args)
+                .args(args.iter().map(os_str_from_bytes))
                 .current_dir(&project)
                 .env("COMPOSER_HOME", work.path().join("home"))
                 .env("COMPOSER_CACHE_DIR", work.path().join("cache"))
@@ -51,9 +56,10 @@ fn install_then_require(program: &str, prefix_args: &[&OsStr]) -> Run {
         .collect();
     Run {
         exit_codes,
-        trace: std::fs::read_to_string(project.join("pre-pool-create-trace.txt"))
-            .unwrap_or_default(),
-        composer_json: std::fs::read_to_string(project.join("composer.json")).unwrap(),
+        trace: BString::from(
+            std::fs::read(project.join("pre-pool-create-trace.txt")).unwrap_or_default(),
+        ),
+        composer_json: BString::from(std::fs::read(project.join("composer.json")).unwrap()),
     }
 }
 
@@ -67,8 +73,8 @@ fn test_pre_pool_create_matches_upstream_composer() {
     };
     let _worker = lock_php_worker();
 
-    let upstream = install_then_require("php", &[composer_bin.as_os_str()]);
-    let shirabe = install_then_require(env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream = install_then_require(BStr::new("php"), &[composer_bin.as_os_str()]);
+    let shirabe = install_then_require(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(
         vec![0, 0],
@@ -82,9 +88,9 @@ fn test_pre_pool_create_matches_upstream_composer() {
     assert!(
         shirabe
             .composer_json
-            .contains("\"shirabe-test/pool-lib\": \"^1.0\""),
+            .contains_str("\"shirabe-test/pool-lib\": \"^1.0\""),
         "{}",
-        shirabe.composer_json
+        shirabe.composer_json.display_lossy()
     );
 
     // Pinned as well as compared, so a run where neither side dispatches anything cannot pass.

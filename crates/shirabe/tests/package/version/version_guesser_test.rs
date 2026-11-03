@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionGuesserTest.php
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -9,7 +9,7 @@ use shirabe::package::version::{VersionGuesser, VersionParser};
 use shirabe::util::Git as GitUtil;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 // Mirrors VersionGuesserTest::setUp/tearDown: reset GitUtil's cached `version`
 // static so each test re-runs `git --version` against its own mock.
@@ -44,19 +44,19 @@ fn make_guesser(
 }
 
 // Helper to build a `['key' => 'value']` package config used in the tests.
-fn package_config(entries: &[(&str, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
+fn package_config(entries: &[(&BStr, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        map.insert(k.to_string().into(), v.clone());
+        map.insert(bconcat!(k), v.clone());
     }
     map
 }
 
-fn string_list(items: &[&str]) -> PhpMixed {
+fn string_list(items: &[&BStr]) -> PhpMixed {
     PhpMixed::List(
         items
             .iter()
-            .map(|s| PhpMixed::string(s.to_string()))
+            .map(|s| PhpMixed::string(bconcat!(s)))
             .collect(),
     )
 }
@@ -104,9 +104,9 @@ fn test_hg_guess_version_returns_data() {
         .unwrap()
         .expect("expected version data");
 
-    assert_eq!(format!("dev-{}", branch), version_data.version.unwrap());
+    assert_eq!(bconcat!("dev-", branch), version_data.version.unwrap());
     assert_eq!(
-        format!("dev-{}", branch),
+        bconcat!("dev-", branch),
         version_data.pretty_version.unwrap()
     );
     assert!(
@@ -130,9 +130,12 @@ fn test_guess_version_returns_data() {
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            format!(
-                "* master {} Commit message\n(no branch) {} Commit message\n",
-                commit_hash, another_commit_hash
+            bconcat!(
+                "* master ",
+                commit_hash,
+                " Commit message\n(no branch) ",
+                another_commit_hash,
+                " Commit message\n"
             ),
             "",
         ),
@@ -167,9 +170,12 @@ fn test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch()
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
             // Assumption here is that arbitrary would be the default branch
-            format!(
-                "  arbitrary {} Commit message\n* current {} Another message\n",
-                commit_hash, another_commit_hash
+            bconcat!(
+                "  arbitrary ",
+                commit_hash,
+                " Commit message\n* current ",
+                another_commit_hash,
+                " Another message\n"
             ),
             "",
         ),
@@ -180,7 +186,10 @@ fn test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch()
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
         .guess_version(
-            &package_config(&[("version", PhpMixed::string("self.version".to_string()))]),
+            &package_config(&[(
+                BStr::new("version"),
+                PhpMixed::string(BString::from("self.version")),
+            )]),
             std::path::Path::new("dummy/path"),
         )
         .unwrap()
@@ -203,16 +212,19 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            format!(
-                "  arbitrary {} Commit message\n* feature {} Another message\n",
-                commit_hash, another_commit_hash
+            bconcat!(
+                "  arbitrary ",
+                commit_hash,
+                " Commit message\n* feature ",
+                another_commit_hash,
+                " Another message\n"
             ),
             "",
         ),
         cmd_full(
             ["git", "rev-list", "arbitrary..feature"],
             0,
-            format!("{}\n", another_commit_hash),
+            bconcat!(another_commit_hash, "\n"),
             "",
         ),
     ];
@@ -223,8 +235,14 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     let version_data = guesser
         .guess_version(
             &package_config(&[
-                ("version", PhpMixed::string("self.version".to_string())),
-                ("non-feature-branches", string_list(&["arbitrary"])),
+                (
+                    BStr::new("version"),
+                    PhpMixed::string(BString::from("self.version")),
+                ),
+                (
+                    BStr::new("non-feature-branches"),
+                    string_list(&[BStr::new("arbitrary")]),
+                ),
             ]),
             std::path::Path::new("dummy/path"),
         )
@@ -261,16 +279,19 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            format!(
-                "  latest-testing {} Commit message\n* feature {} Another message\n",
-                commit_hash, another_commit_hash
+            bconcat!(
+                "  latest-testing ",
+                commit_hash,
+                " Commit message\n* feature ",
+                another_commit_hash,
+                " Another message\n"
             ),
             "",
         ),
         cmd_full(
             ["git", "rev-list", "latest-testing..feature"],
             0,
-            format!("{}\n", another_commit_hash),
+            bconcat!(another_commit_hash, "\n"),
             "",
         ),
     ];
@@ -281,8 +302,14 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     let version_data = guesser
         .guess_version(
             &package_config(&[
-                ("version", PhpMixed::string("self.version".to_string())),
-                ("non-feature-branches", string_list(&["latest-.*"])),
+                (
+                    BStr::new("version"),
+                    PhpMixed::string(BString::from("self.version")),
+                ),
+                (
+                    BStr::new("non-feature-branches"),
+                    string_list(&[BStr::new("latest-.*")]),
+                ),
             ]),
             std::path::Path::new("dummy/path"),
         )
@@ -319,9 +346,14 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            format!(
-                "* latest-testing {} Commit message\n  current {} Another message\n  master {} Another message\n",
-                commit_hash, another_commit_hash, another_commit_hash
+            bconcat!(
+                "* latest-testing ",
+                commit_hash,
+                " Commit message\n  current ",
+                another_commit_hash,
+                " Another message\n  master ",
+                another_commit_hash,
+                " Another message\n"
             ),
             "",
         ),
@@ -333,8 +365,14 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     let version_data = guesser
         .guess_version(
             &package_config(&[
-                ("version", PhpMixed::string("self.version".to_string())),
-                ("non-feature-branches", string_list(&["latest-.*"])),
+                (
+                    BStr::new("version"),
+                    PhpMixed::string(BString::from("self.version")),
+                ),
+                (
+                    BStr::new("non-feature-branches"),
+                    string_list(&[BStr::new("latest-.*")]),
+                ),
             ]),
             std::path::Path::new("dummy/path"),
         )
@@ -359,7 +397,7 @@ fn test_detached_head_becomes_dev_hash() {
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            format!("* (no branch) {} Commit message\n", commit_hash),
+            bconcat!("* (no branch) ", commit_hash, " Commit message\n"),
             "",
         ),
         cmd(["git", "describe", "--exact-match", "--tags"]),
@@ -373,10 +411,7 @@ fn test_detached_head_becomes_dev_hash() {
         .unwrap()
         .expect("expected version data");
 
-    assert_eq!(
-        format!("dev-{}", commit_hash),
-        version_data.version.unwrap()
-    );
+    assert_eq!(bconcat!("dev-", commit_hash), version_data.version.unwrap());
 }
 
 #[test]
@@ -391,9 +426,10 @@ fn test_detached_fetch_head_becomes_dev_hash_git2() {
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            format!(
-                "* (HEAD detached at FETCH_HEAD) {} Commit message\n",
-                commit_hash
+            bconcat!(
+                "* (HEAD detached at FETCH_HEAD) ",
+                commit_hash,
+                " Commit message\n"
             ),
             "",
         ),
@@ -408,10 +444,7 @@ fn test_detached_fetch_head_becomes_dev_hash_git2() {
         .unwrap()
         .expect("expected version data");
 
-    assert_eq!(
-        format!("dev-{}", commit_hash),
-        version_data.version.unwrap()
-    );
+    assert_eq!(bconcat!("dev-", commit_hash), version_data.version.unwrap());
 }
 
 #[test]
@@ -426,9 +459,10 @@ fn test_detached_commit_head_becomes_dev_hash_git2() {
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            format!(
-                "* (HEAD detached at 03a15d220) {} Commit message\n",
-                commit_hash
+            bconcat!(
+                "* (HEAD detached at 03a15d220) ",
+                commit_hash,
+                " Commit message\n"
             ),
             "",
         ),
@@ -443,10 +477,7 @@ fn test_detached_commit_head_becomes_dev_hash_git2() {
         .unwrap()
         .expect("expected version data");
 
-    assert_eq!(
-        format!("dev-{}", commit_hash),
-        version_data.version.unwrap()
-    );
+    assert_eq!(bconcat!("dev-", commit_hash), version_data.version.unwrap());
 }
 
 #[test]
@@ -599,7 +630,10 @@ fn test_remote_branches_are_selected() {
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
         .guess_version(
-            &package_config(&[("version", PhpMixed::string("self.version".to_string()))]),
+            &package_config(&[(
+                BStr::new("version"),
+                PhpMixed::string(BString::from("self.version")),
+            )]),
             std::path::Path::new("dummy/path"),
         )
         .unwrap()
@@ -612,12 +646,12 @@ fn test_remote_branches_are_selected() {
 #[test]
 #[serial]
 fn test_get_root_version_from_env() {
-    let root_env_versions: Vec<(&str, &str)> = vec![
-        ("1.0-dev", "1.0.x-dev"),
-        ("1.0.x-dev", "1.0.x-dev"),
-        ("1-dev", "1.x-dev"),
-        ("1.x-dev", "1.x-dev"),
-        ("1.0.0", "1.0.0"),
+    let root_env_versions: Vec<(&BStr, &BStr)> = vec![
+        (BStr::new("1.0-dev"), BStr::new("1.0.x-dev")),
+        (BStr::new("1.0.x-dev"), BStr::new("1.0.x-dev")),
+        (BStr::new("1-dev"), BStr::new("1.x-dev")),
+        (BStr::new("1.x-dev"), BStr::new("1.x-dev")),
+        (BStr::new("1.0.0"), BStr::new("1.0.0")),
     ];
 
     for (env, expected_version) in root_env_versions {

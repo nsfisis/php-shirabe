@@ -5,7 +5,7 @@
 // crate cannot compile. The fixtures also build PackageRepository security-advisory data
 // and run the Auditor.
 
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::dependency_resolver::SecurityAdvisoryPoolFilter;
@@ -13,7 +13,7 @@ use shirabe::dependency_resolver::pool::Pool;
 use shirabe::dependency_resolver::request::Request;
 use shirabe::package::handle::{CompletePackageHandle, PackageHandle, PackageInterfaceHandle};
 use shirabe::repository::{PackageRepository, RepositoryInterfaceHandle};
-use shirabe_php_shim::{PhpMixed, uniqid};
+use shirabe_php_shim::{PhpMixed, bconcat, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[test]
@@ -34,10 +34,16 @@ fn test_filter_packages_by_advisories() {
     );
     let filter = SecurityAdvisoryPoolFilter::new(Auditor, audit_config);
 
-    let advisory1 =
-        generate_security_advisory("acme/package", Some("CVE-1999-1000"), ">=1.0.0,<1.1.0");
-    let advisory2 =
-        generate_security_advisory("acme/package", Some("CVE-1999-1001"), ">=1.0.0,<1.1.0");
+    let advisory1 = generate_security_advisory(
+        BStr::new("acme/package"),
+        Some(BStr::new("CVE-1999-1000")),
+        BStr::new(">=1.0.0,<1.1.0"),
+    );
+    let advisory2 = generate_security_advisory(
+        BStr::new("acme/package"),
+        Some(BStr::new("CVE-1999-1001")),
+        BStr::new(">=1.0.0,<1.1.0"),
+    );
     let mut security_advisories: IndexMap<BString, PhpMixed> = IndexMap::new();
     security_advisories.insert(
         "acme/package".into(),
@@ -55,21 +61,21 @@ fn test_filter_packages_by_advisories() {
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
 
     let package: PackageInterfaceHandle = PackageHandle::new(
-        bstr::BString::from("acme/package".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0".to_string()),
+        BString::from("acme/package"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0"),
     )
     .into();
     let expected_package1: PackageInterfaceHandle = PackageHandle::new(
-        bstr::BString::from("acme/package".to_string()),
-        bstr::BString::from("2.0.0.0".to_string()),
-        bstr::BString::from("2.0".to_string()),
+        BString::from("acme/package"),
+        BString::from("2.0.0.0"),
+        BString::from("2.0"),
     )
     .into();
     let expected_package2: PackageInterfaceHandle = PackageHandle::new(
-        bstr::BString::from("acme/other".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0".to_string()),
+        BString::from("acme/other"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0"),
     )
     .into();
 
@@ -94,7 +100,8 @@ fn test_filter_packages_by_advisories() {
     assert!(packages[0].ptr_eq(&expected_package1));
     assert!(packages[1].ptr_eq(&expected_package2));
 
-    let constraint: AnyConstraint = SimpleConstraint::new("==", "1.0.0.0".to_string(), None).into();
+    let constraint: AnyConstraint =
+        SimpleConstraint::new("==", BString::from("1.0.0.0"), None).into();
     assert!(
         filtered_pool.is_security_removed_package_version(
             bstr::BStr::new("acme/package"),
@@ -147,9 +154,9 @@ fn test_dont_filter_packages_by_ignored_advisories() {
     security_advisories.insert(
         "acme/package".into(),
         PhpMixed::List(vec![PhpMixed::Array(generate_security_advisory(
-            "acme/package",
-            Some("CVE-2024-1234"),
-            ">=1.0.0,<1.1.0",
+            BStr::new("acme/package"),
+            Some(BStr::new("CVE-2024-1234")),
+            BStr::new(">=1.0.0,<1.1.0"),
         ))]),
     );
     let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -161,15 +168,15 @@ fn test_dont_filter_packages_by_ignored_advisories() {
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
 
     let expected_package1: PackageInterfaceHandle = PackageHandle::new(
-        bstr::BString::from("acme/package".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0".to_string()),
+        BString::from("acme/package"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0"),
     )
     .into();
     let expected_package2: PackageInterfaceHandle = PackageHandle::new(
-        bstr::BString::from("acme/package".to_string()),
-        bstr::BString::from("1.1.0.0".to_string()),
-        bstr::BString::from("1.1".to_string()),
+        BString::from("acme/package"),
+        BString::from("1.1.0.0"),
+        BString::from("1.1"),
     )
     .into();
 
@@ -225,9 +232,9 @@ fn test_dont_filter_packages_with_block_insecure_disabled() {
     security_advisories.insert(
         "acme/package".into(),
         PhpMixed::List(vec![PhpMixed::Array(generate_security_advisory(
-            "acme/package",
-            Some("CVE-2024-1234"),
-            ">=1.0.0,<1.1.0",
+            BStr::new("acme/package"),
+            Some(BStr::new("CVE-2024-1234")),
+            BStr::new(">=1.0.0,<1.1.0"),
         ))]),
     );
     let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -239,15 +246,15 @@ fn test_dont_filter_packages_with_block_insecure_disabled() {
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
 
     let expected_package1: PackageInterfaceHandle = PackageHandle::new(
-        bstr::BString::from("acme/package".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0".to_string()),
+        BString::from("acme/package"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0"),
     )
     .into();
     let expected_package2: PackageInterfaceHandle = PackageHandle::new(
-        bstr::BString::from("acme/package".to_string()),
-        bstr::BString::from("1.1.0.0".to_string()),
-        bstr::BString::from("1.1".to_string()),
+        BString::from("acme/package"),
+        BString::from("1.1.0.0"),
+        BString::from("1.1"),
     )
     .into();
 
@@ -303,21 +310,21 @@ fn test_dont_filter_packages_with_abandoned_package() {
     let filter = SecurityAdvisoryPoolFilter::new(Auditor, audit_config);
 
     let abandoned_package = CompletePackageHandle::new(
-        bstr::BString::from("acme/package".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0".to_string()),
+        BString::from("acme/package"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0"),
     );
     abandoned_package.set_abandoned(PhpMixed::Bool(true));
     let ignore_abandoned_package = CompletePackageHandle::new(
-        bstr::BString::from(package_name_ignore_abandoned.to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0".to_string()),
+        bconcat!(package_name_ignore_abandoned),
+        BString::from("1.0.0.0"),
+        BString::from("1.0"),
     );
     ignore_abandoned_package.set_abandoned(PhpMixed::Bool(true));
     let expected_package = PackageHandle::new(
-        bstr::BString::from("acme/other".to_string()),
-        bstr::BString::from("1.1.0.0".to_string()),
-        bstr::BString::from("1.1".to_string()),
+        BString::from("acme/other"),
+        BString::from("1.1.0.0"),
+        BString::from("1.1"),
     );
 
     let expected_package: PackageInterfaceHandle = expected_package.into();
@@ -357,16 +364,16 @@ fn test_dont_filter_packages_with_abandoned_package() {
 }
 
 fn generate_security_advisory(
-    package_name: &str,
-    cve: Option<&str>,
-    affected_versions: &str,
+    package_name: &BStr,
+    cve: Option<&BStr>,
+    affected_versions: &BStr,
 ) -> IndexMap<BString, PhpMixed> {
     let mut source: IndexMap<BString, PhpMixed> = IndexMap::new();
     source.insert(
         "name".into(),
-        PhpMixed::string("Security Advisory".to_string()),
+        PhpMixed::string(BString::from("Security Advisory")),
     );
-    source.insert("remoteId".into(), PhpMixed::string("test".to_string()));
+    source.insert("remoteId".into(), PhpMixed::string(BString::from("test")));
 
     let mut advisory: IndexMap<BString, PhpMixed> = IndexMap::new();
     advisory.insert(
@@ -375,35 +382,35 @@ fn generate_security_advisory(
     );
     advisory.insert(
         "packageName".into(),
-        PhpMixed::string(package_name.to_string()),
+        PhpMixed::string(bconcat!(package_name)),
     );
-    advisory.insert("remoteId".into(), PhpMixed::string("test".to_string()));
+    advisory.insert("remoteId".into(), PhpMixed::string(BString::from("test")));
     advisory.insert(
         "title".into(),
-        PhpMixed::string("Security Advisory".to_string()),
+        PhpMixed::string(BString::from("Security Advisory")),
     );
     advisory.insert("link".into(), PhpMixed::Null);
     advisory.insert(
         "cve".into(),
         match cve {
-            Some(cve) => PhpMixed::string(cve.to_string()),
+            Some(cve) => PhpMixed::string(bconcat!(cve)),
             None => PhpMixed::Null,
         },
     );
     advisory.insert(
         "affectedVersions".into(),
-        PhpMixed::string(affected_versions.to_string()),
+        PhpMixed::string(bconcat!(affected_versions)),
     );
-    advisory.insert("source".into(), PhpMixed::string("Tests".to_string()));
+    advisory.insert("source".into(), PhpMixed::string(BString::from("Tests")));
     advisory.insert(
         "reportedAt".into(),
-        PhpMixed::string("2024-04-31 12:37:47".to_string()),
+        PhpMixed::string(BString::from("2024-04-31 12:37:47")),
     );
     advisory.insert(
         "composerRepository".into(),
-        PhpMixed::string("Package Repository".to_string()),
+        PhpMixed::string(BString::from("Package Repository")),
     );
-    advisory.insert("severity".into(), PhpMixed::string("high".to_string()));
+    advisory.insert("severity".into(), PhpMixed::string(BString::from("high")));
     advisory.insert(
         "sources".into(),
         PhpMixed::List(vec![PhpMixed::Array(source)]),

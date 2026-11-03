@@ -9,6 +9,7 @@
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::e2e_installers_test::{implementations, run_command, tree};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::BStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -38,13 +39,13 @@ fn test_jetpack_autoloader_matches_upstream_composer() {
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
-        let install = run_command(work.path(), program, prefix, &["install"]);
+        let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let install_tree = tree(&work.path().join("project"));
         let dump = run_command(
             work.path(),
             program,
             prefix,
-            &["dump-autoload", "--optimize"],
+            &[BStr::new("dump-autoload"), BStr::new("--optimize")],
         );
         let dump_tree = tree(&work.path().join("project"));
         results.push((install, install_tree, dump, dump_tree, work));

@@ -5,7 +5,7 @@
 use crate::async_runtime::run;
 use crate::php_worker::{lock_php_worker, php_runtime_available};
 use crate::plugin_installer_test::{new_installer, set_up};
-use bstr::B;
+use bstr::{B, BString};
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{
@@ -33,15 +33,15 @@ fn test_alias_packages_cross_the_plugin_boundary() {
     let set_up = set_up();
 
     let aliased = CompletePackageHandle::new(
-        bstr::BString::from("vendor/aliased".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0.0".to_string()),
+        BString::from("vendor/aliased"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0.0"),
     );
-    aliased.set_description(bstr::BString::from("an aliased package".to_string()));
+    aliased.set_description(BString::from("an aliased package"));
     let alias = CompleteAliasPackageHandle::new(
         aliased.clone(),
-        bstr::BString::from("2.0.0.0".to_string()),
-        bstr::BString::from("2.0.0".to_string()),
+        BString::from("2.0.0.0"),
+        BString::from("2.0.0"),
     );
     set_up
         .repository
@@ -50,14 +50,14 @@ fn test_alias_packages_cross_the_plugin_boundary() {
         .unwrap();
 
     let real_root = RootPackageHandle::new(
-        bstr::BString::from("dummy/root".to_string()),
-        bstr::BString::from("1.0.0.0".to_string()),
-        bstr::BString::from("1.0.0".to_string()),
+        BString::from("dummy/root"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0.0"),
     );
     let root_alias = shirabe::package::RootAliasPackageHandle::new(
         real_root.clone(),
-        bstr::BString::from("1.1.0.0".to_string()),
-        bstr::BString::from("1.1.0".to_string()),
+        BString::from("1.1.0.0"),
+        BString::from("1.1.0"),
     );
     set_up.composer.borrow_mut().set_package(root_alias.into());
 
@@ -85,7 +85,7 @@ fn test_alias_packages_cross_the_plugin_boundary() {
     // `RootAliasPackage`'s setters write through to the package it aliases.
     assert_eq!("dev", real_root.get_minimum_stability());
     assert_eq!(
-        Some(&PhpMixed::string("alias-v1".to_string())),
+        Some(&PhpMixed::string(BString::from("alias-v1"))),
         real_root.get_extra().get(B("seen-by"))
     );
 }

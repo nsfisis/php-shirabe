@@ -10,6 +10,8 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{bconcat, os_str_from_bytes, utf8_text};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -21,7 +23,7 @@ fn fixture_dir() -> PathBuf {
 /// PHP's built-in web server running the fixture's router script, killed when dropped.
 struct HttpServer {
     child: std::process::Child,
-    base_url: String,
+    base_url: BString,
 }
 
 impl HttpServer {
@@ -33,10 +35,10 @@ impl HttpServer {
             .local_addr()
             .unwrap()
             .port();
-        let address = format!("127.0.0.1:{port}");
+        let address = bconcat!("127.0.0.1:", port);
         let child = std::process::Command::new("php")
             .arg("-S")
-            .arg(&address)
+            .arg(os_str_from_bytes(&address))
             .arg(fixture_dir().join("server/router.php"))
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -44,13 +46,18 @@ impl HttpServer {
             .unwrap();
         let server = Self {
             child,
-            base_url: format!("http://{address}"),
+            base_url: bconcat!("http://", address),
         };
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-        while std::net::TcpStream::connect(&address).is_err() {
+        while std::net::TcpStream::connect(
+            utf8_text(&address).expect("the fixture server prints a text address"),
+        )
+        .is_err()
+        {
             assert!(
                 std::time::Instant::now() < deadline,
-                "the fixture HTTP server did not come up on {address}"
+                "the fixture HTTP server did not come up on {address}",
+                address = address.display_lossy()
             );
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
@@ -68,7 +75,7 @@ impl Drop for HttpServer {
 struct Run {
     exit_codes: Vec<i32>,
     output: bstr::BString,
-    trace: String,
+    trace: BString,
     installed: bool,
 }
 
@@ -76,25 +83,31 @@ struct Run {
 /// fixture: the plugin is only active once the first command has installed it, so the events it
 /// records are the ones the second command dispatches. The server's base URL is written into the
 /// project's repository list and replaced by `{server}` in the trace.
-fn install_then_require(program: &str, prefix_args: &[&OsStr], server: &HttpServer) -> Run {
+fn install_then_require(program: &BStr, prefix_args: &[&OsStr], server: &HttpServer) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
     let composer_json = project.join("composer.json");
-    let contents = std::fs::read_to_string(&composer_json).unwrap();
+    let contents = BString::from(std::fs::read(&composer_json).unwrap());
     std::fs::write(
         &composer_json,
         contents.replace("{server}", &server.base_url),
     )
     .unwrap();
-    let commands: [&[&str]; 2] = [&["install"], &["require", "shirabe-test/remote-lib:1.0.0"]];
+    let commands: [&[&BStr]; 2] = [
+        &[BStr::new("install")],
+        &[
+            BStr::new("require"),
+            BStr::new("shirabe-test/remote-lib:1.0.0"),
+        ],
+    ];
     let mut output = bstr::BString::default();
     let exit_codes = commands
         .iter()
         .map(|args| {
-            let result = std::process::Command::new(program)
+            let result = std::process::Command::new(os_str_from_bytes(&program))
                 .args(prefix_args)
-                .args(*args)
+                .args(args.iter().map(os_str_from_bytes))
                 .current_dir(&project)
                 .env("COMPOSER_HOME", work.path().join("home"))
                 .env("COMPOSER_CACHE_DIR", work.path().join("cache"))
@@ -111,9 +124,11 @@ fn install_then_require(program: &str, prefix_args: &[&OsStr], server: &HttpServ
     Run {
         exit_codes,
         output,
-        trace: std::fs::read_to_string(project.join("file-download-trace.txt"))
-            .unwrap_or_default()
-            .replace(&server.base_url, "{server}"),
+        trace: BString::from(
+            std::fs::read(project.join("file-download-trace.txt")).unwrap_or_default(),
+        )
+        .replace(&server.base_url, "{server}")
+        .into(),
         installed: project
             .join("vendor/shirabe-test/remote-lib/README.md")
             .is_file(),
@@ -131,8 +146,8 @@ fn test_file_download_events_match_upstream_composer() {
     let _worker = lock_php_worker();
 
     let server = HttpServer::start();
-    let upstream = install_then_require("php", &[composer_bin.as_os_str()], &server);
-    let shirabe = install_then_require(env!("CARGO_BIN_EXE_shirabe"), &[], &server);
+    let upstream = install_then_require(BStr::new("php"), &[composer_bin.as_os_str()], &server);
+    let shirabe = install_then_require(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[], &server);
 
     assert_eq!(
         vec![0, 0],
