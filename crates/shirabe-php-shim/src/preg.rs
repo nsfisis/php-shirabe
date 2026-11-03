@@ -296,7 +296,8 @@ where
 // anything run through `preg_quote`, which escapes `<` and `>`) keep their original meaning. A `\\`
 // escapes the following backslash, so `\\<` is left untouched. Without the `u` modifier PCRE reads
 // the pattern as bytes, so a non-ASCII character is written as the `\xNN` escapes of its UTF-8
-// bytes, which also keeps it valid inside a character class. PCRE reads `\0` and up to two more
+// bytes, which also keeps it valid inside a character class. A backslash before a non-ASCII
+// character only makes it literal, so the backslash is dropped. PCRE reads `\0` and up to two more
 // octal digits (`preg_quote` writes NUL as `\000`) as an octal escape, which is rewritten to `\xNN`:
 // the `regex` crate's octal mode would also read a backreference such as `\1` as an octal escape and
 // so hide that backreferences are unsupported.
@@ -327,6 +328,7 @@ fn translate_pcre_literals(inner: &str, utf8: bool) -> String {
                     }
                     out.push_str(&format!("\\x{value:02X}"));
                 }
+                Some(next) if !next.is_ascii() => {}
                 _ => out.push('\\'),
             }
         } else if !utf8 && !c.is_ascii() {
@@ -633,6 +635,13 @@ mod tests {
     #[should_panic(expected = "backreferences are not supported")]
     fn a_backreference_is_rejected() {
         preg_is_match(r#"{^(['"])(.*)\1$}"#, "'a'");
+    }
+
+    #[test]
+    fn an_escaped_non_ascii_character_is_literal() {
+        assert!(preg_is_match("{^a\\\u{e9}$}", "a\u{e9}"));
+        assert!(preg_is_match("{^a\\\u{e9}$}u", "a\u{e9}"));
+        assert!(preg_is_match("{^[\\\u{e9}]+$}", "\u{e9}"));
     }
 
     #[test]
