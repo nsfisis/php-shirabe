@@ -5,7 +5,9 @@ use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, SearchResult,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_shim::{bconcat, implode};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -68,13 +70,13 @@ impl RepositoryInterface for CompositeRepository {
         Ok(total)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
-        let names: Vec<String> = self
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
+        let names: Vec<BString> = self
             .repositories
             .iter()
             .map(|r| r.get_repo_name())
             .collect::<anyhow::Result<_>>()?;
-        Ok(format!("composite repo ({})", names.join(", ")))
+        Ok(bconcat!("composite repo (", implode(", ", &names), ")"))
     }
 
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
@@ -88,7 +90,7 @@ impl RepositoryInterface for CompositeRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         for repository in &self.repositories {
@@ -102,7 +104,7 @@ impl RepositoryInterface for CompositeRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         let mut packages = vec![];
@@ -122,16 +124,16 @@ impl RepositoryInterface for CompositeRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         let mut all_packages = IndexMap::new();
         let mut all_names_found = vec![];
 
         for repository in &self.repositories {
-            let name_map_cloned: IndexMap<String, Option<AnyConstraint>> = package_name_map
+            let name_map_cloned: IndexMap<BString, Option<AnyConstraint>> = package_name_map
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
@@ -146,7 +148,7 @@ impl RepositoryInterface for CompositeRepository {
         }
 
         let mut seen = indexmap::IndexSet::new();
-        let unique_names: Vec<String> = all_names_found
+        let unique_names: Vec<BString> = all_names_found
             .into_iter()
             .filter(|s| seen.insert(s.clone()))
             .collect();
@@ -159,9 +161,9 @@ impl RepositoryInterface for CompositeRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let mut matches = vec![];
         for repository in &self.repositories {
@@ -172,8 +174,8 @@ impl RepositoryInterface for CompositeRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         let mut results = IndexMap::new();
         for repository in &self.repositories {
             results.extend(repository.get_providers(package_name.clone())?);

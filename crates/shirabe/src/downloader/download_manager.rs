@@ -2,15 +2,17 @@
 
 use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
-    array_reverse, array_shift, dirname, implode, in_array_strict, preg_is_match, preg_quote,
-    rtrim, str_replace, strtolower, usort,
+    array_reverse, array_shift, bconcat, dirname, implode, in_array_strict, path_from_bytes,
+    path_to_bytes, preg_is_match, preg_quote, rtrim2, str_replace, strtolower, usort,
 };
+use std::path::{Path, PathBuf};
 
 /// Downloaders manager.
 #[derive(Debug)]
@@ -18,9 +20,9 @@ pub struct DownloadManager {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     prefer_dist: std::cell::Cell<bool>,
     prefer_source: std::cell::Cell<bool>,
-    package_preferences: IndexMap<String, String>,
+    package_preferences: IndexMap<BString, BString>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    downloaders: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>,
+    downloaders: IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>,
 }
 
 impl DownloadManager {
@@ -53,14 +55,14 @@ impl DownloadManager {
     }
 
     /// Sets fine tuned preference settings for package level source/dist selection.
-    pub fn set_preferences(&mut self, preferences: IndexMap<String, String>) {
+    pub fn set_preferences(&mut self, preferences: IndexMap<BString, BString>) {
         self.package_preferences = preferences;
     }
 
     /// Sets installer downloader for a specific installation type.
     pub fn set_downloader(
         &mut self,
-        r#type: &str,
+        r#type: impl AsRef<[u8]>,
         downloader: std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>,
     ) {
         let r#type = strtolower(r#type);
@@ -70,19 +72,21 @@ impl DownloadManager {
     /// Returns downloader for a specific installation type.
     pub fn get_downloader(
         &self,
-        r#type: &str,
+        r#type: impl AsRef<[u8]>,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
         let r#type = strtolower(r#type);
-        if !self.downloaders.contains_key(&r#type) {
-            return Err(InvalidArgumentException::new(format!(
-                "Unknown downloader type: {}. Available types: {}.",
+        if !self.downloaders.contains_key(r#type.as_bstr()) {
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Unknown downloader type: ",
                 r#type,
+                ". Available types: ",
                 implode(", ", &array_keys(&self.downloaders)),
+                "."
             ))
             .into());
         }
 
-        Ok(self.downloaders.get(&r#type).unwrap().clone())
+        Ok(self.downloaders.get(r#type.as_bstr()).unwrap().clone())
     }
 
     /// Returns downloader for already installed package.
@@ -96,26 +100,33 @@ impl DownloadManager {
             return Ok(None);
         }
 
-        let downloader = if installation_source.as_deref() == Some("dist") {
-            self.get_downloader(&package.get_dist_type().unwrap_or_default())?
-        } else if installation_source.as_deref() == Some("source") {
-            self.get_downloader(&package.get_source_type().unwrap_or_default())?
+        let downloader = if installation_source.as_ref().is_some_and(|s| s == "dist") {
+            self.get_downloader(package.get_dist_type().unwrap_or_default())?
+        } else if installation_source.as_ref().is_some_and(|s| s == "source") {
+            self.get_downloader(package.get_source_type().unwrap_or_default())?
         } else {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} does not have an installation source set",
-                package,
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
+                package.to_php_string(),
+                " does not have an installation source set"
             ))
             .into());
         };
 
         let downloader_installation_source = downloader.borrow().get_installation_source();
-        if installation_source.as_deref() != Some(&downloader_installation_source) {
-            return Err(LogicException::new(format!(
-                "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
+        if installation_source
+            .as_ref()
+            .is_none_or(|s| *s != downloader_installation_source)
+        {
+            return Err(LogicException::new(bconcat!(
+                "Downloader \"",
                 downloader.borrow().php_class_name(),
+                "\" is a ",
                 downloader_installation_source,
+                " type downloader and can not be used to download ",
                 installation_source.unwrap_or_default(),
-                package,
+                " for package ",
+                package.to_php_string()
             ))
             .into());
         }
@@ -126,27 +137,27 @@ impl DownloadManager {
     pub fn get_downloader_type(
         &self,
         downloader: &std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>,
-    ) -> String {
+    ) -> BString {
         // PHP: array_search($downloader, $this->downloaders)
         for (r#type, candidate) in &self.downloaders {
             if std::rc::Rc::ptr_eq(candidate, downloader) {
                 return r#type.clone();
             }
         }
-        String::new()
+        BString::default()
     }
 
     /// Downloads package into target dir.
     pub async fn download(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         self.filesystem
             .borrow_mut()
-            .ensure_directory_exists(&dirname(&target_dir));
+            .ensure_directory_exists(path_from_bytes(&dirname(path_to_bytes(&target_dir))));
 
         let mut sources = self.get_available_sources(package.clone(), prev_package.clone())?;
 
@@ -160,9 +171,10 @@ impl DownloadManager {
             };
             if retry {
                 self.io.write_error3(
-                    &format!(
-                        "    <warning>Now trying to download from {}</warning>",
+                    bconcat!(
+                        "    <warning>Now trying to download from ",
                         source,
+                        "</warning>"
                     ),
                     true,
                     io_interface::NORMAL,
@@ -192,13 +204,16 @@ impl DownloadManager {
                             .catch::<RuntimeException>()
                             .unwrap()
                             .get_message()
-                            .to_string();
+                            .to_owned();
                         self.io.write_error3(
-                            &format!(
-                                "    <warning>Failed to download {} from {}: {}</warning>",
+                            bconcat!(
+                                "    <warning>Failed to download ",
                                 package.get_pretty_name(),
+                                " from ",
                                 source,
+                                ": ",
                                 message,
+                                "</warning>"
                             ),
                             true,
                             io_interface::NORMAL,
@@ -219,9 +234,9 @@ impl DownloadManager {
     /// Prepares an operation execution
     pub async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
@@ -239,7 +254,7 @@ impl DownloadManager {
     pub async fn install(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
@@ -254,7 +269,7 @@ impl DownloadManager {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         let downloader = self.get_downloader_for_package(target.clone())?;
@@ -298,14 +313,14 @@ impl DownloadManager {
                         .catch::<RuntimeException>()
                         .unwrap()
                         .get_message()
-                        .to_string();
+                        .to_owned();
                     self.io.write_error3(
-                        &format!("<error>    Update failed ({})</error>", message),
+                        bconcat!("<error>    Update failed (", message, ")</error>"),
                         true,
                         io_interface::NORMAL,
                     );
                     if !self.io.ask_confirmation(
-                        "    Would you like to try reinstalling the package instead [<comment>yes</comment>]? ".to_string(),
+                        "    Would you like to try reinstalling the package instead [<comment>yes</comment>]? ",
                         true,
                     )? {
                         return Err(e);
@@ -330,7 +345,7 @@ impl DownloadManager {
     pub async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
@@ -343,9 +358,9 @@ impl DownloadManager {
     /// Cleans up a failed operation
     pub async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
@@ -360,25 +375,26 @@ impl DownloadManager {
     }
 
     /// Determines the install preference of a package
-    fn resolve_package_install_preference(&self, package: PackageInterfaceHandle) -> String {
+    fn resolve_package_install_preference(&self, package: PackageInterfaceHandle) -> &'static BStr {
         for (pattern, preference) in &self.package_preferences {
-            let pattern_regex = format!(
-                "{{^{}$}}i",
-                str_replace("\\*", ".*", &preg_quote(pattern, None)),
+            let pattern_regex = bconcat!(
+                "{^",
+                str_replace("\\*", ".*", preg_quote(pattern, None)),
+                "$}i",
             );
-            if preg_is_match(&pattern_regex, &package.get_name()) {
+            if preg_is_match(&pattern_regex, package.get_name()) {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
-                    return "dist".to_string();
+                    return BStr::new("dist");
                 }
 
-                return "source".to_string();
+                return BStr::new("source");
             }
         }
 
         if package.is_dev() {
-            "source".to_string()
+            BStr::new("source")
         } else {
-            "dist".to_string()
+            BStr::new("dist")
         }
     }
 
@@ -386,23 +402,24 @@ impl DownloadManager {
         &self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<BString>> {
         let source_type = package.get_source_type();
         let dist_type = package.get_dist_type();
 
         // add source before dist by default
-        let mut sources: Vec<String> = vec![];
+        let mut sources: Vec<BString> = vec![];
         if source_type.is_some() && !source_type.unwrap().is_empty() {
-            sources.push("source".to_string());
+            sources.push(BString::from("source"));
         }
         if dist_type.is_some() && !dist_type.unwrap().is_empty() {
-            sources.push("dist".to_string());
+            sources.push(BString::from("dist"));
         }
 
         if sources.is_empty() {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} must have a source or dist specified",
-                package
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
+                package.to_php_string(),
+                " must have a source or dist specified"
             ))
             .into());
         }
@@ -419,11 +436,11 @@ impl DownloadManager {
             )
                 // unless the previous package was stable dist (by default) and the new package is dev, then we allow the new default to take over
                 && !(!prev.is_dev()
-                    && prev.get_installation_source().as_deref() == Some("dist")
+                    && prev.get_installation_source().is_some_and(|s| s == "dist")
                     && package.is_dev())
             {
                 let prev_source_owned = prev_source.unwrap_or_default();
-                usort(&mut sources, move |a: &String, b: &String| -> i64 {
+                usort(&mut sources, move |a: &BString, b: &BString| -> i64 {
                     if *a == prev_source_owned { -1 } else { 1 }
                 });
 
@@ -449,19 +466,20 @@ impl DownloadManager {
         &self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<BString>> {
         self.get_available_sources(package, prev_package)
     }
 
     /// Downloaders expect a /path/to/dir without trailing slash
     ///
     /// If any Installer provides a path with a trailing slash, this can cause bugs so make sure we remove them
-    fn normalize_target_dir(&self, dir: &str) -> String {
-        if dir == "\\" || dir == "/" {
-            return dir.to_string();
+    fn normalize_target_dir(&self, dir: &Path) -> PathBuf {
+        let dir = path_to_bytes(dir);
+        if dir == b"\\" || dir == b"/" {
+            return path_from_bytes(dir).to_path_buf();
         }
 
-        rtrim(dir, Some("\\/"))
+        path_from_bytes(&rtrim2(dir, "\\/")).to_path_buf()
     }
 }
 
@@ -479,37 +497,37 @@ pub trait DownloadManagerInterface: std::fmt::Debug {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn update(
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 }
@@ -534,7 +552,7 @@ impl DownloadManagerInterface for DownloadManager {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download(package, target_dir, prev_package).await
@@ -542,9 +560,9 @@ impl DownloadManagerInterface for DownloadManager {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.prepare(r#type, package, target_dir, prev_package)
@@ -554,7 +572,7 @@ impl DownloadManagerInterface for DownloadManager {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.install(package, target_dir).await
     }
@@ -563,7 +581,7 @@ impl DownloadManagerInterface for DownloadManager {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.update(initial, target, target_dir).await
     }
@@ -571,16 +589,16 @@ impl DownloadManagerInterface for DownloadManager {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.remove(package, target_dir).await
     }
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &str,
+        target_dir: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup(r#type, package, target_dir, prev_package)

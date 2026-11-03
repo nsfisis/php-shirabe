@@ -1,22 +1,18 @@
 //! ref: composer/tests/Composer/Test/Util/UrlTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::util::url::Url;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
-fn conf(entries: &[(&str, &[&str])]) -> IndexMap<BString, PhpMixed> {
+fn conf(entries: &[(&BStr, &[&BStr])]) -> IndexMap<BString, PhpMixed> {
     entries
         .iter()
         .map(|(k, vals)| {
             (
-                k.to_string().into(),
-                PhpMixed::List(
-                    vals.iter()
-                        .map(|v| PhpMixed::string(v.to_string()))
-                        .collect(),
-                ),
+                bconcat!(k),
+                PhpMixed::List(vals.iter().map(|v| PhpMixed::string(bconcat!(v))).collect()),
             )
         })
         .collect()
@@ -32,112 +28,136 @@ fn test_update_dist_reference() {
 
         assert_eq!(
             expected_url,
-            Url::update_dist_reference(&config, url.to_string(), r#ref)
+            Url::update_dist_reference(&config, url, r#ref)
         );
     }
 }
 
 fn dist_refs_provider() -> Vec<(
-    &'static str,
-    &'static str,
+    &'static BStr,
+    &'static BStr,
     IndexMap<BString, PhpMixed>,
-    &'static str,
+    &'static BStr,
 )> {
     vec![
         // github
         (
-            "https://github.com/foo/bar/zipball/abcd",
-            "https://api.github.com/repos/foo/bar/zipball/newref",
+            BStr::new("https://github.com/foo/bar/zipball/abcd"),
+            BStr::new("https://api.github.com/repos/foo/bar/zipball/newref"),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         (
-            "https://www.github.com/foo/bar/zipball/abcd",
-            "https://api.github.com/repos/foo/bar/zipball/newref",
+            BStr::new("https://www.github.com/foo/bar/zipball/abcd"),
+            BStr::new("https://api.github.com/repos/foo/bar/zipball/newref"),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         (
-            "https://github.com/foo/bar/archive/abcd.zip",
-            "https://api.github.com/repos/foo/bar/zipball/newref",
+            BStr::new("https://github.com/foo/bar/archive/abcd.zip"),
+            BStr::new("https://api.github.com/repos/foo/bar/zipball/newref"),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         (
-            "https://github.com/foo/bar/archive/abcd.tar.gz",
-            "https://api.github.com/repos/foo/bar/tarball/newref",
+            BStr::new("https://github.com/foo/bar/archive/abcd.tar.gz"),
+            BStr::new("https://api.github.com/repos/foo/bar/tarball/newref"),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         (
-            "https://api.github.com/repos/foo/bar/tarball",
-            "https://api.github.com/repos/foo/bar/tarball/newref",
+            BStr::new("https://api.github.com/repos/foo/bar/tarball"),
+            BStr::new("https://api.github.com/repos/foo/bar/tarball/newref"),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         (
-            "https://api.github.com/repos/foo/bar/tarball/abcd",
-            "https://api.github.com/repos/foo/bar/tarball/newref",
+            BStr::new("https://api.github.com/repos/foo/bar/tarball/abcd"),
+            BStr::new("https://api.github.com/repos/foo/bar/tarball/newref"),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         // github enterprise
         (
-            "https://mygithub.com/api/v3/repos/foo/bar/tarball/abcd",
-            "https://mygithub.com/api/v3/repos/foo/bar/tarball/newref",
-            conf(&[("github-domains", &["mygithub.com"])]),
-            "newref",
+            BStr::new("https://mygithub.com/api/v3/repos/foo/bar/tarball/abcd"),
+            BStr::new("https://mygithub.com/api/v3/repos/foo/bar/tarball/newref"),
+            conf(&[(BStr::new("github-domains"), &[BStr::new("mygithub.com")])]),
+            BStr::new("newref"),
         ),
         // bitbucket
         (
-            "https://bitbucket.org/foo/bar/get/abcd.zip",
-            "https://bitbucket.org/foo/bar/get/newref.zip",
+            BStr::new("https://bitbucket.org/foo/bar/get/abcd.zip"),
+            BStr::new("https://bitbucket.org/foo/bar/get/newref.zip"),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         (
-            "https://www.bitbucket.org/foo/bar/get/abcd.tar.bz2",
-            "https://bitbucket.org/foo/bar/get/newref.tar.bz2",
+            BStr::new("https://www.bitbucket.org/foo/bar/get/abcd.tar.bz2"),
+            BStr::new("https://bitbucket.org/foo/bar/get/newref.tar.bz2"),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         // gitlab
         (
-            "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.zip?sha=abcd",
-            "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.zip?sha=newref",
+            BStr::new(
+                "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.zip?sha=abcd",
+            ),
+            BStr::new(
+                "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.zip?sha=newref",
+            ),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         (
-            "https://www.gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.zip?sha=abcd",
-            "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.zip?sha=newref",
+            BStr::new(
+                "https://www.gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.zip?sha=abcd",
+            ),
+            BStr::new(
+                "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.zip?sha=newref",
+            ),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         (
-            "https://gitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.gz?sha=abcd",
-            "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.tar.gz?sha=newref",
+            BStr::new(
+                "https://gitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.gz?sha=abcd",
+            ),
+            BStr::new(
+                "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.tar.gz?sha=newref",
+            ),
             conf(&[]),
-            "newref",
+            BStr::new("newref"),
         ),
         // gitlab enterprise
         (
-            "https://mygitlab.com/api/v4/projects/foo%2Fbar/repository/archive.tar.gz?sha=abcd",
-            "https://mygitlab.com/api/v4/projects/foo%2Fbar/repository/archive.tar.gz?sha=newref",
-            conf(&[("gitlab-domains", &["mygitlab.com"])]),
-            "newref",
+            BStr::new(
+                "https://mygitlab.com/api/v4/projects/foo%2Fbar/repository/archive.tar.gz?sha=abcd",
+            ),
+            BStr::new(
+                "https://mygitlab.com/api/v4/projects/foo%2Fbar/repository/archive.tar.gz?sha=newref",
+            ),
+            conf(&[(BStr::new("gitlab-domains"), &[BStr::new("mygitlab.com")])]),
+            BStr::new("newref"),
         ),
         (
-            "https://mygitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.bz2?sha=abcd",
-            "https://mygitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.bz2?sha=newref",
-            conf(&[("gitlab-domains", &["mygitlab.com"])]),
-            "newref",
+            BStr::new(
+                "https://mygitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.bz2?sha=abcd",
+            ),
+            BStr::new(
+                "https://mygitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.bz2?sha=newref",
+            ),
+            conf(&[(BStr::new("gitlab-domains"), &[BStr::new("mygitlab.com")])]),
+            BStr::new("newref"),
         ),
         (
-            "https://mygitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.bz2?sha=abcd",
-            "https://mygitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.bz2?sha=65",
-            conf(&[("gitlab-domains", &["mygitlab.com"])]),
-            "65",
+            BStr::new(
+                "https://mygitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.bz2?sha=abcd",
+            ),
+            BStr::new(
+                "https://mygitlab.com/api/v3/projects/foo%2Fbar/repository/archive.tar.bz2?sha=65",
+            ),
+            conf(&[(BStr::new("gitlab-domains"), &[BStr::new("mygitlab.com")])]),
+            BStr::new("65"),
         ),
     ]
 }
@@ -145,56 +165,75 @@ fn dist_refs_provider() -> Vec<(
 #[test]
 fn test_sanitize() {
     for (expected, url) in sanitize_provider() {
-        assert_eq!(expected, Url::sanitize(url.to_string()));
+        assert_eq!(expected, Url::sanitize(url));
     }
 }
 
-fn sanitize_provider() -> Vec<(&'static str, &'static str)> {
+fn sanitize_provider() -> Vec<(&'static BStr, &'static BStr)> {
     vec![
         // with scheme
         (
-            "https://foo:***@example.org/",
-            "https://foo:bar@example.org/",
-        ),
-        ("https://foo@example.org/", "https://foo@example.org/"),
-        ("https://example.org/", "https://example.org/"),
-        (
-            "http://***:***@example.org",
-            "http://10a8f08e8d7b7b9:foo@example.org",
+            BStr::new("https://foo:***@example.org/"),
+            BStr::new("https://foo:bar@example.org/"),
         ),
         (
-            "https://foo:***@example.org:123/",
-            "https://foo:bar@example.org:123/",
+            BStr::new("https://foo@example.org/"),
+            BStr::new("https://foo@example.org/"),
         ),
         (
-            "https://example.org/foo/bar?access_token=***",
-            "https://example.org/foo/bar?access_token=abcdef",
+            BStr::new("https://example.org/"),
+            BStr::new("https://example.org/"),
         ),
         (
-            "https://example.org/foo/bar?foo=bar&access_token=***",
-            "https://example.org/foo/bar?foo=bar&access_token=abcdef",
+            BStr::new("http://***:***@example.org"),
+            BStr::new("http://10a8f08e8d7b7b9:foo@example.org"),
         ),
         (
-            "https://***:***@github.com/acme/repo",
-            "https://ghp_1234567890abcdefghijklmnopqrstuvwxyzAB:x-oauth-basic@github.com/acme/repo",
+            BStr::new("https://foo:***@example.org:123/"),
+            BStr::new("https://foo:bar@example.org:123/"),
         ),
         (
-            "https://***:***@github.com/acme/repo",
-            "https://github_pat_1234567890abcdefghijkl_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW:x-oauth-basic@github.com/acme/repo",
+            BStr::new("https://example.org/foo/bar?access_token=***"),
+            BStr::new("https://example.org/foo/bar?access_token=abcdef"),
+        ),
+        (
+            BStr::new("https://example.org/foo/bar?foo=bar&access_token=***"),
+            BStr::new("https://example.org/foo/bar?foo=bar&access_token=abcdef"),
+        ),
+        (
+            BStr::new("https://***:***@github.com/acme/repo"),
+            BStr::new(
+                "https://ghp_1234567890abcdefghijklmnopqrstuvwxyzAB:x-oauth-basic@github.com/acme/repo",
+            ),
+        ),
+        (
+            BStr::new("https://***:***@github.com/acme/repo"),
+            BStr::new(
+                "https://github_pat_1234567890abcdefghijkl_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW:x-oauth-basic@github.com/acme/repo",
+            ),
         ),
         // without scheme
-        ("foo:***@example.org/", "foo:bar@example.org/"),
-        ("foo@example.org/", "foo@example.org/"),
-        ("example.org/", "example.org/"),
-        ("***:***@example.org", "10a8f08e8d7b7b9:foo@example.org"),
-        ("foo:***@example.org:123/", "foo:bar@example.org:123/"),
         (
-            "example.org/foo/bar?access_token=***",
-            "example.org/foo/bar?access_token=abcdef",
+            BStr::new("foo:***@example.org/"),
+            BStr::new("foo:bar@example.org/"),
+        ),
+        (BStr::new("foo@example.org/"), BStr::new("foo@example.org/")),
+        (BStr::new("example.org/"), BStr::new("example.org/")),
+        (
+            BStr::new("***:***@example.org"),
+            BStr::new("10a8f08e8d7b7b9:foo@example.org"),
         ),
         (
-            "example.org/foo/bar?foo=bar&access_token=***",
-            "example.org/foo/bar?foo=bar&access_token=abcdef",
+            BStr::new("foo:***@example.org:123/"),
+            BStr::new("foo:bar@example.org:123/"),
+        ),
+        (
+            BStr::new("example.org/foo/bar?access_token=***"),
+            BStr::new("example.org/foo/bar?access_token=abcdef"),
+        ),
+        (
+            BStr::new("example.org/foo/bar?foo=bar&access_token=***"),
+            BStr::new("example.org/foo/bar?foo=bar&access_token=abcdef"),
         ),
     ]
 }

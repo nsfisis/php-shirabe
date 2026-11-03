@@ -1,12 +1,14 @@
 //! ref: composer/tests/Composer/Test/Command/InitCommandTest.php
 
 use crate::test_case::{RestoreEnv, RunOptions, get_application_tester, init_temp_composer};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::command::init_command::InitCommand;
 use shirabe::json::JsonFile;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{PHP_SERVER, PhpMixed};
+use shirabe_php_shim::{
+    PHP_SERVER, PhpJson, PhpMixed, error_chain_message, path_to_bytes, utf8_text,
+};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use tempfile::TempDir;
 
@@ -25,13 +27,8 @@ fn default_authors() -> serde_json::Value {
 /// `serde_json::Value` so the comparison ignores object key order (matching PHPUnit's `assertEquals`
 /// on arrays) while staying order-sensitive for lists.
 fn read_composer_json(dir: &std::path::Path) -> serde_json::Value {
-    let file = JsonFile::new(
-        dir.join("composer.json").to_str().unwrap().to_string(),
-        None,
-        None,
-    )
-    .unwrap();
-    serde_json::to_value(file.read().unwrap()).unwrap()
+    let file = JsonFile::new(dir.join("composer.json"), None, None).unwrap();
+    serde_json::to_value(PhpJson::new(&file.read().unwrap())).unwrap()
 }
 
 /// `['command' => 'init', '--no-interaction' => true] + $arguments`.
@@ -49,52 +46,56 @@ fn non_interactive_input(
     input
 }
 
-fn opt(name: &str, value: &str) -> (ParameterName, InputValue) {
+fn opt(name: &BStr, value: &BStr) -> (ParameterName, InputValue) {
     (ParameterName::of(name), InputValue::from(value))
 }
 
-fn opt_list(name: &str, values: &[&str]) -> (ParameterName, InputValue) {
+fn opt_list(name: &BStr, values: &[&BStr]) -> (ParameterName, InputValue) {
     (
         ParameterName::of(name),
-        InputValue::Array(values.iter().map(|v| v.to_string()).collect()),
+        InputValue::Array(values.iter().map(|v| (*v).into()).collect()),
     )
 }
 
-fn valid_author_string_provider() -> Vec<(&'static str, Option<&'static str>, &'static str)> {
+fn valid_author_string_provider() -> Vec<(&'static BStr, Option<&'static BStr>, &'static BStr)> {
     vec![
         // simple
         (
-            "John Smith",
-            Some("john@example.com"),
-            "John Smith <john@example.com>",
+            BStr::new("John Smith"),
+            Some(BStr::new("john@example.com")),
+            BStr::new("John Smith <john@example.com>"),
         ),
         // without email
-        ("John Smith", None, "John Smith"),
+        (BStr::new("John Smith"), None, BStr::new("John Smith")),
         // UTF-8
         (
-            "Matti Meikäläinen",
-            Some("matti@example.com"),
-            "Matti Meikäläinen <matti@example.com>",
+            BStr::new("Matti Meikäläinen"),
+            Some(BStr::new("matti@example.com")),
+            BStr::new("Matti Meikäläinen <matti@example.com>"),
         ),
         // UTF-8 with non-spacing marks (\xCC\x88 is U+0308 combining diaeresis)
         (
-            "Matti Meika\u{0308}la\u{0308}inen",
-            Some("matti@example.com"),
-            "Matti Meika\u{0308}la\u{0308}inen <matti@example.com>",
+            BStr::new("Matti Meika\u{0308}la\u{0308}inen"),
+            Some(BStr::new("matti@example.com")),
+            BStr::new("Matti Meika\u{0308}la\u{0308}inen <matti@example.com>"),
         ),
         // numeric author name
-        ("h4x0r", Some("h4x@example.com"), "h4x0r <h4x@example.com>"),
+        (
+            BStr::new("h4x0r"),
+            Some(BStr::new("h4x@example.com")),
+            BStr::new("h4x0r <h4x@example.com>"),
+        ),
         // alias 1 (issue #5631)
         (
-            "Johnathon \"Johnny\" Smith",
-            Some("john@example.com"),
-            "Johnathon \"Johnny\" Smith <john@example.com>",
+            BStr::new("Johnathon \"Johnny\" Smith"),
+            Some(BStr::new("john@example.com")),
+            BStr::new("Johnathon \"Johnny\" Smith <john@example.com>"),
         ),
         // alias 2 (issue #5631)
         (
-            "Johnathon (Johnny) Smith",
-            Some("john@example.com"),
-            "Johnathon (Johnny) Smith <john@example.com>",
+            BStr::new("Johnathon (Johnny) Smith"),
+            Some(BStr::new("john@example.com")),
+            BStr::new("Johnathon (Johnny) Smith <john@example.com>"),
         ),
     ]
 }
@@ -105,14 +106,16 @@ fn test_parse_valid_author_string() {
 
     for (name, email, input) in valid_author_string_provider() {
         let command = InitCommand::new();
-        let author = command.__parse_author_string(input).unwrap();
+        let author = command
+            .__parse_author_string(bstr::BStr::new(input))
+            .unwrap();
         assert_eq!(
-            Some(name.to_string()),
-            author.get("name").cloned().flatten()
+            Some(BString::from(name)),
+            author.get(bstr::B("name")).cloned().flatten()
         );
         assert_eq!(
-            email.map(|e| e.to_string()),
-            author.get("email").cloned().flatten()
+            email.map(BString::from),
+            author.get(bstr::B("email")).cloned().flatten()
         );
     }
 }
@@ -122,7 +125,7 @@ fn test_parse_empty_author_string() {
     set_up();
 
     let command = InitCommand::new();
-    let result = command.__parse_author_string("");
+    let result = command.__parse_author_string(BStr::new(""));
     assert!(result.is_err());
 }
 
@@ -131,7 +134,7 @@ fn test_parse_author_string_with_invalid_email() {
     set_up();
 
     let command = InitCommand::new();
-    let result = command.__parse_author_string("John Smith <john>");
+    let result = command.__parse_author_string(BStr::new("John Smith <john>"));
     assert!(result.is_err());
 }
 
@@ -142,7 +145,7 @@ fn test_namespace_from_valid_package_name() {
     let command = InitCommand::new();
     let namespace = command.namespace_from_package_name("new_projects.acme-extra/package-name");
     assert_eq!(
-        Some("NewProjectsAcmeExtra\\PackageName".to_string()),
+        Some(BString::from("NewProjectsAcmeExtra\\PackageName")),
         namespace
     );
 }
@@ -174,7 +177,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "authors": [default_authors()],
                 "require": [],
             }),
-            vec![opt("--name", "test/pkg")],
+            vec![opt(BStr::new("--name"), BStr::new("test/pkg"))],
         ),
         // name and author arguments
         (
@@ -184,8 +187,11 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "authors": [{ "name": "Mr. Test", "email": "test@example.org" }],
             }),
             vec![
-                opt("--name", "test/pkg"),
-                opt("--author", "Mr. Test <test@example.org>"),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(
+                    BStr::new("--author"),
+                    BStr::new("Mr. Test <test@example.org>"),
+                ),
             ],
         ),
         // name and author arguments without email
@@ -195,7 +201,10 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require": [],
                 "authors": [{ "name": "Mr. Test" }],
             }),
-            vec![opt("--name", "test/pkg"), opt("--author", "Mr. Test")],
+            vec![
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--author"), BStr::new("Mr. Test")),
+            ],
         ),
         // single repository argument
         (
@@ -206,10 +215,12 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "repositories": [{ "type": "vcs", "url": "http://packages.example.com" }],
             }),
             vec![
-                opt("--name", "test/pkg"),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
                 opt_list(
-                    "--repository",
-                    &["{\"type\":\"vcs\",\"url\":\"http://packages.example.com\"}"],
+                    BStr::new("--repository"),
+                    &[BStr::new(
+                        "{\"type\":\"vcs\",\"url\":\"http://packages.example.com\"}",
+                    )],
                 ),
             ],
         ),
@@ -230,13 +241,17 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 ],
             }),
             vec![
-                opt("--name", "test/pkg"),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
                 opt_list(
-                    "--repository",
+                    BStr::new("--repository"),
                     &[
-                        "{\"type\":\"vcs\",\"url\":\"http://vcs.example.com\"}",
-                        "{\"type\":\"composer\",\"url\":\"http://composer.example.com\"}",
-                        "{\"type\":\"composer\",\"url\":\"http://composer2.example.com\",\"options\":{\"ssl\":{\"verify_peer\":\"true\"}}}",
+                        BStr::new("{\"type\":\"vcs\",\"url\":\"http://vcs.example.com\"}"),
+                        BStr::new(
+                            "{\"type\":\"composer\",\"url\":\"http://composer.example.com\"}",
+                        ),
+                        BStr::new(
+                            "{\"type\":\"composer\",\"url\":\"http://composer2.example.com\",\"options\":{\"ssl\":{\"verify_peer\":\"true\"}}}",
+                        ),
                     ],
                 ),
             ],
@@ -249,7 +264,10 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require": [],
                 "minimum-stability": "dev",
             }),
-            vec![opt("--name", "test/pkg"), opt("--stability", "dev")],
+            vec![
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--stability"), BStr::new("dev")),
+            ],
         ),
         // require one argument
         (
@@ -259,8 +277,8 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require": { "first/pkg": "1.0.0" },
             }),
             vec![
-                opt("--name", "test/pkg"),
-                opt_list("--require", &["first/pkg:1.0.0"]),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt_list(BStr::new("--require"), &[BStr::new("first/pkg:1.0.0")]),
             ],
         ),
         // require multiple arguments
@@ -271,8 +289,11 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require": { "first/pkg": "1.0.0", "second/pkg": "^3.4" },
             }),
             vec![
-                opt("--name", "test/pkg"),
-                opt_list("--require", &["first/pkg:1.0.0", "second/pkg:^3.4"]),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt_list(
+                    BStr::new("--require"),
+                    &[BStr::new("first/pkg:1.0.0"), BStr::new("second/pkg:^3.4")],
+                ),
             ],
         ),
         // require-dev one argument
@@ -284,8 +305,8 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require-dev": { "first/pkg": "1.0.0" },
             }),
             vec![
-                opt("--name", "test/pkg"),
-                opt_list("--require-dev", &["first/pkg:1.0.0"]),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt_list(BStr::new("--require-dev"), &[BStr::new("first/pkg:1.0.0")]),
             ],
         ),
         // require-dev multiple arguments
@@ -297,8 +318,11 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require-dev": { "first/pkg": "1.0.0", "second/pkg": "^3.4" },
             }),
             vec![
-                opt("--name", "test/pkg"),
-                opt_list("--require-dev", &["first/pkg:1.0.0", "second/pkg:^3.4"]),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt_list(
+                    BStr::new("--require-dev"),
+                    &[BStr::new("first/pkg:1.0.0"), BStr::new("second/pkg:^3.4")],
+                ),
             ],
         ),
         // autoload argument
@@ -309,7 +333,10 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require": [],
                 "autoload": { "psr-4": { "Test\\Pkg\\": "testMapping/" } },
             }),
-            vec![opt("--name", "test/pkg"), opt("--autoload", "testMapping/")],
+            vec![
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--autoload"), BStr::new("testMapping/")),
+            ],
         ),
         // homepage argument
         (
@@ -320,8 +347,8 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "homepage": "https://example.org/",
             }),
             vec![
-                opt("--name", "test/pkg"),
-                opt("--homepage", "https://example.org/"),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--homepage"), BStr::new("https://example.org/")),
             ],
         ),
         // description argument
@@ -333,8 +360,11 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "description": "My first example package",
             }),
             vec![
-                opt("--name", "test/pkg"),
-                opt("--description", "My first example package"),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(
+                    BStr::new("--description"),
+                    BStr::new("My first example package"),
+                ),
             ],
         ),
         // type argument
@@ -345,7 +375,10 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require": [],
                 "type": "project",
             }),
-            vec![opt("--name", "test/pkg"), opt("--type", "project")],
+            vec![
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--type"), BStr::new("project")),
+            ],
         ),
         // license argument
         (
@@ -355,7 +388,10 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
                 "require": [],
                 "license": "MIT",
             }),
-            vec![opt("--name", "test/pkg"), opt("--license", "MIT")],
+            vec![
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--license"), BStr::new("MIT")),
+            ],
         ),
     ]
 }
@@ -385,8 +421,8 @@ fn test_run_command() {
 /// Either the run throws (optionally carrying a message), or it returns exit code 1 and writes a
 /// message matching the regex to stderr.
 enum InvalidExpectation {
-    Throws(Option<&'static str>),
-    StderrMatches(&'static str),
+    Throws(Option<&'static BStr>),
+    StderrMatches(&'static BStr),
 }
 
 fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(ParameterName, InputValue)>)> {
@@ -394,14 +430,14 @@ fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(ParameterName, I
         // invalid name argument
         (
             InvalidExpectation::Throws(None),
-            vec![opt("--name", "test")],
+            vec![opt(BStr::new("--name"), BStr::new("test"))],
         ),
         // invalid author argument
         (
             InvalidExpectation::Throws(None),
             vec![
-                opt("--name", "test/pkg"),
-                opt("--author", "Mr. Test <test>"),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--author"), BStr::new("Mr. Test <test>")),
             ],
         ),
         // invalid stability argument
@@ -410,26 +446,32 @@ fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(ParameterName, I
         // validates with the `jsonschema` crate instead, whose wording differs by design. See also
         // composer_schema_test.rs.
         (
-            InvalidExpectation::StderrMatches(
+            InvalidExpectation::StderrMatches(BStr::new(
                 r#"minimum-stability\s*:\s*"bogus" is not one of "dev", "alpha" or 4 other candidates"#,
-            ),
-            vec![opt("--name", "test/pkg"), opt("--stability", "bogus")],
+            )),
+            vec![
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--stability"), BStr::new("bogus")),
+            ],
         ),
         // invalid require argument
         (
-            InvalidExpectation::Throws(Some(
+            InvalidExpectation::Throws(Some(BStr::new(
                 "Option first is missing a version constraint, use e.g. first:^1.0",
-            )),
-            vec![opt("--name", "test/pkg"), opt_list("--require", &["first"])],
+            ))),
+            vec![
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt_list(BStr::new("--require"), &[BStr::new("first")]),
+            ],
         ),
         // invalid require-dev argument
         (
-            InvalidExpectation::Throws(Some(
+            InvalidExpectation::Throws(Some(BStr::new(
                 "Option first is missing a version constraint, use e.g. first:^1.0",
-            )),
+            ))),
             vec![
-                opt("--name", "test/pkg"),
-                opt_list("--require-dev", &["first"]),
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt_list(BStr::new("--require-dev"), &[BStr::new("first")]),
             ],
         ),
         // invalid homepage argument
@@ -438,8 +480,13 @@ fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(ParameterName, I
         // validates with the `jsonschema` crate instead, whose wording differs by design. See also
         // composer_schema_test.rs.
         (
-            InvalidExpectation::StderrMatches(r#"homepage\s*:\s*"not-a-url" is not a "uri""#),
-            vec![opt("--name", "test/pkg"), opt("--homepage", "not-a-url")],
+            InvalidExpectation::StderrMatches(BStr::new(
+                r#"homepage\s*:\s*"not-a-url" is not a "uri""#,
+            )),
+            vec![
+                opt(BStr::new("--name"), BStr::new("test/pkg")),
+                opt(BStr::new("--homepage"), BStr::new("not-a-url")),
+            ],
         ),
     ]
 }
@@ -466,9 +513,9 @@ fn test_run_command_invalid() {
             InvalidExpectation::Throws(message) => {
                 let error = result.expect_err("expected the command to surface an exception");
                 if let Some(message) = message {
-                    let rendered = format!("{:#}", error);
+                    let rendered = error_chain_message(&error);
                     assert!(
-                        rendered.contains(message),
+                        rendered.contains_str(message),
                         "error {:?} did not contain {:?}",
                         rendered,
                         message
@@ -478,7 +525,7 @@ fn test_run_command_invalid() {
             InvalidExpectation::StderrMatches(pattern) => {
                 result.unwrap();
                 assert_eq!(1, app_tester.get_status_code());
-                let regex = regex::Regex::new(pattern).unwrap();
+                let regex = regex::bytes::Regex::new(utf8_text(pattern).unwrap()).unwrap();
                 let stderr = app_tester.get_error_output();
                 assert!(
                     regex.is_match(&stderr),
@@ -540,16 +587,16 @@ fn test_interactive_run() {
 
     let mut app_tester = get_application_tester();
     app_tester.set_inputs(vec![
-        "vendor/pkg".to_string(),                  // Pkg name
-        "my description".to_string(),              // Description
-        "Mr. Test <test@example.org>".to_string(), // Author
-        "stable".to_string(),                      // Minimum stability
-        "library".to_string(),                     // Type
-        "AGPL-3.0-only".to_string(),               // License
-        "no".to_string(),                          // Define dependencies
-        "no".to_string(),                          // Define dev dependencies
-        "n".to_string(),                           // Add PSR-4 autoload mapping
-        "".to_string(),                            // Confirm generation
+        BString::from("vendor/pkg"),                  // Pkg name
+        BString::from("my description"),              // Description
+        BString::from("Mr. Test <test@example.org>"), // Author
+        BString::from("stable"),                      // Minimum stability
+        BString::from("library"),                     // Type
+        BString::from("AGPL-3.0-only"),               // License
+        BString::from("no"),                          // Define dependencies
+        BString::from("no"),                          // Define dev dependencies
+        BString::from("n"),                           // Add PSR-4 autoload mapping
+        BString::from(""),                            // Confirm generation
     ]);
 
     app_tester
@@ -581,18 +628,22 @@ fn test_format_authors() {
     let author_without_email = "John Smith";
     let command = InitCommand::new();
 
-    let authors = command.__format_authors(author_with_email).unwrap();
+    let authors = command
+        .__format_authors(bstr::BStr::new(author_with_email))
+        .unwrap();
     let mut expected: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
-    expected.insert("name".into(), PhpMixed::string("John Smith".to_string()));
+    expected.insert("name".into(), PhpMixed::string(BString::from("John Smith")));
     expected.insert(
         "email".into(),
-        PhpMixed::string("john@example.com".to_string()),
+        PhpMixed::string(BString::from("john@example.com")),
     );
     assert_eq!(expected, authors[0]);
 
-    let authors = command.__format_authors(author_without_email).unwrap();
+    let authors = command
+        .__format_authors(bstr::BStr::new(author_without_email))
+        .unwrap();
     let mut expected: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
-    expected.insert("name".into(), PhpMixed::string("John Smith".to_string()));
+    expected.insert("name".into(), PhpMixed::string(BString::from("John Smith")));
     assert_eq!(expected, authors[0]);
 }
 
@@ -614,13 +665,13 @@ fn test_get_git_config() {
     )
     .unwrap();
     let original_home = Platform::get_env("HOME");
-    Platform::put_env("HOME", home.path().to_str().unwrap());
+    Platform::put_env("HOME", path_to_bytes(&home.path()));
     let _restore_home = RestoreEnv::new("HOME", original_home);
 
     let command = InitCommand::new();
     let git_config = command.__get_git_config().unwrap();
-    assert!(git_config.contains_key("user.name"));
-    assert!(git_config.contains_key("user.email"));
+    assert!(git_config.contains_key(bstr::B("user.name")));
+    assert!(git_config.contains_key(bstr::B("user.email")));
 }
 
 #[test]
@@ -629,13 +680,12 @@ fn test_add_vendor_ignore() {
 
     let tmp = TempDir::new().unwrap();
     let ignore_file = tmp.path().join("ignore");
-    let ignore_file = ignore_file.to_str().unwrap();
 
     let command = InitCommand::new();
-    command.__add_vendor_ignore(ignore_file, "/vendor/");
-    assert!(std::path::Path::new(ignore_file).exists());
-    let content = std::fs::read_to_string(ignore_file).unwrap();
-    assert!(content.contains("/vendor/"));
+    command.__add_vendor_ignore(&ignore_file, BStr::new("/vendor/"));
+    assert!(std::path::Path::new(&ignore_file).exists());
+    let content = bstr::BString::from(std::fs::read(&ignore_file).unwrap());
+    assert!(content.contains_str("/vendor/"));
 }
 
 #[test]
@@ -644,10 +694,9 @@ fn test_has_vendor_ignore() {
 
     let tmp = TempDir::new().unwrap();
     let ignore_file = tmp.path().join("ignore");
-    let ignore_file = ignore_file.to_str().unwrap();
 
     let command = InitCommand::new();
-    assert!(!command.__has_vendor_ignore(ignore_file, "vendor"));
-    command.__add_vendor_ignore(ignore_file, "/vendor/");
-    assert!(command.__has_vendor_ignore(ignore_file, "vendor"));
+    assert!(!command.__has_vendor_ignore(&ignore_file, BStr::new("vendor")));
+    command.__add_vendor_ignore(&ignore_file, BStr::new("/vendor/"));
+    assert!(command.__has_vendor_ignore(&ignore_file, BStr::new("vendor")));
 }

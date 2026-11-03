@@ -2,7 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};
@@ -25,10 +25,10 @@ fn config_mock() -> std::rc::Rc<std::cell::RefCell<shirabe::config::Config>> {
 // private file_url, then invoke the private get_options_for_url with the given args.
 fn call_get_options_for_url(
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    origin_url: &str,
+    origin_url: &BStr,
     additional_options: IndexMap<BString, PhpMixed>,
     options: IndexMap<BString, PhpMixed>,
-    file_url: &str,
+    file_url: &BStr,
 ) -> IndexMap<BString, PhpMixed> {
     let fs = RemoteFilesystem::new(io, config_mock(), options, false);
     fs.__set_file_url(file_url).unwrap();
@@ -36,14 +36,14 @@ fn call_get_options_for_url(
         .unwrap()
 }
 
-fn http_header_list(res: &IndexMap<BString, PhpMixed>) -> Option<Vec<String>> {
+fn http_header_list(res: &IndexMap<BString, PhpMixed>) -> Option<Vec<BString>> {
     res.get(B("http"))
         .and_then(|v| v.as_array())
         .and_then(|http| http.get(B("header")))
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
-                .map(|v| v.as_string().unwrap_or_default().to_string())
+                .map(|v| BString::from(v.as_string().unwrap_or_default()))
                 .collect()
         })
 }
@@ -60,10 +60,10 @@ fn test_get_options_for_url() {
 
     let res = call_get_options_for_url(
         io,
-        "http://example.org",
+        BStr::new("http://example.org"),
         IndexMap::new(),
         IndexMap::new(),
-        "",
+        BStr::new(""),
     );
 
     assert!(
@@ -78,9 +78,15 @@ fn test_get_options_for_url_with_authorization() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
-    auth.insert("username".to_string(), Some("login".to_string()));
-    auth.insert("password".to_string(), Some("password".to_string()));
+    let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
+    auth.insert(
+        BString::from("username"),
+        Some(bstr::BString::from("login")),
+    );
+    auth.insert(
+        BString::from("password"),
+        Some(bstr::BString::from("password")),
+    );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             IOStub::new()
@@ -90,10 +96,10 @@ fn test_get_options_for_url_with_authorization() {
 
     let options = call_get_options_for_url(
         io,
-        "http://example.org",
+        BStr::new("http://example.org"),
         IndexMap::new(),
         IndexMap::new(),
-        "",
+        BStr::new(""),
     );
 
     let mut found = false;
@@ -111,9 +117,9 @@ fn test_get_options_for_url_with_stream_options() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
-    auth.insert("username".to_string(), None);
-    auth.insert("password".to_string(), None);
+    let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
+    auth.insert(BString::from("username"), None);
+    auth.insert(BString::from("password"), None);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             IOStub::new()
@@ -128,10 +134,10 @@ fn test_get_options_for_url_with_stream_options() {
 
     let res = call_get_options_for_url(
         io,
-        "https://example.org",
+        BStr::new("https://example.org"),
         IndexMap::new(),
         stream_options,
-        "",
+        BStr::new(""),
     );
 
     let allow_self_signed = res
@@ -152,9 +158,9 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
-    auth.insert("username".to_string(), None);
-    auth.insert("password".to_string(), None);
+    let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
+    auth.insert(BString::from("username"), None);
+    auth.insert(BString::from("password"), None);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             IOStub::new()
@@ -163,16 +169,16 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
         ));
 
     let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-    http.insert("header".into(), PhpMixed::string("Foo: bar".to_string()));
+    http.insert("header".into(), PhpMixed::string(BString::from("Foo: bar")));
     let mut additional_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     additional_options.insert("http".into(), PhpMixed::Array(http));
 
     let res = call_get_options_for_url(
         io,
-        "https://example.org",
+        BStr::new("https://example.org"),
         additional_options,
         IndexMap::new(),
-        "",
+        BStr::new(""),
     );
 
     let headers = http_header_list(&res);
@@ -196,8 +202,15 @@ fn test_callback_get_file_size() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
-    fs.__callback_get(STREAM_NOTIFY_FILE_SIZE_IS, 0, Some(String::new()), 0, 0, 20)
-        .unwrap();
+    fs.__callback_get(
+        STREAM_NOTIFY_FILE_SIZE_IS,
+        0,
+        Some(BString::default()),
+        0,
+        0,
+        20,
+    )
+    .unwrap();
     assert_eq!(20, fs.__bytes_max().unwrap());
 }
 
@@ -213,8 +226,15 @@ fn test_callback_get_notify_progress() {
     fs.__set_bytes_max(20).unwrap();
     fs.__set_progress(true).unwrap();
 
-    fs.__callback_get(STREAM_NOTIFY_PROGRESS, 0, Some(String::new()), 0, 10, 20)
-        .unwrap();
+    fs.__callback_get(
+        STREAM_NOTIFY_PROGRESS,
+        0,
+        Some(BString::default()),
+        0,
+        10,
+        20,
+    )
+    .unwrap();
     assert_eq!(Some(50), fs.__last_progress().unwrap());
 }
 
@@ -231,7 +251,7 @@ fn test_callback_get_passes_through404() {
     fs.__callback_get(
         STREAM_NOTIFY_FAILURE,
         0,
-        Some("HTTP/1.1 404 Not Found".to_string()),
+        Some(BString::from("HTTP/1.1 404 Not Found")),
         404,
         0,
         0,
@@ -240,11 +260,11 @@ fn test_callback_get_passes_through404() {
 }
 
 // Mirrors PHP's `(string)` cast of getContents()'s string|true|false result.
-fn get_result_to_string(res: &GetResult) -> String {
+fn get_result_to_string(res: &GetResult) -> bstr::BString {
     match res {
-        GetResult::Content(s) => s.clone(),
-        GetResult::True => "1".to_string(),
-        GetResult::False => String::new(),
+        GetResult::Content(s) => s.clone().into(),
+        GetResult::True => "1".into(),
+        GetResult::False => bstr::BString::default(),
     }
 }
 
@@ -277,17 +297,17 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
     let mut ssl: IndexMap<BString, PhpMixed> = IndexMap::new();
     ssl.insert(
         "cafile".into(),
-        PhpMixed::string("/some/path/file.crt".to_string()),
+        PhpMixed::string(BString::from("/some/path/file.crt")),
     );
     let mut additional_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     additional_options.insert("ssl".into(), PhpMixed::Array(ssl));
 
     let res = call_get_options_for_url(
         io,
-        "example.org",
+        BStr::new("example.org"),
         additional_options,
         IndexMap::new(),
-        "http://www.example.org",
+        BStr::new("http://www.example.org"),
     );
 
     let ssl_res = res.get(B("ssl")).and_then(|v| v.as_array()).unwrap();
@@ -323,10 +343,12 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
 }
 
 // Mirrors RemoteFilesystemTest::provideBitbucketPublicDownloadUrls.
-fn provide_bitbucket_public_download_urls() -> Vec<(&'static str, &'static str)> {
+fn provide_bitbucket_public_download_urls() -> Vec<(&'static BStr, &'static BStr)> {
     vec![(
-        "https://bitbucket.org/seldaek/composer-live-test-repo/raw/master/composer-unit-test-download-me.txt",
-        "1234",
+        BStr::new(
+            "https://bitbucket.org/seldaek/composer-live-test-repo/raw/master/composer-unit-test-download-me.txt",
+        ),
+        BStr::new("1234"),
     )]
 }
 
@@ -340,11 +362,12 @@ fn test_bit_bucket_public_download() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
         let rfs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
-        let hostname = parse_url(url).and_then(|parsed| parsed.host);
-        let hostname = hostname.as_deref().unwrap_or("");
+        let hostname = parse_url(url)
+            .and_then(|parsed| parsed.host)
+            .unwrap_or_default();
 
         let result = rfs
-            .get_contents(hostname, url, false, IndexMap::new())
+            .get_contents(&hostname, url, false, IndexMap::new())
             .unwrap();
 
         assert_eq!(contents, get_result_to_string(&result));

@@ -3,24 +3,24 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::{Filesystem, Hg as HgUtils, Url};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, date_create, dirname, is_dir, is_writable, php_regex,
-    preg_is_match, preg_match, preg_replace,
+    Catch as _, PhpMixed, RuntimeException, bconcat, date_create, dirname, is_dir, is_writable,
+    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, trim,
 };
 
 #[derive(Debug)]
 pub struct HgDriver {
     inner: VcsDriverBase,
-    tags: Option<IndexMap<String, String>>,
-    branches: Option<IndexMap<String, String>>,
-    root_identifier: Option<String>,
-    repo_dir: String,
+    tags: Option<IndexMap<BString, BString>>,
+    branches: Option<IndexMap<BString, BString>>,
+    root_identifier: Option<BString>,
+    repo_dir: BString,
 }
 
 impl HgDriver {
@@ -36,7 +36,7 @@ impl HgDriver {
             tags: None,
             branches: None,
             root_identifier: None,
-            repo_dir: String::new(),
+            repo_dir: BString::default(),
         }
     }
 
@@ -44,37 +44,43 @@ impl HgDriver {
         if Filesystem::is_local_path(&self.inner.url) {
             self.repo_dir = self.inner.url.clone();
         } else {
-            let cache_vcs_dir = self
-                .inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
-            if !Cache::is_usable(&cache_vcs_dir) {
-                return Err(RuntimeException::new("HgDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
+            let cache_vcs_dir = BString::from(
+                &BString::from(
+                    self.inner
+                        .config
+                        .borrow_mut()
+                        .get("cache-vcs-dir")
+                        .as_string()
+                        .unwrap_or_default(),
+                )[..],
+            );
+            if !Cache::is_usable(path_from_bytes(&cache_vcs_dir)) {
+                return Err(RuntimeException::new(BString::from("HgDriver requires a usable cache directory, and it looks like you set it to be disabled")).into());
             }
 
             let sanitized = preg_replace(
                 php_regex!(r"{[^a-z0-9]}i"),
                 "-",
-                &Url::sanitize(self.inner.url.clone()),
+                Url::sanitize(BString::from(&self.inner.url.clone()[..])),
             );
-            self.repo_dir = format!("{}/{}/", cache_vcs_dir, sanitized);
+            self.repo_dir = bconcat!(cache_vcs_dir, "/", sanitized, "/");
 
             let mut fs = Filesystem::new(None);
-            fs.ensure_directory_exists(&cache_vcs_dir)?;
+            fs.ensure_directory_exists(path_from_bytes(&cache_vcs_dir))?;
 
-            if !is_writable(dirname(&self.repo_dir)) {
-                return Err(RuntimeException::new(format!(
-                    "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
-                    self.inner.url, cache_vcs_dir
-                )).into());
+            if !is_writable(path_from_bytes(&dirname(&self.repo_dir))) {
+                return Err(RuntimeException::new(bconcat!(
+                    "Can not clone ",
+                    self.inner.url,
+                    " to access package information. The \"",
+                    cache_vcs_dir,
+                    "\" directory is not writable by the current user."
+                ))
+                .into());
             }
 
             self.inner.config.borrow_mut().prohibit_url_by_config(
-                &self.inner.url,
+                self.inner.url.as_bstr(),
                 Some(self.inner.io.clone()),
                 &indexmap::IndexMap::new(),
             )?;
@@ -85,38 +91,48 @@ impl HgDriver {
                 self.inner.process.clone(),
             );
 
-            if is_dir(&self.repo_dir)
+            if is_dir(path_from_bytes(&self.repo_dir))
                 && self.inner.process.borrow_mut().execute(
-                    ["hg", "summary"].map(|s| s.to_string()).as_ref(),
-                    &mut String::new(),
-                    Some(&self.repo_dir),
+                    ["hg", "summary"].map(|s| bconcat!(s)).as_ref(),
+                    &mut BString::default(),
+                    Some(path_from_bytes(&self.repo_dir)),
                 )? == 0
             {
                 if self.inner.process.borrow_mut().execute(
-                    ["hg", "pull"].map(|s| s.to_string()).as_ref(),
-                    &mut String::new(),
-                    Some(&self.repo_dir),
+                    ["hg", "pull"].map(|s| bconcat!(s)).as_ref(),
+                    &mut BString::default(),
+                    Some(path_from_bytes(&self.repo_dir)),
                 )? != 0
                 {
-                    self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()), true, crate::io::NORMAL);
+                    self.inner.io.write_error3(
+                        bconcat!(
+                            "<error>Failed to update ",
+                            self.inner.url,
+                            ", package information from this repository may be outdated (",
+                            self.inner.process.borrow().get_error_output(),
+                            ")</error>"
+                        ),
+                        true,
+                        crate::io::NORMAL,
+                    );
                 }
             } else {
                 let mut fs2 = Filesystem::new(None);
-                fs2.remove_directory(&self.repo_dir)?;
+                fs2.remove_directory(path_from_bytes(&self.repo_dir))?;
 
                 let repo_dir = self.repo_dir.clone();
-                let command = move |url: String| -> Vec<String> {
+                let command = move |url: BString| -> Vec<BString> {
                     vec![
-                        "hg".to_string(),
-                        "clone".to_string(),
-                        "--noupdate".to_string(),
-                        "--".to_string(),
+                        "hg".into(),
+                        "clone".into(),
+                        "--noupdate".into(),
+                        "--".into(),
                         url,
                         repo_dir.clone(),
                     ]
                 };
 
-                hg_utils.run_command(command, self.inner.url.clone(), None)?;
+                hg_utils.run_command(command, self.inner.url.as_bstr(), None)?;
             }
         }
 
@@ -126,63 +142,68 @@ impl HgDriver {
         Ok(())
     }
 
-    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         if self.root_identifier.is_none() {
-            let mut output = String::new();
+            let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 ["hg", "tip", "--template", "{node}"]
-                    .map(|s| s.to_string())
+                    .map(|s| bconcat!(s))
                     .as_ref(),
                 &mut output,
-                Some(&self.repo_dir),
+                Some(path_from_bytes(&self.repo_dir)),
             )?;
             let lines = self.inner.process.borrow().split_lines(&output);
-            self.root_identifier = lines.into_iter().next();
+            self.root_identifier = lines.into_iter().next().map(|s| BString::from(&s[..]));
         }
 
         Ok(self.root_identifier.clone().unwrap_or_default())
     }
 
-    pub fn get_url(&self) -> String {
+    pub fn get_url(&self) -> BString {
         self.inner.url.clone()
     }
 
-    pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    pub fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         let mut map = IndexMap::new();
-        map.insert("type".to_string(), "hg".to_string());
-        map.insert("url".to_string(), self.get_url());
-        map.insert("reference".to_string(), identifier.to_string());
+        map.insert(BString::from("type"), BString::from("hg"));
+        map.insert(BString::from("url"), BString::from(&self.get_url()[..]));
+        map.insert(BString::from("reference"), BString::from(identifier));
         map
     }
 
-    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<String, String>> {
+    pub fn get_dist(&self, _identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         None
     }
 
-    pub fn get_file_content(&self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
-        if identifier.starts_with('-') {
-            return Err(RuntimeException::new(format!(
-                "Invalid hg identifier detected. Identifier must not start with a -, given: {}",
+    pub fn get_file_content(
+        &self,
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
+        if identifier.starts_with(b"-") {
+            return Err(RuntimeException::new(bconcat!(
+                "Invalid hg identifier detected. Identifier must not start with a -, given: ",
                 identifier
             ))
             .into());
         }
 
         let resource = vec![
-            "hg".to_string(),
-            "cat".to_string(),
-            "-r".to_string(),
-            identifier.to_string(),
-            "--".to_string(),
-            file.to_string(),
+            BString::from("hg"),
+            "cat".into(),
+            "-r".into(),
+            identifier.into(),
+            "--".into(),
+            file.into(),
         ];
-        let mut content = String::new();
-        self.inner
-            .process
-            .borrow_mut()
-            .execute(&resource, &mut content, Some(&self.repo_dir))?;
+        let mut content = BString::default();
+        self.inner.process.borrow_mut().execute(
+            &resource,
+            &mut content,
+            Some(path_from_bytes(&self.repo_dir)),
+        )?;
 
-        if content.trim().is_empty() {
+        if trim(&content).is_empty() {
             return Ok(None);
         }
 
@@ -191,56 +212,54 @@ impl HgDriver {
 
     pub fn get_change_date(
         &self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
-        if identifier.starts_with('-') {
-            return Err(RuntimeException::new(format!(
-                "Invalid hg identifier detected. Identifier must not start with a -, given: {}",
+        if identifier.starts_with(b"-") {
+            return Err(RuntimeException::new(bconcat!(
+                "Invalid hg identifier detected. Identifier must not start with a -, given: ",
                 identifier
             ))
             .into());
         }
 
-        let mut output = String::new();
+        let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
-            [
-                "hg",
-                "log",
-                "--template",
-                "{date|rfc3339date}",
-                "-r",
-                identifier,
-            ]
-            .map(|s| s.to_string())
-            .as_ref(),
+            &[
+                BString::from("hg"),
+                "log".into(),
+                "--template".into(),
+                "{date|rfc3339date}".into(),
+                "-r".into(),
+                identifier.into(),
+            ],
             &mut output,
-            Some(&self.repo_dir),
+            Some(path_from_bytes(&self.repo_dir)),
         )?;
 
-        let date: DateTime<Utc> = date_create(output.trim())?;
+        let date: DateTime<Utc> = date_create(trim(&output))?;
         Ok(Some(date.fixed_offset()))
     }
 
-    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if self.tags.is_none() {
-            let mut tags: IndexMap<String, String> = IndexMap::new();
-            let mut output = String::new();
+            let mut tags: IndexMap<BString, BString> = IndexMap::new();
+            let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["hg", "tags"].map(|s| s.to_string()).as_ref(),
+                ["hg", "tags"].map(|s| bconcat!(s)).as_ref(),
                 &mut output,
-                Some(&self.repo_dir),
+                Some(path_from_bytes(&self.repo_dir)),
             )?;
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty()
                     && let Some(m) = preg_match(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag)
                 {
                     tags.insert(
-                        m.get(1).unwrap_or_default().to_string(),
-                        m.get(2).unwrap_or_default().to_string(),
+                        BString::from(m.get(1).unwrap_or_default()),
+                        BString::from(m.get(2).unwrap_or_default()),
                     );
                 }
             }
-            tags.shift_remove("tip");
+            tags.shift_remove(b"tip".as_slice());
 
             self.tags = Some(tags);
         }
@@ -248,43 +267,43 @@ impl HgDriver {
         Ok(self.tags.clone().unwrap_or_default())
     }
 
-    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if self.branches.is_none() {
-            let mut branches: IndexMap<String, String> = IndexMap::new();
-            let mut bookmarks: IndexMap<String, String> = IndexMap::new();
+            let mut branches: IndexMap<BString, BString> = IndexMap::new();
+            let mut bookmarks: IndexMap<BString, BString> = IndexMap::new();
 
-            let mut output = String::new();
+            let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["hg", "branches"].map(|s| s.to_string()).as_ref(),
+                ["hg", "branches"].map(|s| bconcat!(s)).as_ref(),
                 &mut output,
-                Some(&self.repo_dir),
+                Some(path_from_bytes(&self.repo_dir)),
             )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
                     && let Some(m) =
                         preg_match(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch)
                 {
-                    let name = m.get(1).unwrap_or_default().to_string();
-                    if !name.starts_with('-') {
-                        branches.insert(name, m.get(2).unwrap_or_default().to_string());
+                    let name = BString::from(m.get(1).unwrap_or_default());
+                    if !name.starts_with(b"-") {
+                        branches.insert(name, BString::from(m.get(2).unwrap_or_default()));
                     }
                 }
             }
 
             output.clear();
             self.inner.process.borrow_mut().execute(
-                ["hg", "bookmarks"].map(|s| s.to_string()).as_ref(),
+                ["hg", "bookmarks"].map(|s| bconcat!(s)).as_ref(),
                 &mut output,
-                Some(&self.repo_dir),
+                Some(path_from_bytes(&self.repo_dir)),
             )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
                     && let Some(m) =
                         preg_match(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch)
                 {
-                    let name = m.get(1).unwrap_or_default().to_string();
-                    if !name.starts_with('-') {
-                        bookmarks.insert(name, m.get(2).unwrap_or_default().to_string());
+                    let name = BString::from(m.get(1).unwrap_or_default());
+                    if !name.starts_with(b"-") {
+                        bookmarks.insert(name, BString::from(m.get(2).unwrap_or_default()));
                     }
                 }
             }
@@ -300,7 +319,7 @@ impl HgDriver {
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         _config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
         if preg_is_match(
@@ -313,17 +332,17 @@ impl HgDriver {
         }
 
         if Filesystem::is_local_path(url) {
-            let url = Filesystem::get_platform_path(url);
-            if !is_dir(&url) {
+            let url = BString::from(path_to_bytes(&Filesystem::get_platform_path(url)));
+            if !is_dir(path_from_bytes(&url)) {
                 return Ok(false);
             }
 
             let process = crate::util::ProcessExecutor::new(Some(io.clone()));
-            let mut output = String::new();
+            let mut output = BString::default();
             if process.execute(
-                ["hg", "summary"].map(|s| s.to_string()).as_ref(),
+                ["hg", "summary"].map(|s| bconcat!(s)).as_ref(),
                 &mut output,
-                Some(&url),
+                Some(path_from_bytes(&url)),
             )? == 0
             {
                 return Ok(true);
@@ -335,11 +354,14 @@ impl HgDriver {
         }
 
         let process = crate::util::ProcessExecutor::new(Some(io));
-        let mut ignored = String::new();
+        let mut ignored = BString::default();
         let exit = process.execute(
-            ["hg", "identify", "--", url]
-                .map(|s| s.to_string())
-                .as_ref(),
+            &[
+                BString::from("hg"),
+                "identify".into(),
+                "--".into(),
+                url.into(),
+            ],
             &mut ignored,
             None,
         )?;
@@ -349,13 +371,13 @@ impl HgDriver {
 
     pub fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(cached) = self.inner.read_cached_composer(identifier)? {
             return Ok(cached);
         }
 
-        let file_content = self.get_file_content("composer.json", identifier)?;
+        let file_content = self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
         let composer =
             VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
                 self.get_change_date(identifier)
@@ -372,47 +394,51 @@ impl crate::repository::vcs::VcsDriverInterface for HgDriver {
 
     fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         HgDriver::get_composer_information(self, identifier)
     }
 
-    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+    fn get_file_content(
+        &mut self,
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         HgDriver::get_file_content(self, file, identifier)
     }
 
     fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         HgDriver::get_change_date(self, identifier)
     }
 
-    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         HgDriver::get_root_identifier(self)
     }
 
-    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         HgDriver::get_branches(self)
     }
 
-    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         HgDriver::get_tags(self)
     }
 
-    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
+    fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         HgDriver::get_dist(self, identifier)
     }
 
-    fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         HgDriver::get_source(self, identifier)
     }
 
-    fn get_url(&self) -> String {
+    fn get_url(&self) -> BString {
         HgDriver::get_url(self)
     }
 
-    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+    fn has_composer_file(&mut self, identifier: &BStr) -> anyhow::Result<bool> {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
@@ -432,7 +458,7 @@ impl crate::repository::vcs::VcsDriverInterface for HgDriver {
     fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
         HgDriver::supports(io, config, url, deep)

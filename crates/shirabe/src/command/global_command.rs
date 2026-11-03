@@ -5,17 +5,21 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
+use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
+use bstr::BString;
 use shirabe_php_shim::{
-    LogicException, RuntimeException, chdir, impl_php_class, php_regex, preg_replace2, preg_split,
+    LogicException, RuntimeException, bconcat, chdir, impl_php_class, path_from_bytes, php_regex,
+    preg_replace2, preg_split,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::{
     CompletionInput, CompletionSuggestions, StringOrSuggestion,
 };
-use shirabe_symfony_console::input::{ArgvInput, ArrayInput, InputInterface, StringInput};
+use shirabe_symfony_console::input::{
+    ArgvInput, ArrayInput, InputInterface, InputInterfaceByName, StringInput,
+};
 use shirabe_symfony_console::output::OutputInterface;
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct GlobalCommand {
@@ -45,21 +49,21 @@ impl GlobalCommand {
     // Mirrors PHP's `method_exists($input, '__toString')` guard followed by
     // `$input->__toString()`. `InputInterface` does not declare `__toString`, so the
     // concrete stringable input types are matched explicitly.
-    fn input_to_string(input: &dyn InputInterface) -> anyhow::Result<String> {
+    fn input_to_string(input: &dyn InputInterface) -> anyhow::Result<bstr::BString> {
         let input_any = input.as_any();
         if let Some(argv_input) = input_any.downcast_ref::<ArgvInput>() {
-            Ok(argv_input.to_string())
+            Ok(argv_input.__to_string())
         } else if let Some(array_input) = input_any.downcast_ref::<ArrayInput>() {
-            Ok(array_input.to_string())
+            Ok(array_input.__to_string())
         } else if let Some(string_input) = input_any.downcast_ref::<StringInput>() {
-            Ok(string_input.to_string())
+            Ok(string_input.__to_string())
         } else if let Some(completion_input) = input_any.downcast_ref::<CompletionInput>() {
-            Ok(completion_input.to_string())
+            Ok(completion_input.__to_string())
         } else {
-            Err(
-                LogicException::new("Expected an Input instance that is stringable".to_string())
-                    .into(),
-            )
+            Err(LogicException::new(BString::from(
+                "Expected an Input instance that is stringable",
+            ))
+            .into())
         }
     }
 
@@ -73,34 +77,33 @@ impl GlobalCommand {
         }
 
         let config = Factory::create_config(None, None)?;
-        let home = config
-            .get("home")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let home = config.get("home");
+        let home = path_from_bytes(home.as_string().unwrap_or_default());
 
-        if !Path::new(&home).is_dir() {
+        if !home.is_dir() {
             let mut fs = Filesystem::new(None);
-            fs.ensure_directory_exists(&home)?;
-            if !Path::new(&home).is_dir() {
-                return Err(
-                    RuntimeException::new("Could not create home directory".to_string()).into(),
-                );
+            fs.ensure_directory_exists(home)?;
+            if !home.is_dir() {
+                return Err(RuntimeException::new(BString::from(
+                    "Could not create home directory",
+                ))
+                .into());
             }
         }
 
-        chdir(&home).map_err(|e| {
+        chdir(home).map_err(|e| {
             RuntimeException::with_code_and_previous(
-                format!("Could not switch to home directory \"{}\"", home),
+                bconcat!("Could not switch to home directory \"", home, "\""),
                 0,
                 Some(std::sync::Arc::new(e)),
             )
         })?;
 
         if !quiet {
-            self.get_io().borrow().write_error(&format!(
-                "<info>Changed current directory to {}</info>",
-                home
+            self.get_io().borrow().write_error(bconcat!(
+                "<info>Changed current directory to ",
+                home,
+                "</info>"
             ));
         }
 
@@ -120,8 +123,10 @@ impl GlobalCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for GlobalCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("global")?;
-        self.set_description("Allows running commands in the global composer dir ($COMPOSER_HOME)");
+        self.set_name("global".into())?;
+        self.set_description(
+            "Allows running commands in the global composer dir ($COMPOSER_HOME)".into(),
+        );
         self.set_definition(&[
             InputArgument::new("command-name", Some(InputArgument::REQUIRED), "", None)
                 .unwrap()
@@ -146,7 +151,8 @@ impl Command for GlobalCommand {
             XDG_CONFIG_HOME or default to /home/<user>/.config/composer\n\n\
             Note: This path may vary depending on customizations to bin-dir in\n\
             composer.json or the environmental variable COMPOSER_BIN_DIR.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#global",
+            Read more at https://getcomposer.org/doc/03-cli.md#global"
+                .into(),
         );
         Ok(())
     }
@@ -191,21 +197,21 @@ impl Command for GlobalCommand {
                 .as_any_mut()
                 .downcast_mut::<Application>()
                 .expect("shirabe always installs its own Application");
-            app.has(&command_name)
+            app.has(command_name.as_ref())
         };
         if has {
             let prepared = self.prepare_subcommand_input(
                 std::rc::Rc::new(std::cell::RefCell::new(input.clone())),
                 true,
             )?;
-            let mut input = CompletionInput::from_string(&prepared.to_string(), 2)?;
+            let mut input = CompletionInput::from_string(prepared.__to_string(), 2)?;
             let command = {
                 let mut app_ref = application.borrow_mut();
                 let app = app_ref
                     .as_any_mut()
                     .downcast_mut::<Application>()
                     .expect("shirabe always installs its own Application");
-                app.find(&command_name)?
+                app.find(command_name.as_ref())?
             };
             command.borrow().merge_application_definition(true);
 
@@ -228,10 +234,10 @@ impl Command for GlobalCommand {
             php_regex!(r"{\s+}"),
             &Self::input_to_string(&*input.borrow())?,
         );
-        let mut args: Vec<String> = vec![];
+        let mut args: Vec<&bstr::BString> = vec![];
         for token in &tokens {
-            if !token.is_empty() && !token.starts_with('-') {
-                args.push(token.clone());
+            if !token.is_empty() && !token.starts_with(b"-") {
+                args.push(token);
                 if args.len() >= 2 {
                     break;
                 }

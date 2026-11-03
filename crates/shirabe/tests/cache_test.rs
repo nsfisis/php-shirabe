@@ -1,9 +1,11 @@
 //! ref: composer/tests/Composer/Test/CacheTest.php
 
+use bstr::BStr;
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::util::filesystem::Filesystem;
+use shirabe_php_shim::{bconcat, path_from_bytes};
 use std::fs;
 use tempfile::TempDir;
 
@@ -19,7 +21,9 @@ fn set_up() -> SetUp {
     let zeros = "0".repeat(1000);
 
     for i in 0..4 {
-        let path = root.path().join(format!("cached.file{}.zip", i));
+        let path = root
+            .path()
+            .join(path_from_bytes(&bconcat!("cached.file", i, ".zip")));
         fs::write(&path, &zeros).unwrap();
         files.push(path);
     }
@@ -28,7 +32,7 @@ fn set_up() -> SetUp {
     // that role and the Cache otherwise operates on the real temp directory.
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let cache = Cache::new(io, root.path().to_str().unwrap(), None, None, false);
+    let cache = Cache::new(io, root.path(), None, None, false);
 
     SetUp { root, files, cache }
 }
@@ -114,13 +118,7 @@ fn test_clear_cache() {
     let root = TempDir::new().unwrap();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let mut cache = Cache::new(
-        io,
-        root.path().to_str().unwrap(),
-        Some("a-z0-9."),
-        None,
-        false,
-    );
+    let mut cache = Cache::new(io, root.path(), Some(BStr::new("a-z0-9.")), None, false);
 
     assert!(cache.clear());
 }

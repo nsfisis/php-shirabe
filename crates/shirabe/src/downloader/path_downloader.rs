@@ -5,16 +5,20 @@ use crate::config::Config;
 use crate::dependency_resolver::operation::{InstallOperation, UninstallOperation};
 use crate::downloader::{DownloaderInterface, FileDownloader, VcsCapableDownloaderInterface};
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, RuntimeException, file_exists, impl_php_class, is_dir, realpath};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, bconcat, file_exists, impl_php_class, is_dir, path_from_bytes,
+    path_to_bytes, realpath,
+};
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct PathDownloader {
@@ -49,7 +53,11 @@ impl PathDownloader {
         }
     }
 
-    pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
+    pub fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
@@ -72,19 +80,20 @@ impl PathDownloader {
     fn get_install_operation_appendix(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<String> {
+        path: &Path,
+    ) -> anyhow::Result<BString> {
         let url = package.get_dist_url().ok_or_else(|| {
-            RuntimeException::new(format!(
-                "The package {} has no dist url configured, cannot install.",
-                package.get_pretty_name()
+            RuntimeException::new(bconcat!(
+                "The package ",
+                package.get_pretty_name(),
+                " has no dist url configured, cannot install."
             ))
         })?;
-        let real_url = realpath(&url)
-            .ok_or_else(|| RuntimeException::new(format!("Failed to realpath {}", url)))?;
+        let real_url = realpath(path_from_bytes(&url))
+            .ok_or_else(|| RuntimeException::new(bconcat!("Failed to realpath ", url)))?;
 
-        if realpath(path).as_deref() == Some(&real_url) {
-            return Ok(": Source already present".to_string());
+        if realpath(path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
+            return Ok(BString::from(": Source already present"));
         }
 
         let (current_strategy, _) =
@@ -92,20 +101,20 @@ impl PathDownloader {
 
         if current_strategy == Self::STRATEGY_SYMLINK {
             if Platform::is_windows() {
-                return Ok(format!(
-                    ": Junctioning from {}",
+                return Ok(bconcat!(
+                    ": Junctioning from ",
                     package.get_dist_url().unwrap_or_default()
                 ));
             }
 
-            return Ok(format!(
-                ": Symlinking from {}",
+            return Ok(bconcat!(
+                ": Symlinking from ",
                 package.get_dist_url().unwrap_or_default()
             ));
         }
 
-        Ok(format!(
-            ": Mirroring from {}",
+        Ok(bconcat!(
+            ": Mirroring from ",
             package.get_dist_url().unwrap_or_default()
         ))
     }
@@ -143,7 +152,7 @@ impl PathDownloader {
             && !self.safe_junctions()
         {
             if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
-                return Err(RuntimeException::new("You are on an old Windows / old PHP combo which does not allow Shirabe to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
+                return Err(RuntimeException::new(BString::from("You are on an old Windows / old PHP combo which does not allow Shirabe to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed"))
                 .into());
             }
             current_strategy = Self::STRATEGY_MIRROR;
@@ -165,8 +174,12 @@ impl PathDownloader {
 }
 
 impl VcsCapableDownloaderInterface for PathDownloader {
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
-        PathDownloader::get_vcs_reference(self, package, &path)
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
+        PathDownloader::get_vcs_reference(self, package, path)
     }
 }
 
@@ -175,15 +188,15 @@ impl crate::downloader::ChangeReportInterface for PathDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.base_get_local_changes(self, package, path).await
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for PathDownloader {
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         self.inner.get_installation_source()
     }
 
@@ -200,51 +213,55 @@ impl DownloaderInterface for PathDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
         let url = package.get_dist_url().ok_or_else(|| {
-            RuntimeException::new(format!(
-                "The package {} has no dist url configured, cannot download.",
-                package.get_pretty_name()
+            RuntimeException::new(bconcat!(
+                "The package ",
+                package.get_pretty_name(),
+                " has no dist url configured, cannot download."
             ))
         })?;
-        let real_url = realpath(&url);
+        let real_url = realpath(path_from_bytes(&url));
         if real_url.is_none()
-            || !file_exists(real_url.as_deref().unwrap_or(""))
-            || !is_dir(real_url.as_deref().unwrap_or(""))
+            || !file_exists(real_url.as_deref().unwrap_or(Path::new("")))
+            || !is_dir(real_url.as_deref().unwrap_or(Path::new("")))
         {
-            return Err(RuntimeException::new(format!(
-                "Source path \"{}\" is not found for package {}",
+            return Err(RuntimeException::new(bconcat!(
+                "Source path \"",
                 url,
+                "\" is not found for package ",
                 package.get_name()
             ))
             .into());
         }
         let real_url = real_url.unwrap();
 
-        if realpath(&path).as_deref() == Some(&real_url) {
+        if realpath(&path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
             return Ok(None);
         }
 
-        if format!(
-            "{}{}",
+        if bconcat!(
             realpath(&path).unwrap_or_default(),
-            std::path::MAIN_SEPARATOR
+            std::path::MAIN_SEPARATOR_STR
         )
-        .starts_with(&format!("{}{}", real_url, std::path::MAIN_SEPARATOR))
+        .starts_with(&bconcat!(real_url, std::path::MAIN_SEPARATOR_STR))
         {
             // IMPORTANT NOTICE: If you wish to change this, don't. You are wasting your time and ours.
             //
             // Please see https://github.com/composer/composer/pull/5974 and https://github.com/composer/composer/pull/6174
             // for previous attempts that were shut down because they did not work well enough or introduced too many risks.
-            return Err(RuntimeException::new(format!(
-                "Package {} cannot install to \"{}\" inside its source at \"{}\"",
+            return Err(RuntimeException::new(bconcat!(
+                "Package ",
                 package.get_name(),
+                " cannot install to \"",
                 realpath(&path).unwrap_or_default(),
-                real_url
+                "\" inside its source at \"",
+                real_url,
+                "\""
             ))
             .into());
         }
@@ -254,9 +271,9 @@ impl DownloaderInterface for PathDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
@@ -267,28 +284,25 @@ impl DownloaderInterface for PathDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
         let url = package.get_dist_url().ok_or_else(|| {
-            RuntimeException::new(format!(
-                "The package {} has no dist url configured, cannot install.",
-                package.get_pretty_name()
+            RuntimeException::new(bconcat!(
+                "The package ",
+                package.get_pretty_name(),
+                " has no dist url configured, cannot install."
             ))
         })?;
-        let real_url = realpath(&url)
-            .ok_or_else(|| RuntimeException::new(format!("Failed to realpath {}", url)))?;
+        let real_url = realpath(path_from_bytes(&url))
+            .ok_or_else(|| RuntimeException::new(bconcat!("Failed to realpath ", url)))?;
 
-        if realpath(&path).as_deref() == Some(&real_url) {
+        if realpath(&path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
             if output {
                 let appendix = self.get_install_operation_appendix(package.clone(), &path)?;
                 self.inner.io.borrow().write_error3(
-                    &format!(
-                        "  - {}{}",
-                        InstallOperation::format(package, false),
-                        appendix
-                    ),
+                    bconcat!("  - ", InstallOperation::format(package, false), appendix),
                     true,
                     io_interface::NORMAL,
                 );
@@ -311,7 +325,7 @@ impl DownloaderInterface for PathDownloader {
 
         if output {
             self.inner.io.borrow().write_error3(
-                &format!("  - {}: ", InstallOperation::format(package, false)),
+                bconcat!("  - ", InstallOperation::format(package, false), ": "),
                 false,
                 io_interface::NORMAL,
             );
@@ -324,7 +338,7 @@ impl DownloaderInterface for PathDownloader {
                     // Implement symlinks as NTFS junctions on Windows
                     if output {
                         self.inner.io.borrow().write_error3(
-                            &format!("Junctioning from {}", url),
+                            bconcat!("Junctioning from ", url),
                             false,
                             io_interface::NORMAL,
                         );
@@ -335,10 +349,10 @@ impl DownloaderInterface for PathDownloader {
                         .borrow_mut()
                         .junction(&real_url, &path))
                 } else {
-                    let path = path.trim_end_matches('/').to_string();
+                    let path = Filesystem::trim_trailing_slash(&path);
                     if output {
                         self.inner.io.borrow().write_error3(
-                            &format!("Symlinking from {}", url),
+                            bconcat!("Symlinking from ", url),
                             false,
                             io_interface::NORMAL,
                         );
@@ -350,11 +364,7 @@ impl DownloaderInterface for PathDownloader {
                     {
                         let absolute_path =
                             if !self.inner.filesystem.borrow_mut().is_absolute_path(&path) {
-                                std::path::Path::new(&Platform::get_cwd(false)?)
-                                    .join(&path)
-                                    .into_os_string()
-                                    .into_string()
-                                    .unwrap()
+                                Platform::get_cwd(false)?.join(&path)
                             } else {
                                 path.clone()
                             };
@@ -364,9 +374,15 @@ impl DownloaderInterface for PathDownloader {
                             false,
                             true,
                         )?;
-                        Ok(symfony_filesystem.symlink(&format!("{}/", shortest_path), &path))
+                        Ok(symfony_filesystem.symlink(
+                            path_from_bytes(&bconcat!(path_to_bytes(&shortest_path), "/")),
+                            &path,
+                        ))
                     } else {
-                        Ok(symfony_filesystem.symlink(&format!("{}/", real_url), &path))
+                        Ok(symfony_filesystem.symlink(
+                            path_from_bytes(&bconcat!(path_to_bytes(&real_url), "/")),
+                            &path,
+                        ))
                     }
                 }
             })();
@@ -389,9 +405,12 @@ impl DownloaderInterface for PathDownloader {
                         current_strategy = Self::STRATEGY_MIRROR;
                         is_fallback = true;
                     } else {
-                        return Err(RuntimeException::new(format!(
-                            "Symlink from \"{}\" to \"{}\" failed!",
-                            real_url, path
+                        return Err(RuntimeException::new(bconcat!(
+                            "Symlink from \"",
+                            real_url,
+                            "\" to \"",
+                            path,
+                            "\" failed!"
                         ))
                         .into());
                     }
@@ -405,9 +424,9 @@ impl DownloaderInterface for PathDownloader {
 
             if output {
                 self.inner.io.borrow().write_error3(
-                    &format!(
-                        "{}Mirroring from {}",
+                    bconcat!(
                         if is_fallback { "    " } else { "" },
+                        "Mirroring from ",
                         url
                     ),
                     false,
@@ -415,19 +434,7 @@ impl DownloaderInterface for PathDownloader {
                 );
             }
             let iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
-            // TODO(bytes): mirror takes the paths as Strings.
-            symfony_filesystem.mirror(
-                &real_url,
-                &path,
-                iterator
-                    .map(|entry| {
-                        entry
-                            .into_os_string()
-                            .into_string()
-                            .unwrap_or_else(|entry| panic!("path is not valid UTF-8: {entry:?}"))
-                    })
-                    .collect(),
-            )?;
+            symfony_filesystem.mirror(&real_url, &path, iterator.collect())?;
         }
 
         if output {
@@ -444,18 +451,18 @@ impl DownloaderInterface for PathDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path)?;
         self.inner
-            .base_update(self, &appendix, initial, target, path)
+            .base_update(self, appendix.as_bstr(), initial, target, path)
             .await
     }
 
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
@@ -470,9 +477,10 @@ impl DownloaderInterface for PathDownloader {
         if Platform::is_windows() && self.inner.filesystem.borrow_mut().is_junction(&path) {
             if output {
                 self.inner.io.borrow().write_error3(
-                    &format!(
-                        "  - {}, source is still present in {}",
+                    bconcat!(
+                        "  - ",
                         UninstallOperation::format(package.clone(), false),
+                        ", source is still present in ",
                         path
                     ),
                     true,
@@ -481,15 +489,16 @@ impl DownloaderInterface for PathDownloader {
             }
             if !self.inner.filesystem.borrow_mut().remove_junction(&path)? {
                 self.inner.io.borrow().write_error3(
-                    &format!(
-                        "    <warning>Could not remove junction at {} - is another process locking it?</warning>",
-                        path
+                    bconcat!(
+                        "    <warning>Could not remove junction at ",
+                        path,
+                        " - is another process locking it?</warning>"
                     ),
                     true,
                     io_interface::NORMAL,
                 );
-                return Err(RuntimeException::new(format!(
-                    "Could not reliably remove junction for package {}",
+                return Err(RuntimeException::new(bconcat!(
+                    "Could not reliably remove junction for package ",
                     package.get_name()
                 ))
                 .into());
@@ -499,9 +508,10 @@ impl DownloaderInterface for PathDownloader {
         }
 
         let url = package.get_dist_url().ok_or_else(|| {
-            RuntimeException::new(format!(
-                "The package {} has no dist url configured, cannot remove.",
-                package.get_pretty_name()
+            RuntimeException::new(bconcat!(
+                "The package ",
+                package.get_pretty_name(),
+                " has no dist url configured, cannot remove."
             ))
         })?;
 
@@ -513,19 +523,28 @@ impl DownloaderInterface for PathDownloader {
         let abs_path = if fs.is_absolute_path(&path) {
             path.clone()
         } else {
-            format!("{}/{}", Platform::get_cwd(false)?, path)
+            PathBuf::from(path_from_bytes(&bconcat!(
+                Platform::get_cwd(false)?,
+                "/",
+                path
+            )))
         };
-        let abs_dist_url = if fs.is_absolute_path(&url) {
-            url.to_string()
+        let abs_dist_url = if fs.is_absolute_path(path_from_bytes(&url)) {
+            url.clone()
         } else {
-            format!("{}/{}", Platform::get_cwd(false)?, url)
+            bconcat!(Platform::get_cwd(false)?, "/", url)
         };
-        if fs.normalize_path(&abs_path) == fs.normalize_path(&abs_dist_url) {
+        if fs.normalize_path(&abs_path).as_os_str()
+            == fs
+                .normalize_path(path_from_bytes(&abs_dist_url))
+                .as_os_str()
+        {
             if output {
                 self.inner.io.borrow().write_error3(
-                    &format!(
-                        "  - {}, source is still present in {}",
+                    bconcat!(
+                        "  - ",
                         UninstallOperation::format(package.clone(), false),
+                        ", source is still present in ",
                         path
                     ),
                     true,
@@ -541,9 +560,9 @@ impl DownloaderInterface for PathDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner

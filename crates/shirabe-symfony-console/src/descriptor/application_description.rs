@@ -3,27 +3,27 @@
 use crate::application::Application;
 use crate::command::Command;
 use crate::exception::CommandNotFoundException;
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, php_str};
 
 #[derive(Debug)]
 pub struct ApplicationDescription {
     application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-    namespace: Option<String>,
+    namespace: Option<BString>,
     show_hidden: bool,
     /// Each namespace entry is `['id' => string, 'commands' => string[]]`.
-    namespaces: Option<IndexMap<String, IndexMap<BString, PhpMixed>>>,
-    commands: Option<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
-    aliases: Option<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
+    namespaces: Option<IndexMap<BString, IndexMap<BString, PhpMixed>>>,
+    commands: Option<IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
+    aliases: Option<IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
 }
 
 impl ApplicationDescription {
-    pub const GLOBAL_NAMESPACE: &'static str = "_global";
+    pub const GLOBAL_NAMESPACE: &'static BStr = php_str(b"_global");
 
     pub fn new(
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        namespace: Option<String>,
+        namespace: Option<BString>,
         show_hidden: bool,
     ) -> Self {
         ApplicationDescription {
@@ -36,7 +36,7 @@ impl ApplicationDescription {
         }
     }
 
-    pub fn get_namespaces(&mut self) -> IndexMap<String, IndexMap<BString, PhpMixed>> {
+    pub fn get_namespaces(&mut self) -> IndexMap<BString, IndexMap<BString, PhpMixed>> {
         if self.namespaces.is_none() {
             self.inspect_application();
         }
@@ -46,7 +46,7 @@ impl ApplicationDescription {
 
     pub fn get_commands(
         &mut self,
-    ) -> &IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>> {
+    ) -> &IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>> {
         if self.commands.is_none() {
             self.inspect_application();
         }
@@ -56,7 +56,7 @@ impl ApplicationDescription {
 
     pub fn get_command(
         &self,
-        name: &str,
+        name: &BStr,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn Command>>> {
         let in_commands = self
             .commands
@@ -70,7 +70,7 @@ impl ApplicationDescription {
             .unwrap_or(false);
         if !in_commands && !in_aliases {
             return Err(CommandNotFoundException::new(
-                format!("Command \"{}\" does not exist.", name),
+                bconcat!("Command \"", name, "\" does not exist."),
                 vec![],
                 0,
             )
@@ -90,30 +90,33 @@ impl ApplicationDescription {
         self.namespaces = Some(IndexMap::new());
 
         let namespace_filter = match &self.namespace {
-            Some(ns) if !ns.is_empty() => {
-                Some(self.application.borrow_mut().find_namespace(ns).unwrap())
-            }
+            Some(ns) if !ns.is_empty() => Some(
+                self.application
+                    .borrow_mut()
+                    .find_namespace(ns.as_bstr())
+                    .unwrap(),
+            ),
             _ => None,
         };
         let all = self
             .application
             .borrow_mut()
-            .all(namespace_filter.as_deref())
+            .all(namespace_filter.as_ref().map(|ns| ns.as_bstr()))
             .unwrap();
         for (namespace, commands) in self.sort_commands(all) {
-            let mut names: Vec<String> = vec![];
+            let mut names: Vec<BString> = vec![];
 
             for (name, command) in commands {
                 let command_name = command.borrow().get_name();
                 let is_hidden = command.borrow().is_hidden();
                 if command_name.is_none()
-                    || command_name.as_deref() == Some("")
+                    || command_name.as_ref().is_some_and(|name| name.is_empty())
                     || (!self.show_hidden && is_hidden)
                 {
                     continue;
                 }
 
-                if command_name.as_deref() == Some(name.as_str()) {
+                if command_name.as_ref() == Some(&name) {
                     self.commands
                         .as_mut()
                         .unwrap()
@@ -139,21 +142,24 @@ impl ApplicationDescription {
 
     fn sort_commands(
         &self,
-        commands: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
-    ) -> IndexMap<String, IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>> {
+        commands: IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
+    ) -> IndexMap<BString, IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>> {
         let mut namespaced_commands: IndexMap<
-            String,
-            IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
+            BString,
+            IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
         > = IndexMap::new();
-        let mut global_commands: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>> =
+        let mut global_commands: IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>> =
             IndexMap::new();
         let mut sorted_commands: IndexMap<
-            String,
-            IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
+            BString,
+            IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>,
         > = IndexMap::new();
         for (name, command) in commands {
-            let key = self.application.borrow().extract_namespace(&name, Some(1));
-            if ["", Self::GLOBAL_NAMESPACE].contains(&key.as_str()) {
+            let key = self
+                .application
+                .borrow()
+                .extract_namespace(name.as_bstr(), Some(1));
+            if key.is_empty() || key == Self::GLOBAL_NAMESPACE {
                 global_commands.insert(name, command);
             } else {
                 namespaced_commands
@@ -165,7 +171,7 @@ impl ApplicationDescription {
 
         if !global_commands.is_empty() {
             global_commands.sort_keys();
-            sorted_commands.insert(Self::GLOBAL_NAMESPACE.to_string(), global_commands);
+            sorted_commands.insert(Self::GLOBAL_NAMESPACE.into(), global_commands);
         }
 
         if !namespaced_commands.is_empty() {

@@ -3,6 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface, VERBOSITY_NORMAL};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     PHP_EOL, PhpResource, fflush_resource, fwrite_resource, get_resource_type, getenv, php_regex,
     preg_is_match, sapi_windows_vt100_support, stream_isatty_resource,
@@ -39,7 +40,7 @@ impl StreamOutput {
 
         if get_resource_type(&stream) != "stream" {
             return Ok(Err(InvalidArgumentException::new(
-                "The StreamOutput class needs a stream as its first argument.".to_string(),
+                "The StreamOutput class needs a stream as its first argument.",
             )));
         }
 
@@ -110,12 +111,9 @@ impl StreamOutput {
             return true;
         }
 
-        // TODO(bytes): preg_match matches over a &str.
-        let term = getenv("TERM")
-            .unwrap_or_default()
-            .into_string()
-            .unwrap_or_else(|term| panic!("TERM is not valid UTF-8: {term:?}"));
-        if "dumb" == term {
+        let term = getenv("TERM").unwrap_or_default();
+        let term = term.as_encoded_bytes();
+        if b"dumb" == term {
             return false;
         }
 
@@ -124,7 +122,7 @@ impl StreamOutput {
             php_regex!(
                 "/^((screen|xterm|vt100|vt220|putty|rxvt|ansi|cygwin|linux).*)|(.*-256(color)?(-bce)?)$/"
             ),
-            &term,
+            term,
         )
     }
 }
@@ -139,10 +137,10 @@ fn no_color_first_char() -> Option<u8> {
 }
 
 impl DoWrite for StreamOutput {
-    fn do_write(&self, message: &str, newline: bool) {
-        let mut message = message.to_string();
+    fn do_write(&self, message: &BStr, newline: bool) {
+        let mut message = BString::from(message);
         if newline {
-            message.push_str(PHP_EOL);
+            message.extend_from_slice(PHP_EOL.as_bytes());
         }
 
         fwrite_resource(&self.stream, &message);
@@ -152,10 +150,10 @@ impl DoWrite for StreamOutput {
 }
 
 impl OutputInterface for StreamOutput {
-    fn write(&self, messages: &[String], newline: bool, options: i64) {
+    fn write(&self, messages: &[BString], newline: bool, options: i64) {
         self.inner.write(self, messages, newline, options);
     }
-    fn writeln(&self, messages: &[String], options: i64) {
+    fn writeln(&self, messages: &[BString], options: i64) {
         self.inner.writeln(self, messages, options);
     }
     fn set_verbosity(&self, level: i64) {

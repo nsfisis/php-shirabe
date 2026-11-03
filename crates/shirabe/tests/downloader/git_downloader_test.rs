@@ -5,7 +5,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -16,7 +16,7 @@ use shirabe::package::Mirror;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe::util::{Git as GitUtil, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, error_message, path_from_bytes, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -24,7 +24,7 @@ fn set_up() -> TempDir {
     // skipIfNotExecutable('git') is irrelevant because every git invocation is mocked.
 
     // initGitVersion('1.0.0'): seed the Composer\Util\Git static version cache.
-    GitUtil::__set_version(Some("1.0.0".to_string()));
+    GitUtil::__set_version(Some("1.0.0".into()));
 
     TempDir::new().unwrap()
 }
@@ -62,17 +62,17 @@ impl Drop for TearDown {
 /// The multi-URL/mirror cases in PHP configure `getSourceUrls` to an arbitrary
 /// list that a real package cannot reproduce, so those tests stay ignored.
 fn get_package(
-    name: &str,
-    pretty_version: &str,
-    source_reference: Option<&str>,
-    source_url: Option<&str>,
+    name: &BStr,
+    pretty_version: &BStr,
+    source_reference: Option<&BStr>,
+    source_url: Option<&BStr>,
 ) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(pretty_version, None).unwrap();
     let package =
-        CompletePackageHandle::new(name.to_string(), norm_version, pretty_version.to_string());
-    package.__set_source_type(Some("git".to_string()));
-    package.set_source_reference(source_reference.map(|s| s.to_string()));
-    package.set_source_url(source_url.map(|s| s.to_string()));
+        CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(pretty_version));
+    package.__set_source_type(Some(BString::from("git")));
+    package.set_source_reference(source_reference.map(|s| bconcat!(s)));
+    package.set_source_url(source_url.map(|s| bconcat!(s)));
     package.into()
 }
 
@@ -83,10 +83,7 @@ fn setup_config(config: Config) -> Config {
         let tmp_dir = TempDir::new().unwrap().keep();
         let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
         let mut section: IndexMap<BString, PhpMixed> = IndexMap::new();
-        section.insert(
-            "home".into(),
-            PhpMixed::string(tmp_dir.to_str().unwrap().to_string()),
-        );
+        section.insert("home".into(), PhpMixed::string(path_to_bytes(&tmp_dir)));
         top.insert("config".into(), PhpMixed::Array(section));
         config.merge(&top, Config::SOURCE_UNKNOWN);
     }
@@ -116,22 +113,38 @@ fn test_download_for_package_without_source_reference() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let package = get_package("dummy/pkg", "1.0.0", None, None);
+    let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"), None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
     let downloader = get_downloader_mock(None, None, process, None);
 
     let result = run(async {
-        downloader.download(package.clone(), "/path", None).await?;
         downloader
-            .prepare("install", package.clone(), "/path", None)
+            .download(package.clone(), std::path::Path::new("/path"), None)
             .await?;
-        downloader.install(package.clone(), "/path").await?;
-        downloader.cleanup("install", package, "/path", None).await
+        downloader
+            .prepare(
+                BStr::new("install"),
+                package.clone(),
+                std::path::Path::new("/path"),
+                None,
+            )
+            .await?;
+        downloader
+            .install(package.clone(), std::path::Path::new("/path"))
+            .await?;
+        downloader
+            .cleanup(
+                BStr::new("install"),
+                package,
+                std::path::Path::new("/path"),
+                None,
+            )
+            .await
     });
 
     let e = result.expect_err("missing source reference should throw");
-    assert!(e.to_string().contains("missing reference information"));
+    assert!(error_message(&e).contains_str("missing reference information"));
 }
 
 #[serial]
@@ -140,35 +153,51 @@ fn test_download() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let url = "https://example.com/composer/composer";
+    let url = BStr::new("https://example.com/composer/composer");
     let package = get_package(
-        "composer/composer",
-        "dev-master",
-        Some("1234567890123456789012345678901234567890"),
+        BStr::new("composer/composer"),
+        BStr::new("dev-master"),
+        Some(BStr::new("1234567890123456789012345678901234567890")),
         Some(url),
     );
 
-    let expected_path = working_dir
-        .path()
-        .join("composerPath")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let expected_path = bconcat!(working_dir.path().join("composerPath"));
 
     let (process, _guard) = get_process_executor_mock(
         vec![
             cmd(vec![
-                "git",
-                "clone",
-                "--no-checkout",
-                "--",
+                BStr::new("git"),
+                BStr::new("clone"),
+                BStr::new("--no-checkout"),
+                BStr::new("--"),
                 url,
-                &expected_path,
+                expected_path.as_bstr(),
             ]),
-            cmd(vec!["git", "remote", "add", "composer", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("add"),
+                BStr::new("composer"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd(["git", "fetch", "composer"]),
-            cmd(vec!["git", "remote", "set-url", "origin", "--", url]),
-            cmd(vec!["git", "remote", "set-url", "composer", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("origin"),
+                BStr::new("--"),
+                url,
+            ]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("composer"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd(["git", "branch", "-r"]),
             cmd(["git", "checkout", "master", "--"]),
             cmd(vec![
@@ -187,19 +216,29 @@ fn test_download() {
 
     run(async {
         downloader
-            .download(package.clone(), &expected_path, None)
+            .download(package.clone(), path_from_bytes(&expected_path), None)
             .await
             .unwrap();
         downloader
-            .prepare("install", package.clone(), &expected_path, None)
+            .prepare(
+                BStr::new("install"),
+                package.clone(),
+                path_from_bytes(&expected_path),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .install(package.clone(), &expected_path)
+            .install(package.clone(), path_from_bytes(&expected_path))
             .await
             .unwrap();
         downloader
-            .cleanup("install", package, &expected_path, None)
+            .cleanup(
+                BStr::new("install"),
+                package,
+                path_from_bytes(&expected_path),
+                None,
+            )
             .await
             .unwrap();
     });
@@ -211,57 +250,68 @@ fn test_download_with_cache() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let url = "https://example.com/composer/composer";
+    let url = BStr::new("https://example.com/composer/composer");
     let package = get_package(
-        "composer/composer",
-        "dev-master",
-        Some("1234567890123456789012345678901234567890"),
+        BStr::new("composer/composer"),
+        BStr::new("dev-master"),
+        Some(BStr::new("1234567890123456789012345678901234567890")),
         Some(url),
     );
 
     // initGitVersion('2.17.0'): enables the cache (`--dissociate`) code path.
-    GitUtil::__set_version(Some("2.17.0".to_string()));
+    GitUtil::__set_version(Some("2.17.0".into()));
 
     let config = setup_config(Config::new(false, None));
     let cache_vcs_dir = config
         .get("cache-vcs-dir")
         .as_string()
         .unwrap_or_default()
-        .to_string();
+        .to_owned();
     // ref: GitDownloaderTest cachePath = cache-vcs-dir.'/'.preg_replace('{[^a-z0-9.]}i', '-', url).'/'
-    let sanitized: String = url
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '.' {
+    let sanitized: BString = url
+        .iter()
+        .map(|&c| {
+            if c.is_ascii_alphanumeric() || c == b'.' {
                 c
             } else {
-                '-'
+                b'-'
             }
         })
         .collect();
-    let cache_path = format!("{}/{}/", cache_vcs_dir, sanitized);
+    let cache_path = bconcat!(cache_vcs_dir, "/", sanitized, "/");
 
     let mut filesystem = Filesystem::new(None);
-    filesystem.remove_directory(&cache_path).unwrap();
+    filesystem
+        .remove_directory(path_from_bytes(&cache_path))
+        .unwrap();
 
-    let expected_path = working_dir
-        .path()
-        .join("composerPath")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let expected_path = bconcat!(working_dir.path().join("composerPath"));
 
     let cache_path_for_callback = cache_path.clone();
-    let mut clone_mirror = cmd(vec!["git", "clone", "--mirror", "--", url, &cache_path]);
+    let mut clone_mirror = cmd(vec![
+        BStr::new("git"),
+        BStr::new("clone"),
+        BStr::new("--mirror"),
+        BStr::new("--"),
+        url,
+        cache_path.as_bstr(),
+    ]);
     clone_mirror.callback = Some(Box::new(move || {
-        std::fs::create_dir_all(&cache_path_for_callback).ok();
+        std::fs::create_dir_all(path_from_bytes(&cache_path_for_callback)).ok();
     }));
 
     let (process, _guard) = get_process_executor_mock(
         vec![
             clone_mirror,
             cmd(["git", "remote", "-v"]),
-            cmd(vec!["git", "remote", "set-url", "origin", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("origin"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd_full(["git", "rev-parse", "--git-dir"], 0, ".", ""),
             cmd(vec![
                 "git",
@@ -271,17 +321,31 @@ fn test_download_with_cache() {
                 "1234567890123456789012345678901234567890^{commit}",
             ]),
             cmd(vec![
-                "git",
-                "clone",
-                "--no-checkout",
-                &cache_path,
-                &expected_path,
-                "--dissociate",
-                "--reference",
-                &cache_path,
+                BStr::new("git"),
+                BStr::new("clone"),
+                BStr::new("--no-checkout"),
+                cache_path.as_bstr(),
+                expected_path.as_bstr(),
+                BStr::new("--dissociate"),
+                BStr::new("--reference"),
+                cache_path.as_bstr(),
             ]),
-            cmd(vec!["git", "remote", "set-url", "origin", "--", url]),
-            cmd(vec!["git", "remote", "add", "composer", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("origin"),
+                BStr::new("--"),
+                url,
+            ]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("add"),
+                BStr::new("composer"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd(["git", "branch", "-r"]),
             cmd_full(["git", "checkout", "master", "--"], 1, "", ""),
             cmd(vec![
@@ -308,25 +372,35 @@ fn test_download_with_cache() {
 
     run(async {
         downloader
-            .download(package.clone(), &expected_path, None)
+            .download(package.clone(), path_from_bytes(&expected_path), None)
             .await
             .unwrap();
         downloader
-            .prepare("install", package.clone(), &expected_path, None)
+            .prepare(
+                BStr::new("install"),
+                package.clone(),
+                path_from_bytes(&expected_path),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .install(package.clone(), &expected_path)
+            .install(package.clone(), path_from_bytes(&expected_path))
             .await
             .unwrap();
         downloader
-            .cleanup("install", package, &expected_path, None)
+            .cleanup(
+                BStr::new("install"),
+                package,
+                path_from_bytes(&expected_path),
+                None,
+            )
             .await
             .unwrap();
     });
 
     let mut fs = Filesystem::new(None);
-    fs.remove_directory(&cache_path).ok();
+    fs.remove_directory(path_from_bytes(&cache_path)).ok();
 }
 
 #[serial]
@@ -336,49 +410,44 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
     let package = get_package(
-        "composer/composer",
-        "1.0.0",
-        Some("ref"),
-        Some("https://github.com/composer/composer"),
+        BStr::new("composer/composer"),
+        BStr::new("1.0.0"),
+        Some(BStr::new("ref")),
+        Some(BStr::new("https://github.com/composer/composer")),
     );
     // A preferred mirror with no `%...%` placeholders is passed through
     // ComposerMirror::process_git_url unchanged, so getSourceUrls() lists it (unmodified) ahead
     // of the source url, mirroring the PHP mock's
     // `willReturn(['https://github.com/mirrors/composer', 'https://github.com/composer/composer'])`.
     package.set_source_mirrors(Some(vec![Mirror {
-        url: "https://github.com/mirrors/composer".to_string(),
+        url: BString::from("https://github.com/mirrors/composer"),
         preferred: true,
     }]));
 
-    let expected_path = working_dir
-        .path()
-        .join("composerPath")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let expected_path = bconcat!(working_dir.path().join("composerPath"));
 
     let (process, _guard) = get_process_executor_mock(
         vec![
             cmd_full(
                 vec![
-                    "git",
-                    "clone",
-                    "--no-checkout",
-                    "--",
-                    "https://github.com/mirrors/composer",
-                    &expected_path,
+                    BStr::new("git"),
+                    BStr::new("clone"),
+                    BStr::new("--no-checkout"),
+                    BStr::new("--"),
+                    BStr::new("https://github.com/mirrors/composer"),
+                    expected_path.as_bstr(),
                 ],
                 1,
                 "",
                 "Error1",
             ),
             cmd(vec![
-                "git",
-                "clone",
-                "--no-checkout",
-                "--",
-                "git@github.com:mirrors/composer",
-                &expected_path,
+                BStr::new("git"),
+                BStr::new("clone"),
+                BStr::new("--no-checkout"),
+                BStr::new("--"),
+                BStr::new("git@github.com:mirrors/composer"),
+                expected_path.as_bstr(),
             ]),
             cmd(vec![
                 "git",
@@ -434,19 +503,29 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
 
     run(async {
         downloader
-            .download(package.clone(), &expected_path, None)
+            .download(package.clone(), path_from_bytes(&expected_path), None)
             .await
             .unwrap();
         downloader
-            .prepare("install", package.clone(), &expected_path, None)
+            .prepare(
+                BStr::new("install"),
+                package.clone(),
+                path_from_bytes(&expected_path),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .install(package.clone(), &expected_path)
+            .install(package.clone(), path_from_bytes(&expected_path))
             .await
             .unwrap();
         downloader
-            .cleanup("install", package, &expected_path, None)
+            .cleanup(
+                BStr::new("install"),
+                package,
+                path_from_bytes(&expected_path),
+                None,
+            )
             .await
             .unwrap();
     });
@@ -456,21 +535,21 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
 #[test]
 fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
     // ref: pushUrlProvider — (github-protocols, fetch url, push url).
-    let cases: Vec<(Vec<&str>, &str, &str)> = vec![
+    let cases: Vec<(Vec<&BStr>, &BStr, &BStr)> = vec![
         (
-            vec!["ssh"],
-            "git@github.com:composer/composer",
-            "git@github.com:composer/composer.git",
+            vec![BStr::new("ssh")],
+            BStr::new("git@github.com:composer/composer"),
+            BStr::new("git@github.com:composer/composer.git"),
         ),
         (
-            vec!["https", "ssh", "git"],
-            "https://github.com/composer/composer",
-            "git@github.com:composer/composer.git",
+            vec![BStr::new("https"), BStr::new("ssh"), BStr::new("git")],
+            BStr::new("https://github.com/composer/composer"),
+            BStr::new("git@github.com:composer/composer.git"),
         ),
         (
-            vec!["https"],
-            "https://github.com/composer/composer",
-            "https://github.com/composer/composer.git",
+            vec![BStr::new("https")],
+            BStr::new("https://github.com/composer/composer"),
+            BStr::new("https://github.com/composer/composer.git"),
         ),
     ];
 
@@ -479,35 +558,57 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
         let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
         let package = get_package(
-            "composer/composer",
-            "1.0.0",
-            Some("ref"),
-            Some("https://github.com/composer/composer"),
+            BStr::new("composer/composer"),
+            BStr::new("1.0.0"),
+            Some(BStr::new("ref")),
+            Some(BStr::new("https://github.com/composer/composer")),
         );
 
-        let expected_path = working_dir
-            .path()
-            .join("composerPath")
-            .to_str()
-            .unwrap()
-            .to_string();
+        let expected_path = bconcat!(working_dir.path().join("composerPath"));
 
         let (process, _guard) = get_process_executor_mock(
             vec![
                 cmd(vec![
-                    "git",
-                    "clone",
-                    "--no-checkout",
-                    "--",
+                    BStr::new("git"),
+                    BStr::new("clone"),
+                    BStr::new("--no-checkout"),
+                    BStr::new("--"),
                     url,
-                    &expected_path,
+                    expected_path.as_bstr(),
                 ]),
-                cmd(vec!["git", "remote", "add", "composer", "--", url]),
-                cmd(["git", "fetch", "composer"]),
-                cmd(vec!["git", "remote", "set-url", "origin", "--", url]),
-                cmd(vec!["git", "remote", "set-url", "composer", "--", url]),
                 cmd(vec![
-                    "git", "remote", "set-url", "--push", "origin", "--", push_url,
+                    BStr::new("git"),
+                    BStr::new("remote"),
+                    BStr::new("add"),
+                    BStr::new("composer"),
+                    BStr::new("--"),
+                    url,
+                ]),
+                cmd(["git", "fetch", "composer"]),
+                cmd(vec![
+                    BStr::new("git"),
+                    BStr::new("remote"),
+                    BStr::new("set-url"),
+                    BStr::new("origin"),
+                    BStr::new("--"),
+                    url,
+                ]),
+                cmd(vec![
+                    BStr::new("git"),
+                    BStr::new("remote"),
+                    BStr::new("set-url"),
+                    BStr::new("composer"),
+                    BStr::new("--"),
+                    url,
+                ]),
+                cmd(vec![
+                    BStr::new("git"),
+                    BStr::new("remote"),
+                    BStr::new("set-url"),
+                    BStr::new("--push"),
+                    BStr::new("origin"),
+                    BStr::new("--"),
+                    push_url,
                 ]),
                 cmd(["git", "branch", "-r"]),
                 cmd(["git", "checkout", "ref", "--"]),
@@ -525,7 +626,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
             PhpMixed::List(
                 protocols
                     .iter()
-                    .map(|p| PhpMixed::string(p.to_string()))
+                    .map(|p| PhpMixed::string(bconcat!(p)))
                     .collect(),
             ),
         );
@@ -536,19 +637,29 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
 
         run(async {
             downloader
-                .download(package.clone(), &expected_path, None)
+                .download(package.clone(), path_from_bytes(&expected_path), None)
                 .await
                 .unwrap();
             downloader
-                .prepare("install", package.clone(), &expected_path, None)
+                .prepare(
+                    BStr::new("install"),
+                    package.clone(),
+                    path_from_bytes(&expected_path),
+                    None,
+                )
                 .await
                 .unwrap();
             downloader
-                .install(package.clone(), &expected_path)
+                .install(package.clone(), path_from_bytes(&expected_path))
                 .await
                 .unwrap();
             downloader
-                .cleanup("install", package, &expected_path, None)
+                .cleanup(
+                    BStr::new("install"),
+                    package,
+                    path_from_bytes(&expected_path),
+                    None,
+                )
                 .await
                 .unwrap();
         });
@@ -561,19 +672,26 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let url = "https://example.com/composer/composer";
-    let package = get_package("composer/composer", "1.0.0", Some("ref"), Some(url));
+    let url = BStr::new("https://example.com/composer/composer");
+    let package = get_package(
+        BStr::new("composer/composer"),
+        BStr::new("1.0.0"),
+        Some(BStr::new("ref")),
+        Some(url),
+    );
 
-    let expected_path = working_dir
-        .path()
-        .join("composerPath")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let expected_path = bconcat!(working_dir.path().join("composerPath"));
 
     let (process, _guard) = get_process_executor_mock(
         vec![cmd_full(
-            vec!["git", "clone", "--no-checkout", "--", url, &expected_path],
+            vec![
+                BStr::new("git"),
+                BStr::new("clone"),
+                BStr::new("--no-checkout"),
+                BStr::new("--"),
+                url,
+                expected_path.as_bstr(),
+            ],
             1,
             "",
             "",
@@ -586,21 +704,35 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
 
     let result = run(async {
         downloader
-            .download(package.clone(), &expected_path, None)
+            .download(package.clone(), path_from_bytes(&expected_path), None)
             .await?;
         downloader
-            .prepare("install", package.clone(), &expected_path, None)
+            .prepare(
+                BStr::new("install"),
+                package.clone(),
+                path_from_bytes(&expected_path),
+                None,
+            )
             .await?;
-        downloader.install(package.clone(), &expected_path).await?;
         downloader
-            .cleanup("install", package, &expected_path, None)
+            .install(package.clone(), path_from_bytes(&expected_path))
+            .await?;
+        downloader
+            .cleanup(
+                BStr::new("install"),
+                package,
+                path_from_bytes(&expected_path),
+                None,
+            )
             .await
     });
 
     let e = result.expect_err("failed git clone should throw");
-    assert!(e.to_string().contains(&format!(
-        "Failed to execute git clone --no-checkout -- {} {}",
-        url, expected_path
+    assert!(error_message(&e).contains_str(bconcat!(
+        "Failed to execute git clone --no-checkout -- ",
+        url,
+        " ",
+        expected_path
     )));
 }
 
@@ -610,8 +742,13 @@ fn test_updatefor_package_without_source_reference() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let initial_package = get_package("dummy/pkg", "1.0.0", Some("ref"), None);
-    let source_package = get_package("dummy/pkg", "1.0.0", None, None);
+    let initial_package = get_package(
+        BStr::new("dummy/pkg"),
+        BStr::new("1.0.0"),
+        Some(BStr::new("ref")),
+        None,
+    );
+    let source_package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"), None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
     let downloader = get_downloader_mock(None, None, process, None);
@@ -620,28 +757,37 @@ fn test_updatefor_package_without_source_reference() {
         downloader
             .download(
                 source_package.clone(),
-                "/path",
+                std::path::Path::new("/path"),
                 Some(initial_package.clone()),
             )
             .await?;
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 source_package.clone(),
-                "/path",
+                std::path::Path::new("/path"),
                 Some(initial_package.clone()),
             )
             .await?;
         downloader
-            .update(initial_package.clone(), source_package.clone(), "/path")
+            .update(
+                initial_package.clone(),
+                source_package.clone(),
+                std::path::Path::new("/path"),
+            )
             .await?;
         downloader
-            .cleanup("update", source_package, "/path", Some(initial_package))
+            .cleanup(
+                BStr::new("update"),
+                source_package,
+                std::path::Path::new("/path"),
+                Some(initial_package),
+            )
             .await
     });
 
     let e = result.expect_err("missing source reference should throw");
-    assert!(e.to_string().contains("missing reference information"));
+    assert!(error_message(&e).contains_str("missing reference information"));
 }
 
 #[serial]
@@ -650,8 +796,13 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let url = "https://github.com/composer/composer";
-    let package = get_package("composer/composer", "1.0.0", Some("ref"), Some(url));
+    let url = BStr::new("https://github.com/composer/composer");
+    let package = get_package(
+        BStr::new("composer/composer"),
+        BStr::new("1.0.0"),
+        Some(BStr::new("ref")),
+        Some(url),
+    );
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -665,11 +816,25 @@ fn test_update() {
             ),
             // fallback commands for the above failing
             cmd(["git", "remote", "-v"]),
-            cmd(vec!["git", "remote", "set-url", "composer", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("composer"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd(["git", "fetch", "composer"]),
             cmd(["git", "fetch", "--tags", "composer"]),
             cmd(["git", "remote", "-v"]),
-            cmd(vec!["git", "remote", "set-url", "composer", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("composer"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd(["git", "branch", "-r"]),
             cmd(["git", "checkout", "ref", "--"]),
             cmd(["git", "reset", "--hard", "ref", "--"]),
@@ -680,32 +845,45 @@ fn test_update() {
     );
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
     run(async {
         downloader
-            .download(package.clone(), &working_dir_str, Some(package.clone()))
-            .await
-            .unwrap();
-        downloader
-            .prepare(
-                "update",
+            .download(
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .prepare(
+                BStr::new("update"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package.clone()),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
+            .await
+            .unwrap();
+        downloader
+            .cleanup(
+                BStr::new("update"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
             .unwrap();
     });
@@ -717,8 +895,13 @@ fn test_update_with_new_repo_url() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let url = "https://github.com/composer/composer";
-    let package = get_package("composer/composer", "1.0.0", Some("ref"), Some(url));
+    let url = BStr::new("https://github.com/composer/composer");
+    let package = get_package(
+        BStr::new("composer/composer"),
+        BStr::new("1.0.0"),
+        Some(BStr::new("ref")),
+        Some(url),
+    );
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -731,7 +914,14 @@ fn test_update_with_new_repo_url() {
                 "",
             ),
             cmd(["git", "remote", "-v"]),
-            cmd(vec!["git", "remote", "set-url", "composer", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("composer"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd(["git", "branch", "-r"]),
             cmd(["git", "checkout", "ref", "--"]),
             cmd(["git", "reset", "--hard", "ref", "--"]),
@@ -744,7 +934,14 @@ fn test_update_with_new_repo_url() {
                  composer https://github.com/old/url (push)\n",
                 "",
             ),
-            cmd(vec!["git", "remote", "set-url", "origin", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("origin"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd(vec![
                 "git",
                 "remote",
@@ -760,32 +957,45 @@ fn test_update_with_new_repo_url() {
     );
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
     run(async {
         downloader
-            .download(package.clone(), &working_dir_str, Some(package.clone()))
-            .await
-            .unwrap();
-        downloader
-            .prepare(
-                "update",
+            .download(
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .prepare(
+                BStr::new("update"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package.clone()),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
+            .await
+            .unwrap();
+        downloader
+            .cleanup(
+                BStr::new("update"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
             .unwrap();
     });
@@ -797,8 +1007,13 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let url = "https://github.com/composer/composer";
-    let package = get_package("composer/composer", "1.0.0", Some("ref"), Some(url));
+    let url = BStr::new("https://github.com/composer/composer");
+    let package = get_package(
+        BStr::new("composer/composer"),
+        BStr::new("1.0.0"),
+        Some(BStr::new("ref")),
+        Some(url),
+    );
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -813,7 +1028,14 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
             ),
             // fail first fetch
             cmd(["git", "remote", "-v"]),
-            cmd(vec!["git", "remote", "set-url", "composer", "--", url]),
+            cmd(vec![
+                BStr::new("git"),
+                BStr::new("remote"),
+                BStr::new("set-url"),
+                BStr::new("composer"),
+                BStr::new("--"),
+                url,
+            ]),
             cmd_full(["git", "fetch", "composer"], 1, "", ""),
             // fail second fetch
             cmd(vec![
@@ -832,9 +1054,9 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
     );
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let config = Config::new(false, None);
 
@@ -842,29 +1064,42 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
 
     let result = run(async {
         downloader
-            .download(package.clone(), &working_dir_str, Some(package.clone()))
-            .await?;
-        downloader
-            .prepare(
-                "update",
+            .download(
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await?;
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .prepare(
+                BStr::new("update"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package.clone()),
+            )
             .await?;
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
+            .await?;
+        downloader
+            .cleanup(
+                BStr::new("update"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
     });
 
     let e = result.expect_err("failing git fetch should throw");
-    assert!(e.to_string().contains(
+    assert!(error_message(&e).contains_str(
         "Failed to clone https://github.com/composer/composer via https, ssh protocols, aborting."
     ));
-    assert!(e.to_string().contains("git@github.com:composer/composer"));
+    assert!(error_message(&e).contains_str("git@github.com:composer/composer"));
 }
 
 #[serial]
@@ -874,12 +1109,17 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let package = get_package("composer/composer", "1.0.0", Some("ref"), Some("/"));
+    let package = get_package(
+        BStr::new("composer/composer"),
+        BStr::new("1.0.0"),
+        Some(BStr::new("ref")),
+        Some(BStr::new("/")),
+    );
     // A non-preferred mirror is appended after the source url, mirroring the PHP mock's
     // `willReturn(['/', 'https://github.com/composer/composer'])`: the first ("/") url fails,
     // and VcsDownloader::update retries with the second (the mirror).
     package.set_source_mirrors(Some(vec![Mirror {
-        url: "https://github.com/composer/composer".to_string(),
+        url: BString::from("https://github.com/composer/composer"),
         preferred: false,
     }]));
 
@@ -937,32 +1177,45 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
     );
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(None, Some(Config::new(false, None)), process, None);
 
     run(async {
         downloader
-            .download(package.clone(), &working_dir_str, Some(package.clone()))
-            .await
-            .unwrap();
-        downloader
-            .prepare(
-                "update",
+            .download(
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .prepare(
+                BStr::new("update"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package.clone()),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
+            .await
+            .unwrap();
+        downloader
+            .cleanup(
+                BStr::new("update"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
             .unwrap();
     });
@@ -974,14 +1227,24 @@ fn test_downgrade_shows_appropriate_message() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let url = "https://github.com/composer/composer";
+    let url = BStr::new("https://github.com/composer/composer");
 
-    let old_package = get_package("composer/composer", "1.2.0", Some("ref"), Some("/foo/bar"));
+    let old_package = get_package(
+        BStr::new("composer/composer"),
+        BStr::new("1.2.0"),
+        Some(BStr::new("ref")),
+        Some(BStr::new("/foo/bar")),
+    );
     old_package.set_source_mirrors(Some(vec![Mirror {
-        url: url.to_string(),
+        url: bconcat!(url),
         preferred: false,
     }]));
-    let new_package = get_package("composer/composer", "1.0.0", Some("ref"), Some(url));
+    let new_package = get_package(
+        BStr::new("composer/composer"),
+        BStr::new("1.0.0"),
+        Some(BStr::new("ref")),
+        Some(url),
+    );
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
 
@@ -993,9 +1256,9 @@ fn test_downgrade_shows_appropriate_message() {
     let io = io_mock as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(Some(io), None, process, None);
 
@@ -1003,26 +1266,35 @@ fn test_downgrade_shows_appropriate_message() {
         downloader
             .download(
                 new_package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
             )
             .await
             .unwrap();
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 new_package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(old_package.clone(), new_package.clone(), &working_dir_str)
+            .update(
+                old_package.clone(),
+                new_package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", new_package, &working_dir_str, Some(old_package))
+            .cleanup(
+                BStr::new("update"),
+                new_package,
+                std::path::Path::new(&working_dir_str),
+                Some(old_package),
+            )
             .await
             .unwrap();
     });
@@ -1038,27 +1310,27 @@ fn test_not_using_downgrading_with_references() {
 
     // dev versions: getVersion() is the (non-normalized) branch name.
     let old_package = CompletePackageHandle::new(
-        "composer/composer".to_string(),
-        "dev-ref".to_string(),
-        "dev-ref".to_string(),
+        BString::from("composer/composer"),
+        BString::from("dev-ref"),
+        BString::from("dev-ref"),
     );
-    old_package.__set_source_type(Some("git".to_string()));
-    old_package.set_source_reference(Some("ref".to_string()));
-    old_package.set_source_url(Some("/foo/bar".to_string()));
+    old_package.__set_source_type(Some(BString::from("git")));
+    old_package.set_source_reference(Some(BString::from("ref")));
+    old_package.set_source_url(Some(BString::from("/foo/bar")));
     old_package.set_source_mirrors(Some(vec![Mirror {
-        url: url.to_string(),
+        url: bconcat!(url),
         preferred: false,
     }]));
     let old_package: PackageInterfaceHandle = old_package.into();
 
     let new_package = CompletePackageHandle::new(
-        "composer/composer".to_string(),
-        "dev-ref2".to_string(),
-        "dev-ref2".to_string(),
+        BString::from("composer/composer"),
+        BString::from("dev-ref2"),
+        BString::from("dev-ref2"),
     );
-    new_package.__set_source_type(Some("git".to_string()));
-    new_package.set_source_reference(Some("ref".to_string()));
-    new_package.set_source_url(Some(url.to_string()));
+    new_package.__set_source_type(Some(BString::from("git")));
+    new_package.set_source_reference(Some(BString::from("ref")));
+    new_package.set_source_url(Some(bconcat!(url)));
     let new_package: PackageInterfaceHandle = new_package.into();
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
@@ -1071,9 +1343,9 @@ fn test_not_using_downgrading_with_references() {
     let io = io_mock as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+    fs.ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
     let downloader = get_downloader_mock(Some(io), None, process, None);
 
@@ -1081,26 +1353,35 @@ fn test_not_using_downgrading_with_references() {
         downloader
             .download(
                 new_package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
             )
             .await
             .unwrap();
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 new_package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(old_package.clone(), new_package.clone(), &working_dir_str)
+            .update(
+                old_package.clone(),
+                new_package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", new_package, &working_dir_str, Some(old_package))
+            .cleanup(
+                BStr::new("update"),
+                new_package,
+                std::path::Path::new(&working_dir_str),
+                Some(old_package),
+            )
             .await
             .unwrap();
     });
@@ -1111,9 +1392,9 @@ fn test_not_using_downgrading_with_references() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = working_dir.path().to_path_buf();
 
-    let package = get_package("dummy/pkg", "1.0.0", None, None);
+    let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"), None, None);
     let (process, _guard) = get_process_executor_mock(
         vec![
             cmd(vec!["git", "show-ref", "--head", "-d"]),
@@ -1124,7 +1405,7 @@ fn test_remove() {
     );
 
     Filesystem::new(None)
-        .ensure_directory_exists(working_dir.path().join(".git").to_str().unwrap())
+        .ensure_directory_exists(working_dir.path().join(".git"))
         .unwrap();
 
     let mut filesystem = Filesystem::new(None);
@@ -1137,15 +1418,25 @@ fn test_remove() {
     let downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
     run(async {
         downloader
-            .prepare("uninstall", package.clone(), &working_dir_str, None)
+            .prepare(
+                BStr::new("uninstall"),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .remove(package.clone(), &working_dir_str)
+            .remove(package.clone(), std::path::Path::new(&working_dir_str))
             .await
             .unwrap();
         downloader
-            .cleanup("uninstall", package, &working_dir_str, None)
+            .cleanup(
+                BStr::new("uninstall"),
+                package,
+                std::path::Path::new(&working_dir_str),
+                None,
+            )
             .await
             .unwrap();
     });

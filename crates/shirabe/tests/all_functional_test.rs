@@ -5,10 +5,14 @@
 // integration fixtures by invoking that binary as a subprocess, mirroring the PHP harness which
 // shells out to the built composer.phar.
 
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::{PhpMixed, intval, php_regex, preg_match, preg_split_delim_capture};
+use shirabe_php_shim::{
+    PhpMixed, bconcat, intval, os_str_from_bytes, path_from_bytes, php_regex, preg_match,
+    preg_split_delim_capture, trim, utf8_text,
+};
 use std::path::{Path, PathBuf};
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
@@ -63,11 +67,11 @@ fn unique_tmp_directory() -> PathBuf {
 }
 
 // ref: AllFunctionalTest::parseTestFile
-fn parse_test_file(file: &Path) -> IndexMap<String, String> {
-    let contents = std::fs::read_to_string(file).unwrap();
+fn parse_test_file(file: &Path) -> IndexMap<BString, BString> {
+    let contents = std::fs::read(file).unwrap();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
-    let mut data: IndexMap<String, String> = IndexMap::new();
-    let mut section: Option<String> = None;
+    let mut data: IndexMap<BString, BString> = IndexMap::new();
+    let mut section: Option<BString> = None;
 
     for token in tokens {
         if token.is_empty() && section.is_none() {
@@ -83,14 +87,14 @@ fn parse_test_file(file: &Path) -> IndexMap<String, String> {
         let sec = section.take().unwrap();
 
         // Allow sections to validate, or modify their section data.
-        let section_data = match sec.as_str() {
-            "EXPECT-EXIT-CODE" => intval(&PhpMixed::from(token)).to_string(),
-            "RUN" | "EXPECT" | "EXPECT-REGEX" | "EXPECT-REGEXES" => token.trim().to_string(),
-            "TEST" => token,
+        let section_data = match sec.as_bytes() {
+            b"EXPECT-EXIT-CODE" => bconcat!(intval(&PhpMixed::from(token))),
+            b"RUN" | b"EXPECT" | b"EXPECT-REGEX" | b"EXPECT-REGEXES" => trim(&token),
+            b"TEST" => token,
             _ => panic!(
                 "Unknown section \"{}\". Allowed sections: \"RUN\", \"EXPECT\", \"EXPECT-EXIT-CODE\", \"EXPECT-REGEX\", \"EXPECT-REGEXES\". \
                  Section headers must be written as \"--HEADER_NAME--\".",
-                sec
+                sec.display_lossy()
             ),
         };
 
@@ -99,13 +103,13 @@ fn parse_test_file(file: &Path) -> IndexMap<String, String> {
 
     // validate data
     assert!(
-        data.contains_key("RUN"),
+        data.contains_key(B("RUN")),
         "The test file must have a section named \"RUN\"."
     );
     assert!(
-        data.contains_key("EXPECT")
-            || data.contains_key("EXPECT-REGEX")
-            || data.contains_key("EXPECT-REGEXES"),
+        data.contains_key(B("EXPECT"))
+            || data.contains_key(B("EXPECT-REGEX"))
+            || data.contains_key(B("EXPECT-REGEXES")),
         "The test file must have a section named \"EXPECT\", \"EXPECT-REGEX\", or \"EXPECT-REGEXES\"."
     );
 
@@ -113,33 +117,34 @@ fn parse_test_file(file: &Path) -> IndexMap<String, String> {
 }
 
 // ref: AllFunctionalTest::cleanOutput
-fn clean_output(output: &str) -> String {
+fn clean_output(output: &[u8]) -> BString {
     let mut processed: Vec<u8> = Vec::new();
-    for &byte in output.as_bytes() {
+    for &byte in output {
         if byte == 0x08 {
             processed.pop();
         } else if byte != b'\r' {
             processed.push(byte);
         }
     }
-    String::from_utf8_lossy(&processed).into_owned()
+    processed.into()
 }
 
 /// The fixtures come from Composer's tree and name the `composer` binary in the hints they expect
 /// on stdout; Shirabe prints its own name there.
-fn rename_binary_in_expected_output(expected: &str) -> String {
-    regex::Regex::new(r"\bcomposer (?P<cmd>config|fund|suggest|update)\b")
+fn rename_binary_in_expected_output(expected: &[u8]) -> BString {
+    regex::bytes::Regex::new(r"\bcomposer (?P<cmd>config|fund|suggest|update)\b")
         .unwrap()
-        .replace_all(expected, "shirabe $cmd")
+        .replace_all(expected, &b"shirabe $cmd"[..])
         .into_owned()
+        .into()
 }
 
 /// ref: the inline `--EXPECT--` matcher in AllFunctionalTest::testIntegration. Literal byte
 /// comparison, except `%regex%` spans in `expected` are matched as `{regex}` against the remaining
 /// output and consume whatever they match.
-fn expect_matches(expected: &str, output: &str) {
-    let eb = expected.as_bytes();
-    let ob = output.as_bytes();
+fn expect_matches(expected: &[u8], output: &[u8]) {
+    let eb = expected;
+    let ob = output;
 
     let mut line = 1;
     let mut i = 0usize;
@@ -150,27 +155,35 @@ fn expect_matches(expected: &str, output: &str) {
         }
         if eb[i] == b'%' {
             let Some(m) = preg_match(php_regex!("{%(.+?)%}"), &expected[i..]) else {
-                panic!("Failed to match %...% in {}", &expected[i..]);
+                panic!(
+                    "Failed to match %...% in {}",
+                    expected[i..].as_bstr().display_lossy()
+                );
             };
-            let regex = m.get(1).map(str::to_string).unwrap();
+            let regex = m.get(1).unwrap().to_owned();
 
-            let pattern = format!("{{{}}}", regex);
+            let pattern = bconcat!("{", regex, "}");
             if let Some(m) = preg_match(&pattern, &output[j..]) {
-                let full = m.get(0).map(str::to_string).unwrap();
+                let full = m.get(0).unwrap().to_owned();
                 i += regex.len() + 2;
                 j += full.len();
                 continue;
             } else {
                 panic!(
                     "Failed to match pattern {} at line {} / abs offset {}:\n\nOutput:\n{}",
-                    regex, line, i, output
+                    regex.display_lossy(),
+                    line,
+                    i,
+                    output.as_bstr().display_lossy()
                 );
             }
         }
         if j >= ob.len() || eb[i] != ob[j] {
             panic!(
                 "Output does not match expectation at line {} / abs offset {}:\n\nOutput:\n{}",
-                line, i, output
+                line,
+                i,
+                output.as_bstr().display_lossy()
             );
         }
         i += 1;
@@ -180,10 +193,10 @@ fn expect_matches(expected: &str, output: &str) {
 
 // ref: AllFunctionalTest::testIntegration (the @dataProvider getTestFiles datasets are wired up as
 // the individual #[test] functions below).
-fn run_integration(test_filename: &str) {
+fn run_integration(test_filename: &BStr) {
     let guard = set_up();
 
-    let test_file = fixtures_dir().join(test_filename);
+    let test_file = fixtures_dir().join(path_from_bytes(test_filename));
     let test_data = parse_test_file(&test_file);
 
     let test_dir = unique_tmp_directory();
@@ -191,60 +204,62 @@ fn run_integration(test_filename: &str) {
 
     // if a dir is present with the name of the .test file (without .test), we copy all its contents
     // in the $testDir to be used to run the test with
-    let test_file_setup_dir = fixtures_dir().join(test_filename.strip_suffix(".test").unwrap());
+    let test_file_setup_dir = fixtures_dir().join(path_from_bytes(
+        test_filename.strip_suffix(b".test").unwrap(),
+    ));
     if test_file_setup_dir.is_dir() {
         Filesystem::new(None)
-            .copy(
-                test_file_setup_dir.to_str().unwrap(),
-                test_dir.to_str().unwrap(),
-            )
+            .copy(&test_file_setup_dir, &test_dir)
             .unwrap();
     }
 
-    let composer_home = format!("{}home", test_dir.display());
-    let composer_cache_dir = format!("{}cache", test_dir.display());
+    let composer_home = bconcat!(test_dir, "home");
+    let composer_cache_dir = bconcat!(test_dir, "cache");
 
     // PHP runs `escapeshellcmd(PHP_BINARY) . ' ' . escapeshellarg($pharPath) . ' --no-ansi ' . RUN`
     // via Process::fromShellCommandline; here the shirabe binary takes the place of php+phar. The
     // `2>&1` merges stderr into stdout at the OS level, reproducing the interleaved capture the PHP
     // callback performs.
     let bin = env!("CARGO_BIN_EXE_shirabe");
-    let run = &test_data["RUN"];
-    let command_line = format!("'{}' --no-ansi {} 2>&1", bin, run);
+    let run = &test_data[B("RUN")];
+    let command_line = bconcat!("'", bin, "' --no-ansi ", run, " 2>&1");
 
     let proc = std::process::Command::new("sh")
         .arg("-c")
-        .arg(&command_line)
+        .arg(os_str_from_bytes(&command_line))
         .current_dir(&test_dir)
-        .env("COMPOSER_HOME", &composer_home)
-        .env("COMPOSER_CACHE_DIR", &composer_cache_dir)
+        .env("COMPOSER_HOME", os_str_from_bytes(&composer_home))
+        .env("COMPOSER_CACHE_DIR", os_str_from_bytes(&composer_cache_dir))
         .output()
         .unwrap();
 
     let exit_code = proc.status.code().unwrap_or(-1) as i64;
-    let raw_output = String::from_utf8_lossy(&proc.stdout).into_owned();
+    let raw_output = proc.stdout;
 
-    if let Some(expected) = test_data.get("EXPECT") {
+    if let Some(expected) = test_data.get(B("EXPECT")) {
         let expected = rename_binary_in_expected_output(expected);
         let output = clean_output(&raw_output);
-        let output = output.trim();
-        expect_matches(&expected, output);
+        let output = trim(&output);
+        expect_matches(&expected, &output);
     }
-    if let Some(expect_regex) = test_data.get("EXPECT-REGEX") {
+    if let Some(expect_regex) = test_data.get(B("EXPECT-REGEX")) {
         assert!(preg_match(expect_regex, &clean_output(&raw_output)).is_some());
     }
-    if let Some(expect_regexes) = test_data.get("EXPECT-REGEXES") {
+    if let Some(expect_regexes) = test_data.get(B("EXPECT-REGEXES")) {
         let clean = clean_output(&raw_output);
-        for regex in expect_regexes.split('\n') {
+        for regex in expect_regexes.split_str("\n") {
             assert!(
-                preg_match(regex, &clean).is_some(),
+                preg_match(regex.as_bstr(), &clean).is_some(),
                 "Output: {}",
-                raw_output
+                raw_output.as_bstr().display_lossy()
             );
         }
     }
-    if let Some(expect_exit_code) = test_data.get("EXPECT-EXIT-CODE") {
-        assert_eq!(expect_exit_code.parse::<i64>().unwrap(), exit_code);
+    if let Some(expect_exit_code) = test_data.get(B("EXPECT-EXIT-CODE")) {
+        assert_eq!(
+            utf8_text(expect_exit_code).unwrap().parse::<i64>().unwrap(),
+            exit_code
+        );
     }
 }
 
@@ -260,31 +275,33 @@ fn test_build_phar() {
 #[test]
 #[serial]
 fn test_integration_create_project_command() {
-    run_integration("create-project-command.test");
+    run_integration(BStr::new("create-project-command.test"));
 }
 
 #[test]
 #[serial]
 fn test_integration_create_project_shows_full_hash_for_dev_packages() {
-    run_integration("create-project-shows-full-hash-for-dev-packages.test");
+    run_integration(BStr::new(
+        "create-project-shows-full-hash-for-dev-packages.test",
+    ));
 }
 
 #[test]
 #[serial]
 #[ignore = "the fixture's Hooks read Composer\\InstalledVersions, which is not autoloadable in the plugin worker (the fixture ships no vendor/ directory), so the pre-update hook aborts with `Class \"Composer\\InstalledVersions\" not found`"]
 fn test_integration_installed_versions() {
-    run_integration("installed-versions.test");
+    run_integration(BStr::new("installed-versions.test"));
 }
 
 #[test]
 #[serial]
 #[ignore = "the plugin worker's Composer\\InstalledVersions is only reloaded on a repository write, never seeded from the project's installed.php at boot, so the fixture's plugins fail with `Package \"plugin/a\" is not installed`"]
 fn test_integration_installed_versions2() {
-    run_integration("installed-versions2.test");
+    run_integration(BStr::new("installed-versions2.test"));
 }
 
 #[test]
 #[serial]
 fn test_integration_plugin_autoloading_only_loads_dependencies() {
-    run_integration("plugin-autoloading-only-loads-dependencies.test");
+    run_integration(BStr::new("plugin-autoloading-only-loads-dependencies.test"));
 }

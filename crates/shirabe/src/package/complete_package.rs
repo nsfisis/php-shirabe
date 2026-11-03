@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/CompletePackage.php
 
 use crate::package::{CompletePackageInterface, DisplayMode, Mirror, Package, PackageInterface};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -9,21 +9,21 @@ use shirabe_php_shim::PhpMixed;
 pub struct CompletePackage {
     pub(crate) inner: Package,
     repositories: IndexMap<BString, PhpMixed>,
-    license: Vec<String>,
-    keywords: Vec<String>,
-    authors: Vec<IndexMap<String, String>>,
-    description: Option<String>,
-    homepage: Option<String>,
-    scripts: IndexMap<String, Vec<String>>,
-    support: IndexMap<String, String>,
+    license: Vec<BString>,
+    keywords: Vec<BString>,
+    authors: Vec<IndexMap<BString, BString>>,
+    description: Option<BString>,
+    homepage: Option<BString>,
+    scripts: IndexMap<BString, Vec<BString>>,
+    support: IndexMap<BString, BString>,
     funding: Vec<IndexMap<BString, PhpMixed>>,
     abandoned: PhpMixed,
-    archive_name: Option<String>,
-    archive_excludes: Vec<String>,
+    archive_name: Option<BString>,
+    archive_excludes: Vec<BString>,
 }
 
 impl CompletePackage {
-    pub fn new(name: String, version: String, pretty_version: String) -> Self {
+    pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         Self {
             inner: crate::package::Package::new(name, version, pretty_version),
             repositories: IndexMap::new(),
@@ -41,7 +41,7 @@ impl CompletePackage {
         }
     }
 
-    pub fn replace_version(&mut self, version: String, pretty_version: String) {
+    pub fn replace_version(&mut self, version: BString, pretty_version: BString) {
         self.inner.replace_version(version, pretty_version);
     }
 
@@ -51,11 +51,11 @@ impl CompletePackage {
 }
 
 impl CompletePackageInterface for CompletePackage {
-    fn set_scripts(&mut self, scripts: IndexMap<String, Vec<String>>) {
+    fn set_scripts(&mut self, scripts: IndexMap<BString, Vec<BString>>) {
         self.scripts = scripts;
     }
 
-    fn get_scripts(&self) -> IndexMap<String, Vec<String>> {
+    fn get_scripts(&self) -> IndexMap<BString, Vec<BString>> {
         self.scripts.clone()
     }
 
@@ -67,51 +67,51 @@ impl CompletePackageInterface for CompletePackage {
         self.repositories.clone()
     }
 
-    fn set_license(&mut self, license: Vec<String>) {
+    fn set_license(&mut self, license: Vec<BString>) {
         self.license = license;
     }
 
-    fn get_license(&self) -> Vec<String> {
+    fn get_license(&self) -> Vec<BString> {
         self.license.clone()
     }
 
-    fn set_keywords(&mut self, keywords: Vec<String>) {
+    fn set_keywords(&mut self, keywords: Vec<BString>) {
         self.keywords = keywords;
     }
 
-    fn get_keywords(&self) -> Vec<String> {
+    fn get_keywords(&self) -> Vec<BString> {
         self.keywords.clone()
     }
 
-    fn set_authors(&mut self, authors: Vec<IndexMap<String, String>>) {
+    fn set_authors(&mut self, authors: Vec<IndexMap<BString, BString>>) {
         self.authors = authors;
     }
 
-    fn get_authors(&self) -> Vec<IndexMap<String, String>> {
+    fn get_authors(&self) -> Vec<IndexMap<BString, BString>> {
         self.authors.clone()
     }
 
-    fn set_description(&mut self, description: String) {
+    fn set_description(&mut self, description: BString) {
         self.description = Some(description);
     }
 
-    fn get_description(&self) -> Option<String> {
+    fn get_description(&self) -> Option<BString> {
         self.description.clone()
     }
 
-    fn set_homepage(&mut self, homepage: String) {
+    fn set_homepage(&mut self, homepage: BString) {
         self.homepage = Some(homepage);
     }
 
-    fn get_homepage(&self) -> Option<String> {
+    fn get_homepage(&self) -> Option<BString> {
         self.homepage.clone()
     }
 
-    fn set_support(&mut self, support: IndexMap<String, String>) {
+    fn set_support(&mut self, support: IndexMap<BString, BString>) {
         self.support = support;
     }
 
-    fn get_support(&self) -> IndexMap<String, String> {
+    fn get_support(&self) -> IndexMap<BString, BString> {
         self.support.clone()
     }
 
@@ -131,26 +131,26 @@ impl CompletePackageInterface for CompletePackage {
         self.abandoned = abandoned;
     }
 
-    fn get_replacement_package(&self) -> Option<String> {
+    fn get_replacement_package(&self) -> Option<BString> {
         match &self.abandoned {
-            PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
+            PhpMixed::String(s) => Some(s.clone()),
             _ => None,
         }
     }
 
-    fn set_archive_name(&mut self, name: String) {
+    fn set_archive_name(&mut self, name: BString) {
         self.archive_name = Some(name);
     }
 
-    fn get_archive_name(&self) -> Option<String> {
+    fn get_archive_name(&self) -> Option<BString> {
         self.archive_name.clone()
     }
 
-    fn set_archive_excludes(&mut self, excludes: Vec<String>) {
+    fn set_archive_excludes(&mut self, excludes: Vec<BString>) {
         self.archive_excludes = excludes;
     }
 
-    fn get_archive_excludes(&self) -> Vec<String> {
+    fn get_archive_excludes(&self) -> Vec<BString> {
         self.archive_excludes.clone()
     }
 
@@ -160,15 +160,15 @@ impl CompletePackageInterface for CompletePackage {
 }
 
 impl PackageInterface for CompletePackage {
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &BStr {
         self.inner.get_name()
     }
 
-    fn get_pretty_name(&self) -> &str {
+    fn get_pretty_name(&self) -> &BStr {
         self.inner.get_pretty_name()
     }
 
-    fn get_names(&self, provides: bool) -> Vec<String> {
+    fn get_names(&self, provides: bool) -> Vec<BString> {
         self.inner.get_names(provides)
     }
 
@@ -184,11 +184,11 @@ impl PackageInterface for CompletePackage {
         self.inner.is_dev()
     }
 
-    fn get_type(&self) -> String {
+    fn get_type(&self) -> BString {
         self.inner.get_type()
     }
 
-    fn get_target_dir(&self) -> Option<String> {
+    fn get_target_dir(&self) -> Option<BString> {
         self.inner.get_target_dir()
     }
 
@@ -196,27 +196,27 @@ impl PackageInterface for CompletePackage {
         self.inner.get_extra().clone()
     }
 
-    fn set_installation_source(&mut self, r#type: Option<String>) {
+    fn set_installation_source(&mut self, r#type: Option<BString>) {
         self.inner.set_installation_source(r#type);
     }
 
-    fn get_installation_source(&self) -> Option<String> {
+    fn get_installation_source(&self) -> Option<BString> {
         self.inner.get_installation_source()
     }
 
-    fn get_source_type(&self) -> Option<String> {
+    fn get_source_type(&self) -> Option<BString> {
         self.inner.get_source_type()
     }
 
-    fn get_source_url(&self) -> Option<String> {
+    fn get_source_url(&self) -> Option<BString> {
         self.inner.get_source_url()
     }
 
-    fn get_source_urls(&self) -> Vec<String> {
+    fn get_source_urls(&self) -> Vec<BString> {
         self.inner.get_source_urls()
     }
 
-    fn get_source_reference(&self) -> Option<String> {
+    fn get_source_reference(&self) -> Option<BString> {
         self.inner.get_source_reference()
     }
 
@@ -228,23 +228,23 @@ impl PackageInterface for CompletePackage {
         self.inner.set_source_mirrors(mirrors);
     }
 
-    fn get_dist_type(&self) -> Option<String> {
+    fn get_dist_type(&self) -> Option<BString> {
         self.inner.get_dist_type()
     }
 
-    fn get_dist_url(&self) -> Option<String> {
+    fn get_dist_url(&self) -> Option<BString> {
         self.inner.get_dist_url()
     }
 
-    fn get_dist_urls(&self) -> Vec<String> {
+    fn get_dist_urls(&self) -> Vec<BString> {
         self.inner.get_dist_urls()
     }
 
-    fn get_dist_reference(&self) -> Option<String> {
+    fn get_dist_reference(&self) -> Option<BString> {
         self.inner.get_dist_reference()
     }
 
-    fn get_dist_sha1_checksum(&self) -> Option<String> {
+    fn get_dist_sha1_checksum(&self) -> Option<BString> {
         self.inner.get_dist_sha1_checksum()
     }
 
@@ -256,15 +256,15 @@ impl PackageInterface for CompletePackage {
         self.inner.set_dist_mirrors(mirrors);
     }
 
-    fn get_version(&self) -> &str {
+    fn get_version(&self) -> &BStr {
         self.inner.get_version()
     }
 
-    fn get_pretty_version(&self) -> &str {
+    fn get_pretty_version(&self) -> &BStr {
         self.inner.get_pretty_version()
     }
 
-    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> BString {
         self.inner.get_full_pretty_version(truncate, display_mode)
     }
 
@@ -272,31 +272,31 @@ impl PackageInterface for CompletePackage {
         self.inner.get_release_date().copied()
     }
 
-    fn get_stability(&self) -> &str {
+    fn get_stability(&self) -> &BStr {
         self.inner.get_stability()
     }
 
-    fn get_requires(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
         PackageInterface::get_requires(&self.inner)
     }
 
-    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
         PackageInterface::get_conflicts(&self.inner)
     }
 
-    fn get_provides(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
         PackageInterface::get_provides(&self.inner)
     }
 
-    fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
         PackageInterface::get_replaces(&self.inner)
     }
 
-    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
         PackageInterface::get_dev_requires(&self.inner)
     }
 
-    fn get_suggests(&self) -> IndexMap<String, String> {
+    fn get_suggests(&self) -> IndexMap<BString, BString> {
         self.inner.get_suggests().clone()
     }
 
@@ -308,7 +308,7 @@ impl PackageInterface for CompletePackage {
         self.inner.get_dev_autoload().clone()
     }
 
-    fn get_include_paths(&self) -> Vec<String> {
+    fn get_include_paths(&self) -> Vec<BString> {
         self.inner.get_include_paths().clone()
     }
 
@@ -327,19 +327,19 @@ impl PackageInterface for CompletePackage {
         self.inner.get_repository()
     }
 
-    fn get_binaries(&self) -> Vec<String> {
+    fn get_binaries(&self) -> Vec<BString> {
         self.inner.get_binaries().clone()
     }
 
-    fn get_unique_name(&self) -> String {
+    fn get_unique_name(&self) -> BString {
         self.inner.get_unique_name()
     }
 
-    fn get_notification_url(&self) -> Option<String> {
+    fn get_notification_url(&self) -> Option<BString> {
         self.inner.get_notification_url()
     }
 
-    fn get_pretty_string(&self) -> String {
+    fn get_pretty_string(&self) -> BString {
         self.inner.get_pretty_string()
     }
 
@@ -355,33 +355,27 @@ impl PackageInterface for CompletePackage {
         self.inner.set_transport_options(options);
     }
 
-    fn set_source_reference(&mut self, reference: Option<String>) {
+    fn set_source_reference(&mut self, reference: Option<BString>) {
         self.inner.set_source_reference(reference);
     }
 
-    fn set_source_url(&mut self, url: Option<String>) {
+    fn set_source_url(&mut self, url: Option<BString>) {
         self.inner.set_source_url(url);
     }
 
-    fn set_dist_url(&mut self, url: Option<String>) {
+    fn set_dist_url(&mut self, url: Option<BString>) {
         self.inner.set_dist_url(url);
     }
 
-    fn set_dist_type(&mut self, r#type: Option<String>) {
+    fn set_dist_type(&mut self, r#type: Option<BString>) {
         self.inner.set_dist_type(r#type);
     }
 
-    fn set_dist_reference(&mut self, reference: Option<String>) {
+    fn set_dist_reference(&mut self, reference: Option<BString>) {
         self.inner.set_dist_reference(reference);
     }
 
-    fn set_source_dist_references(&mut self, reference: String) {
+    fn set_source_dist_references(&mut self, reference: BString) {
         self.inner.set_source_dist_references(reference);
-    }
-}
-
-impl std::fmt::Display for CompletePackage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_unique_name())
     }
 }

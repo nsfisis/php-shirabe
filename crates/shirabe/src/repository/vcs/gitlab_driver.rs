@@ -3,43 +3,43 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::http::Response;
 use crate::util::{GitLab, HttpDownloader};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
-    array_search_mixed, array_shift, ctype_alnum, date_create, empty, explode, extension_loaded,
-    implode, in_array_loose, is_array, is_string, ord, php_regex, preg_is_match, preg_match,
-    preg_replace, strpos, strtolower,
+    array_search_mixed, array_shift, bconcat, date_create, empty, explode, extension_loaded,
+    implode, in_array_loose, is_array, is_string, path_from_bytes, php_regex, php_str,
+    preg_is_match, preg_match, preg_replace, sprintf, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
 #[derive(Debug)]
 pub struct GitLabDriver {
     inner: VcsDriverBase,
-    scheme: String,
-    namespace: String,
-    repository: String,
+    scheme: BString,
+    namespace: BString,
+    repository: BString,
     project: Option<IndexMap<BString, PhpMixed>>,
-    commits: IndexMap<String, IndexMap<BString, PhpMixed>>,
-    tags: Option<IndexMap<String, String>>,
-    branches: Option<IndexMap<String, String>>,
+    commits: IndexMap<BString, IndexMap<BString, PhpMixed>>,
+    tags: Option<IndexMap<BString, BString>>,
+    branches: Option<IndexMap<BString, BString>>,
     /// Git Driver
     git_driver: Option<GitDriver>,
     /// Protocol to force use of for repository URLs.
-    protocol: String,
+    protocol: BString,
     /// Defaults to true unless we can make sure it is public
     is_private: bool,
     has_nonstandard_origin: bool,
 }
 
 impl GitLabDriver {
-    pub const URL_REGEX: &'static str = r##"#^(?:(?P<scheme>https?)://(?P<domain>.+?)(?::(?P<port>[0-9]+))?/|git@(?P<domain2>[^:]+):)(?P<parts>.+)/(?P<repo>[^/]+?)(?:\.git|/)?$#"##;
+    pub const URL_REGEX: &'static BStr = php_str(r##"#^(?:(?P<scheme>https?)://(?P<domain>.+?)(?::(?P<port>[0-9]+))?/|git@(?P<domain2>[^:]+):)(?P<parts>.+)/(?P<repo>[^/]+?)(?:\.git|/)?$#"##.as_bytes());
 
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
@@ -50,15 +50,15 @@ impl GitLabDriver {
     ) -> Self {
         Self {
             inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
-            scheme: String::new(),
-            namespace: String::new(),
-            repository: String::new(),
+            scheme: BString::default(),
+            namespace: BString::default(),
+            repository: BString::default(),
             project: None,
             commits: IndexMap::new(),
             tags: None,
             branches: None,
             git_driver: None,
-            protocol: String::new(),
+            protocol: BString::default(),
             is_private: true,
             has_nonstandard_origin: false,
         }
@@ -69,9 +69,10 @@ impl GitLabDriver {
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let Some(match_) = preg_match(Self::URL_REGEX, &self.inner.url) else {
-            return Err(InvalidArgumentException::new(format!(
-                "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The GitLab repository URL ",
                 self.inner.url.clone(),
+                " is invalid. It must be the HTTP URL of a GitLab project."
             ))
             .into());
         };
@@ -79,13 +80,16 @@ impl GitLabDriver {
         let guessed_domain = match_
             .name("domain")
             .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .unwrap_or_else(|| match_.name("domain2").unwrap_or_default().to_string());
+            .map(BString::from)
+            .unwrap_or_else(|| BString::from(match_.name("domain2").unwrap_or_default()));
         let configured_domains = self.inner.config.borrow_mut().get("gitlab-domains");
-        let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default());
+        let mut url_parts: Vec<BString> = explode("/", match_.name("parts").unwrap_or_default())
+            .to_vec()
+            .into_iter()
+            .collect::<Vec<_>>();
 
-        let scheme_match = match_.name("scheme").unwrap_or_default().to_string();
-        self.scheme = if matches!(scheme_match.as_str(), "https" | "http") {
+        let scheme_match = BString::from(match_.name("scheme").unwrap_or_default());
+        self.scheme = if matches!(scheme_match.as_slice(), b"https" | b"http") {
             scheme_match
         } else if self
             .inner
@@ -94,20 +98,17 @@ impl GitLabDriver {
             .and_then(|v| v.as_bool())
             == Some(false)
         {
-            "http".to_string()
+            BString::from("http")
         } else {
-            "https".to_string()
+            BString::from("https")
         };
-        let port = match_.name("port").map(str::to_string);
+        let port = match_.name("port").map(BString::from);
         let origin =
             Self::determine_origin(&configured_domains, guessed_domain, &mut url_parts, port);
         let origin = match origin {
             Some(o) => o,
             None => {
-                return Err(LogicException::new(format!(
-                    "It should not be possible to create a gitlab driver with an unparsable origin URL ({})",
-                    self.inner.url
-                ))
+                return Err(LogicException::new(bconcat!("It should not be possible to create a gitlab driver with an unparsable origin URL (", self.inner.url, ")"))
                 .into());
             }
         };
@@ -119,16 +120,16 @@ impl GitLabDriver {
             .filter(|_| is_string(&protocol_value))
         {
             // https treated as a synonym for http.
-            if !matches!(&*protocol.to_str_lossy(), "git" | "http" | "https") {
-                return Err(RuntimeException::new(
-                    "gitlab-protocol must be one of git, http.".to_string(),
-                )
+            if !matches!(protocol.as_bytes(), b"git" | b"http" | b"https") {
+                return Err(RuntimeException::new(BString::from(
+                    "gitlab-protocol must be one of git, http.",
+                ))
                 .into());
             }
             self.protocol = if protocol == "git" {
-                "ssh".to_string()
+                BString::from("ssh")
             } else {
-                "http".to_string()
+                BString::from("http")
             };
         }
 
@@ -138,27 +139,31 @@ impl GitLabDriver {
             self.has_nonstandard_origin = true;
         }
 
-        self.namespace = implode("/", &url_parts);
-        self.repository = preg_replace(
-            php_regex!(r"#(\.git)$#"),
-            "",
-            match_.name("repo").unwrap_or_default(),
+        self.namespace = bstr::BString::from(&implode("/", &url_parts)[..]);
+        self.repository = BString::from(
+            &preg_replace(
+                php_regex!(r"#(\.git)$#"),
+                "",
+                match_.name("repo").unwrap_or_default(),
+            )[..],
         );
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            &format!(
-                "{}/{}/{}/{}",
+            path_from_bytes(&bconcat!(
                 self.inner
                     .config
                     .borrow_mut()
                     .get("cache-repo-dir")
                     .as_string()
                     .unwrap_or_default(),
+                "/",
                 self.inner.origin_url,
+                "/",
                 self.namespace,
+                "/",
                 self.repository,
-            ),
+            )),
             None,
             None,
             false,
@@ -181,13 +186,13 @@ impl GitLabDriver {
 
     /// For testing only. Mirrors the `setAttribute($driver, 'branches', ...)` reflection
     /// helper used by GitLabDriverTest to seed private state.
-    pub fn __set_branches(&mut self, branches: Option<IndexMap<String, String>>) {
+    pub fn __set_branches(&mut self, branches: Option<IndexMap<BString, BString>>) {
         self.branches = branches;
     }
 
     /// For testing only. Mirrors the `setAttribute($driver, 'tags', ...)` reflection
     /// helper used by GitLabDriverTest to seed private state.
-    pub fn __set_tags(&mut self, tags: Option<IndexMap<String, String>>) {
+    pub fn __set_tags(&mut self, tags: Option<IndexMap<BString, BString>>) {
         self.tags = tags;
     }
 
@@ -202,7 +207,7 @@ impl GitLabDriver {
 
     pub fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_composer_information(identifier);
@@ -225,7 +230,8 @@ impl GitLabDriver {
                     .unwrap_or_default();
                 JsonFile::parse_json(Some(&res), None)?.as_array().cloned()
             } else {
-                let file_content = self.get_file_content("composer.json", identifier)?;
+                let file_content =
+                    self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
                 let composer = VcsDriverBase::finish_base_composer_information(
                     identifier,
                     file_content,
@@ -274,11 +280,11 @@ impl GitLabDriver {
                     .unwrap_or(false);
                 if support_source_missing && has_web_url {
                     let label = array_search_mixed(
-                        &PhpMixed::string(identifier.to_string()),
+                        &PhpMixed::string(BString::from(identifier)),
                         &PhpMixed::Array(
                             self.get_tags()?
                                 .into_iter()
-                                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                                .map(|(k, v)| (k, PhpMixed::string(v)))
                                 .collect(),
                         ),
                         true,
@@ -286,32 +292,33 @@ impl GitLabDriver {
                     .filter(|v| !matches!(v, PhpMixed::Bool(false) | PhpMixed::Null))
                     .or_else(|| {
                         array_search_mixed(
-                            &PhpMixed::string(identifier.to_string()),
+                            &PhpMixed::string(BString::from(identifier)),
                             &PhpMixed::Array(
                                 self.get_branches()
                                     .unwrap_or_default()
                                     .into_iter()
-                                    .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                                    .map(|(k, v)| (k, PhpMixed::string(v)))
                                     .collect(),
                             ),
                             true,
                         )
                     })
                     .filter(|v| !matches!(v, PhpMixed::Bool(false) | PhpMixed::Null))
-                    .unwrap_or_else(|| PhpMixed::string(identifier.to_string()));
-                    let label_str = label.as_string().unwrap_or(identifier.into()).to_string();
-                    let web_url = project
-                        .get(B("web_url"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    .unwrap_or_else(|| PhpMixed::string(BString::from(identifier)));
+                    let label_str = BString::from(label.as_string().unwrap_or(identifier));
+                    let web_url = BString::from(
+                        project
+                            .get(B("web_url"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    );
                     if let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
                     }) {
                         support.insert(
                             "source".into(),
-                            PhpMixed::string(format!("{}/-/tree/{}", web_url, label_str)),
+                            PhpMixed::string(bconcat!(web_url, "/-/tree/", label_str)),
                         );
                     }
                 }
@@ -327,18 +334,19 @@ impl GitLabDriver {
                         .unwrap_or(PhpMixed::Null),
                 );
                 if issues_missing && issues_enabled && has_web_url {
-                    let web_url = project
-                        .get(B("web_url"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let web_url = BString::from(
+                        project
+                            .get(B("web_url"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    );
                     if let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
                     }) {
                         support.insert(
                             "issues".into(),
-                            PhpMixed::string(format!("{}/-/issues", PhpMixed::string(web_url))),
+                            PhpMixed::string(bconcat!(web_url, "/-/issues")),
                         );
                     }
                 }
@@ -356,7 +364,7 @@ impl GitLabDriver {
 
             self.inner
                 .info_cache
-                .insert(identifier.to_string(), composer);
+                .insert(bstr::BString::from(identifier), composer);
         }
 
         Ok(self
@@ -369,31 +377,32 @@ impl GitLabDriver {
 
     pub fn get_file_content(
         &mut self,
-        file: &str,
-        identifier: &str,
-    ) -> anyhow::Result<Option<String>> {
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_file_content(file, identifier);
         }
 
         // Convert the root identifier to a cacheable commit id
-        let mut identifier = identifier.to_string();
+        let mut identifier = BString::from(identifier);
         if !preg_is_match(php_regex!(r"{[a-f0-9]{40}}i"), &identifier) {
             let branches = self.get_branches()?;
             if let Some(sha) = branches.get(&identifier) {
-                identifier = sha.clone();
+                identifier = BString::from(&sha.clone()[..]);
             }
         }
 
-        let resource = format!(
-            "{}/repository/files/{}/raw?ref={}",
+        let resource = bconcat!(
             self.get_api_url(),
+            "/repository/files/",
             self.url_encode_all(file),
+            "/raw?ref=",
             identifier,
         );
 
-        let content = match self.get_contents(&resource, false)? {
-            Ok(response) => response.get_body().map(|s| s.to_string()),
+        let content = match self.get_contents(resource.as_bstr(), false)? {
+            Ok(response) => response.get_body().map(bstr::BString::from),
             Err(e) => {
                 if e.get_code() != 404 {
                     return Err((*e).into());
@@ -408,7 +417,7 @@ impl GitLabDriver {
 
     pub fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_change_date(identifier);
@@ -419,181 +428,195 @@ impl GitLabDriver {
                 .get(B("committed_date"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
-            let date: DateTime<FixedOffset> = date_create(&committed_date.to_str_lossy())?;
+            let date: DateTime<FixedOffset> = date_create(committed_date)?;
             return Ok(Some(date));
         }
 
         Ok(None)
     }
 
-    pub fn get_repository_url(&self) -> String {
+    pub fn get_repository_url(&self) -> BString {
         let project = self.project.clone().unwrap_or_default();
         if !self.protocol.is_empty() {
-            return project
-                .get(B(&format!("{}_url_to_repo", self.protocol)))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            return BString::from(
+                project
+                    .get(B(&bconcat!(self.protocol, "_url_to_repo")))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            );
         }
 
         if self.is_private {
-            project
-                .get(B("ssh_url_to_repo"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string()
+            BString::from(
+                project
+                    .get(B("ssh_url_to_repo"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
         } else {
-            project
-                .get(B("http_url_to_repo"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string()
+            BString::from(
+                project
+                    .get(B("http_url_to_repo"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
         }
     }
 
-    pub fn get_url(&self) -> String {
+    pub fn get_url(&self) -> BString {
         if let Some(ref git_driver) = self.git_driver {
             return git_driver.get_url();
         }
 
-        self.project
-            .as_ref()
-            .and_then(|p| p.get(B("web_url")))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string()
+        BString::from(
+            self.project
+                .as_ref()
+                .and_then(|p| p.get(B("web_url")))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
     }
 
-    pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<BString, PhpMixed>> {
-        let url = format!(
-            "{}/repository/archive.zip?sha={}",
+    pub fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, PhpMixed>> {
+        let url = bconcat!(
             self.get_api_url(),
+            "/repository/archive.zip?sha=",
             identifier
         );
 
         let mut result = IndexMap::new();
-        result.insert("type".into(), PhpMixed::string("zip".to_string()));
+        result.insert("type".into(), PhpMixed::string(BString::from("zip")));
         result.insert("url".into(), PhpMixed::string(url));
-        result.insert("reference".into(), PhpMixed::string(identifier.to_string()));
-        result.insert("shasum".into(), PhpMixed::string(String::new()));
+        result.insert(
+            "reference".into(),
+            PhpMixed::string(BString::from(identifier)),
+        );
+        result.insert("shasum".into(), PhpMixed::string(BString::default()));
         Some(result)
     }
 
-    pub fn get_source(&self, identifier: &str) -> IndexMap<BString, PhpMixed> {
+    pub fn get_source(&self, identifier: &BStr) -> IndexMap<BString, PhpMixed> {
         if let Some(ref git_driver) = self.git_driver {
             return git_driver
                 .get_source(identifier)
                 .into_iter()
-                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect();
         }
 
         let mut result = IndexMap::new();
-        result.insert("type".into(), PhpMixed::string("git".to_string()));
+        result.insert("type".into(), PhpMixed::string(BString::from("git")));
         result.insert("url".into(), PhpMixed::string(self.get_repository_url()));
-        result.insert("reference".into(), PhpMixed::string(identifier.to_string()));
+        result.insert(
+            "reference".into(),
+            PhpMixed::string(BString::from(identifier)),
+        );
         result
     }
 
-    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_root_identifier();
         }
 
-        Ok(self
-            .project
-            .as_ref()
-            .and_then(|p| p.get(B("default_branch")))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string())
+        Ok(BString::from(
+            self.project
+                .as_ref()
+                .and_then(|p| p.get(B("default_branch")))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        ))
     }
 
-    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_branches();
         }
 
         if self.branches.is_none() {
-            self.branches = Some(self.get_references("branches")?);
+            self.branches = Some(self.get_references(bstr::BStr::new("branches"))?);
         }
 
         Ok(self.branches.clone().unwrap_or_default())
     }
 
-    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_tags();
         }
 
         if self.tags.is_none() {
-            self.tags = Some(self.get_references("tags")?);
+            self.tags = Some(self.get_references(bstr::BStr::new("tags"))?);
         }
 
         Ok(self.tags.clone().unwrap_or_default())
     }
 
-    pub fn get_api_url(&self) -> String {
-        format!(
-            "{}://{}/api/v4/projects/{}%2F{}",
+    pub fn get_api_url(&self) -> BString {
+        bconcat!(
             self.scheme,
+            "://",
             self.inner.origin_url,
-            self.url_encode_all(&self.namespace),
-            self.url_encode_all(&self.repository),
+            "/api/v4/projects/",
+            self.url_encode_all(self.namespace.as_bstr()),
+            "%2F",
+            self.url_encode_all(self.repository.as_bstr())
         )
     }
 
     /// Urlencode all non alphanumeric characters. rawurlencode() can not be used as it does not encode `.`
-    fn url_encode_all(&self, string: &str) -> String {
-        let mut encoded = String::new();
-        let bytes: Vec<char> = string.chars().collect();
-        for byte in &bytes {
-            let character = byte.to_string();
-            let final_character =
-                if !ctype_alnum(&character) && !matches!(character.as_str(), "-" | "_") {
-                    format!("%{:02X}", ord(&character))
-                } else {
-                    character
-                };
-            encoded.push_str(&final_character);
+    fn url_encode_all(&self, string: &BStr) -> BString {
+        let mut encoded = BString::default();
+        for &byte in string.iter() {
+            if byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' {
+                encoded.push(byte);
+            } else {
+                encoded.extend_from_slice(&bconcat!(
+                    "%",
+                    sprintf("%02X", &[PhpMixed::Int(byte as i64)])
+                ));
+            }
         }
 
         encoded
     }
 
-    fn get_references(&mut self, r#type: &str) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_references(&mut self, r#type: &BStr) -> anyhow::Result<IndexMap<BString, BString>> {
         let per_page = 100;
-        let mut resource: Option<String> = Some(format!(
-            "{}/repository/{}?per_page={}",
+        let mut resource: Option<BString> = Some(bconcat!(
             self.get_api_url(),
+            "/repository/",
             r#type,
+            "?per_page=",
             per_page
         ));
 
-        let mut references: IndexMap<String, String> = IndexMap::new();
+        let mut references: IndexMap<BString, BString> = IndexMap::new();
         loop {
-            let response = self.get_contents(resource.as_deref().unwrap_or(""), false)??;
+            let response = self.get_contents(resource.as_ref().unwrap().as_bstr(), false)??;
             let data = response.decode_json()?;
 
             if let PhpMixed::List(ref list) = data {
                 for datum in list {
                     if let PhpMixed::Array(ref datum_map) = *datum {
-                        let name = datum_map
-                            .get(B("name"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string();
-                        let commit_id = datum_map
-                            .get(B("commit"))
-                            .and_then(|v| v.as_array())
-                            .and_then(|m| m.get(B("id")))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string();
+                        let name = BString::from(
+                            datum_map
+                                .get(B("name"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        );
+                        let commit_id = BString::from(
+                            datum_map
+                                .get(B("commit"))
+                                .and_then(|v| v.as_array())
+                                .and_then(|m| m.get(B("id")))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        );
                         references.insert(name, commit_id.clone());
 
                         // Keep the last commit date of a reference to avoid
-                        // unnecessary API call when retrieving the composer file.
+                        // unneces.map(|s| BString::from(&s[..]))sary API call when retrieving the composer file.
                         let commit_data = datum_map
                             .get(B("commit"))
                             .and_then(|v| v.as_array())
@@ -629,7 +652,9 @@ impl GitLabDriver {
 
         // we need to fetch the default branch from the api
         let resource = self.get_api_url();
-        let project = self.get_contents(&resource, true)??.decode_json()?;
+        let project = self
+            .get_contents(resource.as_bstr(), true)??
+            .decode_json()?;
         self.project = match project {
             PhpMixed::Array(m) => Some(m),
             _ => None,
@@ -659,16 +684,13 @@ impl GitLabDriver {
         // If this repository may be private and we
         // cannot ask for authentication credentials (because we
         // are not interactive) then we fallback to GitDriver.
-        match self.setup_git_driver(&url) {
+        match self.setup_git_driver(url.as_bstr()) {
             Ok(()) => Ok(true),
             Err(e) => {
                 self.git_driver = None;
 
                 self.inner.io.write_error3(
-                    &format!(
-                        "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your credentials</error>",
-                        url
-                    ),
+                    bconcat!("<error>Failed to clone the ", url, " repository, try running in interactive mode so that you can enter your credentials</error>"),
                     true,
                     io_interface::NORMAL,
                 );
@@ -678,30 +700,46 @@ impl GitLabDriver {
     }
 
     /// Generate an SSH URL
-    fn generate_ssh_url(&self) -> String {
+    fn generate_ssh_url(&self) -> BString {
         if self.has_nonstandard_origin {
-            return format!(
-                "ssh://git@{}/{}/{}.git",
-                self.inner.origin_url, self.namespace, self.repository
+            return bconcat!(
+                "ssh://git@",
+                self.inner.origin_url,
+                "/",
+                self.namespace,
+                "/",
+                self.repository,
+                ".git"
             );
         }
 
-        format!(
-            "git@{}:{}/{}.git",
-            self.inner.origin_url, self.namespace, self.repository
+        bconcat!(
+            "git@",
+            self.inner.origin_url,
+            ":",
+            self.namespace,
+            "/",
+            self.repository,
+            ".git"
         )
     }
 
-    fn generate_public_url(&self) -> String {
-        format!(
-            "{}://{}/{}/{}.git",
-            self.scheme, self.inner.origin_url, self.namespace, self.repository
+    fn generate_public_url(&self) -> BString {
+        bconcat!(
+            self.scheme,
+            "://",
+            self.inner.origin_url,
+            "/",
+            self.namespace,
+            "/",
+            self.repository,
+            ".git"
         )
     }
 
-    fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
+    fn setup_git_driver(&mut self, url: &BStr) -> anyhow::Result<()> {
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".into(), PhpMixed::string(url.to_string()));
+        repo_config.insert("url".into(), PhpMixed::string(BString::from(url)));
         let mut git_driver = GitDriver::new(
             repo_config,
             self.inner.io.clone(),
@@ -716,7 +754,7 @@ impl GitLabDriver {
 
     fn get_contents(
         &mut self,
-        url: &str,
+        url: &BStr,
         fetching_repo_data: bool,
     ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
         // PHP body of the `try` block: a TransportException raised anywhere in here, including the
@@ -775,10 +813,10 @@ impl GitLabDriver {
                             this.attempt_clone_fallback()?;
 
                             return Ok(Ok(Response::new(
-                                "dummy".to_string(),
+                                "dummy".into(),
                                 Some(200),
                                 vec![],
-                                Some("null".to_string()),
+                                Some(b"null".to_vec()),
                             )));
                         }
                     }
@@ -792,7 +830,7 @@ impl GitLabDriver {
                             == Some("disabled".into())
                         {
                             return Ok(Err(Box::new(TransportException::new(
-                                "The GitLab repository is disabled in the project".to_string(),
+                                BString::from("The GitLab repository is disabled in the project"),
                                 400,
                             ))));
                         }
@@ -802,10 +840,11 @@ impl GitLabDriver {
                         }
 
                         return Ok(Err(Box::new(TransportException::new(
-                        "GitLab API seems to not be authenticated as it did not return a default_branch"
-                            .to_string(),
-                        401,
-                    ))));
+                            BString::from(
+                                "GitLab API seems to not be authenticated as it did not return a default_branch",
+                            ),
+                            401,
+                        ))));
                     }
                 }
 
@@ -831,12 +870,15 @@ impl GitLabDriver {
                     return Ok(Err(e));
                 }
 
-                if git_lab_util.authorize_oauth(&self.inner.origin_url)? {
+                if git_lab_util.authorize_oauth(self.inner.origin_url.as_bstr())? {
                     return self.inner.get_contents(url);
                 }
 
-                if git_lab_util.is_oauth_expired(&self.inner.origin_url)
-                    && git_lab_util.authorize_oauth_refresh(&self.scheme, &self.inner.origin_url)?
+                if git_lab_util.is_oauth_expired(self.inner.origin_url.as_bstr())
+                    && git_lab_util.authorize_oauth_refresh(
+                        self.scheme.as_bstr(),
+                        self.inner.origin_url.as_bstr(),
+                    )?
                 {
                     return self.inner.get_contents(url);
                 }
@@ -845,36 +887,39 @@ impl GitLabDriver {
                     self.attempt_clone_fallback()?;
 
                     return Ok(Ok(Response::new(
-                        "dummy".to_string(),
+                        "dummy".into(),
                         Some(200),
                         vec![],
-                        Some("null".to_string()),
+                        Some(b"null".to_vec()),
                     )));
                 }
                 self.inner.io.write_error3(
-                    &format!(
-                        "<warning>Failed to download {}/{}:{}</warning>",
+                    bconcat!(
+                        "<warning>Failed to download ",
                         self.namespace,
+                        "/",
                         self.repository,
-                        e.get_message()
+                        ":",
+                        e.get_message(),
+                        "</warning>"
                     ),
                     true,
                     io_interface::NORMAL,
                 );
                 git_lab_util.authorize_oauth_interactively(
-                    &self.scheme,
-                    &self.inner.origin_url,
-                    Some(&format!(
-                        "Your credentials are required to fetch private repository metadata (<info>{}</info>)",
-                        self.inner.url
-                    )),
+                    self.scheme.as_bstr(),
+                    self.inner.origin_url.as_bstr(),
+                    Some(bconcat!("Your credentials are required to fetch private repository metadata (<info>", self.inner.url, "</info>)").as_bstr()),
                 )?;
 
                 self.inner.get_contents(url)
             }
             403 => {
-                if !self.inner.io.has_authentication(&self.inner.origin_url)
-                    && git_lab_util.authorize_oauth(&self.inner.origin_url)?
+                if !self
+                    .inner
+                    .io
+                    .has_authentication(self.inner.origin_url.as_bstr())
+                    && git_lab_util.authorize_oauth(self.inner.origin_url.as_bstr())?
                 {
                     return self.inner.get_contents(url);
                 }
@@ -883,10 +928,10 @@ impl GitLabDriver {
                     self.attempt_clone_fallback()?;
 
                     return Ok(Ok(Response::new(
-                        "dummy".to_string(),
+                        "dummy".into(),
                         Some(200),
                         vec![],
-                        Some("null".to_string()),
+                        Some(b"null".to_vec()),
                     )));
                 }
 
@@ -901,26 +946,29 @@ impl GitLabDriver {
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         _deep: bool,
     ) -> anyhow::Result<bool> {
         let Some(match_) = preg_match(Self::URL_REGEX, url) else {
             return Ok(false);
         };
 
-        let scheme = match_.name("scheme").unwrap_or_default().to_string();
+        let scheme = BString::from(match_.name("scheme").unwrap_or_default());
         let guessed_domain = match_
             .name("domain")
             .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .unwrap_or_else(|| match_.name("domain2").unwrap_or_default().to_string());
-        let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default());
+            .map(BString::from)
+            .unwrap_or_else(|| BString::from(match_.name("domain2").unwrap_or_default()));
+        let mut url_parts: Vec<BString> = explode("/", match_.name("parts").unwrap_or_default())
+            .to_vec()
+            .into_iter()
+            .collect::<Vec<_>>();
 
         if Self::determine_origin(
             &config.borrow().get("gitlab-domains"),
             guessed_domain,
             &mut url_parts,
-            match_.name("port").map(str::to_string),
+            match_.name("port").map(bstr::BString::from),
         )
         .is_none()
         {
@@ -929,9 +977,10 @@ impl GitLabDriver {
 
         if scheme == "https" && !extension_loaded("openssl") {
             io.write_error3(
-                &format!(
-                    "Skipping GitLab driver for {} because the OpenSSL PHP extension is missing.",
-                    url
+                bconcat!(
+                    "Skipping GitLab driver for ",
+                    url,
+                    " because the OpenSSL PHP extension is missing."
                 ),
                 true,
                 io_interface::VERBOSE,
@@ -950,13 +999,13 @@ impl GitLabDriver {
         Ok(self.project.clone())
     }
 
-    fn get_next_page(&self, response: &Response) -> Option<String> {
-        let header = response.get_header("link").unwrap_or_default();
+    fn get_next_page(&self, response: &Response) -> Option<BString> {
+        let header = response.get_header(BStr::new("link")).unwrap_or_default();
 
         let links = explode(",", &header);
         for link in links.iter() {
             if let Some(match_) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
-                return Some(match_.get(1).unwrap_or_default().to_string());
+                return Some(bstr::BString::from(match_.get(1).unwrap_or_default()));
             }
         }
 
@@ -965,36 +1014,32 @@ impl GitLabDriver {
 
     fn determine_origin(
         configured_domains: &PhpMixed,
-        guessed_domain: String,
-        url_parts: &mut Vec<String>,
-        port_number: Option<String>,
-    ) -> Option<String> {
-        let mut guessed_domain = strtolower(&guessed_domain);
+        guessed_domain: BString,
+        url_parts: &mut Vec<BString>,
+        port_number: Option<BString>,
+    ) -> Option<BString> {
+        let mut guessed_domain = BString::from(&strtolower(&guessed_domain)[..]);
 
         if in_array_loose(guessed_domain.clone(), configured_domains.values())
             || (port_number.is_some()
                 && in_array_loose(
-                    format!(
-                        "{}:{}",
-                        guessed_domain,
-                        port_number.as_deref().unwrap_or("")
-                    ),
+                    bconcat!(guessed_domain, ":", port_number.clone().unwrap_or_default()),
                     configured_domains.values(),
                 ))
         {
             if let Some(ref port) = port_number {
-                return Some(format!("{}:{}", guessed_domain, port));
+                return Some(bconcat!(guessed_domain, ":", port));
             }
 
             return Some(guessed_domain);
         }
 
         if let Some(ref port) = port_number {
-            guessed_domain.push_str(&format!(":{}", port));
+            guessed_domain.push_str(&bconcat!(":", port));
         }
 
         while let Some(part) = array_shift(url_parts) {
-            guessed_domain.push_str(&format!("/{}", part));
+            guessed_domain.push_str(&bconcat!("/", part));
 
             if in_array_loose(guessed_domain.clone(), configured_domains.values())
                 || (port_number.is_some()
@@ -1018,66 +1063,58 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
 
     fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         GitLabDriver::get_composer_information(self, identifier)
     }
 
-    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+    fn get_file_content(
+        &mut self,
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         GitLabDriver::get_file_content(self, file, identifier)
     }
 
     fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         GitLabDriver::get_change_date(self, identifier)
     }
 
-    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         GitLabDriver::get_root_identifier(self)
     }
 
-    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         GitLabDriver::get_branches(self)
     }
 
-    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         GitLabDriver::get_tags(self)
     }
 
-    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
+    fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         GitLabDriver::get_dist(self, identifier).map(|m| {
             m.into_iter()
-                // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-                .map(|(k, v)| {
-                    (
-                        k.to_str_lossy().into_owned(),
-                        v.as_string().unwrap_or_default().to_string(),
-                    )
-                })
+                .map(|(k, v)| (k.clone(), BString::from(v.as_string().unwrap_or_default())))
                 .collect()
         })
     }
 
-    fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         GitLabDriver::get_source(self, identifier)
             .into_iter()
-            // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-            .map(|(k, v)| {
-                (
-                    k.to_str_lossy().into_owned(),
-                    v.as_string().unwrap_or_default().to_string(),
-                )
-            })
+            .map(|(k, v)| (k.clone(), BString::from(v.as_string().unwrap_or_default())))
             .collect()
     }
 
-    fn get_url(&self) -> String {
+    fn get_url(&self) -> BString {
         GitLabDriver::get_url(self)
     }
 
-    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+    fn has_composer_file(&mut self, identifier: &BStr) -> anyhow::Result<bool> {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
@@ -1097,7 +1134,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
     fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
         GitLabDriver::supports(io, config, url, deep)

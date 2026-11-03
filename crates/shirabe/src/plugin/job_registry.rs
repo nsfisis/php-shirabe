@@ -8,6 +8,7 @@ use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::throwable_bridge::throw_into_error;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, call_function_with_dispatcher};
+use shirabe_php_shim::{bconcat, error_chain_message};
 
 /// The service a job is counted against: the one whose `countActiveJobs()` reports it and whose
 /// tick drives it.
@@ -201,8 +202,11 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
     match call_function_with_dispatcher(function, args, Some(&mut PluginRpcDispatcher::default())) {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(PhpThrow::runtime(format!(
-            "settling job {id} in the plugin process failed: {error:#}"
+        Err(error) => Err(PhpThrow::runtime(bconcat!(
+            "settling job ",
+            id,
+            " in the plugin process failed: ",
+            error_chain_message(&error)
         ))),
     }
 }
@@ -210,13 +214,7 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
 /// The fields a `Throw` frame carries, as the argument list the worker rebuilds an exception
 /// from: class, message, code, declared state, file and line.
 pub(crate) fn throw_fields(throw: PhpThrow) -> Vec<PluginValue> {
-    let properties = PluginValue::Array(
-        throw
-            .properties
-            .iter()
-            .map(|(name, value)| (name.as_str().into(), value.clone()))
-            .collect(),
-    );
+    let properties = PluginValue::Array(*throw.properties);
     vec![
         PluginValue::string(throw.exception_class),
         PluginValue::string(throw.message),
@@ -431,8 +429,10 @@ pub(crate) fn fail_php_jobs(ids: &[u64]) {
     for id in ids {
         settle_php_job(
             *id,
-            Err(PhpThrow::runtime(format!(
-                "the promise of plugin job {id} can never settle: no job is left whose \
+            Err(PhpThrow::runtime(bconcat!(
+                "the promise of plugin job ",
+                id,
+                " can never settle: no job is left whose \
                  completion could run the code that resolves it"
             ))),
         );

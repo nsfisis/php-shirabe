@@ -5,12 +5,16 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::installer::Installer;
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
-use shirabe_php_shim::impl_php_class;
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use bstr::BStr;
+use shirabe_php_shim::{bconcat, impl_php_class, implode};
+use shirabe_symfony_console::input::InputInterfaceByName;
+use shirabe_symfony_console::{
+    command::Command,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct InstallCommand {
@@ -40,9 +44,9 @@ impl InstallCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for InstallCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("install")?;
-        self.set_aliases(vec!["i".to_string()])?;
-        self.set_description("Installs the project dependencies from the composer.lock file if present, or falls back on the composer.json");
+        self.set_name("install".into())?;
+        self.set_aliases(vec!["i".into()])?;
+        self.set_description("Installs the project dependencies from the composer.lock file if present, or falls back on the composer.json".into());
         self.set_definition(&[
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
@@ -57,10 +61,10 @@ impl Command for InstallCommand {
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Do not use, only defined here to catch misuse of the install command.", None).unwrap().into(),
             InputOption::new("audit", None, Some(InputOption::VALUE_NONE), "Run an audit after installation is complete.", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
-            InputOption::new("verbose", Some("v|vv|vvv"), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
-            InputOption::new("optimize-autoloader", Some("o"), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
-            InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
+            InputOption::new("verbose", Some("v|vv|vvv".into()), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
             InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
@@ -73,7 +77,8 @@ impl Command for InstallCommand {
             libraries and dependencies outlined in that file. If the file does not\n\
             exist it will look for composer.json and do the same.\n\n\
             <info>shirabe install</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#install-i",
+            Read more at https://getcomposer.org/doc/03-cli.md#install-i"
+                .into(),
         );
         Ok(())
     }
@@ -98,12 +103,17 @@ impl Command for InstallCommand {
         }
 
         let args = input.borrow().get_argument("packages")?;
-        let args_vec: Vec<String> = args.as_array().map(<[String]>::to_vec).unwrap_or_default();
+        let args_vec: Vec<bstr::BString> = args
+            .as_array()
+            .map(<[bstr::BString]>::to_vec)
+            .unwrap_or_default();
         if !args_vec.is_empty() {
-            io.write_error(&format!(
-                "<error>Invalid argument {}. Use \"shirabe require {}\" instead to add packages to your composer.json.</error>",
-                args_vec.join(" "),
-                args_vec.join(" ")
+            io.write_error(bconcat!(
+                "<error>Invalid argument ",
+                implode(" ", &args_vec),
+                ". Use \"shirabe require ",
+                implode(" ", &args_vec),
+                "\" instead to add packages to your composer.json.</error>"
             ));
             return Ok(1);
         }
@@ -126,11 +136,11 @@ impl Command for InstallCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "install", input.clone(), output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 
@@ -162,7 +172,7 @@ impl Command for InstallCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()

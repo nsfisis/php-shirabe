@@ -1,14 +1,16 @@
 //! ref: composer/vendor/composer/spdx-licenses/src/SpdxLicenses.php
 
+use bstr::BString;
 use indexmap::IndexMap;
+use shirabe_php_shim::{bconcat, strtolower};
 
 // PHP reads the resource files from `dirname(__DIR__) . '/res'` at runtime via
 // file_get_contents. Composer's res directory ships with the vendored package; embed it at compile
 // time so the data is available without filesystem access.
-const LICENSES_JSON: &str =
-    include_str!("../../../composer/vendor/composer/spdx-licenses/res/spdx-licenses.json");
-const EXCEPTIONS_JSON: &str =
-    include_str!("../../../composer/vendor/composer/spdx-licenses/res/spdx-exceptions.json");
+const LICENSES_JSON: &[u8] =
+    include_bytes!("../../../composer/vendor/composer/spdx-licenses/res/spdx-licenses.json");
+const EXCEPTIONS_JSON: &[u8] =
+    include_bytes!("../../../composer/vendor/composer/spdx-licenses/res/spdx-exceptions.json");
 
 // Only the members Composer itself calls are ported: SpdxLicenses::getLicenses(),
 // ::getExceptionByIdentifier(), ::getIdentifierByName(), ::isOsiApprovedByIdentifier(),
@@ -21,20 +23,20 @@ const EXCEPTIONS_JSON: &str =
 #[derive(Debug)]
 pub struct SpdxLicenses {
     // [ lowercased license identifier => (identifier, full name, osi certified, deprecated) ]
-    licenses: IndexMap<String, (String, String, bool, bool)>,
+    licenses: IndexMap<BString, (BString, BString, bool, bool)>,
     // [ lowercased exception identifier => (exception identifier, full name) ]
-    exceptions: IndexMap<String, (String, String)>,
+    exceptions: IndexMap<BString, (BString, BString)>,
     // `self.licenses.keys()`, longest first: see `license_id_end`.
-    licenses_by_length_desc: Vec<String>,
+    licenses_by_length_desc: Vec<BString>,
     // `self.exceptions.keys()`, longest first: see `license_exception_id_end`.
-    exceptions_by_length_desc: Vec<String>,
+    exceptions_by_length_desc: Vec<BString>,
 }
 
 #[derive(Debug)]
 pub struct LicenseMetadata {
-    pub name: String,
+    pub name: BString,
     pub is_osi_approved: bool,
-    pub url: String,
+    pub url: BString,
     pub is_deprecated_license_id: bool,
 }
 
@@ -60,8 +62,11 @@ impl SpdxLicenses {
     }
 
     /// Returns license metadata by license identifier.
-    pub fn get_license_by_identifier(&self, identifier: &str) -> Option<LicenseMetadata> {
-        let key = identifier.to_lowercase();
+    pub fn get_license_by_identifier(
+        &self,
+        identifier: impl AsRef<[u8]>,
+    ) -> Option<LicenseMetadata> {
+        let key = strtolower(identifier);
 
         let (identifier, name, is_osi_approved, is_deprecated_license_id) =
             self.licenses.get(&key)?;
@@ -69,39 +74,53 @@ impl SpdxLicenses {
         Some(LicenseMetadata {
             name: name.clone(),
             is_osi_approved: *is_osi_approved,
-            url: format!("https://spdx.org/licenses/{}.html#licenseText", identifier),
+            url: bconcat!(
+                "https://spdx.org/licenses/",
+                identifier,
+                ".html#licenseText"
+            ),
             is_deprecated_license_id: *is_deprecated_license_id,
         })
     }
 
-    pub fn validate(&self, license: &str) -> bool {
+    pub fn validate(&self, license: impl AsRef<[u8]>) -> bool {
         // PHP also accepts string[] and joins it with ' OR '. The Rust signature here takes a single
-        // &str, matching the string-input path of the PHP code; the array path lives in callers.
-        self.is_valid_license_string(license)
+        // string, matching the string-input path of the PHP code; the array path lives in callers.
+        self.is_valid_license_string(license.as_ref())
     }
 
+    #[expect(
+        clippy::disallowed_types,
+        reason = "serde deserializes JSON strings as text"
+    )]
     fn load_licenses(&mut self) {
         let parsed: IndexMap<String, (String, bool, bool)> =
-            serde_json::from_str(LICENSES_JSON).expect("Missing or invalid license file");
+            serde_json::from_slice(LICENSES_JSON).expect("Missing or invalid license file");
         for (identifier, license) in parsed {
             self.licenses.insert(
-                identifier.to_lowercase(),
-                (identifier, license.0, license.1, license.2),
+                strtolower(&identifier),
+                (identifier.into(), license.0.into(), license.1, license.2),
             );
         }
     }
 
+    #[expect(
+        clippy::disallowed_types,
+        reason = "serde deserializes JSON strings as text"
+    )]
     fn load_exceptions(&mut self) {
         let parsed: IndexMap<String, (String,)> =
-            serde_json::from_str(EXCEPTIONS_JSON).expect("Missing or invalid exceptions file");
+            serde_json::from_slice(EXCEPTIONS_JSON).expect("Missing or invalid exceptions file");
         for (identifier, exception) in parsed {
-            self.exceptions
-                .insert(identifier.to_lowercase(), (identifier, exception.0));
+            self.exceptions.insert(
+                strtolower(&identifier),
+                (identifier.into(), exception.0.into()),
+            );
         }
     }
 
-    fn is_valid_license_string(&self, license: &str) -> bool {
-        if self.licenses.contains_key(&license.to_lowercase()) {
+    fn is_valid_license_string(&self, license: &[u8]) -> bool {
+        if self.licenses.contains_key(&strtolower(license)) {
             return true;
         }
 
@@ -127,7 +146,7 @@ impl SpdxLicenses {
         // apparent exception -- a licenseid that is itself a strict prefix of a longer licenseid,
         // e.g. "GPL-2.0" vs "GPL-2.0+" -- is already covered by simple_expression's own optional
         // trailing `+`, which lands on the same end position either way.
-        let bytes = license.as_bytes();
+        let bytes = license;
         if let Some(end) = starts_with_ci(bytes, 0, "NONE")
             && matches_full_string(bytes, end)
         {
@@ -235,8 +254,8 @@ impl SpdxLicenses {
     }
 }
 
-fn sorted_by_length_desc<'a>(keys: impl Iterator<Item = &'a String>) -> Vec<String> {
-    let mut keys: Vec<String> = keys.cloned().collect();
+fn sorted_by_length_desc<'a>(keys: impl Iterator<Item = &'a BString>) -> Vec<BString> {
+    let mut keys: Vec<BString> = keys.cloned().collect();
     keys.sort_by_key(|k| std::cmp::Reverse(k.len()));
     keys
 }
@@ -250,8 +269,8 @@ fn matches_full_string(s: &[u8], end: usize) -> bool {
 }
 
 /// Matches an ASCII `needle` case-insensitively at `pos` and returns the end position, if any.
-fn starts_with_ci(s: &[u8], pos: usize, needle: &str) -> Option<usize> {
-    let needle = needle.as_bytes();
+fn starts_with_ci(s: &[u8], pos: usize, needle: impl AsRef<[u8]>) -> Option<usize> {
+    let needle = needle.as_ref();
     let end = pos.checked_add(needle.len())?;
     let candidate = s.get(pos..end)?;
     candidate.eq_ignore_ascii_case(needle).then_some(end)
@@ -306,7 +325,7 @@ mod tests {
     fn matches_php_spdx_licenses_validate() {
         let s = SpdxLicenses::new();
 
-        let cases: &[(&str, bool)] = &[
+        let cases = [
             ("MIT", true),
             ("mit", true),
             ("Mit", true),
@@ -376,7 +395,7 @@ mod tests {
         for (license, expected) in cases {
             assert_eq!(
                 s.validate(license),
-                *expected,
+                expected,
                 "validate({license:?}) should be {expected}"
             );
         }

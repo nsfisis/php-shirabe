@@ -6,7 +6,7 @@
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use crate::test_case::GitVersionGuard;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -21,7 +21,7 @@ use shirabe::repository::RepositoryManager;
 use shirabe::util::Git as GitUtil;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
@@ -65,28 +65,38 @@ fn make_manager(
     )))
 }
 
-fn require_map(entries: &[(&str, &str)]) -> PhpMixed {
+fn require_map(entries: &[(&BStr, &BStr)]) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string().into(), PhpMixed::string(v.to_string()));
+        m.insert(bconcat!(k), PhpMixed::string(bconcat!(v)));
     }
     PhpMixed::Array(m)
 }
 
 // A test double for the concrete VersionGuesser, supplied through the VersionGuesserInterface seam.
-mockall::mock! {
-    #[derive(Debug)]
-    pub VersionGuesser {}
-    impl VersionGuesserInterface for VersionGuesser {
-        fn guess_version(
-            &mut self,
-            package_config: &IndexMap<BString, PhpMixed>,
-            path: &str,
-        ) -> anyhow::Result<Option<VersionData>>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_version_guesser {
+    use super::*;
 
-        fn get_root_version_from_env(&self) -> anyhow::Result<String>;
+    mockall::mock! {
+        #[derive(Debug)]
+        pub VersionGuesser {}
+        impl VersionGuesserInterface for VersionGuesser {
+            fn guess_version(
+                &mut self,
+                package_config: &IndexMap<BString, PhpMixed>,
+                path: &std::path::Path,
+            ) -> anyhow::Result<Option<VersionData>>;
+
+            fn get_root_version_from_env(&self) -> anyhow::Result<BString>;
+        }
     }
 }
+use mock_version_guesser::MockVersionGuesser;
 
 #[test]
 fn test_stability_flags_parsing() {
@@ -131,56 +141,59 @@ fn test_stability_flags_parsing() {
             let mut m = IndexMap::new();
             m.insert(
                 "foo/bar".into(),
-                PhpMixed::string("~2.1.0-beta2".to_string()),
+                PhpMixed::string(BString::from("~2.1.0-beta2")),
             );
             m.insert(
                 "bar/baz".into(),
-                PhpMixed::string("1.0.x-dev as 1.2.0".to_string()),
+                PhpMixed::string(BString::from("1.0.x-dev as 1.2.0")),
             );
-            m.insert("qux/quux".into(), PhpMixed::string("1.0.*@rc".to_string()));
+            m.insert(
+                "qux/quux".into(),
+                PhpMixed::string(BString::from("1.0.*@rc")),
+            );
             m.insert(
                 "zux/complex".into(),
-                PhpMixed::string("~1.0,>=1.0.2@dev".to_string()),
+                PhpMixed::string(BString::from("~1.0,>=1.0.2@dev")),
             );
             m.insert(
                 "or/op".into(),
-                PhpMixed::string("^2.0@dev || ^2.0@dev".to_string()),
+                PhpMixed::string(BString::from("^2.0@dev || ^2.0@dev")),
             );
             m.insert(
                 "multi/lowest-wins".into(),
-                PhpMixed::string("^2.0@rc || >=3.0@dev , ~3.5@alpha".to_string()),
+                PhpMixed::string(BString::from("^2.0@rc || >=3.0@dev , ~3.5@alpha")),
             );
             m.insert(
                 "or/op-without-flags".into(),
-                PhpMixed::string("dev-master || 2.0 , ~3.5-alpha".to_string()),
+                PhpMixed::string(BString::from("dev-master || 2.0 , ~3.5-alpha")),
             );
             m.insert(
                 "or/op-without-flags2".into(),
-                PhpMixed::string("3.0-beta || 2.0 , ~3.5-alpha".to_string()),
+                PhpMixed::string(BString::from("3.0-beta || 2.0 , ~3.5-alpha")),
             );
             m
         }),
     );
     data.insert(
         "minimum-stability".into(),
-        PhpMixed::string("alpha".to_string()),
+        PhpMixed::string(BString::from("alpha")),
     );
 
     let package = loader
-        .load(data, "Composer\\Package\\RootPackage", None)
+        .load(data, BStr::new("Composer\\Package\\RootPackage"), None)
         .unwrap();
     let package = package.as_root().unwrap();
 
     assert_eq!("alpha", package.get_minimum_stability());
 
     let mut expected = IndexMap::new();
-    expected.insert("bar/baz".to_string(), STABILITY_DEV);
-    expected.insert("qux/quux".to_string(), STABILITY_RC);
-    expected.insert("zux/complex".to_string(), STABILITY_DEV);
-    expected.insert("or/op".to_string(), STABILITY_DEV);
-    expected.insert("multi/lowest-wins".to_string(), STABILITY_DEV);
-    expected.insert("or/op-without-flags".to_string(), STABILITY_DEV);
-    expected.insert("or/op-without-flags2".to_string(), STABILITY_ALPHA);
+    expected.insert(BString::from("bar/baz"), STABILITY_DEV);
+    expected.insert(BString::from("qux/quux"), STABILITY_RC);
+    expected.insert(BString::from("zux/complex"), STABILITY_DEV);
+    expected.insert(BString::from("or/op"), STABILITY_DEV);
+    expected.insert(BString::from("multi/lowest-wins"), STABILITY_DEV);
+    expected.insert(BString::from("or/op-without-flags"), STABILITY_DEV);
+    expected.insert(BString::from("or/op-without-flags2"), STABILITY_ALPHA);
     assert_eq!(expected, package.get_stability_flags());
 }
 
@@ -207,7 +220,11 @@ fn test_no_version_is_visible_in_pretty_version() {
     let mut loader = RootPackageLoader::new(manager, config, None, Some(Box::new(guesser)), None);
 
     let package = loader
-        .load(IndexMap::new(), "Composer\\Package\\RootPackage", None)
+        .load(
+            IndexMap::new(),
+            BStr::new("Composer\\Package\\RootPackage"),
+            None,
+        )
         .unwrap();
     let package = package.as_root().unwrap();
 
@@ -232,9 +249,9 @@ fn test_pretty_version_for_root_package_in_version_branch() {
         .times(1..)
         .returning(|_, _| {
             Ok(Some(VersionData {
-                version: Some("3.0.9999999.9999999-dev".to_string()),
-                commit: Some("aabbccddee".to_string()),
-                pretty_version: Some("3.0-dev".to_string()),
+                version: Some("3.0.9999999.9999999-dev".into()),
+                commit: Some("aabbccddee".into()),
+                pretty_version: Some("3.0-dev".into()),
                 feature_version: None,
                 feature_pretty_version: None,
             }))
@@ -244,7 +261,11 @@ fn test_pretty_version_for_root_package_in_version_branch() {
         RootPackageLoader::new(manager, config, None, Some(Box::new(version_guesser)), None);
 
     let package = loader
-        .load(IndexMap::new(), "Composer\\Package\\RootPackage", None)
+        .load(
+            IndexMap::new(),
+            BStr::new("Composer\\Package\\RootPackage"),
+            None,
+        )
         .unwrap();
 
     assert_eq!("3.0-dev", package.as_root().unwrap().get_pretty_version());
@@ -254,7 +275,7 @@ fn test_pretty_version_for_root_package_in_version_branch() {
 #[serial]
 fn test_feature_branch_pretty_version() {
     // proc_open() is always available; the PHP markTestSkipped guard does not apply here.
-    GitUtil::__set_version(Some("2.52.0".to_string()));
+    GitUtil::__set_version(Some("2.52.0".into()));
     let _git_guard = GitVersionGuard;
 
     let io = null_io();
@@ -278,11 +299,11 @@ fn test_feature_branch_pretty_version() {
     let mut data = IndexMap::new();
     data.insert(
         "require".into(),
-        require_map(&[("foo/bar", "self.version")]),
+        require_map(&[(BStr::new("foo/bar"), BStr::new("self.version"))]),
     );
 
     let package = loader
-        .load(data, "Composer\\Package\\RootPackage", None)
+        .load(data, BStr::new("Composer\\Package\\RootPackage"), None)
         .unwrap();
 
     assert_eq!(
@@ -295,7 +316,7 @@ fn test_feature_branch_pretty_version() {
 #[serial]
 fn test_non_feature_branch_pretty_version() {
     // proc_open() is always available; the PHP markTestSkipped guard does not apply here.
-    GitUtil::__set_version(Some("2.52.0".to_string()));
+    GitUtil::__set_version(Some("2.52.0".into()));
     let _git_guard = GitVersionGuard;
 
     let io = null_io();
@@ -316,15 +337,15 @@ fn test_non_feature_branch_pretty_version() {
     let mut data = IndexMap::new();
     data.insert(
         "require".into(),
-        require_map(&[("foo/bar", "self.version")]),
+        require_map(&[(BStr::new("foo/bar"), BStr::new("self.version"))]),
     );
     data.insert(
         "non-feature-branches".into(),
-        PhpMixed::List(vec![PhpMixed::string("latest-.*".to_string())]),
+        PhpMixed::List(vec![PhpMixed::string(BString::from("latest-.*"))]),
     );
 
     let package = loader
-        .load(data, "Composer\\Package\\RootPackage", None)
+        .load(data, BStr::new("Composer\\Package\\RootPackage"), None)
         .unwrap();
 
     assert_eq!(

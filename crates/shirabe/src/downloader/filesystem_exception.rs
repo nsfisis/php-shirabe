@@ -1,15 +1,16 @@
 //! ref: composer/src/Composer/Downloader/FilesystemException.php
 
-use shirabe_php_shim::Exception;
+use bstr::BString;
+use shirabe_php_shim::{Exception, bconcat};
 
 #[derive(Debug)]
 pub struct FilesystemException(pub Exception);
 
 impl FilesystemException {
     #[track_caller]
-    pub fn new(message: String, code: i64) -> Self {
+    pub fn new(message: impl Into<BString>, code: i64) -> Self {
         FilesystemException(Exception::with_code(
-            format!("Filesystem exception: \n{}", message),
+            bconcat!("Filesystem exception: \n", message.into()),
             code,
         ))
     }

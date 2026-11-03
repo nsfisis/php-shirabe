@@ -6,10 +6,15 @@ use crate::config::{Config, JsonConfigSource};
 use crate::factory::Factory;
 use crate::json::JsonFile;
 use crate::util::Platform;
+use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, chmod, touch};
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, bconcat, chmod, dirname, path_from_bytes, path_to_bytes,
+    php_to_string, touch,
+};
+use shirabe_symfony_console::input::InputInterfaceByName;
+use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
+use std::path::PathBuf;
 
 pub trait BaseConfigCommand: BaseCommand {
     fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>>;
@@ -35,7 +40,10 @@ pub trait BaseConfigCommand: BaseCommand {
             .unwrap_or(false)
             && !input.borrow().get_option("file")?.is_null()
         {
-            return Err(anyhow::anyhow!("--file and --global can not be combined"));
+            return Err(RuntimeException::new(BString::from(
+                "--file and --global can not be combined",
+            ))
+            .into());
         }
 
         let io = self.get_io();
@@ -51,17 +59,21 @@ pub trait BaseConfigCommand: BaseCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let home = config_rc.borrow_mut().get("home").to_string();
+            let home = php_to_string(&config_rc.borrow_mut().get("home"));
             config_rc.borrow_mut().set_base_dir(Some(home));
         }
 
         let config_file = self.get_composer_config_file(input.clone(), &config_rc.borrow())?;
 
         // Create global composer.json if invoked using `composer global [config-cmd]`
-        if (config_file == "composer.json" || config_file == "./composer.json")
+        if (config_file.as_os_str() == "composer.json"
+            || config_file.as_os_str() == "./composer.json")
             && !std::path::Path::new(&config_file).exists()
             && std::fs::canonicalize(Platform::get_cwd(false)?).ok()
-                == std::fs::canonicalize(config_rc.borrow_mut().get("home").to_string()).ok()
+                == std::fs::canonicalize(path_from_bytes(&php_to_string(
+                    &config_rc.borrow_mut().get("home"),
+                )))
+                .ok()
         {
             std::fs::write(&config_file, "{\n}\n")?;
         }
@@ -81,7 +93,12 @@ pub trait BaseConfigCommand: BaseCommand {
             .unwrap_or(false)
             && !self.config_file().unwrap().borrow().exists()
         {
-            let path = self.config_file().unwrap().borrow().get_path().to_string();
+            let path = self
+                .config_file()
+                .unwrap()
+                .borrow()
+                .get_path()
+                .to_path_buf();
             touch(&path);
             self.config_file()
                 .unwrap()
@@ -95,10 +112,12 @@ pub trait BaseConfigCommand: BaseCommand {
         }
 
         if !self.config_file().unwrap().borrow().exists() {
-            return Err(anyhow::anyhow!(
-                "File \"{}\" cannot be found in the current directory",
-                config_file
-            ));
+            return Err(RuntimeException::new(bconcat!(
+                "File \"",
+                config_file,
+                "\" cannot be found in the current directory"
+            ))
+            .into());
         }
 
         Ok(())
@@ -109,21 +128,24 @@ pub trait BaseConfigCommand: BaseCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         config: &Config,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<PathBuf> {
         if input
             .borrow()
             .get_option("global")?
             .as_bool()
             .unwrap_or(false)
         {
-            Ok(format!("{}/config.json", config.get("home")))
+            Ok(path_from_bytes(&php_to_string(&config.get("home"))).join("config.json"))
         } else {
-            Ok(input
+            match input
                 .borrow()
                 .get_option("file")?
                 .as_string()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| Factory::get_composer_file().unwrap_or_default()))
+                .map(|s| path_from_bytes(s).to_path_buf())
+            {
+                Some(file) => Ok(file),
+                None => Factory::get_composer_file(),
+            }
         }
     }
 
@@ -133,25 +155,21 @@ pub trait BaseConfigCommand: BaseCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         config: &Config,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<PathBuf> {
         if input
             .borrow()
             .get_option("global")?
             .as_bool()
             .unwrap_or(false)
         {
-            Ok(format!("{}/auth.json", config.get("home")))
+            Ok(path_from_bytes(&php_to_string(&config.get("home"))).join("auth.json"))
         } else {
             let composer_config = self.get_composer_config_file(input, config)?;
-            let parent = std::path::Path::new(&composer_config)
-                .parent()
-                .map(|p| {
-                    p.to_str()
-                        .expect("the parent of a UTF-8 path is valid UTF-8")
-                        .to_string()
-                })
-                .unwrap_or_default();
-            Ok(format!("{}/auth.json", parent))
+            Ok(path_from_bytes(&bconcat!(
+                dirname(path_to_bytes(&composer_config)),
+                "/auth.json"
+            ))
+            .to_path_buf())
         }
     }
 }

@@ -9,11 +9,12 @@ use crate::repository::{
     FilesystemRepository, RepositoryInterfaceHandle, RepositoryManager, RepositoryManagerInterface,
 };
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
-    php_regex, php_to_string, preg_replace,
+    InvalidArgumentException, PATHINFO_EXTENSION, PhpMixed, UnexpectedValueException, bconcat,
+    get_debug_type, json_encode, path_from_bytes, path_to_bytes, pathinfo, php_regex,
+    php_to_string, preg_replace, realpath, strtr,
 };
 
 pub struct RepositoryFactory;
@@ -22,24 +23,20 @@ impl RepositoryFactory {
     pub fn config_from_string(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        repository: &str,
+        repository: impl AsRef<[u8]>,
         allow_filesystem: bool,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        if repository.starts_with("http") {
+        let repository = repository.as_ref().as_bstr();
+        if repository.starts_with(b"http") {
             let mut repo_config = IndexMap::new();
-            repo_config.insert("type".into(), PhpMixed::string("composer".to_string()));
-            repo_config.insert("url".into(), PhpMixed::string(repository.to_string()));
+            repo_config.insert("type".into(), PhpMixed::string(BString::from("composer")));
+            repo_config.insert("url".into(), PhpMixed::string(repository));
             return Ok(repo_config);
         }
 
-        let extension = std::path::Path::new(repository)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
-
-        if extension == "json" {
+        if pathinfo(repository, PATHINFO_EXTENSION) == "json" {
             let json = JsonFile::new(
-                repository.to_string(),
+                path_from_bytes(repository),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
                     Factory::create_http_downloader(io.clone(), config, IndexMap::new())?,
                 ))),
@@ -50,42 +47,51 @@ impl RepositoryFactory {
             let has_includes = data.get("includes").is_some_and(|v| !v.is_null());
             let has_provider_includes = data.get("provider-includes").is_some_and(|v| !v.is_null());
             if has_packages || has_includes || has_provider_includes {
-                let real_path = std::fs::canonicalize(repository)
-                    .ok()
-                    .and_then(|p| p.to_str().map(|s| s.to_string()))
-                    .unwrap_or_else(|| repository.to_string())
-                    .replace('\\', "/");
+                let real_path = realpath(path_from_bytes(repository))
+                    .map(|p| BString::from(path_to_bytes(&p)))
+                    .unwrap_or_else(|| BString::from(repository));
+                let real_path = strtr(&real_path, "\\", "/");
                 let mut repo_config = IndexMap::new();
-                repo_config.insert("type".into(), PhpMixed::string("composer".to_string()));
+                repo_config.insert("type".into(), PhpMixed::string(BString::from("composer")));
                 repo_config.insert(
                     "url".into(),
-                    PhpMixed::string(format!("file://{}", real_path)),
+                    PhpMixed::string(bconcat!("file://", real_path)),
                 );
                 return Ok(repo_config);
             } else if allow_filesystem {
                 let mut repo_config = IndexMap::new();
-                repo_config.insert("type".into(), PhpMixed::string("filesystem".to_string()));
-                repo_config.insert("json".into(), PhpMixed::string(repository.to_string()));
+                repo_config.insert("type".into(), PhpMixed::string(BString::from("filesystem")));
+                repo_config.insert("json".into(), PhpMixed::string(repository));
                 return Ok(repo_config);
             } else {
-                return Err(InvalidArgumentException::new(format!("Invalid repository URL ({}) given. This file does not contain a valid composer repository.", repository)).into());
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Invalid repository URL (",
+                    repository,
+                    ") given. This file does not contain a valid composer repository."
+                ))
+                .into());
             }
         }
 
-        if repository.starts_with('{') {
+        if repository.starts_with(b"{") {
             let parsed = JsonFile::parse_json(Some(repository), None)?;
             let repo_config: IndexMap<BString, PhpMixed> =
                 parsed.as_array().cloned().unwrap_or_default();
             return Ok(repo_config);
         }
 
-        Err(InvalidArgumentException::new(format!("Invalid repository url ({}) given. Has to be a .json file, an http url or a JSON object.", repository)).into())
+        Err(InvalidArgumentException::new(bconcat!(
+            "Invalid repository url (",
+            repository,
+            ") given. Has to be a .json file, an http url or a JSON object."
+        ))
+        .into())
     }
 
     pub fn from_string(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        repository: &str,
+        repository: impl AsRef<[u8]>,
         allow_filesystem: bool,
         rm: Option<&mut dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
@@ -111,7 +117,7 @@ impl RepositoryFactory {
             Self::create_repos(rm, vec![PhpMixed::Array(repo_config.into_iter().collect())])?;
         // PHP: return current($repos);
         let (_, first) = repos.into_iter().next().ok_or_else(|| {
-            UnexpectedValueException::new("create_repos returned no repository".to_string())
+            UnexpectedValueException::new(BString::from("create_repos returned no repository"))
         })?;
         Ok(first)
     }
@@ -120,7 +126,7 @@ impl RepositoryFactory {
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
         rm: Option<&mut dyn RepositoryManagerInterface>,
-    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
+    ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         let config = match config {
             Some(c) => c,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
@@ -135,10 +141,9 @@ impl RepositoryFactory {
             rm
         } else {
             let io = io.ok_or_else(|| {
-                InvalidArgumentException::new(
-                    "This function requires either an IOInterface or a RepositoryManager"
-                        .to_string(),
-                )
+                InvalidArgumentException::new(BString::from(
+                    "This function requires either an IOInterface or a RepositoryManager",
+                ))
             })?;
             owned_rm = Self::manager(
                 io.clone(),
@@ -188,28 +193,73 @@ impl RepositoryFactory {
             event_dispatcher,
             Some(process),
         );
-        rm.set_repository_class("composer", "Composer\\Repository\\ComposerRepository");
-        rm.set_repository_class("vcs", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("package", "Composer\\Repository\\PackageRepository");
-        rm.set_repository_class("pear", "Composer\\Repository\\PearRepository");
-        rm.set_repository_class("git", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("bitbucket", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("git-bitbucket", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("github", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("gitlab", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("svn", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("fossil", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("perforce", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("hg", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("artifact", "Composer\\Repository\\ArtifactRepository");
-        rm.set_repository_class("path", "Composer\\Repository\\PathRepository");
+        rm.set_repository_class(
+            bstr::BStr::new("composer"),
+            BStr::new("Composer\\Repository\\ComposerRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("vcs"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("package"),
+            BStr::new("Composer\\Repository\\PackageRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("pear"),
+            BStr::new("Composer\\Repository\\PearRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("git"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("bitbucket"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("git-bitbucket"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("github"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("gitlab"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("svn"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("fossil"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("perforce"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("hg"),
+            BStr::new("Composer\\Repository\\VcsRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("artifact"),
+            BStr::new("Composer\\Repository\\ArtifactRepository"),
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("path"),
+            BStr::new("Composer\\Repository\\PathRepository"),
+        );
 
         Ok(rm)
     }
 
     pub fn default_repos_with_default_manager(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
+    ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
             Some(io.clone()),
             None,
@@ -223,28 +273,31 @@ impl RepositoryFactory {
     fn create_repos(
         rm: &mut dyn RepositoryManagerInterface,
         repo_configs: Vec<PhpMixed>,
-    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
-        let mut repo_map: IndexMap<String, RepositoryInterfaceHandle> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
+        let mut repo_map: IndexMap<BString, RepositoryInterfaceHandle> = IndexMap::new();
 
         for (index, repo) in repo_configs.into_iter().enumerate() {
             match &repo {
                 PhpMixed::String(_) => {
-                    return Err(UnexpectedValueException::new("\"repositories\" should be an array of repository definitions, only a single repository was given".to_string()).into());
+                    return Err(UnexpectedValueException::new(BString::from("\"repositories\" should be an array of repository definitions, only a single repository was given")).into());
                 }
                 PhpMixed::Array(repo_arr) => {
                     if !repo_arr.contains_key(B("type")) {
-                        return Err(UnexpectedValueException::new(format!(
-                            "Repository \"{}\" ({}) must have a type defined",
+                        return Err(UnexpectedValueException::new(bconcat!(
+                            "Repository \"",
                             index,
-                            json_encode(&repo).unwrap_or_default()
+                            "\" (",
+                            json_encode(&repo).unwrap_or_default(),
+                            ") must have a type defined"
                         ))
                         .into());
                     }
-                    let repo_type = repo_arr
-                        .get(B("type"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let repo_type = BString::from(
+                        repo_arr
+                            .get(B("type"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    );
                     let repo_config_map: IndexMap<BString, PhpMixed> = repo_arr
                         .iter()
                         .map(|(k, v)| (k.clone(), v.clone()))
@@ -253,11 +306,12 @@ impl RepositoryFactory {
                         Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);
 
                     if repo_type == "filesystem" {
-                        let json_path = repo_arr
-                            .get(B("json"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string();
+                        let json_path = path_from_bytes(
+                            repo_arr
+                                .get(B("json"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        );
                         let created: RepositoryInterfaceHandle =
                             RepositoryInterfaceHandle::new(FilesystemRepository::new(
                                 JsonFile::new(json_path, None, None)?,
@@ -268,19 +322,22 @@ impl RepositoryFactory {
                         repo_map.insert(name, created);
                     } else {
                         let created = rm.create_repository(
-                            &repo_type,
+                            repo_type.as_bstr(),
                             repo_config_map,
-                            Some(&index.to_string()),
+                            Some(bconcat!(index).as_bstr()),
                         )?;
                         repo_map.insert(name, created);
                     }
                 }
                 _ => {
-                    return Err(UnexpectedValueException::new(format!(
-                        "Repository \"{}\" ({}) should be an array, {} given",
+                    return Err(UnexpectedValueException::new(bconcat!(
+                        "Repository \"",
                         index,
+                        "\" (",
                         json_encode(&repo).unwrap_or_default(),
-                        get_debug_type(&repo)
+                        ") should be an array, ",
+                        get_debug_type(&repo),
+                        " given"
                     ))
                     .into());
                 }
@@ -294,21 +351,23 @@ impl RepositoryFactory {
         index: &PhpMixed,
         repo: &IndexMap<BString, PhpMixed>,
         existing_repos: &IndexMap<K, T>,
-    ) -> String {
-        let mut name = if matches!(index, PhpMixed::Int(_)) && repo.contains_key(B("url")) {
-            let url = repo
-                .get(B("url"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default();
-            preg_replace(php_regex!("{^https?://}i"), "", &url.to_str_lossy())
-        } else {
-            php_to_string(index)
-        };
+    ) -> BString {
+        let mut name = BString::from(
+            &if matches!(index, PhpMixed::Int(_)) && repo.contains_key(B("url")) {
+                let url = repo
+                    .get(B("url"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default();
+                preg_replace(php_regex!("{^https?://}i"), "", url)
+            } else {
+                php_to_string(index)
+            }[..],
+        );
         while existing_repos
             .keys()
             .any(|key| key.as_ref() == name.as_bytes())
         {
-            name.push('2');
+            name.push(b'2');
         }
         name
     }
@@ -316,15 +375,17 @@ impl RepositoryFactory {
     fn generate_repository_name_indexed(
         index: usize,
         repo: &IndexMap<BString, PhpMixed>,
-        existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
-    ) -> String {
-        let mut name = if let Some(url) = repo.get(B("url")).and_then(|v| v.as_string()) {
-            preg_replace(php_regex!("{^https?://}i"), "", &url.to_str_lossy())
-        } else {
-            index.to_string()
-        };
+        existing_repos: &IndexMap<BString, RepositoryInterfaceHandle>,
+    ) -> BString {
+        let mut name = BString::from(
+            &if let Some(url) = repo.get(B("url")).and_then(|v| v.as_string()) {
+                preg_replace(php_regex!("{^https?://}i"), "", url)
+            } else {
+                bconcat!(index)
+            }[..],
+        );
         while existing_repos.contains_key(&name) {
-            name.push('2');
+            name.push(b'2');
         }
         name
     }

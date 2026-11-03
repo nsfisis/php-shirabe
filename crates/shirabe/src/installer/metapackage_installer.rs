@@ -4,10 +4,11 @@ use crate::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,
 };
 use crate::installer::InstallerInterface;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
+use bstr::BStr;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat};
 
 #[derive(Debug)]
 pub struct MetapackageInstaller {
@@ -22,7 +23,7 @@ impl MetapackageInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for MetapackageInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(package_type == "metapackage")
     }
 
@@ -44,7 +45,7 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -53,7 +54,7 @@ impl InstallerInterface for MetapackageInstaller {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -66,7 +67,7 @@ impl InstallerInterface for MetapackageInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.write_error3(
-            &format!("  - {}", InstallOperation::format(package.clone(), false)),
+            bconcat!("  - ", InstallOperation::format(package.clone(), false)),
             true,
             io_interface::NORMAL,
         );
@@ -84,16 +85,16 @@ impl InstallerInterface for MetapackageInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                initial
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                initial.to_php_string()
             ))
             .into());
         }
 
         self.io.write_error3(
-            &format!(
-                "  - {}",
+            bconcat!(
+                "  - ",
                 UpdateOperation::format(initial.clone(), target.clone(), false)
             ),
             true,
@@ -113,15 +114,15 @@ impl InstallerInterface for MetapackageInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                package
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                package.to_php_string()
             ))
             .into());
         }
 
         self.io.write_error3(
-            &format!("  - {}", UninstallOperation::format(package.clone(), false)),
+            bconcat!("  - ", UninstallOperation::format(package.clone(), false)),
             true,
             io_interface::NORMAL,
         );
@@ -131,7 +132,7 @@ impl InstallerInterface for MetapackageInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         None
     }
 }

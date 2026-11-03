@@ -2,18 +2,20 @@
 
 use crate::command::{Command, CommandData};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
-use crate::input::{InputArgument, InputInterface, InputOption, InputValue};
+use crate::input::{InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue};
 use crate::output::{OutputInterface, output_interface};
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, realpath, str_replace_arrays,
-    sys_get_temp_dir, touch,
+    PHP_SERVER, PhpMixed, basename, bconcat, file_exists, impl_php_class, implode, path_from_bytes,
+    path_to_bytes, php_str, realpath, str_replace_arrays, sys_get_temp_dir, touch,
 };
 use shirabe_symfony_process::process::Process;
 use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
 
 /// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a
 /// single binary and does not install the Resources directory alongside it).
-const COMPLETION_BASH: &str = include_str!("../Resources/completion.bash");
+const COMPLETION_BASH: &BStr = php_str(include_bytes!("../Resources/completion.bash"));
 
 /// Dumps the completion script for the current shell.
 #[derive(Debug)]
@@ -47,8 +49,8 @@ impl Default for DumpCompletionCommand {
 }
 
 impl DumpCompletionCommand {
-    pub const DEFAULT_NAME: &'static str = "completion";
-    pub const DEFAULT_DESCRIPTION: &'static str = "Dump the shell completion script";
+    pub const DEFAULT_NAME: &'static BStr = php_str(b"completion");
+    pub const DEFAULT_DESCRIPTION: &'static BStr = php_str(b"Dump the shell completion script");
 
     pub fn new() -> Self {
         let command = DumpCompletionCommand {
@@ -60,7 +62,9 @@ impl DumpCompletionCommand {
             .inner
             .apply_default_name(Self::DEFAULT_NAME)
             .expect("DumpCompletionCommand default name is valid");
-        command.inner.set_description(Self::DEFAULT_DESCRIPTION);
+        command
+            .inner
+            .set_description(bstr::BStr::new(Self::DEFAULT_DESCRIPTION));
         command
             .configure()
             .expect("DumpCompletionCommand::configure uses static, valid metadata");
@@ -83,46 +87,39 @@ impl DumpCompletionCommand {
         Ok(())
     }
 
-    fn guess_shell() -> String {
-        // TODO(bytes): basename takes the path as a &str.
-        basename(
-            &PHP_SERVER
-                .lock()
-                .unwrap()
-                .get("SHELL")
-                .unwrap_or_default()
-                .into_string()
-                .unwrap_or_else(|shell| panic!("SHELL is not valid UTF-8: {shell:?}")),
-        )
+    fn guess_shell() -> BString {
+        basename(path_to_bytes(
+            &PHP_SERVER.lock().unwrap().get("SHELL").unwrap_or_default(),
+        ))
     }
 
     fn tail_debug_log(
         &self,
-        command_name: &str,
+        command_name: &BStr,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        // TODO(bytes): Process takes the command line as Strings.
-        let tmp_dir = sys_get_temp_dir()
-            .into_os_string()
-            .into_string()
-            .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
-        let debug_file = format!("{}/sf_{}.log", tmp_dir, command_name);
+        let debug_file =
+            sys_get_temp_dir().join(path_from_bytes(&bconcat!("sf_", command_name, ".log")));
         if !file_exists(&debug_file) {
             touch(&debug_file);
         }
         // new Process(['tail', '-f', $debugFile], null, null, null, 0) — timeout 0 disables it;
         // like PHP, this tails forever until the user interrupts.
         let mut process = Process::new(
-            vec!["tail".to_string(), "-f".to_string(), debug_file],
+            vec![
+                BString::from("tail"),
+                BString::from("-f"),
+                BString::from(path_to_bytes(&debug_file)),
+            ],
             None,
             None,
             PhpMixed::Null,
             Some(0.0),
         )?;
         process.run(
-            Some(Box::new(move |_type: &str, line: &str| {
+            Some(Box::new(move |_type: &BStr, line: &BStr| {
                 output.borrow_mut().write(
-                    &[line.to_string()],
+                    &[BString::from(line)],
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );
@@ -133,33 +130,26 @@ impl DumpCompletionCommand {
         Ok(())
     }
 
-    fn get_supported_shells(&self) -> anyhow::Result<Vec<String>> {
+    fn get_supported_shells(&self) -> anyhow::Result<Vec<BString>> {
         // Deviation from PHP: the PHP implementation scans __DIR__.'/../Resources/' with a
         // DirectoryIterator at runtime; the resources are embedded at compile time in this
         // port, so the supported shells are a static list.
-        Ok(vec!["bash".to_string()])
+        Ok(vec![BString::from("bash")])
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for DumpCompletionCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        // TODO(bytes): basename and the help text work on Strings.
-        let full_command = PHP_SERVER
-            .lock()
-            .unwrap()
-            .php_self()
-            .unwrap_or_default()
-            .into_string()
-            .unwrap_or_else(|php_self| panic!("PHP_SELF is not valid UTF-8: {php_self:?}"));
-        let command_name = basename(&full_command);
+        let full_command = PHP_SERVER.lock().unwrap().php_self().unwrap_or_default();
+        let command_name = basename(path_to_bytes(&full_command));
         // @realpath($fullCommand) ?: $fullCommand
         let full_command = match realpath(&full_command) {
-            Some(p) if !p.is_empty() => p,
-            _ => full_command,
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => PathBuf::from(full_command),
         };
 
-        self.inner.set_help(&format!(
+        self.inner.set_help(bstr::BStr::new(&bconcat!(
             "The <info>%command.name%</> command dumps the shell completion script required\n\
              to use shell autocompletion (currently only bash completion is supported).\n\
              \n\
@@ -168,7 +158,9 @@ impl Command for DumpCompletionCommand {
              \n\
              Dump the script to a global completion file and restart your shell:\n\
              \n\
-             \x20\x20\x20\x20<info>%command.full_name% bash | sudo tee /etc/bash_completion.d/{command_name}</>\n\
+             \x20\x20\x20\x20<info>%command.full_name% bash | sudo tee /etc/bash_completion.d/",
+            command_name,
+            "</>\n\
              \n\
              Or dump the script to a local file and source it:\n\
              \n\
@@ -185,8 +177,10 @@ impl Command for DumpCompletionCommand {
              \n\
              Add this to the end of your shell configuration file (e.g. <info>\"~/.bashrc\"</>):\n\
              \n\
-             \x20\x20\x20\x20<info>eval \"$({full_command} completion bash)\"</>",
-        ));
+             \x20\x20\x20\x20<info>eval \"$(",
+            full_command,
+            " completion bash)\"</>",
+        )));
         self.inner.add_argument(
             "shell",
             Some(InputArgument::OPTIONAL),
@@ -209,32 +203,24 @@ impl Command for DumpCompletionCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        // TODO(bytes): basename takes the path as a &str.
-        let command_name = basename(
-            &PHP_SERVER
-                .lock()
-                .unwrap()
-                .argv()
-                .next()
-                .unwrap_or_default()
-                .into_string()
-                .unwrap_or_else(|arg| panic!("argv[0] is not valid UTF-8: {arg:?}")),
-        );
+        let command_name = basename(path_to_bytes(
+            &PHP_SERVER.lock().unwrap().argv().next().unwrap_or_default(),
+        ));
 
         if input.borrow().get_option("debug")?.to_bool() {
-            self.tail_debug_log(&command_name, output.clone())?;
+            self.tail_debug_log(command_name.as_ref(), output.clone())?;
 
             return Ok(0);
         }
 
         let shell = match input.borrow().get_argument("shell")?.as_string() {
-            Some(s) => s.to_string(),
+            Some(s) => s.to_owned(),
             None => Self::guess_shell(),
         };
         // __DIR__.'/../Resources/completion.'.$shell — resolved against the embedded
         // resources; a shell without an embedded script is PHP's !file_exists() branch.
-        let completion_file = match shell.as_str() {
-            "bash" => Some(COMPLETION_BASH),
+        let completion_file = match shell.as_slice() {
+            b"bash" => Some(COMPLETION_BASH),
             _ => None,
         };
         let Some(completion_file) = completion_file else {
@@ -250,18 +236,21 @@ impl Command for DumpCompletionCommand {
             };
             if !shell.is_empty() {
                 output.borrow_mut().writeln(
-                    &[format!(
-                        "<error>Detected shell \"{}\", which is not supported by Symfony shell completion (supported shells: \"{}\").</>",
+                    &[bconcat!(
+                        "<error>Detected shell \"",
                         shell,
-                        supported_shells.join("\", \"")
+                        "\", which is not supported by Symfony shell completion (supported shells: \"",
+                        implode("\", \"", &supported_shells),
+                        "\").</>"
                     )],
                     output_interface::OUTPUT_NORMAL,
                 );
             } else {
                 output.borrow_mut().writeln(
-                    &[format!(
-                        "<error>Shell not detected, Symfony shell completion only supports \"{}\").</>",
-                        supported_shells.join("\", \"")
+                    &[bconcat!(
+                        "<error>Shell not detected, Symfony shell completion only supports \"",
+                        implode("\", \"", &supported_shells),
+                        "\").</>"
                     )],
                     output_interface::OUTPUT_NORMAL,
                 );
@@ -274,10 +263,7 @@ impl Command for DumpCompletionCommand {
         let version = application.borrow().get_version();
         output.borrow_mut().write(
             &[str_replace_arrays(
-                &[
-                    "{{ COMMAND_NAME }}".to_string(),
-                    "{{ VERSION }}".to_string(),
-                ],
+                &["{{ COMMAND_NAME }}", "{{ VERSION }}"],
                 &[command_name, version],
                 completion_file,
             )],

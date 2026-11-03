@@ -7,21 +7,22 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
-    array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
-    json_decode_assoc, json_decode_obj, php_regex, php_truthy, preg_is_match, preg_match,
-    preg_quote, preg_replace, preg_replace2, rtrim, str_repeat, str_replace, strlen, strnatcmp,
-    strpos, substr, trim, uksort,
+    array_reverse, bconcat, empty, explode, implode, in_array_loose, intval, is_array, is_int,
+    is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_str, php_truthy, preg_is_match,
+    preg_match, preg_quote, preg_replace, preg_replace2, rtrim2, str_repeat, str_replace, strlen,
+    strnatcmp, strpos, substr, trim2, uksort,
 };
 
 #[derive(Debug)]
 pub struct JsonManipulator {
-    contents: String,
-    newline: String,
-    indent: String,
+    contents: BString,
+    newline: BString,
+    indent: BString,
 }
 
 impl JsonManipulator {
-    const DEFINES: &'static str = "(?(DEFINE)
+    const DEFINES: &'static BStr = php_str(
+        b"(?(DEFINE)
        (?<number>    -? (?= [1-9]|0(?!\\d) ) \\d++ (?:\\.\\d++)? (?:[eE] [+-]?+ \\d++)? )
        (?<boolean>   true | false | null )
        (?<string>    \" (?:[^\"\\\\]*+ | \\\\ [\"\\\\bfnrt\\/] | \\\\ u [0-9A-Fa-f]{4} )* \" )
@@ -29,105 +30,113 @@ impl JsonManipulator {
        (?<pair>      \\s*+ (?&string) \\s*+ : (?&json) \\s*+ )
        (?<object>    \\{  (?:  (?&pair)  (?: , (?&pair)  )*+  )?+  \\s*+ \\} )
        (?<json>      \\s*+ (?: (?&number) | (?&boolean) | (?&string) | (?&array) | (?&object) ) )
-    )";
+    )",
+    );
 
-    pub fn new(contents: String) -> anyhow::Result<Self> {
-        let mut contents = trim(&contents, Some(" \t\n\r\0\u{0B}"));
+    pub fn new(contents: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+        let mut contents = trim2(contents, " \t\n\r\0\u{0B}");
         if contents.is_empty() {
-            contents = "{}".to_string();
+            contents = BString::from("{}");
         }
         if !preg_is_match(php_regex!("#^\\{(.*)\\}$#s"), &contents) {
-            return Err(InvalidArgumentException::new(
-                "The json file must be an object ({})".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "The json file must be an object ({})",
+            ))
             .into());
         }
-        let newline = if strpos(&contents, "\r\n").is_some() {
-            "\r\n".to_string()
+        let newline = BString::from(if strpos(&contents, "\r\n").is_some() {
+            "\r\n"
         } else {
-            "\n".to_string()
-        };
+            "\n"
+        });
         let mut s = Self {
             contents: if contents == "{}" {
-                format!("{{{}}}", newline)
+                bconcat!("{", newline, "}")
             } else {
                 contents
             },
             newline,
-            indent: String::new(),
+            indent: BString::default(),
         };
         s.detect_indenting();
         Ok(s)
     }
 
-    pub fn get_contents(&self) -> String {
-        format!("{}{}", self.contents, self.newline)
+    pub fn get_contents(&self) -> BString {
+        bconcat!(self.contents, self.newline)
     }
 
     pub fn add_link(
         &mut self,
-        r#type: &str,
-        package: &str,
-        constraint: &str,
+        r#type: impl AsRef<[u8]>,
+        package: impl AsRef<[u8]>,
+        constraint: impl AsRef<[u8]>,
         sort_packages: bool,
     ) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let r#type = BStr::new(r#type.as_ref());
+        let package = BStr::new(package.as_ref());
+        let constraint = BStr::new(constraint.as_ref());
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no link of that type yet
         if decoded.as_array().and_then(|a| a.get(B(r#type))).is_none() {
             let mut arr: IndexMap<BString, PhpMixed> = IndexMap::new();
-            arr.insert(
-                package.to_string().into(),
-                PhpMixed::string(constraint.to_string()),
-            );
+            arr.insert(BString::from(package), PhpMixed::string(constraint));
             return self.add_main_key(r#type, PhpMixed::Array(arr));
         }
 
         let m = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(r#type)?.as_bytes(),
+            JsonFile::encode(&PhpMixed::string(r#type))?.as_bytes(),
             ValueKind::Json,
         ) {
             Some(m) => m,
             None => return Ok(false),
         };
-        let start = self.contents[..m.key_pos].to_string();
-        let property = self.contents[m.key_pos..m.value_pos].to_string();
-        let end = self.contents[m.value_end..].to_string();
+        let start = BString::from(&self.contents[..m.key_pos]);
+        let property = BString::from(&self.contents[m.key_pos..m.value_pos]);
+        let end = BString::from(&self.contents[m.value_end..]);
 
-        let mut links = self.contents[m.value_pos..m.value_end].to_string();
+        let mut links = BString::from(&self.contents[m.value_pos..m.value_end]);
 
         // try to find existing link
         if let Some((key_start, key_end, value_start, value_end)) =
             find_package_link(&links, package)
         {
             // update existing link: re-encode the existing key, keep its separator, swap the value
-            let existing_package = links[key_start + 1..key_end - 1].to_string();
-            let separator = links[key_end..value_start].to_string();
-            links = format!(
-                "{}{}{}\"{}\"{}",
+            let existing_package = BString::from(&links[key_start + 1..key_end - 1]);
+            let separator = BString::from(&links[key_end..value_start]);
+            links = bconcat!(
                 &links[..key_start],
-                JsonFile::encode(&str_replace("\\/", "/", &existing_package))?,
+                JsonFile::encode(&PhpMixed::string(str_replace(
+                    "\\/",
+                    "/",
+                    &existing_package
+                )))?,
                 separator,
+                "\"",
                 constraint,
+                "\"",
                 &links[value_end..]
             );
         } else {
             if let Some(groups) =
                 preg_match(php_regex!("#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s"), &links)
             {
-                let groups_1 = groups.get(1).unwrap_or_default().to_string();
+                let groups_1 = BString::from(groups.get(1).unwrap_or_default());
                 // link missing but non empty links
                 links = preg_replace(
-                    format!("{{{}$}}", preg_quote(&groups_1, None)),
-                    &addcslashes(
-                        &format!(
-                            ",{}{}{}{}: {}{}",
+                    bconcat!("{", preg_quote(&groups_1, None), "$}"),
+                    addcslashes(
+                        bconcat!(
+                            ",",
                             self.newline,
                             self.indent,
                             self.indent,
-                            JsonFile::encode(package)?,
-                            JsonFile::encode(constraint)?,
+                            JsonFile::encode(&PhpMixed::string(package))?,
+                            ": ",
+                            JsonFile::encode(&PhpMixed::string(constraint))?,
                             groups_1
                         ),
                         "\\$",
@@ -136,15 +145,17 @@ impl JsonManipulator {
                 );
             } else {
                 // links empty
-                links = format!(
-                    "{{{}{}{}{}: {}{}{}}}",
+                links = bconcat!(
+                    "{",
                     self.newline,
                     self.indent,
                     self.indent,
-                    JsonFile::encode(package)?,
-                    JsonFile::encode(constraint)?,
+                    JsonFile::encode(&PhpMixed::string(package))?,
+                    ": ",
+                    JsonFile::encode(&PhpMixed::string(constraint))?,
                     self.newline,
-                    self.indent
+                    self.indent,
+                    "}"
                 );
             }
         }
@@ -155,42 +166,41 @@ impl JsonManipulator {
             links = self.format(&requirements, 0, false)?;
         }
 
-        self.contents = format!("{}{}{}{}", start, property, links, end);
+        self.contents = bconcat!(start, property, links, end);
 
         Ok(true)
     }
 
     /// Sorts packages by importance (platform packages first, then PHP dependencies) and alphabetically.
     fn sort_packages(packages: &mut PhpMixed) {
-        let prefix = |requirement: &str| -> String {
+        let prefix = |requirement: &BStr| -> BString {
             if PlatformRepository::is_platform_package(requirement) {
                 let patterns = ["/^php/", "/^hhvm/", "/^ext/", "/^lib/", "/^\\D/"];
                 let replacements = ["0-$0", "1-$0", "2-$0", "3-$0", "4-$0"];
-                let mut result = requirement.to_string();
+                let mut result = BString::from(requirement);
                 for (p, r) in patterns.iter().zip(replacements.iter()) {
                     result = preg_replace(*p, r, &result);
                 }
                 result
             } else {
-                format!("5-{}", requirement)
+                bconcat!("5-", requirement)
             }
         };
 
         if let Some(arr) = packages.as_array_mut() {
-            // TODO(bytes): package names are compared as UTF-8 text, so non-UTF-8 bytes are
-            // replaced.
             uksort(arr, |a: &BStr, b: &BStr| -> i64 {
-                strnatcmp(&prefix(&a.to_str_lossy()), &prefix(&b.to_str_lossy()))
+                strnatcmp(prefix(a), prefix(b))
             });
         }
     }
 
     pub fn add_repository(
         &mut self,
-        name: &str,
+        name: impl AsRef<[u8]>,
         config: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
+        let name = BStr::new(name.as_ref());
         if !name.is_empty() && !self.do_remove_repository(name)? {
             return Ok(false);
         }
@@ -199,30 +209,28 @@ impl JsonManipulator {
             return Ok(false);
         }
 
-        let final_config = if is_array(&config)
-            && !is_numeric(&PhpMixed::string(name.to_string()))
-            && !name.is_empty()
-        {
-            // PHP: ['name' => $name] + $config — preserve $config keys
-            let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
-            merged.insert("name".into(), PhpMixed::string(name.to_string()));
-            if let Some(arr) = config.as_array() {
-                for (k, v) in arr {
-                    if !merged.contains_key(k) {
-                        merged.insert(k.clone(), v.clone());
+        let final_config =
+            if is_array(&config) && !is_numeric(&PhpMixed::string(name)) && !name.is_empty() {
+                // PHP: ['name' => $name] + $config — preserve $config keys
+                let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+                merged.insert("name".into(), PhpMixed::string(name));
+                if let Some(arr) = config.as_array() {
+                    for (k, v) in arr {
+                        if !merged.contains_key(k) {
+                            merged.insert(k.clone(), v.clone());
+                        }
                     }
                 }
-            }
-            PhpMixed::Array(merged)
-        } else if config.as_bool() == Some(false) {
-            let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
-            m.insert(name.to_string().into(), PhpMixed::Bool(false));
-            PhpMixed::Array(m)
-        } else {
-            config
-        };
+                PhpMixed::Array(merged)
+            } else if config.as_bool() == Some(false) {
+                let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
+                m.insert(BString::from(name), PhpMixed::Bool(false));
+                PhpMixed::Array(m)
+            } else {
+                config
+            };
 
-        self.add_list_item("repositories", final_config, append)
+        self.add_list_item(BStr::new("repositories"), final_config, append)
     }
 
     fn do_convert_repositories_from_assoc_to_list(&mut self) -> anyhow::Result<bool> {
@@ -245,13 +253,12 @@ impl JsonManipulator {
             let entries_to_revert: Vec<BString> = array_reverse(&array_keys(&repos_arr), false);
 
             for entry_key in &entries_to_revert {
-                // TODO(bytes): node names are Strings, so non-UTF-8 bytes are replaced.
-                if !self.remove_sub_node("repositories", &entry_key.to_str_lossy())? {
+                if !self.remove_sub_node("repositories", entry_key)? {
                     return Ok(false);
                 }
             }
 
-            self.change_empty_main_key_from_assoc_to_list("repositories")?;
+            self.change_empty_main_key_from_assoc_to_list(BStr::new("repositories"))?;
 
             // re-add in order
             for (repository_name, repository) in &repos_arr {
@@ -259,11 +266,11 @@ impl JsonManipulator {
                 if !is_obj {
                     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
                     m.insert(repository_name.clone(), repository.clone());
-                    if !self.add_list_item("repositories", PhpMixed::Array(m), true)? {
+                    if !self.add_list_item(BStr::new("repositories"), PhpMixed::Array(m), true)? {
                         return Ok(false);
                     }
                 } else if is_numeric(&PhpMixed::String(repository_name.clone())) {
-                    if !self.add_list_item("repositories", repository.clone(), true)? {
+                    if !self.add_list_item(BStr::new("repositories"), repository.clone(), true)? {
                         return Ok(false);
                     }
                 } else {
@@ -280,7 +287,11 @@ impl JsonManipulator {
                             prepended.insert(k.clone(), v.clone());
                         }
                     }
-                    if !self.add_list_item("repositories", PhpMixed::Array(prepended), true)? {
+                    if !self.add_list_item(
+                        BStr::new("repositories"),
+                        PhpMixed::Array(prepended),
+                        true,
+                    )? {
                         return Ok(false);
                     }
                 }
@@ -290,8 +301,15 @@ impl JsonManipulator {
         Ok(true)
     }
 
-    pub fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+    pub fn set_repository_url(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        url: impl AsRef<[u8]>,
+    ) -> anyhow::Result<bool> {
+        let name = BStr::new(name.as_ref());
+        let url = BStr::new(url.as_ref());
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let mut repository_index: Option<PhpMixed> = None;
 
         let repos_value = decoded
@@ -301,11 +319,11 @@ impl JsonManipulator {
         // A list keeps integer indices (matching PHP's `is_int($index)` branch); an associative
         // "repositories" object keeps string keys.
         let is_list = repos_value.as_ref().and_then(|v| v.as_list()).is_some();
-        let repos: Vec<(String, PhpMixed)> =
+        let repos: Vec<(BString, PhpMixed)> =
             if let Some(list) = repos_value.as_ref().and_then(|v| v.as_list()) {
                 list.iter()
                     .enumerate()
-                    .map(|(i, v)| (i.to_string(), v.clone()))
+                    .map(|(i, v)| (bconcat!(i), v.clone()))
                     .collect()
             } else {
                 repos_value
@@ -314,17 +332,15 @@ impl JsonManipulator {
                     .cloned()
                     .unwrap_or_default()
                     .into_iter()
-                    // TODO(bytes): repository names are Strings, so non-UTF-8 bytes are replaced.
-                    .map(|(k, v)| (k.to_str_lossy().into_owned(), v))
                     .collect()
             };
         for (index, repository) in &repos {
             let index_value = if is_list {
-                PhpMixed::Int(index.parse::<i64>().unwrap_or(0))
+                PhpMixed::Int(intval(&PhpMixed::string(index.clone())))
             } else {
                 PhpMixed::string(index.clone())
             };
-            if name == index.as_str() {
+            if name == index.as_bstr() {
                 repository_index = Some(index_value);
                 break;
             }
@@ -333,7 +349,7 @@ impl JsonManipulator {
                 .as_array()
                 .and_then(|a| a.get(B("name")))
                 .and_then(|v| v.as_string());
-            if Some(name.into()) == repo_name {
+            if Some(name) == repo_name {
                 repository_index = Some(index_value);
                 break;
             }
@@ -378,7 +394,7 @@ impl JsonManipulator {
                     ValueKind::Object,
                 )
                 .and_then(|reps| {
-                    let obj = self.contents[reps.value_pos..reps.value_end].to_string();
+                    let obj = BString::from(&self.contents[reps.value_pos..reps.value_end]);
                     json_grammar::find_top_level_key(
                         obj.as_bytes(),
                         key.as_bytes(),
@@ -399,14 +415,14 @@ impl JsonManipulator {
             None => return Ok(false),
         };
 
-        let raw_repo = self.contents[repo_pos..repo_end].to_string();
+        let raw_repo = BString::from(&self.contents[repo_pos..repo_end]);
         // invalid match due to un-regexable content, abort
         if json_decode_obj(&raw_repo)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
-        let start_outer = self.contents[..repo_pos].to_string();
-        let end_outer = self.contents[repo_end..].to_string();
+        let start_outer = BString::from(&self.contents[..repo_pos]);
+        let end_outer = BString::from(&self.contents[repo_end..]);
 
         // Replace the repository's "url" value, leaving the rest of the object untouched.
         let new_raw_repo = match json_grammar::find_top_level_key(
@@ -414,27 +430,28 @@ impl JsonManipulator {
             b"\"url\"",
             ValueKind::Json,
         ) {
-            Some(u) => format!(
-                "{}{}{}",
+            Some(u) => bconcat!(
                 &raw_repo[..u.value_pos],
-                JsonFile::encode(url)?,
+                JsonFile::encode(&PhpMixed::string(url))?,
                 &raw_repo[u.value_end..]
             ),
             None => raw_repo,
         };
 
-        self.contents = format!("{}{}{}", start_outer, new_raw_repo, end_outer);
+        self.contents = bconcat!(start_outer, new_raw_repo, end_outer);
 
         Ok(true)
     }
 
     pub fn insert_repository(
         &mut self,
-        name: &str,
+        name: impl AsRef<[u8]>,
         config: PhpMixed,
-        reference_name: &str,
+        reference_name: impl AsRef<[u8]>,
         offset: i64,
     ) -> anyhow::Result<bool> {
+        let name = BStr::new(name.as_ref());
+        let reference_name = BStr::new(reference_name.as_ref());
         if !name.is_empty() && !self.do_remove_repository(name)? {
             return Ok(false);
         }
@@ -444,7 +461,8 @@ impl JsonManipulator {
         }
 
         let mut index_to_insert: Option<i64> = None;
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         let repos = decoded
             .as_array()
@@ -457,7 +475,7 @@ impl JsonManipulator {
                 .as_array()
                 .and_then(|a| a.get(B("name")))
                 .and_then(|v| v.as_string());
-            if Some(reference_name.into()) == repo_name {
+            if Some(reference_name) == repo_name {
                 index_to_insert = Some(i as i64);
                 break;
             }
@@ -481,36 +499,39 @@ impl JsonManipulator {
             None => return Ok(false),
         };
 
-        let final_config = if is_array(&config)
-            && !is_numeric(&PhpMixed::string(name.to_string()))
-            && !name.is_empty()
-        {
-            let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
-            merged.insert("name".into(), PhpMixed::string(name.to_string()));
-            if let Some(arr) = config.as_array() {
-                for (k, v) in arr {
-                    if !merged.contains_key(k) {
-                        merged.insert(k.clone(), v.clone());
+        let final_config =
+            if is_array(&config) && !is_numeric(&PhpMixed::string(name)) && !name.is_empty() {
+                let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+                merged.insert("name".into(), PhpMixed::string(name));
+                if let Some(arr) = config.as_array() {
+                    for (k, v) in arr {
+                        if !merged.contains_key(k) {
+                            merged.insert(k.clone(), v.clone());
+                        }
                     }
                 }
-            }
-            PhpMixed::Array(merged)
-        } else if config.as_bool() == Some(false) {
-            let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
-            m.insert("name".into(), PhpMixed::Bool(false));
-            PhpMixed::Array(m)
-        } else {
-            config
-        };
+                PhpMixed::Array(merged)
+            } else if config.as_bool() == Some(false) {
+                let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
+                m.insert("name".into(), PhpMixed::Bool(false));
+                PhpMixed::Array(m)
+            } else {
+                config
+            };
 
-        self.insert_list_item("repositories", final_config, index_to_insert + offset)
+        self.insert_list_item(
+            BStr::new("repositories"),
+            final_config,
+            index_to_insert + offset,
+        )
     }
 
-    pub fn remove_repository(&mut self, name: &str) -> anyhow::Result<bool> {
-        Ok(self.do_remove_repository(name)? && self.remove_main_key_if_empty("repositories")?)
+    pub fn remove_repository(&mut self, name: impl AsRef<[u8]>) -> anyhow::Result<bool> {
+        Ok(self.do_remove_repository(BStr::new(name.as_ref()))?
+            && self.remove_main_key_if_empty("repositories")?)
     }
 
-    fn do_remove_repository(&mut self, name: &str) -> anyhow::Result<bool> {
+    fn do_remove_repository(&mut self, name: &BStr) -> anyhow::Result<bool> {
         let decoded = json_decode_obj(&self.contents)?;
         let repositories_value: Option<PhpMixed> = decoded
             .as_object()
@@ -522,23 +543,20 @@ impl JsonManipulator {
 
         // `repositories` may be an associative object or a positional list; in either case iterate
         // it as (index, repository) pairs.
-        let repos: Vec<(String, PhpMixed)> =
+        let repos: Vec<(BString, PhpMixed)> =
             if let Some(o) = repositories_value.as_ref().and_then(|v| v.as_object()) {
-                // TODO(bytes): repository names are Strings, so non-UTF-8 bytes are replaced.
-                o.iter()
-                    .map(|(k, v)| (k.to_str_lossy().into_owned(), v.clone()))
-                    .collect()
+                o.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
             } else if let Some(l) = repositories_value.as_ref().and_then(|v| v.as_list()) {
                 l.iter()
                     .enumerate()
-                    .map(|(i, v)| (i.to_string(), v.clone()))
+                    .map(|(i, v)| (bconcat!(i), v.clone()))
                     .collect()
             } else {
                 Vec::new()
             };
 
         for (repository_index, repository) in &repos {
-            if repository_index == name && is_assoc {
+            if repository_index.as_bstr() == name && is_assoc {
                 if !self.remove_sub_node("repositories", repository_index)? {
                     return Ok(false);
                 }
@@ -546,18 +564,18 @@ impl JsonManipulator {
                 break;
             }
 
-            let repo_name_owned: Option<String> = repository
+            let repo_name = repository
                 .as_object()
-                .and_then(|o| o.get(B("name")).cloned())
-                .and_then(|v| v.as_string().map(|s| s.to_string()));
-            if Some(name) == repo_name_owned.as_deref() {
+                .and_then(|o| o.get(B("name")))
+                .and_then(|v| v.as_string());
+            if Some(name) == repo_name {
                 if is_assoc {
                     if !self.remove_sub_node("repositories", repository_index)? {
                         return Ok(false);
                     }
                 } else {
-                    let idx: i64 = repository_index.parse().unwrap_or(0);
-                    if !self.remove_list_item("repositories", idx)? {
+                    let idx = intval(&PhpMixed::string(repository_index.clone()));
+                    if !self.remove_list_item(BStr::new("repositories"), idx)? {
                         return Ok(false);
                     }
                 }
@@ -566,7 +584,7 @@ impl JsonManipulator {
             }
 
             if is_assoc {
-                if name == repository_index && repository.as_bool() == Some(false) {
+                if name == repository_index.as_bstr() && repository.as_bool() == Some(false) {
                     if !self.remove_sub_node("repositories", repository_index)? {
                         return Ok(false);
                     }
@@ -581,13 +599,13 @@ impl JsonManipulator {
                     .unwrap_or_default();
 
                 if repository_as_array
-                    .get(B(name))
+                    .get(name)
                     .map(|v| v.as_bool() == Some(false))
                     .unwrap_or(false)
                     && 1 == repository_as_array.len()
                 {
-                    let idx: i64 = repository_index.parse().unwrap_or(0);
-                    if !self.remove_list_item("repositories", idx)? {
+                    let idx = intval(&PhpMixed::string(repository_index.clone()));
+                    if !self.remove_list_item(BStr::new("repositories"), idx)? {
                         return Ok(false);
                     }
 
@@ -599,49 +617,59 @@ impl JsonManipulator {
         Ok(true)
     }
 
-    pub fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<bool> {
+    pub fn add_config_setting(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        value: PhpMixed,
+    ) -> anyhow::Result<bool> {
         self.add_sub_node("config", name, value, true)
     }
 
-    pub fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<bool> {
+    pub fn remove_config_setting(&mut self, name: impl AsRef<[u8]>) -> anyhow::Result<bool> {
         self.remove_sub_node("config", name)
     }
 
-    pub fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<bool> {
+    pub fn add_property(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        value: PhpMixed,
+    ) -> anyhow::Result<bool> {
+        let name = name.as_ref();
         if strpos(name, "suggest.") == Some(0) {
-            return self.add_sub_node("suggest", &substr(name, 8, None), value, true);
+            return self.add_sub_node("suggest", substr(name, 8, None), value, true);
         }
 
         if strpos(name, "extra.") == Some(0) {
-            return self.add_sub_node("extra", &substr(name, 6, None), value, true);
+            return self.add_sub_node("extra", substr(name, 6, None), value, true);
         }
 
         if strpos(name, "scripts.") == Some(0) {
-            return self.add_sub_node("scripts", &substr(name, 8, None), value, true);
+            return self.add_sub_node("scripts", substr(name, 8, None), value, true);
         }
 
         self.add_main_key(name, value)
     }
 
-    pub fn remove_property(&mut self, name: &str) -> anyhow::Result<bool> {
+    pub fn remove_property(&mut self, name: impl AsRef<[u8]>) -> anyhow::Result<bool> {
+        let name = name.as_ref();
         if strpos(name, "suggest.") == Some(0) {
-            return self.remove_sub_node("suggest", &substr(name, 8, None));
+            return self.remove_sub_node("suggest", substr(name, 8, None));
         }
 
         if strpos(name, "extra.") == Some(0) {
-            return self.remove_sub_node("extra", &substr(name, 6, None));
+            return self.remove_sub_node("extra", substr(name, 6, None));
         }
 
         if strpos(name, "scripts.") == Some(0) {
-            return self.remove_sub_node("scripts", &substr(name, 8, None));
+            return self.remove_sub_node("scripts", substr(name, 8, None));
         }
 
         if strpos(name, "autoload.") == Some(0) {
-            return self.remove_sub_node("autoload", &substr(name, 9, None));
+            return self.remove_sub_node("autoload", substr(name, 9, None));
         }
 
         if strpos(name, "autoload-dev.") == Some(0) {
-            return self.remove_sub_node("autoload-dev", &substr(name, 13, None));
+            return self.remove_sub_node("autoload-dev", substr(name, 13, None));
         }
 
         self.remove_main_key(name)
@@ -649,28 +677,31 @@ impl JsonManipulator {
 
     pub fn add_sub_node(
         &mut self,
-        main_node: &str,
-        name: &str,
+        main_node: impl AsRef<[u8]>,
+        name: impl AsRef<[u8]>,
         value: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let main_node = BStr::new(main_node.as_ref());
+        let name = name.as_ref();
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
-        let mut name_owned = name.to_string();
-        let mut sub_name: Option<String> = None;
+        let mut name_owned = BString::from(name);
+        let mut sub_name: Option<BString> = None;
         if in_array_loose(
-            main_node.to_string(),
+            main_node,
             &[
-                PhpMixed::string("config".to_string()),
-                PhpMixed::string("extra".to_string()),
-                PhpMixed::string("scripts".to_string()),
+                PhpMixed::string(BString::from("config")),
+                PhpMixed::string(BString::from("extra")),
+                PhpMixed::string(BString::from("scripts")),
             ],
         ) && strpos(name, ".").is_some()
         {
             let parts = explode(".", name);
             // PHP: explode('.', $name, 2)
             let first = parts[0].clone();
-            let rest = parts[1..].join(".");
+            let rest = implode(".", &parts[1..]);
             name_owned = first;
             sub_name = Some(rest);
         }
@@ -683,13 +714,13 @@ impl JsonManipulator {
         {
             if let Some(ref sub) = sub_name {
                 let mut inner: IndexMap<BString, PhpMixed> = IndexMap::new();
-                inner.insert(sub.as_str().into(), value);
+                inner.insert(sub.clone(), value);
                 let mut outer: IndexMap<BString, PhpMixed> = IndexMap::new();
-                outer.insert(name_owned.into(), PhpMixed::Array(inner));
+                outer.insert(name_owned, PhpMixed::Array(inner));
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             } else {
                 let mut outer: IndexMap<BString, PhpMixed> = IndexMap::new();
-                outer.insert(name_owned.into(), value);
+                outer.insert(name_owned, value);
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             }
 
@@ -699,15 +730,15 @@ impl JsonManipulator {
         // main node content not match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node)?.as_bytes(),
+            JsonFile::encode(&PhpMixed::string(main_node))?.as_bytes(),
             ValueKind::Object,
         ) {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let mut children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let mut children = BString::from(&self.contents[node.value_pos..node.value_end]);
         // invalid match due to un-regexable content, abort
         if !php_truthy(&json_decode_obj(&children)?) {
             return Ok(false);
@@ -716,14 +747,14 @@ impl JsonManipulator {
         // child exists. The child pattern looks for the raw `"name"` key token within the children
         // object and rewrites its value in place; the surrounding `"name"\s*:\s*` and optional comma
         // are preserved as-is.
-        let child_key = format!("\"{}\"", name_owned);
+        let child_key = bconcat!("\"", name_owned, "\"");
         let child = json_grammar::find_top_level_key(
             children.as_bytes(),
             child_key.as_bytes(),
             ValueKind::Json,
         );
         if let Some(cm) = child {
-            let content_str = children[cm.value_pos..cm.value_end].to_string();
+            let content_str = BString::from(&children[cm.value_pos..cm.value_end]);
             let mut value_local = value;
             if let Some(sub_name) = sub_name {
                 let mut cur_val = json_decode_assoc(&content_str).unwrap_or(PhpMixed::Null);
@@ -731,13 +762,12 @@ impl JsonManipulator {
                     cur_val = PhpMixed::Array(IndexMap::new());
                 }
                 if let Some(arr) = cur_val.as_array_mut() {
-                    arr.insert(sub_name.into(), value_local.clone());
+                    arr.insert(sub_name, value_local.clone());
                 }
                 value_local = cur_val;
             }
             let formatted = self.format(&value_local, 1, false)?;
-            children = format!(
-                "{}{}{}",
+            children = bconcat!(
                 &children[..cm.value_pos],
                 formatted,
                 &children[cm.value_end..]
@@ -749,36 +779,34 @@ impl JsonManipulator {
                 ),
                 &children,
             ) {
-                let mut whitespace = leading_match
-                    .name("trailingspace")
-                    .unwrap_or_default()
-                    .to_string();
-                let leading_space = leading_match
-                    .name("leadingspace")
-                    .unwrap_or_default()
-                    .to_string();
+                let mut whitespace =
+                    BString::from(leading_match.name("trailingspace").unwrap_or_default());
+                let leading_space =
+                    BString::from(leading_match.name("leadingspace").unwrap_or_default());
                 let content_present = leading_match.name("content").is_some();
                 if content_present {
                     let mut value_local = value;
                     if let Some(ref sub) = sub_name {
                         let mut wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
-                        wrap.insert(sub.as_str().into(), value_local.clone());
+                        wrap.insert(sub.clone(), value_local.clone());
                         value_local = PhpMixed::Array(wrap);
                     }
 
                     // child missing but non empty children
                     if append {
                         children = preg_replace(
-                            format!("#{}}}$#", whitespace),
-                            &addcslashes(
-                                &format!(
-                                    ",{}{}{}{}: {}{}}}",
+                            bconcat!("#", whitespace, "}$#"),
+                            addcslashes(
+                                bconcat!(
+                                    ",",
                                     self.newline,
                                     self.indent,
                                     self.indent,
-                                    JsonFile::encode(&name_owned)?,
+                                    JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
+                                    ": ",
                                     self.format(&value_local, 1, false)?,
-                                    whitespace
+                                    whitespace,
+                                    "}"
                                 ),
                                 "\\$",
                             ),
@@ -787,13 +815,15 @@ impl JsonManipulator {
                     } else {
                         whitespace = leading_space;
                         children = preg_replace(
-                            format!("#^{{{}#", whitespace),
-                            &addcslashes(
-                                &format!(
-                                    "{{{}{}: {},{}{}{}",
+                            bconcat!("#^{", whitespace, "#"),
+                            addcslashes(
+                                bconcat!(
+                                    "{",
                                     whitespace,
-                                    JsonFile::encode(&name_owned)?,
+                                    JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
+                                    ": ",
                                     self.format(&value_local, 1, false)?,
+                                    ",",
                                     self.newline,
                                     self.indent,
                                     self.indent
@@ -807,37 +837,44 @@ impl JsonManipulator {
                     let mut value_local = value;
                     if let Some(ref sub) = sub_name {
                         let mut wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
-                        wrap.insert(sub.as_str().into(), value_local.clone());
+                        wrap.insert(sub.clone(), value_local.clone());
                         value_local = PhpMixed::Array(wrap);
                     }
 
                     // children present but empty
-                    children = format!(
-                        "{{{}{}{}{}: {}{}}}",
+                    children = bconcat!(
+                        "{",
                         self.newline,
                         self.indent,
                         self.indent,
-                        JsonFile::encode(&name_owned)?,
+                        JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
+                        ": ",
                         self.format(&value_local, 1, false)?,
-                        whitespace
+                        whitespace,
+                        "}"
                     );
                 }
             } else {
-                return Err(LogicException::new(format!(
-                    "Nothing matched above for: {}",
-                    children
-                ))
-                .into());
+                return Err(
+                    LogicException::new(bconcat!("Nothing matched above for: ", children)).into(),
+                );
             }
         }
 
-        self.contents = format!("{}{}{}", node_start, children, node_end);
+        self.contents = bconcat!(node_start, children, node_end);
 
         Ok(true)
     }
 
-    pub fn remove_sub_node(&mut self, main_node: &str, name: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+    pub fn remove_sub_node(
+        &mut self,
+        main_node: impl AsRef<[u8]>,
+        name: impl AsRef<[u8]>,
+    ) -> anyhow::Result<bool> {
+        let main_node = BStr::new(main_node.as_ref());
+        let name = name.as_ref();
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(B(main_node)));
@@ -848,35 +885,35 @@ impl JsonManipulator {
         // no node content match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node)?.as_bytes(),
+            JsonFile::encode(&PhpMixed::string(main_node))?.as_bytes(),
             ValueKind::Object,
         ) {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let children = BString::from(&self.contents[node.value_pos..node.value_end]);
 
         // invalid match due to un-regexable content, abort
         if !php_truthy(&json_decode_assoc(&children)?) {
             return Ok(false);
         }
 
-        let mut name_owned = name.to_string();
-        let mut sub_name: Option<String> = None;
+        let mut name_owned = BString::from(name);
+        let mut sub_name: Option<BString> = None;
         if in_array_loose(
-            main_node.to_string(),
+            main_node,
             &[
-                PhpMixed::string("config".to_string()),
-                PhpMixed::string("extra".to_string()),
-                PhpMixed::string("scripts".to_string()),
+                PhpMixed::string(BString::from("config")),
+                PhpMixed::string(BString::from("extra")),
+                PhpMixed::string(BString::from("scripts")),
             ],
         ) && strpos(name, ".").is_some()
         {
             let parts = explode(".", name);
             let first = parts[0].clone();
-            let rest = parts[1..].join(".");
+            let rest = implode(".", &parts[1..]);
             name_owned = first;
             sub_name = Some(rest);
         }
@@ -898,15 +935,15 @@ impl JsonManipulator {
         }
 
         // try and find a match for the subkey
-        let key_regex = str_replace("/", "\\\\?/", &preg_quote(&name_owned, None));
-        let mut children_clean: Option<String> = None;
-        if preg_is_match(format!("{{\"{}\"\\s*:}}i", key_regex), &children) {
+        let key_regex = str_replace("/", "\\\\?/", preg_quote(&name_owned, None));
+        let mut children_clean: Option<BString> = None;
+        if preg_is_match(bconcat!("{\"", key_regex, "\"\\s*:}i"), &children) {
             // find best match for the value of "name". The PHP pattern `"name"\s*:\s*(?&json)` is
             // not anchored, so it can match the key at several nesting levels; collect every such
             // occurrence and keep the longest, reproducing PHP's behaviour.
             let key_value_matches = find_key_value_matches(&children, &name_owned);
             if !key_value_matches.is_empty() {
-                let mut best_match: String = String::new();
+                let mut best_match = BString::default();
                 for m in &key_value_matches {
                     if strlen(&best_match) < strlen(m) {
                         best_match = m.clone();
@@ -914,7 +951,7 @@ impl JsonManipulator {
                 }
                 let mut count_out: usize = 0;
                 let cleaned = preg_replace2(
-                    format!("{{,\\s*{}}}i", preg_quote(&best_match, None)),
+                    bconcat!("{,\\s*", preg_quote(&best_match, None), "}i"),
                     "",
                     &children,
                     -1,
@@ -922,7 +959,7 @@ impl JsonManipulator {
                 );
                 if 1 != count_out {
                     let cleaned2 = preg_replace2(
-                        format!("{{{}\\s*,?\\s*}}i", preg_quote(&best_match, None)),
+                        bconcat!("{", preg_quote(&best_match, None), "\\s*,?\\s*}i"),
                         "",
                         &cleaned,
                         -1,
@@ -940,7 +977,7 @@ impl JsonManipulator {
             children_clean = Some(children.clone());
         }
 
-        let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/nsfisis/php-shirabe/issues/new.".to_string()))?;
+        let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new(BString::from("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/nsfisis/php-shirabe/issues/new.")))?;
 
         // no child data left, $name was the only key in
         if let Some(empty_match) = preg_match(
@@ -948,10 +985,7 @@ impl JsonManipulator {
             &children_clean,
         ) && empty_match.name("content").is_none()
         {
-            self.contents = format!(
-                "{}{{{}{}}}{}",
-                node_start, self.newline, self.indent, node_end
-            );
+            self.contents = bconcat!(node_start, "{", self.newline, self.indent, "}", node_end);
 
             // we have a subname, so we restore the rest of $name
             if let Some(sub) = sub_name {
@@ -967,10 +1001,7 @@ impl JsonManipulator {
                         .map(|a| a.is_empty())
                         .unwrap_or(false);
                     if now_empty {
-                        arr.insert(
-                            name_owned.as_str().into(),
-                            PhpMixed::Object(IndexMap::new()),
-                        );
+                        arr.insert(name_owned.clone(), PhpMixed::Object(IndexMap::new()));
                     }
                 }
                 let val = cur_val
@@ -999,27 +1030,25 @@ impl JsonManipulator {
                     .map(|a| a.is_empty())
                     .unwrap_or(false);
                 if now_empty {
-                    arr.insert(
-                        name_owned.as_str().into(),
-                        PhpMixed::Object(IndexMap::new()),
-                    );
+                    arr.insert(name_owned.clone(), PhpMixed::Object(IndexMap::new()));
                 }
             }
             children_final = self.format(&cur_val, 0, true)?;
         }
 
-        self.contents = format!("{}{}{}", node_start, children_final, node_end);
+        self.contents = bconcat!(node_start, children_final, node_end);
 
         Ok(true)
     }
 
     pub fn add_list_item(
         &mut self,
-        main_node: &str,
+        main_node: &BStr,
         value: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no main node yet
         if decoded
@@ -1034,15 +1063,15 @@ impl JsonManipulator {
         // main node content not match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node)?.as_bytes(),
+            JsonFile::encode(&PhpMixed::string(main_node))?.as_bytes(),
             ValueKind::Array,
         ) {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let mut children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let mut children = BString::from(&self.contents[node.value_pos..node.value_end]);
         // invalid match due to un-regexable content, abort
         if json_decode_obj(&children)?.as_bool() == Some(false) {
             return Ok(false);
@@ -1054,21 +1083,16 @@ impl JsonManipulator {
             ),
             &children,
         ) {
-            let leading_whitespace = leading_match
-                .name("leadingspace")
-                .unwrap_or_default()
-                .to_string();
-            let mut whitespace = leading_match
-                .name("trailingspace")
-                .unwrap_or_default()
-                .to_string();
-            let mut leading_item_whitespace =
-                format!("{}{}{}", self.newline, self.indent, self.indent);
+            let leading_whitespace =
+                BString::from(leading_match.name("leadingspace").unwrap_or_default());
+            let mut whitespace =
+                BString::from(leading_match.name("trailingspace").unwrap_or_default());
+            let mut leading_item_whitespace = bconcat!(self.newline, self.indent, self.indent);
             let mut trailing_item_whitespace = whitespace.clone();
             let mut item_depth: i64 = 1;
 
             // keep oneline lists as one line
-            if !whitespace.contains(&self.newline) {
+            if !whitespace.contains_str(&self.newline) {
                 leading_item_whitespace = leading_whitespace.clone();
                 trailing_item_whitespace = leading_whitespace.clone();
                 item_depth = 0;
@@ -1078,13 +1102,14 @@ impl JsonManipulator {
                 // child missing but non empty children
                 if append {
                     children = preg_replace(
-                        format!("#{}\\]$#", whitespace),
-                        &addcslashes(
-                            &format!(
-                                ",{}{}{}]",
+                        bconcat!("#", whitespace, "\\]$#"),
+                        addcslashes(
+                            bconcat!(
+                                ",",
                                 leading_item_whitespace,
                                 self.format(&value, item_depth, false)?,
-                                trailing_item_whitespace
+                                trailing_item_whitespace,
+                                "]"
                             ),
                             "\\$",
                         ),
@@ -1093,12 +1118,13 @@ impl JsonManipulator {
                 } else {
                     whitespace = leading_whitespace;
                     children = preg_replace(
-                        format!("#^\\[{}#", whitespace),
-                        &addcslashes(
-                            &format!(
-                                "[{}{},{}",
+                        bconcat!("#^\\[", whitespace, "#"),
+                        addcslashes(
+                            bconcat!(
+                                "[",
                                 whitespace,
                                 self.format(&value, item_depth, false)?,
+                                ",",
                                 leading_item_whitespace
                             ),
                             "\\$",
@@ -1108,34 +1134,35 @@ impl JsonManipulator {
                 }
             } else {
                 // children present but empty
-                children = format!(
-                    "[{}{}{}]",
+                children = bconcat!(
+                    "[",
                     leading_item_whitespace,
                     self.format(&value, item_depth, false)?,
-                    trailing_item_whitespace
+                    trailing_item_whitespace,
+                    "]"
                 );
             }
         } else {
             return Err(
-                LogicException::new(format!("Nothing matched above for: {}", children)).into(),
+                LogicException::new(bconcat!("Nothing matched above for: ", children)).into(),
             );
         }
 
-        self.contents = format!("{}{}{}", node_start, children, node_end);
+        self.contents = bconcat!(node_start, children, node_end);
 
         Ok(true)
     }
 
     pub fn insert_list_item(
         &mut self,
-        main_node: &str,
+        main_node: &BStr,
         value: PhpMixed,
         index: i64,
     ) -> anyhow::Result<bool> {
         if index < 0 {
-            return Err(InvalidArgumentException::new(
-                "Index can only be positive integer".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "Index can only be positive integer",
+            ))
             .into());
         }
 
@@ -1143,7 +1170,8 @@ impl JsonManipulator {
             return self.add_list_item(main_node, value, false);
         }
 
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no main node yet
         if decoded
@@ -1168,15 +1196,15 @@ impl JsonManipulator {
         // main node content not match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node)?.as_bytes(),
+            JsonFile::encode(&PhpMixed::string(main_node))?.as_bytes(),
             ValueKind::Array,
         ) {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let children = BString::from(&self.contents[node.value_pos..node.value_end]);
         // invalid match due to un-regexable content, abort
         if json_decode_obj(&children)?.as_bool() == Some(false) {
             return Ok(false);
@@ -1200,28 +1228,29 @@ impl JsonManipulator {
             let sbi_end = json_grammar::skip_ws(cb, i);
             let space_before_item = &children[start_end..sbi_end];
             let formatted = self.format(&value, 1, false)?;
-            format!(
-                "{}{}{},{}{}",
+            bconcat!(
                 &children[..start_end],
                 space_before_item,
                 formatted,
+                ",",
                 space_before_item,
                 &children[sbi_end..]
             )
         };
 
-        self.contents = format!("{}{}{}", node_start, new_children, node_end);
+        self.contents = bconcat!(node_start, new_children, node_end);
 
         Ok(true)
     }
 
-    pub fn remove_list_item(&mut self, main_node: &str, node_index: i64) -> anyhow::Result<bool> {
+    pub fn remove_list_item(&mut self, main_node: &BStr, node_index: i64) -> anyhow::Result<bool> {
         // invalid index, that cannot be removed anyway
         if node_index < 0 {
             return Ok(true);
         }
 
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(B(main_node)));
@@ -1232,15 +1261,15 @@ impl JsonManipulator {
         // no node content match-able
         let node = match json_grammar::find_top_level_key(
             self.contents.as_bytes(),
-            JsonFile::encode(main_node)?.as_bytes(),
+            JsonFile::encode(&PhpMixed::string(main_node))?.as_bytes(),
             ValueKind::Array,
         ) {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let children = BString::from(&self.contents[node.value_pos..node.value_end]);
 
         // invalid match due to un-regexable content, abort
         if json_decode_assoc(&children)?.as_bool() == Some(false) {
@@ -1292,13 +1321,7 @@ impl JsonManipulator {
         })();
 
         if let Some((a, b)) = removal {
-            self.contents = format!(
-                "{}{}{}{}",
-                node_start,
-                &children[..a],
-                &children[b..],
-                node_end
-            );
+            self.contents = bconcat!(node_start, &children[..a], &children[b..], node_end);
 
             return Ok(true);
         }
@@ -1306,12 +1329,18 @@ impl JsonManipulator {
         Ok(false)
     }
 
-    pub fn add_main_key(&mut self, key: &str, content: PhpMixed) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+    pub fn add_main_key(
+        &mut self,
+        key: impl AsRef<[u8]>,
+        content: PhpMixed,
+    ) -> anyhow::Result<bool> {
+        let key = key.as_ref();
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let content = self.format(&content, 0, false)?;
 
         // key exists already
-        let encoded_key = JsonFile::encode(key)?;
+        let encoded_key = JsonFile::encode(&PhpMixed::string(key))?;
         let key_match = if decoded.as_array().and_then(|a| a.get(B(key))).is_some() {
             json_grammar::find_top_level_key(
                 self.contents.as_bytes(),
@@ -1324,14 +1353,14 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let key_capture = &self.contents[m.key_pos..m.value_end];
-            if json_decode_obj(format!("{{{}}}", key_capture))?.is_null() {
+            if json_decode_obj(bconcat!("{", key_capture, "}"))?.is_null() {
                 return Ok(false);
             }
 
-            self.contents = format!(
-                "{}{}: {}{}",
+            self.contents = bconcat!(
                 &self.contents[..m.key_pos],
                 encoded_key,
+                ": ",
                 content,
                 &self.contents[m.value_end..]
             );
@@ -1341,17 +1370,19 @@ impl JsonManipulator {
 
         // append at the end of the file and keep whitespace
         if let Some(tail_match) = preg_match(php_regex!("#[^{\\s](\\s*)\\}$#"), &self.contents) {
-            let tail_match_1 = tail_match.get(1).unwrap_or_default().to_string();
+            let tail_match_1 = BString::from(tail_match.get(1).unwrap_or_default());
             self.contents = preg_replace(
-                format!("#{}\\}}$#", tail_match_1),
-                &addcslashes(
-                    &format!(
-                        ",{}{}{}: {}{}}}",
+                bconcat!("#", tail_match_1, "\\}$#"),
+                addcslashes(
+                    bconcat!(
+                        ",",
                         self.newline,
                         self.indent,
-                        JsonFile::encode(key)?,
+                        JsonFile::encode(&PhpMixed::string(key))?,
+                        ": ",
                         content,
-                        self.newline
+                        self.newline,
+                        "}"
                     ),
                     "\\$",
                 ),
@@ -1364,13 +1395,14 @@ impl JsonManipulator {
         // append at the end of the file
         self.contents = preg_replace(
             php_regex!("#\\}$#"),
-            &addcslashes(
-                &format!(
-                    "{}{}: {}{}}}",
+            addcslashes(
+                bconcat!(
                     self.indent,
-                    JsonFile::encode(key)?,
+                    JsonFile::encode(&PhpMixed::string(key))?,
+                    ": ",
                     content,
-                    self.newline
+                    self.newline,
+                    "}"
                 ),
                 "\\$",
             ),
@@ -1380,8 +1412,10 @@ impl JsonManipulator {
         Ok(true)
     }
 
-    pub fn remove_main_key(&mut self, key: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+    pub fn remove_main_key(&mut self, key: impl AsRef<[u8]>) -> anyhow::Result<bool> {
+        let key = key.as_ref();
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(B(key), &decoded_arr) {
@@ -1389,7 +1423,7 @@ impl JsonManipulator {
         }
 
         // key exists already
-        let encoded_key = JsonFile::encode(key)?;
+        let encoded_key = JsonFile::encode(&PhpMixed::string(key))?;
         let key_match = json_grammar::find_top_level_key(
             self.contents.as_bytes(),
             encoded_key.as_bytes(),
@@ -1398,7 +1432,7 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let removal = &self.contents[m.key_pos..m.value_end];
-            if json_decode_obj(format!("{{{}}}", removal))?.is_null() {
+            if json_decode_obj(bconcat!("{", removal, "}"))?.is_null() {
                 return Ok(false);
             }
 
@@ -1411,20 +1445,20 @@ impl JsonManipulator {
             e = json_grammar::skip_ws(cb, e);
 
             // check that we are not leaving a dangling comma on the previous line if the last line was removed
-            let mut start = self.contents[..m.key_pos].to_string();
-            let end = self.contents[e..].to_string();
+            let mut start = BString::from(&self.contents[..m.key_pos]);
+            let end = BString::from(&self.contents[e..]);
             if preg_is_match(php_regex!("#,\\s*$#"), &start)
                 && preg_is_match(php_regex!("#^\\}$#"), &end)
             {
-                start = rtrim(
-                    &preg_replace(php_regex!("#,(\\s*)$#"), "$1", &start),
-                    Some(&self.indent),
+                start = rtrim2(
+                    preg_replace(php_regex!("#,(\\s*)$#"), "$1", &start),
+                    &self.indent,
                 );
             }
 
-            self.contents = format!("{}{}", start, end);
+            self.contents = bconcat!(start, end);
             if preg_is_match(php_regex!("#^\\{\\s*\\}\\s*$#"), &self.contents) {
-                self.contents = "{\n}".to_string();
+                self.contents = BString::from("{\n}");
             }
 
             return Ok(true);
@@ -1433,8 +1467,9 @@ impl JsonManipulator {
         Ok(false)
     }
 
-    pub fn change_empty_main_key_from_assoc_to_list(&mut self, key: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+    pub fn change_empty_main_key_from_assoc_to_list(&mut self, key: &BStr) -> anyhow::Result<bool> {
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(B(key), &decoded_arr) {
@@ -1442,7 +1477,7 @@ impl JsonManipulator {
         }
 
         // Match the key only when its value is an empty object `{ <space> }`.
-        let encoded_key = JsonFile::encode(key)?;
+        let encoded_key = JsonFile::encode(&PhpMixed::string(key))?;
         let cb = self.contents.as_bytes();
         let key_match =
             json_grammar::find_top_level_key(cb, encoded_key.as_bytes(), ValueKind::Object)
@@ -1455,10 +1490,11 @@ impl JsonManipulator {
             }
 
             let removal_space = &self.contents[m.value_pos + 1..m.value_end - 1];
-            self.contents = format!(
-                "{}[{}]{}",
+            self.contents = bconcat!(
                 &self.contents[..m.value_pos],
+                "[",
                 removal_space,
+                "]",
                 &self.contents[m.value_end..]
             );
 
@@ -1468,8 +1504,10 @@ impl JsonManipulator {
         Ok(false)
     }
 
-    pub fn remove_main_key_if_empty(&mut self, key: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
+    pub fn remove_main_key_if_empty(&mut self, key: impl AsRef<[u8]>) -> anyhow::Result<bool> {
+        let key = key.as_ref();
+        let decoded =
+            JsonFile::parse_json(Some(&self.contents), Some(bstr::BStr::new("composer.json")))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(B(key), &decoded_arr) {
@@ -1490,7 +1528,7 @@ impl JsonManipulator {
         Ok(true)
     }
 
-    pub fn format(&self, data: &PhpMixed, depth: i64, was_object: bool) -> anyhow::Result<String> {
+    pub fn format(&self, data: &PhpMixed, depth: i64, was_object: bool) -> anyhow::Result<BString> {
         let mut data = data.clone();
         let mut was_object = was_object;
         if let Some(obj) = data.as_object() {
@@ -1504,44 +1542,45 @@ impl JsonManipulator {
                 && data.as_list().map(|l| l.len()).unwrap_or(0) == 0
             {
                 return Ok(if was_object {
-                    format!(
-                        "{{{}{}}}",
+                    bconcat!(
+                        "{",
                         self.newline,
-                        str_repeat(&self.indent, (depth + 1) as usize)
+                        str_repeat(&self.indent, (depth + 1) as usize),
+                        "}"
                     )
                 } else {
-                    "[]".to_string()
+                    BString::from("[]")
                 });
             }
 
             if let Some(list) = data.as_list().cloned() {
-                let mut formatted: Vec<String> = vec![];
+                let mut formatted: Vec<BString> = vec![];
                 for val in &list {
                     formatted.push(self.format(val, depth + 1, false)?);
                 }
 
-                return Ok(format!("[{}]", implode(", ", &formatted)));
+                return Ok(bconcat!("[", implode(", ", &formatted), "]"));
             }
 
-            let out = format!("{{{}", self.newline);
-            let mut elems: Vec<String> = vec![];
+            let out = bconcat!("{", self.newline);
+            let mut elems: Vec<BString> = vec![];
             if let Some(arr) = data.as_array() {
                 for (key, val) in arr {
-                    elems.push(format!(
-                        "{}{}: {}",
+                    elems.push(bconcat!(
                         str_repeat(&self.indent, (depth + 2) as usize),
                         JsonFile::encode(&PhpMixed::String(key.clone()))?,
+                        ": ",
                         self.format(val, depth + 1, false)?
                     ));
                 }
             }
 
-            return Ok(format!(
-                "{}{}{}{}}}",
+            return Ok(bconcat!(
                 out,
-                implode(&format!(",{}", self.newline), &elems),
+                implode(bconcat!(",", self.newline), &elems),
                 self.newline,
-                str_repeat(&self.indent, (depth + 1) as usize)
+                str_repeat(&self.indent, (depth + 1) as usize),
+                "}"
             ));
         }
 
@@ -1556,14 +1595,14 @@ impl JsonManipulator {
 // Reproduces the non-anchored PHP pattern `"name"\s*:\s*(?&json)` over `children`: returns every
 // substring where the raw key token `"name"` (allowing an escaped slash `\/` wherever the name has
 // `/`) is followed by `\s*:\s*` and a JSON value, in left-to-right, non-overlapping order.
-fn find_key_value_matches(children: &str, name: &str) -> Vec<String> {
-    let cb = children.as_bytes();
-    let name_bytes = name.as_bytes();
+fn find_key_value_matches(children: impl AsRef<[u8]>, name: impl AsRef<[u8]>) -> Vec<BString> {
+    let cb = children.as_ref();
+    let name_bytes = name.as_ref();
     let mut out = Vec::new();
     let mut i = 0;
     while i < cb.len() {
         if let Some(end) = match_key_value(cb, i, name_bytes) {
-            out.push(children[i..end].to_string());
+            out.push(BString::from(&cb[i..end]));
             i = end;
         } else {
             i += 1;
@@ -1608,9 +1647,12 @@ fn match_key_value(cb: &[u8], start: usize, name: &[u8]) -> Option<usize> {
 // optional escaped slash where the name has `/`) over the `links` object text. Returns the byte
 // offsets `(key_quote_start, key_end, value_start, value_end)` of the first match, where `key_end`
 // is just past the key's closing quote and the value is a JSON string.
-fn find_package_link(links: &str, package: &str) -> Option<(usize, usize, usize, usize)> {
-    let cb = links.as_bytes();
-    let name = package.as_bytes();
+fn find_package_link(
+    links: impl AsRef<[u8]>,
+    package: impl AsRef<[u8]>,
+) -> Option<(usize, usize, usize, usize)> {
+    let cb = links.as_ref();
+    let name = package.as_ref();
     for i in 0..cb.len() {
         if cb[i] != b'"' {
             continue;
@@ -1662,12 +1704,12 @@ fn match_pkg_name(b: &[u8], start: usize, name: &[u8]) -> Option<usize> {
 
 // Lightweight clone of JsonManipulator's formatting logic, used inside preg_replace_callback closures.
 struct ManipulatorFormatter {
-    newline: String,
-    indent: String,
+    newline: BString,
+    indent: BString,
 }
 
 impl ManipulatorFormatter {
-    fn format(&self, data: &PhpMixed, depth: i64, was_object: bool) -> anyhow::Result<String> {
+    fn format(&self, data: &PhpMixed, depth: i64, was_object: bool) -> anyhow::Result<BString> {
         let mut data = data.clone();
         let mut was_object = was_object;
         if let Some(obj) = data.as_object() {
@@ -1680,44 +1722,45 @@ impl ManipulatorFormatter {
                 && data.as_list().map(|l| l.len()).unwrap_or(0) == 0
             {
                 return Ok(if was_object {
-                    format!(
-                        "{{{}{}}}",
+                    bconcat!(
+                        "{",
                         self.newline,
-                        str_repeat(&self.indent, (depth + 1) as usize)
+                        str_repeat(&self.indent, (depth + 1) as usize),
+                        "}"
                     )
                 } else {
-                    "[]".to_string()
+                    BString::from("[]")
                 });
             }
 
             if let Some(list) = data.as_list().cloned() {
-                let mut formatted: Vec<String> = vec![];
+                let mut formatted: Vec<BString> = vec![];
                 for val in &list {
                     formatted.push(self.format(val, depth + 1, false)?);
                 }
 
-                return Ok(format!("[{}]", implode(", ", &formatted)));
+                return Ok(bconcat!("[", implode(", ", &formatted), "]"));
             }
 
-            let out = format!("{{{}", self.newline);
-            let mut elems: Vec<String> = vec![];
+            let out = bconcat!("{", self.newline);
+            let mut elems: Vec<BString> = vec![];
             if let Some(arr) = data.as_array() {
                 for (key, val) in arr {
-                    elems.push(format!(
-                        "{}{}: {}",
+                    elems.push(bconcat!(
                         str_repeat(&self.indent, (depth + 2) as usize),
                         JsonFile::encode(&PhpMixed::String(key.clone()))?,
+                        ": ",
                         self.format(val, depth + 1, false)?
                     ));
                 }
             }
 
-            return Ok(format!(
-                "{}{}{}{}}}",
+            return Ok(bconcat!(
                 out,
-                implode(&format!(",{}", self.newline), &elems),
+                implode(bconcat!(",", self.newline), &elems),
                 self.newline,
-                str_repeat(&self.indent, (depth + 1) as usize)
+                str_repeat(&self.indent, (depth + 1) as usize),
+                "}"
             ));
         }
 

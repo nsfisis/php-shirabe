@@ -10,7 +10,7 @@ use crate::json::JsonValidationException;
 use crate::package::loader::InvalidPackageException;
 use crate::plugin::PluginBlockedException;
 use crate::repository::{InvalidRepositoryException, RepositorySecurityException};
-use bstr::ByteSlice;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{
@@ -28,7 +28,9 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
     let revived = std::iter::once(&throw.exception_class)
         .chain(throw.parents.iter())
         .enumerate()
-        .find_map(|(depth, class)| revive(class, &throw).map(|exception| (depth, exception)));
+        .find_map(|(depth, class)| {
+            revive(class.as_bstr(), &throw).map(|exception| (depth, exception))
+        });
     let mut exception = match revived {
         Some((0, exception)) => exception,
         Some((_, parent)) => UnportedThrowable::new(throw.exception_class.clone(), parent).into(),
@@ -42,7 +44,7 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
     };
     exception.set_code(throw.code);
     if !throw.file.is_empty() {
-        exception.set_location(throw.file, throw.line);
+        exception.set_location(throw.file.clone(), throw.line);
     }
     anyhow::Error::new(exception)
 }
@@ -55,28 +57,26 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
             .get(position)
             .and_then(PhpMixed::as_string)
             .unwrap_or_default()
-            .to_string()
+            .to_owned()
     };
     let int = |position: usize| fields.get(position).and_then(PhpMixed::as_int).unwrap_or(0);
     let mut throw = PhpThrow::new(string(0), string(1), int(2));
     if let Some(PhpMixed::Array(properties)) = fields.get(3) {
         *throw.properties = properties
             .iter()
-            // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-            .map(|(name, value)| {
-                (
-                    name.to_str_lossy().into_owned(),
-                    PluginValue::from_php_mixed(value),
-                )
-            })
+            .map(|(name, value)| (name.clone(), PluginValue::from_php_mixed(value)))
             .collect();
     }
-    throw.file = string(4);
+    throw.file = fields
+        .get(4)
+        .and_then(PhpMixed::as_string)
+        .map(bstr::BString::from)
+        .unwrap_or_default();
     throw.line = int(5);
     if let Some(PhpMixed::List(parents)) = fields.get(6) {
         throw.parents = parents
             .iter()
-            .filter_map(|parent| parent.as_string().map(|s| s.to_str_lossy().into_owned()))
+            .filter_map(|parent| parent.as_string().map(BString::from))
             .collect();
     }
     throw
@@ -84,13 +84,13 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
 
 /// The ported exception of exactly `class`, built from what `throw` carries, or `None` if the
 /// port has no type for it or cannot build one from a `Throw`.
-fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
+fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
     let message = throw.message.clone();
     let code = throw.code;
-    let property = |name: &str| {
+    let property = |name: &BStr| {
         throw
             .properties
-            .get(name)
+            .get(bstr::B(name))
             .map(|value| {
                 value
                     .to_php_mixed()
@@ -98,122 +98,136 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
             })
             .unwrap_or(PhpMixed::Null)
     };
-    let strings = |name: &str| match property(name) {
-        PhpMixed::List(items) => items
-            .iter()
-            .map(|item| item.as_string().unwrap_or_default().to_string())
-            .collect(),
-        PhpMixed::Array(items) => items
-            .values()
-            .map(|item| item.as_string().unwrap_or_default().to_string())
-            .collect(),
-        _ => Vec::new(),
+    let byte_strings = |name: &BStr| -> Vec<BString> {
+        match property(name) {
+            PhpMixed::List(items) => items
+                .iter()
+                .map(|item| item.as_string().unwrap_or_default().into())
+                .collect(),
+            PhpMixed::Array(items) => items
+                .values()
+                .map(|item| item.as_string().unwrap_or_default().into())
+                .collect(),
+            _ => Vec::new(),
+        }
     };
-    Some(match class {
-        "Exception" => Exception::new(message).into(),
-        "Error" => Error::new(message).into(),
-        "TypeError" => TypeError::new(message).into(),
-        "RuntimeException" => RuntimeException::new(message).into(),
-        "UnexpectedValueException" => UnexpectedValueException::new(message).into(),
-        "OutOfBoundsException" => OutOfBoundsException::new(message).into(),
-        "LogicException" => LogicException::new(message).into(),
-        "InvalidArgumentException" => InvalidArgumentException::new(message).into(),
-        "BadFunctionCallException" => BadFunctionCallException::new(message).into(),
-        "BadMethodCallException" => BadMethodCallException::new(message).into(),
-        r"Composer\Downloader\TransportException" => {
+    Some(match class.as_bytes() {
+        b"Exception" => Exception::new(message).into(),
+        b"Error" => Error::new(message).into(),
+        b"TypeError" => TypeError::new(message).into(),
+        b"RuntimeException" => RuntimeException::new(message).into(),
+        b"UnexpectedValueException" => UnexpectedValueException::new(message).into(),
+        b"OutOfBoundsException" => OutOfBoundsException::new(message).into(),
+        b"LogicException" => LogicException::new(message).into(),
+        b"InvalidArgumentException" => InvalidArgumentException::new(message).into(),
+        b"BadFunctionCallException" => BadFunctionCallException::new(message).into(),
+        b"BadMethodCallException" => BadMethodCallException::new(message).into(),
+        br"Composer\Downloader\TransportException" => {
             let mut exception = TransportException::new(message, code);
-            if let PhpMixed::List(_) | PhpMixed::Array(_) = property("headers") {
-                exception.set_headers(strings("headers"));
+            match property(BStr::new("headers")) {
+                PhpMixed::List(items) => exception.set_headers(
+                    items
+                        .iter()
+                        .map(|item| item.as_string().unwrap_or_default().to_owned())
+                        .collect(),
+                ),
+                PhpMixed::Array(items) => exception.set_headers(
+                    items
+                        .values()
+                        .map(|item| item.as_string().unwrap_or_default().to_owned())
+                        .collect(),
+                ),
+                _ => {}
             }
             exception.set_response(
-                property("response")
+                property(BStr::new("response"))
                     .as_string()
-                    .map(|s| s.to_str_lossy().into_owned()),
+                    .map(|s| s.to_vec()),
             );
-            exception.set_status_code(property("statusCode").as_int());
-            exception.set_response_info(match property("responseInfo") {
+            exception.set_status_code(property(BStr::new("statusCode")).as_int());
+            exception.set_response_info(match property(BStr::new("responseInfo")) {
                 PhpMixed::List(items) => items,
                 PhpMixed::Array(items) => items.into_values().collect(),
                 _ => Vec::new(),
             });
             exception.into()
         }
-        r"Composer\Downloader\MaxFileSizeExceededException" => {
+        br"Composer\Downloader\MaxFileSizeExceededException" => {
             MaxFileSizeExceededException::new(message).into()
         }
-        r"Composer\Downloader\FilesystemException" => {
+        br"Composer\Downloader\FilesystemException" => {
             FilesystemException::new(message, code).into()
         }
-        r"Composer\Exception\IrrecoverableDownloadException" => {
+        br"Composer\Exception\IrrecoverableDownloadException" => {
             IrrecoverableDownloadException::new(message).into()
         }
-        r"Composer\Exception\NoSslException" => NoSslException::new(message).into(),
-        r"Composer\DependencyResolver\SolverBugException" => {
+        br"Composer\Exception\NoSslException" => NoSslException::new(message).into(),
+        br"Composer\DependencyResolver\SolverBugException" => {
             SolverBugException::new(message).into()
         }
-        r"Composer\EventDispatcher\ScriptExecutionException" => {
+        br"Composer\EventDispatcher\ScriptExecutionException" => {
             ScriptExecutionException::new(message, code).into()
         }
-        r"Composer\Json\JsonValidationException" => {
-            JsonValidationException::new(message, strings("errors")).into()
+        br"Composer\Json\JsonValidationException" => {
+            JsonValidationException::new(message, byte_strings(BStr::new("errors"))).into()
         }
-        r"Composer\Package\Loader\InvalidPackageException" => InvalidPackageException::new(
-            strings("errors"),
-            strings("warnings"),
-            match property("data") {
+        br"Composer\Package\Loader\InvalidPackageException" => InvalidPackageException::new(
+            byte_strings(BStr::new("errors")),
+            byte_strings(BStr::new("warnings")),
+            match property(BStr::new("data")) {
                 PhpMixed::Array(data) => data,
                 _ => IndexMap::new(),
             },
         )
         .into(),
-        r"Composer\Plugin\PluginBlockedException" => PluginBlockedException::new(message).into(),
-        r"Composer\Repository\InvalidRepositoryException" => {
+        br"Composer\Plugin\PluginBlockedException" => PluginBlockedException::new(message).into(),
+        br"Composer\Repository\InvalidRepositoryException" => {
             InvalidRepositoryException::new(message).into()
         }
-        r"Composer\Repository\RepositorySecurityException" => {
+        br"Composer\Repository\RepositorySecurityException" => {
             RepositorySecurityException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\CommandNotFoundException" => {
+        br"Symfony\Component\Console\Exception\CommandNotFoundException" => {
             shirabe_symfony_console::exception::CommandNotFoundException::new(
                 message,
-                strings("alternatives"),
+                byte_strings(BStr::new("alternatives")),
                 code,
             )
             .into()
         }
-        r"Symfony\Component\Console\Exception\NamespaceNotFoundException" => {
+        br"Symfony\Component\Console\Exception\NamespaceNotFoundException" => {
             shirabe_symfony_console::exception::NamespaceNotFoundException::new(
                 message,
-                strings("alternatives"),
+                byte_strings(BStr::new("alternatives")),
                 code,
             )
             .into()
         }
-        r"Symfony\Component\Console\Exception\InvalidArgumentException" => {
+        br"Symfony\Component\Console\Exception\InvalidArgumentException" => {
             shirabe_symfony_console::exception::InvalidArgumentException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\InvalidOptionException" => {
+        br"Symfony\Component\Console\Exception\InvalidOptionException" => {
             shirabe_symfony_console::exception::InvalidOptionException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\LogicException" => {
+        br"Symfony\Component\Console\Exception\LogicException" => {
             shirabe_symfony_console::exception::LogicException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\MissingInputException" => {
+        br"Symfony\Component\Console\Exception\MissingInputException" => {
             shirabe_symfony_console::exception::MissingInputException::new(message).into()
         }
-        r"Symfony\Component\Console\Exception\RuntimeException" => {
+        br"Symfony\Component\Console\Exception\RuntimeException" => {
             shirabe_symfony_console::exception::RuntimeException::new(message).into()
         }
-        r"Symfony\Component\Process\Exception\InvalidArgumentException" => {
+        br"Symfony\Component\Process\Exception\InvalidArgumentException" => {
             shirabe_symfony_process::exception::InvalidArgumentException::new(message).into()
         }
-        r"Symfony\Component\Process\Exception\LogicException" => {
+        br"Symfony\Component\Process\Exception\LogicException" => {
             shirabe_symfony_process::exception::LogicException::new(message).into()
         }
-        r"Symfony\Component\Process\Exception\RuntimeException" => {
+        br"Symfony\Component\Process\Exception\RuntimeException" => {
             shirabe_symfony_process::exception::RuntimeException::new(message).into()
         }
-        r"Symfony\Component\Filesystem\Exception\IOException" => {
+        br"Symfony\Component\Filesystem\Exception\IOException" => {
             shirabe_symfony_filesystem::exception::IOException::new(message, code, None, None)
                 .into()
         }
@@ -229,11 +243,11 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
 pub(crate) fn exception_into_throw(exception: &AnyThrowable, error: &anyhow::Error) -> PhpThrow {
     let mut throw = PhpThrow::new(
         exception.php_class_name(),
-        exception.get_message().to_string(),
+        exception.get_message().to_owned(),
         exception.get_code(),
     );
     *throw.properties = throwable_properties(error);
-    throw.file = exception.get_file().to_string();
+    throw.file = exception.get_file().into();
     throw.line = exception.get_line();
     throw
 }
@@ -244,35 +258,37 @@ pub(crate) fn exception_into_throw(exception: &AnyThrowable, error: &anyhow::Err
 /// TODO(plugin): the state of ProcessFailedException, ProcessSignaledException and
 /// SolverProblemsException is the Process or the solver problems, which do not cross, and an
 /// exception of a class the port has no type for keeps none of its own.
-fn throwable_properties(error: &anyhow::Error) -> IndexMap<String, PluginValue> {
-    let strings = |items: &[String]| {
+fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, PluginValue> {
+    let byte_strings = |items: &[BString]| {
         PluginValue::List(items.iter().cloned().map(PluginValue::string).collect())
     };
     let mut properties = IndexMap::new();
     if let Some(exception) = error.catch::<TransportException>() {
         properties.insert(
-            "headers".to_string(),
+            "headers".into(),
             match exception.get_headers() {
-                Some(headers) => strings(headers),
+                Some(headers) => {
+                    PluginValue::List(headers.iter().cloned().map(PluginValue::string).collect())
+                }
                 None => PluginValue::Null,
             },
         );
         properties.insert(
-            "response".to_string(),
+            "response".into(),
             match exception.get_response() {
                 Some(response) => PluginValue::string(response),
                 None => PluginValue::Null,
             },
         );
         properties.insert(
-            "statusCode".to_string(),
+            "statusCode".into(),
             match exception.get_status_code() {
                 Some(status_code) => PluginValue::Int(status_code),
                 None => PluginValue::Null,
             },
         );
         properties.insert(
-            "responseInfo".to_string(),
+            "responseInfo".into(),
             PluginValue::List(
                 exception
                     .get_response_info()
@@ -283,22 +299,22 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<String, PluginValue> 
         );
     }
     if let Some(exception) = error.catch::<InvalidPackageException>() {
-        properties.insert("errors".to_string(), strings(exception.get_errors()));
-        properties.insert("warnings".to_string(), strings(exception.get_warnings()));
+        properties.insert("errors".into(), byte_strings(exception.get_errors()));
+        properties.insert("warnings".into(), byte_strings(exception.get_warnings()));
         properties.insert(
-            "data".to_string(),
+            "data".into(),
             PluginValue::from_php_mixed(&PhpMixed::Array(exception.get_data().clone())),
         );
     }
     if let Some(exception) = error.catch::<JsonValidationException>() {
-        properties.insert("errors".to_string(), strings(exception.get_errors()));
+        properties.insert("errors".into(), byte_strings(exception.get_errors()));
     }
     if let Some(exception) =
         error.catch::<shirabe_symfony_console::exception::CommandNotFoundException>()
     {
         properties.insert(
-            "alternatives".to_string(),
-            strings(exception.get_alternatives()),
+            "alternatives".into(),
+            byte_strings(exception.get_alternatives()),
         );
     }
     properties
@@ -308,19 +324,22 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<String, PluginValue> 
 mod tests {
     use super::*;
 
-    fn throw(class: &str, parents: &[&str]) -> PhpThrow {
-        let mut throw = PhpThrow::new(class.to_string(), "boom".to_string(), 7);
-        throw.file = "/project/src/Thrower.php".to_string();
+    fn throw(class: &BStr, parents: &[&BStr]) -> PhpThrow {
+        let mut throw = PhpThrow::new(class, "boom", 7);
+        throw.file = BString::from("/project/src/Thrower.php");
         throw.line = 12;
-        throw.parents = parents.iter().map(|parent| parent.to_string()).collect();
+        throw.parents = parents
+            .iter()
+            .map(|parent| BString::from(*parent))
+            .collect();
         throw
     }
 
     #[test]
     fn a_ported_class_comes_back_as_itself() {
         let error = throw_into_error(throw(
-            "InvalidArgumentException",
-            &["LogicException", "Exception"],
+            BStr::new("InvalidArgumentException"),
+            &[BStr::new("LogicException"), BStr::new("Exception")],
         ));
 
         assert!(error.is_class::<InvalidArgumentException>());
@@ -334,8 +353,12 @@ mod tests {
     #[test]
     fn an_unported_class_comes_back_as_its_nearest_ported_superclass() {
         let error = throw_into_error(throw(
-            r"Vendor\PluginException",
-            &["UnexpectedValueException", "RuntimeException", "Exception"],
+            BStr::new(r"Vendor\PluginException"),
+            &[
+                BStr::new("UnexpectedValueException"),
+                BStr::new("RuntimeException"),
+                BStr::new("Exception"),
+            ],
         ));
 
         let exception = AnyThrowable::of(&error).unwrap();
@@ -352,25 +375,25 @@ mod tests {
     #[test]
     fn the_state_of_a_ported_class_crosses_both_ways() {
         let mut thrown = throw(
-            r"Composer\Downloader\TransportException",
-            &["RuntimeException", "Exception"],
+            BStr::new(r"Composer\Downloader\TransportException"),
+            &[BStr::new("RuntimeException"), BStr::new("Exception")],
         );
         thrown
             .properties
-            .insert("statusCode".to_string(), PluginValue::Int(404));
+            .insert(BString::from("statusCode"), PluginValue::Int(404));
         thrown
             .properties
-            .insert("response".to_string(), PluginValue::string("missing"));
+            .insert(BString::from("response"), PluginValue::string("missing"));
         let error = throw_into_error(thrown);
 
         let exception = error.catch::<TransportException>().unwrap();
         assert_eq!(Some(404), exception.get_status_code());
-        assert_eq!(Some("missing"), exception.get_response());
+        assert_eq!(Some(&b"missing"[..]), exception.get_response());
 
         let back = exception_into_throw(AnyThrowable::of(&error).unwrap(), &error);
         assert_eq!(
             Some(&PluginValue::Int(404)),
-            back.properties.get("statusCode")
+            back.properties.get(bstr::B("statusCode"))
         );
     }
 }

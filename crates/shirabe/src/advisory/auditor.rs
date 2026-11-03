@@ -1,15 +1,17 @@
 //! ref: composer/src/Composer/Advisory/Auditor.php
 
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
-use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable};
+use crate::io::{ConsoleIO, IOInterface, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::{CompletePackageInterfaceHandle, PackageInterfaceHandle, base_package};
 use crate::repository::RepositorySet;
 use crate::util::PackageInfo;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, get_class, preg_is_match,
+    array_keys, array_reduce, bconcat, display_to_bytes, get_class, json_bytes, php_str,
+    preg_is_match,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::helper::Cell;
@@ -18,81 +20,83 @@ use shirabe_symfony_console::helper::Cell;
 #[derive(serde::Serialize)]
 struct AuditJsonReport<'a> {
     #[serde(serialize_with = "serialize_advisories_field")]
-    advisories: &'a IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-    #[serde(rename = "ignored-advisories", skip_serializing_if = "Option::is_none")]
-    ignored_advisories: Option<&'a IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
+    advisories: &'a IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+    #[serde(
+        rename = "ignored-advisories",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_ignored_advisories_field"
+    )]
+    ignored_advisories: Option<&'a IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
     #[serde(
         rename = "unreachable-repositories",
-        skip_serializing_if = "Option::is_none"
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_unreachable_repositories_field"
     )]
-    unreachable_repositories: Option<&'a Vec<String>>,
-    #[serde(serialize_with = "serialize_abandoned_field")]
-    abandoned: IndexMap<String, Option<String>>,
-}
-
-/// PHP `json_encode` emits an empty associative array as `[]`, not `{}`. Mirror that so an empty
-/// map serializes as an empty JSON array.
-fn serialize_php_array<S, V>(
-    map: &IndexMap<String, V>,
-    serializer: S,
-) -> anyhow::Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-    V: serde::Serialize,
-{
-    use serde::ser::SerializeSeq;
-    if map.is_empty() {
-        let seq = serializer.serialize_seq(Some(0))?;
-        seq.end()
-    } else {
-        serializer.collect_map(map.iter())
-    }
+    unreachable_repositories: Option<&'a Vec<BString>>,
+    #[serde(serialize_with = "shirabe_php_shim::json_bytes::keyed_option_str")]
+    abandoned: IndexMap<BString, Option<BString>>,
 }
 
 fn serialize_advisories_field<S>(
-    map: &&IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+    map: &&IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     serializer: S,
 ) -> anyhow::Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    serialize_php_array(*map, serializer)
+    json_bytes::keyed(*map, serializer)
 }
 
-fn serialize_abandoned_field<S>(
-    map: &IndexMap<String, Option<String>>,
+fn serialize_ignored_advisories_field<S>(
+    map: &Option<&IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
     serializer: S,
 ) -> anyhow::Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    serialize_php_array(map, serializer)
+    match map {
+        Some(map) => json_bytes::keyed(map, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
+fn serialize_unreachable_repositories_field<S>(
+    repositories: &Option<&Vec<BString>>,
+    serializer: S,
+) -> anyhow::Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match repositories {
+        Some(repositories) => json_bytes::str_vec(repositories, serializer),
+        None => serializer.serialize_none(),
+    }
 }
 
 #[derive(Debug)]
 pub struct Auditor;
 
 impl Auditor {
-    pub const FORMAT_TABLE: &'static str = "table";
+    pub const FORMAT_TABLE: &'static BStr = php_str(b"table");
 
-    pub const FORMAT_PLAIN: &'static str = "plain";
+    pub const FORMAT_PLAIN: &'static BStr = php_str(b"plain");
 
-    pub const FORMAT_JSON: &'static str = "json";
+    pub const FORMAT_JSON: &'static BStr = php_str(b"json");
 
-    pub const FORMAT_SUMMARY: &'static str = "summary";
+    pub const FORMAT_SUMMARY: &'static BStr = php_str(b"summary");
 
-    pub const FORMATS: [&'static str; 4] = [
+    pub const FORMATS: [&'static BStr; 4] = [
         Self::FORMAT_TABLE,
         Self::FORMAT_PLAIN,
         Self::FORMAT_JSON,
         Self::FORMAT_SUMMARY,
     ];
 
-    pub const ABANDONED_IGNORE: &'static str = "ignore";
-    pub const ABANDONED_REPORT: &'static str = "report";
-    pub const ABANDONED_FAIL: &'static str = "fail";
+    pub const ABANDONED_IGNORE: &'static BStr = php_str(b"ignore");
+    pub const ABANDONED_REPORT: &'static BStr = php_str(b"report");
+    pub const ABANDONED_FAIL: &'static BStr = php_str(b"fail");
 
-    pub const ABANDONEDS: [&'static str; 3] = [
+    pub const ABANDONEDS: [&'static BStr; 3] = [
         Self::ABANDONED_IGNORE,
         Self::ABANDONED_REPORT,
         Self::ABANDONED_FAIL,
@@ -109,13 +113,13 @@ impl Auditor {
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         repo_set: &RepositorySet,
         packages: Vec<PackageInterfaceHandle>,
-        format: &str,
+        format: &BStr,
         warning_only: bool,
-        ignore_list: IndexMap<String, Option<String>>,
-        abandoned: &str,
-        ignored_severities: IndexMap<String, Option<String>>,
+        ignore_list: IndexMap<BString, Option<BString>>,
+        abandoned: &BStr,
+        ignored_severities: IndexMap<BString, Option<BString>>,
         ignore_unreachable: bool,
-        ignore_abandoned: IndexMap<String, Option<String>>,
+        ignore_abandoned: IndexMap<BString, Option<BString>>,
     ) -> anyhow::Result<i64> {
         let result = repo_set.get_matching_security_advisories(
             packages.clone(),
@@ -160,9 +164,14 @@ impl Auditor {
         if Self::FORMAT_JSON == format {
             let abandoned = array_reduce(
                 &abandoned_packages,
-                |mut carry: IndexMap<String, Option<String>>,
+                |mut carry: IndexMap<BString, Option<BString>>,
                  package: &CompletePackageInterfaceHandle| {
-                    carry.insert(package.get_pretty_name(), package.get_replacement_package());
+                    carry.insert(
+                        BString::from(&package.get_pretty_name()[..]),
+                        package
+                            .get_replacement_package()
+                            .map(|s| BString::from(&s[..])),
+                    );
                     carry
                 },
                 IndexMap::new(),
@@ -187,15 +196,19 @@ impl Auditor {
             return Ok(audit_bitmask);
         }
 
-        let error_or_warn = if warning_only { "warning" } else { "error" };
+        let error_or_warn = BStr::new(if warning_only { "warning" } else { "error" });
         if affected_packages_count > 0 || !ignored_advisories.is_empty() {
             let passes: Vec<(
-                &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-                &str,
-                &str,
+                &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+                &BStr,
+                &BStr,
             )> = vec![
-                (&ignored_advisories, "info", "ignored "),
-                (&advisories, error_or_warn, ""),
+                (
+                    &ignored_advisories,
+                    BStr::new("info"),
+                    BStr::new("ignored "),
+                ),
+                (&advisories, error_or_warn, BStr::new("")),
             ];
             for (advisories_to_output, tag, ignored) in passes {
                 let (pkg_count, total_advisory_count) = self.count_advisories(advisories_to_output);
@@ -207,8 +220,23 @@ impl Auditor {
                     };
                     let pkg_plurality = if pkg_count == 1 { "" } else { "s" };
                     let punctuation = if format == "summary" { "." } else { ":" };
-                    io.write_error(&format!(
-                        "<{tag}>Found {total_advisory_count} {ignored}security vulnerability advisor{plurality} affecting {pkg_count} package{pkg_plurality}{punctuation}</{tag}>"
+                    io.write_error(bconcat!(
+                        "<",
+                        tag,
+                        ">Found ",
+                        total_advisory_count,
+                        " ",
+                        ignored,
+                        "security vulnerability advisor",
+                        plurality,
+                        " affecting ",
+                        pkg_count,
+                        " package",
+                        pkg_plurality,
+                        punctuation,
+                        "</",
+                        tag,
+                        ">"
                     ));
                     self.output_advisories(io, advisories_to_output, format)?;
                 }
@@ -224,7 +252,7 @@ impl Auditor {
         if !unreachable_repos.is_empty() {
             io.write_error("<warning>The following repositories were unreachable:</warning>");
             for repo in &unreachable_repos {
-                io.write_error(&format!("  - {}", repo));
+                io.write_error(bconcat!("  - ", repo));
             }
         }
 
@@ -237,8 +265,8 @@ impl Auditor {
 
     pub fn needs_complete_advisory_load(
         &self,
-        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-        ignore_list: &IndexMap<String, Option<String>>,
+        advisories: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+        ignore_list: &IndexMap<BString, Option<BString>>,
     ) -> bool {
         if advisories.is_empty() {
             return false;
@@ -259,20 +287,23 @@ impl Auditor {
 
         let ignored_ids = array_keys(ignore_list);
 
-        array_any(&ignored_ids, |id: &String| !id.starts_with("PKSA-"))
+        array_any(&ignored_ids, |id: &BString| !id.starts_with(b"PKSA-"))
     }
 
     pub fn filter_abandoned_packages(
         &self,
         packages: &[PackageInterfaceHandle],
-        ignore_abandoned: &IndexMap<String, Option<String>>,
+        ignore_abandoned: &IndexMap<BString, Option<BString>>,
     ) -> anyhow::Result<Vec<CompletePackageInterfaceHandle>> {
-        let mut filter: Option<String> = None;
+        let mut filter: Option<BString> = None;
         if !ignore_abandoned.is_empty() {
-            filter = Some(base_package::package_names_to_regexp(
-                &array_keys(ignore_abandoned),
-                "{^(?:%s)$}iD",
-            ));
+            filter = Some(
+                base_package::package_names_to_regexp(
+                    &array_keys(ignore_abandoned),
+                    BStr::new("{^(?:%s)$}iD"),
+                )
+                .to_owned(),
+            );
         }
 
         // PHP: array_filter($packages, fn(PackageInterface $pkg) => $pkg instanceof CompletePackageInterface && $pkg->isAbandoned() && ($filter === null || !Preg::isMatch($filter, $pkg->getName())))
@@ -282,7 +313,7 @@ impl Auditor {
                 continue;
             };
             if pkg.is_abandoned()
-                && (filter.is_none() || !preg_is_match(filter.as_ref().unwrap(), &pkg.get_name()))
+                && (filter.is_none() || !preg_is_match(filter.as_ref().unwrap(), pkg.get_name()))
             {
                 result.push(pkg);
             }
@@ -292,9 +323,9 @@ impl Auditor {
 
     pub fn process_advisories(
         &self,
-        all_advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-        ignore_list: &IndexMap<String, Option<String>>,
-        ignored_severities: &IndexMap<String, Option<String>>,
+        all_advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+        ignore_list: &IndexMap<BString, Option<BString>>,
+        ignored_severities: &IndexMap<BString, Option<BString>>,
     ) -> ProcessAdvisoriesResult {
         if ignore_list.is_empty() && ignored_severities.is_empty() {
             return ProcessAdvisoriesResult {
@@ -303,10 +334,10 @@ impl Auditor {
             };
         }
 
-        let mut advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+        let mut advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
             IndexMap::new();
-        let mut ignored: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
-        let mut ignore_reason: Option<String> = None;
+        let mut ignored: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
+        let mut ignore_reason: Option<BString> = None;
 
         for (package, pkg_advisories) in all_advisories {
             for advisory in pkg_advisories {
@@ -317,10 +348,10 @@ impl Auditor {
                     ignore_reason = ignore_list.get(&package).cloned().unwrap_or(None);
                 }
 
-                if array_key_exists(advisory.advisory_id(), ignore_list) {
+                if array_key_exists(bstr::B(advisory.advisory_id()), ignore_list) {
                     is_active = false;
                     ignore_reason = ignore_list
-                        .get(advisory.advisory_id())
+                        .get(bstr::B(advisory.advisory_id()))
                         .cloned()
                         .unwrap_or(None);
                 }
@@ -334,7 +365,7 @@ impl Auditor {
                             .get(severity)
                             .cloned()
                             .flatten()
-                            .or_else(|| Some(format!("{} severity is ignored", severity)));
+                            .or_else(|| Some(bconcat!(severity, " severity is ignored")));
                     }
 
                     if let Some(cve) = &full.cve
@@ -345,7 +376,10 @@ impl Auditor {
                     }
 
                     for source in &full.sources {
-                        let remote_id = source.get("remoteId").cloned().unwrap_or_default();
+                        let remote_id = source
+                            .get(b"remoteId".as_slice())
+                            .cloned()
+                            .unwrap_or_default();
                         if array_key_exists(&remote_id, ignore_list) {
                             is_active = false;
                             ignore_reason = ignore_list.get(&remote_id).cloned().flatten();
@@ -385,7 +419,7 @@ impl Auditor {
 
     fn count_advisories(
         &self,
-        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+        advisories: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> (i64, i64) {
         let mut count: i64 = 0;
         for package_advisories in advisories.values() {
@@ -398,11 +432,11 @@ impl Auditor {
     fn output_advisories(
         &self,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-        format: &str,
+        advisories: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+        format: &BStr,
     ) -> anyhow::Result<()> {
         match format {
-            Self::FORMAT_TABLE => {
+            _ if format == Self::FORMAT_TABLE => {
                 let io_ref = io.borrow();
                 // PHP: `$io instanceof ConsoleIO`. BufferIO extends ConsoleIO in PHP but is
                 // modeled as composition here, so also unwrap it to its inner ConsoleIO.
@@ -413,8 +447,8 @@ impl Auditor {
                         .map(|buffer_io| &buffer_io.inner)
                 });
                 if io_as_console.is_none() {
-                    return Err(InvalidArgumentException::new(format!(
-                        "Cannot use table format with {}",
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        "Cannot use table format with ",
                         get_class(&PhpMixed::Null)
                     ))
                     .into());
@@ -423,55 +457,55 @@ impl Auditor {
 
                 Ok(())
             }
-            Self::FORMAT_PLAIN => {
+            _ if format == Self::FORMAT_PLAIN => {
                 self.output_advisories_plain(io, advisories)?;
 
                 Ok(())
             }
-            Self::FORMAT_SUMMARY => Ok(()),
-            _ => {
-                Err(InvalidArgumentException::new(format!("Invalid format \"{}\".", format)).into())
-            }
+            _ if format == Self::FORMAT_SUMMARY => Ok(()),
+            _ => Err(
+                InvalidArgumentException::new(bconcat!("Invalid format \"", format, "\".")).into(),
+            ),
         }
     }
 
     fn output_advisories_table(
         &self,
         io: &ConsoleIO,
-        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+        advisories: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> anyhow::Result<()> {
         for package_advisories in advisories.values() {
             for advisory in package_advisories {
-                let mut headers: Vec<String> = vec![
-                    "Package".to_string(),
-                    "Severity".to_string(),
-                    "Advisory ID".to_string(),
-                    "CVE".to_string(),
-                    "Title".to_string(),
-                    "URL".to_string(),
-                    "Affected versions".to_string(),
-                    "Reported at".to_string(),
+                let mut headers: Vec<BString> = vec![
+                    BString::from("Package"),
+                    BString::from("Severity"),
+                    BString::from("Advisory ID"),
+                    BString::from("CVE"),
+                    BString::from("Title"),
+                    BString::from("URL"),
+                    BString::from("Affected versions"),
+                    BString::from("Reported at"),
                 ];
                 let sa = advisory
                     .as_security_advisory()
                     .expect("output_advisories_table only receives full advisories");
-                let mut row: Vec<String> = vec![
-                    sa.package_name().to_string(),
+                let mut row: Vec<BString> = vec![
+                    BString::from(sa.package_name()),
                     self.get_severity(sa),
                     self.get_advisory_id(sa),
                     self.get_cve(sa),
                     sa.title.clone(),
                     self.get_url(sa),
                     sa.affected_versions().get_pretty_string(),
-                    sa.reported_at.format(DATE_ATOM).to_string(),
+                    display_to_bytes(sa.reported_at.format(DATE_ATOM)),
                 ];
                 if let Some(ignored) = advisory.as_ignored() {
-                    headers.push("Ignore reason".to_string());
+                    headers.push(BString::from("Ignore reason"));
                     row.push(
                         ignored
                             .ignore_reason
                             .clone()
-                            .unwrap_or_else(|| "None specified".to_string()),
+                            .unwrap_or_else(|| BString::from("None specified")),
                     );
                 }
                 let mut table = io.get_table();
@@ -487,7 +521,7 @@ impl Auditor {
                 table
                     .set_column_width(1, 80)
                     .set_column_max_width(1, 80)
-                    .render();
+                    .render()?;
             }
         }
 
@@ -497,36 +531,39 @@ impl Auditor {
     fn output_advisories_plain(
         &self,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+        advisories: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> anyhow::Result<()> {
-        let mut error: Vec<String> = vec![];
+        let mut error: Vec<BString> = vec![];
         let mut first_advisory = true;
         for package_advisories in advisories.values() {
             for advisory in package_advisories {
                 if !first_advisory {
-                    error.push("--------".to_string());
+                    error.push(BString::from("--------"));
                 }
                 let sa = advisory
                     .as_security_advisory()
                     .expect("output_advisories_plain only receives full advisories");
-                error.push(format!("Package: {}", sa.package_name()));
-                error.push(format!("Severity: {}", self.get_severity(sa)));
-                error.push(format!("Advisory ID: {}", self.get_advisory_id(sa)));
-                error.push(format!("CVE: {}", self.get_cve(sa)));
-                error.push(format!("Title: {}", OutputFormatter::escape(&sa.title)?));
-                error.push(format!("URL: {}", self.get_url(sa)));
-                error.push(format!(
-                    "Affected versions: {}",
-                    OutputFormatter::escape(&sa.affected_versions().get_pretty_string())?
+                error.push(bconcat!("Package: ", sa.package_name()));
+                error.push(bconcat!("Severity: ", self.get_severity(sa)));
+                error.push(bconcat!("Advisory ID: ", self.get_advisory_id(sa)));
+                error.push(bconcat!("CVE: ", self.get_cve(sa)));
+                error.push(bconcat!("Title: ", OutputFormatter::escape(&sa.title)?));
+                error.push(bconcat!("URL: ", self.get_url(sa)));
+                error.push(bconcat!(
+                    "Affected versions: ",
+                    OutputFormatter::escape(sa.affected_versions().get_pretty_string())?
                 ));
-                error.push(format!("Reported at: {}", sa.reported_at.format(DATE_ATOM)));
+                error.push(bconcat!(
+                    "Reported at: ",
+                    display_to_bytes(sa.reported_at.format(DATE_ATOM))
+                ));
                 if let Some(ignored) = advisory.as_ignored() {
-                    error.push(format!(
-                        "Ignore reason: {}",
+                    error.push(bconcat!(
+                        "Ignore reason: ",
                         ignored
                             .ignore_reason
                             .clone()
-                            .unwrap_or_else(|| "None specified".to_string())
+                            .unwrap_or_else(|| BString::from("None specified"))
                     ));
                 }
                 first_advisory = false;
@@ -543,29 +580,28 @@ impl Auditor {
         &self,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         packages: &[CompletePackageInterfaceHandle],
-        format: &str,
+        format: &BStr,
     ) -> anyhow::Result<()> {
-        io.write_error(&format!(
-            "<error>Found {} abandoned package{}:</error>",
+        io.write_error(bconcat!(
+            "<error>Found ",
             packages.len() as i64,
-            if packages.len() > 1 {
-                "s".to_string()
-            } else {
-                String::new()
-            },
+            " abandoned package",
+            if packages.len() > 1 { "s" } else { "" },
+            ":</error>"
         ));
 
         if format == Self::FORMAT_PLAIN {
             for pkg in packages {
                 let replacement = if pkg.get_replacement_package().is_some() {
-                    format!("Use {} instead", pkg.get_replacement_package().unwrap())
+                    bconcat!("Use ", pkg.get_replacement_package().unwrap(), " instead")
                 } else {
-                    "No replacement was suggested".to_string()
+                    BString::from("No replacement was suggested")
                 };
-                io.write_error(&format!(
-                    "{} is abandoned. {}.",
+                io.write_error(bconcat!(
                     self.get_package_name_with_link(pkg.clone().into()),
+                    " is abandoned. ",
                     replacement,
+                    "."
                 ));
             }
 
@@ -582,8 +618,8 @@ impl Auditor {
                 .map(|buffer_io| &buffer_io.inner)
         });
         if io_as_console.is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Cannot use table format with {}",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Cannot use table format with ",
                 get_class(&PhpMixed::Null)
             ))
             .into());
@@ -592,89 +628,90 @@ impl Auditor {
         let mut table = io_as_console.unwrap().get_table();
         table
             .set_headers(vec![
-                "Abandoned Package".to_string().into(),
-                "Suggested Replacement".to_string().into(),
+                BString::from("Abandoned Package").into(),
+                BString::from("Suggested Replacement").into(),
             ])
             .set_column_width(1, 80)
             .set_column_max_width(1, 80);
 
         for pkg in packages {
-            let replacement = if pkg.get_replacement_package().is_some() {
-                pkg.get_replacement_package().unwrap().to_string()
-            } else {
-                "none".to_string()
-            };
+            let replacement = pkg
+                .get_replacement_package()
+                .unwrap_or_else(|| BString::from("none"));
             let row: Vec<Cell> = vec![
-                ConsoleIO::sanitize(&self.get_package_name_with_link(pkg.clone().into()), true)
+                ConsoleIO::sanitize(self.get_package_name_with_link(pkg.clone().into()), true)
                     .into(),
                 ConsoleIO::sanitize(&replacement, true).into(),
             ];
             table.add_row(row.into());
         }
 
-        table.render();
+        table.render()?;
 
         Ok(())
     }
 
-    fn get_package_name_with_link(&self, package: PackageInterfaceHandle) -> String {
+    fn get_package_name_with_link(&self, package: PackageInterfaceHandle) -> BString {
         let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
 
         if let Some(package_url) = package_url {
-            format!(
-                "<href={}>{}</>",
+            bconcat!(
+                "<href=",
                 OutputFormatter::escape(&package_url)
                     .expect("OutputFormatter::escape does not fail"),
-                package.get_pretty_name()
+                ">",
+                package.get_pretty_name(),
+                "</>"
             )
         } else {
             package.get_pretty_name()
         }
     }
 
-    fn get_severity(&self, advisory: &SecurityAdvisory) -> String {
+    fn get_severity(&self, advisory: &SecurityAdvisory) -> BString {
         if advisory.severity.is_none() {
-            return String::new();
+            return BString::default();
         }
 
         advisory.severity.clone().unwrap()
     }
 
-    fn get_advisory_id(&self, advisory: &SecurityAdvisory) -> String {
+    fn get_advisory_id(&self, advisory: &SecurityAdvisory) -> BString {
         let advisory_id = advisory.advisory_id();
-        if advisory_id.starts_with("PKSA-") {
-            return format!(
-                "<href=https://packagist.org/security-advisories/{}>{}</>",
-                advisory_id, advisory_id
+        if advisory_id.starts_with(b"PKSA-") {
+            return bconcat!(
+                "<href=https://packagist.org/security-advisories/",
+                advisory_id,
+                ">",
+                advisory_id,
+                "</>"
             );
         }
 
-        advisory_id.to_string()
+        BString::from(advisory_id)
     }
 
-    fn get_cve(&self, advisory: &SecurityAdvisory) -> String {
-        if advisory.cve.is_none() {
-            return "NO CVE".to_string();
-        }
+    fn get_cve(&self, advisory: &SecurityAdvisory) -> BString {
+        let Some(cve) = advisory.cve.as_ref() else {
+            return BString::from("NO CVE");
+        };
 
-        format!(
-            "<href=https://cve.mitre.org/cgi-bin/cvename.cgi?name={}>{}</>",
-            advisory.cve.as_ref().unwrap(),
-            advisory.cve.as_ref().unwrap()
+        bconcat!(
+            "<href=https://cve.mitre.org/cgi-bin/cvename.cgi?name=",
+            cve,
+            ">",
+            cve,
+            "</>"
         )
     }
 
-    fn get_url(&self, advisory: &SecurityAdvisory) -> String {
-        if advisory.link.is_none() {
-            return String::new();
-        }
+    fn get_url(&self, advisory: &SecurityAdvisory) -> BString {
+        let Some(link) = advisory.link.as_ref() else {
+            return BString::default();
+        };
 
-        let link = advisory.link.as_ref().unwrap();
-        format!(
-            "<href={}>{}</>",
-            OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail"),
-            OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail")
-        )
+        let link = OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail");
+        bconcat!("<href=", link, ">", link, "</>")
     }
 
     fn calculate_bitmask(
@@ -698,6 +735,6 @@ impl Auditor {
 
 #[derive(Debug)]
 pub struct ProcessAdvisoriesResult {
-    pub advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-    pub ignored_advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+    pub advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+    pub ignored_advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
 }

@@ -1,5 +1,6 @@
 //! ref: composer/vendor/seld/jsonlint/src/Seld/JsonLint/ParsingException.php
 
+use bstr::BString;
 use shirabe_php_shim::Exception;
 
 #[derive(Debug, Clone, Default)]
@@ -12,17 +13,17 @@ pub struct ParsingExceptionLoc {
 
 #[derive(Debug, Clone)]
 pub enum ParsingExceptionToken {
-    Name(String),
+    Name(BString),
     Symbol(i64),
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct ParsingExceptionDetails {
-    pub text: Option<String>,
+    pub text: Option<BString>,
     pub token: Option<ParsingExceptionToken>,
     pub line: Option<i64>,
     pub loc: Option<ParsingExceptionLoc>,
-    pub expected: Option<Vec<String>>,
+    pub expected: Option<Vec<BString>>,
 }
 
 #[derive(Debug)]
@@ -33,7 +34,7 @@ pub struct ParsingException {
 
 impl ParsingException {
     #[track_caller]
-    pub fn new(message: String, details: ParsingExceptionDetails) -> Self {
+    pub fn new(message: impl Into<BString>, details: ParsingExceptionDetails) -> Self {
         Self {
             inner: Exception::new(message),
             details: Box::new(details),

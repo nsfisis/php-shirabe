@@ -8,6 +8,9 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{bconcat, os_str_from_bytes};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -17,14 +20,14 @@ fn fixture_dir() -> PathBuf {
 
 struct CommandRun {
     exit_code: i32,
-    stdout: String,
+    stdout: BString,
 }
 
 /// One composer-CLI invocation inside the prepared project.
-fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) -> CommandRun {
-    let output = std::process::Command::new(program)
+fn run_command(work: &Path, program: &BStr, prefix_args: &[&OsStr], args: &[&BStr]) -> CommandRun {
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
-        .args(args)
+        .args(args.iter().map(os_str_from_bytes))
         .current_dir(work.join("project"))
         .env("COMPOSER_HOME", work.join("home"))
         .env("COMPOSER_CACHE_DIR", work.join("cache"))
@@ -36,21 +39,31 @@ fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) 
         .unwrap();
     CommandRun {
         exit_code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stdout: BString::from(output.stdout),
     }
 }
 
-fn greet_lines(stdout: &str) -> Vec<&str> {
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
+fn greet_lines(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
-        .filter(|line| line.starts_with("greet:"))
+        .filter(|line| line.starts_with(b"greet:"))
+        .map(ByteSlice::as_bstr)
         .collect()
 }
 
-fn list_lines_mentioning_greet(stdout: &str) -> Vec<&str> {
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
+fn list_lines_mentioning_greet(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
-        .filter(|line| line.contains("greet"))
+        .filter(|line| line.contains_str("greet"))
+        .map(ByteSlice::as_bstr)
         .collect()
 }
 
@@ -63,11 +76,9 @@ fn test_command_provider_execution_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
-    let implementations: [(&str, Vec<&str>); 2] = [
-        ("php", vec![composer_bin.as_str()]),
-        (env!("CARGO_BIN_EXE_shirabe"), vec![]),
+    let implementations: [(&BStr, Vec<&OsStr>); 2] = [
+        (BStr::new("php"), vec![composer_bin.as_os_str()]),
+        (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ];
 
     let mut results: Vec<(
@@ -76,32 +87,51 @@ fn test_command_provider_execution_matches_upstream_composer() {
         CommandRun,
         CommandRun,
         CommandRun,
-        String,
+        BString,
     )> = Vec::new();
     for (program, prefix) in &implementations {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
-        let install = run_command(work.path(), program, prefix, &["install"]);
-        assert_eq!(0, install.exit_code, "{program}: install must succeed");
+        let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
+        assert_eq!(
+            0,
+            install.exit_code,
+            "{program}: install must succeed",
+            program = program.display_lossy()
+        );
 
         let observed = work.path().join("project/observed.txt");
-        let observed_arg = format!("--out={}", observed.to_str().unwrap());
+        let observed_arg = bconcat!("--out=", observed);
         let greet = run_command(
             work.path(),
             program,
             prefix,
-            &["greet", "World", "--shout", &observed_arg],
+            &[
+                BStr::new("greet"),
+                BStr::new("World"),
+                BStr::new("--shout"),
+                observed_arg.as_bstr(),
+            ],
         );
-        let observed = std::fs::read_to_string(&observed).unwrap_or_default();
+        let observed = BString::from(std::fs::read(&observed).unwrap_or_default());
         let alias = run_command(
             work.path(),
             program,
             prefix,
-            &["hi", "there", "--out=o2.txt"],
+            &[
+                BStr::new("hi"),
+                BStr::new("there"),
+                BStr::new("--out=o2.txt"),
+            ],
         );
-        let help = run_command(work.path(), program, prefix, &["help", "greet"]);
-        let list = run_command(work.path(), program, prefix, &["list"]);
-        let missing_argument = run_command(work.path(), program, prefix, &["greet"]);
+        let help = run_command(
+            work.path(),
+            program,
+            prefix,
+            &[BStr::new("help"), BStr::new("greet")],
+        );
+        let list = run_command(work.path(), program, prefix, &[BStr::new("list")]);
+        let missing_argument = run_command(work.path(), program, prefix, &[BStr::new("greet")]);
         results.push((greet, alias, help, list, missing_argument, observed));
     }
 

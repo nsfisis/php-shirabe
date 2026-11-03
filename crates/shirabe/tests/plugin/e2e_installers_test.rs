@@ -7,6 +7,9 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{os_str_from_bytes, path_to_bytes};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -21,27 +24,27 @@ fn plugin_fetched() -> bool {
 }
 
 /// The two implementations under comparison: upstream Composer first, Shirabe second.
-pub(crate) fn implementations(composer_bin: &str) -> [(&str, Vec<&str>); 2] {
+pub(crate) fn implementations(composer_bin: &OsStr) -> [(&BStr, Vec<&OsStr>); 2] {
     [
-        ("php", vec![composer_bin]),
-        (env!("CARGO_BIN_EXE_shirabe"), vec![]),
+        (BStr::new("php"), vec![composer_bin]),
+        (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ]
 }
 
 pub(crate) struct CommandRun {
     pub(crate) exit_code: i32,
-    pub(crate) stdout: Vec<String>,
+    pub(crate) stdout: Vec<BString>,
 }
 
 pub(crate) fn run_command(
     work: &Path,
-    program: &str,
-    prefix_args: &[&str],
-    args: &[&str],
+    program: &BStr,
+    prefix_args: &[&OsStr],
+    args: &[&BStr],
 ) -> CommandRun {
-    let output = std::process::Command::new(program)
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
-        .args(args)
+        .args(args.iter().map(os_str_from_bytes))
         .current_dir(work.join("project"))
         .env("COMPOSER_HOME", work.join("home"))
         .env("COMPOSER_CACHE_DIR", work.join("cache"))
@@ -52,7 +55,7 @@ pub(crate) fn run_command(
         .unwrap();
     CommandRun {
         exit_code: output.status.code().unwrap_or(-1),
-        stdout: normalize_output(&String::from_utf8_lossy(&output.stdout), work),
+        stdout: normalize_output(&output.stdout, work),
     }
 }
 
@@ -60,47 +63,52 @@ pub(crate) fn run_command(
 /// prints absolutely when it deletes a package) is replaced by a placeholder, and progress bar
 /// frames are dropped — Shirabe renders those differently from upstream for every install,
 /// including projects with no plugin at all, so they say nothing about this plugin.
-fn normalize_output(stdout: &str, work: &Path) -> Vec<String> {
-    let work = work.to_str().unwrap();
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
+fn normalize_output(stdout: &[u8], work: &Path) -> Vec<BString> {
+    let work = path_to_bytes(work);
     stdout
         .lines()
         .filter(|line| {
             let trimmed = line.trim_start();
-            !(trimmed.starts_with(|c: char| c.is_ascii_digit()) && trimmed.contains('['))
+            !(trimmed.first().is_some_and(u8::is_ascii_digit) && trimmed.contains(&b'['))
         })
-        .map(|line| line.replace(work, "<work>"))
+        .map(|line| BString::from(line.replace(work, "<work>")))
         .collect()
 }
 
 /// Every file under `dir` as (relative path, contents), so two project trees compare as a whole.
-pub(crate) fn tree(dir: &Path) -> Vec<(String, String)> {
+pub(crate) fn tree(dir: &Path) -> Vec<(BString, BString)> {
     let mut files = Vec::new();
     collect(dir, dir, &mut files);
     files.sort();
     files
 }
 
-fn collect(root: &Path, dir: &Path, files: &mut Vec<(String, String)>) {
+fn collect(root: &Path, dir: &Path, files: &mut Vec<(BString, BString)>) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         if entry.file_type().unwrap().is_dir() {
             collect(root, &path, files);
         } else {
-            let relative = path
-                .strip_prefix(root)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string();
-            files.push((relative, std::fs::read_to_string(&path).unwrap_or_default()));
+            let relative = BString::from(path_to_bytes(path.strip_prefix(root).unwrap()));
+            files.push((
+                relative,
+                BString::from(std::fs::read(&path).unwrap_or_default()),
+            ));
         }
     }
 }
 
-fn edit(path: &Path, from: &str, to: &str) {
-    let text = std::fs::read_to_string(path).unwrap();
-    assert!(text.contains(from), "{path:?} does not contain {from:?}");
+fn edit(path: &Path, from: &BStr, to: &BStr) {
+    let text = BString::from(std::fs::read(path).unwrap());
+    assert!(
+        text.contains_str(from),
+        "{path:?} does not contain {from:?}"
+    );
     std::fs::write(path, text.replace(from, to)).unwrap();
 }
 
@@ -118,13 +126,12 @@ fn test_composer_installers_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let mut results = Vec::new();
-    for (program, prefix) in &implementations(&composer_bin) {
+    for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
-        let run = run_command(work.path(), program, prefix, &["install"]);
+        let run = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let tree = tree(&work.path().join("project"));
         results.push((run, tree, work));
     }
@@ -159,39 +166,38 @@ fn test_composer_installers_update_and_remove_match_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let mut results = Vec::new();
-    for (program, prefix) in &implementations(&composer_bin) {
+    for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
-        let install = run_command(work.path(), program, prefix, &["install"]);
+        let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
 
         let module = work.path().join("packages/hello-module");
         edit(
             &module.join("composer.json"),
-            "\"version\": \"1.0.0\"",
-            "\"version\": \"1.1.0\"",
+            BStr::new("\"version\": \"1.0.0\""),
+            BStr::new("\"version\": \"1.1.0\""),
         );
         std::fs::write(module.join("src/hello.txt"), "hello module payload v1.1\n").unwrap();
         edit(
             &work.path().join("project/composer.json"),
-            "\"acme/hello-module\": \"1.0.0\"",
-            "\"acme/hello-module\": \"1.1.0\"",
+            BStr::new("\"acme/hello-module\": \"1.0.0\""),
+            BStr::new("\"acme/hello-module\": \"1.1.0\""),
         );
 
         let update = run_command(
             work.path(),
             program,
             prefix,
-            &["update", "acme/hello-module"],
+            &[BStr::new("update"), BStr::new("acme/hello-module")],
         );
-        let reinstall = run_command(work.path(), program, prefix, &["install"]);
+        let reinstall = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let remove = run_command(
             work.path(),
             program,
             prefix,
-            &["remove", "acme/hello-theme"],
+            &[BStr::new("remove"), BStr::new("acme/hello-theme")],
         );
         let tree = tree(&work.path().join("project"));
         results.push((install, update, reinstall, remove, tree, work));
@@ -224,25 +230,28 @@ fn test_composer_installers_custom_paths_match_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
     let mut results = Vec::new();
-    for (program, prefix) in &implementations(&composer_bin) {
+    for (program, prefix) in &implementations(composer_bin.as_os_str()) {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         edit(
             &work.path().join("project/composer.json"),
-            "    \"require\": {",
-            "    \"extra\": {\n        \"installer-paths\": {\n            \
+            BStr::new("    \"require\": {"),
+            BStr::new(
+                "    \"extra\": {\n        \"installer-paths\": {\n            \
              \"web/custom/{$name}/\": [\"type:drupal-theme\"],\n            \
              \"web/mods/{$name}/\": [\"acme/hello-module\"]\n        }\n    },\n    \"require\": {",
+            ),
         );
         edit(
             &work.path().join("packages/hello-module/composer.json"),
-            "    \"type\": \"drupal-module\",",
-            "    \"type\": \"drupal-module\",\n    \"extra\": {\"installer-name\": \"renamed-mod\"},",
+            BStr::new("    \"type\": \"drupal-module\","),
+            BStr::new(
+                "    \"type\": \"drupal-module\",\n    \"extra\": {\"installer-name\": \"renamed-mod\"},",
+            ),
         );
-        let run = run_command(work.path(), program, prefix, &["install"]);
+        let run = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let tree = tree(&work.path().join("project"));
         results.push((run, tree, work));
     }

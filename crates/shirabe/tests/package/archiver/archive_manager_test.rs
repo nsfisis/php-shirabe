@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ArchiveManagerTest.php
 
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::{DownloadManager, GitDownloader};
@@ -12,8 +13,8 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, ProcessExecutor};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, file_exists, file_put_contents, realpath,
-    sys_get_temp_dir, unlink,
+    Catch as _, PhpMixed, RuntimeException, bconcat, file_exists, file_put_contents,
+    path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use shirabe_symfony_process::Process;
 use tempfile::TempDir;
@@ -80,13 +81,18 @@ impl TestCase {
     // ref: ArchiverTestCase::setupPackage.
     fn setup_package(&self) -> CompletePackageInterfaceHandle {
         let package = CompletePackageHandle::new(
-            "archivertest/archivertest".to_string(),
-            "master".to_string(),
-            "master".to_string(),
+            BString::from("archivertest/archivertest"),
+            BString::from("master"),
+            BString::from("master"),
         );
-        package.set_source_url(Some(realpath(&self.test_dir).unwrap_or_default()));
-        package.set_source_reference(Some("master".to_string()));
-        package.__set_source_type(Some("git".to_string()));
+        package.set_source_url(Some(bstr::BString::from(
+            realpath(&self.test_dir)
+                .as_deref()
+                .map(path_to_bytes)
+                .unwrap_or_default(),
+        )));
+        package.set_source_reference(Some(BString::from("master")));
+        package.__set_source_type(Some(BString::from("git")));
 
         package.into()
     }
@@ -95,10 +101,11 @@ impl TestCase {
     fn get_target_name(
         &self,
         package: CompletePackageInterfaceHandle,
-        format: &str,
+        format: &BStr,
     ) -> std::path::PathBuf {
         let package_name = self.manager.get_package_filename(package).unwrap();
-        self.target_dir.join(format!("{}.{}", package_name, format))
+        self.target_dir
+            .join(path_from_bytes(&bconcat!(package_name, ".", format)))
     }
 
     // ref: ArchiveManagerTest::setupGitRepo.
@@ -107,7 +114,7 @@ impl TestCase {
     // effect-equivalent for setting up the local repository the archive path clones from.
     fn setup_git_repo(&self) {
         file_put_contents(
-            self.test_dir.join("composer.json").to_str().unwrap(),
+            self.test_dir.join("composer.json"),
             br#"{"name":"faker/faker", "description": "description", "license": "MIT"}"#,
         );
 
@@ -119,7 +126,7 @@ impl TestCase {
              git config user.name \"Your Name\" && \
              git add composer.json && \
              git commit -m \"commit composer.json\" -q",
-            Some(self.test_dir.to_str().unwrap()),
+            Some(std::path::Path::new(&self.test_dir)),
             None,
             PhpMixed::Bool(false),
             Some(60.0),
@@ -129,7 +136,10 @@ impl TestCase {
         if result > 0 {
             panic!(
                 "Could not set up git repo: {}",
-                process.get_error_output().unwrap_or_default()
+                process
+                    .get_error_output()
+                    .unwrap_or_default()
+                    .display_lossy()
             );
         }
     }
@@ -156,8 +166,8 @@ fn test_unknown_format() {
 
     let result = shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package,
-        "__unknown_format__".to_string(),
-        test_case.target_dir.to_str().unwrap().to_string(),
+        "__unknown_format__".into(),
+        test_case.target_dir.clone(),
         None,
         false,
     ));
@@ -181,19 +191,21 @@ fn test_archive_tar() {
 
     shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package.clone(),
-        "tar".to_string(),
-        test_case.target_dir.to_str().unwrap().to_string(),
+        "tar".into(),
+        test_case.target_dir.clone(),
         None,
         false,
     ))
     .unwrap();
 
-    let target = test_case.get_target_name(package.clone(), "tar");
+    let target = test_case.get_target_name(package.clone(), BStr::new("tar"));
     assert!(file_exists(&target));
 
     let tmppath = sys_get_temp_dir()
         .join("composer_archiver")
-        .join(test_case.manager.get_package_filename(package).unwrap());
+        .join(path_from_bytes(
+            &test_case.manager.get_package_filename(package).unwrap(),
+        ));
     assert!(!file_exists(&tmppath));
 
     unlink(&target);
@@ -215,20 +227,24 @@ fn test_archive_custom_file_name() {
 
     shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package.clone(),
-        "tar".to_string(),
-        test_case.target_dir.to_str().unwrap().to_string(),
-        Some(file_name.to_string()),
+        "tar".into(),
+        test_case.target_dir.clone(),
+        Some(file_name.into()),
         false,
     ))
     .unwrap();
 
-    let target = test_case.target_dir.join(format!("{}.tar", file_name));
+    let target = test_case
+        .target_dir
+        .join(path_from_bytes(&bconcat!(file_name, ".tar")));
 
     assert!(file_exists(&target));
 
     let tmppath = sys_get_temp_dir()
         .join("composer_archiver")
-        .join(test_case.manager.get_package_filename(package).unwrap());
+        .join(path_from_bytes(
+            &test_case.manager.get_package_filename(package).unwrap(),
+        ));
     assert!(!file_exists(&tmppath));
 
     unlink(&target);
@@ -239,10 +255,10 @@ fn test_get_package_filename_parts() {
     let test_case = TestCase::set_up();
     let package = test_case.setup_package();
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
-    expected.insert("base".to_string(), "archivertest-archivertest".to_string());
-    expected.insert("version".to_string(), "master".to_string());
-    expected.insert("source_reference".to_string(), "4f26ae".to_string());
+    let mut expected: IndexMap<bstr::BString, bstr::BString> = IndexMap::new();
+    expected.insert("base".into(), "archivertest-archivertest".into());
+    expected.insert("version".into(), "master".into());
+    expected.insert("source_reference".into(), "4f26ae".into());
 
     assert_eq!(
         expected,

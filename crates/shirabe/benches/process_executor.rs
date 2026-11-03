@@ -8,6 +8,7 @@ use shirabe::util::process_executor::ProcessExecutor;
 const MAX_JOBS: i64 = 10;
 
 /// The cheapest child that still goes through the whole spawn path.
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 const COMMAND: &[&str; 1] = &["true"];
 
 /// Concurrency within a case comes from joining futures inside a single task on a current-thread
@@ -20,7 +21,7 @@ fn runtime() -> tokio::runtime::Runtime {
 }
 
 fn executor() -> ProcessExecutor {
-    let mut process_executor = ProcessExecutor::new(None);
+    let process_executor = ProcessExecutor::new(None);
     process_executor.enable_async();
     process_executor.set_max_jobs(MAX_JOBS);
     process_executor
@@ -33,7 +34,7 @@ fn bench_single(c: &mut Criterion) {
     group.bench_function("argv", |b| {
         b.to_async(&runtime).iter_batched(
             executor,
-            |mut process_executor| async move {
+            |process_executor| async move {
                 let process = process_executor.execute_async(COMMAND, None);
                 process.await.expect("the child failed to run")
             },
@@ -44,7 +45,7 @@ fn bench_single(c: &mut Criterion) {
     group.bench_function("shell", |b| {
         b.to_async(&runtime).iter_batched(
             executor,
-            |mut process_executor| async move {
+            |process_executor| async move {
                 let process = process_executor.execute_async("true", None);
                 process.await.expect("the child failed to run")
             },
@@ -64,7 +65,7 @@ fn bench_concurrent(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(jobs), &jobs, |b, &jobs| {
             b.to_async(&runtime).iter_batched(
                 executor,
-                |mut process_executor| async move {
+                |process_executor| async move {
                     let processes: Vec<_> = (0..jobs)
                         .map(|_| process_executor.execute_async(COMMAND, None))
                         .collect();

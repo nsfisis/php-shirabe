@@ -5,8 +5,10 @@ use crate::helper::{QuestionHelper, QuestionHelperInterface};
 use crate::output::{OutputInterface, output_interface};
 use crate::question::QuestionInterface;
 use crate::style::{StyleInterface, SymfonyStyle};
-use bstr::B;
-use shirabe_php_shim::{Exception, PhpMixed, boolval, explode, php_os_family, trim};
+use bstr::{B, BString};
+use shirabe_php_shim::{
+    Exception, PhpMixed, bconcat, boolval, explode, implode, php_os_family, php_to_string, trim,
+};
 use std::ops::{Deref, DerefMut};
 
 /// Symfony Style Guide compliant question helper.
@@ -20,12 +22,12 @@ impl SymfonyQuestionHelper {
         Self::default()
     }
 
-    fn get_eof_shortcut(&self) -> String {
+    fn get_eof_shortcut(&self) -> BString {
         if php_os_family() == "Windows" {
-            return "<comment>Ctrl+Z</comment> then <comment>Enter</comment>".to_string();
+            return "<comment>Ctrl+Z</comment> then <comment>Enter</comment>".into();
         }
 
-        "<comment>Ctrl+D</comment>".to_string()
+        "<comment>Ctrl+D</comment>".into()
     }
 }
 
@@ -47,56 +49,56 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
         let default = question.get_default();
 
         if question.is_multiline() {
-            text += &format!(" (press {} to continue)", self.get_eof_shortcut());
+            text = bconcat!(text, " (press ", self.get_eof_shortcut(), " to continue)");
         }
 
         // switch (true)
         if matches!(default, PhpMixed::Null) {
-            text = format!(" <info>{}</info>:", text);
+            text = bconcat!(" <info>", text, "</info>:");
         } else if question.as_confirmation().is_some() {
-            text = format!(
-                " <info>{} (yes/no)</info> [<comment>{}</comment>]:",
+            text = bconcat!(
+                " <info>",
                 text,
+                " (yes/no)</info> [<comment>",
                 if boolval(&default) { "yes" } else { "no" },
+                "</comment>]:",
             );
         } else if let Some(choice_question) = question.as_choice().filter(|q| q.is_multiselect()) {
             let choices = choice_question.get_choices();
-            let default_parts = explode(",", &default.to_string());
+            let default_parts = explode(",", php_to_string(&default));
 
-            let resolved: Vec<String> = default_parts
+            let resolved: Vec<BString> = default_parts
                 .iter()
-                .map(|value| {
-                    choices
-                        .get(B(&trim(value, None)))
-                        .map(|v| v.to_string())
-                        .unwrap()
-                })
+                .map(|value| php_to_string(choices.get(B(&trim(value))).unwrap()))
                 .collect();
 
-            text = format!(
-                " <info>{}</info> [<comment>{}</comment>]:",
+            text = bconcat!(
+                " <info>",
                 text,
-                OutputFormatter::escape(&resolved.join(", ")).unwrap(),
+                "</info> [<comment>",
+                OutputFormatter::escape(implode(", ", &resolved)).unwrap(),
+                "</comment>]:",
             );
         } else if let Some(choice_question) = question.as_choice() {
             let choices = choice_question.get_choices();
-            text = format!(
-                " <info>{}</info> [<comment>{}</comment>]:",
+            let shown = choices
+                .get(B(&php_to_string(&default)))
+                .cloned()
+                .unwrap_or(default);
+            text = bconcat!(
+                " <info>",
                 text,
-                OutputFormatter::escape(
-                    &choices
-                        .get(B(&default.to_string()))
-                        .cloned()
-                        .unwrap_or(default)
-                        .to_string(),
-                )
-                .unwrap(),
+                "</info> [<comment>",
+                OutputFormatter::escape(php_to_string(&shown)).unwrap(),
+                "</comment>]:",
             );
         } else {
-            text = format!(
-                " <info>{}</info> [<comment>{}</comment>]:",
+            text = bconcat!(
+                " <info>",
                 text,
-                OutputFormatter::escape(&default.to_string()).unwrap(),
+                "</info> [<comment>",
+                OutputFormatter::escape(php_to_string(&default)).unwrap(),
+                "</comment>]:",
             );
         }
 
@@ -104,17 +106,17 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
             .borrow()
             .writeln(&[text], output_interface::OUTPUT_NORMAL);
 
-        let mut prompt = " > ".to_string();
+        let mut prompt = BString::from(" > ");
 
         if let Some(choice_question) = question.as_choice() {
             output.borrow().writeln(
                 &self
                     .inner
-                    .format_choice_question_choices(choice_question, "comment"),
+                    .format_choice_question_choices(choice_question, "comment".into()),
                 output_interface::OUTPUT_NORMAL,
             );
 
-            prompt = choice_question.get_prompt().to_string();
+            prompt = BString::from(choice_question.get_prompt());
         }
 
         output
@@ -131,7 +133,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
             let mut borrowed = output.borrow_mut();
             if let Some(style) = (*borrowed).as_any_mut().downcast_mut::<SymfonyStyle>() {
                 style.new_line(1);
-                style.error(&[error.get_message().to_string()]);
+                style.error(&[error.get_message().into()]);
 
                 return;
             }

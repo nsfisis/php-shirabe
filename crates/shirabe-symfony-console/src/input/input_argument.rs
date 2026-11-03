@@ -2,13 +2,15 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug, Clone)]
 pub struct InputArgument {
-    name: String,
+    name: BString,
     mode: i64,
     default: InputValue,
-    description: String,
+    description: BString,
 }
 
 impl InputArgument {
@@ -17,17 +19,18 @@ impl InputArgument {
     pub const IS_ARRAY: i64 = 4;
 
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         mode: Option<i64>,
-        description: String,
+        description: impl AsRef<[u8]>,
         default: InputValue,
     ) -> anyhow::Result<Self> {
         let mode = match mode {
             None => Self::OPTIONAL,
             Some(m) if !(1..=7).contains(&m) => {
-                return Err(InvalidArgumentException::new(format!(
-                    "Argument mode \"{}\" is not valid.",
-                    m
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Argument mode \"",
+                    m,
+                    "\" is not valid."
                 ))
                 .into());
             }
@@ -35,9 +38,9 @@ impl InputArgument {
         };
 
         let mut argument = InputArgument {
-            name,
+            name: name.into(),
             mode,
-            description,
+            description: BString::from(description.as_ref()),
             default: InputValue::Null,
         };
 
@@ -46,8 +49,8 @@ impl InputArgument {
         Ok(argument)
     }
 
-    pub fn get_name(&self) -> &str {
-        &self.name
+    pub fn get_name(&self) -> &BStr {
+        self.name.as_bstr()
     }
 
     pub fn is_required(&self) -> bool {
@@ -61,7 +64,7 @@ impl InputArgument {
     pub fn set_default(&mut self, default: InputValue) -> anyhow::Result<()> {
         if self.is_required() && !default.is_null() {
             return Err(LogicException::new(
-                "Cannot set a default value except for InputArgument::OPTIONAL mode.".to_string(),
+                "Cannot set a default value except for InputArgument::OPTIONAL mode.",
             )
             .into());
         }
@@ -72,7 +75,7 @@ impl InputArgument {
                 InputValue::Array(_) => default,
                 _ => {
                     return Err(LogicException::new(
-                        "A default value for an array argument must be an array.".to_string(),
+                        "A default value for an array argument must be an array.",
                     )
                     .into());
                 }
@@ -89,7 +92,7 @@ impl InputArgument {
         &self.default
     }
 
-    pub fn get_description(&self) -> &str {
-        &self.description
+    pub fn get_description(&self) -> &BStr {
+        self.description.as_bstr()
     }
 }

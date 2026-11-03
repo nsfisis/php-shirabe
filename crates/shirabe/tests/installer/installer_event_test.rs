@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Installer/InstallerEventTest.php
 
+use bstr::BString;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::dependency_resolver::{AnyTransaction, Transaction};
 use shirabe::event_dispatcher::EventInterface;
@@ -18,7 +19,7 @@ fn test_getter() {
         vec![],
     )));
     let event = InstallerEvent::new(
-        "EVENT_NAME".to_string(),
+        BString::from("EVENT_NAME"),
         composer.downgrade(),
         io,
         true,

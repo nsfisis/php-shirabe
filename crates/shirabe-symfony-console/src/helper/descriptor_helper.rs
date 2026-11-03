@@ -7,15 +7,15 @@ use crate::descriptor::{
 use crate::exception::InvalidArgumentException;
 use crate::helper::{Helper, HelperInterface, HelperSet};
 use crate::output::OutputInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 /// This class adds helper method to describe objects in various formats.
 #[derive(Default)]
 pub struct DescriptorHelper {
     inner: Helper,
-    descriptors: IndexMap<String, Box<dyn DescriptorInterface>>,
+    descriptors: IndexMap<BString, Box<dyn DescriptorInterface>>,
 }
 
 // `DescriptorInterface` does not require `Debug`, so the derive cannot see
@@ -35,10 +35,10 @@ impl DescriptorHelper {
             inner: Helper::default(),
             descriptors: IndexMap::new(),
         };
-        this.register("txt", Box::new(TextDescriptor::default()))
-            .register("xml", Box::new(XmlDescriptor::default()))
-            .register("json", Box::new(JsonDescriptor::default()))
-            .register("md", Box::new(MarkdownDescriptor::default()));
+        this.register("txt".into(), Box::new(TextDescriptor::default()))
+            .register("xml".into(), Box::new(XmlDescriptor::default()))
+            .register("json".into(), Box::new(JsonDescriptor::default()))
+            .register("md".into(), Box::new(MarkdownDescriptor::default()));
         this
     }
 
@@ -55,21 +55,22 @@ impl DescriptorHelper {
     ) -> anyhow::Result<()> {
         let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
         merged.insert("raw_text".into(), PhpMixed::Bool(false));
-        merged.insert("format".into(), PhpMixed::string("txt".to_string()));
+        merged.insert("format".into(), PhpMixed::string("txt"));
         for (key, value) in options {
             merged.insert(key, value);
         }
         let options = merged;
 
         let format = match &options[B("format")] {
-            PhpMixed::String(format) => format.to_str_lossy().into_owned(),
-            _ => String::new(),
+            PhpMixed::String(format) => format.clone(),
+            _ => BString::default(),
         };
 
         if !self.descriptors.contains_key(&format) {
-            return Err(InvalidArgumentException::new(format!(
-                "Unsupported format \"{}\".",
-                format.clone()
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Unsupported format \"",
+                format,
+                "\"."
             ))
             .into());
         }
@@ -81,15 +82,15 @@ impl DescriptorHelper {
     /// Registers a descriptor.
     pub fn register(
         &mut self,
-        format: &str,
+        format: &BStr,
         descriptor: Box<dyn DescriptorInterface>,
     ) -> &mut Self {
-        self.descriptors.insert(format.to_string(), descriptor);
+        self.descriptors.insert(format.to_owned(), descriptor);
 
         self
     }
 
-    pub fn get_formats(&self) -> Vec<String> {
+    pub fn get_formats(&self) -> Vec<BString> {
         self.descriptors.keys().cloned().collect()
     }
 }
@@ -103,7 +104,7 @@ impl HelperInterface for DescriptorHelper {
         self.inner.get_helper_set()
     }
 
-    fn get_name(&self) -> String {
-        "descriptor".to_string()
+    fn get_name(&self) -> BString {
+        "descriptor".into()
     }
 }

@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/CompositeRepositoryTest.php
 
 use crate::test_case::get_package;
+use bstr::BString;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::{
     ArrayRepository, CompositeRepository, FindPackageConstraint, RepositoryInterface,
@@ -33,23 +34,32 @@ fn test_find_package() {
     ]);
 
     let foo = repo
-        .find_package("foo", FindPackageConstraint::String("1".to_string()))
+        .find_package(
+            bstr::BStr::new("foo"),
+            FindPackageConstraint::String(BString::from("1")),
+        )
         .unwrap()
         .unwrap();
     assert_eq!(foo.get_name(), "foo");
     assert_eq!(foo.get_pretty_version(), "1");
 
     let bar = repo
-        .find_package("bar", FindPackageConstraint::String("1".to_string()))
+        .find_package(
+            bstr::BStr::new("bar"),
+            FindPackageConstraint::String(BString::from("1")),
+        )
         .unwrap()
         .unwrap();
     assert_eq!(bar.get_name(), "bar");
     assert_eq!(bar.get_pretty_version(), "1");
 
     assert!(
-        repo.find_package("foo", FindPackageConstraint::String("2".to_string()))
-            .unwrap()
-            .is_none()
+        repo.find_package(
+            bstr::BStr::new("foo"),
+            FindPackageConstraint::String(BString::from("2"))
+        )
+        .unwrap()
+        .is_none()
     );
 }
 
@@ -68,15 +78,15 @@ fn test_find_packages() {
         ]),
     ]);
 
-    let bats = repo.find_packages("bat", None).unwrap();
+    let bats = repo.find_packages(bstr::BStr::new("bat"), None).unwrap();
     assert_eq!(1, bats.len());
     assert_eq!(bats[0].get_name(), "bat");
 
-    let bars = repo.find_packages("bar", None).unwrap();
+    let bars = repo.find_packages(bstr::BStr::new("bar"), None).unwrap();
     assert_eq!(2, bars.len());
     assert_eq!(bars[0].get_name(), "bar");
 
-    let foos = repo.find_packages("foo", None).unwrap();
+    let foos = repo.find_packages(bstr::BStr::new("foo"), None).unwrap();
     assert_eq!(3, foos.len());
     assert_eq!(foos[0].get_name(), "foo");
 }
@@ -123,9 +133,13 @@ fn test_count() {
 fn test_no_repositories() {
     let mut repo = CompositeRepository::new(vec![]);
 
-    assert!(repo.find_packages("foo", None).unwrap().is_empty());
     assert!(
-        repo.search("foo".to_string(), SEARCH_FULLTEXT, None)
+        repo.find_packages(bstr::BStr::new("foo"), None)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        repo.search(BString::from("foo"), SEARCH_FULLTEXT, None)
             .unwrap()
             .is_empty()
     );

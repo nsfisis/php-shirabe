@@ -15,10 +15,10 @@ pub struct NativeHttpResponse {
 
 impl NativeHttpResponse {
     pub fn new(
-        url: String,
+        url: BString,
         code: Option<i64>,
-        headers: Vec<String>,
-        body: Option<String>,
+        headers: Vec<BString>,
+        body: Option<Vec<u8>>,
         transfer_info: IndexMap<BString, PhpMixed>,
     ) -> Self {
         let inner = Response::new(url, code, headers, body);

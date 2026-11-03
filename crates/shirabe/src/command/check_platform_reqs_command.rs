@@ -3,43 +3,54 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::Link;
 use crate::repository::{
     InstalledRepository, PlatformRepository, RepositoryInterface, RootPackageRepository,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, array_merge_map, impl_php_class, strip_tags};
+use shirabe_php_shim::{
+    PhpMixed, array_merge_map, bconcat, impl_php_class, json_bytes, rtrim, strip_tags,
+};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 struct CheckResult {
-    platform_package: String,
-    version: String,
+    platform_package: BString,
+    version: BString,
     link: Option<Link>,
-    status: String,
-    provider: String,
+    status: BString,
+    provider: BString,
 }
 
 /// Shape of one entry of the `check-platform-reqs --format=json` output.
 #[derive(Debug, serde::Serialize)]
 struct PlatformRequirementJson {
-    name: String,
-    version: String,
-    status: String,
+    #[serde(serialize_with = "json_bytes::str")]
+    name: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    version: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    status: BString,
     failed_requirement: Option<FailedRequirementJson>,
-    provider: Option<String>,
+    #[serde(serialize_with = "json_bytes::option_str")]
+    provider: Option<BString>,
 }
 
 #[derive(Debug, serde::Serialize)]
 struct FailedRequirementJson {
-    source: String,
-    r#type: String,
-    target: String,
-    constraint: String,
+    #[serde(serialize_with = "json_bytes::str")]
+    source: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    r#type: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    target: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    constraint: BString,
 }
 
 #[derive(Debug)]
@@ -73,7 +84,7 @@ impl CheckPlatformReqsCommand {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         results: &[CheckResult],
-        format: &str,
+        format: &BStr,
     ) -> anyhow::Result<()> {
         let io = self.get_io();
 
@@ -85,10 +96,10 @@ impl CheckPlatformReqsCommand {
                     version: result.version.clone(),
                     status: strip_tags(&result.status),
                     failed_requirement: result.link.as_ref().map(|link| FailedRequirementJson {
-                        source: link.get_source().to_string(),
-                        r#type: link.get_description().to_string(),
-                        target: link.get_target().to_string(),
-                        constraint: link.get_pretty_constraint().to_string(),
+                        source: BString::from(link.get_source()),
+                        r#type: BString::from(link.get_description()),
+                        target: BString::from(link.get_target()),
+                        constraint: BString::from(link.get_pretty_constraint()),
                     }),
                     provider: if result.provider.is_empty() {
                         None
@@ -107,30 +118,29 @@ impl CheckPlatformReqsCommand {
                         PhpMixed::string(result.platform_package.clone()),
                         PhpMixed::string(result.version.clone()),
                         match &result.link {
-                            Some(link) => PhpMixed::string(link.to_string()),
-                            None => PhpMixed::string(String::new()),
+                            Some(link) => PhpMixed::string(link.to_php_string()),
+                            None => PhpMixed::string(BString::default()),
                         },
                         if let Some(link) = &result.link {
-                            PhpMixed::string(format!(
-                                "{} {} {} ({})",
+                            PhpMixed::string(bconcat!(
                                 link.get_source(),
+                                " ",
                                 link.get_description(),
+                                " ",
                                 link.get_target(),
+                                " (",
                                 link.get_pretty_constraint(),
+                                ")"
                             ))
                         } else {
-                            PhpMixed::string(String::new())
+                            PhpMixed::string(BString::default())
                         },
-                        PhpMixed::string(
-                            format!("{} {}", result.status, result.provider)
-                                .trim_end()
-                                .to_string(),
-                        ),
+                        PhpMixed::string(rtrim(bconcat!(result.status, " ", result.provider))),
                     ])
                 })
                 .collect();
 
-            self.render_table(rows, output);
+            self.render_table(rows, output)?;
         }
 
         Ok(())
@@ -140,8 +150,8 @@ impl CheckPlatformReqsCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for CheckPlatformReqsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("check-platform-reqs")?;
-        self.set_description("Check that platform requirements are satisfied");
+        self.set_name("check-platform-reqs".into())?;
+        self.set_description("Check that platform requirements are satisfied".into());
         self.set_definition(&[
             InputOption::new(
                 "no-dev",
@@ -163,11 +173,11 @@ impl Command for CheckPlatformReqsCommand {
             .into(),
             InputOption::new6(
                 "format",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
-                Some(InputValue::String("text".to_string())),
-                SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
+                Some(InputValue::from("text")),
+                SuggestedValues::List(vec![BString::from("json"), BString::from("text")]),
             )
             .unwrap()
             .into(),
@@ -175,7 +185,7 @@ impl Command for CheckPlatformReqsCommand {
         self.set_help(
             "Checks that your PHP and extensions versions match the platform requirements of the installed packages.\n\n\
             Unlike update/install, this command will ignore config.platform settings and check the real platform packages so you can be certain you have the required platform dependencies.\n\n\
-            <info>shirabe check-platform-reqs</info>\n\n"
+            <info>shirabe check-platform-reqs</info>\n\n".into()
         );
         Ok(())
     }
@@ -195,8 +205,8 @@ impl Command for CheckPlatformReqsCommand {
             .as_bool()
             .unwrap_or(false);
 
-        let mut requires: IndexMap<String, Vec<Link>> = IndexMap::new();
-        let mut remove_packages: Vec<String> = vec![];
+        let mut requires: IndexMap<BString, Vec<Link>> = IndexMap::new();
+        let mut remove_packages: Vec<BString> = vec![];
 
         let installed_repo_base: crate::repository::RepositoryInterfaceHandle = if input
             .borrow()
@@ -204,9 +214,10 @@ impl Command for CheckPlatformReqsCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            io.write_error(&format!(
-                "<info>Checking {}platform requirements using the lock file</info>",
-                if no_dev { "non-dev " } else { "" }
+            io.write_error(bconcat!(
+                "<info>Checking ",
+                if no_dev { "non-dev " } else { "" },
+                "platform requirements using the lock file</info>"
             ));
             composer
                 .get_locker()
@@ -218,9 +229,10 @@ impl Command for CheckPlatformReqsCommand {
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
             if local_repo.get_packages()?.is_empty() {
-                io.write_error(&format!(
-                    "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
-                    if no_dev { "non-dev " } else { "" }
+                io.write_error(bconcat!(
+                    "<warning>No vendor dir present, checking ",
+                    if no_dev { "non-dev " } else { "" },
+                    "platform requirements from the lock file</warning>"
                 ));
                 composer
                     .get_locker()
@@ -231,9 +243,10 @@ impl Command for CheckPlatformReqsCommand {
                 if no_dev {
                     remove_packages = local_repo.get_dev_package_names();
                 }
-                io.write_error(&format!(
-                    "<info>Checking {}platform requirements for packages in the vendor dir</info>",
-                    if no_dev { "non-dev " } else { "" }
+                io.write_error(bconcat!(
+                    "<info>Checking ",
+                    if no_dev { "non-dev " } else { "" },
+                    "platform requirements for packages in the vendor dir</info>"
                 ));
                 local_repo
             }
@@ -242,7 +255,7 @@ impl Command for CheckPlatformReqsCommand {
         if !no_dev {
             for (require, link) in composer.get_package().get_dev_requires().iter() {
                 requires
-                    .entry(require.to_string())
+                    .entry(require.clone())
                     .or_default()
                     .push(link.clone());
             }
@@ -257,18 +270,18 @@ impl Command for CheckPlatformReqsCommand {
         ]);
 
         for package in installed_repo.get_packages()? {
-            if remove_packages.contains(&package.get_name().to_string()) {
+            if remove_packages.contains(&package.get_name()) {
                 continue;
             }
             for (require, link) in package.get_requires().iter() {
                 requires
-                    .entry(require.to_string())
+                    .entry(require.clone())
                     .or_default()
                     .push(link.clone());
             }
         }
 
-        let mut requires_sorted: Vec<(String, Vec<Link>)> = requires.into_iter().collect();
+        let mut requires_sorted: Vec<(BString, Vec<Link>)> = requires.into_iter().collect();
         requires_sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
         installed_repo.add_repository(crate::repository::RepositoryInterfaceHandle::new(
@@ -282,16 +295,16 @@ impl Command for CheckPlatformReqsCommand {
         'requirements: for (require, links) in &requires_sorted {
             if PlatformRepository::is_platform_package(require) {
                 let candidates = installed_repo_with_platform
-                    .find_packages_with_replacers_and_providers(require, None)?;
+                    .find_packages_with_replacers_and_providers(bstr::BStr::new(require), None)?;
                 if !candidates.is_empty() {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {
                         let candidate_constraint: Option<AnyConstraint> =
                             if candidate.get_name() == *require {
                                 let c = SimpleConstraint::new(
-                                    "=".to_string(),
-                                    candidate.get_version().to_string(),
-                                    Some(candidate.get_pretty_version().to_string()),
+                                    "=",
+                                    candidate.get_version(),
+                                    Some(candidate.get_pretty_version()),
                                 );
                                 Some(c.into())
                             } else {
@@ -318,19 +331,20 @@ impl Command for CheckPlatformReqsCommand {
                             if !link.get_constraint().matches(&candidate_constraint) {
                                 req_results.push(CheckResult {
                                     platform_package: if candidate.get_name() == *require {
-                                        candidate.get_pretty_name().to_string()
+                                        candidate.get_pretty_name()
                                     } else {
                                         require.clone()
                                     },
-                                    version: candidate_constraint.get_pretty_string().to_string(),
+                                    version: candidate_constraint.get_pretty_string(),
                                     link: Some(link.clone()),
-                                    status: "<error>failed</error>".to_string(),
+                                    status: BString::from("<error>failed</error>"),
                                     provider: if candidate.get_name() == *require {
-                                        String::new()
+                                        BString::default()
                                     } else {
-                                        format!(
-                                            "<comment>provided by {}</comment>",
-                                            candidate.get_pretty_name()
+                                        bconcat!(
+                                            "<comment>provided by ",
+                                            candidate.get_pretty_name(),
+                                            "</comment>"
                                         )
                                     },
                                 });
@@ -340,19 +354,20 @@ impl Command for CheckPlatformReqsCommand {
 
                         results.push(CheckResult {
                             platform_package: if candidate.get_name() == *require {
-                                candidate.get_pretty_name().to_string()
+                                candidate.get_pretty_name()
                             } else {
                                 require.clone()
                             },
-                            version: candidate_constraint.get_pretty_string().to_string(),
+                            version: candidate_constraint.get_pretty_string(),
                             link: None,
-                            status: "<info>success</info>".to_string(),
+                            status: BString::from("<info>success</info>"),
                             provider: if candidate.get_name() == *require {
-                                String::new()
+                                BString::default()
                             } else {
-                                format!(
-                                    "<comment>provided by {}</comment>",
-                                    candidate.get_pretty_name()
+                                bconcat!(
+                                    "<comment>provided by ",
+                                    candidate.get_pretty_name(),
+                                    "</comment>"
                                 )
                             },
                         });
@@ -366,22 +381,23 @@ impl Command for CheckPlatformReqsCommand {
 
                 results.push(CheckResult {
                     platform_package: require.clone(),
-                    version: "n/a".to_string(),
+                    version: BString::from("n/a"),
                     link: links.first().cloned(),
-                    status: "<error>missing</error>".to_string(),
-                    provider: String::new(),
+                    status: BString::from("<error>missing</error>"),
+                    provider: BString::default(),
                 });
                 exit_code = exit_code.max(2);
             }
         }
 
-        let format = input
-            .borrow()
-            .get_option("format")?
-            .as_string()
-            .unwrap_or("text")
-            .to_string();
-        self.print_table(_output, &results, &format)?;
+        let format = BString::from(
+            input
+                .borrow()
+                .get_option("format")?
+                .as_string()
+                .unwrap_or(BStr::new("text")),
+        );
+        self.print_table(_output, &results, BStr::new(&format))?;
 
         Ok(exit_code)
     }

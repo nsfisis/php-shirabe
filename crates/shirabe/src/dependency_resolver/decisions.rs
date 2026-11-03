@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/Decisions.php
 
 use crate::dependency_resolver::{Pool, Rule, SolverBugException};
+use bstr::{BString, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::LogicException;
+use shirabe_php_shim::{LogicException, bconcat};
 use std::fmt;
 
 pub struct Decisions {
@@ -100,11 +101,12 @@ impl Decisions {
 
         panic!(
             "{}",
-            LogicException::new(format!(
-                "Did not find a decision rule using {}",
+            LogicException::new(bconcat!(
+                "Did not find a decision rule using ",
                 literal_or_package_id
             ))
             .get_message()
+            .display_lossy()
         );
     }
 
@@ -161,12 +163,20 @@ impl Decisions {
             let package = pool.literal_to_package(literal);
             panic!(
                 "{}",
-                SolverBugException::new(format!(
-                    "Trying to decide {} on level {}, even though {} was previously decided as {}.",
-                    literal_string, level, package, previous_decision
+                SolverBugException::new(bconcat!(
+                    "Trying to decide ",
+                    literal_string,
+                    " on level ",
+                    level,
+                    ", even though ",
+                    package.to_php_string(),
+                    " was previously decided as ",
+                    previous_decision,
+                    "."
                 ))
                 .0
                 .get_message()
+                .display_lossy()
             );
         }
 
@@ -177,19 +187,19 @@ impl Decisions {
         }
     }
 
-    pub fn to_string_with_pool(&self, pool: Option<&Pool>) -> String {
+    pub fn to_string_with_pool(&self, pool: Option<&Pool>) -> BString {
         let mut decision_map = self.decision_map.clone();
         decision_map.sort_keys();
-        let mut str = "[".to_string();
+        let mut str = BString::from("[");
         for (package_id, level) in &decision_map {
             let key = if let Some(pool) = pool {
-                pool.literal_to_package(*package_id).to_string()
+                pool.literal_to_package(*package_id).to_php_string()
             } else {
-                package_id.to_string()
+                bconcat!(package_id)
             };
-            str.push_str(&format!("{}:{},", key, level));
+            str.push_str(bconcat!(key, ":", *level, ","));
         }
-        str.push(']');
+        str.push(b']');
 
         str
     }
@@ -202,6 +212,6 @@ impl Decisions {
 
 impl fmt::Display for Decisions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string_with_pool(None))
+        write!(f, "{}", self.to_string_with_pool(None).display_lossy())
     }
 }

@@ -1,14 +1,14 @@
 //! ref: composer/tests/Composer/Test/Repository/FilterRepositoryTest.php
 
 use crate::test_case::get_package;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::base_package::STABILITIES;
 use shirabe::repository::{
     AdvisoryProviderInterface, ArrayRepository, FilterRepository, RepositoryInterface,
     RepositoryInterfaceHandle,
 };
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 fn set_up() -> RepositoryInterfaceHandle {
@@ -22,16 +22,12 @@ fn set_up() -> RepositoryInterfaceHandle {
     RepositoryInterfaceHandle::new(repo)
 }
 
-fn config(only: Option<&[&str]>, exclude: Option<&[&str]>) -> IndexMap<BString, PhpMixed> {
+fn config(only: Option<&[&BStr]>, exclude: Option<&[&BStr]>) -> IndexMap<BString, PhpMixed> {
     let mut c: IndexMap<BString, PhpMixed> = IndexMap::new();
     if let Some(only) = only {
         c.insert(
             "only".into(),
-            PhpMixed::List(
-                only.iter()
-                    .map(|s| PhpMixed::string(s.to_string()))
-                    .collect(),
-            ),
+            PhpMixed::List(only.iter().map(|s| PhpMixed::string(bconcat!(s))).collect()),
         );
     }
     if let Some(exclude) = exclude {
@@ -40,7 +36,7 @@ fn config(only: Option<&[&str]>, exclude: Option<&[&str]>) -> IndexMap<BString, 
             PhpMixed::List(
                 exclude
                     .iter()
-                    .map(|s| PhpMixed::string(s.to_string()))
+                    .map(|s| PhpMixed::string(bconcat!(s)))
                     .collect(),
             ),
         );
@@ -52,26 +48,43 @@ fn match_all() -> AnyConstraint {
     MatchAllConstraint::new(None).into()
 }
 
-fn stabilities() -> IndexMap<String, i64> {
+fn stabilities() -> IndexMap<bstr::BString, i64> {
     STABILITIES
         .iter()
-        .map(|(k, v)| (k.to_string(), *v))
+        .map(|(k, v)| (bstr::BString::from(*k), *v))
         .collect()
 }
 
 #[test]
 fn test_repo_matching() {
-    let all = vec!["foo/aaa", "foo/bbb", "bar/xxx", "baz/yyy"];
-    let cases: Vec<(Vec<&str>, IndexMap<BString, PhpMixed>)> = vec![
-        (vec!["foo/aaa", "foo/bbb"], config(Some(&["foo/*"]), None)),
+    let all = vec![
+        BStr::new("foo/aaa"),
+        BStr::new("foo/bbb"),
+        BStr::new("bar/xxx"),
+        BStr::new("baz/yyy"),
+    ];
+    let cases: Vec<(Vec<&BStr>, IndexMap<BString, PhpMixed>)> = vec![
         (
-            vec!["foo/aaa", "baz/yyy"],
-            config(Some(&["foo/aaa", "baz/yyy"]), None),
+            vec![BStr::new("foo/aaa"), BStr::new("foo/bbb")],
+            config(Some(&[BStr::new("foo/*")]), None),
         ),
-        (vec!["bar/xxx"], config(None, Some(&["foo/*", "baz/yyy"]))),
+        (
+            vec![BStr::new("foo/aaa"), BStr::new("baz/yyy")],
+            config(Some(&[BStr::new("foo/aaa"), BStr::new("baz/yyy")]), None),
+        ),
+        (
+            vec![BStr::new("bar/xxx")],
+            config(None, Some(&[BStr::new("foo/*"), BStr::new("baz/yyy")])),
+        ),
         // make sure sub-patterns are not matched without wildcard
-        (all.clone(), config(None, Some(&["foo/aa", "az/yyy"]))),
-        (vec![], config(Some(&["foo/aa", "az/yyy"]), None)),
+        (
+            all.clone(),
+            config(None, Some(&[BStr::new("foo/aa"), BStr::new("az/yyy")])),
+        ),
+        (
+            vec![],
+            config(Some(&[BStr::new("foo/aa"), BStr::new("az/yyy")]), None),
+        ),
         // empty "only" means no packages allowed
         (vec![], config(Some(&[]), None)),
         // absent "only" means all packages allowed
@@ -84,9 +97,12 @@ fn test_repo_matching() {
     for (expected, cfg) in cases {
         let mut repo = FilterRepository::new(set_up(), cfg).unwrap();
         let packages = repo.get_packages().unwrap();
-        let names: Vec<String> = packages.iter().map(|p| p.get_name()).collect();
+        let names: Vec<bstr::BString> = packages
+            .iter()
+            .map(|p| bstr::BString::from(&p.get_name()[..]))
+            .collect();
 
-        let expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
+        let expected: Vec<BString> = expected.iter().map(|s| bconcat!(s)).collect();
         assert_eq!(expected, names);
     }
 }
@@ -98,13 +114,16 @@ fn test_both_filters_disallowed() {
 
 #[test]
 fn test_security_advisories_disabled_in_child() {
-    let mut repo = FilterRepository::new(set_up(), config(Some(&["foo/*"]), None)).unwrap();
+    let mut repo =
+        FilterRepository::new(set_up(), config(Some(&[BStr::new("foo/*")]), None)).unwrap();
 
     assert!(!repo.has_security_advisories().unwrap());
 
-    let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
-    map.insert("foo/aaa".to_string(), match_all());
-    let result = repo.get_security_advisories(map, true).unwrap();
+    let mut map: IndexMap<BString, AnyConstraint> = IndexMap::new();
+    map.insert(BString::from("foo/aaa"), match_all());
+    let result = repo
+        .get_security_advisories(map.into_iter().collect::<indexmap::IndexMap<_, _>>(), true)
+        .unwrap();
 
     assert!(result.names_found.is_empty());
     assert!(result.advisories.is_empty());
@@ -114,8 +133,8 @@ fn test_security_advisories_disabled_in_child() {
 fn test_canonical_default_true() {
     let mut repo = FilterRepository::new(set_up(), config(None, None)).unwrap();
 
-    let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-    map.insert("foo/aaa".to_string(), Some(match_all()));
+    let mut map: IndexMap<BString, Option<AnyConstraint>> = IndexMap::new();
+    map.insert(BString::from("foo/aaa"), Some(match_all()));
     let result = repo
         .load_packages(map, stabilities(), IndexMap::new(), IndexMap::new())
         .unwrap();
@@ -130,8 +149,8 @@ fn test_non_canonical() {
     cfg.insert("canonical".into(), PhpMixed::Bool(false));
     let mut repo = FilterRepository::new(set_up(), cfg).unwrap();
 
-    let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-    map.insert("foo/aaa".to_string(), Some(match_all()));
+    let mut map: IndexMap<BString, Option<AnyConstraint>> = IndexMap::new();
+    map.insert(BString::from("foo/aaa"), Some(match_all()));
     let result = repo
         .load_packages(map, stabilities(), IndexMap::new(), IndexMap::new())
         .unwrap();

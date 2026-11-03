@@ -4,8 +4,9 @@ use crate::exception::{InvalidArgumentException, InvalidOptionException};
 use crate::input::{
     ArgumentName, Input, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
 };
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpResource, implode, substr};
+use shirabe_php_shim::{PhpResource, bconcat, implode};
 
 /// ArrayInput represents an input provided as an array.
 ///
@@ -60,7 +61,7 @@ impl ArrayInput {
             // $param && \is_string($param) && '-' === $param[0]
             if let ParameterName::Name(param) = param
                 && !param.is_empty()
-                && param.as_bytes()[0] == b'-'
+                && param[0] == b'-'
             {
                 continue;
             }
@@ -71,19 +72,19 @@ impl ArrayInput {
         None
     }
 
-    pub fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
+    pub fn has_parameter_option(&self, values: &[impl AsRef<[u8]>], only_params: bool) -> bool {
         for (k, v) in &self.parameters {
             // if (!\is_int($k)) { $v = $k; }
             let v = match k {
                 ParameterName::Index(_) => v.as_string(),
-                ParameterName::Name(k) => Some(k.as_str()),
+                ParameterName::Name(k) => Some(k.as_bstr()),
             };
 
-            if only_params && v == Some("--") {
+            if only_params && v.is_some_and(|v| v == "--") {
                 return false;
             }
 
-            if v.is_some_and(|v| values.contains(&v)) {
+            if v.is_some_and(|v| values.iter().any(|value| v.as_bytes() == value.as_ref())) {
                 return true;
             }
         }
@@ -93,7 +94,7 @@ impl ArrayInput {
 
     pub fn get_parameter_option(
         &self,
-        values: &[&str],
+        values: &[impl AsRef<[u8]>],
         default: InputValue,
         only_params: bool,
     ) -> InputValue {
@@ -101,8 +102,8 @@ impl ArrayInput {
             // $onlyParams && ('--' === $k || (\is_int($k) && '--' === $v))
             if only_params {
                 let k_is_double_dash = matches!(k, ParameterName::Name(k) if k == "--");
-                let int_v_double_dash =
-                    matches!(k, ParameterName::Index(_)) && v.as_string() == Some("--");
+                let int_v_double_dash = matches!(k, ParameterName::Index(_))
+                    && v.as_string().is_some_and(|v| v == "--");
                 if k_is_double_dash || int_v_double_dash {
                     return default;
                 }
@@ -110,12 +111,14 @@ impl ArrayInput {
 
             match k {
                 ParameterName::Index(_) => {
-                    if v.as_string().is_some_and(|v| values.contains(&v)) {
+                    if v.as_string()
+                        .is_some_and(|v| values.iter().any(|value| v.as_bytes() == value.as_ref()))
+                    {
                         return InputValue::Bool(true);
                     }
                 }
                 ParameterName::Name(k) => {
-                    if values.contains(&k.as_str()) {
+                    if values.iter().any(|value| k.as_slice() == value.as_ref()) {
                         return v.clone();
                     }
                 }
@@ -129,16 +132,16 @@ impl ArrayInput {
         let parameters = self.parameters.clone();
         for (key, value) in parameters {
             // PHP compares the key as a string even when it is an int.
-            let key_string = key.to_string();
+            let key_string = key.to_key();
             if key_string == "--" {
                 return Ok(());
             }
-            if key_string.starts_with("--") {
-                self.add_long_option(&substr(&key_string, 2, None), value)?;
-            } else if key_string.starts_with("-") {
-                self.add_short_option(&substr(&key_string, 1, None), value)?;
+            if let Some(name) = key_string.strip_prefix(b"--") {
+                self.add_long_option(name.as_bstr(), value)?;
+            } else if let Some(shortcut) = key_string.strip_prefix(b"-") {
+                self.add_short_option(shortcut.as_bstr(), value)?;
             } else {
-                self.add_argument(&key.to_argument_name(), value)?;
+                self.add_argument(&key, value)?;
             }
         }
 
@@ -146,11 +149,12 @@ impl ArrayInput {
     }
 
     /// Adds a short option value.
-    fn add_short_option(&mut self, shortcut: &str, value: InputValue) -> anyhow::Result<()> {
+    fn add_short_option(&mut self, shortcut: &BStr, value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
-            return Err(InvalidOptionException::new(format!(
-                "The \"-{}\" option does not exist.",
-                shortcut
+            return Err(InvalidOptionException::new(bconcat!(
+                "The \"-",
+                shortcut,
+                "\" option does not exist."
             ))
             .into());
         }
@@ -165,12 +169,13 @@ impl ArrayInput {
     }
 
     /// Adds a long option value.
-    fn add_long_option(&mut self, name: &str, mut value: InputValue) -> anyhow::Result<()> {
+    fn add_long_option(&mut self, name: &BStr, mut value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
-                return Err(InvalidOptionException::new(format!(
-                    "The \"--{}\" option does not exist.",
-                    name
+                return Err(InvalidOptionException::new(bconcat!(
+                    "The \"--",
+                    name,
+                    "\" option does not exist."
                 ))
                 .into());
             }
@@ -187,9 +192,10 @@ impl ArrayInput {
 
         if value.is_null() {
             if option.is_value_required() {
-                return Err(InvalidOptionException::new(format!(
-                    "The \"--{}\" option requires a value.",
-                    name
+                return Err(InvalidOptionException::new(bconcat!(
+                    "The \"--",
+                    name,
+                    "\" option requires a value."
                 ))
                 .into());
             }
@@ -199,76 +205,76 @@ impl ArrayInput {
             }
         }
 
-        self.inner.options.insert(name.to_string(), value);
+        self.inner.options.insert(name.to_owned(), value);
 
         Ok(())
     }
 
     /// Adds an argument value.
-    fn add_argument(&mut self, name: &ArgumentName, value: InputValue) -> anyhow::Result<()> {
-        if !self.inner.definition.has_argument(name) {
-            return Err(InvalidArgumentException::new(format!(
-                "The \"{}\" argument does not exist.",
-                name
+    fn add_argument(&mut self, name: &ParameterName, value: InputValue) -> anyhow::Result<()> {
+        let key = name.to_key();
+        if !self.inner.definition.has_argument(&name.to_argument_name()) {
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The \"",
+                key,
+                "\" argument does not exist."
             ))
             .into());
         }
 
-        self.inner.arguments.insert(name.to_string(), value);
+        self.inner.arguments.insert(key, value);
 
         Ok(())
     }
-}
 
-/// Returns a stringified representation of the args passed to the command.
-impl std::fmt::Display for ArrayInput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut params: Vec<String> = vec![];
+    /// Returns a stringified representation of the args passed to the command.
+    pub fn __to_string(&self) -> BString {
+        let mut params: Vec<BString> = vec![];
         for (param, val) in &self.parameters {
             // $param && \is_string($param) && '-' === $param[0]
             if let ParameterName::Name(param) = param
                 && !param.is_empty()
-                && param.as_bytes()[0] == b'-'
+                && param[0] == b'-'
             {
-                let glue = if param.as_bytes().get(1) == Some(&b'-') {
+                let glue = if param.get(1) == Some(&b'-') {
                     "="
                 } else {
                     " "
                 };
                 if let InputValue::Array(list) = val {
                     for v in list {
-                        params.push(format!(
-                            "{}{}",
+                        params.push(bconcat!(
                             param,
                             if !v.is_empty() {
-                                format!("{}{}", glue, self.inner.escape_token(v))
+                                bconcat!(glue, self.inner.escape_token(v.as_ref()))
                             } else {
-                                String::new()
+                                BString::default()
                             }
                         ));
                     }
                 } else {
                     let val = val.to_php_string();
-                    params.push(format!(
-                        "{}{}",
+                    params.push(bconcat!(
                         param,
                         if !val.is_empty() {
-                            format!("{}{}", glue, self.inner.escape_token(&val))
+                            bconcat!(glue, self.inner.escape_token(val.as_ref()))
                         } else {
-                            String::new()
+                            BString::default()
                         }
                     ));
                 }
             } else if let InputValue::Array(list) = val {
-                let escaped: Vec<String> =
-                    list.iter().map(|v| self.inner.escape_token(v)).collect();
+                let escaped: Vec<BString> = list
+                    .iter()
+                    .map(|v| self.inner.escape_token(v.as_ref()))
+                    .collect();
                 params.push(implode(" ", &escaped));
             } else {
-                params.push(self.inner.escape_token(&val.to_php_string()));
+                params.push(self.inner.escape_token(val.to_php_string().as_ref()));
             }
         }
 
-        write!(f, "{}", implode(" ", &params))
+        implode(" ", &params)
     }
 }
 
@@ -277,17 +283,17 @@ impl InputInterface for ArrayInput {
         std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
     }
 
-    fn get_first_argument(&self) -> Option<String> {
+    fn get_first_argument(&self) -> Option<BString> {
         ArrayInput::get_first_argument(self).map(|v| v.to_php_string())
     }
 
-    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
+    fn has_parameter_option_bytes(&self, values: &[&BStr], only_params: bool) -> bool {
         ArrayInput::has_parameter_option(self, values, only_params)
     }
 
-    fn get_parameter_option(
+    fn get_parameter_option_bytes(
         &self,
-        values: &[&str],
+        values: &[&BStr],
         default: InputValue,
         only_params: bool,
     ) -> InputValue {
@@ -302,35 +308,35 @@ impl InputInterface for ArrayInput {
         self.inner.validate()
     }
 
-    fn get_arguments(&self) -> IndexMap<String, InputValue> {
+    fn get_arguments(&self) -> IndexMap<BString, InputValue> {
         self.inner.get_arguments()
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
+    fn get_argument_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
         self.inner.get_argument(name)
     }
 
-    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    fn set_argument_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_argument(name, value)
     }
 
-    fn has_argument(&self, name: &str) -> bool {
+    fn has_argument_bytes(&self, name: &BStr) -> bool {
         self.inner.has_argument(name)
     }
 
-    fn get_options(&self) -> IndexMap<String, InputValue> {
+    fn get_options(&self) -> IndexMap<BString, InputValue> {
         self.inner.get_options()
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
+    fn get_option_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
         self.inner.get_option(name)
     }
 
-    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    fn set_option_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_option(name, value)
     }
 
-    fn has_option(&self, name: &str) -> bool {
+    fn has_option_bytes(&self, name: &BStr) -> bool {
         self.inner.has_option(name)
     }
 
@@ -342,8 +348,8 @@ impl InputInterface for ArrayInput {
         self.inner.set_interactive(interactive)
     }
 
-    fn __to_string(&self) -> String {
-        self.to_string()
+    fn __to_string(&self) -> BString {
+        ArrayInput::__to_string(self)
     }
 
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {
@@ -365,13 +371,21 @@ impl StreamableInputInterface for ArrayInput {
 /// (`--foo` / `-f`), or the position of a bare token.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterName {
-    Name(String),
+    Name(BString),
     Index(i64),
 }
 
 impl ParameterName {
-    pub fn of(name: &str) -> Self {
-        Self::Name(name.to_string())
+    pub fn of(name: impl AsRef<[u8]>) -> Self {
+        Self::Name(BString::from(name.as_ref()))
+    }
+
+    /// The key as PHP's array holds it, an int compared as a string.
+    fn to_key(&self) -> BString {
+        match self {
+            Self::Name(name) => name.clone(),
+            Self::Index(index) => bconcat!(*index),
+        }
     }
 
     fn to_argument_name(&self) -> ArgumentName {
@@ -385,7 +399,7 @@ impl ParameterName {
 impl std::fmt::Display for ParameterName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Name(name) => write!(f, "{}", name),
+            Self::Name(name) => write!(f, "{}", name.display_lossy()),
             Self::Index(index) => write!(f, "{}", index),
         }
     }

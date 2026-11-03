@@ -4,6 +4,7 @@ use crate::async_runtime::run;
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::get_process_executor_mock;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe::config::Config;
 use shirabe::downloader::VcsDownloader;
 use shirabe::downloader::fossil_downloader::FossilDownloader;
@@ -11,7 +12,7 @@ use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, error_message, path_from_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -47,13 +48,19 @@ impl Drop for TearDown {
 /// A real CompletePackage seeded with the stubbed values is a faithful stand-in
 /// for a PackageInterface mock as long as `getSourceUrls()` equals
 /// `[getSourceUrl()]`, which holds for every non-ignored case here.
-fn get_package(source_reference: Option<&str>, source_url: Option<&str>) -> PackageInterfaceHandle {
+fn get_package(
+    source_reference: Option<&BStr>,
+    source_url: Option<&BStr>,
+) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
-    let package =
-        CompletePackageHandle::new("dummy/pkg".to_string(), norm_version, "1.0.0".to_string());
-    package.__set_source_type(Some("fossil".to_string()));
-    package.set_source_reference(source_reference.map(|s| s.to_string()));
-    package.set_source_url(source_url.map(|s| s.to_string()));
+    let package = CompletePackageHandle::new(
+        BString::from("dummy/pkg"),
+        norm_version,
+        BString::from("1.0.0"),
+    );
+    package.__set_source_type(Some(BString::from("fossil")));
+    package.set_source_reference(source_reference.map(|s| bconcat!(s)));
+    package.set_source_url(source_url.map(|s| bconcat!(s)));
     package.into()
 }
 
@@ -90,10 +97,10 @@ fn test_install_for_package_without_source_reference() {
     let downloader = get_downloader_mock(None, None, process, None);
 
     let path = working_dir.path().join("path");
-    let result = run(downloader.install(package, path.to_str().unwrap()));
+    let result = run(downloader.install(package, std::path::Path::new(&path)));
 
     let e = result.expect_err("missing source reference should throw");
-    assert!(e.to_string().contains("missing reference information"));
+    assert!(error_message(&e).contains_str("missing reference information"));
 }
 
 #[test]
@@ -101,20 +108,29 @@ fn test_install() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
-    let package = get_package(Some("trunk"), Some("http://fossil.kd2.org/kd2fw/"));
+    let working_dir_str = bconcat!(working_dir.path());
+    let package = get_package(
+        Some(BStr::new("trunk")),
+        Some(BStr::new("http://fossil.kd2.org/kd2fw/")),
+    );
 
-    let repo_file = format!("{}.fossil", working_dir_str);
+    let repo_file = bconcat!(working_dir_str, ".fossil");
     let (process, _guard) = get_process_executor_mock(
         vec![
             crate::process_executor_mock::cmd(vec![
-                "fossil",
-                "clone",
-                "--",
-                "http://fossil.kd2.org/kd2fw/",
-                &repo_file,
+                BStr::new("fossil"),
+                BStr::new("clone"),
+                BStr::new("--"),
+                BStr::new("http://fossil.kd2.org/kd2fw/"),
+                repo_file.as_bstr(),
             ]),
-            crate::process_executor_mock::cmd(vec!["fossil", "open", "--nested", "--", &repo_file]),
+            crate::process_executor_mock::cmd(vec![
+                BStr::new("fossil"),
+                BStr::new("open"),
+                BStr::new("--nested"),
+                BStr::new("--"),
+                repo_file.as_bstr(),
+            ]),
             crate::process_executor_mock::cmd(vec!["fossil", "update", "--", "trunk"]),
         ],
         true,
@@ -122,7 +138,7 @@ fn test_install() {
     );
 
     let downloader = get_downloader_mock(None, None, process, None);
-    run(downloader.install(package, &working_dir_str)).unwrap();
+    run(downloader.install(package, path_from_bytes(&working_dir_str))).unwrap();
 }
 
 #[test]
@@ -130,7 +146,7 @@ fn test_updatefor_package_without_source_reference() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let initial_package = get_package(Some("ref"), None);
+    let initial_package = get_package(Some(BStr::new("ref")), None);
     let source_package = get_package(None, None);
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
@@ -139,22 +155,31 @@ fn test_updatefor_package_without_source_reference() {
     let result = run(async {
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 source_package.clone(),
-                "/path",
+                std::path::Path::new("/path"),
                 Some(initial_package.clone()),
             )
             .await?;
         downloader
-            .update(initial_package.clone(), source_package.clone(), "/path")
+            .update(
+                initial_package.clone(),
+                source_package.clone(),
+                std::path::Path::new("/path"),
+            )
             .await?;
         downloader
-            .cleanup("update", source_package, "/path", Some(initial_package))
+            .cleanup(
+                BStr::new("update"),
+                source_package,
+                std::path::Path::new("/path"),
+                Some(initial_package),
+            )
             .await
     });
 
     let e = result.expect_err("missing source reference should throw");
-    assert!(e.to_string().contains("missing reference information"));
+    assert!(error_message(&e).contains_str("missing reference information"));
 }
 
 #[test]
@@ -162,7 +187,7 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = bconcat!(working_dir.path());
 
     // Ensure the .fslckout metadata file exists.
     let fslckout = working_dir.path().join(".fslckout");
@@ -170,7 +195,10 @@ fn test_update() {
         std::fs::File::create(&fslckout).unwrap();
     }
 
-    let package = get_package(Some("trunk"), Some("http://fossil.kd2.org/kd2fw/"));
+    let package = get_package(
+        Some(BStr::new("trunk")),
+        Some(BStr::new("http://fossil.kd2.org/kd2fw/")),
+    );
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -186,19 +214,28 @@ fn test_update() {
     run(async {
         downloader
             .prepare(
-                "update",
+                BStr::new("update"),
                 package.clone(),
-                &working_dir_str,
+                path_from_bytes(&working_dir_str),
                 Some(package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .update(
+                package.clone(),
+                package.clone(),
+                path_from_bytes(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .cleanup(
+                BStr::new("update"),
+                package.clone(),
+                path_from_bytes(&working_dir_str),
+                Some(package),
+            )
             .await
             .unwrap();
     });
@@ -208,7 +245,7 @@ fn test_update() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
+    let working_dir_str = bconcat!(working_dir.path());
 
     // Ensure file exists
     let file = working_dir.path().join(".fslckout");
@@ -232,15 +269,25 @@ fn test_remove() {
     let downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
     run(async {
         downloader
-            .prepare("uninstall", package.clone(), &working_dir_str, None)
+            .prepare(
+                BStr::new("uninstall"),
+                package.clone(),
+                path_from_bytes(&working_dir_str),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .remove(package.clone(), &working_dir_str)
+            .remove(package.clone(), path_from_bytes(&working_dir_str))
             .await
             .unwrap();
         downloader
-            .cleanup("uninstall", package, &working_dir_str, None)
+            .cleanup(
+                BStr::new("uninstall"),
+                package,
+                path_from_bytes(&working_dir_str),
+                None,
+            )
             .await
             .unwrap();
     });

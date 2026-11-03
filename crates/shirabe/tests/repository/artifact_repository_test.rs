@@ -1,10 +1,10 @@
 //! ref: composer/tests/Composer/Test/Repository/ArtifactRepositoryTest.php
 
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
-use shirabe_php_shim::{PhpMixed, extension_loaded};
+use shirabe_php_shim::{PhpMixed, bconcat, extension_loaded, path_to_bytes, str_replace};
 
 /// Returns true when the test should be skipped because the zip extension is
 /// unavailable, mirroring PHP's markTestSkipped in setUp.
@@ -16,18 +16,15 @@ fn set_up() -> bool {
     false
 }
 
-fn artifacts_dir() -> String {
+fn artifacts_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Repository/Fixtures/artifacts")
-        .to_str()
-        .unwrap()
-        .to_string()
 }
 
-fn create_repo(url: &str) -> ArtifactRepository {
+fn create_repo(url: impl AsRef<[u8]>) -> ArtifactRepository {
     let mut coordinates: IndexMap<BString, PhpMixed> = IndexMap::new();
-    coordinates.insert("type".into(), PhpMixed::string("artifact".to_string()));
-    coordinates.insert("url".into(), PhpMixed::string(url.to_string()));
+    coordinates.insert("type".into(), PhpMixed::string(BString::from("artifact")));
+    coordinates.insert("url".into(), PhpMixed::string(url.as_ref()));
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -41,30 +38,24 @@ fn test_extracts_configs_from_zip_archives() {
     }
 
     let mut expected_packages = vec![
-        "vendor0/package0-0.0.1".to_string(),
-        "composer/composer-1.0.0-alpha6".to_string(),
-        "vendor1/package2-4.3.2".to_string(),
-        "vendor3/package1-5.4.3".to_string(),
-        "test/jsonInRoot-1.0.0".to_string(),
-        "test/jsonInRootTarFile-1.0.0".to_string(),
-        "test/jsonInFirstLevel-1.0.0".to_string(),
+        BString::from("vendor0/package0-0.0.1"),
+        BString::from("composer/composer-1.0.0-alpha6"),
+        BString::from("vendor1/package2-4.3.2"),
+        BString::from("vendor3/package1-5.4.3"),
+        BString::from("test/jsonInRoot-1.0.0"),
+        BString::from("test/jsonInRootTarFile-1.0.0"),
+        BString::from("test/jsonInFirstLevel-1.0.0"),
         // The files not-an-artifact.zip and jsonSecondLevel are not valid
         // artifacts and do not get detected.
     ];
 
-    let mut repo = create_repo(&artifacts_dir());
+    let mut repo = create_repo(path_to_bytes(&artifacts_dir()));
 
-    let mut found_packages: Vec<String> = repo
+    let mut found_packages: Vec<bstr::BString> = repo
         .__get_packages()
         .unwrap()
         .iter()
-        .map(|package| {
-            format!(
-                "{}-{}",
-                package.get_pretty_name(),
-                package.get_pretty_version()
-            )
-        })
+        .map(|package| bconcat!(package.get_pretty_name(), "-", package.get_pretty_version()))
         .collect();
 
     expected_packages.sort();
@@ -80,7 +71,10 @@ fn test_extracts_configs_from_zip_archives() {
         .collect();
     assert_eq!(1, tar_package.len());
     let tar_package = tar_package.into_iter().next_back().unwrap();
-    assert_eq!(Some("tar".to_string()), tar_package.get_dist_type());
+    assert_eq!(
+        Some(bstr::BString::from("tar")),
+        tar_package.get_dist_type()
+    );
 }
 
 #[test]
@@ -90,14 +84,15 @@ fn test_absolute_repo_url_creates_absolute_url_packages() {
     }
 
     let absolute_path = artifacts_dir();
-    let mut repo = create_repo(&absolute_path);
+    let mut repo = create_repo(path_to_bytes(&absolute_path));
 
     for package in repo.__get_packages().unwrap() {
         assert_eq!(
-            package
-                .get_dist_url()
-                .unwrap_or_default()
-                .find(&absolute_path.replace('\\', "/")),
+            package.get_dist_url().unwrap_or_default().find(str_replace(
+                "\\",
+                "/",
+                path_to_bytes(&absolute_path)
+            )),
             Some(0)
         );
     }

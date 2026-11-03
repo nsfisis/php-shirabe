@@ -3,7 +3,8 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer;
-use shirabe_php_shim::impl_php_class;
+use crate::io::IOInterfaceWrite;
+use shirabe_php_shim::{bconcat, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -36,9 +37,9 @@ impl AboutCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AboutCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("about")?;
-        self.set_description("Shows a short information about Composer");
-        self.set_help("<info>shirabe about</info>");
+        self.set_name("about".into())?;
+        self.set_description("Shows a short information about Composer".into());
+        self.set_help("<info>shirabe about</info>".into());
         Ok(())
     }
 
@@ -51,11 +52,9 @@ impl Command for AboutCommand {
         let composer_version = composer::VERSION;
         let _ = (input, output);
 
-        self.get_io().borrow().write(&format!(
-            "<info>Shirabe - Dependency Manager for PHP - version {shirabe_version} (based on Composer {composer_version})</info>\n\
+        self.get_io().borrow().write(bconcat!("<info>Shirabe - Dependency Manager for PHP - version ", shirabe_version, " (based on Composer ", composer_version, ")</info>\n\
             <comment>Shirabe is a dependency manager tracking local dependencies of your projects and libraries.\n\
-            See https://getcomposer.org/ for more information.</comment>"
-        ));
+            See https://getcomposer.org/ for more information.</comment>"));
 
         Ok(0)
     }

@@ -1,7 +1,9 @@
 //! ref: composer/tests/Composer/Test/Command/ConfigCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::{BStr, ByteSlice};
 use serial_test::serial;
+use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// `['command' => 'config'] + $command`, with the command name prepended.
@@ -11,32 +13,32 @@ fn config_input(command: Vec<(ParameterName, InputValue)>) -> Vec<(ParameterName
     input
 }
 
-fn key(setting_key: &str) -> (ParameterName, InputValue) {
+fn key(setting_key: &BStr) -> (ParameterName, InputValue) {
     (
         ParameterName::of("setting-key"),
         InputValue::from(setting_key),
     )
 }
 
-fn value(values: &[&str]) -> (ParameterName, InputValue) {
+fn value(values: &[&BStr]) -> (ParameterName, InputValue) {
     (
         ParameterName::of("setting-value"),
-        InputValue::Array(values.iter().map(|v| v.to_string()).collect()),
+        InputValue::Array(values.iter().map(|v| (*v).into()).collect()),
     )
 }
 
-fn flag(name: &str) -> (ParameterName, InputValue) {
+fn flag(name: &BStr) -> (ParameterName, InputValue) {
     (ParameterName::of(name), InputValue::Bool(true))
 }
 
 /// Reads CWD's composer.json as a `serde_json::Value` (mirrors PHP's `json_decode(..., true)`).
 fn read_composer_json() -> serde_json::Value {
-    let contents = std::fs::read_to_string("composer.json").unwrap();
-    serde_json::from_str(&contents).unwrap()
+    let contents = bstr::BString::from(std::fs::read("composer.json").unwrap());
+    serde_json::from_slice(&contents).unwrap()
 }
 
 struct UpdateCase {
-    name: &'static str,
+    name: &'static BStr,
     before: serde_json::Value,
     command: Vec<(ParameterName, InputValue)>,
     expected: serde_json::Value,
@@ -47,260 +49,293 @@ struct UpdateCase {
 fn test_config_updates() {
     let cases: Vec<UpdateCase> = vec![
         UpdateCase {
-            name: "set scripts",
+            name: BStr::new("set scripts"),
             before: serde_json::json!({}),
-            command: vec![key("scripts.test"), value(&["foo bar"])],
+            command: vec![
+                key(BStr::new("scripts.test")),
+                value(&[BStr::new("foo bar")]),
+            ],
             expected: serde_json::json!({"scripts": {"test": "foo bar"}}),
         },
         UpdateCase {
-            name: "unset scripts",
+            name: BStr::new("unset scripts"),
             before: serde_json::json!({"scripts": {"test": "foo bar", "lala": "baz"}}),
-            command: vec![key("scripts.lala"), flag("--unset")],
+            command: vec![key(BStr::new("scripts.lala")), flag(BStr::new("--unset"))],
             expected: serde_json::json!({"scripts": {"test": "foo bar"}}),
         },
         UpdateCase {
-            name: "set single config with bool normalizer",
+            name: BStr::new("set single config with bool normalizer"),
             before: serde_json::json!({}),
-            command: vec![key("use-github-api"), value(&["1"])],
+            command: vec![key(BStr::new("use-github-api")), value(&[BStr::new("1")])],
             expected: serde_json::json!({"config": {"use-github-api": true}}),
         },
         UpdateCase {
-            name: "set multi config",
+            name: BStr::new("set multi config"),
             before: serde_json::json!({}),
-            command: vec![key("github-protocols"), value(&["https", "git"])],
+            command: vec![
+                key(BStr::new("github-protocols")),
+                value(&[BStr::new("https"), BStr::new("git")]),
+            ],
             expected: serde_json::json!({"config": {"github-protocols": ["https", "git"]}}),
         },
         UpdateCase {
-            name: "set version",
+            name: BStr::new("set version"),
             before: serde_json::json!({}),
-            command: vec![key("version"), value(&["1.0.0"])],
+            command: vec![key(BStr::new("version")), value(&[BStr::new("1.0.0")])],
             expected: serde_json::json!({"version": "1.0.0"}),
         },
         UpdateCase {
-            name: "unset version",
+            name: BStr::new("unset version"),
             before: serde_json::json!({"version": "1.0.0"}),
-            command: vec![key("version"), flag("--unset")],
+            command: vec![key(BStr::new("version")), flag(BStr::new("--unset"))],
             expected: serde_json::json!({}),
         },
         UpdateCase {
-            name: "unset arbitrary property",
+            name: BStr::new("unset arbitrary property"),
             before: serde_json::json!({"random-prop": "1.0.0"}),
-            command: vec![key("random-prop"), flag("--unset")],
+            command: vec![key(BStr::new("random-prop")), flag(BStr::new("--unset"))],
             expected: serde_json::json!({}),
         },
         UpdateCase {
-            name: "set preferred-install",
+            name: BStr::new("set preferred-install"),
             before: serde_json::json!({}),
-            command: vec![key("preferred-install.foo/*"), value(&["source"])],
+            command: vec![
+                key(BStr::new("preferred-install.foo/*")),
+                value(&[BStr::new("source")]),
+            ],
             expected: serde_json::json!({"config": {"preferred-install": {"foo/*": "source"}}}),
         },
         UpdateCase {
-            name: "unset preferred-install",
+            name: BStr::new("unset preferred-install"),
             before: serde_json::json!({"config": {"preferred-install": {"foo/*": "source"}}}),
-            command: vec![key("preferred-install.foo/*"), flag("--unset")],
+            command: vec![
+                key(BStr::new("preferred-install.foo/*")),
+                flag(BStr::new("--unset")),
+            ],
             expected: serde_json::json!({"config": {"preferred-install": {}}}),
         },
         UpdateCase {
-            name: "unset platform",
+            name: BStr::new("unset platform"),
             before: serde_json::json!({"config": {"platform": {"php": "7.2.5"}, "platform-check": false}}),
-            command: vec![key("platform.php"), flag("--unset")],
+            command: vec![key(BStr::new("platform.php")), flag(BStr::new("--unset"))],
             expected: serde_json::json!({"config": {"platform": {}, "platform-check": false}}),
         },
         UpdateCase {
-            name: "set extra with merge",
+            name: BStr::new("set extra with merge"),
             before: serde_json::json!({}),
             command: vec![
-                key("extra.patches.foo/bar"),
-                value(&["{\"123\":\"value\"}"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("extra.patches.foo/bar")),
+                value(&[BStr::new("{\"123\":\"value\"}")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"extra": {"patches": {"foo/bar": {"123": "value"}}}}),
         },
         UpdateCase {
-            name: "combine extra with merge",
+            name: BStr::new("combine extra with merge"),
             before: serde_json::json!({"extra": {"patches": {"foo/bar": {"5": "oldvalue"}}}}),
             command: vec![
-                key("extra.patches.foo/bar"),
-                value(&["{\"123\":\"value\"}"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("extra.patches.foo/bar")),
+                value(&[BStr::new("{\"123\":\"value\"}")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"extra": {"patches": {"foo/bar": {"123": "value", "5": "oldvalue"}}}}),
         },
         UpdateCase {
-            name: "combine extra with list",
+            name: BStr::new("combine extra with list"),
             before: serde_json::json!({"extra": {"patches": {"foo/bar": ["oldvalue"]}}}),
             command: vec![
-                key("extra.patches.foo/bar"),
-                value(&["{\"123\":\"value\"}"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("extra.patches.foo/bar")),
+                value(&[BStr::new("{\"123\":\"value\"}")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"extra": {"patches": {"foo/bar": {"123": "value", "0": "oldvalue"}}}}),
         },
         UpdateCase {
-            name: "overwrite extra with merge",
+            name: BStr::new("overwrite extra with merge"),
             before: serde_json::json!({"extra": {"patches": {"foo/bar": {"123": "oldvalue"}}}}),
             command: vec![
-                key("extra.patches.foo/bar"),
-                value(&["{\"123\":\"value\"}"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("extra.patches.foo/bar")),
+                value(&[BStr::new("{\"123\":\"value\"}")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"extra": {"patches": {"foo/bar": {"123": "value"}}}}),
         },
         UpdateCase {
-            name: "unset autoload",
+            name: BStr::new("unset autoload"),
             before: serde_json::json!({"autoload": {"psr-4": ["test"], "classmap": ["test"]}}),
-            command: vec![key("autoload.psr-4"), flag("--unset")],
+            command: vec![key(BStr::new("autoload.psr-4")), flag(BStr::new("--unset"))],
             expected: serde_json::json!({"autoload": {"classmap": ["test"]}}),
         },
         UpdateCase {
-            name: "unset autoload-dev",
+            name: BStr::new("unset autoload-dev"),
             before: serde_json::json!({"autoload-dev": {"psr-4": ["test"], "classmap": ["test"]}}),
-            command: vec![key("autoload-dev.psr-4"), flag("--unset")],
+            command: vec![
+                key(BStr::new("autoload-dev.psr-4")),
+                flag(BStr::new("--unset")),
+            ],
             expected: serde_json::json!({"autoload-dev": {"classmap": ["test"]}}),
         },
         UpdateCase {
-            name: "set audit.ignore-unreachable",
+            name: BStr::new("set audit.ignore-unreachable"),
             before: serde_json::json!({}),
-            command: vec![key("audit.ignore-unreachable"), value(&["true"])],
+            command: vec![
+                key(BStr::new("audit.ignore-unreachable")),
+                value(&[BStr::new("true")]),
+            ],
             expected: serde_json::json!({"config": {"audit": {"ignore-unreachable": true}}}),
         },
         UpdateCase {
-            name: "set audit.block-insecure",
+            name: BStr::new("set audit.block-insecure"),
             before: serde_json::json!({}),
-            command: vec![key("audit.block-insecure"), value(&["false"])],
+            command: vec![
+                key(BStr::new("audit.block-insecure")),
+                value(&[BStr::new("false")]),
+            ],
             expected: serde_json::json!({"config": {"audit": {"block-insecure": false}}}),
         },
         UpdateCase {
-            name: "set audit.block-abandoned",
+            name: BStr::new("set audit.block-abandoned"),
             before: serde_json::json!({}),
-            command: vec![key("audit.block-abandoned"), value(&["true"])],
+            command: vec![
+                key(BStr::new("audit.block-abandoned")),
+                value(&[BStr::new("true")]),
+            ],
             expected: serde_json::json!({"config": {"audit": {"block-abandoned": true}}}),
         },
         UpdateCase {
-            name: "unset audit.ignore-unreachable",
+            name: BStr::new("unset audit.ignore-unreachable"),
             before: serde_json::json!({"config": {"audit": {"ignore-unreachable": true}}}),
-            command: vec![key("audit.ignore-unreachable"), flag("--unset")],
+            command: vec![
+                key(BStr::new("audit.ignore-unreachable")),
+                flag(BStr::new("--unset")),
+            ],
             expected: serde_json::json!({"config": {"audit": {}}}),
         },
         UpdateCase {
-            name: "set audit.ignore-severity",
+            name: BStr::new("set audit.ignore-severity"),
             before: serde_json::json!({}),
-            command: vec![key("audit.ignore-severity"), value(&["low", "medium"])],
+            command: vec![
+                key(BStr::new("audit.ignore-severity")),
+                value(&[BStr::new("low"), BStr::new("medium")]),
+            ],
             expected: serde_json::json!({"config": {"audit": {"ignore-severity": ["low", "medium"]}}}),
         },
         UpdateCase {
-            name: "set audit.ignore as array",
+            name: BStr::new("set audit.ignore as array"),
             before: serde_json::json!({}),
             command: vec![
-                key("audit.ignore"),
-                value(&["[\"CVE-2024-1234\",\"GHSA-xxxx-yyyy\"]"]),
-                flag("--json"),
+                key(BStr::new("audit.ignore")),
+                value(&[BStr::new("[\"CVE-2024-1234\",\"GHSA-xxxx-yyyy\"]")]),
+                flag(BStr::new("--json")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore": ["CVE-2024-1234", "GHSA-xxxx-yyyy"]}}}),
         },
         UpdateCase {
-            name: "set audit.ignore as object",
+            name: BStr::new("set audit.ignore as object"),
             before: serde_json::json!({}),
             command: vec![
-                key("audit.ignore"),
-                value(&[
+                key(BStr::new("audit.ignore")),
+                value(&[BStr::new(
                     "{\"CVE-2024-1234\":\"False positive\",\"GHSA-xxxx-yyyy\":\"Not applicable\"}",
-                ]),
-                flag("--json"),
+                )]),
+                flag(BStr::new("--json")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore": {"CVE-2024-1234": "False positive", "GHSA-xxxx-yyyy": "Not applicable"}}}}),
         },
         UpdateCase {
-            name: "merge audit.ignore array",
+            name: BStr::new("merge audit.ignore array"),
             before: serde_json::json!({"config": {"audit": {"ignore": ["CVE-2024-1234"]}}}),
             command: vec![
-                key("audit.ignore"),
-                value(&["[\"CVE-2024-5678\"]"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("audit.ignore")),
+                value(&[BStr::new("[\"CVE-2024-5678\"]")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore": ["CVE-2024-1234", "CVE-2024-5678"]}}}),
         },
         UpdateCase {
-            name: "merge audit.ignore object",
+            name: BStr::new("merge audit.ignore object"),
             before: serde_json::json!({"config": {"audit": {"ignore": {"CVE-2024-1234": "Old reason"}}}}),
             command: vec![
-                key("audit.ignore"),
-                value(&["{\"CVE-2024-5678\":\"New advisory\"}"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("audit.ignore")),
+                value(&[BStr::new("{\"CVE-2024-5678\":\"New advisory\"}")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore": {"CVE-2024-5678": "New advisory", "CVE-2024-1234": "Old reason"}}}}),
         },
         UpdateCase {
-            name: "overwrite audit.ignore key with merge",
+            name: BStr::new("overwrite audit.ignore key with merge"),
             before: serde_json::json!({"config": {"audit": {"ignore": {"CVE-2024-1234": "Old reason"}}}}),
             command: vec![
-                key("audit.ignore"),
-                value(&["{\"CVE-2024-1234\":\"New reason\"}"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("audit.ignore")),
+                value(&[BStr::new("{\"CVE-2024-1234\":\"New reason\"}")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore": {"CVE-2024-1234": "New reason"}}}}),
         },
         UpdateCase {
-            name: "set audit.ignore-abandoned as array",
+            name: BStr::new("set audit.ignore-abandoned as array"),
             before: serde_json::json!({}),
             command: vec![
-                key("audit.ignore-abandoned"),
-                value(&["[\"vendor/package1\",\"vendor/package2\"]"]),
-                flag("--json"),
+                key(BStr::new("audit.ignore-abandoned")),
+                value(&[BStr::new("[\"vendor/package1\",\"vendor/package2\"]")]),
+                flag(BStr::new("--json")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore-abandoned": ["vendor/package1", "vendor/package2"]}}}),
         },
         UpdateCase {
-            name: "set audit.ignore-abandoned as object",
+            name: BStr::new("set audit.ignore-abandoned as object"),
             before: serde_json::json!({}),
             command: vec![
-                key("audit.ignore-abandoned"),
-                value(&[
+                key(BStr::new("audit.ignore-abandoned")),
+                value(&[BStr::new(
                     "{\"vendor/package1\":\"Still maintained\",\"vendor/package2\":\"Fork available\"}",
-                ]),
-                flag("--json"),
+                )]),
+                flag(BStr::new("--json")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore-abandoned": {"vendor/package1": "Still maintained", "vendor/package2": "Fork available"}}}}),
         },
         UpdateCase {
-            name: "merge audit.ignore-abandoned array",
+            name: BStr::new("merge audit.ignore-abandoned array"),
             before: serde_json::json!({"config": {"audit": {"ignore-abandoned": ["vendor/package1"]}}}),
             command: vec![
-                key("audit.ignore-abandoned"),
-                value(&["[\"vendor/package2\"]"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("audit.ignore-abandoned")),
+                value(&[BStr::new("[\"vendor/package2\"]")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore-abandoned": ["vendor/package1", "vendor/package2"]}}}),
         },
         UpdateCase {
-            name: "merge audit.ignore-abandoned object",
+            name: BStr::new("merge audit.ignore-abandoned object"),
             before: serde_json::json!({"config": {"audit": {"ignore-abandoned": {"vendor/package1": "Old reason"}}}}),
             command: vec![
-                key("audit.ignore-abandoned"),
-                value(&["{\"vendor/package2\":\"New reason\"}"]),
-                flag("--json"),
-                flag("--merge"),
+                key(BStr::new("audit.ignore-abandoned")),
+                value(&[BStr::new("{\"vendor/package2\":\"New reason\"}")]),
+                flag(BStr::new("--json")),
+                flag(BStr::new("--merge")),
             ],
             expected: serde_json::json!({"config": {"audit": {"ignore-abandoned": {"vendor/package2": "New reason", "vendor/package1": "Old reason"}}}}),
         },
         UpdateCase {
-            name: "unset audit.ignore",
+            name: BStr::new("unset audit.ignore"),
             before: serde_json::json!({"config": {"audit": {"ignore": ["CVE-2024-1234"]}}}),
-            command: vec![key("audit.ignore"), flag("--unset")],
+            command: vec![key(BStr::new("audit.ignore")), flag(BStr::new("--unset"))],
             expected: serde_json::json!({"config": {"audit": {}}}),
         },
         UpdateCase {
-            name: "unset audit.ignore-abandoned",
+            name: BStr::new("unset audit.ignore-abandoned"),
             before: serde_json::json!({"config": {"audit": {"ignore-abandoned": ["vendor/package1"]}}}),
-            command: vec![key("audit.ignore-abandoned"), flag("--unset")],
+            command: vec![
+                key(BStr::new("audit.ignore-abandoned")),
+                flag(BStr::new("--unset")),
+            ],
             expected: serde_json::json!({"config": {"audit": {}}}),
         },
     ];
@@ -318,7 +353,7 @@ fn test_config_updates() {
             app_tester.get_status_code(),
             "case {:?}: display: {}",
             case.name,
-            app_tester.get_display()
+            app_tester.get_display().display_lossy()
         );
 
         assert_eq!(case.expected, read_composer_json(), "case {:?}", case.name);
@@ -326,10 +361,10 @@ fn test_config_updates() {
 }
 
 struct ReadCase {
-    name: &'static str,
+    name: &'static BStr,
     composer_json: serde_json::Value,
     command: Vec<(ParameterName, InputValue)>,
-    expected: &'static str,
+    expected: &'static BStr,
 }
 
 #[test]
@@ -337,40 +372,42 @@ struct ReadCase {
 fn test_config_reads() {
     let cases: Vec<ReadCase> = vec![
         ReadCase {
-            name: "read description",
+            name: BStr::new("read description"),
             composer_json: serde_json::json!({"description": "foo bar"}),
-            command: vec![key("description")],
-            expected: "foo bar",
+            command: vec![key(BStr::new("description"))],
+            expected: BStr::new("foo bar"),
         },
         ReadCase {
-            name: "read vendor-dir with source",
+            name: BStr::new("read vendor-dir with source"),
             composer_json: serde_json::json!({"config": {"vendor-dir": "lala"}}),
-            command: vec![key("vendor-dir"), flag("--source")],
-            expected: "lala (./composer.json)",
+            command: vec![key(BStr::new("vendor-dir")), flag(BStr::new("--source"))],
+            expected: BStr::new("lala (./composer.json)"),
         },
         ReadCase {
-            name: "read default vendor-dir",
+            name: BStr::new("read default vendor-dir"),
             composer_json: serde_json::json!({}),
-            command: vec![key("vendor-dir")],
-            expected: "vendor",
+            command: vec![key(BStr::new("vendor-dir"))],
+            expected: BStr::new("vendor"),
         },
         ReadCase {
-            name: "read repos by named key",
+            name: BStr::new("read repos by named key"),
             composer_json: serde_json::json!({"repositories": {"foo": {"type": "vcs", "url": "https://example.org"}, "packagist.org": {"type": "composer", "url": "https://repo.packagist.org"}}}),
-            command: vec![key("repositories.foo")],
-            expected: "{\"type\":\"vcs\",\"url\":\"https://example.org\"}",
+            command: vec![key(BStr::new("repositories.foo"))],
+            expected: BStr::new("{\"type\":\"vcs\",\"url\":\"https://example.org\"}"),
         },
         ReadCase {
-            name: "read all repos includes the default packagist",
+            name: BStr::new("read all repos includes the default packagist"),
             composer_json: serde_json::json!({"repositories": {"foo": {"type": "vcs", "url": "https://example.org"}, "packagist.org": {"type": "composer", "url": "https://repo.packagist.org"}}}),
-            command: vec![key("repos")],
-            expected: "{\"foo\":{\"type\":\"vcs\",\"url\":\"https://example.org\"},\"packagist.org\":{\"type\":\"composer\",\"url\":\"https://repo.packagist.org\"}}",
+            command: vec![key(BStr::new("repos"))],
+            expected: BStr::new(
+                "{\"foo\":{\"type\":\"vcs\",\"url\":\"https://example.org\"},\"packagist.org\":{\"type\":\"composer\",\"url\":\"https://repo.packagist.org\"}}",
+            ),
         },
         ReadCase {
-            name: "read all repos does not include the disabled packagist",
+            name: BStr::new("read all repos does not include the disabled packagist"),
             composer_json: serde_json::json!({"repositories": {"foo": {"type": "vcs", "url": "https://example.org"}, "packagist.org": false}}),
-            command: vec![key("repos")],
-            expected: "{\"foo\":{\"type\":\"vcs\",\"url\":\"https://example.org\"}}",
+            command: vec![key(BStr::new("repos"))],
+            expected: BStr::new("{\"foo\":{\"type\":\"vcs\",\"url\":\"https://example.org\"}}"),
         },
     ];
 
@@ -386,7 +423,7 @@ fn test_config_reads() {
 
         assert_eq!(
             case.expected,
-            app_tester.get_display().trim(),
+            trim(app_tester.get_display()),
             "case {:?}",
             case.name
         );
@@ -414,13 +451,16 @@ fn test_config_reads_repos_by_numeric_index() {
 
     let mut app_tester = get_application_tester();
     app_tester
-        .run(config_input(vec![key("repos.0")]), RunOptions::default())
+        .run(
+            config_input(vec![key(BStr::new("repos.0"))]),
+            RunOptions::default(),
+        )
         .unwrap();
 
     assert_eq!(0, app_tester.get_status_code());
     assert_eq!(
         "{\"type\":\"vcs\",\"url\":\"https://example.org\"}",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -434,15 +474,14 @@ fn test_config_throws_for_invalid_arg_combination() {
                 ParameterName::of("--file"),
                 InputValue::from("alt.composer.json"),
             ),
-            flag("--global"),
+            flag(BStr::new("--global")),
         ]),
         RunOptions::default(),
     );
 
     let err = result.expect_err("expected RuntimeException");
     assert!(
-        err.to_string()
-            .contains("--file and --global can not be combined"),
+        error_message(&err).contains_str("--file and --global can not be combined"),
         "got: {:?}",
         err
     );
@@ -456,16 +495,15 @@ fn test_config_throws_for_invalid_severity() {
     let mut app_tester = get_application_tester();
     let result = app_tester.run(
         config_input(vec![
-            key("audit.ignore-severity"),
-            value(&["low", "invalid"]),
+            key(BStr::new("audit.ignore-severity")),
+            value(&[BStr::new("low"), BStr::new("invalid")]),
         ]),
         RunOptions::default(),
     );
 
     let err = result.expect_err("expected RuntimeException");
     assert!(
-        err.to_string()
-            .contains("valid severities include: low, medium, high, critical"),
+        error_message(&err).contains_str("valid severities include: low, medium, high, critical"),
         "got: {:?}",
         err
     );
@@ -484,17 +522,17 @@ fn test_config_throws_when_merging_array_with_object() {
     let mut app_tester = get_application_tester();
     let result = app_tester.run(
         config_input(vec![
-            key("audit.ignore"),
-            value(&["{\"CVE-2024-5678\":\"reason\"}"]),
-            flag("--json"),
-            flag("--merge"),
+            key(BStr::new("audit.ignore")),
+            value(&[BStr::new("{\"CVE-2024-5678\":\"reason\"}")]),
+            flag(BStr::new("--json")),
+            flag(BStr::new("--merge")),
         ]),
         RunOptions::default(),
     );
 
     let err = result.expect_err("expected RuntimeException");
     assert!(
-        err.to_string().contains("Cannot merge array and object"),
+        error_message(&err).contains_str("Cannot merge array and object"),
         "got: {:?}",
         err
     );

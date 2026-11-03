@@ -70,7 +70,8 @@ impl CaBundle {
         std::path::PathBuf::new()
     }
 
-    fn get_env_variable(name: &str) -> Option<std::ffi::OsString> {
+    fn get_env_variable(name: impl AsRef<std::ffi::OsStr>) -> Option<std::ffi::OsString> {
+        let name = name.as_ref();
         let value = PHP_SERVER.lock().unwrap().get(name);
         value.or_else(|| getenv(name))
     }
@@ -78,8 +79,8 @@ impl CaBundle {
     // TODO(http): Dummy stand-in until reqwest validates certificates itself.
     // The original parses the file with OpenSSL and rejects malformed or expired
     // bundles; here we only require the file to exist and be non-empty.
-    pub fn validate_ca_file(ca_file: &str, _logger: ()) -> bool {
-        std::fs::read(ca_file)
+    pub fn validate_ca_file(ca_file: impl AsRef<std::path::Path>, _logger: ()) -> bool {
+        std::fs::read(ca_file.as_ref())
             .map(|c| !c.is_empty())
             .unwrap_or(false)
     }

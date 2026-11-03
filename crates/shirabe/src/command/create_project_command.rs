@@ -12,7 +12,7 @@ use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterInterface,
 };
 use crate::installer::{Installer, ProjectInstaller, SuggestedPackagesReporter};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -25,15 +25,16 @@ use crate::repository::{
 use crate::script::ScriptEvents;
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
-    array_pop, chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir,
-    is_file, mkdir, preg_match, realpath, rtrim, strtolower, unlink,
+    array_pop, bconcat, chdir, error_message, explode_with_limit, file_exists, getcwd,
+    impl_php_class, implode, is_dir, is_file, mkdir, path_from_bytes, path_to_bytes, preg_match,
+    realpath, rtrim2, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
@@ -76,10 +77,10 @@ impl CreateProjectCommand {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        package_name: Option<String>,
-        directory: Option<String>,
-        package_version: Option<String>,
-        stability: Option<String>,
+        package_name: Option<BString>,
+        directory: Option<PathBuf>,
+        package_version: Option<BString>,
+        stability: Option<BString>,
         mut prefer_source: bool,
         mut prefer_dist: bool,
         install_dev_packages: bool,
@@ -94,19 +95,19 @@ impl CreateProjectCommand {
     ) -> anyhow::Result<i64> {
         let old_cwd = Platform::get_cwd(false)?;
 
-        let repositories: Option<Vec<String>> = match repositories {
+        let repositories: Option<Vec<BString>> = match repositories {
             Some(PhpMixed::Null) | None => None,
             Some(PhpMixed::List(list)) => Some(
                 list.into_iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_string().map(BString::from))
                     .collect(),
             ),
             Some(PhpMixed::Array(map)) => Some(
                 map.into_iter()
-                    .filter_map(|(_, v)| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|(_, v)| v.as_string().map(BString::from))
                     .collect(),
             ),
-            Some(other) => Some(vec![other.as_string().unwrap_or_default().to_string()]),
+            Some(other) => Some(vec![BString::from(other.as_string().unwrap_or_default())]),
         };
 
         let platform_requirement_filter = platform_requirement_filter
@@ -125,7 +126,7 @@ impl CreateProjectCommand {
                 input.clone(),
                 io.clone(),
                 &config,
-                package_name,
+                package_name.as_bstr(),
                 platform_requirement_filter.clone(),
                 directory,
                 package_version,
@@ -176,7 +177,7 @@ impl CreateProjectCommand {
                 );
                 let mut config_source = JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
-                        "composer.json".to_string(),
+                        "composer.json",
                         None,
                         None,
                     )?)),
@@ -193,10 +194,14 @@ impl CreateProjectCommand {
                             .and_then(|v| v.as_bool())
                             == Some(false));
                 if is_packagist_disabled {
-                    config_source.add_repository("packagist.org", PhpMixed::Bool(false), false);
+                    config_source.add_repository(
+                        bstr::BStr::new("packagist.org"),
+                        PhpMixed::Bool(false),
+                        false,
+                    );
                 } else {
                     config_source.add_repository(
-                        &name,
+                        bstr::BStr::new(&name),
                         PhpMixed::Array(
                             repo_config
                                 .iter()
@@ -303,10 +308,7 @@ impl CreateProjectCommand {
                 Err(e) => {
                     if e.is_instanceof::<PluginBlockedException>() {
                         io.write_error("<error>Hint: To allow running the config command recommended below before dependencies are installed, run create-project with --no-install.</error>");
-                        io.write_error(&format!(
-                            "<error>You can then cd into {}, configure allow-plugins, and finally run a shirabe install to complete the process.</error>",
-                            getcwd().unwrap_or_default().display()
-                        ));
+                        io.write_error(bconcat!("<error>You can then cd into ", getcwd().unwrap_or_default(), ", configure allow-plugins, and finally run a shirabe install to complete the process.</error>"));
                     }
                     return Err(e);
                 }
@@ -319,7 +321,7 @@ impl CreateProjectCommand {
             && (input.borrow().get_option("remove-vcs")?.as_bool().unwrap_or(false)
                 || !io.is_interactive()
                 || io.ask_confirmation(
-                    "<info>Do you want to remove the existing VCS (.git, .svn..) history?</info> [<comment>y,n</comment>]? ".to_string(),
+                    "<info>Do you want to remove the existing VCS (.git, .svn..) history?</info> [<comment>y,n</comment>]? ",
                     true,
                 )?);
         if remove_vcs {
@@ -345,7 +347,7 @@ impl CreateProjectCommand {
             ]
             .iter()
             {
-                finder.name(vcs_name);
+                finder.name(BStr::new(vcs_name));
             }
 
             // PHP: try { $dirs = iterator_to_array($finder); ... } catch (\Exception $e) { ... }
@@ -354,16 +356,16 @@ impl CreateProjectCommand {
             let mut had_error: Option<anyhow::Error> = None;
             for dir in &dirs {
                 if !fs.remove_directory(dir)? {
-                    had_error = Some(
-                        RuntimeException::new(format!("Could not remove {}", dir.display())).into(),
-                    );
+                    had_error =
+                        Some(RuntimeException::new(bconcat!("Could not remove ", dir)).into());
                     break;
                 }
             }
             if let Some(e) = had_error {
-                io.write_error(&format!(
-                    "<error>An error occurred while removing the VCS metadata: {}</error>",
-                    e
+                io.write_error(bconcat!(
+                    "<error>An error occurred while removing the VCS metadata: ",
+                    error_message(&e),
+                    "</error>"
                 ));
             }
 
@@ -375,7 +377,7 @@ impl CreateProjectCommand {
             let package = composer.get_package();
             let mut config_source = JsonConfigSource::new(
                 std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
-                    "composer.json".to_string(),
+                    "composer.json",
                     None,
                     None,
                 )?)),
@@ -385,9 +387,9 @@ impl CreateProjectCommand {
                 for link in package.get_links_for_type(meta.method).values() {
                     if link.get_pretty_constraint() == "self.version" {
                         config_source.add_link(
-                            r#type,
+                            bstr::BStr::new(r#type),
                             link.get_target(),
-                            &package.get_pretty_version(),
+                            package.get_pretty_version().as_bstr(),
                         )?;
                     }
                 }
@@ -416,66 +418,61 @@ impl CreateProjectCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        package_name: &str,
+        package_name: &BStr,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
-        directory: Option<String>,
-        mut package_version: Option<String>,
-        mut stability: Option<String>,
+        directory: Option<PathBuf>,
+        mut package_version: Option<BString>,
+        mut stability: Option<BString>,
         prefer_source: bool,
         prefer_dist: bool,
         _install_dev_packages: bool,
-        repositories: Option<&Vec<String>>,
+        repositories: Option<&Vec<BString>>,
         disable_plugins: bool,
         disable_scripts: bool,
         no_progress: bool,
         secure_http: bool,
     ) -> anyhow::Result<bool> {
         let parser: VersionParser = VersionParser::new();
-        let requirements = parser.parse_name_version_pairs(vec![package_name.to_string()])?;
+        let requirements = parser.parse_name_version_pairs(vec![BString::from(package_name)])?;
         let name = strtolower(
             requirements[0]
-                .get("name")
-                .map(|s| s.as_str())
-                .unwrap_or(""),
+                .get(bstr::B("name"))
+                .map(|s| s.as_bstr())
+                .unwrap_or_default(),
         );
-        if package_version.is_none() && requirements[0].contains_key("version") {
-            package_version = requirements[0].get("version").cloned();
+        if package_version.is_none() && requirements[0].contains_key(bstr::B("version")) {
+            package_version = requirements[0].get(bstr::B("version")).cloned();
         }
 
         // if no directory was specified, use the 2nd part of the package name
         let mut directory = match directory {
             None => {
                 let mut parts = explode_with_limit("/", &name, 2);
-                std::path::Path::new(&Platform::get_cwd(false)?)
-                    .join(array_pop(&mut parts).unwrap_or_default())
-                    .into_os_string()
-                    .into_string()
-                    .unwrap()
+                Platform::get_cwd(false)?
+                    .join(path_from_bytes(&array_pop(&mut parts).unwrap_or_default()))
             }
             Some(directory) => directory,
         };
-        directory = rtrim(&directory, Some("/\\"));
+        directory = path_from_bytes(&rtrim2(path_to_bytes(&directory), "/\\")).to_path_buf();
 
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(process))));
         if !fs.borrow().is_absolute_path(&directory) {
-            directory = std::path::Path::new(&Platform::get_cwd(false)?)
-                .join(&directory)
-                .into_os_string()
-                .into_string()
-                .unwrap();
+            directory = Platform::get_cwd(false)?.join(&directory);
         }
-        if directory.is_empty() {
-            return Err(UnexpectedValueException::new(
-                "Got an empty target directory, something went wrong".to_string(),
-            )
+        if directory.as_os_str().is_empty() {
+            return Err(UnexpectedValueException::new(BString::from(
+                "Got an empty target directory, something went wrong",
+            ))
             .into());
         }
 
         // set the base dir to ensure $config->all() below resolves the correct absolute paths to vendor-dir etc
-        config.borrow_mut().set_base_dir(Some(directory.clone()));
+        config
+            .borrow_mut()
+            .set_base_dir(Some(BString::from(path_to_bytes(&directory))));
         if !secure_http {
             let mut merge_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             let mut inner_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
@@ -486,25 +483,29 @@ impl CreateProjectCommand {
                 .merge(&merge_map, Config::SOURCE_COMMAND);
         }
 
-        io.write_error(&format!(
-            "<info>Creating a \"{}\" project at \"{}\"</info>",
+        io.write_error(bconcat!(
+            "<info>Creating a \"",
             package_name,
+            "\" project at \"",
             fs.borrow()
-                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?
+                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?,
+            "\"</info>"
         ));
 
         if file_exists(&directory) {
             if !is_dir(&directory) {
-                return Err(InvalidArgumentException::new(format!(
-                    "Cannot create project directory at \"{}\", it exists as a file.",
-                    directory
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Cannot create project directory at \"",
+                    directory,
+                    "\", it exists as a file."
                 ))
                 .into());
             }
             if !fs.borrow().is_dir_empty(&directory) {
-                return Err(InvalidArgumentException::new(format!(
-                    "Project directory \"{}\" is not empty.",
-                    directory
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Project directory \"",
+                    directory,
+                    "\" is not empty."
                 ))
                 .into());
             }
@@ -512,45 +513,38 @@ impl CreateProjectCommand {
 
         if stability.is_none() {
             if package_version.is_none() {
-                stability = Some("stable".to_string());
+                stability = Some("stable".into());
             } else {
                 let matched = preg_match(
-                    format!(
-                        "{{^[^,\\s]*?@({})$}}i",
-                        implode(
-                            "|",
-                            &STABILITIES
-                                .keys()
-                                .map(|k| k.to_string())
-                                .collect::<Vec<_>>()
-                        )
+                    bconcat!(
+                        "{^[^,\\s]*?@(",
+                        implode("|", &STABILITIES.keys().copied().collect::<Vec<_>>()),
+                        ")$}i"
                     ),
-                    package_version.as_deref().unwrap_or(""),
+                    package_version
+                        .as_ref()
+                        .map(|v| v.as_bstr())
+                        .unwrap_or_default(),
                 );
                 if let Some(matched) = matched {
-                    stability = Some(matched.get(1).unwrap_or_default().to_string());
+                    stability = Some(BString::from(matched.get(1).unwrap_or_default()));
                 } else {
                     stability = Some(VersionParser::parse_stability(
-                        package_version.as_deref().unwrap_or(""),
+                        package_version.clone().unwrap_or_default(),
                     ));
                 }
             }
         }
 
-        let stability = VersionParser::normalize_stability(stability.as_deref().unwrap_or(""))
-            .unwrap_or_default();
+        let stability =
+            VersionParser::normalize_stability(stability.unwrap_or_default()).unwrap_or_default();
 
-        if !STABILITIES.contains_key(stability.as_str()) {
-            return Err(InvalidArgumentException::new(format!(
-                "Invalid stability provided ({}), must be one of: {}",
+        if crate::package::stability_priority(&stability).is_none() {
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Invalid stability provided (",
                 stability,
-                implode(
-                    ", ",
-                    &STABILITIES
-                        .keys()
-                        .map(|k| k.to_string())
-                        .collect::<Vec<_>>()
-                )
+                "), must be one of: ",
+                implode(", ", &STABILITIES.keys().copied().collect::<Vec<_>>())
             ))
             .into());
         }
@@ -565,7 +559,9 @@ impl CreateProjectCommand {
         let composer = crate::composer::composer_full(&composer_handle);
         let config = composer.get_config();
         // set the base dir here again on the new config instance, as otherwise in case the vendor dir is defined in an env var for example it would still override the value set above by $config->all()
-        config.borrow_mut().set_base_dir(Some(directory.clone()));
+        config
+            .borrow_mut()
+            .set_base_dir(Some(BString::from(path_to_bytes(&directory))));
         let rm = composer.get_repository_manager();
 
         let mut repository_set = RepositorySet::new(
@@ -638,15 +634,7 @@ impl CreateProjectCommand {
         let mut platform_repo = PlatformRepository::new(
             vec![],
             match platform_overrides {
-                PhpMixed::Array(m) => m
-                    .iter()
-                    .map(|(k, v)| {
-                        (
-                            k.clone(),
-                            PhpMixed::string(v.as_string().unwrap_or_default().to_string()),
-                        )
-                    })
-                    .collect(),
+                PhpMixed::Array(m) => m,
                 _ => indexmap::IndexMap::new(),
             },
             None,
@@ -659,9 +647,9 @@ impl CreateProjectCommand {
             Some(&mut platform_repo),
         )?;
         let package = version_selector.find_best_candidate(
-            &name,
-            package_version.as_deref(),
-            &stability,
+            bstr::BStr::new(&name),
+            package_version.as_ref().map(BString::as_ref),
+            bstr::BStr::new(&stability),
             Some(platform_requirement_filter.clone()),
             0,
             Some(io.clone()),
@@ -669,13 +657,14 @@ impl CreateProjectCommand {
         )?;
 
         if package.is_none() {
-            let error_message = format!(
-                "Could not find package {} with {}",
+            let error_message = bconcat!(
+                "Could not find package ",
                 name,
+                " with ",
                 if let Some(v) = package_version.as_ref() {
-                    format!("version {}", v)
+                    bconcat!("version ", v)
                 } else {
-                    format!("stability {}", stability)
+                    bconcat!("stability ", stability)
                 }
             );
             let is_ignore_all = platform_requirement_filter
@@ -685,9 +674,9 @@ impl CreateProjectCommand {
             if !is_ignore_all
                 && version_selector
                     .find_best_candidate(
-                        &name,
-                        package_version.as_deref(),
-                        &stability,
+                        bstr::BStr::new(&name),
+                        package_version.as_ref().map(BString::as_ref),
+                        bstr::BStr::new(&stability),
                         Some(PlatformRequirementFilterFactory::ignore_all()),
                         0,
                         None,
@@ -695,14 +684,11 @@ impl CreateProjectCommand {
                     )?
                     .is_some()
             {
-                return Err(InvalidArgumentException::new(format!(
-                    "{} in a version installable using your PHP version, PHP extensions and Composer version.",
-                    error_message
-                ))
+                return Err(InvalidArgumentException::new(bconcat!(error_message, " in a version installable using your PHP version, PHP extensions and Composer version."))
                 .into());
             }
 
-            return Err(InvalidArgumentException::new(format!("{}.", error_message)).into());
+            return Err(InvalidArgumentException::new(bconcat!(error_message, ".")).into());
         }
         let mut package = package.unwrap();
 
@@ -712,7 +698,7 @@ impl CreateProjectCommand {
         let signals = real_dir.as_ref().map(|_| SignalSubscription::new());
         let abort_on_signal = |signals: &SignalSubscription| {
             io.write_error3(
-                &format!("Received {}, aborting", signals.last_signal().as_str()),
+                bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
                 true,
                 crate::io::DEBUG,
             );
@@ -733,10 +719,12 @@ impl CreateProjectCommand {
             package = alias.get_alias_of().into();
         }
 
-        io.write_error(&format!(
-            "<info>Installing {} ({})</info>",
+        io.write_error(bconcat!(
+            "<info>Installing ",
             package.get_name(),
-            package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRefIfDev)
+            " (",
+            package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRefIfDev),
+            ")</info>"
         ));
 
         if disable_plugins {
@@ -792,21 +780,23 @@ impl CreateProjectCommand {
             .borrow_mut()
             .add_suggestions_from_package(package.clone());
 
-        let installed_from_vcs = package.get_installation_source().as_deref() == Some("source");
+        let installed_from_vcs = package
+            .get_installation_source()
+            .is_some_and(|s| s == "source");
 
-        io.write_error(&format!("<info>Created project in {}</info>", directory));
+        io.write_error(bconcat!("<info>Created project in ", directory, "</info>"));
         chdir(&directory);
 
         // ensure that the env var being set does not interfere with create-project
         // as it is probably not meant to be used here, so we do not use it if a composer.json can be found
         // in the project
-        if file_exists(format!("{}/composer.json", directory))
+        if file_exists(path_from_bytes(&bconcat!(directory, "/composer.json")))
             && Platform::get_env("COMPOSER").is_some()
         {
             Platform::clear_env("COMPOSER");
         }
 
-        Platform::put_env("COMPOSER_ROOT_VERSION", &package.get_pretty_version());
+        Platform::put_env("COMPOSER_ROOT_VERSION", package.get_pretty_version());
 
         if let Some(signals) = &signals
             && signals.is_triggered()
@@ -824,13 +814,13 @@ impl CreateProjectCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for CreateProjectCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("create-project")?;
-        self.set_description("Creates new project from a package into given directory");
+        self.set_name("create-project".into())?;
+        self.set_description("Creates new project from a package into given directory".into());
         self.set_definition(&[
                 InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
                 InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
                 InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None).unwrap().into(),
-                InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
+                InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
                 InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
                 InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
                 InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
@@ -847,7 +837,7 @@ impl Command for CreateProjectCommand {
                 InputOption::new("remove-vcs", None, Some(InputOption::VALUE_NONE), "Whether to force deletion of the vcs folder without prompting.", None).unwrap().into(),
                 InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Whether to skip installation of the package dependencies.", None).unwrap().into(),
                 InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Whether to skip auditing of the installed package dependencies (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-                InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+                InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
                 InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
                 InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
                 InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
@@ -868,7 +858,7 @@ impl Command for CreateProjectCommand {
                 controlled code by appending the <info>'--prefer-source'</info> flag.\n\n\
                 To install a package from another repository than the default one you\n\
                 can pass the <info>'--repository=https://myrepository.org'</info> flag.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#create-project"
+                Read more at https://getcomposer.org/doc/03-cli.md#create-project".into()
             );
         Ok(())
     }
@@ -904,16 +894,17 @@ impl Command for CreateProjectCommand {
         {
             let package = input.borrow().get_argument("package")?;
             if package.is_null() {
-                return Err(RuntimeException::new(
-                    "Not enough arguments (missing: \"package\").".to_string(),
-                )
+                return Err(RuntimeException::new(BString::from(
+                    "Not enough arguments (missing: \"package\").",
+                ))
                 .into());
             }
             let mut parts =
-                explode_with_limit("/", &strtolower(package.as_string().unwrap_or_default()), 2);
-            let prompt = format!(
-                "New project directory [<comment>{}</comment>]: ",
-                array_pop(&mut parts).unwrap_or_default()
+                explode_with_limit("/", strtolower(package.as_string().unwrap_or_default()), 2);
+            let prompt = bconcat!(
+                "New project directory [<comment>",
+                array_pop(&mut parts).unwrap_or_default(),
+                "</comment>]: "
             );
             input.borrow_mut().set_argument(
                 "directory",
@@ -938,22 +929,22 @@ impl Command for CreateProjectCommand {
                 .borrow()
                 .get_argument("package")?
                 .as_string()
-                .map(|s| s.to_string()),
+                .map(BString::from),
             input
                 .borrow()
                 .get_argument("directory")?
                 .as_string()
-                .map(|s| s.to_string()),
+                .map(|s| path_from_bytes(s).to_path_buf()),
             input
                 .borrow()
                 .get_argument("version")?
                 .as_string()
-                .map(|s| s.to_string()),
+                .map(BString::from),
             input
                 .borrow()
                 .get_option("stability")?
                 .as_string()
-                .map(|s| s.to_string()),
+                .map(BString::from),
             prefer_source,
             prefer_dist,
             !input

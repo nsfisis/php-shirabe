@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionSelectorTest.php
 
 use crate::test_case::get_package;
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use shirabe::io::{BufferIO, IOInterface};
@@ -13,21 +13,31 @@ use shirabe::package::{
     PackageInterfaceHandle,
 };
 use shirabe::repository::{PlatformRepository, RepositorySetInterface};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::output::output_interface;
 
-mockall::mock! {
-    RepositorySet {}
-    impl RepositorySetInterface for RepositorySet {
-        fn find_packages(
-            &self,
-            name: &str,
-            constraint: Option<AnyConstraint>,
-            flags: i64,
-        ) -> anyhow::Result<Vec<BasePackageHandle>>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_repository_set {
+    use super::*;
+
+    mockall::mock! {
+        pub RepositorySet {}
+        impl RepositorySetInterface for RepositorySet {
+            fn find_packages(
+                &self,
+                name: &BStr,
+                constraint: Option<AnyConstraint>,
+                flags: i64,
+            ) -> anyhow::Result<Vec<BasePackageHandle>>;
+        }
     }
 }
+use mock_repository_set::MockRepositorySet;
 
 // `RepositorySetInterface` requires `Debug`; mockall does not generate it.
 impl std::fmt::Debug for MockRepositorySet {
@@ -46,29 +56,32 @@ fn into_seam(
 fn assert_same(
     best: &Option<PackageInterfaceHandle>,
     expected: &PackageInterfaceHandle,
-    msg: &str,
+    msg: &BStr,
 ) {
-    let best = best
-        .as_ref()
-        .unwrap_or_else(|| panic!("{msg}: expected Some(_), got None"));
-    assert!(best.ptr_eq(expected), "{msg}");
+    let best = best.as_ref().unwrap_or_else(|| {
+        panic!(
+            "{msg}: expected Some(_), got None",
+            msg = msg.display_lossy()
+        )
+    });
+    assert!(best.ptr_eq(expected), "{msg}", msg = msg.display_lossy());
 }
 
-fn require_link(package_name: &str, target: &str, pretty_constraint: &str) -> Link {
+fn require_link(package_name: &BStr, target: &BStr, pretty_constraint: &BStr) -> Link {
     let parser = VersionParser::new();
     Link::new(
-        package_name.to_string(),
-        target.to_string(),
+        bconcat!(package_name),
+        bconcat!(target),
         parser.parse_constraints(pretty_constraint).unwrap(),
-        Some(Link::TYPE_REQUIRE.to_string()),
-        pretty_constraint.to_string(),
+        Some(Link::TYPE_REQUIRE.to_owned()),
+        bconcat!(pretty_constraint),
     )
 }
 
 fn find_best(
     version_selector: &mut VersionSelector,
-    package_name: &str,
-    preferred_stability: &str,
+    package_name: &BStr,
+    preferred_stability: &BStr,
     platform_requirement_filter: Option<
         std::rc::Rc<
             dyn shirabe::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
@@ -78,9 +91,9 @@ fn find_best(
 ) -> Option<PackageInterfaceHandle> {
     version_selector
         .find_best_candidate(
-            package_name,
+            bstr::BStr::new(package_name),
             None,
-            preferred_stability,
+            bstr::BStr::new(preferred_stability),
             platform_requirement_filter,
             0,
             io,
@@ -91,7 +104,7 @@ fn find_best(
 
 #[test]
 fn test_latest_version_is_returned() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let package1 = get_package("foo/bar", "1.2.1");
     let package2 = get_package("foo/bar", "1.2.2");
@@ -105,40 +118,66 @@ fn test_latest_version_is_returned() {
         .returning_st(move |_, _, _| Ok(packages.clone()));
 
     let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
-    let best = find_best(&mut version_selector, package_name, "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("stable"),
+        None,
+        None,
+    );
 
     // 1.2.2 should be returned because it's the latest of the returned versions
-    assert_same(&best, &package2, "Latest version should be 1.2.2");
+    assert_same(
+        &best,
+        &package2,
+        BStr::new("Latest version should be 1.2.2"),
+    );
 }
 
 #[test]
 fn test_latest_version_is_returned_that_matches_php_requirements() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let mut overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
-    overrides.insert("php".into(), PhpMixed::string("5.5.0".to_string()));
+    overrides.insert("php".into(), PhpMixed::string(BString::from("5.5.0")));
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
     let package0 = get_package("foo/bar", "0.9.0");
-    package0.__set_requires(IndexMap::from([(
-        "php".to_string(),
-        require_link(package_name, "php", ">=5.6"),
-    )]));
+    package0.__set_requires(
+        IndexMap::from([(
+            BString::from("php"),
+            require_link(package_name, BStr::new("php"), BStr::new(">=5.6")),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package1 = get_package("foo/bar", "1.0.0");
-    package1.__set_requires(IndexMap::from([(
-        "php".to_string(),
-        require_link(package_name, "php", ">=5.4"),
-    )]));
+    package1.__set_requires(
+        IndexMap::from([(
+            BString::from("php"),
+            require_link(package_name, BStr::new("php"), BStr::new(">=5.4")),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package2 = get_package("foo/bar", "2.0.0");
-    package2.__set_requires(IndexMap::from([(
-        "php".to_string(),
-        require_link(package_name, "php", ">=5.6"),
-    )]));
+    package2.__set_requires(
+        IndexMap::from([(
+            BString::from("php"),
+            require_link(package_name, BStr::new("php"), BStr::new(">=5.6")),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package3 = get_package("foo/bar", "2.1.0");
-    package3.__set_requires(IndexMap::from([(
-        "php".to_string(),
-        require_link(package_name, "php", ">=5.6"),
-    )]));
+    package3.__set_requires(
+        IndexMap::from([(
+            BString::from("php"),
+            require_link(package_name, BStr::new("php"), BStr::new(">=5.6")),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let packages = vec![package0, package1.clone(), package2, package3.clone()];
 
     let mut repository_set = MockRepositorySet::new();
@@ -151,20 +190,20 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
         VersionSelector::new(into_seam(repository_set), Some(&mut platform)).unwrap();
 
     let io = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
     ));
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
     let best = find_best(
         &mut version_selector,
         package_name,
-        "stable",
+        BStr::new("stable"),
         None,
         Some(io_dyn),
     );
     assert_same(
         &best,
         &package1,
-        "Latest version supporting php 5.5 should be returned (1.0.0)",
+        BStr::new("Latest version supporting php 5.5 should be returned (1.0.0)"),
     );
     assert_eq!(
         "<warning>Cannot use foo/bar's latest version 2.1.0 as it requires php >=5.6 which is not satisfied by your platform.\n",
@@ -172,20 +211,25 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
     );
 
     let io = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), output_interface::VERBOSITY_VERBOSE, None).unwrap(),
+        BufferIO::new(
+            BString::default(),
+            output_interface::VERBOSITY_VERBOSE,
+            None,
+        )
+        .unwrap(),
     ));
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
     let best = find_best(
         &mut version_selector,
         package_name,
-        "stable",
+        BStr::new("stable"),
         None,
         Some(io_dyn),
     );
     assert_same(
         &best,
         &package1,
-        "Latest version supporting php 5.5 should be returned (1.0.0)",
+        BStr::new("Latest version supporting php 5.5 should be returned (1.0.0)"),
     );
     assert_eq!(
         "<warning>Cannot use foo/bar's latest version 2.1.0 as it requires php >=5.6 which is not satisfied by your platform.\n\
@@ -196,35 +240,43 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
     let best = find_best(
         &mut version_selector,
         package_name,
-        "stable",
+        BStr::new("stable"),
         Some(PlatformRequirementFilterFactory::ignore_all()),
         None,
     );
     assert_same(
         &best,
         &package3,
-        "Latest version should be returned when ignoring platform reqs (2.1.0)",
+        BStr::new("Latest version should be returned when ignoring platform reqs (2.1.0)"),
     );
 }
 
 #[test]
 fn test_latest_version_is_returned_that_matches_ext_requirements() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let mut overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
-    overrides.insert("ext-zip".into(), PhpMixed::string("5.3.0".to_string()));
+    overrides.insert("ext-zip".into(), PhpMixed::string(BString::from("5.3.0")));
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
     let package1 = get_package("foo/bar", "1.0.0");
-    package1.__set_requires(IndexMap::from([(
-        "ext-zip".to_string(),
-        require_link(package_name, "ext-zip", "^5.2"),
-    )]));
+    package1.__set_requires(
+        IndexMap::from([(
+            BString::from("ext-zip"),
+            require_link(package_name, BStr::new("ext-zip"), BStr::new("^5.2")),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package2 = get_package("foo/bar", "2.0.0");
-    package2.__set_requires(IndexMap::from([(
-        "ext-zip".to_string(),
-        require_link(package_name, "ext-zip", "^5.4"),
-    )]));
+    package2.__set_requires(
+        IndexMap::from([(
+            BString::from("ext-zip"),
+            require_link(package_name, BStr::new("ext-zip"), BStr::new("^5.4")),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let packages = vec![package1.clone(), package2.clone()];
 
     let mut repository_set = MockRepositorySet::new();
@@ -236,38 +288,48 @@ fn test_latest_version_is_returned_that_matches_ext_requirements() {
     let mut version_selector =
         VersionSelector::new(into_seam(repository_set), Some(&mut platform)).unwrap();
 
-    let best = find_best(&mut version_selector, package_name, "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("stable"),
+        None,
+        None,
+    );
     assert_same(
         &best,
         &package1,
-        "Latest version supporting ext-zip 5.3.0 should be returned (1.0.0)",
+        BStr::new("Latest version supporting ext-zip 5.3.0 should be returned (1.0.0)"),
     );
     let best = find_best(
         &mut version_selector,
         package_name,
-        "stable",
+        BStr::new("stable"),
         Some(PlatformRequirementFilterFactory::ignore_all()),
         None,
     );
     assert_same(
         &best,
         &package2,
-        "Latest version should be returned when ignoring platform reqs (2.0.0)",
+        BStr::new("Latest version should be returned when ignoring platform reqs (2.0.0)"),
     );
 }
 
 #[test]
 fn test_latest_version_is_returned_that_matches_platform_ext() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let mut platform = PlatformRepository::new(vec![], IndexMap::new(), None, None).unwrap();
 
     let package1 = get_package("foo/bar", "1.0.0");
     let package2 = get_package("foo/bar", "2.0.0");
-    package2.__set_requires(IndexMap::from([(
-        "ext-barfoo".to_string(),
-        require_link(package_name, "ext-barfoo", "*"),
-    )]));
+    package2.__set_requires(
+        IndexMap::from([(
+            BString::from("ext-barfoo"),
+            require_link(package_name, BStr::new("ext-barfoo"), BStr::new("*")),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let packages = vec![package1.clone(), package2.clone()];
 
     let mut repository_set = MockRepositorySet::new();
@@ -279,47 +341,69 @@ fn test_latest_version_is_returned_that_matches_platform_ext() {
     let mut version_selector =
         VersionSelector::new(into_seam(repository_set), Some(&mut platform)).unwrap();
 
-    let best = find_best(&mut version_selector, package_name, "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("stable"),
+        None,
+        None,
+    );
     assert_same(
         &best,
         &package1,
-        "Latest version not requiring ext-barfoo should be returned (1.0.0)",
+        BStr::new("Latest version not requiring ext-barfoo should be returned (1.0.0)"),
     );
     let best = find_best(
         &mut version_selector,
         package_name,
-        "stable",
+        BStr::new("stable"),
         Some(PlatformRequirementFilterFactory::ignore_all()),
         None,
     );
     assert_same(
         &best,
         &package2,
-        "Latest version should be returned when ignoring platform reqs (2.0.0)",
+        BStr::new("Latest version should be returned when ignoring platform reqs (2.0.0)"),
     );
 }
 
 #[test]
 fn test_latest_version_is_returned_that_matches_composer_requirements() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let mut overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
     overrides.insert(
         "composer-runtime-api".into(),
-        PhpMixed::string("1.0.0".to_string()),
+        PhpMixed::string(BString::from("1.0.0")),
     );
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
     let package1 = get_package("foo/bar", "1.0.0");
-    package1.__set_requires(IndexMap::from([(
-        "composer-runtime-api".to_string(),
-        require_link(package_name, "composer-runtime-api", "^1.0"),
-    )]));
+    package1.__set_requires(
+        IndexMap::from([(
+            BString::from("composer-runtime-api"),
+            require_link(
+                package_name,
+                BStr::new("composer-runtime-api"),
+                BStr::new("^1.0"),
+            ),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package2 = get_package("foo/bar", "1.1.0");
-    package2.__set_requires(IndexMap::from([(
-        "composer-runtime-api".to_string(),
-        require_link(package_name, "composer-runtime-api", "^2.0"),
-    )]));
+    package2.__set_requires(
+        IndexMap::from([(
+            BString::from("composer-runtime-api"),
+            require_link(
+                package_name,
+                BStr::new("composer-runtime-api"),
+                BStr::new("^2.0"),
+            ),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let packages = vec![package1.clone(), package2.clone()];
 
     let mut repository_set = MockRepositorySet::new();
@@ -331,29 +415,35 @@ fn test_latest_version_is_returned_that_matches_composer_requirements() {
     let mut version_selector =
         VersionSelector::new(into_seam(repository_set), Some(&mut platform)).unwrap();
 
-    let best = find_best(&mut version_selector, package_name, "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("stable"),
+        None,
+        None,
+    );
     assert_same(
         &best,
         &package1,
-        "Latest version supporting composer 1 should be returned (1.0.0)",
+        BStr::new("Latest version supporting composer 1 should be returned (1.0.0)"),
     );
     let best = find_best(
         &mut version_selector,
         package_name,
-        "stable",
+        BStr::new("stable"),
         Some(PlatformRequirementFilterFactory::ignore_all()),
         None,
     );
     assert_same(
         &best,
         &package2,
-        "Latest version should be returned when ignoring platform reqs (1.1.0)",
+        BStr::new("Latest version should be returned when ignoring platform reqs (1.1.0)"),
     );
 }
 
 #[test]
 fn test_most_stable_version_is_returned() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let package1 = get_package("foo/bar", "1.0.0");
     let package2 = get_package("foo/bar", "1.1.0-beta");
@@ -366,18 +456,24 @@ fn test_most_stable_version_is_returned() {
         .returning_st(move |_, _, _| Ok(packages.clone()));
 
     let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
-    let best = find_best(&mut version_selector, package_name, "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("stable"),
+        None,
+        None,
+    );
 
     assert_same(
         &best,
         &package1,
-        "Latest most stable version should be returned (1.0.0)",
+        BStr::new("Latest most stable version should be returned (1.0.0)"),
     );
 }
 
 #[test]
 fn test_most_stable_version_is_returned_regardless_of_order() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let package1 = get_package("foo/bar", "2.x-dev");
     let package2 = get_package("foo/bar", "2.0.0-beta3");
@@ -398,24 +494,36 @@ fn test_most_stable_version_is_returned_regardless_of_order() {
         .returning_st(move |_, _, _| Ok(reversed.clone()));
 
     let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
-    let best = find_best(&mut version_selector, package_name, "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("stable"),
+        None,
+        None,
+    );
     assert_same(
         &best,
         &package2,
-        "Expecting 2.0.0-beta3, cause beta is more stable than dev",
+        BStr::new("Expecting 2.0.0-beta3, cause beta is more stable than dev"),
     );
 
-    let best = find_best(&mut version_selector, package_name, "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("stable"),
+        None,
+        None,
+    );
     assert_same(
         &best,
         &package2,
-        "Expecting 2.0.0-beta3, cause beta is more stable than dev",
+        BStr::new("Expecting 2.0.0-beta3, cause beta is more stable than dev"),
     );
 }
 
 #[test]
 fn test_highest_version_is_returned() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let package1 = get_package("foo/bar", "1.0.0");
     let package2 = get_package("foo/bar", "1.1.0-beta");
@@ -428,18 +536,24 @@ fn test_highest_version_is_returned() {
         .returning_st(move |_, _, _| Ok(packages.clone()));
 
     let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
-    let best = find_best(&mut version_selector, package_name, "dev", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("dev"),
+        None,
+        None,
+    );
 
     assert_same(
         &best,
         &package2,
-        "Latest version should be returned (1.1.0-beta)",
+        BStr::new("Latest version should be returned (1.1.0-beta)"),
     );
 }
 
 #[test]
 fn test_highest_version_matching_stability_is_returned() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let package1 = get_package("foo/bar", "1.0.0");
     let package2 = get_package("foo/bar", "1.1.0-beta");
@@ -453,18 +567,24 @@ fn test_highest_version_matching_stability_is_returned() {
         .returning_st(move |_, _, _| Ok(packages.clone()));
 
     let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
-    let best = find_best(&mut version_selector, package_name, "beta", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("beta"),
+        None,
+        None,
+    );
 
     assert_same(
         &best,
         &package2,
-        "Latest version should be returned (1.1.0-beta)",
+        BStr::new("Latest version should be returned (1.1.0-beta)"),
     );
 }
 
 #[test]
 fn test_most_stable_unstable_version_is_returned() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let package2 = get_package("foo/bar", "1.1.0-beta");
     let package3 = get_package("foo/bar", "1.2.0-alpha");
@@ -477,26 +597,32 @@ fn test_most_stable_unstable_version_is_returned() {
         .returning_st(move |_, _, _| Ok(packages.clone()));
 
     let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
-    let best = find_best(&mut version_selector, package_name, "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("stable"),
+        None,
+        None,
+    );
 
     assert_same(
         &best,
         &package2,
-        "Latest version should be returned (1.1.0-beta)",
+        BStr::new("Latest version should be returned (1.1.0-beta)"),
     );
 }
 
 #[test]
 fn test_default_branch_alias_is_never_returned() {
-    let package_name = "foo/bar";
+    let package_name = BStr::new("foo/bar");
 
     let package = get_package("foo/bar", "1.1.0-beta");
     let package2 = get_package("foo/bar", "dev-main");
     let package2_complete = CompletePackageHandle::from_rc_unchecked(package2.as_rc().clone());
     let package2_alias: PackageInterfaceHandle = CompleteAliasPackageHandle::new(
         package2_complete,
-        VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
-        VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
+        VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
+        VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
     )
     .into();
     let packages = vec![package, package2_alias];
@@ -508,12 +634,18 @@ fn test_default_branch_alias_is_never_returned() {
         .returning_st(move |_, _, _| Ok(packages.clone()));
 
     let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
-    let best = find_best(&mut version_selector, package_name, "dev", None, None);
+    let best = find_best(
+        &mut version_selector,
+        package_name,
+        BStr::new("dev"),
+        None,
+        None,
+    );
 
     assert_same(
         &best,
         &package2,
-        "Latest version should be returned (dev-main)",
+        BStr::new("Latest version should be returned (dev-main)"),
     );
 }
 
@@ -526,97 +658,203 @@ fn test_false_returned_on_no_packages() {
         .returning_st(|_, _, _| Ok(vec![]));
 
     let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
-    let best = find_best(&mut version_selector, "foobaz", "stable", None, None);
+    let best = find_best(
+        &mut version_selector,
+        BStr::new("foobaz"),
+        BStr::new("stable"),
+        None,
+        None,
+    );
     assert!(best.is_none(), "No versions are available returns false");
 }
 
 #[test]
 fn test_find_recommended_require_version() {
     let php = shirabe_php_rpc::get_php_version();
-    let php_version = format!("{}.{}.{}", php.major, php.minor, php.release);
+    let php_version = bconcat!(php.major, ".", php.minor, ".", php.release);
     // real version, expected recommendation, [branch-alias], [pkg name]
-    let cases: Vec<(String, &str, Option<&str>, &str)> = vec![
-        ("1.2.1".to_string(), "^1.2", None, "foo/bar"),
-        ("1.2".to_string(), "^1.2", None, "foo/bar"),
-        ("v1.2.1".to_string(), "^1.2", None, "foo/bar"),
-        ("3.1.2-pl2".to_string(), "^3.1", None, "foo/bar"),
-        ("3.1.2-patch".to_string(), "^3.1", None, "foo/bar"),
-        ("2.0-beta.1".to_string(), "^2.0@beta", None, "foo/bar"),
-        ("3.1.2-alpha5".to_string(), "^3.1@alpha", None, "foo/bar"),
-        ("3.0-RC2".to_string(), "^3.0@RC", None, "foo/bar"),
-        ("0.1.0".to_string(), "^0.1.0", None, "foo/bar"),
-        ("0.1.3".to_string(), "^0.1.3", None, "foo/bar"),
-        ("0.0.3".to_string(), "^0.0.3", None, "foo/bar"),
-        ("0.0.3-alpha".to_string(), "^0.0.3@alpha", None, "foo/bar"),
-        ("0.0.3.4-alpha".to_string(), "^0.0.3@alpha", None, "foo/bar"),
-        ("3.0.0.2-RC2".to_string(), "^3.0@RC", None, "foo/bar"),
-        ("1.2.1.1020402".to_string(), "^1.2", None, "foo/bar"),
+    let cases: Vec<(BString, &BStr, Option<&BStr>, &BStr)> = vec![
+        (
+            BString::from("1.2.1"),
+            BStr::new("^1.2"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("1.2"),
+            BStr::new("^1.2"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("v1.2.1"),
+            BStr::new("^1.2"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("3.1.2-pl2"),
+            BStr::new("^3.1"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("3.1.2-patch"),
+            BStr::new("^3.1"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("2.0-beta.1"),
+            BStr::new("^2.0@beta"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("3.1.2-alpha5"),
+            BStr::new("^3.1@alpha"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("3.0-RC2"),
+            BStr::new("^3.0@RC"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("0.1.0"),
+            BStr::new("^0.1.0"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("0.1.3"),
+            BStr::new("^0.1.3"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("0.0.3"),
+            BStr::new("^0.0.3"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("0.0.3-alpha"),
+            BStr::new("^0.0.3@alpha"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("0.0.3.4-alpha"),
+            BStr::new("^0.0.3@alpha"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("3.0.0.2-RC2"),
+            BStr::new("^3.0@RC"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("1.2.1.1020402"),
+            BStr::new("^1.2"),
+            None,
+            BStr::new("foo/bar"),
+        ),
         // date-based versions are not touched at all
-        ("v20121020".to_string(), "v20121020", None, "foo/bar"),
-        ("v20121020.2".to_string(), "v20121020.2", None, "foo/bar"),
+        (
+            BString::from("v20121020"),
+            BStr::new("v20121020"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("v20121020.2"),
+            BStr::new("v20121020.2"),
+            None,
+            BStr::new("foo/bar"),
+        ),
         // dev packages without alias are not touched at all
-        ("dev-master".to_string(), "dev-master", None, "foo/bar"),
-        ("3.1.2-dev".to_string(), "3.1.2-dev", None, "foo/bar"),
+        (
+            BString::from("dev-master"),
+            BStr::new("dev-master"),
+            None,
+            BStr::new("foo/bar"),
+        ),
+        (
+            BString::from("3.1.2-dev"),
+            BStr::new("3.1.2-dev"),
+            None,
+            BStr::new("foo/bar"),
+        ),
         // dev packages with alias inherit the alias
         (
-            "dev-master".to_string(),
-            "^2.1@dev",
-            Some("2.1.x-dev"),
-            "foo/bar",
+            BString::from("dev-master"),
+            BStr::new("^2.1@dev"),
+            Some(BStr::new("2.1.x-dev")),
+            BStr::new("foo/bar"),
         ),
         (
-            "dev-master".to_string(),
-            "^2.1@dev",
-            Some("2.1-dev"),
-            "foo/bar",
+            BString::from("dev-master"),
+            BStr::new("^2.1@dev"),
+            Some(BStr::new("2.1-dev")),
+            BStr::new("foo/bar"),
         ),
         (
-            "dev-master".to_string(),
-            "^2.1@dev",
-            Some("2.1.3.x-dev"),
-            "foo/bar",
+            BString::from("dev-master"),
+            BStr::new("^2.1@dev"),
+            Some(BStr::new("2.1.3.x-dev")),
+            BStr::new("foo/bar"),
         ),
         (
-            "dev-master".to_string(),
-            "^2.0@dev",
-            Some("2.x-dev"),
-            "foo/bar",
+            BString::from("dev-master"),
+            BStr::new("^2.0@dev"),
+            Some(BStr::new("2.x-dev")),
+            BStr::new("foo/bar"),
         ),
         (
-            "dev-master".to_string(),
-            "^0.3.0@dev",
-            Some("0.3.x-dev"),
-            "foo/bar",
+            BString::from("dev-master"),
+            BStr::new("^0.3.0@dev"),
+            Some(BStr::new("0.3.x-dev")),
+            BStr::new("foo/bar"),
         ),
         (
-            "dev-master".to_string(),
-            "^0.0.3@dev",
-            Some("0.0.3.x-dev"),
-            "foo/bar",
+            BString::from("dev-master"),
+            BStr::new("^0.0.3@dev"),
+            Some(BStr::new("0.0.3.x-dev")),
+            BStr::new("foo/bar"),
         ),
         (
-            "dev-master".to_string(),
-            "dev-master",
+            BString::from("dev-master"),
+            BStr::new("dev-master"),
             Some(VersionParser::DEFAULT_BRANCH_ALIAS),
-            "foo/bar",
+            BStr::new("foo/bar"),
         ),
         // numeric alias
         (
-            "3.x-dev".to_string(),
-            "^3.0@dev",
-            Some("3.0.x-dev"),
-            "foo/bar",
+            BString::from("3.x-dev"),
+            BStr::new("^3.0@dev"),
+            Some(BStr::new("3.0.x-dev")),
+            BStr::new("foo/bar"),
         ),
         (
-            "3.x-dev".to_string(),
-            "^3.0@dev",
-            Some("3.0-dev"),
-            "foo/bar",
+            BString::from("3.x-dev"),
+            BStr::new("^3.0@dev"),
+            Some(BStr::new("3.0-dev")),
+            BStr::new("foo/bar"),
         ),
         // ext in sync with php
-        (php_version, "*", None, "ext-filter"),
+        (php_version, BStr::new("*"), None, BStr::new("ext-filter")),
         // ext versioned individually
-        ("3.0.5".to_string(), "^3.0", None, "ext-xdebug"),
+        (
+            BString::from("3.0.5"),
+            BStr::new("^3.0"),
+            None,
+            BStr::new("ext-xdebug"),
+        ),
     ];
 
     let version_parser = VersionParser::new();
@@ -625,7 +863,7 @@ fn test_find_recommended_require_version() {
         let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
 
         let package = PackageHandle::new(
-            package_name.to_string(),
+            bconcat!(package_name),
             version_parser.normalize(pretty_version, None).unwrap(),
             pretty_version.clone(),
         );
@@ -633,8 +871,8 @@ fn test_find_recommended_require_version() {
         if let Some(branch_alias) = branch_alias {
             let mut alias_map: IndexMap<BString, PhpMixed> = IndexMap::new();
             alias_map.insert(
-                pretty_version.as_str().into(),
-                PhpMixed::string(branch_alias.to_string()),
+                pretty_version.as_bstr().into(),
+                PhpMixed::string(bconcat!(branch_alias)),
             );
             let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
             extra.insert("branch-alias".into(), PhpMixed::Array(alias_map));

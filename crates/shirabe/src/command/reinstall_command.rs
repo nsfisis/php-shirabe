@@ -5,14 +5,15 @@ use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
 use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::{AnyOperation, UninstallOperation};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use shirabe_php_shim::{InvalidArgumentException, impl_php_class, preg_is_match};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{InvalidArgumentException, bconcat, impl_php_class, preg_is_match};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -43,16 +44,16 @@ impl ReinstallCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ReinstallCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("reinstall")?;
-        self.set_description("Uninstalls and reinstalls the given package names");
+        self.set_name("reinstall".into())?;
+        self.set_description("Uninstalls and reinstalls the given package names".into());
         self.set_definition(&[
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
             InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-            InputOption::new("optimize-autoloader", Some("o"), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
-            InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
             InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
@@ -66,7 +67,8 @@ impl Command for ReinstallCommand {
             of a package if you messed with its files, or if you wish to change\n\
             the installation type using --prefer-install.\n\n\
             <info>shirabe reinstall acme/foo \"acme/bar-*\"</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#reinstall",
+            Read more at https://getcomposer.org/doc/03-cli.md#reinstall"
+                .into(),
         );
         Ok(())
     }
@@ -84,54 +86,57 @@ impl Command for ReinstallCommand {
         let repository_manager = repository_manager.borrow();
         let local_repo = repository_manager.get_local_repository();
         let mut packages_to_reinstall: Vec<crate::package::PackageInterfaceHandle> = vec![];
-        let mut package_names_to_reinstall: Vec<String> = vec![];
+        let mut package_names_to_reinstall: Vec<bstr::BString> = vec![];
 
         let type_option = input.borrow().get_option("type")?;
-        let type_count = type_option.as_array().map_or(0, <[String]>::len);
+        let type_count = type_option.as_array().map_or(0, <[bstr::BString]>::len);
         let packages_arg = input.borrow().get_argument("packages")?;
-        let packages_count = packages_arg.as_array().map_or(0, <[String]>::len);
+        let packages_count = packages_arg.as_array().map_or(0, <[bstr::BString]>::len);
 
         if type_count > 0 {
             if packages_count > 0 {
-                return Err(InvalidArgumentException::new(
-                    "You cannot specify package names and filter by type at the same time."
-                        .to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "You cannot specify package names and filter by type at the same time.",
+                ))
                 .into());
             }
-            let filter_types: Vec<String> = type_option
+            let filter_types: Vec<bstr::BString> = type_option
                 .as_array()
-                .map(<[String]>::to_vec)
+                .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             for package in local_repo.get_canonical_packages()? {
-                if filter_types.contains(&package.get_type()) {
+                if filter_types.iter().any(|t| *t == package.get_type()) {
                     package_names_to_reinstall.push(package.get_name());
                     packages_to_reinstall.push(package);
                 }
             }
         } else {
             if packages_count == 0 {
-                return Err(InvalidArgumentException::new(
-                    "You must pass one or more package names to be reinstalled.".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "You must pass one or more package names to be reinstalled.",
+                ))
                 .into());
             }
-            let patterns: Vec<String> = packages_arg
+            let patterns: Vec<bstr::BString> = packages_arg
                 .as_array()
-                .map(<[String]>::to_vec)
+                .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             for pattern in &patterns {
                 let pattern_regexp = base_package::package_name_to_regexp(pattern);
                 let mut matched = false;
                 for package in local_repo.get_canonical_packages()? {
-                    if preg_is_match(&pattern_regexp, &package.get_name()) {
+                    if preg_is_match(&pattern_regexp, package.get_name()) {
                         matched = true;
                         package_names_to_reinstall.push(package.get_name());
                         packages_to_reinstall.push(package);
                     }
                 }
                 if !matched {
-                    io.write_error(&format!("<warning>Pattern \"{}\" does not match any currently installed packages.</warning>", pattern));
+                    io.write_error(bconcat!(
+                        "<warning>Pattern \"",
+                        pattern,
+                        "\" does not match any currently installed packages.</warning>"
+                    ));
                 }
             }
         }
@@ -151,7 +156,11 @@ impl Command for ReinstallCommand {
             present_packages.to_vec();
         let present_packages: Vec<crate::package::PackageInterfaceHandle> = present_packages
             .into_iter()
-            .filter(|package| !package_names_to_reinstall.contains(&package.get_name()))
+            .filter(|package| {
+                !package_names_to_reinstall
+                    .iter()
+                    .any(|name| *name == package.get_name())
+            })
             .collect();
 
         let transaction = Transaction::new(present_packages, result_packages);
@@ -180,11 +189,11 @@ impl Command for ReinstallCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "reinstall", input.clone(), output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         let event_dispatcher = composer.get_event_dispatcher();
         event_dispatcher
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
@@ -269,7 +278,7 @@ impl Command for ReinstallCommand {
                 .borrow()
                 .get_option("apcu-autoloader-prefix")?
                 .as_string()
-                .map(|s| s.to_string());
+                .map(BStr::to_owned);
             let apcu = apcu_prefix.is_some()
                 || input
                     .borrow()
@@ -297,7 +306,7 @@ impl Command for ReinstallCommand {
                 local_repo.clone(),
                 package.clone(),
                 installation_manager.clone(),
-                "composer",
+                BStr::new("composer"),
                 optimize,
                 None,
                 Some(locker.clone()),

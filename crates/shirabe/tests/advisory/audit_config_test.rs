@@ -1,39 +1,37 @@
 //! ref: composer/tests/Composer/Test/Advisory/AuditConfigTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::config::Config;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
-fn arr(pairs: Vec<(&str, PhpMixed)>) -> PhpMixed {
-    PhpMixed::Array(
-        pairs
-            .into_iter()
-            .map(|(k, v)| (k.to_string().into(), v))
-            .collect(),
-    )
+fn arr(pairs: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
+    PhpMixed::Array(pairs.into_iter().map(|(k, v)| (bconcat!(k), v)).collect())
 }
 
 fn list(items: Vec<PhpMixed>) -> PhpMixed {
     PhpMixed::List(items)
 }
 
-fn s(v: &str) -> PhpMixed {
-    PhpMixed::string(v.to_string())
+fn s(v: &BStr) -> PhpMixed {
+    PhpMixed::string(bconcat!(v))
 }
 
-fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<String, Option<String>> {
+fn ignore_list(pairs: Vec<(&BStr, Option<&BStr>)>) -> IndexMap<BString, Option<BString>> {
     pairs
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v.map(String::from)))
+        .map(|(k, v)| (BString::from(k), v.map(BString::from)))
         .collect()
 }
 
 fn audit_config_from(audit_section: PhpMixed) -> anyhow::Result<AuditConfig> {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
-    top.insert("config".into(), arr(vec![("audit", audit_section)]));
+    top.insert(
+        "config".into(),
+        arr(vec![(BStr::new("audit"), audit_section)]),
+    );
     config.merge(&top, "test");
 
     AuditConfig::from_config(&mut config, true, Auditor::FORMAT_SUMMARY)
@@ -42,17 +40,26 @@ fn audit_config_from(audit_section: PhpMixed) -> anyhow::Result<AuditConfig> {
 #[test]
 fn test_simple_format() {
     let audit_config = audit_config_from(arr(vec![(
-        "ignore",
-        list(vec![s("CVE-2024-1234"), s("CVE-2024-5678")]),
+        BStr::new("ignore"),
+        list(vec![
+            s(BStr::new("CVE-2024-1234")),
+            s(BStr::new("CVE-2024-5678")),
+        ]),
     )]))
     .unwrap();
 
     assert_eq!(
-        ignore_list(vec![("CVE-2024-1234", None), ("CVE-2024-5678", None)]),
+        ignore_list(vec![
+            (BStr::new("CVE-2024-1234"), None),
+            (BStr::new("CVE-2024-5678"), None)
+        ]),
         audit_config.ignore_list_for_audit
     );
     assert_eq!(
-        ignore_list(vec![("CVE-2024-1234", None), ("CVE-2024-5678", None)]),
+        ignore_list(vec![
+            (BStr::new("CVE-2024-1234"), None),
+            (BStr::new("CVE-2024-5678"), None)
+        ]),
         audit_config.ignore_list_for_blocking
     );
 }
@@ -60,19 +67,25 @@ fn test_simple_format() {
 #[test]
 fn test_detailed_format_audit_only() {
     let audit_config = audit_config_from(arr(vec![(
-        "ignore",
+        BStr::new("ignore"),
         arr(vec![(
-            "CVE-2024-1234",
+            BStr::new("CVE-2024-1234"),
             arr(vec![
-                ("apply", s("audit")),
-                ("reason", s("Only ignore for auditing")),
+                (BStr::new("apply"), s(BStr::new("audit"))),
+                (
+                    BStr::new("reason"),
+                    s(BStr::new("Only ignore for auditing")),
+                ),
             ]),
         )]),
     )]))
     .unwrap();
 
     assert_eq!(
-        ignore_list(vec![("CVE-2024-1234", Some("Only ignore for auditing"))]),
+        ignore_list(vec![(
+            BStr::new("CVE-2024-1234"),
+            Some(BStr::new("Only ignore for auditing"))
+        )]),
         audit_config.ignore_list_for_audit
     );
     assert_eq!(ignore_list(vec![]), audit_config.ignore_list_for_blocking);
@@ -81,12 +94,15 @@ fn test_detailed_format_audit_only() {
 #[test]
 fn test_detailed_format_block_only() {
     let audit_config = audit_config_from(arr(vec![(
-        "ignore",
+        BStr::new("ignore"),
         arr(vec![(
-            "CVE-2024-1234",
+            BStr::new("CVE-2024-1234"),
             arr(vec![
-                ("apply", s("block")),
-                ("reason", s("Only ignore for blocking")),
+                (BStr::new("apply"), s(BStr::new("block"))),
+                (
+                    BStr::new("reason"),
+                    s(BStr::new("Only ignore for blocking")),
+                ),
             ]),
         )]),
     )]))
@@ -94,7 +110,10 @@ fn test_detailed_format_block_only() {
 
     assert_eq!(ignore_list(vec![]), audit_config.ignore_list_for_audit);
     assert_eq!(
-        ignore_list(vec![("CVE-2024-1234", Some("Only ignore for blocking"))]),
+        ignore_list(vec![(
+            BStr::new("CVE-2024-1234"),
+            Some(BStr::new("Only ignore for blocking"))
+        )]),
         audit_config.ignore_list_for_blocking
     );
 }
@@ -102,35 +121,41 @@ fn test_detailed_format_block_only() {
 #[test]
 fn test_mixed_formats() {
     let audit_config = audit_config_from(arr(vec![(
-        "ignore",
+        BStr::new("ignore"),
         arr(vec![
-            ("0", s("CVE-2024-1234")),
-            ("CVE-2024-5678", s("Simple reason")),
+            (BStr::new("0"), s(BStr::new("CVE-2024-1234"))),
+            (BStr::new("CVE-2024-5678"), s(BStr::new("Simple reason"))),
             (
-                "CVE-2024-9999",
+                BStr::new("CVE-2024-9999"),
                 arr(vec![
-                    ("apply", s("audit")),
-                    ("reason", s("Detailed reason")),
+                    (BStr::new("apply"), s(BStr::new("audit"))),
+                    (BStr::new("reason"), s(BStr::new("Detailed reason"))),
                 ]),
             ),
-            ("CVE-2024-8888", arr(vec![("apply", s("block"))])),
+            (
+                BStr::new("CVE-2024-8888"),
+                arr(vec![(BStr::new("apply"), s(BStr::new("block")))]),
+            ),
         ]),
     )]))
     .unwrap();
 
     assert_eq!(
         ignore_list(vec![
-            ("CVE-2024-1234", None),
-            ("CVE-2024-5678", Some("Simple reason")),
-            ("CVE-2024-9999", Some("Detailed reason")),
+            (BStr::new("CVE-2024-1234"), None),
+            (BStr::new("CVE-2024-5678"), Some(BStr::new("Simple reason"))),
+            (
+                BStr::new("CVE-2024-9999"),
+                Some(BStr::new("Detailed reason"))
+            ),
         ]),
         audit_config.ignore_list_for_audit
     );
     assert_eq!(
         ignore_list(vec![
-            ("CVE-2024-1234", None),
-            ("CVE-2024-5678", Some("Simple reason")),
-            ("CVE-2024-8888", None),
+            (BStr::new("CVE-2024-1234"), None),
+            (BStr::new("CVE-2024-5678"), Some(BStr::new("Simple reason"))),
+            (BStr::new("CVE-2024-8888"), None),
         ]),
         audit_config.ignore_list_for_blocking
     );
@@ -139,17 +164,17 @@ fn test_mixed_formats() {
 #[test]
 fn test_ignore_severity_simple_array() {
     let audit_config = audit_config_from(arr(vec![(
-        "ignore-severity",
-        list(vec![s("low"), s("medium")]),
+        BStr::new("ignore-severity"),
+        list(vec![s(BStr::new("low")), s(BStr::new("medium"))]),
     )]))
     .unwrap();
 
     assert_eq!(
-        ignore_list(vec![("low", None), ("medium", None)]),
+        ignore_list(vec![(BStr::new("low"), None), (BStr::new("medium"), None)]),
         audit_config.ignore_severity_for_audit
     );
     assert_eq!(
-        ignore_list(vec![("low", None), ("medium", None)]),
+        ignore_list(vec![(BStr::new("low"), None), (BStr::new("medium"), None)]),
         audit_config.ignore_severity_for_blocking
     );
 }
@@ -157,26 +182,35 @@ fn test_ignore_severity_simple_array() {
 #[test]
 fn test_ignore_severity_detailed_format() {
     let audit_config = audit_config_from(arr(vec![(
-        "ignore-severity",
+        BStr::new("ignore-severity"),
         arr(vec![
             (
-                "low",
+                BStr::new("low"),
                 arr(vec![
-                    ("apply", s("audit")),
-                    ("reason", s("We accept low severity issues")),
+                    (BStr::new("apply"), s(BStr::new("audit"))),
+                    (
+                        BStr::new("reason"),
+                        s(BStr::new("We accept low severity issues")),
+                    ),
                 ]),
             ),
-            ("medium", arr(vec![("apply", s("block"))])),
+            (
+                BStr::new("medium"),
+                arr(vec![(BStr::new("apply"), s(BStr::new("block")))]),
+            ),
         ]),
     )]))
     .unwrap();
 
     assert_eq!(
-        ignore_list(vec![("low", Some("We accept low severity issues"))]),
+        ignore_list(vec![(
+            BStr::new("low"),
+            Some(BStr::new("We accept low severity issues"))
+        )]),
         audit_config.ignore_severity_for_audit
     );
     assert_eq!(
-        ignore_list(vec![("medium", None)]),
+        ignore_list(vec![(BStr::new("medium"), None)]),
         audit_config.ignore_severity_for_blocking
     );
 }
@@ -184,17 +218,26 @@ fn test_ignore_severity_detailed_format() {
 #[test]
 fn test_ignore_abandoned_simple_format() {
     let audit_config = audit_config_from(arr(vec![(
-        "ignore-abandoned",
-        list(vec![s("vendor/package1"), s("vendor/package2")]),
+        BStr::new("ignore-abandoned"),
+        list(vec![
+            s(BStr::new("vendor/package1")),
+            s(BStr::new("vendor/package2")),
+        ]),
     )]))
     .unwrap();
 
     assert_eq!(
-        ignore_list(vec![("vendor/package1", None), ("vendor/package2", None)]),
+        ignore_list(vec![
+            (BStr::new("vendor/package1"), None),
+            (BStr::new("vendor/package2"), None)
+        ]),
         audit_config.ignore_abandoned_for_audit
     );
     assert_eq!(
-        ignore_list(vec![("vendor/package1", None), ("vendor/package2", None)]),
+        ignore_list(vec![
+            (BStr::new("vendor/package1"), None),
+            (BStr::new("vendor/package2"), None)
+        ]),
         audit_config.ignore_abandoned_for_blocking
     );
 }
@@ -202,20 +245,20 @@ fn test_ignore_abandoned_simple_format() {
 #[test]
 fn test_ignore_abandoned_detailed_format() {
     let audit_config = audit_config_from(arr(vec![(
-        "ignore-abandoned",
+        BStr::new("ignore-abandoned"),
         arr(vec![
             (
-                "vendor/package1",
+                BStr::new("vendor/package1"),
                 arr(vec![
-                    ("apply", s("audit")),
-                    ("reason", s("Report but do not block")),
+                    (BStr::new("apply"), s(BStr::new("audit"))),
+                    (BStr::new("reason"), s(BStr::new("Report but do not block"))),
                 ]),
             ),
             (
-                "vendor/package2",
+                BStr::new("vendor/package2"),
                 arr(vec![
-                    ("apply", s("block")),
-                    ("reason", s("Block but do not report")),
+                    (BStr::new("apply"), s(BStr::new("block"))),
+                    (BStr::new("reason"), s(BStr::new("Block but do not report"))),
                 ]),
             ),
         ]),
@@ -223,11 +266,17 @@ fn test_ignore_abandoned_detailed_format() {
     .unwrap();
 
     assert_eq!(
-        ignore_list(vec![("vendor/package1", Some("Report but do not block"))]),
+        ignore_list(vec![(
+            BStr::new("vendor/package1"),
+            Some(BStr::new("Report but do not block"))
+        )]),
         audit_config.ignore_abandoned_for_audit
     );
     assert_eq!(
-        ignore_list(vec![("vendor/package2", Some("Block but do not report"))]),
+        ignore_list(vec![(
+            BStr::new("vendor/package2"),
+            Some(BStr::new("Block but do not report"))
+        )]),
         audit_config.ignore_abandoned_for_blocking
     );
 }
@@ -235,8 +284,11 @@ fn test_ignore_abandoned_detailed_format() {
 #[test]
 fn test_invalid_apply_value() {
     let result = audit_config_from(arr(vec![(
-        "ignore",
-        arr(vec![("CVE-2024-1234", arr(vec![("apply", s("invalid"))]))]),
+        BStr::new("ignore"),
+        arr(vec![(
+            BStr::new("CVE-2024-1234"),
+            arr(vec![(BStr::new("apply"), s(BStr::new("invalid")))]),
+        )]),
     )]));
 
     assert!(result.is_err());

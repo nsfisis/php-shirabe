@@ -1,26 +1,28 @@
 //! ref: composer/vendor/symfony/console/Helper/TableCellStyle.php
 
 use crate::exception::InvalidArgumentException;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, STR_PAD_BOTH, STR_PAD_LEFT, STR_PAD_RIGHT};
+use shirabe_php_shim::{
+    PhpMixed, STR_PAD_BOTH, STR_PAD_LEFT, STR_PAD_RIGHT, bconcat, implode, php_str,
+};
 
-pub const DEFAULT_ALIGN: &str = "left";
+pub const DEFAULT_ALIGN: &BStr = php_str(b"left");
 
-const TAG_OPTIONS: [&str; 3] = ["fg", "bg", "options"];
+const TAG_OPTIONS: [&BStr; 3] = [php_str(b"fg"), php_str(b"bg"), php_str(b"options")];
 
 /// Maps an alignment name to the corresponding `STR_PAD_*` value.
-fn align_map(align: &str) -> Option<i64> {
+fn align_map(align: &[u8]) -> Option<i64> {
     match align {
-        "left" => Some(STR_PAD_RIGHT),
-        "center" => Some(STR_PAD_BOTH),
-        "right" => Some(STR_PAD_LEFT),
+        b"left" => Some(STR_PAD_RIGHT),
+        b"center" => Some(STR_PAD_BOTH),
+        b"right" => Some(STR_PAD_LEFT),
         _ => None,
     }
 }
 
-fn align_map_keys() -> Vec<&'static str> {
-    vec!["left", "center", "right"]
+fn align_map_keys() -> Vec<&'static BStr> {
+    vec![php_str(b"left"), php_str(b"center"), php_str(b"right")]
 }
 
 #[derive(Debug)]
@@ -31,33 +33,34 @@ pub struct TableCellStyle {
 impl TableCellStyle {
     pub fn new(options: IndexMap<BString, PhpMixed>) -> Result<Self, InvalidArgumentException> {
         let mut this_options: IndexMap<BString, PhpMixed> = IndexMap::new();
-        this_options.insert("fg".into(), PhpMixed::string("default".to_string()));
-        this_options.insert("bg".into(), PhpMixed::string("default".to_string()));
+        this_options.insert("fg".into(), PhpMixed::string("default"));
+        this_options.insert("bg".into(), PhpMixed::string("default"));
         this_options.insert("options".into(), PhpMixed::Null);
-        this_options.insert("align".into(), PhpMixed::string(DEFAULT_ALIGN.to_string()));
+        this_options.insert("align".into(), PhpMixed::string(DEFAULT_ALIGN));
         this_options.insert("cellFormat".into(), PhpMixed::Null);
 
-        let diff: Vec<String> = options
+        let diff: Vec<&BString> = options
             .keys()
             .filter(|key| !this_options.contains_key(*key))
-            .map(|key| key.to_str_lossy().into_owned())
             .collect();
         if !diff.is_empty() {
-            return Err(InvalidArgumentException::new(format!(
-                "The TableCellStyle does not support the following options: '{}'.",
-                diff.join("', '"),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The TableCellStyle does not support the following options: '",
+                implode("', '", &diff),
+                "'."
             )));
         }
 
         if let Some(align) = options.get(B("align")) {
-            let align = match align {
-                PhpMixed::String(align) => align.to_str_lossy().into_owned(),
-                _ => String::new(),
+            let align: &[u8] = match align {
+                PhpMixed::String(align) => align,
+                _ => b"",
             };
-            if align_map(&align).is_none() {
-                return Err(InvalidArgumentException::new(format!(
-                    "Wrong align value. Value must be following: '{}'.",
-                    align_map_keys().join("', '"),
+            if align_map(align).is_none() {
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Wrong align value. Value must be following: '",
+                    implode("', '", &align_map_keys()),
+                    "'."
                 )));
             }
         }
@@ -89,16 +92,17 @@ impl TableCellStyle {
     }
 
     pub fn get_pad_by_align(&self) -> i64 {
-        let align = match &self.get_options()[B("align")] {
-            PhpMixed::String(align) => align.to_str_lossy().into_owned(),
-            _ => String::new(),
+        let options = self.get_options();
+        let align: &[u8] = match &options[B("align")] {
+            PhpMixed::String(align) => align,
+            _ => b"",
         };
-        align_map(&align).unwrap()
+        align_map(align).unwrap()
     }
 
-    pub fn get_cell_format(&self) -> Option<String> {
+    pub fn get_cell_format(&self) -> Option<BString> {
         match &self.get_options()[B("cellFormat")] {
-            PhpMixed::String(format) => Some(format.to_str_lossy().into_owned()),
+            PhpMixed::String(format) => Some(format.clone()),
             _ => None,
         }
     }

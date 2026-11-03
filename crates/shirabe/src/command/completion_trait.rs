@@ -10,7 +10,7 @@ use crate::repository::{
 };
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_quote, substr};
+use shirabe_php_shim::{PhpMixed, bconcat, php_regex, preg_is_match, preg_quote, substr};
 
 /// Adds completion to arguments and options.
 ///
@@ -21,9 +21,9 @@ pub trait CompletionTrait: BaseCommand {
     /// Suggestion values for "prefer-install" option
     fn suggest_prefer_install(&self) -> SuggestedValues {
         SuggestedValues::List(vec![
-            "dist".to_string(),
-            "source".to_string(),
-            "auto".to_string(),
+            BString::from("dist"),
+            BString::from("source"),
+            BString::from("auto"),
         ])
     }
 
@@ -34,7 +34,7 @@ pub trait CompletionTrait: BaseCommand {
             let composer = crate::composer::composer_full(&composer);
 
             let package = composer.get_package();
-            let mut names: Vec<String> = package.get_requires().keys().cloned().collect();
+            let mut names: Vec<BString> = package.get_requires().keys().cloned().collect();
             names.extend(package.get_dev_requires().keys().cloned());
             Ok(names)
         }))
@@ -69,14 +69,14 @@ pub trait CompletionTrait: BaseCommand {
                 );
             }
 
-            let mut platform_hint: Vec<String> = vec![];
+            let mut platform_hint: Vec<BString> = vec![];
             if include_platform_packages {
                 let mut platform_repo = if locker.borrow_mut().is_locked() {
                     let overrides: IndexMap<BString, PhpMixed> = locker
                         .borrow_mut()
                         .get_platform_overrides()?
                         .into_iter()
-                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect();
                     PlatformRepository::new(vec![], overrides, None, None)?
                 } else {
@@ -89,18 +89,18 @@ pub trait CompletionTrait: BaseCommand {
                 };
                 if input.get_completion_value().is_empty() {
                     // to reduce noise, when no text is yet entered we list only two entries for ext- and lib- prefixes
-                    let mut hints_to_find: IndexMap<String, i64> = IndexMap::from([
-                        ("ext-".to_string(), 0),
-                        ("lib-".to_string(), 0),
-                        ("php".to_string(), 99),
-                        ("composer".to_string(), 99),
+                    let mut hints_to_find: IndexMap<BString, i64> = IndexMap::from([
+                        (BString::from("ext-"), 0),
+                        (BString::from("lib-"), 0),
+                        (BString::from("php"), 99),
+                        (BString::from("composer"), 99),
                     ]);
                     // PHP: continue 2
                     'pkgs: for pkg in platform_repo.get_packages()? {
                         // PHP's inner foreach iterates a by-value copy of $hintsToFind while
                         // mutating the original.
                         for (hint_prefix, hint_count) in hints_to_find.clone() {
-                            if pkg.get_name().starts_with(&hint_prefix) {
+                            if pkg.get_name().starts_with(hint_prefix.as_slice()) {
                                 if hint_count == 0 || hint_count >= 99 {
                                     platform_hint.push(pkg.get_name());
                                     *hints_to_find.get_mut(&hint_prefix).unwrap() += 1;
@@ -111,8 +111,7 @@ pub trait CompletionTrait: BaseCommand {
                                         name.len() as i64 - 3,
                                         hint_prefix.len() as i64 + 1,
                                     );
-                                    platform_hint
-                                        .push(format!("{}...", substr(&name, 0, Some(end))));
+                                    platform_hint.push(bconcat!(substr(name, 0, Some(end)), "..."));
                                 }
                                 continue 'pkgs;
                             }
@@ -125,7 +124,7 @@ pub trait CompletionTrait: BaseCommand {
 
             let mut installed_repo = InstalledRepository::new(installed_repos);
 
-            let mut names: Vec<String> = installed_repo
+            let mut names: Vec<BString> = installed_repo
                 .get_packages()?
                 .into_iter()
                 .map(|package| package.get_name())
@@ -164,7 +163,7 @@ pub trait CompletionTrait: BaseCommand {
 
             // array_values(array_unique(array_map(getType, ...))) — array_unique keeps the
             // first occurrence in order.
-            let mut types: Vec<String> = vec![];
+            let mut types: Vec<BString> = vec![];
             for package in installed_repo.get_packages()? {
                 let r#type = package.get_type();
                 if !types.contains(&r#type) {
@@ -192,9 +191,9 @@ pub trait CompletionTrait: BaseCommand {
 
             let mut results: Vec<SearchResult> = vec![];
             let mut show_vendors = false;
-            if !input.get_completion_value().contains('/') {
+            if !input.get_completion_value().contains(&b'/') {
                 results = repos.search(
-                    format!("^{}", preg_quote(&input.get_completion_value(), None)),
+                    bconcat!("^", preg_quote(input.get_completion_value(), None)),
                     SEARCH_VENDOR,
                     None,
                 )?;
@@ -204,7 +203,7 @@ pub trait CompletionTrait: BaseCommand {
             // if we get a single vendor, we expand it into its contents already
             if results.len() <= 1 {
                 results = repos.search(
-                    format!("^{}", preg_quote(&input.get_completion_value(), None)),
+                    bconcat!("^", preg_quote(input.get_completion_value(), None)),
                     SEARCH_NAME,
                     None,
                 )?;
@@ -212,12 +211,12 @@ pub trait CompletionTrait: BaseCommand {
             }
 
             // array_column($results, 'name')
-            let results: Vec<String> = results.into_iter().map(|result| result.name).collect();
+            let results: Vec<BString> = results.into_iter().map(|result| result.name).collect();
 
             if show_vendors {
-                let mut results: Vec<String> = results
+                let mut results: Vec<BString> = results
                     .into_iter()
-                    .map(|name| format!("{}/", name))
+                    .map(|name| bconcat!(name, "/"))
                     .collect();
 
                 // sort shorter results first to avoid auto-expanding the completion to a longer string than needed
@@ -230,10 +229,10 @@ pub trait CompletionTrait: BaseCommand {
                     len_a.cmp(&len_b)
                 });
 
-                let mut pinned: Vec<String> = vec![];
+                let mut pinned: Vec<BString> = vec![];
 
                 // ensure if the input is an exact match that it is always in the result set
-                let completion_input = format!("{}/", input.get_completion_value());
+                let completion_input = bconcat!(input.get_completion_value(), "/");
                 // PHP: array_search(..., true) + array_splice($results, $exactIndex, 1)
                 if let Some(exact_index) = results.iter().position(|r| *r == completion_input) {
                     pinned.push(completion_input);
@@ -255,7 +254,7 @@ pub trait CompletionTrait: BaseCommand {
         SuggestedValues::Closure(Box::new(|this, input, suggestions| {
             let matches = if preg_is_match(
                 php_regex!(r"{^(ext|lib|php)(-|$)|^com}"),
-                &input.get_completion_value(),
+                input.get_completion_value(),
             ) {
                 this.suggest_platform_package()
                     .call(this, input, suggestions)?
@@ -285,10 +284,10 @@ pub trait CompletionTrait: BaseCommand {
             let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 
             let pattern =
-                base_package::package_name_to_regexp(&format!("{}*", input.get_completion_value()));
+                base_package::package_name_to_regexp(bconcat!(input.get_completion_value(), "*"));
 
             // array_filter(array_map(getName, ...), isMatch)
-            let mut names: Vec<String> = vec![];
+            let mut names: Vec<BString> = vec![];
             for package in repos.get_packages()? {
                 let name = package.get_name();
                 if preg_is_match(pattern.clone(), &name) {

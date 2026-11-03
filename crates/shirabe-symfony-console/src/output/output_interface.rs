@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Output/OutputInterface.php
 
 use crate::formatter::OutputFormatterInterface;
+use bstr::BString;
 use shirabe_php_shim::AsAny;
 
 pub const VERBOSITY_QUIET: i64 = 16;
@@ -18,10 +19,10 @@ pub trait OutputInterface: std::fmt::Debug + AsAny {
     /// Writes a message to the output.
     ///
     /// `$messages` is a single string or an iterable of strings.
-    fn write(&self, messages: &[String], newline: bool, options: i64);
+    fn write(&self, messages: &[BString], newline: bool, options: i64);
 
     /// Writes a message to the output and adds a newline at the end.
-    fn writeln(&self, messages: &[String], options: i64);
+    fn writeln(&self, messages: &[BString], options: i64);
 
     /// Sets the verbosity of the output.
     fn set_verbosity(&self, level: i64);

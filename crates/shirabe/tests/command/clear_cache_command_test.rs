@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/ClearCacheCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester};
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::util::platform::Platform;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -38,7 +39,7 @@ fn test_clear_cache_command_success() {
 
     let output = app_tester.get_display();
     assert!(
-        output.contains("All caches cleared."),
+        output.contains_str("All caches cleared."),
         "expected output to contain 'All caches cleared.', got: {:?}",
         output,
     );
@@ -67,7 +68,7 @@ fn test_clear_cache_command_with_option_garbage_collection() {
 
     let output = app_tester.get_display();
     assert!(
-        output.contains("All caches garbage-collected."),
+        output.contains_str("All caches garbage-collected."),
         "expected output to contain 'All caches garbage-collected.', got: {:?}",
         output,
     );
@@ -96,7 +97,7 @@ fn test_clear_cache_command_with_option_no_cache() {
 
     let output = app_tester.get_display();
     assert!(
-        output.contains("Cache is not enabled"),
+        output.contains_str("Cache is not enabled"),
         "expected output to contain 'Cache is not enabled', got: {:?}",
         output,
     );

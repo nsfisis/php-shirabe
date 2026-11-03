@@ -10,20 +10,22 @@ use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterFactory, PlatformRequirementFilterInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, NullIO};
+use crate::io::{IOInterface, IOInterfaceWrite, NullIO};
 use crate::package::version::VersionParser;
 use crate::plugin::{PluginEvents, PreCommandRunEvent};
 use crate::util::Platform;
-use bstr::{BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, count, explode, in_array_strict,
+    UnexpectedValueException, bconcat, count, explode, implode, in_array_strict,
 };
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
 use shirabe_symfony_console::helper::{Table, TableSeparator};
-use shirabe_symfony_console::input::{ArgumentName, InputInterface, InputValue};
+use shirabe_symfony_console::input::{
+    ArgumentName, InputInterface, InputInterfaceByName, InputValue,
+};
 use shirabe_symfony_console::output::OutputInterface;
 
 pub const SUCCESS: i64 = 0;
@@ -42,14 +44,16 @@ pub struct BaseCommandData {
     /// `$definition->getArgument($name) instanceof Composer\Console\Input\InputArgument`; in
     /// this port `set_definition` converts the entries to the Symfony types for storage, so
     /// the Composer-typedness is tracked by name in these side maps instead.
-    composer_arguments:
-        std::cell::RefCell<IndexMap<String, std::rc::Rc<crate::console::input::InputArgument>>>,
-    composer_options:
-        std::cell::RefCell<IndexMap<String, std::rc::Rc<crate::console::input::InputOption>>>,
+    composer_arguments: std::cell::RefCell<
+        IndexMap<bstr::BString, std::rc::Rc<crate::console::input::InputArgument>>,
+    >,
+    composer_options: std::cell::RefCell<
+        IndexMap<bstr::BString, std::rc::Rc<crate::console::input::InputOption>>,
+    >,
 }
 
 impl BaseCommandData {
-    pub fn new(name: Option<String>) -> Self {
+    pub fn new(name: Option<bstr::BString>) -> Self {
         BaseCommandData {
             inner: CommandData::new(name),
             composer: std::cell::RefCell::new(None),
@@ -116,9 +120,9 @@ pub trait BaseCommand: Command {
 
     fn add_argument(
         &self,
-        name: &str,
+        name: impl AsRef<[u8]>,
         mode: Option<i64>,
-        description: &str,
+        description: &BStr,
         default: InputValue,
     ) -> &Self
     where
@@ -132,10 +136,10 @@ pub trait BaseCommand: Command {
 
     fn add_option(
         &self,
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
-        description: &str,
+        description: &BStr,
         default: InputValue,
     ) -> &Self
     where
@@ -205,27 +209,27 @@ pub trait BaseCommand: Command {
 
     fn format_requirements(
         &self,
-        requirements: Vec<String>,
-    ) -> anyhow::Result<IndexMap<String, String>>;
+        requirements: Vec<BString>,
+    ) -> anyhow::Result<IndexMap<BString, BString>>;
 
     fn normalize_requirements(
         &self,
-        requirements: Vec<String>,
-    ) -> anyhow::Result<Vec<IndexMap<String, String>>>;
+        requirements: Vec<BString>,
+    ) -> anyhow::Result<Vec<IndexMap<BString, BString>>>;
 
     fn render_table(
         &self,
         table: Vec<PhpMixed>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    );
+    ) -> anyhow::Result<()>;
 
     fn get_terminal_width(&self) -> i64;
 
     fn get_audit_format(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        opt_name: &str,
-    ) -> anyhow::Result<String>;
+        opt_name: &BStr,
+    ) -> anyhow::Result<BString>;
 
     /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
     fn create_audit_config(
@@ -251,11 +255,11 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
         shirabe_symfony_console::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_preferred_install_options(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, keep_vcs_requires_prefer_source: bool) -> anyhow::Result<(bool, bool)>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<String>) -> anyhow::Result<indexmap::IndexMap<String, String>>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<String>) -> anyhow::Result<Vec<indexmap::IndexMap<String, String>>>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>));
+        shirabe_symfony_console::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<bstr::BString>) -> anyhow::Result<indexmap::IndexMap<bstr::BString, bstr::BString>>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<bstr::BString>) -> anyhow::Result<Vec<indexmap::IndexMap<bstr::BString, bstr::BString>>>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>) -> anyhow::Result<()>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
-        shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &str) -> anyhow::Result<String>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &bstr::BStr) -> anyhow::Result<bstr::BString>);
         shirabe_symfony_console::delegate_to_inner!($field, fn create_audit_config(&self, config: &mut $crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
     };
 }
@@ -266,7 +270,7 @@ impl Command for BaseCommandData {
 }
 
 impl PhpClass for BaseCommandData {
-    fn php_class_name(&self) -> String {
+    fn php_class_name(&self) -> &BStr {
         // Forwards to the base state's panicking implementation; concrete commands supply
         // their own class name through `impl_php_class!`.
         self.inner.php_class_name()
@@ -286,7 +290,7 @@ impl BaseCommand for BaseCommandData {
         if self.composer.borrow().is_none() {
             let application = self.get_application();
             let Some(application) = application else {
-                return Err(RuntimeException::new("Could not create a Composer\\Composer instance, you must inject one if this command is not used with a Composer\\Console\\Application instance".to_string())
+                return Err(RuntimeException::new(BString::from("Could not create a Composer\\Composer instance, you must inject one if this command is not used with a Composer\\Console\\Application instance"))
                 .into());
             };
             let composer = {
@@ -421,16 +425,16 @@ impl BaseCommand for BaseCommandData {
         let mut prefer_source = false;
         let mut prefer_dist = false;
 
-        match &*config
+        match config
             .get("preferred-install")
             .as_string()
             .unwrap_or_default()
-            .to_str_lossy()
+            .as_bytes()
         {
-            "source" => {
+            b"source" => {
                 prefer_source = true;
             }
-            "dist" => {
+            b"dist" => {
                 prefer_dist = true;
             }
             _ => {
@@ -456,9 +460,9 @@ impl BaseCommand for BaseCommandData {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException::new(
-                    "--prefer-source can not be used together with --prefer-install".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "--prefer-source can not be used together with --prefer-install",
+                ))
                 .into());
             }
             if input
@@ -467,31 +471,32 @@ impl BaseCommand for BaseCommandData {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException::new(
-                    "--prefer-dist can not be used together with --prefer-install".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "--prefer-dist can not be used together with --prefer-install",
+                ))
                 .into());
             }
             let prefer_install = input.borrow().get_option("prefer-install")?;
-            match prefer_install.as_string().unwrap_or_default() {
-                "dist" => {
+            let prefer_install_value: &[u8] = prefer_install.as_string().unwrap_or_default();
+            match prefer_install_value {
+                b"dist" => {
                     input
                         .borrow_mut()
                         .set_option("prefer-dist", InputValue::Bool(true))?;
                 }
-                "source" => {
+                b"source" => {
                     input
                         .borrow_mut()
                         .set_option("prefer-source", InputValue::Bool(true))?;
                 }
-                "auto" => {
+                b"auto" => {
                     prefer_dist = false;
                     prefer_source = false;
                 }
                 other => {
-                    return Err(UnexpectedValueException::new(format!(
-                        "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got {}",
-                        other
+                    return Err(UnexpectedValueException::new(bconcat!(
+                        "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got ",
+                        bstr::BStr::new(other)
                     ))
                     .into());
                 }
@@ -545,8 +550,7 @@ impl BaseCommand for BaseCommandData {
         if !input.borrow().has_option("ignore-platform-reqs")
             || !input.borrow().has_option("ignore-platform-req")
         {
-            return Err(LogicException::new("Calling getPlatformRequirementFilter from a command which does not define the --ignore-platform-req[s] flags is not permitted."
-                .to_string())
+            return Err(LogicException::new(BString::from("Calling getPlatformRequirementFilter from a command which does not define the --ignore-platform-req[s] flags is not permitted."))
             .into());
         }
 
@@ -569,22 +573,24 @@ impl BaseCommand for BaseCommandData {
 
     fn format_requirements(
         &self,
-        requirements: Vec<String>,
-    ) -> anyhow::Result<IndexMap<String, String>> {
-        let mut requires: IndexMap<String, String> = IndexMap::new();
+        requirements: Vec<BString>,
+    ) -> anyhow::Result<IndexMap<BString, BString>> {
+        let mut requires: IndexMap<BString, BString> = IndexMap::new();
         let requirements = self.normalize_requirements(requirements)?;
         for requirement in requirements {
-            if !requirement.contains_key("version") {
-                return Err(UnexpectedValueException::new(format!(
-                    "Option {} is missing a version constraint, use e.g. {}:^1.0",
-                    requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
-                    requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
+            if !requirement.contains_key(B("version")) {
+                return Err(UnexpectedValueException::new(bconcat!(
+                    "Option ",
+                    requirement.get(B("name")).cloned().unwrap_or_default(),
+                    " is missing a version constraint, use e.g. ",
+                    requirement.get(B("name")).cloned().unwrap_or_default(),
+                    ":^1.0"
                 ))
                 .into());
             }
             requires.insert(
-                requirement.get("name").cloned().unwrap_or_default(),
-                requirement.get("version").cloned().unwrap_or_default(),
+                requirement.get(B("name")).cloned().unwrap_or_default(),
+                requirement.get(B("version")).cloned().unwrap_or_default(),
             );
         }
 
@@ -593,8 +599,8 @@ impl BaseCommand for BaseCommandData {
 
     fn normalize_requirements(
         &self,
-        requirements: Vec<String>,
-    ) -> anyhow::Result<Vec<IndexMap<String, String>>> {
+        requirements: Vec<BString>,
+    ) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
         let parser: VersionParser = VersionParser::new();
 
         parser.parse_name_version_pairs(requirements)
@@ -604,7 +610,7 @@ impl BaseCommand for BaseCommandData {
         &self,
         table: Vec<PhpMixed>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
+    ) -> anyhow::Result<()> {
         let mut renderer = Table::new(output);
         renderer
             .set_style("compact".into())
@@ -612,8 +618,10 @@ impl BaseCommand for BaseCommandData {
             .expect("'compact' is a built-in table style");
         renderer
             .set_rows(table.into_iter().map(Into::into).collect())
-            .render();
+            .render()?;
         let _ = TableSeparator::new();
+
+        Ok(())
     }
 
     fn get_terminal_width(&self) -> i64 {
@@ -632,12 +640,13 @@ impl BaseCommand for BaseCommandData {
     fn get_audit_format(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        opt_name: &str,
-    ) -> anyhow::Result<String> {
+        opt_name: &BStr,
+    ) -> anyhow::Result<BString> {
         if !input.borrow().has_option(opt_name) {
-            return Err(LogicException::new(format!(
-                "This should not be called on a Command which has no {} option defined.",
-                opt_name
+            return Err(LogicException::new(bconcat!(
+                "This should not be called on a Command which has no ",
+                opt_name,
+                " option defined."
             ))
             .into());
         }
@@ -645,18 +654,20 @@ impl BaseCommand for BaseCommandData {
         let val = input.borrow().get_option(opt_name)?;
         let formats: Vec<PhpMixed> = Auditor::FORMATS
             .iter()
-            .map(|s| PhpMixed::string(s.to_string()))
+            .map(|s| PhpMixed::string(*s))
             .collect();
         if !in_array_strict(val.clone(), &formats) {
-            return Err(InvalidArgumentException::new(format!(
-                "--{} must be one of {}.",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "--",
                 opt_name,
-                Auditor::FORMATS.join(", ")
+                " must be one of ",
+                implode(", ", &Auditor::FORMATS),
+                "."
             ))
             .into());
         }
 
-        Ok(val.as_string().unwrap_or_default().to_string())
+        Ok(val.as_string().unwrap_or_default().to_owned())
     }
 
     fn create_audit_config(
@@ -680,12 +691,12 @@ impl BaseCommand for BaseCommandData {
                     .unwrap_or(false))
         };
         let audit_format = if input.borrow().has_option("audit-format") {
-            self.get_audit_format(input.clone(), "audit-format")?
+            self.get_audit_format(input.clone(), BStr::new("audit-format"))?
         } else {
-            Auditor::FORMAT_SUMMARY.to_string()
+            Auditor::FORMAT_SUMMARY.to_owned()
         };
 
-        let audit_config = AuditConfig::from_config(config, audit, &audit_format)?;
+        let audit_config = AuditConfig::from_config(config, audit, audit_format.as_bstr())?;
 
         if Platform::get_env("COMPOSER_NO_SECURITY_BLOCKING")
             .is_some_and(|s| !s.is_empty() && s != "0")
@@ -760,7 +771,7 @@ pub fn base_command_complete(
             .base_command_data()
             .composer_options
             .borrow()
-            .get(&name)
+            .get(name.as_bstr())
             .cloned();
         if let Some(option) = option {
             return option.complete(cmd, input, suggestions);
@@ -774,7 +785,7 @@ pub fn base_command_complete(
             .base_command_data()
             .composer_arguments
             .borrow()
-            .get(&name)
+            .get(name.as_bstr())
             .cloned();
         if let Some(argument) = argument {
             return argument.complete(cmd, input, suggestions);
@@ -824,14 +835,14 @@ pub fn base_command_initialize(
     if let Some(composer) = composer.as_ref() {
         let command_name = cmd.get_name().unwrap_or_default();
         let mut pre_command_run_event = PreCommandRunEvent::new(
-            PluginEvents::PRE_COMMAND_RUN.to_string(),
+            bconcat!(PluginEvents::PRE_COMMAND_RUN),
             input.clone(),
             command_name,
         );
-        let pre_command_run_event_name = pre_command_run_event.get_name().to_string();
+        let pre_command_run_event_name = pre_command_run_event.get_name().to_owned();
         let dispatcher = composer.borrow_partial().get_event_dispatcher();
         dispatcher.borrow_mut().dispatch(
-            Some(&pre_command_run_event_name),
+            Some(pre_command_run_event_name.as_ref()),
             Some(&mut pre_command_run_event),
         )?;
     }
@@ -844,20 +855,35 @@ pub fn base_command_initialize(
             .set_option("no-progress", InputValue::Bool(true));
     }
 
-    let env_options: IndexMap<&str, Vec<&str>> = [
-        ("COMPOSER_NO_AUDIT", vec!["no-audit"]),
-        ("COMPOSER_NO_DEV", vec!["no-dev", "update-no-dev"]),
-        ("COMPOSER_PREFER_STABLE", vec!["prefer-stable"]),
-        ("COMPOSER_PREFER_LOWEST", vec!["prefer-lowest"]),
-        ("COMPOSER_MINIMAL_CHANGES", vec!["minimal-changes"]),
-        ("COMPOSER_WITH_DEPENDENCIES", vec!["with-dependencies"]),
+    let env_options: IndexMap<&BStr, Vec<&BStr>> = [
+        (BStr::new("COMPOSER_NO_AUDIT"), vec![BStr::new("no-audit")]),
         (
-            "COMPOSER_WITH_ALL_DEPENDENCIES",
-            vec!["with-all-dependencies"],
+            BStr::new("COMPOSER_NO_DEV"),
+            vec![BStr::new("no-dev"), BStr::new("update-no-dev")],
         ),
         (
-            "COMPOSER_NO_SECURITY_BLOCKING",
-            vec!["no-security-blocking"],
+            BStr::new("COMPOSER_PREFER_STABLE"),
+            vec![BStr::new("prefer-stable")],
+        ),
+        (
+            BStr::new("COMPOSER_PREFER_LOWEST"),
+            vec![BStr::new("prefer-lowest")],
+        ),
+        (
+            BStr::new("COMPOSER_MINIMAL_CHANGES"),
+            vec![BStr::new("minimal-changes")],
+        ),
+        (
+            BStr::new("COMPOSER_WITH_DEPENDENCIES"),
+            vec![BStr::new("with-dependencies")],
+        ),
+        (
+            BStr::new("COMPOSER_WITH_ALL_DEPENDENCIES"),
+            vec![BStr::new("with-all-dependencies")],
+        ),
+        (
+            BStr::new("COMPOSER_NO_SECURITY_BLOCKING"),
+            vec![BStr::new("no-security-blocking")],
         ),
     ]
     .into_iter()
@@ -915,9 +941,10 @@ pub fn base_command_initialize(
                 InputValue::Array(explode(",", &ignore_str)),
             );
 
-            io.write_error(&format!(
-                "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore {}. You may experience unexpected errors.</warning>",
-                ignore_str
+            io.write_error(bconcat!(
+                "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore ",
+                ignore_str,
+                ". You may experience unexpected errors.</warning>"
             ));
         }
     }

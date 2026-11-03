@@ -3,11 +3,13 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, json_encode, time};
+use shirabe_php_shim::{
+    Catch as _, LogicException, PhpMixed, bconcat, json_encode, php_str, time, trim,
+};
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
     err.catch::<TransportException>().map(|te| te.get_code())
@@ -24,8 +26,8 @@ pub struct Bitbucket {
 }
 
 impl Bitbucket {
-    pub const OAUTH2_ACCESS_TOKEN_URL: &'static str =
-        "https://bitbucket.org/site/oauth2/access_token";
+    pub const OAUTH2_ACCESS_TOKEN_URL: &'static BStr =
+        php_str(b"https://bitbucket.org/site/oauth2/access_token");
 
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -57,18 +59,18 @@ impl Bitbucket {
         })
     }
 
-    pub fn get_token(&self) -> String {
+    pub fn get_token(&self) -> BString {
         match &self.token {
             Some(token) => token
                 .get(B("access_token"))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string())
+                .map(BString::from)
                 .unwrap_or_default(),
-            None => String::new(),
+            None => BString::default(),
         }
     }
 
-    pub fn authorize_oauth(&mut self, origin_url: &str) -> anyhow::Result<bool> {
+    pub fn authorize_oauth(&mut self, origin_url: &BStr) -> anyhow::Result<bool> {
         if origin_url != "bitbucket.org" {
             return Ok(false);
         }
@@ -80,15 +82,10 @@ impl Bitbucket {
             None,
         )? == 0
         {
-            let output_str = output
-                .as_string()
-                .unwrap_or_default()
-                .to_str_lossy()
-                .trim()
-                .to_string();
+            let output_str = trim(output.as_string().unwrap_or_default());
             self.io.borrow_mut().set_authentication(
-                origin_url.to_string(),
-                "x-token-auth".to_string(),
+                origin_url.into(),
+                BString::from("x-token-auth"),
                 Some(output_str),
             );
             return Ok(true);
@@ -99,10 +96,10 @@ impl Bitbucket {
 
     fn request_access_token(&mut self) -> anyhow::Result<bool> {
         let mut http = IndexMap::new();
-        http.insert("method".into(), PhpMixed::string("POST".to_string()));
+        http.insert("method".into(), PhpMixed::string(BString::from("POST")));
         http.insert(
             "content".into(),
-            PhpMixed::string("grant_type=client_credentials".to_string()),
+            PhpMixed::string(BString::from("grant_type=client_credentials")),
         );
         let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
         options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
@@ -165,16 +162,16 @@ impl Bitbucket {
         let token_map = match token {
             PhpMixed::Array(ref m) => m.clone(),
             _ => {
-                return Err(LogicException::new(format!(
-                    "Expected a token configured with expires_in and access_token present, got {}",
+                return Err(LogicException::new(bconcat!(
+                    "Expected a token configured with expires_in and access_token present, got ",
                     json_encode(&token).unwrap_or_default()
                 ))
                 .into());
             }
         };
         if !token_map.contains_key(B("expires_in")) || !token_map.contains_key(B("access_token")) {
-            return Err(LogicException::new(format!(
-                "Expected a token configured with expires_in and access_token present, got {}",
+            return Err(LogicException::new(bconcat!(
+                "Expected a token configured with expires_in and access_token present, got ",
                 json_encode(&token).unwrap_or_default()
             ))
             .into());
@@ -186,14 +183,14 @@ impl Bitbucket {
 
     pub fn authorize_oauth_interactively(
         &mut self,
-        origin_url: &str,
-        message: Option<&str>,
+        origin_url: &BStr,
+        message: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
             self.io.write_error3(msg, true, io_interface::NORMAL);
         }
 
-        let local_auth_config_name: Option<String> = self
+        let local_auth_config_name: Option<BString> = self
             .config
             .borrow()
             .get_local_auth_config_source()
@@ -207,12 +204,14 @@ impl Bitbucket {
         self.io.write_error3(url, true, io_interface::NORMAL);
         let local_name_prefix = local_auth_config_name
             .as_ref()
-            .map(|name| format!("{} OR ", name))
+            .map(|name| bconcat!(name, " OR "))
             .unwrap_or_default();
         self.io.write_error3(
-            &format!(
-                "to create a consumer. It will be stored in \"{}\" for future use by Composer.",
-                local_name_prefix + &auth_config_source_name
+            bconcat!(
+                "to create a consumer. It will be stored in \"",
+                local_name_prefix,
+                auth_config_source_name,
+                "\" for future use by Composer."
             ),
             true,
             io_interface::NORMAL,
@@ -226,18 +225,16 @@ impl Bitbucket {
         let mut store_in_local_auth_config = false;
         if has_local_auth_config {
             store_in_local_auth_config = self.io.ask_confirmation(
-                "A local auth config source was found, do you want to store the token there?"
-                    .to_string(),
+                "A local auth config source was found, do you want to store the token there?",
                 true,
             )?;
         }
 
         let consumer_key = self
             .io
-            .ask_and_hide_answer("Consumer Key (hidden): ".to_string())?
-            .unwrap_or_default()
-            .trim()
-            .to_string();
+            .ask_and_hide_answer("Consumer Key (hidden): ")?
+            .unwrap_or_default();
+        let consumer_key = trim(consumer_key);
 
         if consumer_key.is_empty() {
             self.io.write_error3(
@@ -255,10 +252,9 @@ impl Bitbucket {
 
         let consumer_secret = self
             .io
-            .ask_and_hide_answer("Consumer Secret (hidden): ".to_string())?
-            .unwrap_or_default()
-            .trim()
-            .to_string();
+            .ask_and_hide_answer("Consumer Secret (hidden): ")?
+            .unwrap_or_default();
+        let consumer_secret = trim(consumer_secret);
 
         if consumer_secret.is_empty() {
             self.io.write_error3(
@@ -275,7 +271,7 @@ impl Bitbucket {
         }
 
         self.io.borrow_mut().set_authentication(
-            origin_url.to_string(),
+            origin_url.into(),
             consumer_key.clone(),
             Some(consumer_secret.clone()),
         );
@@ -287,12 +283,12 @@ impl Bitbucket {
         // NOTE: PHP $authConfigSource parameter is unused inside storeInAuthConfig
         //   (upstream Composer bug); the dispatch on local vs. global is dropped here too.
         let _ = store_in_local_auth_config;
-        self.store_in_auth_config(origin_url, &consumer_key, &consumer_secret)?;
+        self.store_in_auth_config(origin_url, consumer_key.as_ref(), consumer_secret.as_ref())?;
 
         self.config
             .borrow_mut()
             .get_auth_config_source_mut()
-            .remove_config_setting(&format!("http-basic.{}", origin_url))?;
+            .remove_config_setting(bstr::BStr::new(&bconcat!("http-basic.", origin_url)))?;
 
         self.io.write_error3(
             "<info>Consumer stored successfully.</info>",
@@ -305,10 +301,10 @@ impl Bitbucket {
 
     pub fn request_token(
         &mut self,
-        origin_url: &str,
-        consumer_key: &str,
-        consumer_secret: &str,
-    ) -> anyhow::Result<String> {
+        origin_url: &BStr,
+        consumer_key: &BStr,
+        consumer_secret: &BStr,
+    ) -> anyhow::Result<BString> {
         if self.token.is_some() || self.get_token_from_config(origin_url) {
             return Ok(self
                 .token
@@ -316,17 +312,17 @@ impl Bitbucket {
                 .unwrap()
                 .get(B("access_token"))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string())
+                .map(BString::from)
                 .unwrap_or_default());
         }
 
         self.io.borrow_mut().set_authentication(
-            origin_url.to_string(),
-            consumer_key.to_string(),
-            Some(consumer_secret.to_string()),
+            origin_url.into(),
+            consumer_key.into(),
+            Some(consumer_secret.into()),
         );
         if !self.request_access_token()? {
-            return Ok(String::new());
+            return Ok(BString::default());
         }
 
         // NOTE: PHP $authConfigSource parameter is unused inside storeInAuthConfig
@@ -338,30 +334,32 @@ impl Bitbucket {
             .as_ref()
             .and_then(|t| t.get(B("access_token")))
             .and_then(|v| v.as_string())
-            .map(|s| s.to_string());
+            .map(BString::from);
 
         match access_token {
             Some(t) => Ok(t),
-            None => Err(LogicException::new("Failed to initialize token above".to_string()).into()),
+            None => {
+                Err(LogicException::new(BString::from("Failed to initialize token above")).into())
+            }
         }
     }
 
     // NOTE: PHP $authConfigSource parameter dropped — unused in upstream Composer too.
     fn store_in_auth_config(
         &mut self,
-        origin_url: &str,
-        consumer_key: &str,
-        consumer_secret: &str,
+        origin_url: &BStr,
+        consumer_key: &BStr,
+        consumer_secret: &BStr,
     ) -> anyhow::Result<()> {
         self.config
             .borrow_mut()
             .get_config_source_mut()
-            .remove_config_setting(&format!("bitbucket-oauth.{}", origin_url))?;
+            .remove_config_setting(bstr::BStr::new(&bconcat!("bitbucket-oauth.", origin_url)))?;
 
         let token = self.token.as_ref().ok_or_else(|| {
-            LogicException::new(
-                "Expected a token configured with expires_in present, got null".to_string(),
-            )
+            LogicException::new(BString::from(
+                "Expected a token configured with expires_in present, got null",
+            ))
         })?;
         let expires_in = token
             .get(B("expires_in"))
@@ -369,22 +367,16 @@ impl Bitbucket {
             .ok_or_else(|| {
                 let token_mixed =
                     PhpMixed::Array(token.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                LogicException::new(format!(
-                    "Expected a token configured with expires_in present, got {}",
+                LogicException::new(bconcat!(
+                    "Expected a token configured with expires_in present, got ",
                     json_encode(&token_mixed).unwrap_or_default()
                 ))
             })?;
 
         let t = self.time.unwrap_or_else(time);
         let mut consumer = IndexMap::new();
-        consumer.insert(
-            "consumer-key".into(),
-            PhpMixed::string(consumer_key.to_string()),
-        );
-        consumer.insert(
-            "consumer-secret".into(),
-            PhpMixed::string(consumer_secret.to_string()),
-        );
+        consumer.insert("consumer-key".into(), PhpMixed::string(consumer_key));
+        consumer.insert("consumer-secret".into(), PhpMixed::string(consumer_secret));
         consumer.insert(
             "access-token".into(),
             token
@@ -401,21 +393,21 @@ impl Bitbucket {
             .borrow_mut()
             .get_auth_config_source_mut()
             .add_config_setting(
-                &format!("bitbucket-oauth.{}", origin_url),
+                bstr::BStr::new(&bconcat!("bitbucket-oauth.", origin_url)),
                 PhpMixed::Array(consumer),
             )?;
 
         Ok(())
     }
 
-    fn get_token_from_config(&mut self, origin_url: &str) -> bool {
+    fn get_token_from_config(&mut self, origin_url: &BStr) -> bool {
         let auth_config = self.config.borrow_mut().get("bitbucket-oauth");
 
         let auth_map = match auth_config.as_array() {
             Some(m) => m.clone(),
             None => return false,
         };
-        let origin_config = match auth_map.get(B(origin_url)) {
+        let origin_config = match auth_map.get(origin_url) {
             Some(v) => match v.as_array() {
                 Some(m) => m.clone(),
                 None => return false,

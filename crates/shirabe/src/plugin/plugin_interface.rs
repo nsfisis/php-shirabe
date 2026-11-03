@@ -4,8 +4,10 @@ use crate::composer::ComposerHandle;
 use crate::event_dispatcher::EventSubscriberInterface;
 use crate::io::IOInterface;
 use crate::plugin::Capable;
+use bstr::{BStr, BString};
+use shirabe_php_shim::php_str;
 
-pub const PLUGIN_API_VERSION: &str = "2.9.0";
+pub const PLUGIN_API_VERSION: &BStr = php_str(b"2.9.0");
 
 pub trait PluginInterface: std::fmt::Debug {
     // The PHP methods return void but may throw; the owned `ComposerHandle` follows the shared
@@ -30,7 +32,7 @@ pub trait PluginInterface: std::fmt::Debug {
 
     /// PHP: `get_class($plugin)`. Rust has no runtime class name, so each implementor carries
     /// the name PHP would report.
-    fn get_class_name(&self) -> String;
+    fn get_class_name(&self) -> BString;
 
     // PHP-side `instanceof EventSubscriberInterface` / `instanceof Capable` checks map to
     // these downcast accessors.

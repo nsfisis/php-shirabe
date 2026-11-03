@@ -5,16 +5,18 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
-use bstr::{B, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_is_match,
-    preg_match, preg_replace, preg_split, version_compare,
+    CmpOp, PhpMixed, RuntimeException, bconcat, error_message, impl_php_class, implode, is_dir,
+    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split,
+    version_compare,
 };
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct SvnDownloader {
@@ -40,14 +42,14 @@ impl SvnDownloader {
     fn execute(
         &self,
         package: PackageInterfaceHandle,
-        base_url: &str,
-        command: Vec<String>,
-        url: &str,
-        cwd: Option<&str>,
-        path: Option<&str>,
-    ) -> anyhow::Result<String> {
+        base_url: &BStr,
+        command: Vec<BString>,
+        url: &BStr,
+        cwd: Option<&Path>,
+        path: Option<&Path>,
+    ) -> anyhow::Result<BString> {
         let mut util = SvnUtil::new(
-            base_url.to_string(),
+            base_url.to_owned(),
             self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
@@ -55,24 +57,25 @@ impl SvnDownloader {
         util.set_cache_credentials(self.cache_credentials.get());
         util.execute(command, url, cwd, path, self.inner.io.is_verbose())
             .map_err(|e| {
-                anyhow::anyhow!(
-                    "{} could not be downloaded, {}",
+                RuntimeException::new(bconcat!(
                     package.get_pretty_name(),
-                    e
-                )
+                    " could not be downloaded, ",
+                    error_message(&e)
+                ))
+                .into()
             })
     }
 
-    async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
-        let mut output = String::new();
+    async fn discard_changes(&self, path: &Path) -> anyhow::Result<Option<PhpMixed>> {
+        let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
-            ["svn", "revert", "-R", "."].map(|s| s.to_string()).as_ref(),
+            &["svn", "revert", "-R", "."],
             &mut output,
             Some(path),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Could not reset changes\n\n:{}",
+            return Err(RuntimeException::new(bconcat!(
+                "Could not reset changes\n\n:",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -86,12 +89,13 @@ impl SvnDownloader {
     async fn fail_on_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path).await?.is_some() {
-            return Err(RuntimeException::new(format!(
-                "Source directory {} has uncommitted changes.",
-                path
+            return Err(RuntimeException::new(bconcat!(
+                "Source directory ",
+                path,
+                " has uncommitted changes."
             ))
             .into());
         }
@@ -117,28 +121,28 @@ impl VcsDownloader for SvnDownloader {
         &self.inner.filesystem
     }
 
-    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.inner.has_cleaned_changes
     }
 
     async fn do_download(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &str,
-        url: &str,
+        _path: &Path,
+        url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let mut util = SvnUtil::new(
-            url.to_string(),
+            url.to_owned(),
             self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
         );
         if util.binary_version()?.is_none() {
-            return Err(RuntimeException::new(
-                "svn was not found in your PATH, skipping source download".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "svn was not found in your PATH, skipping source download",
+            ))
             .into());
         }
 
@@ -148,8 +152,8 @@ impl VcsDownloader for SvnDownloader {
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let r#ref = package.get_source_reference();
@@ -168,8 +172,8 @@ impl VcsDownloader for SvnDownloader {
         }
 
         self.inner.io.write_error3(
-            &format!(
-                " Checking out {}",
+            bconcat!(
+                " Checking out ",
                 package.get_source_reference().unwrap_or_default()
             ),
             true,
@@ -178,8 +182,8 @@ impl VcsDownloader for SvnDownloader {
         self.execute(
             package,
             url,
-            vec!["svn".to_string(), "co".to_string()],
-            &format!("{}/{}", url, r#ref.unwrap_or_default()),
+            vec!["svn".into(), "co".into()],
+            bconcat!(url, "/", r#ref.unwrap_or_default()).as_bstr(),
             None,
             Some(path),
         )?;
@@ -191,47 +195,48 @@ impl VcsDownloader for SvnDownloader {
         &self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let r#ref = target.get_source_reference();
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException::new(format!(
-                "The .svn directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                path
+            return Err(RuntimeException::new(bconcat!(
+                "The .svn directory is missing from ",
+                path,
+                ", see https://getcomposer.org/commit-deps for more information"
             ))
             .into());
         }
 
         let mut util = SvnUtil::new(
-            url.to_string(),
+            url.to_owned(),
             self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
         );
-        let mut flags: Vec<String> = vec![];
+        let mut flags: Vec<BString> = vec![];
         if version_compare(
-            &util.binary_version()?.unwrap_or_default(),
+            util.binary_version()?.unwrap_or_default(),
             "1.7.0",
             CmpOp::Ge,
         ) {
-            flags.push("--ignore-ancestry".to_string());
+            flags.push("--ignore-ancestry".into());
         }
 
         self.inner.io.write_error3(
-            &format!(" Checking out {}", r#ref.clone().unwrap_or_default()),
+            bconcat!(" Checking out ", r#ref.clone().unwrap_or_default()),
             true,
             io_interface::NORMAL,
         );
-        let mut command = vec!["svn".to_string(), "switch".to_string()];
+        let mut command: Vec<BString> = vec!["svn".into(), "switch".into()];
         command.extend(flags);
         self.execute(
             target,
             url,
             command,
-            &format!("{}/{}", url, r#ref.unwrap_or_default()),
+            bconcat!(url, "/", r#ref.unwrap_or_default()).as_bstr(),
             Some(path),
             None,
         )?;
@@ -242,7 +247,7 @@ impl VcsDownloader for SvnDownloader {
     async fn clean_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let changes = self.get_local_changes(package.clone(), path).await?;
@@ -267,16 +272,18 @@ impl VcsDownloader for SvnDownloader {
         }
 
         let changes_str = changes.unwrap();
-        let changes: Vec<String> = preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes_str)
+        let changes: Vec<BString> = preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes_str)
             .into_iter()
-            .map(|elem| format!("    {}", elem))
+            .map(|elem| bconcat!("    ", elem))
             .collect();
         let count_changes = changes.len() as i64;
         self.inner.io.write_error3(
-            &format!(
-                "    <error>{} has modified file{}:</error>",
+            bconcat!(
+                "    <error>",
                 package.get_pretty_name(),
-                if count_changes == 1 { "" } else { "s" }
+                " has modified file",
+                if count_changes == 1 { "" } else { "s" },
+                ":</error>"
             ),
             true,
             io_interface::NORMAL,
@@ -288,10 +295,12 @@ impl VcsDownloader for SvnDownloader {
         if count_changes > 10 {
             let remaining_changes = count_changes - 10;
             self.inner.io.write_error3(
-                &format!(
-                    "    <info>{} more file{} modified, choose \"v\" to view the full list</info>",
+                bconcat!(
+                    "    <info>",
                     remaining_changes,
-                    if remaining_changes == 1 { "" } else { "s" }
+                    " more file",
+                    if remaining_changes == 1 { "" } else { "s" },
+                    " modified, choose \"v\" to view the full list</info>"
                 ),
                 true,
                 io_interface::NORMAL,
@@ -303,37 +312,37 @@ impl VcsDownloader for SvnDownloader {
                 .inner
                 .io
                 .ask(
-                    "    <info>Discard changes [y,n,v,?]?</info> ".into(),
-                    PhpMixed::string("?".to_string()),
+                    "    <info>Discard changes [y,n,v,?]?</info> ",
+                    PhpMixed::string(BString::from("?")),
                 )?
                 .as_string()
-                .map(|s| s.to_str_lossy())
-                .as_deref()
+                .map(|s| &**s)
             {
-                Some("y") => {
+                Some(b"y") => {
                     self.discard_changes(path).await?;
                     break;
                 }
-                Some("n") => {
-                    return Err(RuntimeException::new("Update aborted".to_string()).into());
+                Some(b"n") => {
+                    return Err(RuntimeException::new(BString::from("Update aborted")).into());
                 }
-                Some("v") => {
+                Some(b"v") => {
                     for line in &changes {
                         self.inner.io.write_error3(line, true, io_interface::NORMAL);
                     }
                 }
                 _ => {
                     let help_lines = vec![
-                        format!(
-                            "    y - discard changes and apply the {}",
+                        bconcat!(
+                            "    y - discard changes and apply the ",
                             if update { "update" } else { "uninstall" }
                         ),
-                        format!(
-                            "    n - abort the {} and let you manually clean things up",
-                            if update { "update" } else { "uninstall" }
+                        bconcat!(
+                            "    n - abort the ",
+                            if update { "update" } else { "uninstall" },
+                            " and let you manually clean things up"
                         ),
-                        "    v - view modified files".to_string(),
-                        "    ? - print help".to_string(),
+                        BString::from("    v - view modified files"),
+                        BString::from("    ? - print help"),
                     ];
                     for line in &help_lines {
                         self.inner.io.write_error3(line, true, io_interface::NORMAL);
@@ -347,23 +356,23 @@ impl VcsDownloader for SvnDownloader {
 
     fn get_commit_logs(
         &self,
-        from_reference: &str,
-        to_reference: &str,
-        path: &str,
-    ) -> anyhow::Result<String> {
+        from_reference: &bstr::BStr,
+        to_reference: &bstr::BStr,
+        path: &Path,
+    ) -> anyhow::Result<bstr::BString> {
         if preg_is_match(php_regex!(r"{@(\d+)$}"), from_reference)
             && preg_is_match(php_regex!(r"{@(\d+)$}"), to_reference)
         {
             // retrieve the svn base url from the checkout folder
-            let command = vec![
-                "svn".to_string(),
-                "info".to_string(),
-                "--non-interactive".to_string(),
-                "--xml".to_string(),
-                "--".to_string(),
-                path.to_string(),
+            let command: Vec<BString> = vec![
+                "svn".into(),
+                "info".into(),
+                "--non-interactive".into(),
+                "--xml".into(),
+                "--".into(),
+                path_to_bytes(path).into(),
             ];
-            let mut output = String::new();
+            let mut output = BString::default();
             if self
                 .inner
                 .process
@@ -371,9 +380,10 @@ impl VcsDownloader for SvnDownloader {
                 .execute(&command, &mut output, Some(path))?
                 != 0
             {
-                return Err(RuntimeException::new(format!(
-                    "Failed to execute {}\n\n{}",
-                    command.join(" "),
+                return Err(RuntimeException::new(bconcat!(
+                    "Failed to execute ",
+                    implode(" ", &command),
+                    "\n\n",
                     self.inner.process.borrow().get_error_output()
                 ))
                 .into());
@@ -381,10 +391,10 @@ impl VcsDownloader for SvnDownloader {
 
             let url_pattern = "#<url>(.*)</url>#";
             let base_url = if let Some(matches) = preg_match(url_pattern, &output) {
-                matches.get(1).unwrap_or_default().to_string()
+                matches.get(1).unwrap_or_default().to_owned()
             } else {
-                return Err(RuntimeException::new(format!(
-                    "Unable to determine svn url for path {}",
+                return Err(RuntimeException::new(bconcat!(
+                    "Unable to determine svn url for path ",
                     path
                 ))
                 .into());
@@ -394,12 +404,12 @@ impl VcsDownloader for SvnDownloader {
             let from_revision = preg_replace(php_regex!(r"{.*@(\d+)$}"), "$1", from_reference);
             let to_revision = preg_replace(php_regex!(r"{.*@(\d+)$}"), "$1", to_reference);
 
-            let command = vec![
-                "svn".to_string(),
-                "log".to_string(),
-                "-r".to_string(),
-                format!("{}:{}", from_revision, to_revision),
-                "--incremental".to_string(),
+            let command: Vec<BString> = vec![
+                "svn".into(),
+                "log".into(),
+                "-r".into(),
+                bconcat!(from_revision, ":", to_revision),
+                "--incremental".into(),
             ];
 
             let mut util = SvnUtil::new(
@@ -411,23 +421,27 @@ impl VcsDownloader for SvnDownloader {
             util.set_cache_credentials(self.cache_credentials.get());
             util.execute_local(command.clone(), path, None, self.inner.io.is_verbose())
                 .map_err(|e| {
-                    RuntimeException::new(format!(
-                        "Failed to execute {}\n\n{}",
-                        command.join(" "),
-                        e
+                    RuntimeException::new(bconcat!(
+                        "Failed to execute ",
+                        implode(" ", &command),
+                        "\n\n",
+                        error_message(&e)
                     ))
                     .into()
                 })
         } else {
-            Ok(format!(
-                "Could not retrieve changes between {} and {} due to missing revision information",
-                from_reference, to_reference
+            Ok(bconcat!(
+                "Could not retrieve changes between ",
+                from_reference,
+                " and ",
+                to_reference,
+                " due to missing revision information"
             ))
         }
     }
 
-    fn has_metadata_repository(&self, path: &str) -> bool {
-        is_dir(format!("{}/.svn", path))
+    fn has_metadata_repository(&self, path: &Path) -> bool {
+        is_dir(path_from_bytes(&bconcat!(path, "/.svn")))
     }
 }
 
@@ -436,17 +450,15 @@ impl ChangeReportInterface for SvnDownloader {
     async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         if !self.has_metadata_repository(path) {
             return Ok(None);
         }
 
-        let mut output = String::new();
+        let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
-            ["svn", "status", "--ignore-externals"]
-                .map(|s| s.to_string())
-                .as_ref(),
+            &["svn", "status", "--ignore-externals"],
             &mut output,
             Some(path),
         )?;
@@ -460,14 +472,18 @@ impl ChangeReportInterface for SvnDownloader {
 }
 
 impl VcsCapableDownloaderInterface for SvnDownloader {
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
-        self.inner.get_vcs_reference(package, &path)
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
+        self.inner.get_vcs_reference(package, path)
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for SvnDownloader {
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         <Self as VcsDownloader>::get_installation_source(self)
     }
 
@@ -484,7 +500,7 @@ impl DownloaderInterface for SvnDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -493,9 +509,9 @@ impl DownloaderInterface for SvnDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -504,7 +520,7 @@ impl DownloaderInterface for SvnDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
@@ -514,7 +530,7 @@ impl DownloaderInterface for SvnDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
@@ -522,7 +538,7 @@ impl DownloaderInterface for SvnDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
@@ -530,9 +546,9 @@ impl DownloaderInterface for SvnDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await

@@ -4,65 +4,65 @@ use crate::util::http::RequestProxy;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_encode, parse_url, rawurldecode, strpbrk,
+    PhpMixed, RuntimeException, base64_encode, bconcat, parse_url, rawurldecode, str_replace,
+    strpbrk, strtolower,
 };
 
 #[derive(Debug)]
 pub struct ProxyItem {
-    url: String,
-    safe_url: String,
-    curl_auth: Option<String>,
-    options_proxy: String,
-    options_auth: Option<String>,
+    url: BString,
+    safe_url: BString,
+    curl_auth: Option<BString>,
+    options_proxy: BString,
+    options_auth: Option<BString>,
 }
 
 impl ProxyItem {
-    pub fn new(proxy_url: String, env_name: String) -> Result<Self, RuntimeException> {
-        let syntax_error = format!("unsupported `{}` syntax", env_name);
+    pub fn new(proxy_url: impl AsRef<[u8]>, env_name: BString) -> Result<Self, RuntimeException> {
+        let proxy_url = proxy_url.as_ref();
+        let syntax_error = bconcat!("unsupported `", env_name, "` syntax");
 
-        if strpbrk(&proxy_url, "\r\n\t").is_some() {
+        if strpbrk(proxy_url, "\r\n\t").is_some() {
             return Err(RuntimeException::new(syntax_error));
         }
 
-        let Some(proxy) = parse_url(&proxy_url) else {
+        let Some(proxy) = parse_url(proxy_url) else {
             return Err(RuntimeException::new(syntax_error));
         };
 
         let Some(host) = proxy.host else {
-            return Err(RuntimeException::new(format!(
-                "unable to find proxy host in {}",
+            return Err(RuntimeException::new(bconcat!(
+                "unable to find proxy host in ",
                 env_name
             )));
         };
 
         let scheme = match &proxy.scheme {
-            Some(scheme) => format!("{}://", scheme.to_lowercase()),
-            None => "http://".to_string(),
+            Some(scheme) => bconcat!(strtolower(scheme), "://"),
+            None => BString::from("http://"),
         };
-        let mut safe = String::new();
+        let mut safe = BString::default();
 
-        let mut curl_auth: Option<String> = None;
-        let mut options_auth: Option<String> = None;
+        let mut curl_auth: Option<BString> = None;
+        let mut options_auth: Option<BString> = None;
 
         if let Some(user_raw) = &proxy.user {
-            safe = "***".to_string();
-            let auth_raw = rawurldecode(user_raw);
-
+            safe = "***".into();
             let mut user = user_raw.clone();
-            let mut auth = auth_raw;
+            let mut auth = rawurldecode(user_raw);
 
             if let Some(pass_raw) = &proxy.pass {
-                safe += ":***";
-                user += &format!(":{}", pass_raw);
-                auth += &format!(":{}", rawurldecode(pass_raw));
+                safe.extend_from_slice(b":***");
+                user = bconcat!(user, ":", pass_raw);
+                auth = bconcat!(auth, ":", rawurldecode(pass_raw));
             }
 
-            safe += "@";
+            safe.extend_from_slice(b"@");
 
             if !user.is_empty() {
                 curl_auth = Some(user);
-                options_auth = Some(format!(
-                    "Proxy-Authorization: Basic {}",
+                options_auth = Some(bconcat!(
+                    "Proxy-Authorization: Basic ",
                     base64_encode(&auth)
                 ));
             }
@@ -84,27 +84,29 @@ impl ProxyItem {
         // but is considered valid depending on the PHP or Curl version.
         let port = match port {
             None => {
-                return Err(RuntimeException::new(format!(
-                    "unable to find proxy port in {}",
+                return Err(RuntimeException::new(bconcat!(
+                    "unable to find proxy port in ",
                     env_name
                 )));
             }
             Some(0) => {
-                return Err(RuntimeException::new(format!(
-                    "port 0 is reserved in {}",
+                return Err(RuntimeException::new(bconcat!(
+                    "port 0 is reserved in ",
                     env_name
                 )));
             }
             Some(p) => p,
         };
 
-        let url = format!("{}{}:{}", scheme, host, port);
-        let safe_url = format!("{}{}{}:{}", scheme, safe, host, port);
+        let url = bconcat!(scheme, host, ":", port);
+        let safe_url = bconcat!(scheme, safe, host, ":", port);
 
-        let options_proxy_scheme = scheme
-            .replace("http://", "tcp://")
-            .replace("https://", "ssl://");
-        let options_proxy = format!("{}{}:{}", options_proxy_scheme, host, port);
+        let options_proxy_scheme = str_replace(
+            "https://",
+            "ssl://",
+            str_replace("http://", "tcp://", &scheme),
+        );
+        let options_proxy = bconcat!(options_proxy_scheme, host, ":", port);
 
         Ok(Self {
             url,
@@ -115,7 +117,7 @@ impl ProxyItem {
         })
     }
 
-    pub fn to_request_proxy(&self, scheme: String) -> RequestProxy {
+    pub fn to_request_proxy(&self, scheme: impl AsRef<[u8]>) -> RequestProxy {
         let mut http_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         http_options.insert("proxy".into(), PhpMixed::string(self.options_proxy.clone()));
 
@@ -123,12 +125,12 @@ impl ProxyItem {
             http_options.insert("header".into(), PhpMixed::string(auth.clone()));
         }
 
-        if scheme == "http" {
+        if scheme.as_ref() == b"http" {
             http_options.insert("request_fulluri".into(), PhpMixed::Bool(true));
         }
 
-        let mut options: IndexMap<String, IndexMap<BString, PhpMixed>> = IndexMap::new();
-        options.insert("http".to_string(), http_options);
+        let mut options: IndexMap<BString, IndexMap<BString, PhpMixed>> = IndexMap::new();
+        options.insert(BString::from("http"), http_options);
 
         RequestProxy::new(
             Some(self.url.clone()),

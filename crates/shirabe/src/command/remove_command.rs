@@ -8,17 +8,22 @@ use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
-use bstr::{B, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, impl_php_class, preg_grep, strtolower};
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::exception::InvalidArgumentException;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_php_shim::{
+    PhpMixed, UnexpectedValueException, bconcat, impl_php_class, implode, preg_grep, strtolower,
+};
+use shirabe_symfony_console::input::InputInterfaceByName;
+use shirabe_symfony_console::{
+    command::Command,
+    exception::InvalidArgumentException,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct RemoveCommand {
@@ -48,9 +53,9 @@ impl RemoveCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RemoveCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("remove")?;
-        self.set_aliases(vec!["rm".to_string(), "uninstall".to_string()])?;
-        self.set_description("Removes a package from the require or require-dev");
+        self.set_name("remove".into())?;
+        self.set_aliases(vec!["rm".into(), "uninstall".into()])?;
+        self.set_description("Removes a package from the require or require-dev".into());
         self.set_definition(&[
                 InputArgument::new5("packages",
             Some(InputArgument::IS_ARRAY),
@@ -91,8 +96,8 @@ impl Command for RemoveCommand {
         None,
         Some(InputOption::VALUE_REQUIRED),
         "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
-        Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())),
-        SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+        Some(InputValue::from(Auditor::FORMAT_SUMMARY)),
+        SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
         InputOption::new("no-security-blocking",
         None,
         Some(InputOption::VALUE_NONE),
@@ -104,12 +109,12 @@ impl Command for RemoveCommand {
         "Run the dependency update with the --no-dev option.",
         None).unwrap().into(),
         InputOption::new("update-with-dependencies",
-        Some("w"),
+        Some("w".into()),
         Some(InputOption::VALUE_NONE),
         "Allows inherited dependencies to be updated with explicit dependencies (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var). (Deprecated, is now default behavior)",
         None).unwrap().into(),
         InputOption::new("update-with-all-dependencies",
-        Some("W"),
+        Some("W".into()),
         Some(InputOption::VALUE_NONE),
         "Allows all inherited dependencies to be updated, including those that are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).",
         None).unwrap().into(),
@@ -124,7 +129,7 @@ impl Command for RemoveCommand {
         "Does not allow inherited dependencies to be updated with explicit dependencies.",
         None).unwrap().into(),
         InputOption::new("minimal-changes",
-        Some("m"),
+        Some("m".into()),
         Some(InputOption::VALUE_NONE),
         "During an update with -w/-W, only perform absolutely necessary changes to transitive dependencies (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).",
         None).unwrap().into(),
@@ -144,12 +149,12 @@ impl Command for RemoveCommand {
         "Ignore all platform requirements (php & ext- packages).",
         None).unwrap().into(),
         InputOption::new("optimize-autoloader",
-        Some("o"),
+        Some("o".into()),
         Some(InputOption::VALUE_NONE),
         "Optimize autoloader during autoloader dump",
         None).unwrap().into(),
         InputOption::new("classmap-authoritative",
-        Some("a"),
+        Some("a".into()),
         Some(InputOption::VALUE_NONE),
         "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.",
         None).unwrap().into(),
@@ -168,7 +173,8 @@ impl Command for RemoveCommand {
             "The <info>remove</info> command removes a package from the current\n\
                 list of installed packages\n\n\
                 <info>shirabe remove</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#remove-rm",
+                Read more at https://getcomposer.org/doc/03-cli.md#remove-rm"
+                .into(),
         );
         Ok(())
     }
@@ -182,7 +188,7 @@ impl Command for RemoveCommand {
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::is_empty)
+            .map(<[bstr::BString]>::is_empty)
             .unwrap_or(true)
             && !input
                 .borrow()
@@ -190,17 +196,17 @@ impl Command for RemoveCommand {
                 .as_bool()
                 .unwrap_or(false)
         {
-            return Err(InvalidArgumentException::new(
-                "Not enough arguments (missing: \"packages\").".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "Not enough arguments (missing: \"packages\").",
+            ))
             .into());
         }
 
-        let mut packages: Vec<String> = input
+        let mut packages: Vec<BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(|l| l.iter().map(|v| strtolower(v)).collect())
+            .map(|l| l.iter().map(strtolower).collect())
             .unwrap_or_default();
 
         if input
@@ -215,10 +221,9 @@ impl Command for RemoveCommand {
                 let locker = composer.get_locker().clone();
                 let mut locker = locker.borrow_mut();
                 if !locker.is_locked() {
-                    return Err(UnexpectedValueException::new(
-                        "A valid composer.lock file is required to run this command with --unused"
-                            .to_string(),
-                    )
+                    return Err(UnexpectedValueException::new(BString::from(
+                        "A valid composer.lock file is required to run this command with --unused",
+                    ))
                     .into());
                 }
             }
@@ -229,14 +234,14 @@ impl Command for RemoveCommand {
                 .get_locked_repository(true)?;
             let locked_packages = locked_repo.borrow_mut().get_packages()?;
 
-            let mut required: IndexMap<String, bool> = IndexMap::new();
+            let mut required: IndexMap<BString, bool> = IndexMap::new();
             for link in composer
                 .get_package()
                 .get_requires()
                 .values()
                 .chain(composer.get_package().get_dev_requires().values())
             {
-                required.insert(link.get_target().to_string(), true);
+                required.insert(BString::from(link.get_target()), true);
             }
 
             let mut locked_packages = locked_packages;
@@ -245,9 +250,9 @@ impl Command for RemoveCommand {
                 let mut to_remove = vec![];
                 for (index, package) in locked_packages.iter().enumerate() {
                     for name in package.get_names(true) {
-                        if required.contains_key(name.as_str()) {
+                        if required.contains_key(name.as_bstr()) {
                             for link in package.get_requires().values() {
-                                required.insert(link.get_target().to_string(), true);
+                                required.insert(BString::from(link.get_target()), true);
                             }
                             found = true;
                             to_remove.push(index);
@@ -263,7 +268,7 @@ impl Command for RemoveCommand {
                 }
             }
 
-            let unused: Vec<String> = locked_packages.iter().map(|p| p.get_name()).collect();
+            let unused: Vec<BString> = locked_packages.iter().map(|p| p.get_name()).collect();
             packages.extend(unused);
 
             if packages.is_empty() {
@@ -277,7 +282,7 @@ impl Command for RemoveCommand {
 
         let json_file = JsonFile::new(file.clone(), None, None)?;
         let composer_data = json_file.read()?;
-        let composer_backup = std::fs::read_to_string(json_file.get_path())?;
+        let composer_backup = std::fs::read(json_file.get_path())?;
 
         let json_file_for_source = JsonFile::new(file.clone(), None, None)?;
         let mut json = JsonConfigSource::new(
@@ -314,18 +319,12 @@ impl Command for RemoveCommand {
                 .and_then(|m| m.get_mut(B(link_type)))
                 .and_then(|v| v.as_array_mut())
             {
-                let entries: Vec<(String, String)> = section
+                let entries: Vec<BString> = section
                     .iter()
-                    // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
-                    .filter_map(|(k, v)| {
-                        v.as_string().map(|_| {
-                            let k = k.to_str_lossy().into_owned();
-                            (k.clone(), k)
-                        })
-                    })
+                    .filter_map(|(k, v)| v.as_string().map(|_| k.clone()))
                     .collect();
-                for (name, canonical) in entries {
-                    section.insert(strtolower(&name).into(), PhpMixed::string(canonical));
+                for name in entries {
+                    section.insert(strtolower(&name), PhpMixed::string(name));
                 }
             }
         }
@@ -335,7 +334,7 @@ impl Command for RemoveCommand {
             .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false);
-        let mut to_remove: IndexMap<String, Vec<String>> = IndexMap::new();
+        let mut to_remove: IndexMap<BString, Vec<BString>> = IndexMap::new();
         for package in &packages {
             let in_type = composer_data
                 .as_array()
@@ -343,7 +342,7 @@ impl Command for RemoveCommand {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B(package)))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string());
+                .map(BString::from);
 
             let in_alt_type = composer_data
                 .as_array()
@@ -351,64 +350,69 @@ impl Command for RemoveCommand {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B(package)))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string());
+                .map(BString::from);
 
             if let Some(canonical_name) = in_type {
                 if dry_run {
                     to_remove
-                        .entry(r#type.to_string())
+                        .entry(bconcat!(r#type))
                         .or_default()
                         .push(canonical_name.clone());
                 } else {
-                    json.remove_link(r#type, &canonical_name);
+                    json.remove_link(bstr::BStr::new(r#type), bstr::BStr::new(&canonical_name));
                 }
             } else if let Some(canonical_name) = in_alt_type {
-                io.write_error(&format!(
-                    "<warning>{} could not be found in {} but it is present in {}</warning>",
-                    canonical_name, r#type, alt_type
+                io.write_error(bconcat!(
+                    "<warning>",
+                    canonical_name,
+                    " could not be found in ",
+                    r#type,
+                    " but it is present in ",
+                    alt_type,
+                    "</warning>"
                 ));
                 if io.is_interactive()
                     && io.ask_confirmation(
-                        format!(
-                            "Do you want to remove it from {} [<comment>yes</comment>]? ",
-                            alt_type
+                        bconcat!(
+                            "Do you want to remove it from ",
+                            alt_type,
+                            " [<comment>yes</comment>]? "
                         ),
                         true,
                     )?
                 {
                     if dry_run {
                         to_remove
-                            .entry(alt_type.to_string())
+                            .entry(bconcat!(alt_type))
                             .or_default()
                             .push(canonical_name.clone());
                     } else {
-                        json.remove_link(alt_type, &canonical_name);
+                        json.remove_link(
+                            bstr::BStr::new(alt_type),
+                            bstr::BStr::new(&canonical_name),
+                        );
                     }
                 }
             } else {
-                // TODO(bytes): package names are matched as UTF-8 text, so non-UTF-8 bytes are
-                // replaced.
-                let type_keys: Vec<String> = composer_data
+                let type_keys: Vec<BString> = composer_data
                     .as_array()
                     .and_then(|m| m.get(B(r#type)))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.keys().map(|k| k.to_str_lossy().into_owned()).collect())
+                    .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let matches_in_type: Vec<&String> = preg_grep(
+                let matches_in_type: Vec<&BString> = preg_grep(
                     base_package::package_name_to_regexp(package),
                     type_keys.iter(),
                 )
                 .collect();
 
-                // TODO(bytes): package names are matched as UTF-8 text, so non-UTF-8 bytes are
-                // replaced.
-                let alt_type_keys: Vec<String> = composer_data
+                let alt_type_keys: Vec<BString> = composer_data
                     .as_array()
                     .and_then(|m| m.get(B(alt_type)))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.keys().map(|k| k.to_str_lossy().into_owned()).collect())
+                    .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let matches_in_alt_type: Vec<&String> = preg_grep(
+                let matches_in_alt_type: Vec<&BString> = preg_grep(
                     base_package::package_name_to_regexp(package),
                     alt_type_keys.iter(),
                 )
@@ -418,48 +422,61 @@ impl Command for RemoveCommand {
                     for matched_package in matches_in_type {
                         if dry_run {
                             to_remove
-                                .entry(r#type.to_string())
+                                .entry(bconcat!(r#type))
                                 .or_default()
                                 .push(matched_package.clone());
                         } else {
-                            json.remove_link(r#type, matched_package);
+                            json.remove_link(
+                                bstr::BStr::new(r#type),
+                                bstr::BStr::new(matched_package),
+                            );
                         }
                     }
                 } else if !alt_type_keys.is_empty() && !matches_in_alt_type.is_empty() {
                     for matched_package in matches_in_alt_type {
-                        io.write_error(&format!(
-                            "<warning>{} could not be found in {} but it is present in {}</warning>",
-                            matched_package, r#type, alt_type
+                        io.write_error(bconcat!(
+                            "<warning>",
+                            matched_package,
+                            " could not be found in ",
+                            r#type,
+                            " but it is present in ",
+                            alt_type,
+                            "</warning>"
                         ));
                         if io.is_interactive()
                             && io.ask_confirmation(
-                                format!(
-                                    "Do you want to remove it from {} [<comment>yes</comment>]? ",
-                                    alt_type
+                                bconcat!(
+                                    "Do you want to remove it from ",
+                                    alt_type,
+                                    " [<comment>yes</comment>]? "
                                 ),
                                 true,
                             )?
                         {
                             if dry_run {
                                 to_remove
-                                    .entry(alt_type.to_string())
+                                    .entry(bconcat!(alt_type))
                                     .or_default()
                                     .push(matched_package.clone());
                             } else {
-                                json.remove_link(alt_type, matched_package);
+                                json.remove_link(
+                                    bstr::BStr::new(alt_type),
+                                    bstr::BStr::new(matched_package),
+                                );
                             }
                         }
                     }
                 } else {
-                    io.write_error(&format!(
-                        "<warning>{} is not required in your composer.json and has not been removed</warning>",
-                        package
+                    io.write_error(bconcat!(
+                        "<warning>",
+                        package,
+                        " is not required in your composer.json and has not been removed</warning>"
                     ));
                 }
             }
         }
 
-        io.write_error(&format!("<info>{} has been updated</info>", file));
+        io.write_error(bconcat!("<info>", file, " has been updated</info>"));
 
         if input
             .borrow()
@@ -485,24 +502,24 @@ impl Command for RemoveCommand {
 
         if dry_run {
             let root_package = composer.get_package();
-            let mut links: IndexMap<String, IndexMap<String, _>> = IndexMap::new();
+            let mut links: IndexMap<BString, IndexMap<BString, _>> = IndexMap::new();
             links.insert(
-                "require".to_string(),
+                BString::from("require"),
                 (*root_package.get_requires()).clone(),
             );
             links.insert(
-                "require-dev".to_string(),
+                BString::from("require-dev"),
                 (*root_package.get_dev_requires()).clone(),
             );
             for (link_type, names) in &to_remove {
                 for name in names {
-                    if let Some(section) = links.get_mut(link_type.as_str()) {
-                        section.shift_remove(name.as_str());
+                    if let Some(section) = links.get_mut(link_type.as_bstr()) {
+                        section.shift_remove(name.as_bytes());
                     }
                 }
             }
-            root_package.set_requires(links.shift_remove("require").unwrap_or_default());
-            root_package.set_dev_requires(links.shift_remove("require-dev").unwrap_or_default());
+            root_package.set_requires(links.shift_remove(B("require")).unwrap_or_default());
+            root_package.set_dev_requires(links.shift_remove(B("require-dev")).unwrap_or_default());
         }
 
         let mut command_event = crate::plugin::CommandEvent::new(
@@ -511,14 +528,14 @@ impl Command for RemoveCommand {
             input.clone(),
             output,
         );
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let allow_plugins = composer.get_config().borrow_mut().get("allow-plugins");
-        let removed_plugins: Vec<String> =
+        let removed_plugins: Vec<BString> =
             if let Some(allow_map) = allow_plugins.as_opt().and_then(|v| v.as_array()) {
                 packages
                     .iter()
@@ -539,10 +556,13 @@ impl Command for RemoveCommand {
                 .map(|m| m.len())
                 .unwrap_or(0);
             if allow_map_len == removed_plugins.len() {
-                json.remove_config_setting("allow-plugins");
+                json.remove_config_setting(bstr::BStr::new("allow-plugins"));
             } else {
                 for plugin in &removed_plugins {
-                    json.remove_config_setting(&format!("allow-plugins.{}", plugin));
+                    json.remove_config_setting(bstr::BStr::new(&bconcat!(
+                        "allow-plugins.",
+                        plugin
+                    )));
                 }
             }
         }
@@ -591,7 +611,7 @@ impl Command for RemoveCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
@@ -618,7 +638,7 @@ impl Command for RemoveCommand {
 
         let mut update_allow_transitive_dependencies =
             UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire;
-        let mut flags = String::new();
+        let mut flags = BString::default();
         if input
             .borrow()
             .get_option("update-with-all-dependencies")?
@@ -632,7 +652,7 @@ impl Command for RemoveCommand {
         {
             update_allow_transitive_dependencies =
                 UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps;
-            flags += " --with-all-dependencies";
+            flags.push_str(" --with-all-dependencies");
         } else if input
             .borrow()
             .get_option("no-update-with-dependencies")?
@@ -640,13 +660,14 @@ impl Command for RemoveCommand {
             .unwrap_or(false)
         {
             update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
-            flags += " --with-dependencies";
+            flags.push_str(" --with-dependencies");
         }
 
-        io.write_error(&format!(
-            "<info>Running shirabe update {}{}</info>",
-            packages.join(" "),
-            flags
+        io.write_error(bconcat!(
+            "<info>Running shirabe update ",
+            implode(" ", &packages),
+            flags,
+            "</info>"
         ));
 
         install.set_verbose(
@@ -685,9 +706,10 @@ impl Command for RemoveCommand {
 
         let status = install.run().await?;
         if status != 0 {
-            io.write_error(&format!(
-                "\n<error>Removal failed, reverting {} to its original content.</error>",
-                file
+            io.write_error(bconcat!(
+                "\n<error>Removal failed, reverting ",
+                file,
+                " to its original content.</error>"
             ));
             std::fs::write(json_file.get_path(), &composer_backup)?;
         }
@@ -698,13 +720,10 @@ impl Command for RemoveCommand {
                     .get_repository_manager()
                     .borrow()
                     .get_local_repository()
-                    .find_packages(package, None)?
+                    .find_packages(bstr::BStr::new(package), None)?
                     .is_empty()
                 {
-                    io.write_error(&format!(
-                        "<error>Removal failed, {} is still present, it may be required by another package. See `shirabe why {}`.</error>",
-                        package, package
-                    ));
+                    io.write_error(bconcat!("<error>Removal failed, ", package, " is still present, it may be required by another package. See `shirabe why ", package, "`.</error>"));
                     return Ok(2);
                 }
             }

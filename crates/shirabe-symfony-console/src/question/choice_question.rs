@@ -2,10 +2,10 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::question::{Question, QuestionInterface};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_search, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
+    PhpMixed, bconcat, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
 };
 
 /// Represents a choice question.
@@ -14,8 +14,8 @@ pub struct ChoiceQuestion {
     inner: Question,
     choices: IndexMap<BString, PhpMixed>,
     multiselect: bool,
-    prompt: String,
-    error_message: String,
+    prompt: BString,
+    error_message: BString,
 }
 
 impl ChoiceQuestion {
@@ -23,13 +23,13 @@ impl ChoiceQuestion {
     /// `$choices` The list of available choices.
     /// `$default` The default answer to return.
     pub fn new(
-        question: String,
+        question: impl Into<BString>,
         choices: IndexMap<BString, PhpMixed>,
         default: Option<PhpMixed>,
     ) -> Result<Self, LogicException> {
         if choices.is_empty() {
             return Err(LogicException::new(
-                "Choice question must have at least 1 choice available.".to_string(),
+                "Choice question must have at least 1 choice available.",
             ));
         }
 
@@ -37,8 +37,8 @@ impl ChoiceQuestion {
             inner: Question::new(question, default),
             choices: choices.clone(),
             multiselect: false,
-            prompt: " > ".to_string(),
-            error_message: "Value \"%s\" is invalid".to_string(),
+            prompt: BString::from(" > "),
+            error_message: BString::from("Value \"%s\" is invalid"),
         };
 
         let validator = this.get_default_validator();
@@ -73,13 +73,13 @@ impl ChoiceQuestion {
     }
 
     /// Gets the prompt for choices.
-    pub fn get_prompt(&self) -> &str {
-        &self.prompt
+    pub fn get_prompt(&self) -> &BStr {
+        self.prompt.as_bstr()
     }
 
     /// Sets the prompt for choices.
-    pub fn set_prompt(&mut self, prompt: String) -> &mut Self {
-        self.prompt = prompt;
+    pub fn set_prompt(&mut self, prompt: impl Into<BString>) -> &mut Self {
+        self.prompt = prompt.into();
 
         self
     }
@@ -97,8 +97,8 @@ impl ChoiceQuestion {
     /// Sets the error message for invalid values.
     ///
     /// The error message has a string placeholder (%s) for the invalid value.
-    pub fn set_error_message(&mut self, error_message: String) -> &mut Self {
-        self.error_message = error_message;
+    pub fn set_error_message(&mut self, error_message: impl Into<BString>) -> &mut Self {
+        self.error_message = error_message.into();
         let validator = self.get_default_validator();
         self.inner.set_validator(Some(validator));
 
@@ -123,14 +123,14 @@ impl ChoiceQuestion {
 
             let selected_choices: Vec<PhpMixed> = if multiselect {
                 // Check for a separated comma values
-                if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), &strval(&selected)) {
+                if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), strval(&selected)) {
                     return Err(InvalidArgumentException::new(sprintf(
                         &error_message,
                         std::slice::from_ref(&selected),
                     )));
                 }
 
-                explode(",", &strval(&selected))
+                explode(",", strval(&selected))
                     .into_iter()
                     .map(PhpMixed::string)
                     .collect()
@@ -141,29 +141,33 @@ impl ChoiceQuestion {
             let mut selected_choices = selected_choices;
             if trimmable {
                 for v in selected_choices.iter_mut() {
-                    *v = PhpMixed::string(trim(&strval(v), None));
+                    *v = PhpMixed::string(trim(strval(v)));
                 }
             }
 
             let mut multiselect_choices: Vec<PhpMixed> = Vec::new();
             for value in &selected_choices {
-                let mut results: Vec<String> = Vec::new();
+                let mut results: Vec<&BString> = Vec::new();
                 for (key, choice) in &choices {
                     if (*choice) == *value {
-                        // TODO(bytes): results are Strings, so non-UTF-8 bytes are replaced.
-                        results.push(key.to_str_lossy().into_owned());
+                        results.push(key);
                     }
                 }
 
                 if results.len() > 1 {
-                    return Err(InvalidArgumentException::new(format!(
-                        "The provided answer is ambiguous. Value should be one of \"{}\".",
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        "The provided answer is ambiguous. Value should be one of \"",
                         implode("\" or \"", &results),
+                        "\"."
                     )));
                 }
 
                 // array_search($value, $choices)
-                let result_key = array_search(&strval(value), &choices_as_str(&choices));
+                let needle = strval(value);
+                let result_key = choices
+                    .iter()
+                    .find(|(_, choice)| strval(choice) == needle)
+                    .map(|(key, _)| key.clone());
 
                 let mut result: PhpMixed;
                 if !is_assoc {
@@ -216,7 +220,7 @@ impl ChoiceQuestion {
 }
 
 impl QuestionInterface for ChoiceQuestion {
-    fn get_question(&self) -> &str {
+    fn get_question(&self) -> &BStr {
         self.inner.get_question()
     }
 
@@ -240,7 +244,7 @@ impl QuestionInterface for ChoiceQuestion {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
         self.inner.get_autocompleter_callback()
     }
 
@@ -265,14 +269,4 @@ impl QuestionInterface for ChoiceQuestion {
     fn as_choice(&self) -> Option<&ChoiceQuestion> {
         Some(self)
     }
-}
-
-/// array_search operates over the choice values as strings; this projects the
-/// choices map's values into the string-keyed form the shim expects.
-fn choices_as_str(choices: &IndexMap<BString, PhpMixed>) -> IndexMap<String, String> {
-    choices
-        .iter()
-        // TODO(bytes): the result is keyed by String, so non-UTF-8 bytes are replaced.
-        .map(|(k, v)| (k.to_str_lossy().into_owned(), strval(v)))
-        .collect()
 }

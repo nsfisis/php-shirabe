@@ -12,6 +12,7 @@ shirabe-php-rpc.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-symfony-finder.workspace = true
 anyhow.workspace = true
+bstr.workspace = true
 indexmap.workspace = true
 
 [lints]

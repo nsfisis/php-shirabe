@@ -5,9 +5,11 @@
 use crate::async_runtime::run;
 use crate::php_worker::{lock_php_worker, php_runtime_available};
 use crate::plugin_installer_test::{new_installer, set_up};
+use bstr::BStr;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
+use shirabe_php_shim::path_to_bytes;
 
 fn subscriber_fixture_package() -> PackageInterfaceHandle {
     let loader = JsonLoader::new(Box::new(ArrayLoader::new(None, false)));
@@ -15,7 +17,7 @@ fn subscriber_fixture_package() -> PackageInterfaceHandle {
         .join("tests/plugin/fixtures/subscriber-v1/composer.json");
     loader
         .load(JsonLoaderInput::String(
-            path.canonicalize().unwrap().to_str().unwrap().to_string(),
+            path_to_bytes(&path.canonicalize().unwrap()).into(),
         ))
         .unwrap()
 }
@@ -29,7 +31,7 @@ fn install_subscriber_plugin(set_up: &crate::plugin_installer_test::SetUp) {
     assert_eq!("activate subscriber-v1\n", set_up.io.borrow().get_output());
 }
 
-fn dispatch(set_up: &crate::plugin_installer_test::SetUp, event_name: &str) -> i64 {
+fn dispatch(set_up: &crate::plugin_installer_test::SetUp, event_name: &BStr) -> i64 {
     let dispatcher = set_up.composer.borrow().get_event_dispatcher();
     let result = dispatcher.borrow_mut().dispatch(Some(event_name), None);
     result.unwrap()
@@ -46,7 +48,7 @@ fn test_subscriber_listener_receives_event() {
 
     // 'post-install-cmd' => 'onPostInstall' (bare method-name shape); the listener calls
     // $event->getName() back over RPC.
-    let return_code = dispatch(&set_up, "post-install-cmd");
+    let return_code = dispatch(&set_up, BStr::new("post-install-cmd"));
 
     assert_eq!(0, return_code);
     assert_eq!(
@@ -65,7 +67,7 @@ fn test_subscriber_listeners_run_in_priority_order() {
     install_subscriber_plugin(&set_up);
 
     // 'shirabe-priority-event' => [['early', 10], ['late', -10]] (multi-handler shape).
-    let return_code = dispatch(&set_up, "shirabe-priority-event");
+    let return_code = dispatch(&set_up, BStr::new("shirabe-priority-event"));
 
     assert_eq!(0, return_code);
     assert_eq!(
@@ -85,7 +87,7 @@ fn test_subscriber_listener_returning_false_sets_return_code() {
 
     // 'shirabe-false-event' => ['returnsFalse', 0] (method+priority shape); PHP maps a false
     // listener return to exit code 1.
-    let return_code = dispatch(&set_up, "shirabe-false-event");
+    let return_code = dispatch(&set_up, BStr::new("shirabe-false-event"));
 
     assert_eq!(1, return_code);
     assert_eq!(
@@ -103,7 +105,7 @@ fn test_remove_plugin_removes_its_subscribed_listeners() {
     let set_up = set_up();
     install_subscriber_plugin(&set_up);
 
-    assert_eq!(0, dispatch(&set_up, "post-install-cmd"));
+    assert_eq!(0, dispatch(&set_up, BStr::new("post-install-cmd")));
 
     // The worker is shared across tests: when another test already defined the plugin class,
     // this install registered it under a `_composer_tmpN` rename (as upstream does).
@@ -115,7 +117,7 @@ fn test_remove_plugin_removes_its_subscribed_listeners() {
         .find(|p| {
             p.borrow()
                 .get_class_name()
-                .starts_with("Subscriber\\Plugin")
+                .starts_with(b"Subscriber\\Plugin")
         })
         .expect("the subscriber plugin is registered")
         .clone();
@@ -123,7 +125,7 @@ fn test_remove_plugin_removes_its_subscribed_listeners() {
 
     // removePlugin removed the plugin's `[$subscriber, 'onPostInstall']` listener, so the
     // second dispatch produces no further output.
-    let return_code = dispatch(&set_up, "post-install-cmd");
+    let return_code = dispatch(&set_up, BStr::new("post-install-cmd"));
 
     assert_eq!(0, return_code);
     assert_eq!(
@@ -141,7 +143,7 @@ fn test_unrelated_event_does_not_reach_the_subscriber() {
     let set_up = set_up();
     install_subscriber_plugin(&set_up);
 
-    let return_code = dispatch(&set_up, "shirabe-unrelated-event");
+    let return_code = dispatch(&set_up, BStr::new("shirabe-unrelated-event"));
 
     assert_eq!(0, return_code);
     assert_eq!("activate subscriber-v1\n", set_up.io.borrow().get_output());

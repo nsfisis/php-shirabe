@@ -1,5 +1,7 @@
 //! ref: composer/vendor/symfony/process/Exception/RuntimeException.php
 
+use bstr::BString;
+
 #[derive(Debug)]
 pub struct RuntimeException {
     inner: shirabe_php_shim::RuntimeException,
@@ -7,7 +9,7 @@ pub struct RuntimeException {
 
 impl RuntimeException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self {
             inner: shirabe_php_shim::RuntimeException::new(message),
         }

@@ -1,4 +1,5 @@
 use crate::PhpClass;
+use bstr::{BStr, BString, ByteSlice};
 
 /// The fields a PHP `\Throwable` carries: its message and code, and the error it wraps. Ported
 /// exception types embed this, either directly or through the parent exception they extend.
@@ -11,28 +12,28 @@ use crate::PhpClass;
 /// exception the port creates, that is the Rust source location of the constructor call.
 #[derive(Debug, Clone)]
 pub struct ThrowableFields {
-    message: String,
+    message: BString,
     code: i64,
-    file: String,
+    file: BString,
     line: i64,
     previous: Option<std::sync::Arc<anyhow::Error>>,
 }
 
 impl ThrowableFields {
     #[track_caller]
-    fn new(message: String, code: i64, previous: Option<std::sync::Arc<anyhow::Error>>) -> Self {
+    fn new(message: BString, code: i64, previous: Option<std::sync::Arc<anyhow::Error>>) -> Self {
         let location = std::panic::Location::caller();
         Self {
             message,
             code,
-            file: location.file().to_string(),
+            file: BString::from(location.file()),
             line: i64::from(location.line()),
             previous,
         }
     }
 
-    pub fn get_message(&self) -> &str {
-        &self.message
+    pub fn get_message(&self) -> &BStr {
+        self.message.as_bstr()
     }
 
     pub fn get_code(&self) -> i64 {
@@ -48,8 +49,8 @@ impl ThrowableFields {
         self.previous.as_deref()
     }
 
-    pub fn get_file(&self) -> &str {
-        &self.file
+    pub fn get_file(&self) -> &BStr {
+        self.file.as_bstr()
     }
 
     pub fn get_line(&self) -> i64 {
@@ -59,15 +60,15 @@ impl ThrowableFields {
     /// PHP's `file` and `line` properties are protected with no setter. `ErrorException`'s
     /// constructor overwrites them, and an exception rebuilt from one raised elsewhere takes the
     /// location it was raised at.
-    pub fn set_location(&mut self, file: String, line: i64) {
-        self.file = file;
+    pub fn set_location(&mut self, file: impl Into<BString>, line: i64) {
+        self.file = file.into();
         self.line = line;
     }
 }
 
 impl std::fmt::Display for ThrowableFields {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message)
+        write!(f, "{}", self.message.display_lossy())
     }
 }
 
@@ -171,7 +172,7 @@ impl AnyThrowable {
         class.as_any_mut().downcast_mut::<T>()
     }
 
-    pub fn get_message(&self) -> &str {
+    pub fn get_message(&self) -> &BStr {
         self.0.fields().get_message()
     }
 
@@ -183,7 +184,7 @@ impl AnyThrowable {
         self.0.fields().get_previous()
     }
 
-    pub fn get_file(&self) -> &str {
+    pub fn get_file(&self) -> &BStr {
         self.0.fields().get_file()
     }
 
@@ -199,7 +200,7 @@ impl AnyThrowable {
             .set_code(code);
     }
 
-    pub fn set_location(&mut self, file: String, line: i64) {
+    pub fn set_location(&mut self, file: impl Into<BString>, line: i64) {
         self.downcast_mut::<ThrowableFields>()
             .expect("every exception bottoms out at the ThrowableFields")
             .set_location(file, line);
@@ -220,9 +221,34 @@ impl std::error::Error for AnyThrowable {
 }
 
 impl PhpClass for AnyThrowable {
-    fn php_class_name(&self) -> String {
+    fn php_class_name(&self) -> &BStr {
         self.0.php_class_name()
     }
+}
+
+/// What PHP's `$e->getMessage()` reads from a Rust error: the bytes of the exception it carries, or
+/// the text of an error the port raised as itself.
+pub fn error_message(error: &anyhow::Error) -> BString {
+    match AnyThrowable::of(error) {
+        Some(exception) => exception.get_message().to_owned(),
+        None => crate::display_to_bytes(&**error),
+    }
+}
+
+/// What `{:#}` renders for a Rust error, the message of the error and of each cause joined by
+/// `: `, with the bytes of every exception in the chain kept.
+pub fn error_chain_message(error: &anyhow::Error) -> BString {
+    let mut message = BString::default();
+    for (index, cause) in error.chain().enumerate() {
+        if index != 0 {
+            message.extend_from_slice(b": ");
+        }
+        match cause.downcast_ref::<AnyThrowable>() {
+            Some(exception) => message.extend_from_slice(exception.get_message()),
+            None => message.extend_from_slice(&crate::display_to_bytes(cause)),
+        }
+    }
+    message
 }
 
 /// PHP's `catch` applied to a Rust error.
@@ -337,7 +363,7 @@ macro_rules! impl_php_exception {
     };
     (@accessors $ty:ty, $field:tt, $class_name:expr) => {
         impl $ty {
-            pub fn get_message(&self) -> &str {
+            pub fn get_message(&self) -> &::bstr::BStr {
                 self.$field.get_message()
             }
 
@@ -353,7 +379,7 @@ macro_rules! impl_php_exception {
                 self.$field.get_previous()
             }
 
-            pub fn get_file(&self) -> &str {
+            pub fn get_file(&self) -> &::bstr::BStr {
                 self.$field.get_file()
             }
 
@@ -361,7 +387,7 @@ macro_rules! impl_php_exception {
                 self.$field.get_line()
             }
 
-            pub fn set_location(&mut self, file: String, line: i64) {
+            pub fn set_location(&mut self, file: impl Into<::bstr::BString>, line: i64) {
                 self.$field.set_location(file, line);
             }
         }
@@ -373,8 +399,8 @@ macro_rules! impl_php_exception {
         }
 
         impl $crate::PhpClass for $ty {
-            fn php_class_name(&self) -> String {
-                $class_name.to_string()
+            fn php_class_name(&self) -> &::bstr::BStr {
+                ::bstr::BStr::new($class_name)
             }
         }
     };
@@ -389,12 +415,12 @@ macro_rules! define_php_exception {
         impl $ty {
             #[track_caller]
             pub fn with_code_and_previous(
-                message: String,
+                message: impl Into<BString>,
                 code: i64,
                 previous: Option<std::sync::Arc<anyhow::Error>>,
             ) -> Self {
                 Self {
-                    inner: ThrowableFields::new(message, code, previous),
+                    inner: ThrowableFields::new(message.into(), code, previous),
                 }
             }
         }
@@ -405,7 +431,7 @@ macro_rules! define_php_exception {
         impl $ty {
             #[track_caller]
             pub fn with_code_and_previous(
-                message: String,
+                message: impl Into<BString>,
                 code: i64,
                 previous: Option<std::sync::Arc<anyhow::Error>>,
             ) -> Self {
@@ -423,12 +449,12 @@ macro_rules! define_php_exception {
 
         impl $ty {
             #[track_caller]
-            pub fn new(message: String) -> Self {
+            pub fn new(message: impl Into<BString>) -> Self {
                 Self::with_code_and_previous(message, 0, None)
             }
 
             #[track_caller]
-            pub fn with_code(message: String, code: i64) -> Self {
+            pub fn with_code(message: impl Into<BString>, code: i64) -> Self {
                 Self::with_code_and_previous(message, code, None)
             }
         }
@@ -441,6 +467,11 @@ define_php_exception!(Exception, ThrowableFields, r"Exception");
 define_php_exception!(Error, ThrowableFields, r"Error");
 define_php_exception!(TypeError, Error, r"TypeError");
 define_php_exception!(RuntimeException, Exception, r"RuntimeException");
+define_php_exception!(
+    PcreException,
+    RuntimeException,
+    r"Composer\Pcre\PcreException"
+);
 define_php_exception!(
     UnexpectedValueException,
     RuntimeException,
@@ -472,20 +503,21 @@ define_php_exception!(
 pub struct ErrorException {
     inner: Exception,
     pub severity: i64,
-    pub filename: String,
+    pub filename: BString,
     pub lineno: i64,
 }
 
 impl ErrorException {
     #[track_caller]
     pub fn new(
-        message: String,
+        message: impl Into<BString>,
         code: i64,
         severity: i64,
-        filename: String,
+        filename: impl Into<BString>,
         lineno: i64,
         previous: Option<std::sync::Arc<anyhow::Error>>,
     ) -> Self {
+        let filename = filename.into();
         let mut inner = Exception::with_code_and_previous(message, code, previous);
         inner.set_location(filename.clone(), lineno);
         Self {
@@ -506,13 +538,16 @@ crate::impl_php_exception!(ErrorException, inner, r"ErrorException");
 /// TODO(plugin): the state the class itself declares is not kept.
 #[derive(Debug)]
 pub struct UnportedThrowable {
-    class_name: String,
+    class_name: BString,
     parent: AnyThrowable,
 }
 
 impl UnportedThrowable {
-    pub fn new(class_name: String, parent: AnyThrowable) -> Self {
-        Self { class_name, parent }
+    pub fn new(class_name: impl Into<BString>, parent: AnyThrowable) -> Self {
+        Self {
+            class_name: class_name.into(),
+            parent,
+        }
     }
 }
 
@@ -523,8 +558,8 @@ impl std::fmt::Display for UnportedThrowable {
 }
 
 impl PhpClass for UnportedThrowable {
-    fn php_class_name(&self) -> String {
-        self.class_name.clone()
+    fn php_class_name(&self) -> &BStr {
+        self.class_name.as_bstr()
     }
 }
 
@@ -594,7 +629,7 @@ mod tests {
     impl Subclass {
         fn new(detail: i64) -> Self {
             Self {
-                inner: UnexpectedValueException::new("boom".to_string()),
+                inner: UnexpectedValueException::new("boom"),
                 detail,
             }
         }
@@ -615,7 +650,7 @@ mod tests {
 
     #[test]
     fn catch_reaches_no_sibling_or_subclass() {
-        let error: anyhow::Error = RuntimeException::new("boom".to_string()).into();
+        let error: anyhow::Error = RuntimeException::new("boom").into();
 
         assert!(error.catch::<Subclass>().is_none());
         assert!(error.catch::<LogicException>().is_none());
@@ -624,7 +659,7 @@ mod tests {
 
     #[test]
     fn an_error_is_not_an_exception() {
-        let error: anyhow::Error = TypeError::new("boom".to_string()).into();
+        let error: anyhow::Error = TypeError::new("boom").into();
 
         assert!(error.catch::<Error>().is_some());
         assert!(error.catch::<ThrowableFields>().is_some());
@@ -634,7 +669,7 @@ mod tests {
     #[test]
     fn an_exception_records_where_it_was_created() {
         let line = i64::from(line!()) + 1;
-        let error: anyhow::Error = UnexpectedValueException::new("boom".to_string()).into();
+        let error: anyhow::Error = UnexpectedValueException::new("boom").into();
 
         let exception = AnyThrowable::of(&error).unwrap();
         assert_eq!(file!(), exception.get_file());
@@ -643,14 +678,7 @@ mod tests {
 
     #[test]
     fn an_error_exception_takes_the_location_it_is_given() {
-        let exception = ErrorException::new(
-            "boom".to_string(),
-            0,
-            1,
-            "/path/to/file.php".to_string(),
-            42,
-            None,
-        );
+        let exception = ErrorException::new("boom", 0, 1, "/path/to/file.php", 42, None);
 
         assert_eq!("/path/to/file.php", exception.get_file());
         assert_eq!(42, exception.get_line());
@@ -658,10 +686,8 @@ mod tests {
 
     #[test]
     fn an_unported_class_is_an_instance_of_its_superclasses() {
-        let parent: AnyThrowable =
-            UnexpectedValueException::with_code("boom".to_string(), 5).into();
-        let error: anyhow::Error =
-            UnportedThrowable::new(r"Vendor\PluginException".to_string(), parent).into();
+        let parent: AnyThrowable = UnexpectedValueException::with_code("boom", 5).into();
+        let error: anyhow::Error = UnportedThrowable::new(r"Vendor\PluginException", parent).into();
 
         let exception = AnyThrowable::of(&error).unwrap();
         assert_eq!(r"Vendor\PluginException", exception.php_class_name());
@@ -675,13 +701,25 @@ mod tests {
 
     #[test]
     fn of_sees_an_exception_behind_a_context_layer() {
-        let error: anyhow::Error = RuntimeException::with_code("boom".to_string(), 3).into();
+        let error: anyhow::Error = RuntimeException::with_code("boom", 3).into();
         let error = error.context("while doing something");
 
         assert_eq!(
             AnyThrowable::of(&error).map(AnyThrowable::get_code),
             Some(3)
         );
+    }
+
+    #[test]
+    fn error_message_keeps_the_bytes_of_an_exception() {
+        let error: anyhow::Error = RuntimeException::new(b"bad \xff name").into();
+
+        assert_eq!(error_message(&error), BStr::new(b"bad \xff name"));
+    }
+
+    #[test]
+    fn error_message_reads_the_text_of_a_plain_rust_error() {
+        assert_eq!(error_message(&anyhow::anyhow!("boom")), BStr::new("boom"));
     }
 
     #[test]
@@ -724,22 +762,20 @@ mod tests {
     fn the_previous_is_any_error_a_catch_can_reach() {
         let previous = std::sync::Arc::new(anyhow::Error::new(std::io::Error::other("io")));
         let error: anyhow::Error =
-            Exception::with_code_and_previous("boom".to_string(), 0, Some(previous)).into();
+            Exception::with_code_and_previous("boom", 0, Some(previous)).into();
 
         assert_eq!(
             error
                 .catch::<Exception>()
                 .and_then(|e| e.get_previous())
-                .map(ToString::to_string),
-            Some("io".to_string())
+                .map(error_message),
+            Some(BString::from("io"))
         );
     }
 
     #[test]
     fn set_previous_reaches_the_superclass_holding_it() {
-        let pending = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new(
-            "first".to_string(),
-        )));
+        let pending = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new("first")));
         let mut error: anyhow::Error = Subclass::new(7).into();
 
         error
@@ -752,22 +788,43 @@ mod tests {
                 .catch::<Subclass>()
                 .and_then(|e| e.get_previous())
                 .and_then(|previous| previous.catch::<RuntimeException>())
-                .map(|previous| previous.get_message().to_string()),
-            Some("first".to_string())
+                .map(|previous| previous.get_message().to_owned()),
+            Some(BString::from("first"))
+        );
+    }
+
+    #[test]
+    fn the_chain_message_keeps_the_bytes_of_every_exception() {
+        let previous = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new(
+            b"cause \xff".as_slice(),
+        )));
+        let error: anyhow::Error =
+            Exception::with_code_and_previous(b"boom \xfe".as_slice(), 0, Some(previous)).into();
+
+        assert_eq!(
+            BStr::new(b"boom \xfe: cause \xff"),
+            error_chain_message(&error).as_bstr()
+        );
+        assert_eq!(
+            BStr::new(b"raised by the port"),
+            error_chain_message(&anyhow::anyhow!("raised by the port")).as_bstr()
         );
     }
 
     #[test]
     fn the_previous_exception_is_the_error_source() {
-        let previous = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new(
-            "cause".to_string(),
-        )));
+        let previous = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new("cause")));
         let error: anyhow::Error =
-            Exception::with_code_and_previous("boom".to_string(), 0, Some(previous)).into();
+            Exception::with_code_and_previous("boom", 0, Some(previous)).into();
 
         let source = std::error::Error::source(
             error.downcast_ref::<AnyThrowable>().unwrap() as &dyn std::error::Error
         );
-        assert_eq!(source.map(ToString::to_string), Some("cause".to_string()));
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "std::error::Error::source() exposes the cause through core::fmt"
+        )]
+        let source = source.map(ToString::to_string);
+        assert_eq!(source.as_deref(), Some("cause"));
     }
 }

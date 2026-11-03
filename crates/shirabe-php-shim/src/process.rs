@@ -1,5 +1,5 @@
-use crate::{ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState};
-use bstr::BString;
+use crate::{ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, os_str_from_bytes};
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::exec::escapeshellcmd;
 
@@ -8,28 +8,37 @@ pub const SIGTERM: i64 = 15;
 pub const SIGUSR1: i64 = 10;
 pub const SIGUSR2: i64 = 12;
 
-pub fn exec(
-    command: &str,
-    output: Option<&mut Vec<String>>,
-    exit_code: Option<&mut i64>,
-) -> Option<String> {
-    let result = std::process::Command::new("/bin/sh")
+/// The lines of a command's output, as PHP's `exec()` and `system()` split it: without the line
+/// terminators, and without the single empty line a terminating newline leaves.
+fn output_lines(stdout: &[u8]) -> Vec<BString> {
+    let mut lines: Vec<BString> = stdout
+        .split(|&b| b == b'\n')
+        .map(|l| BString::from(l.strip_suffix(b"\r").unwrap_or(l)))
+        .collect();
+    if lines.last().is_some_and(|l| l.is_empty()) {
+        lines.pop();
+    }
+    lines
+}
+
+fn run_shell(command: &[u8]) -> Option<std::process::Output> {
+    std::process::Command::new("/bin/sh")
         .arg("-c")
-        .arg(command)
+        .arg(os_str_from_bytes(command))
         .output()
-        .ok()?;
+        .ok()
+}
+
+pub fn exec(
+    command: impl AsRef<[u8]>,
+    output: Option<&mut Vec<BString>>,
+    exit_code: Option<&mut i64>,
+) -> Option<BString> {
+    let result = run_shell(command.as_ref())?;
     if let Some(code) = exit_code {
         *code = result.status.code().unwrap_or(-1) as i64;
     }
-    let stdout = String::from_utf8_lossy(&result.stdout);
-    let mut lines: Vec<String> = stdout
-        .split('\n')
-        .map(|l| l.strip_suffix('\r').unwrap_or(l).to_string())
-        .collect();
-    // Drop the single trailing empty line produced by a terminating newline.
-    if lines.last().map(String::is_empty).unwrap_or(false) {
-        lines.pop();
-    }
+    let lines = output_lines(&result.stdout);
     let last = lines.last().cloned().unwrap_or_default();
     if let Some(out) = output {
         // PHP appends to the array rather than replacing it.
@@ -38,28 +47,19 @@ pub fn exec(
     Some(last)
 }
 
-pub fn shell_exec(command: &str) -> Option<String> {
-    let result = std::process::Command::new("/bin/sh")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .ok()?;
-    let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
+pub fn shell_exec(command: impl AsRef<[u8]>) -> Option<BString> {
+    let result = run_shell(command.as_ref())?;
     // PHP returns null when the command produces no output.
-    if stdout.is_empty() {
+    if result.stdout.is_empty() {
         None
     } else {
-        Some(stdout)
+        Some(BString::from(result.stdout))
     }
 }
 
-pub fn system(command: &str, result_code: Option<&mut i64>) -> Option<String> {
+pub fn system(command: impl AsRef<[u8]>, result_code: Option<&mut i64>) -> Option<BString> {
     use std::io::Write as _;
-    let result = std::process::Command::new("/bin/sh")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .ok()?;
+    let result = run_shell(command.as_ref())?;
     if let Some(code) = result_code {
         *code = result.status.code().unwrap_or(-1) as i64;
     }
@@ -68,29 +68,22 @@ pub fn system(command: &str, result_code: Option<&mut i64>) -> Option<String> {
     // and emitted once the command finishes, which changes interleaving/streaming timing.
     let _ = std::io::stdout().write_all(&result.stdout);
     let _ = std::io::stdout().flush();
-    let stdout = String::from_utf8_lossy(&result.stdout);
-    let mut lines: Vec<String> = stdout
-        .split('\n')
-        .map(|l| l.strip_suffix('\r').unwrap_or(l).to_string())
-        .collect();
-    if lines.last().map(String::is_empty).unwrap_or(false) {
-        lines.pop();
-    }
-    Some(lines.last().cloned().unwrap_or_default())
+    Some(output_lines(&result.stdout).pop().unwrap_or_default())
 }
 
 // Unix branch of PHP's escapeshellarg: wrap in single quotes, escaping embedded single quotes.
-pub fn escapeshellarg(arg: &str) -> String {
-    let mut out = String::with_capacity(arg.len() + 2);
-    out.push('\'');
-    for c in arg.chars() {
-        if c == '\'' {
-            out.push_str("'\\''");
+pub fn escapeshellarg(arg: impl AsRef<[u8]>) -> BString {
+    let arg = arg.as_ref();
+    let mut out = BString::from(Vec::with_capacity(arg.len() + 2));
+    out.push(b'\'');
+    for &c in arg {
+        if c == b'\'' {
+            out.extend_from_slice(b"'\\''");
         } else {
             out.push(c);
         }
     }
-    out.push('\'');
+    out.push(b'\'');
     out
 }
 
@@ -100,7 +93,7 @@ pub struct ProcessState {
     /// The spawned child. Taken by `proc_close`/`wait`; once taken the handle is closed.
     child: Option<std::process::Child>,
     /// The command line passed to `proc_open`, reported back by `proc_get_status`.
-    command: String,
+    command: BString,
 }
 
 /// One entry of the `descriptorspec` array passed to `proc_open`. Unlike PHP's array this is a
@@ -108,9 +101,9 @@ pub struct ProcessState {
 #[derive(Debug)]
 pub enum Descriptor {
     /// `['pipe', mode]` — `mode` is `"r"`/`"w"` from the child's point of view.
-    Pipe(String),
+    Pipe(BString),
     /// `['file', path, mode]`.
-    File(String, String),
+    File(BString, BString),
     /// An already-opened stream resource used directly as the descriptor.
     Resource(PhpResource),
     /// A descriptor index left unspecified by a sparse PHP descriptorspec; the child inherits the
@@ -142,18 +135,19 @@ fn resource_to_file(resource: &PhpResource) -> std::io::Result<std::fs::File> {
 /// PHP `proc_open`. Returns the process resource on success; the PHP `false` return is modeled as
 /// `Err`. The `pipes` out-parameter is filled with the parent-side pipe streams keyed by fd index.
 pub fn proc_open(
-    command: &str,
+    command: impl AsRef<[u8]>,
     descriptorspec: &[Descriptor],
     pipes: &mut IndexMap<i64, PhpResource>,
     cwd: Option<&std::path::Path>,
-    env: Option<&[String]>,
+    env: Option<&[BString]>,
     options: Option<&IndexMap<BString, PhpMixed>>,
 ) -> std::io::Result<PhpResource> {
     // Windows-oriented options (bypass_shell, create_process_group, ...) have no effect here.
     let _ = options;
 
     let mut cmd = std::process::Command::new("/bin/sh");
-    cmd.arg("-c").arg(command);
+    cmd.arg("-c")
+        .arg(crate::os_str_from_bytes(command.as_ref()));
 
     if let Some(cwd) = cwd {
         cmd.current_dir(cwd);
@@ -163,15 +157,15 @@ pub fn proc_open(
         // A provided environment replaces the inherited one, matching proc_open.
         cmd.env_clear();
         for pair in env {
-            match pair.split_once('=') {
-                Some((k, v)) => cmd.env(k, v),
-                None => cmd.env(pair, ""),
+            match pair.split_once_str("=") {
+                Some((k, v)) => cmd.env(crate::os_str_from_bytes(k), crate::os_str_from_bytes(v)),
+                None => cmd.env(crate::os_str_from_bytes(pair), ""),
             };
         }
     }
 
     // Remember which fds requested a pipe so their ends can be taken after spawn.
-    let mut pipe_modes: Vec<(i64, String)> = Vec::new();
+    let mut pipe_modes: Vec<(i64, BString)> = Vec::new();
     // Descriptors beyond stderr, as (target fd, child-side end). `Command` cannot express them, so
     // the child installs them with dup2(2) between fork and exec.
     let mut extra_fds: Vec<(std::os::fd::RawFd, std::os::fd::OwnedFd)> = Vec::new();
@@ -186,7 +180,7 @@ pub fn proc_open(
                         .map_err(std::io::Error::from)?;
                     // The mode is the child's point of view, so "r" means the child reads and the
                     // parent writes.
-                    let child_reads = mode.starts_with('r');
+                    let child_reads = mode.starts_with(b"r");
                     let (child_end, parent_end) = if child_reads {
                         (read_end, write_end)
                     } else {
@@ -203,7 +197,7 @@ pub fn proc_open(
                                 !child_reads,
                                 child_reads,
                                 mode.clone(),
-                                format!("pipe:fd{}", fd),
+                                crate::bconcat!("pipe:fd", fd),
                             ),
                         ))),
                     );
@@ -212,7 +206,8 @@ pub fn proc_open(
                     extra_fds.push((
                         fd as std::os::fd::RawFd,
                         std::os::fd::OwnedFd::from(resource_to_file(&crate::fs::fopen(
-                            path, mode,
+                            crate::path_from_bytes(path),
+                            mode,
                         )?)?),
                     ));
                 }
@@ -232,9 +227,9 @@ pub fn proc_open(
                 pipe_modes.push((fd, mode.clone()));
                 std::process::Stdio::piped()
             }
-            Descriptor::File(path, mode) => {
-                std::process::Stdio::from(resource_to_file(&crate::fs::fopen(path, mode)?)?)
-            }
+            Descriptor::File(path, mode) => std::process::Stdio::from(resource_to_file(
+                &crate::fs::fopen(crate::path_from_bytes(path), mode)?,
+            )?),
             Descriptor::Resource(resource) => {
                 std::process::Stdio::from(resource_to_file(resource)?)
             }
@@ -297,7 +292,7 @@ pub fn proc_open(
                 readable,
                 writable,
                 mode,
-                format!("pipe:fd{}", fd),
+                crate::bconcat!("pipe:fd", fd),
             ))));
         pipes.insert(fd, resource);
     }
@@ -305,7 +300,7 @@ pub fn proc_open(
     Ok(PhpResource::Process(std::rc::Rc::new(
         std::cell::RefCell::new(ProcessState {
             child: Some(child),
-            command: command.to_string(),
+            command: BString::from(command.as_ref()),
         }),
     )))
 }
@@ -327,7 +322,7 @@ pub fn proc_close(process: &PhpResource) -> i64 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcStatus {
-    pub command: String,
+    pub command: BString,
     pub pid: i64,
     pub running: bool,
     pub signaled: bool,
@@ -416,7 +411,7 @@ pub fn posix_geteuid() -> u32 {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PasswdEntry {
-    pub name: String,
+    pub name: BString,
     pub passwd: std::ffi::CString,
     pub uid: i64,
     pub gid: i64,
@@ -428,7 +423,7 @@ pub struct PasswdEntry {
 pub fn posix_getpwuid(uid: u32) -> Option<PasswdEntry> {
     let user = nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(uid)).ok()??;
     Some(PasswdEntry {
-        name: user.name,
+        name: user.name.into(),
         passwd: user.passwd,
         uid: user.uid.as_raw() as i64,
         gid: user.gid.as_raw() as i64,
@@ -451,17 +446,17 @@ pub fn posix_isatty(stream: PhpResource) -> bool {
 
 /// PHP `get_current_user()`: the name of the owner of the running script file. The Shirabe
 /// executable takes the place of the script; PHP returns an empty string when the lookup fails.
-pub fn get_current_user() -> String {
+pub fn get_current_user() -> BString {
     use std::os::unix::fs::MetadataExt as _;
     let Ok(executable) = std::env::current_exe() else {
-        return String::new();
+        return BString::default();
     };
     let Ok(metadata) = std::fs::metadata(&executable) else {
-        return String::new();
+        return BString::default();
     };
     match nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(metadata.uid())) {
-        Ok(Some(user)) => user.name,
-        _ => String::new(),
+        Ok(Some(user)) => user.name.into(),
+        _ => BString::default(),
     }
 }
 
@@ -478,7 +473,7 @@ mod tests {
             "echo hi",
             &[
                 Descriptor::Inherit,
-                Descriptor::Pipe("w".to_string()),
+                Descriptor::Pipe(BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,
@@ -516,8 +511,8 @@ mod tests {
         let process = proc_open(
             "cat",
             &[
-                Descriptor::Pipe("r".to_string()),
-                Descriptor::Pipe("w".to_string()),
+                Descriptor::Pipe(BString::from("r")),
+                Descriptor::Pipe(BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,
@@ -549,7 +544,7 @@ mod tests {
                 Descriptor::Inherit,
                 Descriptor::Inherit,
                 Descriptor::Inherit,
-                Descriptor::Pipe("w".to_string()),
+                Descriptor::Pipe(BString::from("w")),
             ],
             &mut pipes,
             None,
@@ -572,10 +567,10 @@ mod tests {
             "cat <&4",
             &[
                 Descriptor::Inherit,
-                Descriptor::Pipe("w".to_string()),
+                Descriptor::Pipe(BString::from("w")),
                 Descriptor::Inherit,
                 Descriptor::Inherit,
-                Descriptor::Pipe("r".to_string()),
+                Descriptor::Pipe(BString::from("r")),
             ],
             &mut pipes,
             None,
@@ -622,16 +617,19 @@ mod tests {
 
     #[test]
     fn proc_open_redirects_stdout_to_file() {
-        let path =
-            std::env::temp_dir().join(format!("shirabe_proc_open_{}.txt", std::process::id()));
-        let path_str = path.to_str().unwrap();
+        let path = std::env::temp_dir().join(crate::path_from_bytes(&crate::bconcat!(
+            "shirabe_proc_open_",
+            std::process::id(),
+            ".txt"
+        )));
+        let path_str = crate::path_to_bytes(&path);
 
         let mut pipes = IndexMap::new();
         let process = proc_open(
             "echo filetest",
             &[
                 Descriptor::Inherit,
-                Descriptor::File(path_str.to_string(), "w".to_string()),
+                Descriptor::File(crate::bconcat!(path_str), BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,
@@ -643,7 +641,7 @@ mod tests {
         assert!(pipes.is_empty());
         assert_eq!(proc_close(&process), 0);
 
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "filetest\n");
+        assert_eq!(std::fs::read(&path).unwrap(), b"filetest\n");
         std::fs::remove_file(&path).ok();
     }
 }

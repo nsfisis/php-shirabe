@@ -3,14 +3,15 @@
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
+use bstr::BStr;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat, path_from_bytes};
 
 #[derive(Debug)]
 pub struct NoopInstaller;
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for NoopInstaller {
-    fn supports(&self, _package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, _package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(true)
     }
 
@@ -32,7 +33,7 @@ impl InstallerInterface for NoopInstaller {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -41,7 +42,7 @@ impl InstallerInterface for NoopInstaller {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -69,9 +70,9 @@ impl InstallerInterface for NoopInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
         if !repo.has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                initial
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                initial.to_php_string()
             ))
             .into());
         }
@@ -91,9 +92,9 @@ impl InstallerInterface for NoopInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
         if !repo.has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                package
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                package.to_php_string()
             ))
             .into());
         }
@@ -102,14 +103,14 @@ impl InstallerInterface for NoopInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         let target_dir = package.get_target_dir();
-        let pretty_name = package.get_pretty_name();
 
-        Some(if let Some(dir) = target_dir {
-            format!("{}/{}", pretty_name, dir)
+        let install_path = if let Some(dir) = target_dir {
+            bconcat!(package.get_pretty_name(), "/", dir)
         } else {
-            pretty_name
-        })
+            package.get_pretty_name()
+        };
+        Some(std::path::PathBuf::from(path_from_bytes(&install_path)))
     }
 }

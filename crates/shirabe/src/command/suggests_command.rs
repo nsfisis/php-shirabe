@@ -12,7 +12,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class, in_array_loose};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -43,8 +43,8 @@ impl SuggestsCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SuggestsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("suggests")?;
-        self.set_description("Shows package suggestions");
+        self.set_name("suggests".into())?;
+        self.set_description("Shows package suggestions".into());
         self.set_definition(&[
             InputOption::new(
                 "by-package",
@@ -66,7 +66,7 @@ impl Command for SuggestsCommand {
             .into(),
             InputOption::new(
                 "all",
-                Some("a"),
+                Some("a".into()),
                 Some(InputOption::VALUE_NONE),
                 "Show suggestions from all dependencies, including transitive ones",
                 None,
@@ -102,7 +102,7 @@ impl Command for SuggestsCommand {
             .into(),
         ]);
         self.set_help(
-            "\nThe <info>%command.name%</info> command shows a sorted list of suggested packages.\n\nRead more at https://getcomposer.org/doc/03-cli.md#suggests",
+            "\nThe <info>%command.name%</info> command shows a sorted list of suggested packages.\n\nRead more at https://getcomposer.org/doc/03-cli.md#suggests".into(),
         );
         Ok(())
     }
@@ -127,7 +127,7 @@ impl Command for SuggestsCommand {
                 .get_platform_overrides()?;
             let platform_overrides: IndexMap<BString, PhpMixed> = platform_overrides
                 .into_iter()
-                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect();
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],

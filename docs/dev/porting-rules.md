@@ -63,14 +63,12 @@ Map PHP types to Rust types as follows:
 * `bool`: `bool`
 * `int`: `i64`
 * `float`: `f64`
-* `string`: `String`, `Vec<u8>`, `bstr::BString`, `PathBuf`, `OsString`, or their borrowed
-  counterparts:
+* `string`: `Vec<u8>`, `bstr::BString`, `PathBuf`, `OsString`, or their borrowed counterparts. See
+  [strings-porting.md](strings-porting.md).
     * `PathBuf`, `OsString`: for the same purposes as in Rust.
-    * `String`: avoid, as a rule.
     * `Vec<u8>`: for what is best described as binary data or a blob.
-    * `BString`: for what is best described as a string.
-    * The existing code base leans heavily on `String`. When modifying an existing API, keep using
-      `String`; apply the criteria above only to new code.
+    * `BString`: for everything else that is a string. This is the default.
+    * `String`: only for the reasons listed in [strings-porting.md](strings-porting.md).
 * `array`: `Vec` or `indexmap::IndexMap`, depending on whether the array is used as a list or as a
   map.
     * PHP arrays preserve insertion order, and `IndexMap` emulates this. Use `IndexMap` even where
@@ -96,7 +94,7 @@ Map PHP types to Rust types as follows:
 * Define exception classes as follows:
     * Define PHP's built-in exception classes (`\Exception`, `\RuntimeException`,
       `\UnexpectedValueException`, etc.) in `crates/shirabe-php-shim/src/lib.rs` as flat structs
-      with `message: String` and `code: i64` fields. The PHP exception hierarchy is not reproduced.
+      with `message: BString` and `code: i64` fields. The PHP exception hierarchy is not reproduced.
     * Define Composer's exception classes (including empty classes that only extend another
       exception) as newtypes, e.g. `pub struct MaxFileSizeExceededException(pub TransportException);`.
 
@@ -146,6 +144,10 @@ through `$this->`, a method that a child overrides, port it with the following p
 ## Regular expressions
 
 See [regex-porting.md](regex-porting.md).
+
+## Strings
+
+See [strings-porting.md](strings-porting.md).
 
 ## Environment variables
 

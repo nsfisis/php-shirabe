@@ -1,4 +1,5 @@
 mod array;
+mod bytes;
 mod compress;
 mod curl;
 mod datetime;
@@ -8,6 +9,7 @@ mod filter;
 mod fs;
 mod hash;
 mod json;
+mod json_serializer;
 mod math;
 mod net;
 mod openssl;
@@ -25,6 +27,7 @@ mod xml;
 mod zip;
 
 pub use array::*;
+pub use bytes::*;
 pub use compress::*;
 pub use curl::*;
 pub use datetime::*;
@@ -34,6 +37,7 @@ pub use filter::*;
 pub use fs::*;
 pub use hash::*;
 pub use json::*;
+pub use json_serializer::*;
 pub use math::*;
 pub use net::*;
 pub use openssl::*;
@@ -50,13 +54,8 @@ pub use var::*;
 pub use xml::*;
 pub use zip::*;
 
-use bstr::{B, BString, ByteSlice};
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-
-// Re-exported at the crate root so `php_regex!` can reach it via `$crate::regex!` regardless of
-// which crate invokes the macro.
-#[doc(hidden)]
-pub use regex_macro::regex;
 
 #[derive(Debug, Clone, Default)]
 pub enum PhpMixed {
@@ -74,6 +73,108 @@ pub enum PhpMixed {
     // things to this type.
 }
 
+/// A PHP string, which a serializer receives as bytes. See [`PhpJson`].
+struct ByteString<'a>(&'a [u8]);
+
+impl serde::Serialize for ByteString<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(self.0)
+    }
+}
+
+/// `#[serde(serialize_with = "...")]` adapters for PHP strings held as bytes. Each passes the
+/// bytes to `serialize_bytes`; serialize the value through [`PhpJson`](crate::PhpJson)
+/// to write them as JSON strings.
+pub mod json_bytes {
+    use super::ByteString;
+    use bstr::BString;
+    use indexmap::IndexMap;
+    use serde::ser::{SerializeMap, SerializeSeq};
+    use serde::{Serialize, Serializer};
+
+    struct StrMap<'a>(&'a IndexMap<BString, BString>);
+
+    impl Serialize for StrMap<'_> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            str_map(self.0, serializer)
+        }
+    }
+
+    pub fn str<S: Serializer>(value: &BString, serializer: S) -> Result<S::Ok, S::Error> {
+        ByteString(value).serialize(serializer)
+    }
+
+    pub fn option_str<S: Serializer>(
+        value: &Option<BString>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(value) => ByteString(value).serialize(serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn str_vec<S: Serializer>(value: &[BString], serializer: S) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_seq(Some(value.len()))?;
+        for item in value {
+            seq.serialize_element(&ByteString(item))?;
+        }
+        seq.end()
+    }
+
+    pub fn str_map<S: Serializer>(
+        value: &IndexMap<BString, BString>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(value.len()))?;
+        for (k, v) in value {
+            map.serialize_entry(&ByteString(k), &ByteString(v))?;
+        }
+        map.end()
+    }
+
+    pub fn str_map_vec<S: Serializer>(
+        value: &[IndexMap<BString, BString>],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_seq(Some(value.len()))?;
+        for item in value {
+            seq.serialize_element(&StrMap(item))?;
+        }
+        seq.end()
+    }
+
+    /// A map keyed by PHP strings. PHP's `json_encode()` writes an empty array as `[]`.
+    pub fn keyed<S: Serializer, V: Serialize>(
+        value: &IndexMap<BString, V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_empty() {
+            return serializer.serialize_seq(Some(0))?.end();
+        }
+        let mut map = serializer.serialize_map(Some(value.len()))?;
+        for (k, v) in value {
+            map.serialize_entry(&ByteString(k), v)?;
+        }
+        map.end()
+    }
+
+    /// Like [`keyed`], for values that are themselves optional PHP strings.
+    pub fn keyed_option_str<S: Serializer>(
+        value: &IndexMap<BString, Option<BString>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_empty() {
+            return serializer.serialize_seq(Some(0))?.end();
+        }
+        let mut map = serializer.serialize_map(Some(value.len()))?;
+        for (k, v) in value {
+            map.serialize_entry(&ByteString(k), &v.as_ref().map(|v| ByteString(v)))?;
+        }
+        map.end()
+    }
+}
+
 impl serde::Serialize for PhpMixed {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -85,8 +186,7 @@ impl serde::Serialize for PhpMixed {
             PhpMixed::Bool(b) => serializer.serialize_bool(*b),
             PhpMixed::Int(i) => serializer.serialize_i64(*i),
             PhpMixed::Float(f) => serializer.serialize_f64(*f),
-            // TODO(bytes): serde serializes strings as UTF-8, so non-UTF-8 bytes are replaced.
-            PhpMixed::String(s) => serializer.serialize_str(&s.to_str_lossy()),
+            PhpMixed::String(s) => ByteString(s).serialize(serializer),
             PhpMixed::List(items) => {
                 let mut seq = serializer.serialize_seq(Some(items.len()))?;
                 for item in items {
@@ -103,16 +203,14 @@ impl serde::Serialize for PhpMixed {
                 }
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
-                    // TODO(bytes): serde serializes keys as UTF-8, so non-UTF-8 bytes are replaced.
-                    map.serialize_entry(&k.to_str_lossy(), v)?;
+                    map.serialize_entry(&ByteString(k), v)?;
                 }
                 map.end()
             }
             PhpMixed::Object(entries) => {
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
-                    // TODO(bytes): serde serializes keys as UTF-8, so non-UTF-8 bytes are replaced.
-                    map.serialize_entry(&k.to_str_lossy(), v)?;
+                    map.serialize_entry(&ByteString(k), v)?;
                 }
                 map.end()
             }
@@ -148,8 +246,8 @@ impl PartialEq for PhpMixed {
 }
 
 impl PhpMixed {
-    pub fn string(s: impl Into<String>) -> PhpMixed {
-        PhpMixed::String(s.into().into())
+    pub fn string(s: impl Into<BString>) -> PhpMixed {
+        PhpMixed::String(s.into())
     }
 
     pub fn as_bool(&self) -> Option<bool> {
@@ -234,8 +332,8 @@ impl PhpMixed {
         php_truthy(self)
     }
 
-    pub fn get(&self, key: &str) -> Option<&PhpMixed> {
-        self.as_array().and_then(|m| m.get(B(key)))
+    pub fn get(&self, key: impl AsRef<[u8]>) -> Option<&PhpMixed> {
+        self.as_array().and_then(|m| m.get(key.as_ref()))
     }
 
     /// Treats PhpMixed::Null as None, everything else as Some.
@@ -308,7 +406,7 @@ impl<T: std::any::Any> AsAny for T {
 /// report.
 pub trait PhpClass {
     /// The fully-qualified class name, e.g. `Composer\Command\InstallCommand`.
-    fn php_class_name(&self) -> String;
+    fn php_class_name(&self) -> &bstr::BStr;
 }
 
 /// Implements [`PhpClass`] for a ported type, given the fully-qualified name of the PHP
@@ -321,8 +419,8 @@ pub trait PhpClass {
 macro_rules! impl_php_class {
     ($ty:ty, $class_name:literal) => {
         impl $crate::PhpClass for $ty {
-            fn php_class_name(&self) -> String {
-                $class_name.to_string()
+            fn php_class_name(&self) -> &::bstr::BStr {
+                ::bstr::BStr::new($class_name)
             }
         }
     };
@@ -340,12 +438,7 @@ impl From<f64> for PhpMixed {
     }
 }
 
-impl From<String> for PhpMixed {
-    fn from(value: String) -> Self {
-        PhpMixed::string(value)
-    }
-}
-
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for PhpMixed {
     fn from(value: &str) -> Self {
         PhpMixed::string(value)
@@ -361,20 +454,6 @@ impl From<BString> for PhpMixed {
 impl From<&bstr::BStr> for PhpMixed {
     fn from(value: &bstr::BStr) -> Self {
         PhpMixed::String(value.to_owned())
-    }
-}
-
-impl<T> From<IndexMap<String, T>> for PhpMixed
-where
-    T: Into<PhpMixed>,
-{
-    fn from(value: IndexMap<String, T>) -> Self {
-        PhpMixed::Array(
-            value
-                .into_iter()
-                .map(|(k, v)| (k.into(), v.into()))
-                .collect(),
-        )
     }
 }
 
@@ -414,12 +493,6 @@ where
 {
     fn from(value: Box<T>) -> Self {
         (*value).into()
-    }
-}
-
-impl std::fmt::Display for PhpMixed {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.pad(&php_to_string(self))
     }
 }
 
@@ -559,9 +632,9 @@ pub struct StreamState {
     eof: bool,
     closed: bool,
     /// The mode string passed to `fopen`, reported back by `stream_get_meta_data`.
-    mode: String,
+    mode: BString,
     /// The path/URI the stream was opened from, reported back by `stream_get_meta_data`.
-    uri: String,
+    uri: BString,
 }
 
 impl StreamState {
@@ -569,8 +642,8 @@ impl StreamState {
         backing: StreamBacking,
         readable: bool,
         writable: bool,
-        mode: String,
-        uri: String,
+        mode: BString,
+        uri: BString,
     ) -> StreamState {
         StreamState {
             backing,

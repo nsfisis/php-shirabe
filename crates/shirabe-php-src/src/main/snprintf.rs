@@ -1,9 +1,12 @@
+use bstr::BString;
+use std::io::Write as _;
+
 /// php-src: main/snprintf.c `php_gcvt` (PHP 8.5.8)
 ///
 /// The digit extraction is delegated to `dtoa_shortest` / `dtoa_fixed`, so only the digit
 /// placement logic is ported here. `value` must be finite: the caller strips NAN and INF, so the
 /// `decpt == 9999` branch has no counterpart here.
-pub fn php_gcvt(value: f64, ndigit: i32, dec_point: char, exponent: char) -> String {
+pub fn php_gcvt(value: f64, ndigit: i32, dec_point: u8, exponent: u8) -> BString {
     let mode = if ndigit >= 0 { 2 } else { 0 };
     // Mode 0 asks dtoa for the shortest round-trip digits, so its digit budget is the widest a
     // double can need. Mode 2 yields a single digit when asked for fewer.
@@ -15,9 +18,9 @@ pub fn php_gcvt(value: f64, ndigit: i32, dec_point: char, exponent: char) -> Str
         dtoa_fixed(value, ndigit)
     };
 
-    let mut buf = String::new();
+    let mut buf: Vec<u8> = Vec::new();
     if sign {
-        buf.push('-');
+        buf.push(b'-');
     }
 
     if if decpt < 0 {
@@ -27,46 +30,43 @@ pub fn php_gcvt(value: f64, ndigit: i32, dec_point: char, exponent: char) -> Str
     } {
         // exponential format (e.g. 1.0E+17)
         let exp = decpt - 1;
-        let mut chars = digits.chars();
-        buf.push(chars.next().expect("dtoa always yields at least one digit"));
+        let (first, rest) = digits
+            .split_first()
+            .expect("dtoa always yields at least one digit");
+        buf.push(*first);
         buf.push(dec_point);
-        let rest = chars.as_str();
         if rest.is_empty() {
-            buf.push('0');
+            buf.push(b'0');
         } else {
-            buf.push_str(rest);
+            buf.extend_from_slice(rest);
         }
         buf.push(exponent);
         if exp < 0 {
-            buf.push('-');
+            buf.push(b'-');
         } else {
-            buf.push('+');
+            buf.push(b'+');
         }
-        buf.push_str(&exp.abs().to_string());
+        write!(buf, "{}", exp.abs()).expect("writing to a Vec cannot fail");
     } else if decpt > 0 {
         // standard format, integer part present
         let decpt = decpt as usize;
         if digits.len() <= decpt {
-            buf.push_str(&digits);
-            for _ in digits.len()..decpt {
-                buf.push('0');
-            }
+            buf.extend_from_slice(&digits);
+            buf.resize(buf.len() + (decpt - digits.len()), b'0');
         } else {
-            buf.push_str(&digits[..decpt]);
+            buf.extend_from_slice(&digits[..decpt]);
             buf.push(dec_point);
-            buf.push_str(&digits[decpt..]);
+            buf.extend_from_slice(&digits[decpt..]);
         }
     } else {
         // standard format, 0.000ddd
-        buf.push('0');
+        buf.push(b'0');
         buf.push(dec_point);
-        for _ in decpt..0 {
-            buf.push('0');
-        }
-        buf.push_str(&digits);
+        buf.resize(buf.len() + decpt.unsigned_abs() as usize, b'0');
+        buf.extend_from_slice(&digits);
     }
 
-    buf
+    BString::from(buf)
 }
 
 /// php-src: Zend/zend_strtod.c `zend_dtoa` mode 0 equivalent: the shortest round-trip digit
@@ -74,7 +74,11 @@ pub fn php_gcvt(value: f64, ndigit: i32, dec_point: char, exponent: char) -> Str
 /// Rust's `{:e}` supplies the shortest round-trip digit count, but it breaks a tie between two
 /// equally distant digit strings away from zero while `zend_dtoa` breaks it to even, so the digits
 /// themselves come from `dtoa_fixed` at that count.
-fn dtoa_shortest(value: f64) -> (bool, String, i32) {
+#[expect(
+    clippy::disallowed_macros,
+    reason = "`{:e}` is Rust's shortest digit generator"
+)]
+fn dtoa_shortest(value: f64) -> (bool, Vec<u8>, i32) {
     let shortest = format!("{:e}", value.abs());
     let shortest_mantissa = shortest
         .split_once('e')
@@ -90,7 +94,11 @@ fn dtoa_shortest(value: f64) -> (bool, String, i32) {
 /// (`value = 0.digits * 10^decpt`). Rust's `{:.*e}` rounds the exact decimal value of the double
 /// half to even, which is how `zend_dtoa` breaks a tie. Trailing zeros are dropped, as dtoa never
 /// emits them; a value that rounds down to nothing keeps a single `0` digit.
-fn dtoa_fixed(value: f64, ndigit: i32) -> (bool, String, i32) {
+#[expect(
+    clippy::disallowed_macros,
+    reason = "`{:.*e}` is Rust's fixed digit generator"
+)]
+fn dtoa_fixed(value: f64, ndigit: i32) -> (bool, Vec<u8>, i32) {
     let sign = value.is_sign_negative();
     let value = value.abs();
 
@@ -98,24 +106,28 @@ fn dtoa_fixed(value: f64, ndigit: i32) -> (bool, String, i32) {
     let (mantissa, exp) = formatted
         .split_once('e')
         .expect("`{:e}` always contains an exponent");
-    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let mut digits: Vec<u8> = mantissa.bytes().filter(|c| *c != b'.').collect();
     let exp: i32 = exp.parse().expect("`{:e}` exponent is a decimal integer");
 
-    let trimmed = digits.trim_end_matches('0');
-    let digits = if trimmed.is_empty() { "0" } else { trimmed };
-    (sign, digits.to_string(), exp + 1)
+    while digits.last() == Some(&b'0') {
+        digits.pop();
+    }
+    if digits.is_empty() {
+        digits.push(b'0');
+    }
+    (sign, digits, exp + 1)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn gcvt(value: f64) -> String {
-        php_gcvt(value, -1, '.', 'E')
+    fn gcvt(value: f64) -> BString {
+        php_gcvt(value, -1, b'.', b'E')
     }
 
-    fn gcvt14(value: f64) -> String {
-        php_gcvt(value, 14, '.', 'E')
+    fn gcvt14(value: f64) -> BString {
+        php_gcvt(value, 14, b'.', b'E')
     }
 
     // Expected strings are the output of `(string) $v` under PHP 8.5.9 with precision=14, which
@@ -163,9 +175,9 @@ mod tests {
     // PHP clamps precision=0 to a single significant digit.
     #[test]
     fn fixed_precision_below_one_digit_yields_one_digit() {
-        assert_eq!(php_gcvt(1.0 / 3.0, 0, '.', 'E'), "0.3");
-        assert_eq!(php_gcvt(123.456, 0, '.', 'E'), "1.0E+2");
-        assert_eq!(php_gcvt(123.456, 2, '.', 'E'), "1.2E+2");
+        assert_eq!(php_gcvt(1.0 / 3.0, 0, b'.', b'E'), "0.3");
+        assert_eq!(php_gcvt(123.456, 0, b'.', b'E'), "1.0E+2");
+        assert_eq!(php_gcvt(123.456, 2, b'.', b'E'), "1.2E+2");
     }
 
     // Each value here sits exactly halfway between the two shortest decimal strings that round

@@ -5,7 +5,8 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct NullIO {
-    authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+    authentications:
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 }
 
 impl Default for NullIO {
@@ -43,36 +44,47 @@ impl IOInterfaceImmutable for NullIO {
         false
     }
 
-    fn write3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
 
-    fn write_error3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_error_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
 
-    fn write_raw3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_raw_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
 
-    fn write_error_raw3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_error_raw_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
 
-    fn overwrite4(&self, _message: &str, _newline: bool, _size: Option<i64>, _verbosity: i64) {}
-
-    fn overwrite_error4(
+    fn overwrite_bytes(
         &self,
-        _message: &str,
+        _message: &bstr::BStr,
         _newline: bool,
         _size: Option<i64>,
         _verbosity: i64,
     ) {
     }
 
-    fn ask(&self, _question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        Ok(default)
-    }
-
-    fn ask_confirmation(&self, _question: String, default: bool) -> anyhow::Result<bool> {
-        Ok(default)
-    }
-
-    fn ask_and_validate(
+    fn overwrite_error_bytes(
         &self,
-        _question: String,
+        _message: &bstr::BStr,
+        _newline: bool,
+        _size: Option<i64>,
+        _verbosity: i64,
+    ) {
+    }
+
+    fn ask_bytes(&self, _question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        Ok(default)
+    }
+
+    fn ask_confirmation_bytes(
+        &self,
+        _question: &bstr::BStr,
+        default: bool,
+    ) -> anyhow::Result<bool> {
+        Ok(default)
+    }
+
+    fn ask_and_validate_bytes(
+        &self,
+        _question: &bstr::BStr,
         _validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         _attempts: Option<i64>,
         default: PhpMixed,
@@ -80,17 +92,20 @@ impl IOInterfaceImmutable for NullIO {
         Ok(default)
     }
 
-    fn ask_and_hide_answer(&self, _question: String) -> anyhow::Result<Option<String>> {
+    fn ask_and_hide_answer_bytes(
+        &self,
+        _question: &bstr::BStr,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         Ok(None)
     }
 
-    fn select(
+    fn select_bytes(
         &self,
-        _question: String,
+        _question: &bstr::BStr,
         _choices: PhpMixed,
         default: PhpMixed,
         _attempts: PhpMixed,
-        _error_message: String,
+        _error_message: &bstr::BStr,
         _multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
         Ok(default)
@@ -98,30 +113,31 @@ impl IOInterfaceImmutable for NullIO {
 
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         <Self as BaseIO>::get_authentications(self)
     }
 
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
         <Self as BaseIO>::has_authentication(self, repository_name)
     }
 
     fn get_authentication(
         &self,
-        repository_name: &str,
-    ) -> indexmap::IndexMap<String, Option<String>> {
+        repository_name: &bstr::BStr,
+    ) -> indexmap::IndexMap<bstr::BString, Option<bstr::BString>> {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
+    fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::error(self, message, context);
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+    fn warning_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::warning(self, message, context);
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+    fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
 }
@@ -129,9 +145,9 @@ impl IOInterfaceImmutable for NullIO {
 impl IOInterfaceMutable for NullIO {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: bstr::BString,
+        username: bstr::BString,
+        password: Option<bstr::BString>,
     ) {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
@@ -154,13 +170,17 @@ impl IOInterface for NullIO {
 impl BaseIO for NullIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         &self.authentications
     }
 
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &mut indexmap::IndexMap<
+        bstr::BString,
+        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    > {
         &mut self.authentications
     }
 }

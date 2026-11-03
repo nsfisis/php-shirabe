@@ -5,6 +5,7 @@ use crate::repository::{
     FindPackageConstraint, InstalledRepositoryInterface, LoadPackagesResult, LockArrayRepository,
     PlatformRepository, ProviderInfo, RepositoryInterface, SearchResult,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 use std::cell::{Ref, RefMut};
@@ -86,7 +87,7 @@ impl RepositoryInterfaceHandle {
         self.0.borrow_mut().count()
     }
 
-    pub fn get_repo_name(&self) -> anyhow::Result<String> {
+    pub fn get_repo_name(&self) -> anyhow::Result<BString> {
         self.0.borrow().get_repo_name()
     }
 
@@ -100,7 +101,7 @@ impl RepositoryInterfaceHandle {
 
     pub fn find_package(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.0.borrow_mut().find_package(name, constraint)
@@ -108,7 +109,7 @@ impl RepositoryInterfaceHandle {
 
     pub fn find_packages(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.0.borrow_mut().find_packages(name, constraint)
@@ -116,10 +117,10 @@ impl RepositoryInterfaceHandle {
 
     pub fn load_packages(
         &self,
-        package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         self.0.borrow_mut().load_packages(
             package_name_map,
@@ -131,17 +132,17 @@ impl RepositoryInterfaceHandle {
 
     pub fn search(
         &self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.0.borrow_mut().search(query, mode, r#type)
     }
 
     pub fn get_providers(
         &self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.0.borrow_mut().get_providers(package_name)
     }
 
@@ -176,7 +177,7 @@ impl RepositoryInterfaceHandle {
         }
     }
 
-    pub fn get_dev_package_names(&self) -> Vec<String> {
+    pub fn get_dev_package_names(&self) -> Vec<BString> {
         self.0
             .borrow()
             .as_installed_repository_interface()
@@ -184,7 +185,7 @@ impl RepositoryInterfaceHandle {
             .unwrap_or_default()
     }
 
-    pub fn set_dev_package_names(&self, dev_package_names: Vec<String>) {
+    pub fn set_dev_package_names(&self, dev_package_names: Vec<BString>) {
         if let Some(r) = self.0.borrow_mut().as_installed_repository_interface_mut() {
             r.set_dev_package_names(dev_package_names);
         }

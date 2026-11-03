@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Cursor.php
 
 use crate::output::{OutputInterface, output_interface};
-use shirabe_php_shim::{PhpResource, STDIN};
+use shirabe_php_shim::{PhpResource, STDIN, bconcat};
 
 #[derive(Debug)]
 pub struct Cursor {
@@ -21,7 +21,7 @@ impl Cursor {
 
     pub fn move_up(&self, lines: i64) -> &Self {
         self.output.borrow().write(
-            &[format!("\x1b[{}A", lines)],
+            &[bconcat!("\x1b[", lines, "A")],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -31,7 +31,7 @@ impl Cursor {
 
     pub fn move_left(&self, columns: i64) -> &Self {
         self.output.borrow().write(
-            &[format!("\x1b[{}D", columns)],
+            &[bconcat!("\x1b[", columns, "D")],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -41,7 +41,7 @@ impl Cursor {
 
     pub fn move_to_column(&self, column: i64) -> &Self {
         self.output.borrow().write(
-            &[format!("\x1b[{}G", column)],
+            &[bconcat!("\x1b[", column, "G")],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -51,7 +51,7 @@ impl Cursor {
 
     pub fn save_position(&self) -> &Self {
         self.output.borrow().write(
-            &["\x1b7".to_string()],
+            &[bstr::BString::from("\x1b7")],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -61,7 +61,7 @@ impl Cursor {
 
     pub fn restore_position(&self) -> &Self {
         self.output.borrow().write(
-            &["\x1b8".to_string()],
+            &[bstr::BString::from("\x1b8")],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -72,7 +72,7 @@ impl Cursor {
     /// Clears all the output from the current line.
     pub fn clear_line(&self) -> &Self {
         self.output.borrow().write(
-            &["\x1b[2K".to_string()],
+            &[bstr::BString::from("\x1b[2K")],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -83,7 +83,7 @@ impl Cursor {
     /// Clears all the output from the current line after the current position.
     pub fn clear_line_after(&self) -> &Self {
         self.output.borrow().write(
-            &["\x1b[K".to_string()],
+            &[bstr::BString::from("\x1b[K")],
             false,
             output_interface::OUTPUT_NORMAL,
         );

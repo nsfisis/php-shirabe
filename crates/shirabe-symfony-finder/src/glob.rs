@@ -1,5 +1,8 @@
 //! ref: composer/vendor/symfony/finder/Glob.php
 
+use bstr::{BStr, BString, ByteSlice, ByteVec};
+use shirabe_php_shim::{bconcat, implode};
+
 // Regex pattern compatibility:
 // PHP's Glob::toRegex builds its regex in a single character loop and emits PCRE-only
 // constructs: the look-ahead `(?=[^\.])` enforcing the strict-leading-dot rule, and a
@@ -41,7 +44,7 @@ enum Terminal {
 #[derive(Debug, Clone)]
 enum Token {
     /// A literal regex piece for one glob character, escaped as needed.
-    Text(String),
+    Text(BString),
     /// An unescaped `*`.
     Star,
     /// An unescaped `?`.
@@ -62,7 +65,7 @@ enum Token {
 #[derive(Debug)]
 enum Out {
     /// Fully rendered.
-    Ok(String),
+    Ok(BString),
     /// Cannot match anything; the branch must be dropped.
     Dead,
     /// A no-dot constraint reached the end of an isolated sub-sequence (e.g. `{a/,b}`
@@ -72,15 +75,16 @@ enum Out {
 }
 
 impl Glob {
-    pub fn to_regex(glob: &str, strict_leading_dot: bool, strict_wildcard_slash: bool) -> String {
-        format!(
-            "#^{}$#",
+    pub fn to_regex(glob: &BStr, strict_leading_dot: bool, strict_wildcard_slash: bool) -> BString {
+        bconcat!(
+            "#^",
             expand(
                 glob,
                 strict_leading_dot,
                 strict_wildcard_slash,
                 Terminal::EndAnchor
-            )
+            ),
+            "$#"
         )
     }
 
@@ -93,12 +97,12 @@ impl Glob {
     /// boundary woven in as the consuming `(?:$|/)` (equivalent under boolean
     /// matching, since nothing follows it).
     pub fn to_regex_dir_boundary(
-        glob: &str,
+        glob: impl AsRef<[u8]>,
         strict_leading_dot: bool,
         strict_wildcard_slash: bool,
-    ) -> String {
+    ) -> BString {
         expand(
-            glob,
+            BStr::new(glob.as_ref()),
             strict_leading_dot,
             strict_wildcard_slash,
             Terminal::EndOrSlash,
@@ -107,11 +111,11 @@ impl Glob {
 }
 
 fn expand(
-    glob: &str,
+    glob: &BStr,
     strict_leading_dot: bool,
     strict_wildcard_slash: bool,
     terminal: Terminal,
-) -> String {
+) -> BString {
     let ctx = Ctx {
         strict_leading_dot,
         strict_wildcard_slash,
@@ -120,15 +124,13 @@ fn expand(
     tokens.push(Token::End(terminal));
     match render_seq(&tokens, ctx) {
         Out::Ok(body) => body,
-        Out::Dead => "\\b\\B".to_string(),
+        Out::Dead => BString::from("\\b\\B"),
         Out::Escapes => unreachable!("the terminal token resolves every constraint"),
     }
 }
 
-// PHP iterates over bytes; iterating over chars is equivalent for valid UTF-8 because
-// every character the loop treats specially is ASCII.
-fn tokenize(glob: &str, ctx: Ctx) -> Vec<Token> {
-    let chars: Vec<char> = glob.chars().collect();
+fn tokenize(glob: &BStr, ctx: Ctx) -> Vec<Token> {
+    let chars = glob.as_bytes();
     let mut first_byte = true;
     let mut escaping = false;
     // stack[0] is the root sequence (a pseudo-group with a single alternative); deeper
@@ -142,18 +144,18 @@ fn tokenize(glob: &str, ctx: Ctx) -> Vec<Token> {
     let mut i = 0;
     while i < chars.len() {
         let car = chars[i];
-        if first_byte && ctx.strict_leading_dot && car != '.' {
+        if first_byte && ctx.strict_leading_dot && car != b'.' {
             push(&mut stack, Token::NoDot);
         }
 
-        first_byte = car == '/';
+        first_byte = car == b'/';
 
         if first_byte
             && ctx.strict_wildcard_slash
             && i + 2 < chars.len()
-            && chars[i + 1] == '*'
-            && chars[i + 2] == '*'
-            && (i + 3 >= chars.len() || chars[i + 3] == '/')
+            && chars[i + 1] == b'*'
+            && chars[i + 2] == b'*'
+            && (i + 3 >= chars.len() || chars[i + 3] == b'/')
         {
             push(
                 &mut stack,
@@ -167,43 +169,43 @@ fn tokenize(glob: &str, ctx: Ctx) -> Vec<Token> {
             continue;
         }
 
-        if car == '#'
-            || car == '.'
-            || car == '('
-            || car == ')'
-            || car == '|'
-            || car == '+'
-            || car == '^'
-            || car == '$'
+        if car == b'#'
+            || car == b'.'
+            || car == b'('
+            || car == b')'
+            || car == b'|'
+            || car == b'+'
+            || car == b'^'
+            || car == b'$'
         {
-            push(&mut stack, Token::Text(format!("\\{car}")));
-        } else if car == '*' {
+            push(&mut stack, Token::Text(BString::from([b'\\', car])));
+        } else if car == b'*' {
             push(
                 &mut stack,
                 if escaping {
-                    Token::Text("\\*".to_string())
+                    Token::Text(BString::from("\\*"))
                 } else {
                     Token::Star
                 },
             );
-        } else if car == '?' {
+        } else if car == b'?' {
             push(
                 &mut stack,
                 if escaping {
-                    Token::Text("\\?".to_string())
+                    Token::Text(BString::from("\\?"))
                 } else {
                     Token::Question
                 },
             );
-        } else if car == '{' {
+        } else if car == b'{' {
             if escaping {
-                push(&mut stack, Token::Text("\\{".to_string()));
+                push(&mut stack, Token::Text(BString::from("\\{")));
             } else {
                 stack.push(vec![Vec::new()]);
             }
-        } else if car == '}' && stack.len() > 1 {
+        } else if car == b'}' && stack.len() > 1 {
             if escaping {
-                push(&mut stack, Token::Text("}".to_string()));
+                push(&mut stack, Token::Text(BString::from("}")));
             } else {
                 let alternatives = stack.pop().unwrap();
                 push(
@@ -214,15 +216,15 @@ fn tokenize(glob: &str, ctx: Ctx) -> Vec<Token> {
                     },
                 );
             }
-        } else if car == ',' && stack.len() > 1 {
+        } else if car == b',' && stack.len() > 1 {
             if escaping {
-                push(&mut stack, Token::Text(",".to_string()));
+                push(&mut stack, Token::Text(BString::from(",")));
             } else {
                 stack.last_mut().unwrap().push(Vec::new());
             }
-        } else if car == '\\' {
+        } else if car == b'\\' {
             if escaping {
-                push(&mut stack, Token::Text("\\\\".to_string()));
+                push(&mut stack, Token::Text(BString::from("\\\\")));
                 escaping = false;
             } else {
                 escaping = true;
@@ -230,7 +232,7 @@ fn tokenize(glob: &str, ctx: Ctx) -> Vec<Token> {
             i += 1;
             continue;
         } else {
-            push(&mut stack, Token::Text(car.to_string()));
+            push(&mut stack, Token::Text(BString::from([car])));
         }
         escaping = false;
         i += 1;
@@ -251,23 +253,23 @@ fn tokenize(glob: &str, ctx: Ctx) -> Vec<Token> {
     stack.pop().unwrap().pop().unwrap()
 }
 
-fn star(ctx: Ctx) -> &'static str {
+fn star(ctx: Ctx) -> &'static BStr {
     if ctx.strict_wildcard_slash {
-        "[^/]*"
+        BStr::new("[^/]*")
     } else {
-        ".*"
+        BStr::new(".*")
     }
 }
 
-fn question(ctx: Ctx) -> &'static str {
+fn question(ctx: Ctx) -> &'static BStr {
     if ctx.strict_wildcard_slash {
-        "[^/]"
+        BStr::new("[^/]")
     } else {
-        "."
+        BStr::new(".")
     }
 }
 
-fn globstar(ctx: Ctx, trailing_slash_optional: bool) -> String {
+fn globstar(ctx: Ctx, trailing_slash_optional: bool) -> BString {
     // PHP emits `/(?:(?=[^\.])[^/]++/)*`; `(?=[^\.])[^/]+` collapses to `[^/.][^/]*`.
     let step = if ctx.strict_leading_dot {
         "[^/.][^/]*"
@@ -275,11 +277,11 @@ fn globstar(ctx: Ctx, trailing_slash_optional: bool) -> String {
         "[^/]+"
     };
     let slash = if trailing_slash_optional { "/?" } else { "/" };
-    format!("/(?:{step}{slash})*")
+    bconcat!("/(?:", step, slash, ")*")
 }
 
 fn render_seq(tokens: &[Token], ctx: Ctx) -> Out {
-    let mut out = String::new();
+    let mut out = BString::default();
     for (idx, token) in tokens.iter().enumerate() {
         match token {
             Token::Text(text) => out.push_str(text),
@@ -287,7 +289,7 @@ fn render_seq(tokens: &[Token], ctx: Ctx) -> Out {
             Token::Question => out.push_str(question(ctx)),
             Token::Globstar {
                 trailing_slash_optional,
-            } => out.push_str(&globstar(ctx, *trailing_slash_optional)),
+            } => out.push_str(globstar(ctx, *trailing_slash_optional)),
             Token::End(Terminal::EndAnchor) => {}
             Token::End(Terminal::EndOrSlash) => out.push_str("(?:$|/)"),
             Token::NoDot => {
@@ -314,7 +316,7 @@ fn render_seq(tokens: &[Token], ctx: Ctx) -> Out {
                         }
                     }
                     return match join_branches(branches) {
-                        Some(joined) => Out::Ok(out + &joined),
+                        Some(joined) => Out::Ok(bconcat!(out, joined)),
                         None => Out::Dead,
                     };
                 }
@@ -349,7 +351,7 @@ fn render_group_isolated(alternatives: &[Vec<Token>], closed: bool, ctx: Ctx) ->
         return Out::Dead;
     }
     let close = if closed { ")" } else { "" };
-    Out::Ok(format!("({}{close}", rendered.join("|")))
+    Out::Ok(bconcat!("(", implode("|", &rendered), close))
 }
 
 /// Renders the remainder of the pattern under the constraint that the next matched
@@ -363,11 +365,11 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
         Token::Text(text) if text == "[" => {
             if let Some((class, after)) = scan_char_class(tokens) {
                 prefix(
-                    format!("[{class}&&[^.]]"),
+                    bconcat!("[", class, "&&[^.]]"),
                     render_seq(&tokens[after..], ctx),
                 )
             } else {
-                prefix("[".to_string(), render_seq(rest, ctx))
+                prefix(BString::from("["), render_seq(rest, ctx))
             }
         }
         Token::Text(text) => prefix(text.clone(), render_seq(rest, ctx)),
@@ -379,11 +381,11 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
             } else {
                 "[^.\\n].*"
             };
-            let consumed = prefix(head.to_string(), render_seq(rest, ctx));
+            let consumed = prefix(bconcat!(head), render_seq(rest, ctx));
             let skipped = apply_no_dot(rest, ctx);
             match (consumed, skipped) {
                 (Out::Escapes, _) | (_, Out::Escapes) => Out::Escapes,
-                (Out::Ok(a), Out::Ok(b)) => Out::Ok(format!("(?:{a}|{b})")),
+                (Out::Ok(a), Out::Ok(b)) => Out::Ok(bconcat!("(?:", a, "|", b, ")")),
                 (Out::Ok(a), Out::Dead) => Out::Ok(a),
                 (Out::Dead, Out::Ok(b)) => Out::Ok(b),
                 (Out::Dead, Out::Dead) => Out::Dead,
@@ -395,7 +397,7 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
             } else {
                 "[^.\\n]"
             };
-            prefix(head.to_string(), render_seq(rest, ctx))
+            prefix(bconcat!(head), render_seq(rest, ctx))
         }
         // The construct starts with a literal `/`, which satisfies the constraint.
         Token::Globstar { .. } => render_seq(tokens, ctx),
@@ -425,23 +427,23 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
         Token::End(Terminal::EndAnchor) => Out::Dead,
         // `(?=[^.])(?=$|/)`: the next character must exist, must not be a dot, and must
         // be either the end (impossible) or a slash — exactly one consumable `/`.
-        Token::End(Terminal::EndOrSlash) => Out::Ok("/".to_string()),
+        Token::End(Terminal::EndOrSlash) => Out::Ok(BString::from("/")),
         Token::NoDot => unreachable!("PHP never emits two consecutive look-aheads"),
     }
 }
 
-fn prefix(head: String, tail: Out) -> Out {
+fn prefix(head: BString, tail: Out) -> Out {
     match tail {
-        Out::Ok(tail) => Out::Ok(head + &tail),
+        Out::Ok(tail) => Out::Ok(bconcat!(head, tail)),
         other => other,
     }
 }
 
-fn join_branches(mut branches: Vec<String>) -> Option<String> {
+fn join_branches(mut branches: Vec<BString>) -> Option<BString> {
     match branches.len() {
         0 => None,
         1 => branches.pop(),
-        _ => Some(format!("(?:{})", branches.join("|"))),
+        _ => Some(bconcat!("(?:", implode("|", &branches), ")")),
     }
 }
 
@@ -449,13 +451,13 @@ fn join_branches(mut branches: Vec<String>) -> Option<String> {
 /// final regex, so a no-dot constraint has to intersect the class rather than be
 /// satisfied by the `[` itself. Collects a class spanning plain text tokens; None when
 /// no plain closing `]` follows (the `[` is then treated as a literal).
-fn scan_char_class(tokens: &[Token]) -> Option<(String, usize)> {
-    let mut class = String::from("[");
+fn scan_char_class(tokens: &[Token]) -> Option<(BString, usize)> {
+    let mut class = BString::from("[");
     let mut idx = 1;
     loop {
         match tokens.get(idx)? {
             Token::Text(text) if text == "]" => {
-                class.push(']');
+                class.push_byte(b']');
                 return Some((class, idx + 1));
             }
             Token::Text(text) => class.push_str(text),

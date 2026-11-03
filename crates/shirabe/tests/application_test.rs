@@ -5,15 +5,16 @@ mod bootstrap;
 #[path = "common/test_case.rs"]
 mod test_case;
 
+use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
 use test_case::init_temp_composer;
 
 use shirabe::command::about_command::AboutCommand;
 use shirabe::command::self_update_command::SelfUpdateCommand;
-use shirabe::console::application::ApplicationHandle;
+use shirabe::console::application::{Application, ApplicationHandle};
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{PHP_EOL, PHP_SERVER, time};
+use shirabe_php_shim::{PHP_EOL, PHP_SERVER, RuntimeException, bconcat, time};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};
 
@@ -38,7 +39,7 @@ fn test_dev_warning() {
     let _tear_down = TearDown;
     set_up();
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
 
     application.__set_dev_warning_time(Some(time() - 1));
 
@@ -56,19 +57,19 @@ fn test_dev_warning() {
     let output_trait: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = output.clone();
     shirabe::util::sync_executor::block_on(application.do_run(input, output_trait)).unwrap();
 
-    let expected_output = format!(
-        "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>{}",
+    let expected_output = bconcat!(
+        "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"",
         std::path::Path::new(
             &PHP_SERVER
                 .lock()
                 .unwrap()
                 .get("PHP_SELF")
                 .unwrap_or_default()
-        )
-        .display(),
+        ),
+        " self-update\" to get the latest version.</warning>",
         PHP_EOL
     );
-    assert!(output.borrow().fetch().contains(&expected_output));
+    assert!(output.borrow().fetch().contains_str(&expected_output));
 }
 
 #[ignore = "SelfUpdateCommand::execute is intentionally stubbed with a Shirabe-specific \"not available\" message instead of the original Composer wording this test expects"]
@@ -82,7 +83,7 @@ fn test_dev_warning_suppressed_for_self_update() {
         return;
     }
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     let command: std::rc::Rc<std::cell::RefCell<dyn Command>> =
         std::rc::Rc::new(std::cell::RefCell::new(SelfUpdateCommand::new()));
     application.add(command).unwrap();
@@ -107,7 +108,7 @@ fn test_dev_warning_suppressed_for_self_update() {
     assert_eq!(
         "This instance of Composer does not have the self-update command.\n\
          This could be due to a number of reasons, such as Composer being installed as a system package on your OS, or Composer being installed as a package in the current project.\n",
-        output.borrow().fetch().as_str()
+        output.borrow().fetch().as_bstr()
     );
 }
 
@@ -116,7 +117,7 @@ fn test_process_isolation_works_multiple_times() {
     let _tear_down = TearDown;
     set_up();
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     let command: std::rc::Rc<std::cell::RefCell<dyn Command>> =
         std::rc::Rc::new(std::cell::RefCell::new(AboutCommand::new()));
     application.add(command).unwrap();
@@ -175,7 +176,7 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
         true,
     );
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     application.set_catch_exceptions(false);
 
     // Run list command with --no-plugins, this triggers script command registration which previously
@@ -207,14 +208,14 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
         composer
             .get_plugin_manager()
             .borrow()
-            .are_plugins_disabled("local"),
+            .are_plugins_disabled(BStr::new("local")),
         "Plugins should be disabled when --no-plugins is used"
     );
     assert!(
         composer
             .get_plugin_manager()
             .borrow()
-            .are_plugins_disabled("global"),
+            .are_plugins_disabled(BStr::new("global")),
         "Global plugins should be disabled when --no-plugins is used"
     );
 }
@@ -240,7 +241,7 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
         true,
     );
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     application.set_catch_exceptions(false);
 
     let app_output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
@@ -260,7 +261,20 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
 
     assert_eq!(0, exit_code, "Script command should have run successfully");
     assert!(
-        app_output.borrow().fetch().contains("hello"),
+        app_output.borrow().fetch().contains_str("hello"),
         "The \"check\" script should have been executed instead of the check-platform-reqs command"
     );
+}
+
+#[test]
+fn a_non_utf8_exception_message_reaches_the_output_unchanged() {
+    let application = Application::new("Shirabe".into(), "".into());
+    let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+        None, false, None,
+    )));
+    let error: anyhow::Error = RuntimeException::new(b"bad name \xff".as_slice()).into();
+
+    application.do_render_throwable(&error, output.clone());
+
+    assert!(output.borrow().fetch().contains_str(b"bad name \xff"));
 }

@@ -17,7 +17,7 @@ mod suggested_packages_reporter;
 
 pub use binary_installer::*;
 pub use binary_presence_interface::*;
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 pub use installation_manager::*;
 pub use installer_event::*;
 pub use installer_events::*;
@@ -30,12 +30,12 @@ pub use package_events::*;
 pub use plugin_installer::*;
 pub use project_installer::*;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, array_map, array_unique, implode, intval, is_dir,
-    is_numeric, strcmp, strpos, strtolower, touch, usort,
+    Catch as _, PhpMixed, RuntimeException, array_map, array_unique, bconcat, implode, intval,
+    is_dir, is_numeric, path_from_bytes, strcmp, strpos, strtolower, touch, usort,
 };
 pub use suggested_packages_reporter::*;
 
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use indexmap::IndexMap;
 
 use shirabe_seld_json_lint::ParsingException;
@@ -91,7 +91,7 @@ pub struct Installer {
     optimize_autoloader: bool,
     class_map_authoritative: bool,
     apcu_autoloader: bool,
-    apcu_autoloader_prefix: Option<String>,
+    apcu_autoloader_prefix: Option<BString>,
     dev_mode: bool,
     dry_run: bool,
     download_only: bool,
@@ -107,17 +107,17 @@ pub struct Installer {
     execute_operations: bool,
     audit: bool,
     error_on_audit: bool,
-    audit_format: String,
+    audit_format: BString,
     audit_config: Option<AuditConfig>,
-    ignored_types: Vec<String>,
-    allowed_types: Option<Vec<String>>,
+    ignored_types: Vec<BString>,
+    allowed_types: Option<Vec<BString>>,
     update_mirrors: bool,
-    update_allow_list: Option<Vec<String>>,
+    update_allow_list: Option<Vec<BString>>,
     update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     suggested_packages_reporter: std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
     platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     additional_fixed_repository: Option<crate::repository::RepositoryInterfaceHandle>,
-    temporary_constraints: IndexMap<String, AnyConstraint>,
+    temporary_constraints: IndexMap<BString, AnyConstraint>,
 }
 
 impl Installer {
@@ -181,9 +181,9 @@ impl Installer {
             execute_operations: true,
             audit: true,
             error_on_audit: false,
-            audit_format: Auditor::FORMAT_SUMMARY.to_string(),
+            audit_format: Auditor::FORMAT_SUMMARY.to_owned(),
             audit_config: None,
-            ignored_types: vec!["php-ext".to_string(), "php-ext-zend".to_string()],
+            ignored_types: vec!["php-ext".into(), "php-ext-zend".into()],
             allowed_types: None,
             update_mirrors: false,
             update_allow_list: None,
@@ -202,10 +202,9 @@ impl Installer {
         // It is possible to disable GC in PHP via RPC, but it might not be effective.
 
         if self.update_allow_list.is_some() && self.update_mirrors {
-            return Err(RuntimeException::new(
-                "The installer options updateMirrors and updateAllowList are mutually exclusive."
-                    .to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "The installer options updateMirrors and updateAllowList are mutually exclusive.",
+            ))
             .into());
         }
 
@@ -348,15 +347,17 @@ impl Installer {
             };
 
             let replacement = if let Some(repl) = complete.get_replacement_package() {
-                format!("Use {} instead", repl)
+                bconcat!("Use ", repl, " instead")
             } else {
-                "No replacement was suggested".to_string()
+                BString::from("No replacement was suggested")
             };
 
-            self.io.write_error(&format!(
-                "<warning>Package {} is abandoned, you should avoid using it. {}.</warning>",
+            self.io.write_error(bconcat!(
+                "<warning>Package ",
                 complete.get_pretty_name(),
+                " is abandoned, you should avoid using it. ",
                 replacement,
+                ".</warning>"
             ));
         }
 
@@ -388,7 +389,7 @@ impl Installer {
                 local_repo_handle,
                 self.package.clone(),
                 self.installation_manager.clone(),
-                "composer",
+                BStr::new("composer"),
                 self.optimize_autoloader,
                 None,
                 Some(self.locker.clone()),
@@ -410,7 +411,7 @@ impl Installer {
         let fund_env = Platform::get_env("COMPOSER_FUND");
         let mut show_funding = true;
         if let Some(ref s) = fund_env {
-            let mixed = PhpMixed::string(s.to_string());
+            let mixed = PhpMixed::string(s.clone());
             if is_numeric(&mixed) {
                 show_funding = intval(&mixed) != 0;
             }
@@ -429,11 +430,14 @@ impl Installer {
                 }
             }
             if funding_count > 0 {
-                self.io.write_error(&format!(
-                    "<info>{} package{} you are using {} looking for funding.</info>",
+                self.io.write_error(bconcat!(
+                    "<info>",
                     funding_count,
+                    " package",
                     (if 1 == funding_count { "" } else { "s" }),
+                    " you are using ",
                     (if 1 == funding_count { "is" } else { "are" }),
+                    " looking for funding.</info>"
                 ));
                 self.io
                     .write_error("<info>Use the `shirabe fund` command to find out more!</info>");
@@ -492,10 +496,10 @@ impl Installer {
                     &self.io,
                     &repo_set,
                     packages,
-                    &audit_config.audit_format,
+                    audit_config.audit_format.as_bstr(),
                     true,
                     audit_config.ignore_list_for_audit.clone(),
-                    &audit_config.audit_abandoned,
+                    audit_config.audit_abandoned.as_bstr(),
                     audit_config.ignore_severity_for_audit.clone(),
                     audit_config.ignore_unreachable,
                     audit_config.ignore_abandoned_for_audit.clone(),
@@ -511,10 +515,10 @@ impl Installer {
                     Err(e) => {
                         if let Some(te) = e.catch::<TransportException>() {
                             self.io
-                                .error(&format!("Failed to audit {} packages.", target), &[]);
+                                .error(bconcat!("Failed to audit ", target, " packages."), &[]);
                             if self.io.is_verbose() {
                                 self.io.error(
-                                    &format!("[{}] {}", "TransportException", te.get_message()),
+                                    bconcat!("[", "TransportException", "] ", te.get_message()),
                                     &[],
                                 );
                             }
@@ -525,7 +529,7 @@ impl Installer {
                 }
             } else {
                 self.io
-                    .write_error(&format!("No {} packages - skipping audit.", target));
+                    .write_error(bconcat!("No ", target, " packages - skipping audit."));
             }
         }
 
@@ -572,14 +576,11 @@ impl Installer {
         if (self.update_allow_list.is_some() || self.update_mirrors) && locked_repository.is_none()
         {
             self.io.write_error3(
-                &format!(
-                    "<error>Cannot update {} without a lock file present. Run `shirabe update` to generate a lock file.</error>",
-                    if self.update_mirrors {
+                bconcat!("<error>Cannot update ", if self.update_mirrors {
                         "lock file information"
                     } else {
                         "only a partial set of packages"
-                    }
-                ),
+                    }, " without a lock file present. Run `shirabe update` to generate a lock file.</error>"),
                 true,
                 io_interface::QUIET,
             );
@@ -659,7 +660,7 @@ impl Installer {
                 )?;
 
                 self.io.write_error3(
-                    &format!("<error>{}</error>", err),
+                    bconcat!("<error>", err, "</error>"),
                     true,
                     io_interface::QUIET,
                 );
@@ -673,7 +674,7 @@ impl Installer {
                 }
 
                 let mut ghe = GithubActionError::new(self.io.clone());
-                ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+                ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
 
                 return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
             }
@@ -681,15 +682,16 @@ impl Installer {
         let _ = solver;
 
         self.io.write_error3(
-            &format!(
-                "Analyzed {} packages to resolve dependencies",
-                pool.borrow().get_packages().len()
+            bconcat!(
+                "Analyzed ",
+                pool.borrow().get_packages().len(),
+                " packages to resolve dependencies"
             ),
             true,
             io_interface::VERBOSE,
         );
         self.io.write_error3(
-            &format!("Analyzed {} rules to resolve dependencies", rule_set_size),
+            bconcat!("Analyzed ", rule_set_size, " rules to resolve dependencies"),
             true,
             io_interface::VERBOSE,
         );
@@ -728,15 +730,15 @@ impl Installer {
         let mut installs_updates: Vec<std::rc::Rc<AnyOperation>> = vec![];
         let mut uninstalls: Vec<std::rc::Rc<AnyOperation>> = vec![];
         if !lock_transaction.get_operations().is_empty() {
-            let mut install_names: Vec<String> = vec![];
-            let mut update_names: Vec<String> = vec![];
-            let mut uninstall_names: Vec<String> = vec![];
+            let mut install_names: Vec<BString> = vec![];
+            let mut update_names: Vec<BString> = vec![];
+            let mut uninstall_names: Vec<BString> = vec![];
             for operation in lock_transaction.get_operations() {
                 if let AnyOperation::Install(io) = &**operation {
                     installs_updates.push(operation.clone());
-                    install_names.push(format!(
-                        "{}:{}",
+                    install_names.push(bconcat!(
                         io.get_package().get_pretty_name(),
+                        ":",
                         io.get_package().get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev
@@ -754,9 +756,9 @@ impl Installer {
                     }
 
                     installs_updates.push(operation.clone());
-                    update_names.push(format!(
-                        "{}:{}",
+                    update_names.push(bconcat!(
                         uo.get_target_package().get_pretty_name(),
+                        ":",
                         uo.get_target_package().get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev
@@ -764,7 +766,7 @@ impl Installer {
                     ));
                 } else if let AnyOperation::Uninstall(uo) = &**operation {
                     uninstalls.push(operation.clone());
-                    uninstall_names.push(uo.get_package().get_pretty_name().to_string());
+                    uninstall_names.push(uo.get_package().get_pretty_name());
                 }
             }
 
@@ -775,32 +777,38 @@ impl Installer {
                 .as_bool()
                 .unwrap_or(false)
             {
-                self.io.write_error(&format!(
-                    "<info>Lock file operations: {} install{}, {} update{}, {} removal{}</info>",
+                self.io.write_error(bconcat!(
+                    "<info>Lock file operations: ",
                     (install_names.len() as i64),
+                    " install",
                     (if 1 == install_names.len() { "" } else { "s" }),
+                    ", ",
                     (update_names.len() as i64),
+                    " update",
                     (if 1 == update_names.len() { "" } else { "s" }),
+                    ", ",
                     (uninstalls.len() as i64),
+                    " removal",
                     (if 1 == uninstalls.len() { "" } else { "s" }),
+                    "</info>"
                 ));
                 if !install_names.is_empty() {
                     self.io.write_error3(
-                        &format!("Installs: {}", implode(", ", &install_names)),
+                        bconcat!("Installs: ", implode(", ", &install_names)),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !update_names.is_empty() {
                     self.io.write_error3(
-                        &format!("Updates: {}", implode(", ", &update_names)),
+                        bconcat!("Updates: ", implode(", ", &update_names)),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !uninstalls.is_empty() {
                     self.io.write_error3(
-                        &format!("Removals: {}", implode(", ", &uninstall_names)),
+                        bconcat!("Removals: ", implode(", ", &uninstall_names)),
                         true,
                         io_interface::VERBOSE,
                     );
@@ -810,8 +818,8 @@ impl Installer {
 
         let sort_by_name = |a: &std::rc::Rc<AnyOperation>, b: &std::rc::Rc<AnyOperation>| -> i64 {
             strcmp(
-                &a.get_target_package().get_name(),
-                &b.get_target_package().get_name(),
+                a.get_target_package().get_name(),
+                b.get_target_package().get_name(),
             )
         };
         usort(&mut uninstalls, &sort_by_name);
@@ -836,27 +844,27 @@ impl Installer {
                 .unwrap_or(false)
                 && (strpos(operation.get_operation_type(), "Alias").is_none() || self.io.is_debug())
             {
-                let mut source_repo = String::new();
+                let mut source_repo = BString::default();
                 if self.io.is_very_verbose()
                     && strpos(operation.get_operation_type(), "Alias").is_none()
                 {
                     let operation_pkg = operation.get_target_package();
                     if let Some(repo) = operation_pkg.get_repository() {
-                        source_repo = format!(" from {}", repo.get_repo_name()?);
+                        source_repo = bconcat!(" from ", repo.get_repo_name()?);
                     }
                 }
                 self.io
-                    .write_error(&format!("  - {}{}", operation.show(true), source_repo));
+                    .write_error(bconcat!("  - ", operation.show(true), source_repo));
             }
         }
 
-        // Convert aliases (Vec<IndexMap<String, String>>) into Vec<IndexMap<BString, PhpMixed>>
+        // Convert aliases (Vec<IndexMap<BString, BString>>) into Vec<IndexMap<BString, PhpMixed>>
         let aliases_php_mixed: Vec<IndexMap<BString, PhpMixed>> = lock_transaction
             .get_aliases(aliases.clone())
             .into_iter()
             .map(|m| {
                 m.into_iter()
-                    .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                    .map(|(k, v)| (k, PhpMixed::string(v)))
                     .collect::<IndexMap<BString, PhpMixed>>()
             })
             .collect();
@@ -875,7 +883,7 @@ impl Installer {
             platform_reqs,
             platform_dev_reqs,
             aliases_php_mixed,
-            &self.package.get_minimum_stability(),
+            self.package.get_minimum_stability().as_ref(),
             self.package.get_stability_flags(),
             self.prefer_stable || self.package.get_prefer_stable(),
             self.prefer_lowest,
@@ -900,7 +908,7 @@ impl Installer {
         &mut self,
         lock_transaction: &mut LockTransaction,
         platform_repo: &PlatformRepositoryHandle,
-        aliases: &[IndexMap<String, String>],
+        aliases: &[IndexMap<BString, BString>],
         policy: std::rc::Rc<dyn PolicyInterface>,
         locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
     ) -> anyhow::Result<i64> {
@@ -914,7 +922,7 @@ impl Installer {
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
             let loaded = loader.load(
                 dumper.dump(pkg.clone()),
-                Some("Composer\\Package\\CompletePackage".to_string()),
+                Some(BString::from("Composer\\Package\\CompletePackage")),
             )?;
             result_repo.add_package(loaded)?;
         }
@@ -954,7 +962,7 @@ impl Installer {
                 )?;
 
                 self.io.write_error3(
-                    &format!("<error>{}</error>", err),
+                    bconcat!("<error>", err, "</error>"),
                     true,
                     io_interface::QUIET,
                 );
@@ -967,7 +975,7 @@ impl Installer {
                 self.io.write_error(&pretty_problem);
 
                 let mut ghe = GithubActionError::new(self.io.clone());
-                ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+                ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
 
                 return Ok(e.get_code());
             }
@@ -992,13 +1000,14 @@ impl Installer {
             .as_bool()
             .unwrap_or(false)
         {
-            self.io.write_error(&format!(
-                "<info>Installing dependencies from lock file{}</info>",
+            self.io.write_error(bconcat!(
+                "<info>Installing dependencies from lock file",
                 if self.dev_mode {
                     " (including require-dev)"
                 } else {
                     ""
-                }
+                },
+                "</info>"
             ));
         }
 
@@ -1047,7 +1056,8 @@ impl Installer {
                 .borrow_mut()
                 .get_missing_requirement_info(package_for_missing, self.dev_mode)?;
             if !missing_requirement_info.is_empty() {
-                self.io.write_error(&missing_requirement_info.join("\n"));
+                self.io
+                    .write_error(implode("\n", &missing_requirement_info));
 
                 if !self
                     .config
@@ -1073,7 +1083,10 @@ impl Installer {
             }
             for (_key, link) in root_requires.iter() {
                 if PlatformRepository::is_platform_package(link.get_target()) {
-                    request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
+                    request.require_name(
+                        bstr::BStr::new(link.get_target()),
+                        Some(link.get_constraint().clone()),
+                    )?;
                 }
             }
 
@@ -1084,7 +1097,10 @@ impl Installer {
                 .into_values()
             {
                 if !root_requires.contains_key(link.get_target()) {
-                    request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
+                    request.require_name(
+                        bstr::BStr::new(link.get_target()),
+                        Some(link.get_constraint().clone()),
+                    )?;
                 }
             }
             drop(root_requires);
@@ -1132,14 +1148,14 @@ impl Installer {
                     )?;
 
                     self.io.write_error3(
-                        &format!("<error>{}</error>", err),
+                        bconcat!("<error>", err, "</error>"),
                         true,
                         io_interface::QUIET,
                     );
                     self.io.write_error(&pretty_problem);
 
                     let mut ghe = GithubActionError::new(self.io.clone());
-                    ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
+                    ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
 
                     return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
                 }
@@ -1169,58 +1185,64 @@ impl Installer {
                 local_repo_transaction.clone(),
             )?;
 
-        let mut installs: Vec<String> = vec![];
-        let mut updates: Vec<String> = vec![];
-        let mut uninstalls: Vec<String> = vec![];
+        let mut installs: Vec<BString> = vec![];
+        let mut updates: Vec<BString> = vec![];
+        let mut uninstalls: Vec<BString> = vec![];
         for operation in local_repo_transaction.get_operations() {
             if let AnyOperation::Install(io) = &**operation {
-                installs.push(format!(
-                    "{}:{}",
+                installs.push(bconcat!(
                     io.get_package().get_pretty_name(),
+                    ":",
                     io.get_package()
                         .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 ));
             } else if let AnyOperation::Update(uo) = &**operation {
-                updates.push(format!(
-                    "{}:{}",
+                updates.push(bconcat!(
                     uo.get_target_package().get_pretty_name(),
+                    ":",
                     uo.get_target_package()
                         .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 ));
             } else if let AnyOperation::Uninstall(uo) = &**operation {
-                uninstalls.push(uo.get_package().get_pretty_name().to_string());
+                uninstalls.push(uo.get_package().get_pretty_name());
             }
         }
 
         if installs.is_empty() && updates.is_empty() && uninstalls.is_empty() {
             self.io.write_error("Nothing to install, update or remove");
         } else {
-            self.io.write_error(&format!(
-                "<info>Package operations: {} install{}, {} update{}, {} removal{}</info>",
+            self.io.write_error(bconcat!(
+                "<info>Package operations: ",
                 (installs.len() as i64),
+                " install",
                 (if 1 == installs.len() { "" } else { "s" }),
+                ", ",
                 (updates.len() as i64),
+                " update",
                 (if 1 == updates.len() { "" } else { "s" }),
+                ", ",
                 (uninstalls.len() as i64),
+                " removal",
                 (if 1 == uninstalls.len() { "" } else { "s" }),
+                "</info>"
             ));
             if !installs.is_empty() {
                 self.io.write_error3(
-                    &format!("Installs: {}", implode(", ", &installs)),
+                    bconcat!("Installs: ", implode(", ", &installs)),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !updates.is_empty() {
                 self.io.write_error3(
-                    &format!("Updates: {}", implode(", ", &updates)),
+                    bconcat!("Updates: ", implode(", ", &updates)),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !uninstalls.is_empty() {
                 self.io.write_error3(
-                    &format!("Removals: {}", implode(", ", &uninstalls)),
+                    bconcat!("Removals: ", implode(", ", &uninstalls)),
                     true,
                     io_interface::VERBOSE,
                 );
@@ -1244,25 +1266,25 @@ impl Installer {
 
             // see https://github.com/composer/composer/issues/2764
             if !local_repo_transaction.get_operations().is_empty() {
-                let vendor_dir = self
-                    .config
-                    .borrow_mut()
-                    .get("vendor-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string();
-                if is_dir(&vendor_dir) {
+                let vendor_dir = BString::from(
+                    self.config
+                        .borrow_mut()
+                        .get("vendor-dir")
+                        .as_string()
+                        .unwrap_or_default(),
+                );
+                let vendor_dir = path_from_bytes(&vendor_dir);
+                if is_dir(vendor_dir) {
                     // suppress errors as this fails sometimes on OSX for no apparent reason
                     // see https://github.com/composer/composer/issues/4070#issuecomment-129792748
-                    let _ = touch(&vendor_dir);
+                    let _ = touch(vendor_dir);
                 }
             }
         } else {
             for operation in local_repo_transaction.get_operations() {
                 // output op, but alias op only in debug verbosity
                 if strpos(operation.get_operation_type(), "Alias").is_none() || self.io.is_debug() {
-                    self.io
-                        .write_error(&format!("  - {}", operation.show(false)));
+                    self.io.write_error(bconcat!("  - ", operation.show(false)));
                 }
             }
         }
@@ -1289,7 +1311,7 @@ impl Installer {
                 .get_platform_overrides()
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect()
         };
 
@@ -1305,27 +1327,27 @@ impl Installer {
         &mut self,
         for_update: bool,
         platform_repo: &PlatformRepositoryHandle,
-        root_aliases: &[IndexMap<String, String>],
+        root_aliases: &[IndexMap<BString, BString>],
         locked_repository: Option<&mut dyn RepositoryInterface>,
     ) -> anyhow::Result<RepositorySet> {
-        let minimum_stability: String;
-        let mut stability_flags: IndexMap<String, i64>;
+        let minimum_stability: BString;
+        let mut stability_flags: IndexMap<BString, i64>;
 
-        let requires: IndexMap<String, AnyConstraint>;
+        let requires: IndexMap<BString, AnyConstraint>;
         if for_update {
             minimum_stability = self.package.get_minimum_stability();
             stability_flags = self.package.get_stability_flags();
 
             // Convert Link map merge into ConstraintInterface map for use later
-            let mut req_links: IndexMap<String, Link> = IndexMap::new();
+            let mut req_links: IndexMap<BString, Link> = IndexMap::new();
             for (k, v) in self.package.get_requires().iter() {
-                req_links.insert(k.clone(), v.clone());
+                req_links.insert(bstr::BString::from(&k.clone()[..]), v.clone());
             }
             for (k, v) in self.package.get_dev_requires().iter() {
-                req_links.insert(k.clone(), v.clone());
+                req_links.insert(bstr::BString::from(&k.clone()[..]), v.clone());
             }
             // Translate to constraint map for downstream uniform handling.
-            let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
+            let mut tmp: IndexMap<BString, AnyConstraint> = IndexMap::new();
             for (k, link) in req_links {
                 tmp.insert(k, link.get_constraint().clone());
             }
@@ -1335,29 +1357,32 @@ impl Installer {
                 .locker
                 .borrow_mut()
                 .get_minimum_stability()
-                .unwrap_or_else(|_| String::new());
+                .unwrap_or_default();
             stability_flags = self
                 .locker
                 .borrow_mut()
                 .get_stability_flags()
                 .unwrap_or_default();
 
-            let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
+            let mut tmp: IndexMap<BString, AnyConstraint> = IndexMap::new();
             for package in locked_repository.unwrap().get_packages()? {
                 let constraint = SimpleConstraint::new(
-                    "=".to_string(),
-                    package.get_version().to_string(),
-                    Some(package.get_pretty_version().to_string()),
+                    "=",
+                    package.get_version(),
+                    Some(package.get_pretty_version()),
                 );
-                tmp.insert(package.get_name().to_string(), constraint.into());
+                tmp.insert(
+                    bstr::BString::from(&package.get_name()[..]),
+                    constraint.into(),
+                );
             }
             requires = tmp;
         }
 
-        let mut root_requires: IndexMap<String, AnyConstraint> = IndexMap::new();
+        let mut root_requires: IndexMap<BString, AnyConstraint> = IndexMap::new();
         for (req, mut constraint) in requires {
             // skip platform requirements from the root package to avoid filtering out existing platform packages
-            if self.platform_requirement_filter.is_ignored(&req) {
+            if self.platform_requirement_filter.is_ignored(req.as_bstr()) {
                 continue;
             } else if let Some(filter) = self
                 .platform_requirement_filter
@@ -1365,9 +1390,9 @@ impl Installer {
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>()
             {
                 constraint = filter
-                    .filter_constraint(&req, constraint, false)
+                    .filter_constraint(req.as_bstr(), constraint, false)
                     .unwrap_or_else(|_| {
-                        SimpleConstraint::new("=".to_string(), String::new(), None).into()
+                        SimpleConstraint::new("=", BString::default(), None).into()
                     });
             }
             root_requires.insert(req, constraint);
@@ -1378,18 +1403,23 @@ impl Installer {
         self.fixed_root_package.set_dev_requires(IndexMap::new());
 
         stability_flags.insert(
-            self.package.get_name(),
-            base_package::STABILITIES
-                [VersionParser::parse_stability(&self.package.get_version()).as_str()],
+            bstr::BString::from(&self.package.get_name()[..]),
+            base_package::stability_priority(VersionParser::parse_stability(
+                self.package.get_version(),
+            ))
+            .expect("parse_stability returns a known stability"),
         );
 
         let root_aliases_input: Vec<crate::repository::RootAliasInput> = root_aliases
             .iter()
             .map(|alias| crate::repository::RootAliasInput {
-                package: alias.get("package").cloned().unwrap_or_default(),
-                version: alias.get("version").cloned().unwrap_or_default(),
-                alias: alias.get("alias").cloned().unwrap_or_default(),
-                alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
+                package: alias.get(bstr::B("package")).cloned().unwrap_or_default(),
+                version: alias.get(bstr::B("version")).cloned().unwrap_or_default(),
+                alias: alias.get(bstr::B("alias")).cloned().unwrap_or_default(),
+                alias_normalized: alias
+                    .get(bstr::B("alias_normalized"))
+                    .cloned()
+                    .unwrap_or_default(),
             })
             .collect();
         let mut repository_set = RepositorySet::new(
@@ -1449,12 +1479,12 @@ impl Installer {
             prefer_lowest = Some(self.prefer_lowest);
         }
 
-        let mut preferred_versions: Option<IndexMap<String, String>> = None;
+        let mut preferred_versions: Option<IndexMap<BString, BString>> = None;
         if for_update
             && self.minimal_update
             && let Some(locked_repo) = locked_repo
         {
-            let mut versions: IndexMap<String, String> = IndexMap::new();
+            let mut versions: IndexMap<BString, BString> = IndexMap::new();
             let pkgs = locked_repo.borrow_mut().get_canonical_packages()?;
             for pkg in pkgs {
                 if pkg.as_alias().is_some()
@@ -1468,7 +1498,10 @@ impl Installer {
                 {
                     continue;
                 }
-                versions.insert(pkg.get_name(), pkg.get_version());
+                versions.insert(
+                    bstr::BString::from(&pkg.get_name()[..]),
+                    bstr::BString::from(&pkg.get_version()[..]),
+                );
             }
             preferred_versions = Some(versions);
         }
@@ -1511,14 +1544,11 @@ impl Installer {
             let name = package.get_name();
             if !pkg_repo_is_platform
                 || !provided.contains_key(&name)
-                || !provided.get(&name).unwrap().get_constraint().matches(
-                    &SimpleConstraint::new(
-                        "=".to_string(),
-                        package.get_version().to_string(),
-                        None,
-                    )
-                    .into(),
-                )
+                || !provided
+                    .get(&name)
+                    .unwrap()
+                    .get_constraint()
+                    .matches(&SimpleConstraint::new("=", package.get_version(), None).into())
             {
                 request.fix_package(package);
             }
@@ -1535,7 +1565,7 @@ impl Installer {
     ) -> anyhow::Result<()> {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
         if self.update_mirrors {
-            let excluded_packages: indexmap::IndexSet<String> = if !include_dev_requires {
+            let excluded_packages: indexmap::IndexSet<BString> = if !include_dev_requires {
                 let names = self.locker.borrow_mut().get_dev_package_names()?;
                 names.into_iter().collect()
             } else {
@@ -1550,17 +1580,12 @@ impl Installer {
                 // exclude alias packages here as for root aliases, both alias and aliased are
                 // present in the lock repo and we only want to require the aliased version
                 if locked_package.as_alias().is_none()
-                    && !excluded_packages.contains(&locked_package.get_name())
+                    && !excluded_packages.contains(bstr::B(&locked_package.get_name()))
                 {
                     request.require_name(
-                        &locked_package.get_name(),
+                        bstr::BStr::new(&locked_package.get_name()),
                         Some(
-                            SimpleConstraint::new(
-                                "==".to_string(),
-                                locked_package.get_version(),
-                                None,
-                            )
-                            .into(),
+                            SimpleConstraint::new("==", locked_package.get_version(), None).into(),
                         ),
                     )?;
                 }
@@ -1573,13 +1598,16 @@ impl Installer {
                 }
             }
             for (_key, link) in links.iter() {
-                request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
+                request.require_name(
+                    bstr::BStr::new(link.get_target()),
+                    Some(link.get_constraint().clone()),
+                )?;
             }
         }
         Ok(())
     }
 
-    fn get_root_aliases(&mut self, for_update: bool) -> Vec<IndexMap<String, String>> {
+    fn get_root_aliases(&mut self, for_update: bool) -> Vec<IndexMap<BString, BString>> {
         if for_update {
             self.package.get_aliases().to_vec()
         } else {
@@ -1589,14 +1617,14 @@ impl Installer {
 
     fn extract_platform_requirements(
         &self,
-        links: &IndexMap<String, Link>,
-    ) -> IndexMap<String, String> {
-        let mut platform_reqs: IndexMap<String, String> = IndexMap::new();
+        links: &IndexMap<BString, Link>,
+    ) -> IndexMap<BString, BString> {
+        let mut platform_reqs: IndexMap<BString, BString> = IndexMap::new();
         for (_key, link) in links {
             if PlatformRepository::is_platform_package(link.get_target()) {
                 platform_reqs.insert(
-                    link.get_target().to_string(),
-                    link.get_pretty_constraint().to_string(),
+                    bstr::BString::from(link.get_target()),
+                    bstr::BString::from(link.get_pretty_constraint()),
                 );
             }
         }
@@ -1611,15 +1639,18 @@ impl Installer {
         &self,
         rm: &mut dyn RepositoryManagerInterface,
     ) -> anyhow::Result<()> {
-        let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
+        let mut packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
         for package in rm.get_local_repository().get_packages()? {
-            packages.insert(package.to_string(), PackageInterfaceHandle::dup(&package));
+            packages.insert(
+                package.to_php_string(),
+                PackageInterfaceHandle::dup(&package),
+            );
         }
-        let keys: Vec<String> = packages.keys().cloned().collect();
+        let keys: Vec<BString> = packages.keys().cloned().collect();
         for key in keys {
             let package_clone = packages.get(&key).unwrap().clone();
             if let Some(alias_pkg) = package_clone.as_alias() {
-                let alias_key = alias_pkg.get_alias_of().to_string();
+                let alias_key = alias_pkg.get_alias_of().to_php_string();
                 let aliased = packages.get(&alias_key).unwrap().clone();
                 let version = alias_pkg.get_version();
                 let pretty_version = alias_pkg.get_pretty_version();
@@ -1654,7 +1685,7 @@ impl Installer {
         // Not the best architectural decision here, would need to be able
         // to configure from the outside of Installer but this is only
         // a debugging tool and should never be required in any other use case
-        if Platform::get_env("COMPOSER_POOL_OPTIMIZER").as_deref() == Some("0") {
+        if Platform::get_env("COMPOSER_POOL_OPTIMIZER").is_some_and(|v| v == "0") {
             self.io.write3(
                 "Pool Optimizer was disabled for debugging purposes.",
                 true,
@@ -1672,7 +1703,7 @@ impl Installer {
             self.audit_config = Some(AuditConfig::from_config(
                 &mut self.config.borrow_mut(),
                 self.audit,
-                &self.audit_format,
+                self.audit_format.as_bstr(),
             )?);
         }
 
@@ -1715,14 +1746,14 @@ impl Installer {
     }
 
     /// Packages of those types are ignored, by default php-ext and php-ext-zend are ignored
-    pub fn set_ignored_types(&mut self, types: Vec<String>) -> &mut Self {
+    pub fn set_ignored_types(&mut self, types: Vec<BString>) -> &mut Self {
         self.ignored_types = types;
 
         self
     }
 
     /// Only packages of those types are allowed if set to non-null
-    pub fn set_allowed_types(&mut self, types: Option<Vec<String>>) -> &mut Self {
+    pub fn set_allowed_types(&mut self, types: Option<Vec<BString>>) -> &mut Self {
         self.allowed_types = types;
 
         self
@@ -1739,7 +1770,7 @@ impl Installer {
 
     pub fn set_temporary_constraints(
         &mut self,
-        constraints: IndexMap<String, AnyConstraint>,
+        constraints: IndexMap<BString, AnyConstraint>,
     ) -> &mut Self {
         self.temporary_constraints = constraints;
 
@@ -1807,7 +1838,7 @@ impl Installer {
     pub fn set_apcu_autoloader(
         &mut self,
         apcu_autoloader: bool,
-        apcu_autoloader_prefix: Option<String>,
+        apcu_autoloader_prefix: Option<BString>,
     ) -> &mut Self {
         self.apcu_autoloader = apcu_autoloader;
         self.apcu_autoloader_prefix = apcu_autoloader_prefix;
@@ -1882,12 +1913,12 @@ impl Installer {
 
     /// restrict the update operation to a few packages, all other packages
     /// that are already installed will be kept at their current version
-    pub fn set_update_allow_list(&mut self, packages: Vec<String>) -> &mut Self {
+    pub fn set_update_allow_list(&mut self, packages: Vec<BString>) -> &mut Self {
         if packages.is_empty() {
             self.update_allow_list = None;
         } else {
-            let lowered: Vec<String> = array_map(|s: &String| strtolower(s), &packages);
-            let unique: Vec<String> = array_unique(&lowered);
+            let lowered: Vec<BString> = array_map(|s: &BString| strtolower(s), &packages);
+            let unique: Vec<BString> = array_unique(&lowered);
             self.update_allow_list = Some(unique);
         }
 

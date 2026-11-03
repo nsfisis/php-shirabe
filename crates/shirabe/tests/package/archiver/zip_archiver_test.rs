@@ -1,13 +1,14 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ZipArchiverTest.php
 
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::archiver::{ArchiverInterface, ZipArchiver};
 use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::Platform;
 use shirabe_php_shim::{
-    ZipArchive, class_exists, dirname, file_exists, file_put_contents, mkdir, realpath,
-    sys_get_temp_dir, unlink,
+    ZipArchive, bconcat, class_exists, dirname, file_exists, file_put_contents, mkdir,
+    path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use tempfile::TempDir;
 
@@ -39,18 +40,23 @@ impl ArchiverTestCase {
 
     fn setup_package(&self) -> CompletePackageHandle {
         let package = CompletePackageHandle::new(
-            "archivertest/archivertest".to_string(),
-            "master".to_string(),
-            "master".to_string(),
+            BString::from("archivertest/archivertest"),
+            BString::from("master"),
+            BString::from("master"),
         );
-        package.set_source_url(Some(realpath(&self.test_dir).unwrap_or_default()));
-        package.set_source_reference(Some("master".to_string()));
-        package.__set_source_type(Some("git".to_string()));
+        package.set_source_url(Some(BString::from(
+            realpath(&self.test_dir)
+                .as_deref()
+                .map(path_to_bytes)
+                .unwrap_or_default(),
+        )));
+        package.set_source_reference(Some(BString::from("master")));
+        package.__set_source_type(Some(BString::from("git")));
 
         package
     }
 
-    fn assert_zip_archive(&mut self, mut files: IndexMap<String, Option<String>>) {
+    fn assert_zip_archive(&mut self, mut files: IndexMap<BString, Option<BString>>) {
         if !class_exists("ZipArchive") {
             // markTestSkipped('Cannot run ZipArchiverTest, missing class "ZipArchive".')
             return;
@@ -64,9 +70,9 @@ impl ArchiverTestCase {
         let archiver = ZipArchiver::new();
         archiver
             .archive(
-                package.get_source_url().unwrap(),
-                target.to_str().unwrap().to_string(),
-                "zip".to_string(),
+                path_from_bytes(&package.get_source_url().unwrap()),
+                &target,
+                "zip".into(),
                 vec![],
                 false,
             )
@@ -76,40 +82,45 @@ impl ArchiverTestCase {
         let res = zip.open(&target, 0);
         assert!(res.is_ok(), "Failed asserting that Zip file can be opened");
 
-        let mut zip_contents: IndexMap<String, Option<String>> = IndexMap::new();
+        let mut zip_contents: IndexMap<BString, Option<BString>> = IndexMap::new();
         for i in 0..zip.num_files {
             let path = zip.get_name_index(i);
-            zip_contents.insert(path.clone(), zip.get_from_name(&path));
+            let contents = zip.get_from_name(&path).map(BString::from);
+            zip_contents.insert(path, contents);
         }
         zip.close();
 
-        let files: IndexMap<String, Option<String>> = files;
+        let files: IndexMap<BString, Option<BString>> = files.into_iter().collect();
         assert_eq!(
             files, zip_contents,
             "Failed asserting that Zip created with the ZipArchiver contains all files from the repository."
         );
     }
 
-    fn setup_dummy_repo(&self, files: &mut IndexMap<String, Option<String>>) {
+    fn setup_dummy_repo(&self, files: &mut IndexMap<BString, Option<BString>>) {
         let current_work_dir = Platform::get_cwd(false).unwrap();
         std::env::set_current_dir(&self.test_dir).unwrap();
-        let paths: Vec<String> = files.keys().cloned().collect();
+        let paths: Vec<BString> = files.keys().cloned().collect();
         for path in paths {
             if files[&path].is_none() {
-                files.insert(path.clone(), Some("content".to_string()));
+                files.insert(path.clone(), Some(BString::from("content")));
             }
-            self.write_file(&path, files[&path].clone().unwrap(), &current_work_dir);
+            self.write_file(
+                path.as_bstr(),
+                files[&path].clone().unwrap(),
+                &current_work_dir,
+            );
         }
 
         std::env::set_current_dir(&current_work_dir).unwrap();
     }
 
-    fn write_file(&self, path: &str, content: String, current_work_dir: &str) {
-        if !file_exists(dirname(path)) {
-            mkdir(dirname(path), 0o777, true);
+    fn write_file(&self, path: &BStr, content: BString, current_work_dir: &std::path::Path) {
+        if !file_exists(path_from_bytes(&dirname(path))) {
+            mkdir(path_from_bytes(&dirname(path)), 0o777, true);
         }
 
-        let result = file_put_contents(path, content.as_bytes());
+        let result = file_put_contents(path_from_bytes(&path), content.as_slice());
         if result.is_none() {
             std::env::set_current_dir(current_work_dir).unwrap();
             panic!("Could not save file.");
@@ -122,15 +133,15 @@ impl ArchiverTestCase {
 fn test_simple_files() {
     let mut test_case = ArchiverTestCase::set_up();
 
-    let mut files: IndexMap<String, Option<String>> = IndexMap::new();
-    files.insert("file.txt".to_string(), None);
-    files.insert("foo/bar/baz".to_string(), None);
-    files.insert("x/baz".to_string(), None);
-    files.insert("x/includeme".to_string(), None);
+    let mut files: IndexMap<BString, Option<BString>> = IndexMap::new();
+    files.insert(BString::from("file.txt"), None);
+    files.insert(BString::from("foo/bar/baz"), None);
+    files.insert(BString::from("x/baz"), None);
+    files.insert(BString::from("x/includeme"), None);
 
     if !Platform::is_windows() {
         files.insert(
-            format!("zfoo{}/file.txt", Platform::get_cwd(false).unwrap()),
+            bconcat!("zfoo", Platform::get_cwd(false).unwrap(), "/file.txt"),
             None,
         );
     }
@@ -144,12 +155,15 @@ fn test_gitignore_exclude_negation() {
     for include in ["!/docs", "!/docs/"] {
         let mut test_case = ArchiverTestCase::set_up();
 
-        let mut files: IndexMap<String, Option<String>> = IndexMap::new();
+        let mut files: IndexMap<BString, Option<BString>> = IndexMap::new();
         files.insert(
-            ".gitignore".to_string(),
-            Some(format!("/*\n.*\n!.git*\n{}", include)),
+            BString::from(".gitignore"),
+            Some(bconcat!("/*\n.*\n!.git*\n", include)),
         );
-        files.insert("docs/README.md".to_string(), Some("# The doc".to_string()));
+        files.insert(
+            BString::from("docs/README.md"),
+            Some(BString::from("# The doc")),
+        );
 
         test_case.assert_zip_archive(files);
     }
@@ -165,10 +179,10 @@ fn test_folder_with_backslashes() {
 
     let mut test_case = ArchiverTestCase::set_up();
 
-    let mut files: IndexMap<String, Option<String>> = IndexMap::new();
+    let mut files: IndexMap<BString, Option<BString>> = IndexMap::new();
     files.insert(
-        "folder\\with\\backslashes/README.md".to_string(),
-        Some("# doc".to_string()),
+        BString::from("folder\\with\\backslashes/README.md"),
+        Some(BString::from("# doc")),
     );
 
     test_case.assert_zip_archive(files);

@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Advisory/IgnoredSecurityAdvisory.php
 
 use crate::advisory::SecurityAdvisory;
+use bstr::BString;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
@@ -10,23 +11,26 @@ use shirabe_semver::constraint::AnyConstraint;
 pub struct IgnoredSecurityAdvisory {
     #[serde(flatten)]
     inner: SecurityAdvisory,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ignore_reason: Option<String>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "shirabe_php_shim::json_bytes::option_str"
+    )]
+    pub ignore_reason: Option<BString>,
 }
 
 impl IgnoredSecurityAdvisory {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
-        package_name: String,
-        advisory_id: String,
+        package_name: BString,
+        advisory_id: BString,
         affected_versions: AnyConstraint,
-        title: String,
-        sources: Vec<IndexMap<String, String>>,
+        title: BString,
+        sources: Vec<IndexMap<BString, BString>>,
         reported_at: DateTime<Utc>,
-        cve: Option<String>,
-        link: Option<String>,
-        ignore_reason: Option<String>,
-        severity: Option<String>,
+        cve: Option<BString>,
+        link: Option<BString>,
+        ignore_reason: Option<BString>,
+        severity: Option<BString>,
     ) -> Self {
         let inner = SecurityAdvisory::new(
             package_name,

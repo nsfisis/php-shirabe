@@ -9,9 +9,11 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, file_get_contents, php_regex, preg_is_match, preg_replace,
+    Catch as _, PhpMixed, bconcat, error_message, file_get_contents, php_regex, preg_is_match,
+    preg_replace, str_replace, strtolower,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct ConfigValidator {
@@ -27,19 +29,19 @@ impl ConfigValidator {
 
     pub fn validate(
         &self,
-        file: &str,
+        file: &Path,
         array_loader_validation_flags: i64,
         flags: i64,
-    ) -> (Vec<String>, Vec<String>, Vec<String>) {
-        let mut errors: Vec<String> = Vec::new();
-        let mut publish_errors: Vec<String> = Vec::new();
-        let mut warnings: Vec<String> = Vec::new();
+    ) -> (Vec<BString>, Vec<BString>, Vec<BString>) {
+        let mut errors: Vec<BString> = Vec::new();
+        let mut publish_errors: Vec<BString> = Vec::new();
+        let mut warnings: Vec<BString> = Vec::new();
 
         // validate json schema
         let mut lax_valid = false;
         let mut manifest: Option<IndexMap<BString, PhpMixed>> = None;
 
-        let json = JsonFile::new(file.to_string(), None, Some(self.io.clone()))
+        let json = JsonFile::new(file, None, Some(self.io.clone()))
             .expect("config file path is always local");
         let schema_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             manifest = Some(match json.read()? {
@@ -64,7 +66,7 @@ impl ConfigValidator {
                         }
                     }
                 } else {
-                    errors.push(e.to_string());
+                    errors.push(error_message(&e));
 
                     return (errors, publish_errors, warnings);
                 }
@@ -72,11 +74,16 @@ impl ConfigValidator {
         }
 
         if manifest.is_some() {
-            // TODO(bytes): detect_duplicate_keys scans the JSON as a &str.
-            let contents =
-                String::from_utf8_lossy(&file_get_contents(file).unwrap_or_default()).into_owned();
+            let contents = file_get_contents(file).unwrap_or_default();
             if let Some((key, line)) = detect_duplicate_keys(&contents) {
-                warnings.push(format!("Key {key} is a duplicate in {file} at line {line}"));
+                warnings.push(bconcat!(
+                    "Key ",
+                    key,
+                    " is a duplicate in ",
+                    file,
+                    " at line ",
+                    line
+                ));
             }
         }
 
@@ -91,16 +98,16 @@ impl ConfigValidator {
             .is_none_or(|v| matches!(v, PhpMixed::Null))
             || !manifest.contains_key(B("license"))
         {
-            warnings.push("No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.".to_string());
+            warnings.push(BString::from("No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license."));
         } else {
             let license_val = manifest.get(B("license")).unwrap();
-            let licenses: Vec<String> = match license_val {
-                PhpMixed::String(s) => vec![s.to_str_lossy().into_owned()],
+            let licenses: Vec<BString> = match license_val {
+                PhpMixed::String(s) => vec![s.clone()],
                 PhpMixed::List(list) => list
                     .iter()
                     .filter_map(|v| {
                         if let PhpMixed::String(s) = v {
-                            Some(s.to_str_lossy().into_owned())
+                            Some(s.clone())
                         } else {
                             None
                         }
@@ -110,7 +117,7 @@ impl ConfigValidator {
             };
 
             // strip proprietary since it's not a valid SPDX identifier, but is accepted by composer
-            let licenses: Vec<String> = licenses
+            let licenses: Vec<BString> = licenses
                 .into_iter()
                 .filter(|l| l != "proprietary")
                 .collect();
@@ -120,52 +127,53 @@ impl ConfigValidator {
                 let spdx_license = license_validator.get_license_by_identifier(license);
                 if spdx_license.is_some_and(|l| l.is_deprecated_license_id) {
                     if preg_is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license) {
-                        warnings.push(format!(
-                            "License \"{}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead",
+                        warnings.push(bconcat!(
+                            "License \"",
                             license,
-                            license.replace('+', "")
+                            "\" is a deprecated SPDX license identifier, use \"",
+                            str_replace("+", "", license),
+                            "-or-later\" instead"
                         ));
                     } else if preg_is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"), license) {
-                        warnings.push(format!(
-                            "License \"{}\" is a deprecated SPDX license identifier, use \"{}-only\" or \"{}-or-later\" instead",
-                            license, license, license
+                        warnings.push(bconcat!(
+                            "License \"",
+                            license,
+                            "\" is a deprecated SPDX license identifier, use \"",
+                            license,
+                            "-only\" or \"",
+                            license,
+                            "-or-later\" instead"
                         ));
                     } else {
-                        warnings.push(format!(
-                            "License \"{}\" is a deprecated SPDX license identifier, see https://spdx.org/licenses/",
-                            license
-                        ));
+                        warnings.push(bconcat!("License \"", license, "\" is a deprecated SPDX license identifier, see https://spdx.org/licenses/"));
                     }
                 }
             }
         }
 
         if (flags & Self::CHECK_VERSION != 0) && manifest.contains_key(B("version")) {
-            warnings.push("The version field is present, it is recommended to leave it out if the package is published on Packagist.".to_string());
+            warnings.push(BString::from("The version field is present, it is recommended to leave it out if the package is published on Packagist."));
         }
 
         if let Some(PhpMixed::String(name)) = manifest.get(B("name"))
             && !name.is_empty()
-            && preg_is_match(php_regex!(r"{[A-Z]}"), &name.to_str_lossy())
+            && preg_is_match(php_regex!(r"{[A-Z]}"), name)
         {
             let suggest_name = preg_replace(
                 php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
                 r"\1\3-\2\4",
-                &name.to_str_lossy(),
+                name,
             );
-            let suggest_name = suggest_name.to_lowercase();
+            let suggest_name = strtolower(&suggest_name);
 
-            publish_errors.push(format!(
-                    "Name \"{}\" does not match the best practice (e.g. lower-cased/with-dashes). We suggest using \"{}\" instead. As such you will not be able to submit it to Packagist.",
-                    name, suggest_name
-                ));
+            publish_errors.push(bconcat!("Name \"", name, "\" does not match the best practice (e.g. lower-cased/with-dashes). We suggest using \"", suggest_name, "\" instead. As such you will not be able to submit it to Packagist."));
         }
 
         if let Some(PhpMixed::String(t)) = manifest.get(B("type"))
             && !t.is_empty()
             && t == "composer-installer"
         {
-            warnings.push("The package type 'composer-installer' is deprecated. Please distribute your custom installers as plugins from now on. See https://getcomposer.org/doc/articles/plugins.md for plugin documentation.".to_string());
+            warnings.push(BString::from("The package type 'composer-installer' is deprecated. Please distribute your custom installers as plugins from now on. See https://getcomposer.org/doc/articles/plugins.md for plugin documentation."));
         }
 
         // check for require-dev overrides
@@ -184,11 +192,7 @@ impl ConfigValidator {
                 } else {
                     "is"
                 };
-                warnings.push(format!(
-                    "{} {} required both in require and require-dev, this can lead to unexpected behavior",
-                    bstr::join(", ", &require_overrides).as_bstr(),
-                    plural
-                ));
+                warnings.push(bconcat!(bstr::join(", ", &require_overrides).as_bstr(), " ", plural, " required both in require and require-dev, this can lead to unexpected behavior"));
             }
         }
 
@@ -199,9 +203,16 @@ impl ConfigValidator {
                     if let Some(PhpMixed::Array(require_map)) = manifest.get(B(require_type)) {
                         for provide in link_map.keys() {
                             if require_map.contains_key(provide) {
-                                warnings.push(format!(
-                                    "The package {} in {} is also listed in {} which satisfies the requirement. Remove it from {} if you wish to install it.",
-                                    provide, require_type, link_type, link_type
+                                warnings.push(bconcat!(
+                                    "The package ",
+                                    provide,
+                                    " in ",
+                                    require_type,
+                                    " is also listed in ",
+                                    link_type,
+                                    " which satisfies the requirement. Remove it from ",
+                                    link_type,
+                                    " if you wish to install it."
                                 ));
                             }
                         }
@@ -223,12 +234,9 @@ impl ConfigValidator {
         packages.extend(require_dev);
         for (package, version) in &packages {
             if let PhpMixed::String(version_str) = version
-                && preg_is_match(php_regex!(r"{#}"), &version_str.to_str_lossy())
+                && preg_is_match(php_regex!(r"{#}"), version_str)
             {
-                warnings.push(format!(
-                        "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",
-                        package
-                    ));
+                warnings.push(bconcat!("The package \"", package, "\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues."));
             }
         }
 
@@ -243,9 +251,10 @@ impl ConfigValidator {
         };
         for (script_name, _) in &scripts_descriptions {
             if !scripts.contains_key(script_name) {
-                warnings.push(format!(
-                    "Description for non-existent script \"{}\" found in \"scripts-descriptions\"",
-                    script_name
+                warnings.push(bconcat!(
+                    "Description for non-existent script \"",
+                    script_name,
+                    "\" found in \"scripts-descriptions\""
                 ));
             }
         }
@@ -257,9 +266,10 @@ impl ConfigValidator {
         };
         for (script_name, _) in &script_aliases {
             if !scripts.contains_key(script_name) {
-                warnings.push(format!(
-                    "Aliases for non-existent script \"{}\" found in \"scripts-aliases\"",
-                    script_name
+                warnings.push(bconcat!(
+                    "Aliases for non-existent script \"",
+                    script_name,
+                    "\" found in \"scripts-aliases\""
                 ));
             }
         }
@@ -269,12 +279,12 @@ impl ConfigValidator {
             if let Some(PhpMixed::Array(psr0)) = autoload.get(B("psr-0"))
                 && psr0.contains_key(B(""))
             {
-                warnings.push("Defining autoload.psr-0 with an empty namespace prefix is a bad idea for performance".to_string());
+                warnings.push(BString::from("Defining autoload.psr-0 with an empty namespace prefix is a bad idea for performance"));
             }
             if let Some(PhpMixed::Array(psr4)) = autoload.get(B("psr-4"))
                 && psr4.contains_key(B(""))
             {
-                warnings.push("Defining autoload.psr-4 with an empty namespace prefix is a bad idea for performance".to_string());
+                warnings.push(BString::from("Defining autoload.psr-4 with an empty namespace prefix is a bad idea for performance"));
             }
         }
 
@@ -286,14 +296,17 @@ impl ConfigValidator {
         );
         let mut manifest_for_load = manifest;
         if !manifest_for_load.contains_key(B("version")) {
-            manifest_for_load.insert("version".into(), PhpMixed::string("1.0.0".to_string()));
+            manifest_for_load.insert("version".into(), PhpMixed::string(BString::from("1.0.0")));
         }
         if !manifest_for_load.contains_key(B("name")) {
-            manifest_for_load.insert("name".into(), PhpMixed::string("dummy/dummy".to_string()));
+            manifest_for_load.insert(
+                "name".into(),
+                PhpMixed::string(BString::from("dummy/dummy")),
+            );
         }
         match loader.load(
             manifest_for_load,
-            Some("Composer\\Package\\CompletePackage".to_string()),
+            Some(BString::from("Composer\\Package\\CompletePackage")),
         ) {
             Ok(_) => {}
             Err(e) => {
@@ -312,10 +325,10 @@ impl ConfigValidator {
 /// Detects the first duplicate object key in a JSON text, returning its key name and line number.
 /// Replaces `Seld\JsonLint\JsonParser` with `DETECT_KEY_CONFLICTS`.
 /// Returns `None` on no collision, even if any other error occurs.
-fn detect_duplicate_keys(json: &str) -> Option<(String, usize)> {
-    let duplicate_key: std::cell::Cell<Option<String>> = std::cell::Cell::new(None);
+fn detect_duplicate_keys(json: &[u8]) -> Option<(BString, usize)> {
+    let duplicate_key: std::cell::Cell<Option<BString>> = std::cell::Cell::new(None);
 
-    let mut deserializer = serde_json::Deserializer::from_str(json);
+    let mut deserializer = serde_json::Deserializer::from_slice(json);
     let seed = DuplicateKeyScanSeed {
         duplicate_key: &duplicate_key,
     };
@@ -327,7 +340,7 @@ fn detect_duplicate_keys(json: &str) -> Option<(String, usize)> {
 
 /// Carries the cell that records the first duplicate key found while recursing into a value.
 struct DuplicateKeyScanSeed<'a> {
-    duplicate_key: &'a std::cell::Cell<Option<String>>,
+    duplicate_key: &'a std::cell::Cell<Option<BString>>,
 }
 
 impl<'de> serde::de::DeserializeSeed<'de> for DuplicateKeyScanSeed<'_> {
@@ -344,7 +357,7 @@ impl<'de> serde::de::DeserializeSeed<'de> for DuplicateKeyScanSeed<'_> {
 }
 
 struct DuplicateKeyScanVisitor<'a> {
-    duplicate_key: &'a std::cell::Cell<Option<String>>,
+    duplicate_key: &'a std::cell::Cell<Option<BString>>,
 }
 
 impl<'de> serde::de::Visitor<'de> for DuplicateKeyScanVisitor<'_> {
@@ -354,6 +367,10 @@ impl<'de> serde::de::Visitor<'de> for DuplicateKeyScanVisitor<'_> {
         formatter.write_str("any JSON value")
     }
 
+    #[expect(
+        clippy::disallowed_types,
+        reason = "serde_json hands a map key over as text"
+    )]
     fn visit_map<A>(self, mut map: A) -> Result<(), A::Error>
     where
         A: serde::de::MapAccess<'de>,
@@ -361,7 +378,7 @@ impl<'de> serde::de::Visitor<'de> for DuplicateKeyScanVisitor<'_> {
         let mut seen: indexmap::IndexSet<String> = indexmap::IndexSet::new();
         while let Some(key) = map.next_key::<String>()? {
             if !seen.insert(key.clone()) {
-                self.duplicate_key.set(Some(key));
+                self.duplicate_key.set(Some(BString::from(key)));
                 return Err(A::Error::custom("found duplicate key"));
             }
             map.next_value_seed(DuplicateKeyScanSeed {
@@ -400,6 +417,7 @@ impl<'de> serde::de::Visitor<'de> for DuplicateKeyScanVisitor<'_> {
         Ok(())
     }
 
+    #[expect(clippy::disallowed_types, reason = "the signature of a serde visitor")]
     fn visit_str<E>(self, _v: &str) -> Result<(), E> {
         Ok(())
     }
@@ -419,24 +437,33 @@ mod tests {
 
     #[test]
     fn no_duplicates() {
-        assert_eq!(detect_duplicate_keys("{\"a\": 1, \"b\": {\"c\": 2}}"), None);
+        assert_eq!(
+            detect_duplicate_keys(b"{\"a\": 1, \"b\": {\"c\": 2}}"),
+            None
+        );
     }
 
     #[test]
     fn top_level_duplicate_reports_key_and_line() {
         let json = "{\n    \"name\": \"a\",\n    \"name\": \"b\"\n}";
-        assert_eq!(detect_duplicate_keys(json), Some(("name".to_string(), 3)));
+        assert_eq!(
+            detect_duplicate_keys(json.as_bytes()),
+            Some((BString::from("name"), 3))
+        );
     }
 
     #[test]
     fn nested_duplicate_is_detected() {
         let json =
             "{\n    \"require\": {\n        \"x/y\": \"1\",\n        \"x/y\": \"2\"\n    }\n}";
-        assert_eq!(detect_duplicate_keys(json), Some(("x/y".to_string(), 4)));
+        assert_eq!(
+            detect_duplicate_keys(json.as_bytes()),
+            Some((BString::from("x/y"), 4))
+        );
     }
 
     #[test]
     fn syntax_error_is_not_reported_as_duplicate() {
-        assert_eq!(detect_duplicate_keys("{ not json"), None);
+        assert_eq!(detect_duplicate_keys(b"{ not json"), None);
     }
 }

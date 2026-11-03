@@ -2,9 +2,10 @@
 
 // ProxyManager reads HTTP(S)_PROXY / CGI_HTTP_PROXY / no_proxy environment variables; the
 // env-dependent setup (without its setUp/tearDown isolation) is not ported.
-use bstr::BString;
+use bstr::{BStr, BString};
 use shirabe::util::http::proxy_manager::ProxyManager;
 use shirabe::util::platform::Platform;
+use shirabe_php_shim::bconcat;
 
 fn set_up() {
     Platform::clear_env("HTTP_PROXY");
@@ -89,30 +90,30 @@ fn test_lowercase_overrides_uppercase() {
     set_up();
 
     // server, url, expectedUrl
-    let cases: Vec<(Vec<(&str, &str)>, &str, &str)> = vec![
+    let cases: Vec<(Vec<(&BStr, &BStr)>, &BStr, &BStr)> = vec![
         (
             vec![
-                ("HTTP_PROXY", "http://upper.com"),
-                ("http_proxy", "http://lower.com"),
+                (BStr::new("HTTP_PROXY"), BStr::new("http://upper.com")),
+                (BStr::new("http_proxy"), BStr::new("http://lower.com")),
             ],
-            "http://repo.org",
-            "http://lower.com:80",
+            BStr::new("http://repo.org"),
+            BStr::new("http://lower.com:80"),
         ),
         (
             vec![
-                ("CGI_HTTP_PROXY", "http://upper.com"),
-                ("cgi_http_proxy", "http://lower.com"),
+                (BStr::new("CGI_HTTP_PROXY"), BStr::new("http://upper.com")),
+                (BStr::new("cgi_http_proxy"), BStr::new("http://lower.com")),
             ],
-            "http://repo.org",
-            "http://lower.com:80",
+            BStr::new("http://repo.org"),
+            BStr::new("http://lower.com:80"),
         ),
         (
             vec![
-                ("HTTPS_PROXY", "http://upper.com"),
-                ("https_proxy", "http://lower.com"),
+                (BStr::new("HTTPS_PROXY"), BStr::new("http://upper.com")),
+                (BStr::new("https_proxy"), BStr::new("http://lower.com")),
             ],
-            "https://repo.org",
-            "http://lower.com:80",
+            BStr::new("https://repo.org"),
+            BStr::new("http://lower.com:80"),
         ),
     ];
 
@@ -136,17 +137,17 @@ fn test_cgi_proxy_is_only_used_when_no_http_proxy() {
     set_up();
 
     // server, expectedUrl
-    let cases: Vec<(Vec<(&str, &str)>, &str)> = vec![
+    let cases: Vec<(Vec<(&BStr, &BStr)>, &BStr)> = vec![
         (
-            vec![("CGI_HTTP_PROXY", "http://cgi.com:80")],
-            "http://cgi.com:80",
+            vec![(BStr::new("CGI_HTTP_PROXY"), BStr::new("http://cgi.com:80"))],
+            BStr::new("http://cgi.com:80"),
         ),
         (
             vec![
-                ("http_proxy", "http://http.com:80"),
-                ("CGI_HTTP_PROXY", "http://cgi.com:80"),
+                (BStr::new("http_proxy"), BStr::new("http://http.com:80")),
+                (BStr::new("CGI_HTTP_PROXY"), BStr::new("http://cgi.com:80")),
             ],
-            "http://http.com:80",
+            BStr::new("http://http.com:80"),
         ),
     ];
 
@@ -211,57 +212,72 @@ fn test_get_proxy_for_request() {
     set_up();
 
     let server = vec![
-        ("http_proxy", "http://user:p%40ss@proxy.com"),
-        ("https_proxy", "https://proxy.com:443"),
-        ("no_proxy", "other.repo.org"),
+        (
+            BStr::new("http_proxy"),
+            BStr::new("http://user:p%40ss@proxy.com"),
+        ),
+        (BStr::new("https_proxy"), BStr::new("https://proxy.com:443")),
+        (BStr::new("no_proxy"), BStr::new("other.repo.org")),
     ];
 
     let http_options =
-        |pairs: &[(&str, PhpMixed)]| -> Option<IndexMap<String, IndexMap<BString, PhpMixed>>> {
+        |pairs: &[(&BStr, PhpMixed)]| -> Option<IndexMap<BString, IndexMap<BString, PhpMixed>>> {
             let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
             for (k, v) in pairs {
-                http.insert((*k).to_string().into(), v.clone());
+                http.insert(bconcat!((*k)), v.clone());
             }
-            let mut options: IndexMap<String, IndexMap<BString, PhpMixed>> = IndexMap::new();
-            options.insert("http".to_string(), http);
+            let mut options: IndexMap<BString, IndexMap<BString, PhpMixed>> = IndexMap::new();
+            options.insert(BString::from("http"), http);
             Some(options)
         };
 
     // server, url, options, status, excluded
     let cases: Vec<(
-        Vec<(&str, &str)>,
-        &str,
-        Option<IndexMap<String, IndexMap<BString, PhpMixed>>>,
-        &str,
+        Vec<(&BStr, &BStr)>,
+        &BStr,
+        Option<IndexMap<BString, IndexMap<BString, PhpMixed>>>,
+        &BStr,
         bool,
     )> = vec![
-        (vec![], "http://repo.org", None, "", false),
         (
-            server.clone(),
-            "http://repo.org",
-            http_options(&[
-                ("proxy", PhpMixed::string("tcp://proxy.com:80".to_string())),
-                (
-                    "header",
-                    PhpMixed::string("Proxy-Authorization: Basic dXNlcjpwQHNz".to_string()),
-                ),
-                ("request_fulluri", PhpMixed::Bool(true)),
-            ]),
-            "http://***:***@proxy.com:80",
-            false,
-        ),
-        (
-            server.clone(),
-            "https://repo.org",
-            http_options(&[("proxy", PhpMixed::string("ssl://proxy.com:443".to_string()))]),
-            "https://proxy.com:443",
-            false,
-        ),
-        (
-            server.clone(),
-            "https://other.repo.org",
+            vec![],
+            BStr::new("http://repo.org"),
             None,
-            "excluded by no_proxy",
+            BStr::new(""),
+            false,
+        ),
+        (
+            server.clone(),
+            BStr::new("http://repo.org"),
+            http_options(&[
+                (
+                    BStr::new("proxy"),
+                    PhpMixed::string(BString::from("tcp://proxy.com:80")),
+                ),
+                (
+                    BStr::new("header"),
+                    PhpMixed::string(BString::from("Proxy-Authorization: Basic dXNlcjpwQHNz")),
+                ),
+                (BStr::new("request_fulluri"), PhpMixed::Bool(true)),
+            ]),
+            BStr::new("http://***:***@proxy.com:80"),
+            false,
+        ),
+        (
+            server.clone(),
+            BStr::new("https://repo.org"),
+            http_options(&[(
+                BStr::new("proxy"),
+                PhpMixed::string(BString::from("ssl://proxy.com:443")),
+            )]),
+            BStr::new("https://proxy.com:443"),
+            false,
+        ),
+        (
+            server.clone(),
+            BStr::new("https://other.repo.org"),
+            None,
+            BStr::new("excluded by no_proxy"),
             true,
         ),
     ];

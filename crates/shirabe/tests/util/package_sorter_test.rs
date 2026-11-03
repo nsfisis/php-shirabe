@@ -1,43 +1,49 @@
 //! ref: composer/tests/Composer/Test/Util/PackageSorterTest.php
 
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::Link;
 use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
 use shirabe::util::package_sorter::PackageSorter;
+use shirabe_php_shim::bconcat;
 use shirabe_semver::constraint::MatchAllConstraint;
 
-fn create_package(name: &str, requires: &[&str]) -> PackageInterfaceHandle {
-    let package = PackageHandle::new(name.to_string(), "1.0.0.0".to_string(), "1.0.0".to_string());
+fn create_package(name: &BStr, requires: &[&BStr]) -> PackageInterfaceHandle {
+    let package = PackageHandle::new(
+        bconcat!(name),
+        BString::from("1.0.0.0"),
+        BString::from("1.0.0"),
+    );
 
-    let mut links: IndexMap<String, Link> = IndexMap::new();
+    let mut links: IndexMap<BString, Link> = IndexMap::new();
     for require_name in requires {
         links.insert(
-            require_name.to_string(),
+            bconcat!(require_name),
             Link::new(
                 package.get_name(),
-                require_name.to_string(),
+                bconcat!(require_name),
                 MatchAllConstraint::new(None).into(),
                 None,
-                "*".to_string(),
+                BString::from("*"),
             ),
         );
     }
-    package.__set_requires(links);
+    package.__set_requires(links.into_iter().collect::<indexmap::IndexMap<_, _>>());
 
     package.into()
 }
 
-fn names(packages: &[PackageInterfaceHandle]) -> Vec<String> {
+fn names(packages: &[PackageInterfaceHandle]) -> Vec<BString> {
     packages.iter().map(|p| p.get_name()).collect()
 }
 
 #[test]
 fn test_sorting_does_nothing_with_no_dependencies() {
     let packages = vec![
-        create_package("foo/bar1", &[]),
-        create_package("foo/bar2", &[]),
-        create_package("foo/bar3", &[]),
-        create_package("foo/bar4", &[]),
+        create_package(BStr::new("foo/bar1"), &[]),
+        create_package(BStr::new("foo/bar2"), &[]),
+        create_package(BStr::new("foo/bar3"), &[]),
+        create_package(BStr::new("foo/bar4"), &[]),
     ];
 
     let expected = names(&packages);
@@ -48,94 +54,129 @@ fn test_sorting_does_nothing_with_no_dependencies() {
 
 fn sorting_orders_dependencies_higher_than_package_cases() -> Vec<(
     Vec<PackageInterfaceHandle>,
-    Vec<&'static str>,
-    IndexMap<String, i64>,
+    Vec<&'static BStr>,
+    IndexMap<bstr::BString, i64>,
 )> {
     vec![
         // one package is dep
         (
             vec![
-                create_package("foo/bar1", &["foo/bar4"]),
-                create_package("foo/bar2", &["foo/bar4"]),
-                create_package("foo/bar3", &["foo/bar4"]),
-                create_package("foo/bar4", &[]),
+                create_package(BStr::new("foo/bar1"), &[BStr::new("foo/bar4")]),
+                create_package(BStr::new("foo/bar2"), &[BStr::new("foo/bar4")]),
+                create_package(BStr::new("foo/bar3"), &[BStr::new("foo/bar4")]),
+                create_package(BStr::new("foo/bar4"), &[]),
             ],
-            vec!["foo/bar4", "foo/bar1", "foo/bar2", "foo/bar3"],
+            vec![
+                BStr::new("foo/bar4"),
+                BStr::new("foo/bar1"),
+                BStr::new("foo/bar2"),
+                BStr::new("foo/bar3"),
+            ],
             IndexMap::new(),
         ),
         // one package has more deps
         (
             vec![
-                create_package("foo/bar1", &["foo/bar2"]),
-                create_package("foo/bar2", &["foo/bar4"]),
-                create_package("foo/bar3", &["foo/bar4"]),
-                create_package("foo/bar4", &[]),
+                create_package(BStr::new("foo/bar1"), &[BStr::new("foo/bar2")]),
+                create_package(BStr::new("foo/bar2"), &[BStr::new("foo/bar4")]),
+                create_package(BStr::new("foo/bar3"), &[BStr::new("foo/bar4")]),
+                create_package(BStr::new("foo/bar4"), &[]),
             ],
-            vec!["foo/bar4", "foo/bar2", "foo/bar1", "foo/bar3"],
+            vec![
+                BStr::new("foo/bar4"),
+                BStr::new("foo/bar2"),
+                BStr::new("foo/bar1"),
+                BStr::new("foo/bar3"),
+            ],
             IndexMap::new(),
         ),
         // package is required by many, but requires one other
         (
             vec![
-                create_package("foo/bar1", &["foo/bar3"]),
-                create_package("foo/bar2", &["foo/bar3"]),
-                create_package("foo/bar3", &["foo/bar4"]),
-                create_package("foo/bar4", &[]),
-                create_package("foo/bar5", &["foo/bar3"]),
-                create_package("foo/bar6", &["foo/bar3"]),
+                create_package(BStr::new("foo/bar1"), &[BStr::new("foo/bar3")]),
+                create_package(BStr::new("foo/bar2"), &[BStr::new("foo/bar3")]),
+                create_package(BStr::new("foo/bar3"), &[BStr::new("foo/bar4")]),
+                create_package(BStr::new("foo/bar4"), &[]),
+                create_package(BStr::new("foo/bar5"), &[BStr::new("foo/bar3")]),
+                create_package(BStr::new("foo/bar6"), &[BStr::new("foo/bar3")]),
             ],
             vec![
-                "foo/bar4", "foo/bar3", "foo/bar1", "foo/bar2", "foo/bar5", "foo/bar6",
+                BStr::new("foo/bar4"),
+                BStr::new("foo/bar3"),
+                BStr::new("foo/bar1"),
+                BStr::new("foo/bar2"),
+                BStr::new("foo/bar5"),
+                BStr::new("foo/bar6"),
             ],
             IndexMap::new(),
         ),
         // one package has many requires
         (
             vec![
-                create_package("foo/bar1", &["foo/bar2"]),
-                create_package("foo/bar2", &[]),
-                create_package("foo/bar3", &["foo/bar4"]),
-                create_package("foo/bar4", &[]),
-                create_package("foo/bar5", &["foo/bar2"]),
-                create_package("foo/bar6", &["foo/bar2"]),
+                create_package(BStr::new("foo/bar1"), &[BStr::new("foo/bar2")]),
+                create_package(BStr::new("foo/bar2"), &[]),
+                create_package(BStr::new("foo/bar3"), &[BStr::new("foo/bar4")]),
+                create_package(BStr::new("foo/bar4"), &[]),
+                create_package(BStr::new("foo/bar5"), &[BStr::new("foo/bar2")]),
+                create_package(BStr::new("foo/bar6"), &[BStr::new("foo/bar2")]),
             ],
             vec![
-                "foo/bar2", "foo/bar4", "foo/bar1", "foo/bar3", "foo/bar5", "foo/bar6",
+                BStr::new("foo/bar2"),
+                BStr::new("foo/bar4"),
+                BStr::new("foo/bar1"),
+                BStr::new("foo/bar3"),
+                BStr::new("foo/bar5"),
+                BStr::new("foo/bar6"),
             ],
             IndexMap::new(),
         ),
         // circular deps sorted alphabetically if weighted equally
         (
             vec![
-                create_package("foo/bar1", &["circular/part1"]),
-                create_package("foo/bar2", &["circular/part2"]),
-                create_package("circular/part1", &["circular/part2"]),
-                create_package("circular/part2", &["circular/part1"]),
+                create_package(BStr::new("foo/bar1"), &[BStr::new("circular/part1")]),
+                create_package(BStr::new("foo/bar2"), &[BStr::new("circular/part2")]),
+                create_package(BStr::new("circular/part1"), &[BStr::new("circular/part2")]),
+                create_package(BStr::new("circular/part2"), &[BStr::new("circular/part1")]),
             ],
-            vec!["circular/part1", "circular/part2", "foo/bar1", "foo/bar2"],
+            vec![
+                BStr::new("circular/part1"),
+                BStr::new("circular/part2"),
+                BStr::new("foo/bar1"),
+                BStr::new("foo/bar2"),
+            ],
             IndexMap::new(),
         ),
         // equal weight sorted alphabetically
         (
             vec![
-                create_package("foo/bar10", &["foo/dep"]),
-                create_package("foo/bar2", &["foo/dep"]),
-                create_package("foo/baz", &["foo/dep"]),
-                create_package("foo/dep", &[]),
+                create_package(BStr::new("foo/bar10"), &[BStr::new("foo/dep")]),
+                create_package(BStr::new("foo/bar2"), &[BStr::new("foo/dep")]),
+                create_package(BStr::new("foo/baz"), &[BStr::new("foo/dep")]),
+                create_package(BStr::new("foo/dep"), &[]),
             ],
-            vec!["foo/dep", "foo/bar2", "foo/bar10", "foo/baz"],
+            vec![
+                BStr::new("foo/dep"),
+                BStr::new("foo/bar2"),
+                BStr::new("foo/bar10"),
+                BStr::new("foo/baz"),
+            ],
             IndexMap::new(),
         ),
         // pre-weighted packages bumped to top incl their deps
         (
             vec![
-                create_package("foo/bar", &["foo/dep"]),
-                create_package("foo/bar2", &["foo/dep2"]),
-                create_package("foo/dep", &[]),
-                create_package("foo/dep2", &[]),
+                create_package(BStr::new("foo/bar"), &[BStr::new("foo/dep")]),
+                create_package(BStr::new("foo/bar2"), &[BStr::new("foo/dep2")]),
+                create_package(BStr::new("foo/dep"), &[]),
+                create_package(BStr::new("foo/dep2"), &[]),
             ],
-            vec!["foo/dep", "foo/bar", "foo/dep2", "foo/bar2"],
-            IndexMap::from([("foo/bar".to_string(), -1000)]),
+            vec![
+                BStr::new("foo/dep"),
+                BStr::new("foo/bar"),
+                BStr::new("foo/dep2"),
+                BStr::new("foo/bar2"),
+            ],
+            IndexMap::from([(bstr::BString::from("foo/bar"), -1000)]),
         ),
     ]
 }

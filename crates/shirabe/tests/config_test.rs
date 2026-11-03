@@ -1,13 +1,15 @@
 //! ref: composer/tests/Composer/Test/ConfigTest.php
 
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe::advisory::Auditor;
-use shirabe::config::Config;
-use shirabe::io::{IOInterface, io_interface};
-use shirabe::util::Platform;
-use shirabe_php_shim::PhpMixed;
+use shirabe::{
+    advisory::Auditor,
+    config::Config,
+    io::{IOInterface, io_interface},
+    util::Platform,
+};
+use shirabe_php_shim::{PhpMixed, bconcat, error_message, rtrim2};
 
 #[path = "common/io_mock.rs"]
 #[allow(dead_code)] // io_mock exposes more helpers than this binary uses
@@ -15,7 +17,7 @@ mod io_mock;
 use io_mock::{Expectation, get_io_mock};
 
 /// Builds a `['config' => {...}]` map for `Config::merge`.
-fn config_section(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+fn config_section(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     m.insert("config".into(), PhpMixed::Array(map(pairs)));
     m
@@ -29,26 +31,26 @@ fn assert_map_equals(expected: &IndexMap<BString, PhpMixed>, actual: &IndexMap<B
     }
 }
 
-fn repo(r#type: &str, url: &str) -> PhpMixed {
+fn repo(r#type: &BStr, url: &BStr) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
-    m.insert("type".into(), PhpMixed::string(r#type.to_string()));
-    m.insert("url".into(), PhpMixed::string(url.to_string()));
+    m.insert("type".into(), PhpMixed::string(bconcat!(r#type)));
+    m.insert("url".into(), PhpMixed::string(bconcat!(url)));
     PhpMixed::Array(m)
 }
 
-fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
-    pairs
-        .into_iter()
-        .map(|(k, v)| (k.to_string().into(), v))
-        .collect()
+fn map(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+    pairs.into_iter().map(|(k, v)| (bconcat!(k), v)).collect()
 }
 
-fn disable(name: &str) -> PhpMixed {
+fn disable(name: &BStr) -> PhpMixed {
     PhpMixed::Array(map(vec![(name, PhpMixed::Bool(false))]))
 }
 
 fn packagist() -> PhpMixed {
-    repo("composer", "https://repo.packagist.org")
+    repo(
+        BStr::new("composer"),
+        BStr::new("https://repo.packagist.org"),
+    )
 }
 
 struct Case {
@@ -62,105 +64,165 @@ fn data_add_packagist_repository() -> Vec<Case> {
     vec![
         // local config inherits system defaults
         Case {
-            expected: map(vec![("packagist.org", packagist())]),
+            expected: map(vec![(BStr::new("packagist.org"), packagist())]),
             local: map(vec![]),
             system: None,
         },
         // local config can disable system config by name
         Case {
             expected: map(vec![]),
-            local: map(vec![("0", disable("packagist.org"))]),
+            local: map(vec![(BStr::new("0"), disable(BStr::new("packagist.org")))]),
             system: None,
         },
         // local config can disable system config by name bc
         Case {
             expected: map(vec![]),
-            local: map(vec![("0", disable("packagist"))]),
+            local: map(vec![(BStr::new("0"), disable(BStr::new("packagist")))]),
             system: None,
         },
         // local config adds above defaults
         Case {
             expected: map(vec![
-                ("0", repo("vcs", "git://github.com/composer/composer.git")),
-                ("1", repo("pear", "http://pear.composer.org")),
-                ("packagist.org", packagist()),
+                (
+                    BStr::new("0"),
+                    repo(
+                        BStr::new("vcs"),
+                        BStr::new("git://github.com/composer/composer.git"),
+                    ),
+                ),
+                (
+                    BStr::new("1"),
+                    repo(BStr::new("pear"), BStr::new("http://pear.composer.org")),
+                ),
+                (BStr::new("packagist.org"), packagist()),
             ]),
             local: map(vec![
-                ("0", repo("vcs", "git://github.com/composer/composer.git")),
-                ("1", repo("pear", "http://pear.composer.org")),
+                (
+                    BStr::new("0"),
+                    repo(
+                        BStr::new("vcs"),
+                        BStr::new("git://github.com/composer/composer.git"),
+                    ),
+                ),
+                (
+                    BStr::new("1"),
+                    repo(BStr::new("pear"), BStr::new("http://pear.composer.org")),
+                ),
             ]),
             system: None,
         },
         // system config adds above core defaults
         Case {
             expected: map(vec![
-                ("example.com", repo("composer", "http://example.com")),
-                ("packagist.org", packagist()),
+                (
+                    BStr::new("example.com"),
+                    repo(BStr::new("composer"), BStr::new("http://example.com")),
+                ),
+                (BStr::new("packagist.org"), packagist()),
             ]),
             local: map(vec![]),
             system: Some(map(vec![(
-                "example.com",
-                repo("composer", "http://example.com"),
+                BStr::new("example.com"),
+                repo(BStr::new("composer"), BStr::new("http://example.com")),
             )])),
         },
         // local config can disable repos by name and re-add them anonymously to bring them above system config
         Case {
             expected: map(vec![
-                ("1", repo("composer", "http://packagist.org")),
-                ("example.com", repo("composer", "http://example.com")),
+                (
+                    BStr::new("1"),
+                    repo(BStr::new("composer"), BStr::new("http://packagist.org")),
+                ),
+                (
+                    BStr::new("example.com"),
+                    repo(BStr::new("composer"), BStr::new("http://example.com")),
+                ),
             ]),
             local: map(vec![
-                ("0", disable("packagist.org")),
-                ("1", repo("composer", "http://packagist.org")),
+                (BStr::new("0"), disable(BStr::new("packagist.org"))),
+                (
+                    BStr::new("1"),
+                    repo(BStr::new("composer"), BStr::new("http://packagist.org")),
+                ),
             ]),
             system: Some(map(vec![(
-                "example.com",
-                repo("composer", "http://example.com"),
+                BStr::new("example.com"),
+                repo(BStr::new("composer"), BStr::new("http://example.com")),
             )])),
         },
         // local config can override by name to bring a repo above system config
         Case {
             expected: map(vec![
-                ("packagist.org", repo("composer", "http://packagistnew.org")),
-                ("example.com", repo("composer", "http://example.com")),
+                (
+                    BStr::new("packagist.org"),
+                    repo(BStr::new("composer"), BStr::new("http://packagistnew.org")),
+                ),
+                (
+                    BStr::new("example.com"),
+                    repo(BStr::new("composer"), BStr::new("http://example.com")),
+                ),
             ]),
             local: map(vec![(
-                "packagist.org",
-                repo("composer", "http://packagistnew.org"),
+                BStr::new("packagist.org"),
+                repo(BStr::new("composer"), BStr::new("http://packagistnew.org")),
             )]),
             system: Some(map(vec![(
-                "example.com",
-                repo("composer", "http://example.com"),
+                BStr::new("example.com"),
+                repo(BStr::new("composer"), BStr::new("http://example.com")),
             )])),
         },
         // local config redefining packagist.org by URL override it if no named keys are used
         Case {
-            expected: map(vec![("0", repo("composer", "https://repo.packagist.org"))]),
-            local: map(vec![("0", repo("composer", "https://repo.packagist.org"))]),
+            expected: map(vec![(
+                BStr::new("0"),
+                repo(
+                    BStr::new("composer"),
+                    BStr::new("https://repo.packagist.org"),
+                ),
+            )]),
+            local: map(vec![(
+                BStr::new("0"),
+                repo(
+                    BStr::new("composer"),
+                    BStr::new("https://repo.packagist.org"),
+                ),
+            )]),
             system: None,
         },
         // local config redefining packagist.org by URL override it also with named keys
         Case {
             expected: map(vec![(
-                "example",
-                repo("composer", "https://repo.packagist.org"),
+                BStr::new("example"),
+                repo(
+                    BStr::new("composer"),
+                    BStr::new("https://repo.packagist.org"),
+                ),
             )]),
             local: map(vec![(
-                "example",
-                repo("composer", "https://repo.packagist.org"),
+                BStr::new("example"),
+                repo(
+                    BStr::new("composer"),
+                    BStr::new("https://repo.packagist.org"),
+                ),
             )]),
             system: None,
         },
         // incorrect local config does not cause ErrorException
         Case {
             expected: map(vec![
-                ("packagist.org", packagist()),
-                ("type", PhpMixed::string("vcs".to_string())),
-                ("url", PhpMixed::string("http://example.com".to_string())),
+                (BStr::new("packagist.org"), packagist()),
+                (BStr::new("type"), PhpMixed::string(BString::from("vcs"))),
+                (
+                    BStr::new("url"),
+                    PhpMixed::string(BString::from("http://example.com")),
+                ),
             ]),
             local: map(vec![
-                ("type", PhpMixed::string("vcs".to_string())),
-                ("url", PhpMixed::string("http://example.com".to_string())),
+                (BStr::new("type"), PhpMixed::string(BString::from("vcs"))),
+                (
+                    BStr::new("url"),
+                    PhpMixed::string(BString::from("http://example.com")),
+                ),
             ]),
             system: None,
         },
@@ -199,21 +261,21 @@ fn test_preferred_install_as_string() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
-            "preferred-install",
-            PhpMixed::string("source".to_string()),
+            BStr::new("preferred-install"),
+            PhpMixed::string(BString::from("source")),
         )]),
         "test",
     );
     config.merge(
         &config_section(vec![(
-            "preferred-install",
-            PhpMixed::string("dist".to_string()),
+            BStr::new("preferred-install"),
+            PhpMixed::string(BString::from("dist")),
         )]),
         "test",
     );
 
     assert_eq!(
-        PhpMixed::string("dist".to_string()),
+        PhpMixed::string(BString::from("dist")),
         config.get("preferred-install")
     );
 }
@@ -223,15 +285,18 @@ fn test_merge_preferred_install() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
-            "preferred-install",
-            PhpMixed::string("dist".to_string()),
+            BStr::new("preferred-install"),
+            PhpMixed::string(BString::from("dist")),
         )]),
         "test",
     );
     config.merge(
         &config_section(vec![(
-            "preferred-install",
-            PhpMixed::Array(map(vec![("foo/*", PhpMixed::string("source".to_string()))])),
+            BStr::new("preferred-install"),
+            PhpMixed::Array(map(vec![(
+                BStr::new("foo/*"),
+                PhpMixed::string(BString::from("source")),
+            )])),
         )]),
         "test",
     );
@@ -240,8 +305,11 @@ fn test_merge_preferred_install() {
     // Handled by composer because we convert string preferences for BC, all other
     // care for ordering and collision prevention is up to the user
     let expected = map(vec![
-        ("foo/*", PhpMixed::string("source".to_string())),
-        ("*", PhpMixed::string("dist".to_string())),
+        (
+            BStr::new("foo/*"),
+            PhpMixed::string(BString::from("source")),
+        ),
+        (BStr::new("*"), PhpMixed::string(BString::from("dist"))),
     ]);
     match config.get("preferred-install") {
         PhpMixed::Array(actual) => assert_map_equals(&expected, &actual),
@@ -254,22 +322,28 @@ fn test_merge_github_oauth() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
-            "github-oauth",
-            PhpMixed::Array(map(vec![("foo", PhpMixed::string("bar".to_string()))])),
+            BStr::new("github-oauth"),
+            PhpMixed::Array(map(vec![(
+                BStr::new("foo"),
+                PhpMixed::string(BString::from("bar")),
+            )])),
         )]),
         "test",
     );
     config.merge(
         &config_section(vec![(
-            "github-oauth",
-            PhpMixed::Array(map(vec![("bar", PhpMixed::string("baz".to_string()))])),
+            BStr::new("github-oauth"),
+            PhpMixed::Array(map(vec![(
+                BStr::new("bar"),
+                PhpMixed::string(BString::from("baz")),
+            )])),
         )]),
         "test",
     );
 
     let expected = map(vec![
-        ("foo", PhpMixed::string("bar".to_string())),
-        ("bar", PhpMixed::string("baz".to_string())),
+        (BStr::new("foo"), PhpMixed::string(BString::from("bar"))),
+        (BStr::new("bar"), PhpMixed::string(BString::from("baz"))),
     ]);
     match config.get("github-oauth") {
         PhpMixed::Array(actual) => assert_map_equals(&expected, &actual),
@@ -282,15 +356,21 @@ fn test_var_replacement() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![
-            ("a", PhpMixed::string("b".to_string())),
-            ("c", PhpMixed::string("{$a}".to_string())),
+            (BStr::new("a"), PhpMixed::string(BString::from("b"))),
+            (BStr::new("c"), PhpMixed::string(BString::from("{$a}"))),
         ]),
         "test",
     );
     config.merge(
         &config_section(vec![
-            ("bin-dir", PhpMixed::string("$HOME".to_string())),
-            ("cache-dir", PhpMixed::string("~/foo/".to_string())),
+            (
+                BStr::new("bin-dir"),
+                PhpMixed::string(BString::from("$HOME")),
+            ),
+            (
+                BStr::new("cache-dir"),
+                PhpMixed::string(BString::from("~/foo/")),
+            ),
         ]),
         "test",
     );
@@ -299,23 +379,32 @@ fn test_var_replacement() {
         .filter(|s| !s.is_empty())
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
-    let home = home_raw.trim_end_matches(['\\', '/']).to_string();
-    assert_eq!(PhpMixed::string("b".to_string()), config.get("c"));
+    let home = rtrim2(&home_raw, "\\/");
+    assert_eq!(PhpMixed::string(BString::from("b")), config.get("c"));
     assert_eq!(PhpMixed::string(home.clone()), config.get("bin-dir"));
     assert_eq!(
-        PhpMixed::string(format!("{}/foo", home)),
+        PhpMixed::string(shirabe_php_shim::bconcat!(home, "/foo")),
         config.get("cache-dir")
     );
 }
 
 #[test]
 fn test_realpath_replacement() {
-    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    let mut config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![
-            ("bin-dir", PhpMixed::string("$HOME/foo".to_string())),
-            ("cache-dir", PhpMixed::string("/baz/".to_string())),
-            ("vendor-dir", PhpMixed::string("vendor".to_string())),
+            (
+                BStr::new("bin-dir"),
+                PhpMixed::string(BString::from("$HOME/foo")),
+            ),
+            (
+                BStr::new("cache-dir"),
+                PhpMixed::string(BString::from("/baz/")),
+            ),
+            (
+                BStr::new("vendor-dir"),
+                PhpMixed::string(BString::from("vendor")),
+            ),
         ]),
         "test",
     );
@@ -324,65 +413,71 @@ fn test_realpath_replacement() {
         .filter(|s| !s.is_empty())
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
-    let home = home_raw.trim_end_matches(['\\', '/']).to_string();
+    let home = rtrim2(&home_raw, "\\/");
     assert_eq!(
-        PhpMixed::string("/foo/bar/vendor".to_string()),
+        PhpMixed::string(BString::from("/foo/bar/vendor")),
         config.get("vendor-dir")
     );
     assert_eq!(
-        PhpMixed::string(format!("{}/foo", home)),
+        PhpMixed::string(shirabe_php_shim::bconcat!(home, "/foo")),
         config.get("bin-dir")
     );
     assert_eq!(
-        PhpMixed::string("/baz".to_string()),
+        PhpMixed::string(BString::from("/baz")),
         config.get("cache-dir")
     );
 }
 
 #[test]
 fn test_stream_wrapper_dirs() {
-    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    let mut config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![(
-            "cache-dir",
-            PhpMixed::string("s3://baz/".to_string()),
+            BStr::new("cache-dir"),
+            PhpMixed::string(BString::from("s3://baz/")),
         )]),
         "test",
     );
 
     assert_eq!(
-        PhpMixed::string("s3://baz".to_string()),
+        PhpMixed::string(BString::from("s3://baz")),
         config.get("cache-dir")
     );
 }
 
 #[test]
 fn test_fetching_relative_paths() {
-    let mut config = Config::new(false, Some("/foo/bar".to_string()));
+    let mut config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![
-            ("bin-dir", PhpMixed::string("{$vendor-dir}/foo".to_string())),
-            ("vendor-dir", PhpMixed::string("vendor".to_string())),
+            (
+                BStr::new("bin-dir"),
+                PhpMixed::string(BString::from("{$vendor-dir}/foo")),
+            ),
+            (
+                BStr::new("vendor-dir"),
+                PhpMixed::string(BString::from("vendor")),
+            ),
         ]),
         "test",
     );
 
     assert_eq!(
-        PhpMixed::string("/foo/bar/vendor".to_string()),
+        PhpMixed::string(BString::from("/foo/bar/vendor")),
         config.get("vendor-dir")
     );
     assert_eq!(
-        PhpMixed::string("/foo/bar/vendor/foo".to_string()),
+        PhpMixed::string(BString::from("/foo/bar/vendor/foo")),
         config.get("bin-dir")
     );
     assert_eq!(
-        PhpMixed::string("vendor".to_string()),
+        PhpMixed::string(BString::from("vendor")),
         config
             .get_with_flags("vendor-dir", Config::RELATIVE_PATHS)
             .unwrap()
     );
     assert_eq!(
-        PhpMixed::string("vendor/foo".to_string()),
+        PhpMixed::string(BString::from("vendor/foo")),
         config
             .get_with_flags("bin-dir", Config::RELATIVE_PATHS)
             .unwrap()
@@ -394,24 +489,24 @@ fn test_override_github_protocols() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
-            "github-protocols",
+            BStr::new("github-protocols"),
             PhpMixed::List(vec![
-                PhpMixed::string("https".to_string()),
-                PhpMixed::string("ssh".to_string()),
+                PhpMixed::string(BString::from("https")),
+                PhpMixed::string(BString::from("ssh")),
             ]),
         )]),
         "test",
     );
     config.merge(
         &config_section(vec![(
-            "github-protocols",
-            PhpMixed::List(vec![PhpMixed::string("https".to_string())]),
+            BStr::new("github-protocols"),
+            PhpMixed::List(vec![PhpMixed::string(BString::from("https"))]),
         )]),
         "test",
     );
 
     assert_eq!(
-        PhpMixed::List(vec![PhpMixed::string("https".to_string())]),
+        PhpMixed::List(vec![PhpMixed::string(BString::from("https"))]),
         config.get("github-protocols")
     );
 }
@@ -421,27 +516,27 @@ fn test_git_disabled_by_default_in_github_protocols() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
-            "github-protocols",
+            BStr::new("github-protocols"),
             PhpMixed::List(vec![
-                PhpMixed::string("https".to_string()),
-                PhpMixed::string("git".to_string()),
+                PhpMixed::string(BString::from("https")),
+                PhpMixed::string(BString::from("git")),
             ]),
         )]),
         "test",
     );
     assert_eq!(
-        PhpMixed::List(vec![PhpMixed::string("https".to_string())]),
+        PhpMixed::List(vec![PhpMixed::string(BString::from("https"))]),
         config.get("github-protocols")
     );
 
     config.merge(
-        &config_section(vec![("secure-http", PhpMixed::Bool(false))]),
+        &config_section(vec![(BStr::new("secure-http"), PhpMixed::Bool(false))]),
         "test",
     );
     assert_eq!(
         PhpMixed::List(vec![
-            PhpMixed::string("https".to_string()),
-            PhpMixed::string("git".to_string()),
+            PhpMixed::string(BString::from("https")),
+            PhpMixed::string(BString::from("git")),
         ]),
         config.get("github-protocols")
     );
@@ -463,7 +558,7 @@ fn test_allowed_urls_pass() {
     for url in urls {
         let mut config = Config::new(false, None);
         config
-            .prohibit_url_by_config(url, None, &IndexMap::new())
+            .prohibit_url_by_config(url.into(), None, &IndexMap::new())
             .unwrap();
     }
 }
@@ -484,11 +579,12 @@ fn test_prohibited_urls_throw_exception() {
     for url in urls {
         let mut config = Config::new(false, None);
         let err = config
-            .prohibit_url_by_config(url, None, &IndexMap::new())
+            .prohibit_url_by_config(url.into(), None, &IndexMap::new())
             .unwrap_err();
         assert!(
-            err.to_string().contains(&format!(
-                "Your configuration does not allow connections to {url}"
+            error_message(&err).contains_str(bconcat!(
+                "Your configuration does not allow connections to ",
+                url
             )),
             "url {url:?}: {err}"
         );
@@ -514,12 +610,12 @@ fn test_prohibited_urls_warning_verify_peer() {
     repo_options.insert(
         "ssl".into(),
         PhpMixed::Array(map(vec![
-            ("verify_peer", PhpMixed::Bool(false)),
-            ("verify_peer_name", PhpMixed::Bool(false)),
+            (BStr::new("verify_peer"), PhpMixed::Bool(false)),
+            (BStr::new("verify_peer_name"), PhpMixed::Bool(false)),
         ])),
     );
     config
-        .prohibit_url_by_config("https://example.org", Some(io), &repo_options)
+        .prohibit_url_by_config("https://example.org".into(), Some(io), &repo_options)
         .unwrap();
 }
 
@@ -527,12 +623,18 @@ fn test_prohibited_urls_warning_verify_peer() {
 fn test_disable_tls_can_be_overridden() {
     let mut config = Config::new(true, None);
     config.merge(
-        &config_section(vec![("disable-tls", PhpMixed::string("false".to_string()))]),
+        &config_section(vec![(
+            BStr::new("disable-tls"),
+            PhpMixed::string(BString::from("false")),
+        )]),
         "test",
     );
     assert_eq!(PhpMixed::Bool(false), config.get("disable-tls"));
     config.merge(
-        &config_section(vec![("disable-tls", PhpMixed::string("true".to_string()))]),
+        &config_section(vec![(
+            BStr::new("disable-tls"),
+            PhpMixed::string(BString::from("true")),
+        )]),
         "test",
     );
     assert_eq!(PhpMixed::Bool(true), config.get("disable-tls"));
@@ -569,17 +671,17 @@ fn test_get_source_of_value() {
 
     assert_eq!(
         Config::SOURCE_DEFAULT,
-        config.get_source_of_value("process-timeout").as_str()
+        config.get_source_of_value("process-timeout")
     );
 
     config.merge(
-        &config_section(vec![("process-timeout", PhpMixed::Int(1))]),
+        &config_section(vec![(BStr::new("process-timeout"), PhpMixed::Int(1))]),
         "phpunit-test",
     );
 
     assert_eq!(
         "phpunit-test",
-        config.get_source_of_value("process-timeout").as_str()
+        config.get_source_of_value("process-timeout")
     );
 }
 
@@ -591,7 +693,7 @@ fn test_get_source_of_value_env_variables() {
     let result = config.get_source_of_value("htaccess-protect");
     Platform::clear_env("COMPOSER_HTACCESS_PROTECT");
 
-    assert_eq!("COMPOSER_HTACCESS_PROTECT", result.as_str());
+    assert_eq!("COMPOSER_HTACCESS_PROTECT", result);
 }
 
 #[test]
@@ -603,7 +705,7 @@ fn test_audit() {
     assert!(result.contains_key(B("abandoned")));
     assert!(result.contains_key(B("ignore")));
     assert_eq!(
-        Some(&PhpMixed::string(Auditor::ABANDONED_FAIL.to_string())),
+        Some(&PhpMixed::string(Auditor::ABANDONED_FAIL.to_owned())),
         result.get(B("abandoned"))
     );
     assert_eq!(
@@ -618,7 +720,7 @@ fn test_audit() {
     assert!(result.contains_key(B("abandoned")));
     assert!(result.contains_key(B("ignore")));
     assert_eq!(
-        Some(&PhpMixed::string(Auditor::ABANDONED_IGNORE.to_string())),
+        Some(&PhpMixed::string(Auditor::ABANDONED_IGNORE.to_owned())),
         result.get(B("abandoned"))
     );
     assert_eq!(
@@ -628,12 +730,12 @@ fn test_audit() {
 
     config.merge(
         &config_section(vec![(
-            "audit",
+            BStr::new("audit"),
             PhpMixed::Array(map(vec![(
-                "ignore",
+                BStr::new("ignore"),
                 PhpMixed::List(vec![
-                    PhpMixed::string("A".to_string()),
-                    PhpMixed::string("B".to_string()),
+                    PhpMixed::string(BString::from("A")),
+                    PhpMixed::string(BString::from("B")),
                 ]),
             )])),
         )]),
@@ -641,12 +743,12 @@ fn test_audit() {
     );
     config.merge(
         &config_section(vec![(
-            "audit",
+            BStr::new("audit"),
             PhpMixed::Array(map(vec![(
-                "ignore",
+                BStr::new("ignore"),
                 PhpMixed::List(vec![
-                    PhpMixed::string("A".to_string()),
-                    PhpMixed::string("C".to_string()),
+                    PhpMixed::string(BString::from("A")),
+                    PhpMixed::string(BString::from("C")),
                 ]),
             )])),
         )]),
@@ -657,10 +759,10 @@ fn test_audit() {
     assert!(result.contains_key(B("ignore")));
     assert_eq!(
         Some(&PhpMixed::List(vec![
-            PhpMixed::string("A".to_string()),
-            PhpMixed::string("B".to_string()),
-            PhpMixed::string("A".to_string()),
-            PhpMixed::string("C".to_string()),
+            PhpMixed::string(BString::from("A")),
+            PhpMixed::string(BString::from("B")),
+            PhpMixed::string(BString::from("A")),
+            PhpMixed::string(BString::from("C")),
         ])),
         result.get(B("ignore"))
     );
@@ -713,30 +815,34 @@ fn test_merges_plugin_config() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
-            "allow-plugins",
-            PhpMixed::Array(map(vec![("some/plugin", PhpMixed::Bool(true))])),
+            BStr::new("allow-plugins"),
+            PhpMixed::Array(map(vec![(BStr::new("some/plugin"), PhpMixed::Bool(true))])),
         )]),
         "test",
     );
     match config.get("allow-plugins") {
-        PhpMixed::Array(actual) => {
-            assert_map_equals(&map(vec![("some/plugin", PhpMixed::Bool(true))]), &actual)
-        }
+        PhpMixed::Array(actual) => assert_map_equals(
+            &map(vec![(BStr::new("some/plugin"), PhpMixed::Bool(true))]),
+            &actual,
+        ),
         other => panic!("expected array, got {other:?}"),
     }
 
     config.merge(
         &config_section(vec![(
-            "allow-plugins",
-            PhpMixed::Array(map(vec![("another/plugin", PhpMixed::Bool(true))])),
+            BStr::new("allow-plugins"),
+            PhpMixed::Array(map(vec![(
+                BStr::new("another/plugin"),
+                PhpMixed::Bool(true),
+            )])),
         )]),
         "test",
     );
     match config.get("allow-plugins") {
         PhpMixed::Array(actual) => assert_map_equals(
             &map(vec![
-                ("some/plugin", PhpMixed::Bool(true)),
-                ("another/plugin", PhpMixed::Bool(true)),
+                (BStr::new("some/plugin"), PhpMixed::Bool(true)),
+                (BStr::new("another/plugin"), PhpMixed::Bool(true)),
             ]),
             &actual,
         ),
@@ -748,21 +854,24 @@ fn test_merges_plugin_config() {
 fn test_overrides_global_boolean_plugins_config() {
     let mut config = Config::new(false, None);
     config.merge(
-        &config_section(vec![("allow-plugins", PhpMixed::Bool(true))]),
+        &config_section(vec![(BStr::new("allow-plugins"), PhpMixed::Bool(true))]),
         "test",
     );
     assert_eq!(PhpMixed::Bool(true), config.get("allow-plugins"));
 
     config.merge(
         &config_section(vec![(
-            "allow-plugins",
-            PhpMixed::Array(map(vec![("another/plugin", PhpMixed::Bool(true))])),
+            BStr::new("allow-plugins"),
+            PhpMixed::Array(map(vec![(
+                BStr::new("another/plugin"),
+                PhpMixed::Bool(true),
+            )])),
         )]),
         "test",
     );
     match config.get("allow-plugins") {
         PhpMixed::Array(actual) => assert_map_equals(
-            &map(vec![("another/plugin", PhpMixed::Bool(true))]),
+            &map(vec![(BStr::new("another/plugin"), PhpMixed::Bool(true))]),
             &actual,
         ),
         other => panic!("expected array, got {other:?}"),
@@ -774,20 +883,21 @@ fn test_allows_all_plugins_from_local_boolean() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
-            "allow-plugins",
-            PhpMixed::Array(map(vec![("some/plugin", PhpMixed::Bool(true))])),
+            BStr::new("allow-plugins"),
+            PhpMixed::Array(map(vec![(BStr::new("some/plugin"), PhpMixed::Bool(true))])),
         )]),
         "test",
     );
     match config.get("allow-plugins") {
-        PhpMixed::Array(actual) => {
-            assert_map_equals(&map(vec![("some/plugin", PhpMixed::Bool(true))]), &actual)
-        }
+        PhpMixed::Array(actual) => assert_map_equals(
+            &map(vec![(BStr::new("some/plugin"), PhpMixed::Bool(true))]),
+            &actual,
+        ),
         other => panic!("expected array, got {other:?}"),
     }
 
     config.merge(
-        &config_section(vec![("allow-plugins", PhpMixed::Bool(true))]),
+        &config_section(vec![(BStr::new("allow-plugins"), PhpMixed::Bool(true))]),
         "test",
     );
     assert_eq!(PhpMixed::Bool(true), config.get("allow-plugins"));

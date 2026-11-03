@@ -1,16 +1,19 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchiverInterface.php
 
+use bstr::{BStr, BString};
+use std::path::{Path, PathBuf};
+
 pub trait ArchiverInterface {
     fn archive(
         &self,
-        sources: String,
-        target: String,
-        format: String,
-        excludes: Vec<String>,
+        sources: &Path,
+        target: &Path,
+        format: &BStr,
+        excludes: Vec<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<String>;
+    ) -> anyhow::Result<PathBuf>;
 
-    fn supports(&self, format: String, source_type: Option<String>) -> bool;
+    fn supports(&self, format: &BStr, source_type: Option<&BStr>) -> bool;
 
     /// PHP `$archiver instanceof X` checks; allow downcasting from `dyn ArchiverInterface`.
     fn as_any(&self) -> &dyn std::any::Any;

@@ -6,11 +6,13 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::IOInterfaceImmutable;
-use shirabe_php_shim::{impl_php_class, realpath};
+use crate::io::IOInterfaceWrite;
+use bstr::BStr;
+use shirabe_php_shim::{bconcat, impl_php_class, path_from_bytes, realpath};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {
@@ -40,9 +42,9 @@ impl ClearCacheCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ClearCacheCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("clear-cache")?;
-        self.set_aliases(vec!["clearcache".to_string(), "cc".to_string()])?;
-        self.set_description("Clears composer's internal package cache");
+        self.set_name("clear-cache".into())?;
+        self.set_aliases(vec!["clearcache".into(), "cc".into()])?;
+        self.set_description("Clears composer's internal package cache".into());
         self.set_definition(&[InputOption::new(
             "gc",
             None,
@@ -55,7 +57,8 @@ impl Command for ClearCacheCommand {
         self.set_help(
             "The <info>clear-cache</info> deletes all cached packages from composer's\n\
             cache directory.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#clear-cache-clearcache-cc",
+            Read more at https://getcomposer.org/doc/03-cli.md#clear-cache-clearcache-cc"
+                .into(),
         );
         Ok(())
     }
@@ -83,40 +86,18 @@ impl Command for ClearCacheCommand {
 
         let gc = input.borrow().get_option("gc")?.as_bool().unwrap_or(false);
 
-        let cache_paths: [(&str, String); 4] = [
+        let cache_paths: [(&BStr, PathBuf); 4] = [
+            BStr::new("cache-vcs-dir"),
+            BStr::new("cache-repo-dir"),
+            BStr::new("cache-files-dir"),
+            BStr::new("cache-dir"),
+        ]
+        .map(|key| {
             (
-                "cache-vcs-dir",
-                config
-                    .get("cache-vcs-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
-            ),
-            (
-                "cache-repo-dir",
-                config
-                    .get("cache-repo-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
-            ),
-            (
-                "cache-files-dir",
-                config
-                    .get("cache-files-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
-            ),
-            (
-                "cache-dir",
-                config
-                    .get("cache-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
-            ),
-        ];
+                key,
+                path_from_bytes(config.get(key).as_string().unwrap_or_default()).to_path_buf(),
+            )
+        });
 
         for (key, cache_path) in cache_paths {
             // only individual dirs get garbage collected
@@ -127,8 +108,12 @@ impl Command for ClearCacheCommand {
             let cache_path = match realpath(&cache_path) {
                 Some(path) => path,
                 None => {
-                    io.write_error(&format!(
-                        "<info>Cache directory does not exist ({key}): {cache_path}</info>"
+                    io.write_error(bconcat!(
+                        "<info>Cache directory does not exist (",
+                        key,
+                        "): ",
+                        cache_path,
+                        "</info>"
                     ));
                     continue;
                 }
@@ -136,15 +121,23 @@ impl Command for ClearCacheCommand {
             let mut cache = Cache::new(io.clone(), &cache_path, None, None, false);
             cache.set_read_only(config.get("cache-read-only").as_bool().unwrap_or(false));
             if !cache.is_enabled() {
-                io.write_error(&format!(
-                    "<info>Cache is not enabled ({key}): {cache_path}</info>"
+                io.write_error(bconcat!(
+                    "<info>Cache is not enabled (",
+                    key,
+                    "): ",
+                    cache_path,
+                    "</info>"
                 ));
                 continue;
             }
 
             if gc {
-                io.write_error(&format!(
-                    "<info>Garbage-collecting cache ({key}): {cache_path}</info>"
+                io.write_error(bconcat!(
+                    "<info>Garbage-collecting cache (",
+                    key,
+                    "): ",
+                    cache_path,
+                    "</info>"
                 ));
                 if key == "cache-files-dir" {
                     cache.gc(
@@ -160,8 +153,12 @@ impl Command for ClearCacheCommand {
                     cache.gc_vcs_cache(config.get("cache-ttl").as_int().unwrap_or(0));
                 }
             } else {
-                io.write_error(&format!(
-                    "<info>Clearing cache ({key}): {cache_path}</info>"
+                io.write_error(bconcat!(
+                    "<info>Clearing cache (",
+                    key,
+                    "): ",
+                    cache_path,
+                    "</info>"
                 ));
                 cache.clear();
             }

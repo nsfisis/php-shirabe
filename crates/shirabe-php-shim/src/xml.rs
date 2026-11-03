@@ -1,5 +1,6 @@
 //! Minimal, PHP-compatible subset of the DOM classes.
 
+use bstr::{BStr, BString};
 use std::rc::Weak;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -13,16 +14,16 @@ enum NodeType {
 struct NodeInner {
     node_type: NodeType,
     /// Tag name for elements; unused otherwise.
-    name: String,
+    name: BString,
     /// Ordered attributes for elements (matches setAttribute insertion order).
-    attributes: Vec<(String, String)>,
+    attributes: Vec<(BString, BString)>,
     /// Character data for text nodes.
-    value: String,
+    value: BString,
     children: Vec<std::rc::Rc<std::cell::RefCell<NodeInner>>>,
     owner_document: Weak<std::cell::RefCell<NodeInner>>,
     /// Document-only fields.
-    version: String,
-    encoding: String,
+    version: BString,
+    encoding: BString,
     format_output: bool,
 }
 
@@ -39,16 +40,18 @@ pub struct DOMNode(std::rc::Rc<std::cell::RefCell<NodeInner>>);
 pub struct DOMNodeList(Vec<DOMNode>);
 
 impl DOMDocument {
-    pub fn new(version: &str, encoding: &str) -> DOMDocument {
+    pub fn new(version: impl AsRef<[u8]>, encoding: impl AsRef<[u8]>) -> DOMDocument {
+        let version = BStr::new(version.as_ref());
+        let encoding = BStr::new(encoding.as_ref());
         DOMDocument(std::rc::Rc::new(std::cell::RefCell::new(NodeInner {
             node_type: NodeType::Document,
-            name: String::new(),
+            name: BString::default(),
             attributes: Vec::new(),
-            value: String::new(),
+            value: BString::default(),
             children: Vec::new(),
             owner_document: Weak::new(),
-            version: version.to_string(),
-            encoding: encoding.to_string(),
+            version: BString::from(version),
+            encoding: BString::from(encoding),
             format_output: false,
         })))
     }
@@ -58,37 +61,43 @@ impl DOMDocument {
         DOMNode(self.0.clone())
     }
 
-    pub fn create_element(&self, name: &str) -> DOMNode {
+    pub fn create_element(&self, name: impl AsRef<[u8]>) -> DOMNode {
+        let name = BStr::new(name.as_ref());
         DOMNode(std::rc::Rc::new(std::cell::RefCell::new(NodeInner {
             node_type: NodeType::Element,
-            name: name.to_string(),
+            name: BString::from(name),
             attributes: Vec::new(),
-            value: String::new(),
+            value: BString::default(),
             children: Vec::new(),
             owner_document: std::rc::Rc::downgrade(&self.0),
-            version: String::new(),
-            encoding: String::new(),
+            version: BString::default(),
+            encoding: BString::default(),
             format_output: false,
         })))
     }
 
-    pub fn create_element_with_value(&self, name: &str, value: &str) -> DOMNode {
+    pub fn create_element_with_value(
+        &self,
+        name: impl AsRef<[u8]>,
+        value: impl AsRef<[u8]>,
+    ) -> DOMNode {
+        let name = BStr::new(name.as_ref());
         let element = self.create_element(name);
         let text = self.create_text_node(value);
         element.0.borrow_mut().children.push(text.0);
         element
     }
 
-    pub fn create_text_node(&self, data: &str) -> DOMNode {
+    pub fn create_text_node(&self, data: impl AsRef<[u8]>) -> DOMNode {
         DOMNode(std::rc::Rc::new(std::cell::RefCell::new(NodeInner {
             node_type: NodeType::Text,
-            name: String::new(),
+            name: BString::default(),
             attributes: Vec::new(),
-            value: data.to_string(),
+            value: BString::from(data.as_ref()),
             children: Vec::new(),
             owner_document: std::rc::Rc::downgrade(&self.0),
-            version: String::new(),
-            encoding: String::new(),
+            version: BString::default(),
+            encoding: BString::default(),
             format_output: false,
         })))
     }
@@ -103,7 +112,8 @@ impl DOMDocument {
         DOMNode(deep_clone(&node.0, &std::rc::Rc::downgrade(&self.0), deep))
     }
 
-    pub fn get_elements_by_tag_name(&self, name: &str) -> DOMNodeList {
+    pub fn get_elements_by_tag_name(&self, name: impl AsRef<[u8]>) -> DOMNodeList {
+        let name = BStr::new(name.as_ref());
         let mut out = Vec::new();
         collect_by_tag(&self.0, name, &mut out);
         DOMNodeList(out.into_iter().map(DOMNode).collect())
@@ -116,11 +126,13 @@ impl DOMDocument {
 
     pub fn save_xml<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let doc = self.0.borrow();
-        writeln!(
-            writer,
-            "<?xml version=\"{}\" encoding=\"{}\"?>",
-            doc.version, doc.encoding
-        )?;
+        writer.write_all(&crate::bconcat!(
+            "<?xml version=\"",
+            doc.version,
+            "\" encoding=\"",
+            doc.encoding,
+            "\"?>\n"
+        ))?;
         for child in &doc.children {
             serialize_node(child, 0, doc.format_output, writer)?;
             writer.write_all(b"\n")?;
@@ -135,12 +147,14 @@ impl DOMNode {
         child
     }
 
-    pub fn set_attribute(&self, name: &str, value: &str) {
+    pub fn set_attribute(&self, name: impl AsRef<[u8]>, value: impl AsRef<[u8]>) {
+        let name = BStr::new(name.as_ref());
+        let value = BString::from(value.as_ref());
         let mut node = self.0.borrow_mut();
         if let Some(attr) = node.attributes.iter_mut().find(|(k, _)| k == name) {
-            attr.1 = value.to_string();
+            attr.1 = value;
         } else {
-            node.attributes.push((name.to_string(), value.to_string()));
+            node.attributes.push((BString::from(name), value));
         }
     }
 
@@ -165,7 +179,8 @@ impl DOMNode {
         )
     }
 
-    pub fn get_elements_by_tag_name(&self, name: &str) -> DOMNodeList {
+    pub fn get_elements_by_tag_name(&self, name: impl AsRef<[u8]>) -> DOMNodeList {
+        let name = BStr::new(name.as_ref());
         let mut out = Vec::new();
         collect_by_tag(&self.0, name, &mut out);
         DOMNodeList(out.into_iter().map(DOMNode).collect())
@@ -229,7 +244,7 @@ fn deep_clone(
 
 fn collect_by_tag(
     node: &std::rc::Rc<std::cell::RefCell<NodeInner>>,
-    name: &str,
+    name: &BStr,
     out: &mut Vec<std::rc::Rc<std::cell::RefCell<NodeInner>>>,
 ) {
     for child in &node.borrow().children {
@@ -255,10 +270,10 @@ fn serialize_node<W: std::io::Write>(
         NodeType::Text => escape_text(&node.value, out)?,
         NodeType::Element => {
             out.write_all(b"<")?;
-            out.write_all(node.name.as_bytes())?;
+            out.write_all(&node.name)?;
             for (key, value) in &node.attributes {
                 out.write_all(b" ")?;
-                out.write_all(key.as_bytes())?;
+                out.write_all(key)?;
                 out.write_all(b"=\"")?;
                 escape_attribute(value, out)?;
                 out.write_all(b"\"")?;
@@ -287,7 +302,7 @@ fn serialize_node<W: std::io::Write>(
                 }
             }
             out.write_all(b"</")?;
-            out.write_all(node.name.as_bytes())?;
+            out.write_all(&node.name)?;
             out.write_all(b">")?;
         }
         NodeType::Document => {
@@ -306,32 +321,30 @@ fn write_indent<W: std::io::Write>(out: &mut W, depth: usize) -> std::io::Result
     Ok(())
 }
 
-fn escape_text<W: std::io::Write>(s: &str, out: &mut W) -> std::io::Result<()> {
-    let mut buf = [0u8; 4];
-    for c in s.chars() {
-        match c {
-            '&' => out.write_all(b"&amp;")?,
-            '<' => out.write_all(b"&lt;")?,
-            '>' => out.write_all(b"&gt;")?,
-            '\r' => out.write_all(b"&#13;")?,
-            _ => out.write_all(c.encode_utf8(&mut buf).as_bytes())?,
+fn escape_text<W: std::io::Write>(s: &[u8], out: &mut W) -> std::io::Result<()> {
+    for &b in s {
+        match b {
+            b'&' => out.write_all(b"&amp;")?,
+            b'<' => out.write_all(b"&lt;")?,
+            b'>' => out.write_all(b"&gt;")?,
+            b'\r' => out.write_all(b"&#13;")?,
+            _ => out.write_all(&[b])?,
         }
     }
     Ok(())
 }
 
-fn escape_attribute<W: std::io::Write>(s: &str, out: &mut W) -> std::io::Result<()> {
-    let mut buf = [0u8; 4];
-    for c in s.chars() {
-        match c {
-            '&' => out.write_all(b"&amp;")?,
-            '<' => out.write_all(b"&lt;")?,
-            '>' => out.write_all(b"&gt;")?,
-            '"' => out.write_all(b"&quot;")?,
-            '\r' => out.write_all(b"&#13;")?,
-            '\n' => out.write_all(b"&#10;")?,
-            '\t' => out.write_all(b"&#9;")?,
-            _ => out.write_all(c.encode_utf8(&mut buf).as_bytes())?,
+fn escape_attribute<W: std::io::Write>(s: &[u8], out: &mut W) -> std::io::Result<()> {
+    for &b in s {
+        match b {
+            b'&' => out.write_all(b"&amp;")?,
+            b'<' => out.write_all(b"&lt;")?,
+            b'>' => out.write_all(b"&gt;")?,
+            b'"' => out.write_all(b"&quot;")?,
+            b'\r' => out.write_all(b"&#13;")?,
+            b'\n' => out.write_all(b"&#10;")?,
+            b'\t' => out.write_all(b"&#9;")?,
+            _ => out.write_all(&[b])?,
         }
     }
     Ok(())
@@ -371,7 +384,7 @@ mod tests {
 </definition>\n";
         let mut out = Vec::new();
         dom.save_xml(&mut out).unwrap();
-        assert_eq!(String::from_utf8(out).unwrap(), expected);
+        assert_eq!(bstr::BStr::new(&out), bstr::BStr::new(expected));
     }
 
     #[test]
@@ -392,7 +405,7 @@ mod tests {
 </root>\n";
         let mut out = Vec::new();
         dom.save_xml(&mut out).unwrap();
-        assert_eq!(String::from_utf8(out).unwrap(), expected);
+        assert_eq!(bstr::BStr::new(&out), bstr::BStr::new(expected));
     }
 
     #[test]
@@ -424,6 +437,6 @@ mod tests {
 </command>\n";
         let mut out = Vec::new();
         target.save_xml(&mut out).unwrap();
-        assert_eq!(String::from_utf8(out).unwrap(), expected);
+        assert_eq!(bstr::BStr::new(&out), bstr::BStr::new(expected));
     }
 }

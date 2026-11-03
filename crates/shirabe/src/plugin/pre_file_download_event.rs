@@ -3,7 +3,7 @@
 use crate::event_dispatcher::{Event, EventInterface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::HttpDownloader;
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -23,19 +23,19 @@ pub enum FileDownloadContext {
 pub struct PreFileDownloadEvent {
     inner: Event,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    processed_url: String,
-    custom_cache_key: Option<String>,
-    r#type: String,
+    processed_url: BString,
+    custom_cache_key: Option<BString>,
+    r#type: BString,
     context: Option<FileDownloadContext>,
     transport_options: IndexMap<BString, PhpMixed>,
 }
 
 impl PreFileDownloadEvent {
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        processed_url: String,
-        r#type: String,
+        processed_url: BString,
+        r#type: BString,
         context: Option<FileDownloadContext>,
     ) -> Self {
         Self {
@@ -49,7 +49,7 @@ impl PreFileDownloadEvent {
         }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
@@ -57,24 +57,24 @@ impl PreFileDownloadEvent {
         &self.http_downloader
     }
 
-    pub fn get_processed_url(&self) -> &str {
-        &self.processed_url
+    pub fn get_processed_url(&self) -> &BStr {
+        self.processed_url.as_bstr()
     }
 
-    pub fn set_processed_url(&mut self, processed_url: String) {
+    pub fn set_processed_url(&mut self, processed_url: BString) {
         self.processed_url = processed_url;
     }
 
-    pub fn get_custom_cache_key(&self) -> Option<&str> {
-        self.custom_cache_key.as_deref()
+    pub fn get_custom_cache_key(&self) -> Option<&BStr> {
+        self.custom_cache_key.as_ref().map(|key| key.as_bstr())
     }
 
-    pub fn set_custom_cache_key(&mut self, custom_cache_key: Option<String>) {
+    pub fn set_custom_cache_key(&mut self, custom_cache_key: Option<BString>) {
         self.custom_cache_key = custom_cache_key;
     }
 
-    pub fn get_type(&self) -> &str {
-        &self.r#type
+    pub fn get_type(&self) -> &BStr {
+        self.r#type.as_bstr()
     }
 
     pub fn get_context(&self) -> Option<&FileDownloadContext> {
@@ -99,11 +99,11 @@ impl EventInterface for PreFileDownloadEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<bstr::BString> {
         self.inner.get_arguments()
     }
 

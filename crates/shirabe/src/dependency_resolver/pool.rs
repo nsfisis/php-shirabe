@@ -3,8 +3,9 @@
 use crate::advisory::AnySecurityAdvisory;
 use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, str_pad};
+use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, bconcat, str_pad};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::fmt;
@@ -13,28 +14,28 @@ use std::fmt;
 #[derive(Debug)]
 pub struct Pool {
     packages: Vec<BasePackageHandle>,
-    package_by_name: IndexMap<String, Vec<BasePackageHandle>>,
+    package_by_name: IndexMap<BString, Vec<BasePackageHandle>>,
     version_parser: VersionParser,
-    provider_cache: IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
+    provider_cache: IndexMap<BString, IndexMap<BString, Vec<BasePackageHandle>>>,
     unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
-    removed_versions: IndexMap<String, IndexMap<String, String>>,
-    removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
+    removed_versions: IndexMap<BString, IndexMap<BString, BString>>,
+    removed_versions_by_package: IndexMap<BString, IndexMap<BString, BString>>,
     security_removed_versions:
-        IndexMap<String, IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
-    abandoned_removed_versions: IndexMap<String, IndexMap<String, String>>,
+        IndexMap<BString, IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
+    abandoned_removed_versions: IndexMap<BString, IndexMap<BString, BString>>,
 }
 
 impl Pool {
     pub fn new(
         packages: Vec<BasePackageHandle>,
         unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
-        removed_versions: IndexMap<String, IndexMap<String, String>>,
-        removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
+        removed_versions: IndexMap<BString, IndexMap<BString, BString>>,
+        removed_versions_by_package: IndexMap<BString, IndexMap<BString, BString>>,
         security_removed_versions: IndexMap<
-            String,
-            IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+            BString,
+            IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
         >,
-        abandoned_removed_versions: IndexMap<String, IndexMap<String, String>>,
+        abandoned_removed_versions: IndexMap<BString, IndexMap<BString, BString>>,
     ) -> Self {
         let mut this = Self {
             packages: vec![],
@@ -53,18 +54,16 @@ impl Pool {
 
     pub fn get_removed_versions(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: &AnyConstraint,
-    ) -> IndexMap<String, String> {
+    ) -> IndexMap<BString, BString> {
         let Some(versions) = self.removed_versions.get(name) else {
             return IndexMap::new();
         };
 
-        let mut result: IndexMap<String, String> = IndexMap::new();
+        let mut result: IndexMap<BString, BString> = IndexMap::new();
         for (version, pretty_version) in versions {
-            if constraint
-                .matches(&SimpleConstraint::new("==".to_string(), version.to_string(), None).into())
-            {
+            if constraint.matches(&SimpleConstraint::new("==", version.clone(), None).into()) {
                 result.insert(version.clone(), pretty_version.clone());
             }
         }
@@ -72,12 +71,15 @@ impl Pool {
         result
     }
 
-    pub fn get_all_removed_versions(&self) -> &IndexMap<String, IndexMap<String, String>> {
+    pub fn get_all_removed_versions(&self) -> &IndexMap<BString, IndexMap<BString, BString>> {
         &self.removed_versions
     }
 
-    pub fn get_removed_versions_by_package(&self, object_hash: &str) -> IndexMap<String, String> {
-        let Some(versions) = self.removed_versions_by_package.get(object_hash) else {
+    pub fn get_removed_versions_by_package(
+        &self,
+        object_hash: &BStr,
+    ) -> IndexMap<BString, BString> {
+        let Some(versions) = self.removed_versions_by_package.get(bstr::B(object_hash)) else {
             return IndexMap::new();
         };
 
@@ -86,13 +88,13 @@ impl Pool {
 
     pub fn get_all_removed_versions_by_package(
         &self,
-    ) -> &IndexMap<String, IndexMap<String, String>> {
+    ) -> &IndexMap<BString, IndexMap<BString, BString>> {
         &self.removed_versions_by_package
     }
 
     pub fn is_security_removed_package_version(
         &self,
-        package_name: &str,
+        package_name: &BStr,
         constraint: Option<&AnyConstraint>,
     ) -> bool {
         let empty = IndexMap::new();
@@ -102,9 +104,7 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, _package_with_security_advisories) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.clone(), None).into())
             {
                 return true;
             }
@@ -115,9 +115,9 @@ impl Pool {
 
     pub fn get_security_advisory_identifiers_for_package_version(
         &self,
-        package_name: &str,
+        package_name: &BStr,
         constraint: Option<&AnyConstraint>,
-    ) -> Vec<String> {
+    ) -> Vec<BString> {
         let empty = IndexMap::new();
         let versions = self
             .security_removed_versions
@@ -125,13 +125,11 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, package_with_security_advisories) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.clone(), None).into())
             {
                 return package_with_security_advisories
                     .iter()
-                    .map(|advisory| advisory.advisory_id().to_string())
+                    .map(|advisory| BString::from(advisory.advisory_id()))
                     .collect();
             }
         }
@@ -141,7 +139,7 @@ impl Pool {
 
     pub fn is_abandoned_removed_package_version(
         &self,
-        package_name: &str,
+        package_name: &BStr,
         constraint: Option<&AnyConstraint>,
     ) -> bool {
         let empty = IndexMap::new();
@@ -151,9 +149,7 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, _pretty_version) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.clone(), None).into())
             {
                 return true;
             }
@@ -164,13 +160,13 @@ impl Pool {
 
     pub fn get_all_security_removed_package_versions(
         &self,
-    ) -> &IndexMap<String, IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>> {
+    ) -> &IndexMap<BString, IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>> {
         &self.security_removed_versions
     }
 
     pub fn get_all_abandoned_removed_package_versions(
         &self,
-    ) -> &IndexMap<String, IndexMap<String, String>> {
+    ) -> &IndexMap<BString, IndexMap<BString, BString>> {
         &self.abandoned_removed_versions
     }
 
@@ -183,7 +179,7 @@ impl Pool {
 
             for provided in package.get_names(true) {
                 self.package_by_name
-                    .entry(provided)
+                    .entry(BString::from(&provided[..]))
                     .or_default()
                     .push(package.clone());
             }
@@ -204,13 +200,13 @@ impl Pool {
     /// Searches all packages providing the given package name and match the constraint
     pub fn what_provides(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<&AnyConstraint>,
     ) -> Vec<BasePackageHandle> {
         // PHP: $key = (string) $constraint;
         let key = match constraint {
-            Some(c) => c.to_string(),
-            None => String::new(),
+            Some(c) => BString::from(&c.to_php_string()[..]),
+            None => BString::default(),
         };
         if let Some(by_key) = self.provider_cache.get(name)
             && let Some(cached) = by_key.get(&key)
@@ -220,7 +216,7 @@ impl Pool {
 
         let computed = self.compute_what_provides(name, constraint);
         self.provider_cache
-            .entry(name.to_string())
+            .entry(bstr::BString::from(name))
             .or_default()
             .insert(key, computed.clone());
         computed
@@ -228,7 +224,7 @@ impl Pool {
 
     pub(crate) fn compute_what_provides(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: Option<&AnyConstraint>,
     ) -> Vec<BasePackageHandle> {
         let Some(candidates) = self.package_by_name.get(name) else {
@@ -255,11 +251,11 @@ impl Pool {
     pub fn literal_to_pretty_string(
         &self,
         literal: i64,
-        installed_map: &IndexMap<String, BasePackageHandle>,
-    ) -> String {
+        installed_map: &IndexMap<BString, BasePackageHandle>,
+    ) -> BString {
         let package = self.literal_to_package(literal);
 
-        let prefix = if installed_map.contains_key(&package.id().to_string()) {
+        let prefix = if installed_map.contains_key(bstr::B(&bconcat!(package.id()))) {
             if literal > 0 { "keep" } else { "remove" }
         } else {
             if literal > 0 {
@@ -269,7 +265,7 @@ impl Pool {
             }
         };
 
-        format!("{} {}", prefix, package.get_pretty_string())
+        bconcat!(prefix, " ", package.get_pretty_string())
     }
 
     /// Checks if the package matches the given constraint directly or through
@@ -277,7 +273,7 @@ impl Pool {
     pub fn r#match(
         &self,
         candidate: BasePackageHandle,
-        name: &str,
+        name: &BStr,
         constraint: Option<&AnyConstraint>,
     ) -> bool {
         let candidate_name = candidate.get_name();
@@ -292,7 +288,7 @@ impl Pool {
         let replaces = candidate.get_replaces();
 
         // aliases create multiple replaces/provides for one target so they can not use the shortcut below
-        if replaces.contains_key("0") || provides.contains_key("0") {
+        if replaces.contains_key(b"0".as_slice()) || provides.contains_key(b"0".as_slice()) {
             for link in provides.values() {
                 if link.get_target() == name
                     && (constraint.is_none() || constraint.unwrap().matches(link.get_constraint()))
@@ -348,16 +344,17 @@ impl Pool {
 
 impl fmt::Display for Pool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut str = String::from("Pool:\n");
+        writeln!(f, "Pool:")?;
 
         for package in &self.packages {
-            str.push_str(&format!(
-                "- {}: {}\n",
-                str_pad(&package.id().to_string(), 6, " ", STR_PAD_LEFT),
-                package.get_name()
-            ));
+            writeln!(
+                f,
+                "- {}: {}",
+                str_pad(bconcat!(package.id()), 6, " ", STR_PAD_LEFT).display_lossy(),
+                package.get_name().display_lossy()
+            )?;
         }
 
-        write!(f, "{}", str)
+        Ok(())
     }
 }

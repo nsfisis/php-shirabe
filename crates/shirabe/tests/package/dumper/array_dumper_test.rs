@@ -13,12 +13,12 @@ fn set_up() -> ArrayDumper {
 
 fn complete_package() -> CompletePackageHandle {
     let norm = VersionParser.normalize("1.0.0", None).unwrap();
-    CompletePackageHandle::new("dummy/pkg".to_string(), norm, "1.0.0".to_string())
+    CompletePackageHandle::new(BString::from("dummy/pkg"), norm, BString::from("1.0.0"))
 }
 
 fn root_package() -> RootPackageHandle {
     let norm = VersionParser.normalize("1.0.0", None).unwrap();
-    RootPackageHandle::new("dummy/pkg".to_string(), norm, "1.0.0".to_string())
+    RootPackageHandle::new(BString::from("dummy/pkg"), norm, BString::from("1.0.0"))
 }
 
 #[test]
@@ -27,13 +27,13 @@ fn test_required_information() {
     let config = dumper.dump(complete_package().into());
 
     let mut expected: IndexMap<BString, PhpMixed> = IndexMap::new();
-    expected.insert("name".into(), PhpMixed::string("dummy/pkg".to_string()));
-    expected.insert("version".into(), PhpMixed::string("1.0.0".to_string()));
+    expected.insert("name".into(), PhpMixed::string(BString::from("dummy/pkg")));
+    expected.insert("version".into(), PhpMixed::string(BString::from("1.0.0")));
     expected.insert(
         "version_normalized".into(),
-        PhpMixed::string("1.0.0.0".to_string()),
+        PhpMixed::string(BString::from("1.0.0.0")),
     );
-    expected.insert("type".into(), PhpMixed::string("library".to_string()));
+    expected.insert("type".into(), PhpMixed::string(BString::from("library")));
 
     assert_eq!(expected, config);
 }
@@ -42,12 +42,12 @@ fn test_required_information() {
 fn test_root_package() {
     let dumper = set_up();
     let package = root_package();
-    package.set_minimum_stability("dev".to_string());
+    package.set_minimum_stability(BString::from("dev"));
 
     let config = dumper.dump(package.into());
 
     assert_eq!(
-        Some(&PhpMixed::string("dev".to_string())),
+        Some(&PhpMixed::string(BString::from("dev"))),
         config.get(B("minimum-stability"))
     );
 }
@@ -67,12 +67,12 @@ fn test_dump_abandoned() {
 fn test_dump_abandoned_replacement() {
     let dumper = set_up();
     let package = complete_package();
-    package.set_abandoned(PhpMixed::string("foo/bar".to_string()));
+    package.set_abandoned(PhpMixed::string(BString::from("foo/bar")));
 
     let config = dumper.dump(package.into());
 
     assert_eq!(
-        Some(&PhpMixed::string("foo/bar".to_string())),
+        Some(&PhpMixed::string(BString::from("foo/bar"))),
         config.get(B("abandoned"))
     );
 }

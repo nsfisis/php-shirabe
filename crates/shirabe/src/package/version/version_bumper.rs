@@ -5,7 +5,11 @@ use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::util::Platform;
-use shirabe_php_shim::{php_regex, preg_is_match, preg_match_all, preg_replace, substr_replace};
+use bstr::BString;
+use shirabe_php_shim::{
+    bconcat, explode, implode, php_regex, preg_is_match, preg_match_all, preg_replace,
+    substr_count, substr_replace,
+};
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -17,21 +21,25 @@ impl VersionBumper {
         &self,
         constraint: &AnyConstraint,
         package: PackageInterfaceHandle,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         let parser = VersionParser::new();
         let pretty_constraint = constraint.get_pretty_string();
-        if pretty_constraint.starts_with("dev-") {
+        if pretty_constraint.starts_with(b"dev-") {
             return Ok(pretty_constraint);
         }
 
         let mut version = package.get_version();
-        if version.starts_with("dev-") {
+        if version.starts_with(b"dev-") {
             let loader = ArrayLoader::new(Some(parser.clone()), false);
             let dumper = ArrayDumper::new();
             let dumped = dumper.dump(package);
             let extra = loader.get_branch_alias(&dumped)?;
 
-            if extra.is_none() || extra.as_deref() == Some(VersionParser::DEFAULT_BRANCH_ALIAS) {
+            if extra.is_none()
+                || extra
+                    .as_ref()
+                    .is_some_and(|e| e == VersionParser::DEFAULT_BRANCH_ALIAS)
+            {
                 return Ok(pretty_constraint);
             }
 
@@ -47,7 +55,7 @@ impl VersionBumper {
         let major = preg_replace(php_regex!(r"{^([1-9][0-9]*|0\.\d+).*}"), "$1", &version);
         let version_without_suffix =
             preg_replace(php_regex!(r"{(?:\.(?:0|9999999))+(-dev)?$}"), "", &version);
-        let new_pretty_constraint = format!("^{}", version_without_suffix);
+        let new_pretty_constraint = bconcat!("^", &version_without_suffix);
 
         if !preg_is_match(php_regex!(r"{^\^\d+(\.\d+)*$}"), &new_pretty_constraint) {
             return Ok(pretty_constraint);
@@ -61,22 +69,27 @@ impl VersionBumper {
         // does not shift the rewrite. The single-character `|`/space/comma separators are not consumed
         // by both an adjacent trailing and leading match, but Composer never packs two same-major
         // constraints around a single such separator (alternatives use `||`, ranges use spaces).
-        let pattern = format!(
-            r#"{{
+        let pattern = bconcat!(
+            r#"{
             (?:^|[,\ |]) # leading separator
             (?P<constraint>
-                \^v?{major}(?:\.\d+)* # e.g. ^2.anything
-                | ~v?{major}(?:\.\d+){{1,3}} # e.g. ~2.2 or ~2.2.2 or ~2.2.2.2
-                | v?{major}(?:\.[*x])+ # e.g. 2.* or 2.*.* or 2.x.x.x etc
+                \^v?"#,
+            &major,
+            r#"(?:\.\d+)* # e.g. ^2.anything
+                | ~v?"#,
+            &major,
+            r#"(?:\.\d+){1,3} # e.g. ~2.2 or ~2.2.2 or ~2.2.2.2
+                | v?"#,
+            &major,
+            r#"(?:\.[*x])+ # e.g. 2.* or 2.*.* or 2.x.x.x etc
                 | >=v?\d(?:\.\d+)* # e.g. >=2 or >=1.2 etc
                 | \* # full wildcard
             )
             (?:$|[,\ |@]) # trailing separator
-        }}x"#,
-            major = major
+        }x"#
         );
 
-        let constraint_matches: Vec<(String, i64)> = preg_match_all(&pattern, &pretty_constraint)
+        let constraint_matches: Vec<(BString, i64)> = preg_match_all(&pattern, &pretty_constraint)
             .map(|match_| {
                 let constraint = match_
                     .name("constraint")
@@ -84,46 +97,37 @@ impl VersionBumper {
                 let offset = match_
                     .name_offset("constraint")
                     .expect("the `constraint` group participates whenever the pattern matches");
-                (constraint.to_string(), offset as i64)
+                (BString::from(constraint), offset as i64)
             })
             .collect();
         if !constraint_matches.is_empty() {
             let mut modified = pretty_constraint.clone();
             for (match_str, match_offset) in constraint_matches.into_iter().rev() {
-                let suffix = if match_str.matches('.').count() == 2
-                    && version_without_suffix.matches('.').count() == 1
-                {
-                    ".0"
-                } else {
-                    ""
-                };
-                let replacement =
-                    if match_str.starts_with('~') && match_str.matches('.').count() != 1 {
-                        let mut version_bits: Vec<String> = version_without_suffix
-                            .split('.')
-                            .map(String::from)
-                            .collect();
-                        let needed_len = match_str.matches('.').count() + 1;
-                        while version_bits.len() < needed_len {
-                            version_bits.push("0".to_string());
-                        }
-                        let dots_in_match = match_str.matches('.').count();
-                        format!("~{}", version_bits[..dots_in_match + 1].join("."))
-                    } else if match_str == "*" || match_str.starts_with(">=") {
-                        format!(">={}{}", version_without_suffix, suffix)
+                let dots_in_match = substr_count(&match_str, ".");
+                let suffix =
+                    if dots_in_match == 2 && substr_count(&version_without_suffix, ".") == 1 {
+                        ".0"
                     } else {
-                        format!("{}{}", new_pretty_constraint, suffix)
+                        ""
                     };
-                modified = String::from_utf8(
-                    substr_replace(
-                        &modified,
-                        &replacement,
-                        match_offset,
-                        Some(Platform::strlen(&match_str)),
-                    )
-                    .into(),
-                )
-                .expect("the replaced range is a regex match, so it ends on character boundaries");
+                let replacement = if match_str.starts_with(b"~") && dots_in_match != 1 {
+                    let mut version_bits = explode(".", &version_without_suffix);
+                    let needed_len = dots_in_match as usize + 1;
+                    while version_bits.len() < needed_len {
+                        version_bits.push("0".into());
+                    }
+                    bconcat!("~", implode(".", &version_bits[..needed_len]))
+                } else if match_str == "*" || match_str.starts_with(b">=") {
+                    bconcat!(">=", &version_without_suffix, suffix)
+                } else {
+                    bconcat!(&new_pretty_constraint, suffix)
+                };
+                modified = substr_replace(
+                    &modified,
+                    &replacement,
+                    match_offset,
+                    Some(Platform::strlen(&match_str)),
+                );
             }
 
             let new_constraint = parser.parse_constraints(&modified)?;

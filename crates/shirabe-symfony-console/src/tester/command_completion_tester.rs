@@ -2,6 +2,8 @@
 
 use crate::command::Command;
 use crate::completion::{CompletionInput, CompletionSuggestions};
+use bstr::BString;
+use shirabe_php_shim::bconcat;
 
 /// Eases the testing of command completion.
 #[derive(Debug)]
@@ -15,10 +17,10 @@ impl CommandCompletionTester {
     }
 
     /// Create completion suggestions from input tokens.
-    pub fn complete(&self, input: &[&str]) -> anyhow::Result<Vec<String>> {
-        let mut input: Vec<String> = input.iter().map(|s| s.to_string()).collect();
+    pub fn complete(&self, input: &[impl AsRef<[u8]>]) -> anyhow::Result<Vec<BString>> {
+        let mut input: Vec<BString> = input.iter().map(|s| BString::from(s.as_ref())).collect();
         let current_index = input.len() as i64;
-        if input.last().map(String::as_str) == Some("") {
+        if input.last().is_some_and(|last| last.is_empty()) {
             input.pop();
         }
         // array_unshift($input, $this->command->getName())
@@ -36,17 +38,17 @@ impl CommandCompletionTester {
             .borrow()
             .complete(&completion_input, &mut suggestions)?;
 
-        let mut result: Vec<String> = suggestions
+        let mut result: Vec<BString> = suggestions
             .get_option_suggestions()
             .iter()
-            .map(|option| format!("--{}", option.get_name()))
+            .map(|option| bconcat!("--", option.get_name()))
             .collect();
         // array_map('strval', ... $suggestions->getValueSuggestions())
         result.extend(
             suggestions
                 .get_value_suggestions()
                 .iter()
-                .map(|suggestion| suggestion.to_string()),
+                .map(|suggestion| suggestion.get_value()),
         );
         Ok(result)
     }

@@ -15,7 +15,7 @@ use crate::downloader::{
 use crate::event_dispatcher::{Event, EventDispatcher};
 use crate::exception::NoSslException;
 use crate::installer::{BinaryInstaller, InstallationManager};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::archiver::{ArchiveManager, PharArchiver, ZipArchiver};
 use crate::package::loader::RootPackageLoader;
@@ -27,23 +27,25 @@ use crate::repository::{
 };
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
-    PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, class_exists,
-    dirname, extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir,
-    is_file, json_decode_assoc, json_decode_obj, mkdir, pathinfo, realpath, rename, rtrim, strpos,
-    strtr, substr, trim,
+    PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, bconcat,
+    class_exists, dirname, error_message, extension_loaded, file_exists, file_get_contents,
+    file_put_contents, implode, is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir,
+    path_from_bytes, path_to_bytes, pathinfo, realpath, rename, rtrim2, strpos, strtr, substr,
+    trim2,
 };
-use shirabe_symfony_console::formatter::{
-    OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface,
+use shirabe_symfony_console::{
+    formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
+    output::ConsoleOutput,
 };
-use shirabe_symfony_console::output::ConsoleOutput;
+use std::path::{Path, PathBuf};
 
 /// Either a configuration array or a filename to read from. PHP's `$localConfig` accepts both.
 pub enum LocalConfigInput {
-    Path(String),
+    Path(PathBuf),
     Data(IndexMap<BString, PhpMixed>),
 }
 
@@ -71,7 +73,7 @@ pub struct Factory {
 }
 
 impl Factory {
-    fn get_home_dir() -> anyhow::Result<String> {
+    fn get_home_dir() -> anyhow::Result<BString> {
         let home = Platform::get_env("COMPOSER_HOME");
         if let Some(h) = home
             && !h.is_empty()
@@ -84,35 +86,34 @@ impl Factory {
                 .map(|s| s.is_empty())
                 .unwrap_or(true)
             {
-                return Err(RuntimeException::new("The APPDATA or COMPOSER_HOME environment variable must be set for composer to run correctly"
-                            .to_string()).into());
+                return Err(RuntimeException::new(BString::from("The APPDATA or COMPOSER_HOME environment variable must be set for composer to run correctly")).into());
             }
 
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
-            return Ok(format!(
-                "{}/Shirabe",
-                rtrim(&strtr(&appdata, "\\", "/"), Some("/"))
+            return Ok(bconcat!(
+                rtrim2(strtr(&appdata, "\\", "/"), "/"),
+                "/Shirabe"
             ));
         }
 
         let user_dir = Self::get_user_dir()?;
-        let mut dirs: Vec<String> = Vec::new();
+        let mut dirs: Vec<BString> = Vec::new();
 
         if Self::use_xdg() {
             // XDG Base Directory Specifications
             let mut xdg_config = Platform::get_env("XDG_CONFIG_HOME").unwrap_or_default();
             if xdg_config.is_empty() {
-                xdg_config = format!("{}/.config", user_dir);
+                xdg_config = bconcat!(user_dir, "/.config");
             }
 
-            dirs.push(format!("{}/shirabe", xdg_config));
+            dirs.push(bconcat!(xdg_config, "/shirabe"));
         }
 
-        dirs.push(format!("{}/.shirabe", user_dir));
+        dirs.push(bconcat!(user_dir, "/.shirabe"));
 
         // select first dir which exists of: $XDG_CONFIG_HOME/shirabe or ~/.shirabe
         for dir in &dirs {
-            if is_dir(dir) {
+            if is_dir(path_from_bytes(dir)) {
                 return Ok(dir.clone());
             }
         }
@@ -121,7 +122,7 @@ impl Factory {
         Ok(dirs[0].clone())
     }
 
-    fn get_cache_dir(home: &str) -> anyhow::Result<String> {
+    fn get_cache_dir(home: &BStr) -> anyhow::Result<BString> {
         let cache_dir = Platform::get_env("COMPOSER_CACHE_DIR").unwrap_or_default();
         if !cache_dir.is_empty() {
             return Ok(cache_dir);
@@ -129,53 +130,53 @@ impl Factory {
 
         let home_env = Platform::get_env("COMPOSER_HOME").unwrap_or_default();
         if !home_env.is_empty() {
-            return Ok(format!("{}/cache", home_env));
+            return Ok(bconcat!(home_env, "/cache"));
         }
 
         if Platform::is_windows() {
             let mut cache_dir = Platform::get_env("LOCALAPPDATA").unwrap_or_default();
             if !cache_dir.is_empty() {
-                cache_dir = format!("{}/Shirabe", cache_dir);
+                cache_dir = bconcat!(cache_dir, "/Shirabe");
             } else {
-                cache_dir = format!("{}/cache", home);
+                cache_dir = bconcat!(home, "/cache");
             }
 
-            return Ok(rtrim(&strtr(&cache_dir, "\\", "/"), Some("/")));
+            return Ok(rtrim2(strtr(&cache_dir, "\\", "/"), "/"));
         }
 
         let user_dir = Self::get_user_dir()?;
         if PHP_OS == "Darwin" {
             // Migrate existing cache dir in old location if present
-            if is_dir(format!("{}/cache", home))
-                && !is_dir(format!("{}/Library/Caches/shirabe", user_dir))
+            if is_dir_at(bconcat!(home, "/cache"))
+                && !is_dir_at(bconcat!(user_dir, "/Library/Caches/shirabe"))
             {
-                let from = format!("{}/cache", home);
-                let to = format!("{}/Library/Caches/shirabe", user_dir);
-                let _ = rename(&from, &to);
+                let from = bconcat!(home, "/cache");
+                let to = bconcat!(user_dir, "/Library/Caches/shirabe");
+                let _ = rename(path_from_bytes(&from), path_from_bytes(&to));
             }
 
-            return Ok(format!("{}/Library/Caches/shirabe", user_dir));
+            return Ok(bconcat!(user_dir, "/Library/Caches/shirabe"));
         }
 
-        if home == format!("{}/.shirabe", user_dir).as_str() && is_dir(format!("{}/cache", home)) {
-            return Ok(format!("{}/cache", home));
+        if home == bconcat!(user_dir, "/.shirabe") && is_dir_at(bconcat!(home, "/cache")) {
+            return Ok(bconcat!(home, "/cache"));
         }
 
         if Self::use_xdg() {
             let xdg_cache = Platform::get_env("XDG_CACHE_HOME").unwrap_or_default();
             let xdg_cache = if xdg_cache.is_empty() {
-                format!("{}/.cache", user_dir)
+                bconcat!(user_dir, "/.cache")
             } else {
                 xdg_cache
             };
 
-            return Ok(format!("{}/shirabe", xdg_cache));
+            return Ok(bconcat!(xdg_cache, "/shirabe"));
         }
 
-        Ok(format!("{}/cache", home))
+        Ok(bconcat!(home, "/cache"))
     }
 
-    fn get_data_dir(home: &str) -> anyhow::Result<String> {
+    fn get_data_dir(home: &BStr) -> anyhow::Result<BString> {
         let home_env = Platform::get_env("COMPOSER_HOME").unwrap_or_default();
         if !home_env.is_empty() {
             return Ok(home_env);
@@ -186,30 +187,30 @@ impl Factory {
         }
 
         let user_dir = Self::get_user_dir()?;
-        if home != format!("{}/.shirabe", user_dir) && Self::use_xdg() {
+        if home != bconcat!(user_dir, "/.shirabe") && Self::use_xdg() {
             let xdg_data = Platform::get_env("XDG_DATA_HOME").unwrap_or_default();
             let xdg_data = if xdg_data.is_empty() {
-                format!("{}/.local/share", user_dir)
+                bconcat!(user_dir, "/.local/share")
             } else {
                 xdg_data
             };
 
-            return Ok(format!("{}/shirabe", xdg_data));
+            return Ok(bconcat!(xdg_data, "/shirabe"));
         }
 
-        Ok(home.to_string())
+        Ok(BString::from(home))
     }
 
     pub fn create_config(
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
     ) -> anyhow::Result<Config> {
         let cwd = match cwd {
-            Some(s) => s.to_string(),
+            Some(cwd) => cwd.to_path_buf(),
             None => Platform::get_cwd(true)?,
         };
 
-        let mut config = Config::new(true, Some(cwd));
+        let mut config = Config::new(true, Some(path_to_bytes(&cwd).into()));
 
         // determine and add main dirs to the config
         let home = Self::get_home_dir()?;
@@ -218,11 +219,11 @@ impl Factory {
         inner.insert("home".into(), PhpMixed::string(home.clone()));
         inner.insert(
             "cache-dir".into(),
-            PhpMixed::string(Self::get_cache_dir(&home)?),
+            PhpMixed::string(Self::get_cache_dir(bstr::BStr::new(&home))?),
         );
         inner.insert(
             "data-dir".into(),
-            PhpMixed::string(Self::get_data_dir(&home)?),
+            PhpMixed::string(Self::get_data_dir(bstr::BStr::new(&home))?),
         );
         defaults.insert(
             "config".into(),
@@ -231,12 +232,12 @@ impl Factory {
         config.merge(&defaults, Config::SOURCE_DEFAULT);
 
         // load global config
-        let global_config_path = format!("{}/config.json", config.get_str("home")?);
+        let global_config_path = path_from_bytes(&config.get_str("home")?).join("config.json");
         let file = JsonFile::new(global_config_path, None, io.clone())?;
         if file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
-                    &format!("Loading config file {}", file.get_path()),
+                    bconcat!("Loading config file ", file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -251,8 +252,7 @@ impl Factory {
                 PhpMixed::Array(map) => map.into_iter().collect::<IndexMap<_, _>>(),
                 _ => IndexMap::new(),
             };
-            let file_path_owned = file.get_path().to_string();
-            config.merge(&read_data, &file_path_owned);
+            config.merge(&read_data, path_to_bytes(file.get_path()));
         }
         config.set_config_source(Box::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(file)),
@@ -270,23 +270,24 @@ impl Factory {
                 config.get_str("data-dir")?,
             ];
             for dir in &dirs {
-                if !file_exists(format!("{}/.htaccess", dir)) {
+                let dir = path_from_bytes(dir);
+                let path = dir.join(".htaccess");
+                if !file_exists(&path) {
                     if !is_dir(dir) {
                         let _ = mkdir(dir, 0o777, true);
                     }
-                    let path = format!("{}/.htaccess", dir);
                     let _ = file_put_contents(&path, b"Deny from all");
                 }
             }
         }
 
         // load global auth file
-        let auth_file_path = format!("{}/auth.json", config.get_str("home")?);
+        let auth_file_path = path_from_bytes(&config.get_str("home")?).join("auth.json");
         let auth_file = JsonFile::new(auth_file_path, None, io.clone())?;
         if auth_file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
-                    &format!("Loading config file {}", auth_file.get_path()),
+                    bconcat!("Loading config file ", auth_file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -306,8 +307,7 @@ impl Factory {
                 "config".into(),
                 PhpMixed::Array(read_data.into_iter().collect()),
             );
-            let auth_path_owned = auth_file.get_path().to_string();
-            config.merge(&wrapped, &auth_path_owned);
+            config.merge(&wrapped, path_to_bytes(auth_file.get_path()));
         }
         config.set_auth_config_source(Box::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(auth_file)),
@@ -319,48 +319,50 @@ impl Factory {
         Ok(config)
     }
 
-    pub fn get_composer_file() -> anyhow::Result<String> {
+    pub fn get_composer_file() -> anyhow::Result<PathBuf> {
         let env = Platform::get_env("COMPOSER");
         if let Some(env_str) = env {
-            let env_trimmed = trim(&env_str, Some(" \t\n\r\0\u{0B}"));
+            let env_trimmed = trim2(&env_str, " \t\n\r\0\u{0B}");
             if !env_trimmed.is_empty() {
-                if is_dir(&env_trimmed) {
-                    return Err(RuntimeException::new(format!(
-                        "The COMPOSER environment variable is set to {} which is a directory, this variable should point to a composer.json or be left unset.",
-                        env_trimmed
-                    )).into());
+                let env_trimmed = path_from_bytes(&env_trimmed);
+                if is_dir(env_trimmed) {
+                    return Err(RuntimeException::new(bconcat!("The COMPOSER environment variable is set to ", env_trimmed, " which is a directory, this variable should point to a composer.json or be left unset.")).into());
                 }
 
-                return Ok(env_trimmed);
+                return Ok(env_trimmed.to_path_buf());
             }
         }
 
-        Ok("./composer.json".to_string())
+        Ok(PathBuf::from("./composer.json"))
     }
 
-    pub fn get_lock_file(composer_file: &str) -> String {
+    pub fn get_lock_file(composer_file: &Path) -> PathBuf {
+        let composer_file = path_to_bytes(composer_file);
         let ext = pathinfo(composer_file, PATHINFO_EXTENSION);
-        if ext == "json" {
-            format!(
-                "{}lock",
-                substr(composer_file, 0, Some(composer_file.len() as i64 - 4))
+        let lock_file = if ext == "json" {
+            bconcat!(
+                substr(composer_file, 0, Some(composer_file.len() as i64 - 4)),
+                "lock"
             )
         } else {
-            format!("{}.lock", composer_file)
-        }
+            bconcat!(composer_file, ".lock")
+        };
+        path_from_bytes(&lock_file).to_path_buf()
     }
 
-    pub fn create_additional_styles() -> IndexMap<String, Box<dyn OutputFormatterStyleInterface>> {
-        let mut styles: IndexMap<String, Box<dyn OutputFormatterStyleInterface>> = IndexMap::new();
+    pub fn create_additional_styles()
+    -> IndexMap<bstr::BString, Box<dyn OutputFormatterStyleInterface>> {
+        let mut styles: IndexMap<bstr::BString, Box<dyn OutputFormatterStyleInterface>> =
+            IndexMap::new();
         styles.insert(
-            "highlight".to_string(),
-            Box::new(OutputFormatterStyle::new(Some("red"), None, vec![])),
+            "highlight".into(),
+            Box::new(OutputFormatterStyle::new(Some("red".into()), None, vec![])),
         );
         styles.insert(
-            "warning".to_string(),
+            "warning".into(),
             Box::new(OutputFormatterStyle::new(
-                Some("black"),
-                Some("yellow"),
+                Some("black".into()),
+                Some("yellow".into()),
                 vec![],
             )),
         );
@@ -386,22 +388,22 @@ impl Factory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         local_config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
         full_load: bool,
         disable_scripts: bool,
     ) -> anyhow::Result<PartialComposerHandle> {
         // if a custom composer.json path is given, we change the default cwd to be that file's directory
         let mut local_config = local_config;
-        let mut cwd = cwd.map(|s| s.to_string());
+        let mut cwd = cwd.map(Path::to_path_buf);
         if let Some(LocalConfigInput::Path(ref s)) = local_config
             && is_file(s)
             && cwd.is_none()
         {
-            cwd = Some(dirname(s));
+            cwd = Some(path_from_bytes(&dirname(path_to_bytes(s))).to_path_buf());
         }
 
         let cwd = match cwd {
-            Some(s) => s,
+            Some(cwd) => cwd,
             None => Platform::get_cwd(true)?,
         };
 
@@ -410,8 +412,8 @@ impl Factory {
             local_config = Some(LocalConfigInput::Path(Self::get_composer_file()?));
         }
 
-        let mut local_config_source = Config::SOURCE_UNKNOWN.to_string();
-        let mut composer_file: Option<String> = None;
+        let mut local_config_source = BString::from(Config::SOURCE_UNKNOWN);
+        let mut composer_file: Option<PathBuf> = None;
         let mut local_config_data: IndexMap<BString, PhpMixed> = IndexMap::new();
         if let Some(LocalConfigInput::Path(path)) = &local_config {
             composer_file = Some(path.clone());
@@ -419,19 +421,22 @@ impl Factory {
             let file = JsonFile::new(path.clone(), None, Some(io.clone()))?;
 
             if !file.exists() {
-                let message = if path == "./composer.json" || path == "composer.json" {
-                    format!("Shirabe could not find a composer.json file in {}", cwd)
+                let message = if path.as_os_str() == "./composer.json"
+                    || path.as_os_str() == "composer.json"
+                {
+                    bconcat!("Shirabe could not find a composer.json file in ", cwd)
                 } else {
-                    format!("Shirabe could not find the config file: {}", path)
+                    bconcat!("Shirabe could not find the config file: ", path)
                 };
                 let instructions = if full_load {
                     "To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage"
                 } else {
                     ""
                 };
-                return Err(InvalidArgumentException::new(format!(
-                    "{}{}{}",
-                    message, PHP_EOL, instructions
+                return Err(InvalidArgumentException::new(bconcat!(
+                    message,
+                    PHP_EOL,
+                    instructions
                 ))
                 .into());
             }
@@ -440,11 +445,9 @@ impl Factory {
                 && let Err(e) = file.validate_schema(JsonFile::LAX_SCHEMA, None)
             {
                 if let Some(jve) = e.catch::<JsonValidationException>() {
-                    let errors = format!(
-                        " - {}",
-                        implode(&format!("{} - ", PHP_EOL), jve.get_errors())
-                    );
-                    let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
+                    let errors =
+                        bconcat!(" - ", (implode(bconcat!(PHP_EOL, " - "), jve.get_errors())));
+                    let message = bconcat!(jve.get_message(), ":", PHP_EOL, errors);
                     return Err(
                         JsonValidationException::new(message, jve.get_errors().clone()).into(),
                     );
@@ -457,7 +460,7 @@ impl Factory {
                 .as_array()
                 .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default();
-            local_config_source = file.get_path().to_string();
+            local_config_source = path_to_bytes(file.get_path()).into();
         } else if let Some(LocalConfigInput::Data(data)) = local_config {
             local_config_data = data;
         }
@@ -469,15 +472,19 @@ impl Factory {
             Self::create_config(Some(io.clone()), Some(&cwd))?
         };
         let is_global = local_config_source != Config::SOURCE_UNKNOWN
-            && realpath(&config.get_str("home")?) == realpath(dirname(&local_config_source));
+            && realpath(path_from_bytes(&config.get_str("home")?)).map(PathBuf::into_os_string)
+                == realpath(path_from_bytes(&dirname(&local_config_source)))
+                    .map(PathBuf::into_os_string);
         config.merge(&local_config_data, &local_config_source);
 
         if let Some(ref composer_file_path) = composer_file {
             io.write_error3(
-                &format!(
-                    "Loading config file {} ({})",
+                bconcat!(
+                    "Loading config file ",
                     composer_file_path,
-                    realpath(composer_file_path).unwrap_or_default()
+                    " (",
+                    realpath(composer_file_path).unwrap_or_default(),
+                    ")"
                 ),
                 true,
                 crate::io::DEBUG,
@@ -492,16 +499,16 @@ impl Factory {
             )));
 
             let local_auth_file = JsonFile::new(
-                format!(
-                    "{}/auth.json",
-                    dirname(&realpath(composer_file_path).unwrap_or_default())
-                ),
+                path_from_bytes(&dirname(path_to_bytes(
+                    &realpath(composer_file_path).unwrap_or_default(),
+                )))
+                .join("auth.json"),
                 None,
                 Some(io.clone()),
             )?;
             if local_auth_file.exists() {
                 io.write_error3(
-                    &format!("Loading config file {}", local_auth_file.get_path()),
+                    bconcat!("Loading config file ", local_auth_file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -514,8 +521,7 @@ impl Factory {
                 let auth_read = local_auth_file.read()?;
                 let mut wrapped: IndexMap<BString, PhpMixed> = IndexMap::new();
                 wrapped.insert("config".into(), auth_read);
-                let auth_path = local_auth_file.get_path().to_string();
-                config.merge(&wrapped, &auth_path);
+                config.merge(&wrapped, path_to_bytes(local_auth_file.get_path()));
                 config.set_local_auth_config_source(Box::new(JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(local_auth_file)),
                     true,
@@ -554,10 +560,9 @@ impl Factory {
 
                         // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
                         // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
-                        let installed_versions_path = format!(
-                            "{}/composer/installed.php",
-                            config.borrow_mut().get_str("vendor-dir")?
-                        );
+                        let installed_versions_path =
+                            path_from_bytes(&config.borrow_mut().get_str("vendor-dir")?)
+                                .join("composer/installed.php");
                         if !disable_plugins.is_disabled_at_all()
                             && !disable_scripts
                             && !class_exists("Composer\\InstalledVersions")
@@ -614,7 +619,7 @@ impl Factory {
                     // guessing it adds no value and only takes time
                     if !full_load && !local_config_data.contains_key(B("version")) {
                         local_config_data
-                            .insert("version".into(), PhpMixed::string("1.0.0".to_string()));
+                            .insert("version".into(), PhpMixed::string(BString::from("1.0.0")));
                     }
 
                     // load package
@@ -644,7 +649,7 @@ impl Factory {
                     );
                     let package = loader.load(
                         local_config_data.clone(),
-                        "Composer\\Package\\RootPackage",
+                        BStr::new("Composer\\Package\\RootPackage"),
                         Some(&cwd),
                     )?;
                     // load() builds a RootPackage of the requested class, so as_root() is always
@@ -659,7 +664,7 @@ impl Factory {
                     self.add_local_repository(
                         io.clone(),
                         &mut rm.borrow_mut(),
-                        &vendor_dir,
+                        vendor_dir.as_ref(),
                         composer.get_package().clone(),
                         Some(&process),
                     );
@@ -716,10 +721,7 @@ impl Factory {
                                 .unwrap_or(true);
                             if !lock_enabled && file_exists(&lock_file) {
                                 io.write_error3(
-                                    &format!(
-                                        "<warning>{} is present but ignored as the \"lock\" config option is disabled.</warning>",
-                                        lock_file
-                                    ),
+                                    bconcat!("<warning>", lock_file, " is present but ignored as the \"lock\" config option is disabled.</warning>"),
                                     true,
                                     crate::io::NORMAL,
                                 );
@@ -731,7 +733,7 @@ impl Factory {
                                     if lock_enabled {
                                         lock_file
                                     } else {
-                                        Platform::get_dev_null()
+                                        path_from_bytes(Platform::get_dev_null()).to_path_buf()
                                     },
                                     None,
                                     Some(io.clone()),
@@ -751,7 +753,11 @@ impl Factory {
                             ))?;
                             let locker = Locker::new(
                                 io.clone(),
-                                JsonFile::new(Platform::get_dev_null(), None, Some(io.clone()))?,
+                                JsonFile::new(
+                                    path_from_bytes(Platform::get_dev_null()),
+                                    None,
+                                    Some(io.clone()),
+                                )?,
                                 im,
                                 &lock_contents,
                                 process,
@@ -840,12 +846,12 @@ impl Factory {
         if full_load {
             // The back-reference is now upgradeable, so dispatching the INIT event (which may read
             // the Composer through the dispatcher) is safe only after the Rc has been constructed.
-            let mut init_event = Event::from_name(PluginEvents::INIT.to_string());
-            let init_event_name = init_event.get_name().to_string();
+            let mut init_event = Event::from_name(bconcat!(PluginEvents::INIT));
+            let init_event_name = init_event.get_name().to_owned();
             let dispatcher = composer.borrow().get_event_dispatcher();
             dispatcher
                 .borrow_mut()
-                .dispatch(Some(&init_event_name), Some(&mut init_event))?;
+                .dispatch(Some(init_event_name.as_ref()), Some(&mut init_event))?;
 
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem
@@ -878,7 +884,7 @@ impl Factory {
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         rm: &mut RepositoryManager,
-        vendor_dir: &str,
+        vendor_dir: &BStr,
         root_package: RootPackageInterfaceHandle,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
@@ -897,7 +903,7 @@ impl Factory {
         rm.set_local_repository(crate::repository::RepositoryInterfaceHandle::new(
             InstalledFilesystemRepository::new(
                 JsonFile::new(
-                    format!("{}/composer/installed.json", vendor_dir),
+                    path_from_bytes(vendor_dir).join("composer/installed.json"),
                     None,
                     Some(io.clone()),
                 )
@@ -930,19 +936,18 @@ impl Factory {
 
         match self.create_composer(
             io.clone(),
-            Some(LocalConfigInput::Path(format!(
-                "{}/composer.json",
-                config.get_str("home").ok()?
-            ))),
+            Some(LocalConfigInput::Path(
+                path_from_bytes(&config.get_str("home").ok()?).join("composer.json"),
+            )),
             disable_plugins,
-            Some(&config.get_str("home").ok()?),
+            Some(path_from_bytes(&config.get_str("home").ok()?)),
             full_load,
             disable_scripts,
         ) {
             Ok(c) => Some(c),
             Err(e) => {
                 io.write_error3(
-                    &format!("Failed to initialize global composer: {}", e),
+                    bconcat!("Failed to initialize global composer: ", error_message(&e)),
                     true,
                     crate::io::DEBUG,
                 );
@@ -967,8 +972,8 @@ impl Factory {
         let cache = if cache_files_ttl > 0 {
             let mut cache = Cache::new(
                 io.clone(),
-                &config.borrow_mut().get_str("cache-files-dir")?,
-                Some("a-z0-9_./"),
+                path_from_bytes(&config.borrow_mut().get_str("cache-files-dir")?),
+                Some(BStr::new("a-z0-9_./")),
                 None,
                 false,
             );
@@ -990,11 +995,11 @@ impl Factory {
 
         let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
         let preferred = config.borrow_mut().get("preferred-install");
-        match preferred.as_string().map(|s| s.to_str_lossy()).as_deref() {
-            Some("dist") => {
+        match preferred.as_string().map(|s| &**s) {
+            Some(b"dist") => {
                 dm.set_prefer_dist(true);
             }
-            Some("source") => {
+            Some(b"source") => {
                 dm.set_prefer_source(true);
             }
             _ => {
@@ -1006,13 +1011,12 @@ impl Factory {
             dm.set_preferences(
                 prefs
                     .into_iter()
-                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                     .map(|(k, v)| {
                         (
-                            k.to_str_lossy().into_owned(),
+                            k,
                             match v {
-                                PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-                                _ => String::new(),
+                                PhpMixed::String(s) => s,
+                                _ => BString::default(),
                             },
                         )
                     })
@@ -1226,21 +1230,28 @@ impl Factory {
                 .expect("Composer must outlive create_default_installers");
             let composer_ref = composer_rc.borrow_partial();
             let config = composer_ref.get_config();
-            let bin_dir = rtrim(
-                &config.borrow_mut().get_str("bin-dir").unwrap_or_default(),
-                Some("/"),
-            );
+            let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim2(
+                config
+                    .borrow_mut()
+                    .get("bin-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+                "/",
+            )));
             let bin_compat = config
                 .borrow_mut()
-                .get_str("bin-compat")
-                .unwrap_or_default();
-            let vendor_dir = rtrim(
-                &config
+                .get("bin-compat")
+                .as_string()
+                .unwrap_or_default()
+                .to_owned();
+            let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim2(
+                config
                     .borrow_mut()
-                    .get_str("vendor-dir")
+                    .get("vendor-dir")
+                    .as_string()
                     .unwrap_or_default(),
-                Some("/"),
-            );
+                "/",
+            )));
             (bin_dir, bin_compat, vendor_dir)
         };
 
@@ -1330,7 +1341,7 @@ impl Factory {
             factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
         // fullLoad=true guarantees a full Composer; narrow PartialComposer -> Composer (PHP `: Composer`).
         composer.as_full().ok_or_else(|| {
-            RuntimeException::new("Composer expected with fullLoad=true".to_string()).into()
+            RuntimeException::new(BString::from("Composer expected with fullLoad=true")).into()
         })
     }
 
@@ -1363,35 +1374,28 @@ impl Factory {
         let composer =
             factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
         composer.as_full().ok_or_else(|| {
-            RuntimeException::new("Composer expected with fullLoad=true".to_string()).into()
+            RuntimeException::new(BString::from("Composer expected with fullLoad=true")).into()
         })
     }
 
     /// For testing only: equivalent of `FactoryMock::createConfig`. Builds a `Config` with a unique
     /// temp home and packagist disabled, without loading the global config/auth files.
-    fn __create_config_mock(cwd: Option<&str>) -> anyhow::Result<Config> {
+    fn __create_config_mock(cwd: Option<&Path>) -> anyhow::Result<Config> {
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT: AtomicU64 = AtomicU64::new(0);
 
-        let mut config = Config::new(true, cwd.map(|s| s.to_string()));
+        let mut config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
 
-        let home = std::env::temp_dir().join(format!(
-            "shirabe-test-{}-{}",
+        let home = std::env::temp_dir().join(path_from_bytes(&bconcat!(
+            "shirabe-test-",
             std::process::id(),
+            "-",
             NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
+        )));
         let _ = std::fs::create_dir_all(&home);
 
         let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-        config_section.insert(
-            "home".into(),
-            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-            PhpMixed::string(
-                home.into_os_string()
-                    .into_string()
-                    .unwrap_or_else(|home| panic!("temp dir is not valid UTF-8: {home:?}")),
-            ),
-        );
+        config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home)));
         let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
         repositories.insert("packagist".into(), PhpMixed::Bool(false));
 
@@ -1413,10 +1417,10 @@ impl Factory {
         static mut WARNED: bool = false;
         let mut disable_tls = false;
         // allow running the config command if disable-tls is in the arg list, even if openssl is missing, to allow disabling it via the config command
-        let argv: Vec<String> = std::env::args().collect();
+        let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
         if !argv.is_empty()
-            && argv.contains(&"disable-tls".to_string())
-            && (argv.contains(&"conf".to_string()) || argv.contains(&"config".to_string()))
+            && argv.iter().any(|arg| arg == "disable-tls")
+            && argv.iter().any(|arg| arg == "conf" || arg == "config")
         {
             unsafe { WARNED = true };
             disable_tls = !extension_loaded("openssl");
@@ -1436,8 +1440,7 @@ impl Factory {
             unsafe { WARNED = true };
             disable_tls = true;
         } else if !extension_loaded("openssl") {
-            return Err(NoSslException::new("The openssl extension is required for SSL/TLS protection but is not available. If you can not enable the openssl extension, you can disable this error, at your own risk, by setting the 'disable-tls' option to true."
-                        .to_string()).into());
+            return Err(NoSslException::new(BString::from("The openssl extension is required for SSL/TLS protection but is not available. If you can not enable the openssl extension, you can disable this error, at your own risk, by setting the 'disable-tls' option to true.")).into());
         }
         let mut http_downloader_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         if !disable_tls {
@@ -1512,10 +1515,9 @@ impl Factory {
 
         let auth_data = json_decode_obj(&composer_auth_env_str)?;
         if matches!(auth_data, PhpMixed::Null) {
-            return Err(UnexpectedValueException::new(
-                "COMPOSER_AUTH environment variable is malformed, should be a valid JSON object"
-                    .to_string(),
-            )
+            return Err(UnexpectedValueException::new(BString::from(
+                "COMPOSER_AUTH environment variable is malformed, should be a valid JSON object",
+            ))
             .into());
         }
 
@@ -1530,7 +1532,7 @@ impl Factory {
             io,
             ValidateJsonInput::Data(auth_data),
             JsonFile::AUTH_SCHEMA,
-            Some("COMPOSER_AUTH"),
+            Some(BStr::new("COMPOSER_AUTH")),
         )?;
         let auth_data_assoc = json_decode_assoc(&composer_auth_env_str)?;
         if !matches!(auth_data_assoc, PhpMixed::Null) {
@@ -1557,21 +1559,20 @@ impl Factory {
         is_dir("/etc/xdg")
     }
 
-    fn get_user_dir() -> anyhow::Result<String> {
+    fn get_user_dir() -> anyhow::Result<BString> {
         let home = Platform::get_env("HOME").unwrap_or_default();
         if home.is_empty() {
-            return Err(RuntimeException::new("The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly"
-                        .to_string()).into());
+            return Err(RuntimeException::new(BString::from("The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly")).into());
         }
 
-        Ok(rtrim(&strtr(&home, "\\", "/"), Some("/")))
+        Ok(rtrim2(strtr(&home, "\\", "/"), "/"))
     }
 
     fn validate_json_schema(
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         file_or_data: ValidateJsonInput<'_>,
         schema: i64,
-        source: Option<&str>,
+        source: Option<&BStr>,
     ) -> anyhow::Result<()> {
         if Platform::is_input_completion_process() {
             return Ok(());
@@ -1581,10 +1582,9 @@ impl Factory {
             ValidateJsonInput::File(file) => file.validate_schema(schema, None),
             ValidateJsonInput::Data(data) => {
                 let source = source.ok_or_else(|| -> anyhow::Error {
-                    InvalidArgumentException::new(
-                        "$source is required to be provided if $fileOrData is arbitrary data"
-                            .to_string(),
-                    )
+                    InvalidArgumentException::new(BString::from(
+                        "$source is required to be provided if $fileOrData is arbitrary data",
+                    ))
                     .into()
                 })?;
                 JsonFile::validate_json_schema(source, &data, schema, None)
@@ -1593,14 +1593,15 @@ impl Factory {
 
         if let Err(e) = result {
             if let Some(jve) = e.catch::<JsonValidationException>() {
-                let msg = format!(
-                    "{}, this may result in errors and should be resolved:{} - {}",
+                let msg = bconcat!(
                     jve.get_message(),
+                    ", this may result in errors and should be resolved:",
                     PHP_EOL,
-                    implode(&format!("{} - ", PHP_EOL), jve.get_errors())
+                    " - ",
+                    (implode(bconcat!(PHP_EOL, " - "), jve.get_errors()))
                 );
                 if let Some(io_ref) = io {
-                    io_ref.write_error3(&format!("<warning>{}</>", msg), true, crate::io::NORMAL);
+                    io_ref.write_error3(bconcat!("<warning>", msg, "</>"), true, crate::io::NORMAL);
                 } else {
                     return Err(UnexpectedValueException::new(msg).into());
                 }
@@ -1615,4 +1616,8 @@ impl Factory {
 enum ValidateJsonInput<'a> {
     File(&'a JsonFile),
     Data(PhpMixed),
+}
+
+fn is_dir_at(path: BString) -> bool {
+    is_dir(path_from_bytes(&path))
 }

@@ -7,13 +7,14 @@ use crate::repository::vcs::HgDriver;
 use crate::util::{
     Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Svn as SvnUtil, sync_executor,
 };
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, implode, is_string,
-    json_encode, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, str_replace,
+    PhpMixed, RuntimeException, array_map, bconcat, empty, implode, is_string, json_encode,
+    path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, str_replace,
     strlen, strnatcasecmp, strpos, substr, trim, usort,
 };
+use std::path::Path;
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
 /// with a test double. PHP has no such interface; this exists only to allow mocking the
@@ -22,10 +23,10 @@ pub trait VersionGuesserInterface: std::fmt::Debug {
     fn guess_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<VersionData>>;
 
-    fn get_root_version_from_env(&self) -> anyhow::Result<String>;
+    fn get_root_version_from_env(&self) -> anyhow::Result<BString>;
 }
 
 /// Try to guess the current version number based on different VCS configuration.
@@ -46,11 +47,11 @@ pub struct VersionGuesser {
 
 #[derive(Debug, Clone)]
 pub struct VersionData {
-    pub version: Option<String>,
-    pub commit: Option<String>,
-    pub pretty_version: Option<String>,
-    pub feature_version: Option<String>,
-    pub feature_pretty_version: Option<String>,
+    pub version: Option<BString>,
+    pub commit: Option<BString>,
+    pub pretty_version: Option<BString>,
+    pub feature_version: Option<BString>,
+    pub feature_pretty_version: Option<BString>,
 }
 
 impl VersionGuesser {
@@ -86,7 +87,7 @@ impl VersionGuesser {
     pub fn guess_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<VersionData>> {
         // For testing only (ref VersionGuesserMock::guessVersion returns null).
         if self.mock {
@@ -140,16 +141,21 @@ impl VersionGuesser {
             version_data.feature_pretty_version = None;
         }
 
-        if "-dev" == substr(version_data.version.as_deref().unwrap_or(""), -4, None)
+        if "-dev"
+            == substr(
+                version_data.version.as_ref().map_or(B(""), |v| v.as_bstr()),
+                -4,
+                None,
+            )
             && preg_is_match(
                 php_regex!(r"{\.9{7}}"),
-                version_data.version.as_deref().unwrap_or(""),
+                version_data.version.as_ref().map_or(B(""), |v| v.as_bstr()),
             )
         {
             version_data.pretty_version = Some(preg_replace(
                 php_regex!(r"{(\.9{7})+}"),
                 ".x",
-                version_data.version.as_deref().unwrap_or(""),
+                version_data.version.as_ref().map_or(B(""), |v| v.as_bstr()),
             ));
         }
 
@@ -161,19 +167,28 @@ impl VersionGuesser {
         if feature_non_empty
             && "-dev"
                 == substr(
-                    version_data.feature_version.as_deref().unwrap_or(""),
+                    version_data
+                        .feature_version
+                        .as_ref()
+                        .map_or(B(""), |v| v.as_bstr()),
                     -4,
                     None,
                 )
             && preg_is_match(
                 php_regex!(r"{\.9{7}}"),
-                version_data.feature_version.as_deref().unwrap_or(""),
+                version_data
+                    .feature_version
+                    .as_ref()
+                    .map_or(B(""), |v| v.as_bstr()),
             )
         {
             version_data.feature_pretty_version = Some(preg_replace(
                 php_regex!(r"{(\.9{7})+}"),
                 ".x",
-                version_data.feature_version.as_deref().unwrap_or(""),
+                version_data
+                    .feature_version
+                    .as_ref()
+                    .map_or(B(""), |v| v.as_bstr()),
             ));
         }
 
@@ -183,31 +198,24 @@ impl VersionGuesser {
     fn guess_git_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<VersionData> {
         GitUtil::clean_env(&self.process);
-        let mut commit: Option<String> = None;
-        let mut version: Option<String> = None;
-        let mut pretty_version: Option<String> = None;
-        let mut feature_version: Option<String> = None;
-        let mut feature_pretty_version: Option<String> = None;
+        let mut commit: Option<BString> = None;
+        let mut version: Option<BString> = None;
+        let mut pretty_version: Option<BString> = None;
+        let mut feature_version: Option<BString> = None;
+        let mut feature_pretty_version: Option<BString> = None;
         let mut is_detached = false;
 
         // try to fetch current version from git branch
-        let mut output = String::new();
+        let mut output = BString::default();
         if 0 == self.process.borrow_mut().execute(
-            &[
-                "git".to_string(),
-                "branch".to_string(),
-                "-a".to_string(),
-                "--no-color".to_string(),
-                "--no-abbrev".to_string(),
-                "-v".to_string(),
-            ],
+            &["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             &mut output,
             Some(path),
         )? {
-            let mut branches: Vec<String> = vec![];
+            let mut branches: Vec<BString> = vec![];
             let mut is_feature_branch = false;
 
             // find current branch and collect all branch names
@@ -220,20 +228,20 @@ impl VersionGuesser {
                         &branch,
                     )
                 {
-                    let g1 = m.get(1).unwrap_or_default().to_string();
-                    let g2 = m.get(2).unwrap_or_default().to_string();
+                    let g1 = m.get(1).unwrap_or_default();
+                    let g2 = BString::from(m.get(2).unwrap_or_default());
                     if g1 == "(no branch)"
-                        || strpos(&g1, "(detached ") == Some(0)
-                        || strpos(&g1, "(HEAD detached at") == Some(0)
+                        || strpos(g1, "(detached ") == Some(0)
+                        || strpos(g1, "(HEAD detached at") == Some(0)
                     {
-                        version = Some(format!("dev-{}", g2));
+                        version = Some(bconcat!("dev-", g2));
                         pretty_version = version.clone();
                         is_feature_branch = true;
                         is_detached = true;
                     } else {
-                        version = Some(self.version_parser.normalize_branch(&g1)?);
-                        pretty_version = Some(format!("dev-{}", g1));
-                        is_feature_branch = self.is_feature_branch(package_config, Some(&g1));
+                        version = Some(self.version_parser.normalize_branch(g1)?);
+                        pretty_version = Some(bconcat!("dev-", g1));
+                        is_feature_branch = self.is_feature_branch(package_config, Some(g1));
                     }
 
                     commit = Some(g2);
@@ -248,7 +256,7 @@ impl VersionGuesser {
                         &branch,
                     )
                 {
-                    branches.push(m.get(1).unwrap_or_default().to_string());
+                    branches.push(m.get(1).unwrap_or_default().into());
                 }
             }
 
@@ -262,9 +270,9 @@ impl VersionGuesser {
                     version.clone(),
                     branches,
                     vec![
-                        "git".to_string(),
-                        "rev-list".to_string(),
-                        "%candidate%..%branch%".to_string(),
+                        "git".into(),
+                        "rev-list".into(),
+                        "%candidate%..%branch%".into(),
                     ],
                     path,
                 )?;
@@ -273,7 +281,7 @@ impl VersionGuesser {
             }
         }
         GitUtil::check_for_repo_ownership_error(
-            &self.process.borrow().get_error_output(),
+            self.process.borrow().get_error_output().as_bstr(),
             path,
             self.io.clone(),
         );
@@ -289,39 +297,20 @@ impl VersionGuesser {
         }
 
         if commit.is_none() {
-            let command = GitUtil::build_rev_list_command(
-                &self.process,
-                array_merge(
-                    PhpMixed::List(vec![
-                        PhpMixed::string("--format=%H".to_string()),
-                        PhpMixed::string("-n1".to_string()),
-                        PhpMixed::string("HEAD".to_string()),
-                    ]),
-                    PhpMixed::List(
-                        GitUtil::get_no_show_signature_flags(&self.process)?
-                            .into_iter()
-                            .map(PhpMixed::string)
-                            .collect(),
-                    ),
-                )
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-                .unwrap_or_default(),
-            )?;
-            let mut command_output = String::new();
+            let mut arguments: Vec<BString> =
+                vec!["--format=%H".into(), "-n1".into(), "HEAD".into()];
+            arguments.extend(GitUtil::get_no_show_signature_flags(&self.process)?);
+            let command = GitUtil::build_rev_list_command(&self.process, arguments)?;
+            let mut command_output = BString::default();
             if 0 == self
                 .process
                 .borrow_mut()
                 .execute(&command, &mut command_output, Some(path))?
             {
-                let parsed = trim(
-                    &GitUtil::parse_rev_list_output(&command_output, &self.process)?,
-                    None,
-                );
+                let parsed = trim(GitUtil::parse_rev_list_output(
+                    &command_output,
+                    &self.process,
+                )?);
                 commit = if parsed.is_empty() {
                     None
                 } else {
@@ -339,21 +328,18 @@ impl VersionGuesser {
         })
     }
 
-    fn version_from_git_tags(&mut self, path: &str) -> anyhow::Result<Option<(String, String)>> {
+    fn version_from_git_tags(&mut self, path: &Path) -> anyhow::Result<Option<(BString, BString)>> {
         // try to fetch current version from git tags
-        let mut output = String::new();
+        let mut output = BString::default();
         if 0 == self.process.borrow_mut().execute(
-            &[
-                "git".to_string(),
-                "describe".to_string(),
-                "--exact-match".to_string(),
-                "--tags".to_string(),
-            ],
+            &["git", "describe", "--exact-match", "--tags"],
             &mut output,
             Some(path),
         )? {
-            match self.version_parser.normalize(&trim(&output, None), None) {
-                Ok(version) => return Ok(Some((version, trim(&output, None)))),
+            match self.version_parser.normalize(trim(&output), None) {
+                Ok(version) => {
+                    return Ok(Some((version, trim(&output))));
+                }
                 Err(_e) => {}
             }
         }
@@ -364,16 +350,16 @@ impl VersionGuesser {
     fn guess_hg_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<VersionData>> {
         // try to fetch current version from hg branch
-        let mut output = String::new();
-        if 0 == self.process.borrow_mut().execute(
-            &["hg".to_string(), "branch".to_string()],
-            &mut output,
-            Some(path),
-        )? {
-            let branch = trim(&output, None);
+        let mut output = BString::default();
+        if 0 == self
+            .process
+            .borrow_mut()
+            .execute(&["hg", "branch"], &mut output, Some(path))?
+        {
+            let branch = trim(&output);
             let version = self.version_parser.normalize_branch(&branch)?;
             let is_feature_branch = strpos(&version, "dev-") == Some(0);
 
@@ -381,7 +367,7 @@ impl VersionGuesser {
                 return Ok(Some(VersionData {
                     version: Some(version),
                     commit: None,
-                    pretty_version: Some(format!("dev-{}", branch)),
+                    pretty_version: Some(bconcat!("dev-", branch)),
                     feature_version: None,
                     feature_pretty_version: None,
                 }));
@@ -399,7 +385,7 @@ impl VersionGuesser {
 
             // re-use the HgDriver to fetch branches (this properly includes bookmarks)
             let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-            repo_config.insert("url".into(), PhpMixed::string(path.to_string()));
+            repo_config.insert("url".into(), PhpMixed::string(path_to_bytes(path)));
             let io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
             let http_io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
@@ -417,8 +403,7 @@ impl VersionGuesser {
                 http_downloader,
                 std::rc::Rc::clone(&self.process),
             );
-            let branches: Vec<String> =
-                array_map(|k: &String| k.clone(), &array_keys(&driver.get_branches()?));
+            let branches: Vec<BString> = driver.get_branches()?.keys().cloned().collect();
 
             // try to find the best (nearest) version branch to assume this feature's version
             let result = self.guess_feature_version(
@@ -426,16 +411,16 @@ impl VersionGuesser {
                 Some(version.clone()),
                 branches,
                 vec![
-                    "hg".to_string(),
-                    "log".to_string(),
-                    "-r".to_string(),
-                    "not ancestors('%candidate%') and ancestors('%branch%')".to_string(),
-                    "--template".to_string(),
-                    "\"{node}\\n\"".to_string(),
+                    "hg".into(),
+                    "log".into(),
+                    "-r".into(),
+                    "not ancestors('%candidate%') and ancestors('%branch%')".into(),
+                    "--template".into(),
+                    "\"{node}\\n\"".into(),
                 ],
                 path,
             )?;
-            let commit = Some(String::new());
+            let commit = Some(BString::default());
             let feature_version = Some(version.clone());
             let feature_pretty_version = Some(version);
 
@@ -454,12 +439,12 @@ impl VersionGuesser {
     fn guess_feature_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        version: Option<String>,
-        mut branches: Vec<String>,
-        scm_cmdline: Vec<String>,
-        path: &str,
+        version: Option<BString>,
+        mut branches: Vec<BString>,
+        scm_cmdline: Vec<BString>,
+        path: &Path,
     ) -> anyhow::Result<FeatureVersionResult> {
-        let mut pretty_version: Option<String> = version.clone();
+        let mut pretty_version: Option<BString> = version.clone();
         let mut version = version;
 
         // ignore feature branches if they have no branch-alias or self.version is used
@@ -469,10 +454,10 @@ impl VersionGuesser {
             .and_then(|v| v.as_array())
             .and_then(|m| m.get(B("branch-alias")))
             .and_then(|v| v.as_array())
-            .map(|m| m.contains_key(B(version.as_deref().unwrap_or(""))))
+            .map(|m| m.contains_key(version.as_ref().map_or(B(""), |v| v.as_bstr())))
             .unwrap_or(false);
         let has_self_version = strpos(
-            &json_encode(&PhpMixed::Array(
+            json_encode(&PhpMixed::Array(
                 package_config
                     .iter()
                     .map(|(k, v)| (k.clone(), v.clone()))
@@ -483,11 +468,15 @@ impl VersionGuesser {
         )
         .is_some();
         if !has_branch_alias || has_self_version {
-            let branch = preg_replace(php_regex!(r"{^dev-}"), "", version.as_deref().unwrap_or(""));
+            let branch = preg_replace(
+                php_regex!(r"{^dev-}"),
+                "",
+                version.as_ref().map_or(B(""), |v| v.as_bstr()),
+            );
             let mut length = i64::MAX;
 
             // return directly, if branch is configured to be non-feature branch
-            if !self.is_feature_branch(package_config, Some(&branch)) {
+            if !self.is_feature_branch(package_config, Some(branch.as_bstr())) {
                 return Ok(FeatureVersionResult {
                     version,
                     pretty_version,
@@ -497,7 +486,7 @@ impl VersionGuesser {
             // sort local branches first then remote ones
             // and sort numeric branches below named ones, to make sure if the branch has the same distance from main and 1.10 and 1.9 for example, 1.9 is picked
             // and sort using natural sort so that 1.10 will appear before 1.9
-            usort(&mut branches, |a: &String, b: &String| -> i64 {
+            usort(&mut branches, |a: &BString, b: &BString| -> i64 {
                 let a_remote = strpos(a, "remotes/") == Some(0);
                 let b_remote = strpos(b, "remotes/") == Some(0);
 
@@ -521,17 +510,15 @@ impl VersionGuesser {
 
                     // do not compare against itself or other feature branches
                     if candidate == &branch
-                        || self.is_feature_branch(package_config, Some(&candidate_version))
+                        || self.is_feature_branch(package_config, Some(candidate_version.as_bstr()))
                     {
                         continue;
                     }
 
-                    let candidate_clone = candidate.clone();
-                    let branch_clone = branch.clone();
-                    let cmd_line: Vec<String> = array_map(
-                        move |component: &String| -> String {
-                            let r1 = str_replace("%candidate%", &candidate_clone, component);
-                            str_replace("%branch%", &branch_clone, &r1)
+                    let cmd_line: Vec<BString> = array_map(
+                        |component: &BString| -> BString {
+                            let r1 = str_replace("%candidate%", candidate, component);
+                            str_replace("%branch%", &branch, &r1)
                         },
                         &scm_cmdline,
                     );
@@ -553,7 +540,7 @@ impl VersionGuesser {
                         last_index = index;
                         length = strlen(&output);
                         version = Some(self.version_parser.normalize_branch(&candidate_version)?);
-                        pretty_version = Some(format!("dev-{}", candidate_version));
+                        pretty_version = Some(bconcat!("dev-", candidate_version));
                         if length == 0 {
                             break;
                         }
@@ -575,16 +562,16 @@ impl VersionGuesser {
     fn is_feature_branch(
         &self,
         package_config: &IndexMap<BString, PhpMixed>,
-        branch_name: Option<&str>,
+        branch_name: Option<&BStr>,
     ) -> bool {
-        let mut non_feature_branches = String::new();
+        let mut non_feature_branches = BString::default();
         let nf_value = package_config.get(B("non-feature-branches"));
         if !empty(&nf_value.cloned().unwrap_or(PhpMixed::Null)) {
-            let names: Vec<String> = nf_value
+            let names: Vec<BString> = nf_value
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .filter_map(|v| v.as_string().map(BString::from))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -592,45 +579,42 @@ impl VersionGuesser {
         }
 
         !preg_is_match(
-            format!(
-                r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
+            bconcat!(
+                "{^(",
                 non_feature_branches,
+                r"|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}",
             ),
-            branch_name.unwrap_or(""),
+            branch_name.unwrap_or_default(),
         )
     }
 
-    fn guess_fossil_version(&mut self, path: &str) -> anyhow::Result<VersionData> {
-        let mut version: Option<String> = None;
-        let mut pretty_version: Option<String> = None;
+    fn guess_fossil_version(&mut self, path: &Path) -> anyhow::Result<VersionData> {
+        let mut version: Option<BString> = None;
+        let mut pretty_version: Option<BString> = None;
 
         // try to fetch current version from fossil
-        let mut output = String::new();
+        let mut output = BString::default();
         if 0 == self.process.borrow_mut().execute(
-            &[
-                "fossil".to_string(),
-                "branch".to_string(),
-                "list".to_string(),
-            ],
+            &["fossil", "branch", "list"],
             &mut output,
             Some(path),
         )? {
-            let branch = trim(&output, None);
+            let branch = trim(&output);
             version = Some(self.version_parser.normalize_branch(&branch)?);
-            pretty_version = Some(format!("dev-{}", branch));
+            pretty_version = Some(bconcat!("dev-", branch));
         }
 
         // try to fetch current version from fossil tags
-        let mut output = String::new();
+        let mut output = BString::default();
         if 0 == self.process.borrow_mut().execute(
-            &["fossil".to_string(), "tag".to_string(), "list".to_string()],
+            &["fossil", "tag", "list"],
             &mut output,
             Some(path),
         )? {
-            match self.version_parser.normalize(&trim(&output, None), None) {
+            match self.version_parser.normalize(trim(&output), None) {
                 Ok(v) => {
                     version = Some(v);
-                    pretty_version = Some(trim(&output, None));
+                    pretty_version = Some(trim(&output));
                 }
                 Err(_e) => {}
             }
@@ -638,7 +622,7 @@ impl VersionGuesser {
 
         Ok(VersionData {
             version,
-            commit: Some(String::new()),
+            commit: Some(BString::default()),
             pretty_version,
             feature_version: None,
             feature_pretty_version: None,
@@ -648,36 +632,41 @@ impl VersionGuesser {
     fn guess_svn_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<VersionData>> {
         SvnUtil::clean_env();
 
         // try to fetch current version from svn
-        let mut output = String::new();
+        let mut output = BString::default();
         if 0 == self.process.borrow_mut().execute(
-            &["svn".to_string(), "info".to_string(), "--xml".to_string()],
+            &["svn", "info", "--xml"],
             &mut output,
             Some(path),
         )? {
             let trunk_path = package_config
                 .get(B("trunk-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
-                .unwrap_or_else(|| "trunk".to_string());
+                .map(|s| preg_quote(s, Some(b'#')))
+                .unwrap_or_else(|| BString::from("trunk"));
             let branches_path = package_config
                 .get(B("branches-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
-                .unwrap_or_else(|| "branches".to_string());
+                .map(|s| preg_quote(s, Some(b'#')))
+                .unwrap_or_else(|| BString::from("branches"));
             let tags_path = package_config
                 .get(B("tags-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
-                .unwrap_or_else(|| "tags".to_string());
+                .map(|s| preg_quote(s, Some(b'#')))
+                .unwrap_or_else(|| BString::from("tags"));
 
-            let url_pattern = format!(
-                "#<url>.*/({}|({}|{})/(.*))</url>#",
-                trunk_path, branches_path, tags_path,
+            let url_pattern = bconcat!(
+                "#<url>.*/(",
+                trunk_path,
+                "|(",
+                branches_path,
+                "|",
+                tags_path,
+                ")/(.*))</url>#"
             );
 
             if let Some(matches) = preg_match(&url_pattern, &output) {
@@ -686,32 +675,33 @@ impl VersionGuesser {
                 let m3 = matches.get(3);
                 if let Some(m2) = m2
                     && let Some(m3) = m3
-                    && (branches_path == *m2 || tags_path == *m2)
+                    && (branches_path.as_bytes() == m2.as_bytes()
+                        || tags_path.as_bytes() == m2.as_bytes())
                 {
                     // we are in a branches path
                     let version = self.version_parser.normalize_branch(m3)?;
-                    let pretty_version = format!("dev-{}", m3);
+                    let pretty_version = bconcat!("dev-", m3);
 
                     return Ok(Some(VersionData {
                         version: Some(version),
-                        commit: Some(String::new()),
+                        commit: Some(BString::default()),
                         pretty_version: Some(pretty_version),
                         feature_version: None,
                         feature_pretty_version: None,
                     }));
                 }
 
-                assert!(is_string(&PhpMixed::string(m1.to_string())));
-                let pretty_version = trim(m1, None);
+                assert!(is_string(&PhpMixed::string(m1)));
+                let pretty_version = trim(m1);
                 let version = if pretty_version == "trunk" {
-                    "dev-trunk".to_string()
+                    BString::from("dev-trunk")
                 } else {
                     self.version_parser.normalize(&pretty_version, None)?
                 };
 
                 return Ok(Some(VersionData {
                     version: Some(version),
-                    commit: Some(String::new()),
+                    commit: Some(BString::default()),
                     pretty_version: Some(pretty_version),
                     feature_version: None,
                     feature_pretty_version: None,
@@ -722,19 +712,19 @@ impl VersionGuesser {
         Ok(None)
     }
 
-    pub fn get_root_version_from_env(&self) -> anyhow::Result<String> {
+    pub fn get_root_version_from_env(&self) -> anyhow::Result<BString> {
         let version = Platform::get_env("COMPOSER_ROOT_VERSION");
         let version = match version {
             Some(v) if !v.is_empty() => v,
             _ => {
-                return Err(RuntimeException::new(
-                    "COMPOSER_ROOT_VERSION not set or empty".to_string(),
-                )
+                return Err(RuntimeException::new(BString::from(
+                    "COMPOSER_ROOT_VERSION not set or empty",
+                ))
                 .into());
             }
         };
         if let Some(m) = preg_match(php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"), &version) {
-            return Ok(format!("{}.x-dev", m.get(1).unwrap_or_default()));
+            return Ok(bconcat!(m.get(1).unwrap_or_default(), ".x-dev"));
         }
 
         Ok(version)
@@ -745,18 +735,18 @@ impl VersionGuesserInterface for VersionGuesser {
     fn guess_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<VersionData>> {
         VersionGuesser::guess_version(self, package_config, path)
     }
 
-    fn get_root_version_from_env(&self) -> anyhow::Result<String> {
+    fn get_root_version_from_env(&self) -> anyhow::Result<BString> {
         VersionGuesser::get_root_version_from_env(self)
     }
 }
 
 #[derive(Debug)]
 pub struct FeatureVersionResult {
-    pub version: Option<String>,
-    pub pretty_version: Option<String>,
+    pub version: Option<BString>,
+    pub pretty_version: Option<BString>,
 }

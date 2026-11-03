@@ -10,6 +10,7 @@ use crate::dependency_resolver::operation::{
     UninstallOperation, UpdateOperation,
 };
 use crate::package::PackageInterfaceHandle;
+use bstr::BStr;
 
 /// Any solver operation.
 #[derive(Debug, Clone)]
@@ -22,7 +23,7 @@ pub enum AnyOperation {
 }
 
 impl AnyOperation {
-    pub fn get_operation_type(&self) -> &'static str {
+    pub fn get_operation_type(&self) -> &'static BStr {
         match self {
             Self::Install(_) => InstallOperation::TYPE,
             Self::Update(_) => UpdateOperation::TYPE,
@@ -32,7 +33,7 @@ impl AnyOperation {
         }
     }
 
-    pub fn show(&self, lock: bool) -> String {
+    pub fn show(&self, lock: bool) -> bstr::BString {
         match self {
             Self::Install(op) => op.show(lock),
             Self::Update(op) => op.show(lock),
@@ -57,7 +58,7 @@ impl AnyOperation {
 
 impl std::fmt::Display for AnyOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false))
+        write!(f, "{}", self.show(false).display_lossy())
     }
 }
 

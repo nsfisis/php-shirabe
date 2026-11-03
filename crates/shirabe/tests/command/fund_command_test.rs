@@ -4,14 +4,14 @@ use crate::test_case::{
     RunOptions, create_installed_json, get_application_tester, get_complete_package,
     init_temp_composer,
 };
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
-fn funding_entry(r#type: &str, url: &str) -> IndexMap<BString, PhpMixed> {
+fn funding_entry(r#type: &BStr, url: &BStr) -> IndexMap<BString, PhpMixed> {
     let mut m = IndexMap::new();
     m.insert("type".into(), PhpMixed::from(r#type));
     m.insert("url".into(), PhpMixed::from(url));
@@ -21,9 +21,9 @@ fn funding_entry(r#type: &str, url: &str) -> IndexMap<BString, PhpMixed> {
 /// Runs one `useCaseProvider` case.
 fn run_fund_case(
     composer_json: serde_json::Value,
-    command: &[(&str, InputValue)],
-    funding: &[(&str, IndexMap<BString, PhpMixed>)],
-    expected: &str,
+    command: &[(&BStr, InputValue)],
+    funding: &[(&BStr, IndexMap<BString, PhpMixed>)],
+    expected: &BStr,
 ) {
     let tear_down = init_temp_composer(Some(&composer_json), None, None, true);
 
@@ -31,10 +31,10 @@ fn run_fund_case(
     let stable = get_complete_package("stable/pkg", "1.0.0");
     let dev = get_complete_package("dev/pkg", "2.3.4.5");
 
-    let by_name: IndexMap<&str, &CompletePackageHandle> = [
-        ("first/pkg", &first),
-        ("stable/pkg", &stable),
-        ("dev/pkg", &dev),
+    let by_name: IndexMap<&BStr, &CompletePackageHandle> = [
+        (BStr::new("first/pkg"), &first),
+        (BStr::new("stable/pkg"), &stable),
+        (BStr::new("dev/pkg"), &dev),
     ]
     .into_iter()
     .collect();
@@ -59,7 +59,7 @@ fn run_fund_case(
     let mut app_tester = get_application_tester();
     let status_code = app_tester.run(input, RunOptions::default()).unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(trim(expected), trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -76,7 +76,9 @@ fn test_fund_command() {
         }),
         &[],
         &[],
-        "No funding links were found in your package dependencies. This doesn't mean they don't need your support!",
+        BStr::new(
+            "No funding links were found in your package dependencies. This doesn't mean they don't need your support!",
+        ),
     );
 
     // 'funding links set locally are used as fallback if not found remotely'
@@ -89,15 +91,15 @@ fn test_fund_command() {
         &[],
         &[
             (
-                "first/pkg",
-                funding_entry("github", "https://github.com/composer-test-data"),
+                BStr::new("first/pkg"),
+                funding_entry(BStr::new("github"), BStr::new("https://github.com/composer-test-data")),
             ),
             (
-                "dev/pkg",
-                funding_entry("github", "https://github.com/composer-test-data-dev"),
+                BStr::new("dev/pkg"),
+                funding_entry(BStr::new("github"), BStr::new("https://github.com/composer-test-data-dev")),
             ),
         ],
-        "The following packages were found in your dependencies which publish funding information:
+        BStr::new("The following packages were found in your dependencies which publish funding information:
 
 dev
   pkg
@@ -107,7 +109,7 @@ first
     https://github.com/sponsors/composer-test-data
 
 Please consider following these links and sponsoring the work of package authors!
-Thank you!",
+Thank you!"),
     );
 
     // 'funding links set remotely are used as primary if found'
@@ -130,19 +132,19 @@ Thank you!",
         &[],
         &[
             (
-                "first/pkg",
-                funding_entry("github", "https://github.com/composer-test-data"),
+                BStr::new("first/pkg"),
+                funding_entry(BStr::new("github"), BStr::new("https://github.com/composer-test-data")),
             ),
             (
-                "dev/pkg",
-                funding_entry("github", "https://github.com/composer-test-data-dev"),
+                BStr::new("dev/pkg"),
+                funding_entry(BStr::new("github"), BStr::new("https://github.com/composer-test-data-dev")),
             ),
             (
-                "stable/pkg",
-                funding_entry("github", "https://github.com/composer-test-data-stable"),
+                BStr::new("stable/pkg"),
+                funding_entry(BStr::new("github"), BStr::new("https://github.com/composer-test-data-stable")),
             ),
         ],
-        "The following packages were found in your dependencies which publish funding information:
+        BStr::new("The following packages were found in your dependencies which publish funding information:
 
 dev
   pkg
@@ -155,7 +157,7 @@ stable
     https://github.com/sponsors/composer-test-data-stable
 
 Please consider following these links and sponsoring the work of package authors!
-Thank you!",
+Thank you!"),
     );
 
     // 'format funding links as JSON'
@@ -165,18 +167,25 @@ Thank you!",
             "require": { "first/pkg": "^2.0" },
             "require-dev": { "dev/pkg": "~4.0" },
         }),
-        &[("--format", InputValue::from("json"))],
+        &[(BStr::new("--format"), InputValue::from("json"))],
         &[
             (
-                "first/pkg",
-                funding_entry("github", "https://github.com/composer-test-data"),
+                BStr::new("first/pkg"),
+                funding_entry(
+                    BStr::new("github"),
+                    BStr::new("https://github.com/composer-test-data"),
+                ),
             ),
             (
-                "dev/pkg",
-                funding_entry("github", "https://github.com/composer-test-data-dev"),
+                BStr::new("dev/pkg"),
+                funding_entry(
+                    BStr::new("github"),
+                    BStr::new("https://github.com/composer-test-data-dev"),
+                ),
             ),
         ],
-        r#"{
+        BStr::new(
+            r#"{
     "dev": {
         "https://github.com/sponsors/composer-test-data-dev": [
             "pkg"
@@ -188,5 +197,6 @@ Thank you!",
         ]
     }
 }"#,
+        ),
     );
 }

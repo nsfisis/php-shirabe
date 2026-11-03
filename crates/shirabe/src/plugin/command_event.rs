@@ -10,15 +10,15 @@ use shirabe_symfony_console::output::OutputInterface;
 #[derive(Debug)]
 pub struct CommandEvent {
     inner: Event,
-    command_name: String,
+    command_name: BString,
     input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
 }
 
 impl CommandEvent {
     pub fn new(
-        name: &str,
-        command_name: &str,
+        name: impl Into<BString>,
+        command_name: impl AsRef<[u8]>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Self {
@@ -26,17 +26,17 @@ impl CommandEvent {
     }
 
     pub fn new6(
-        name: &str,
-        command_name: &str,
+        name: impl Into<BString>,
+        command_name: impl AsRef<[u8]>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        args: Vec<String>,
+        args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
     ) -> Self {
-        let inner = Event::new(name.to_string(), args, flags);
+        let inner = Event::new(name, args, flags);
         Self {
             inner,
-            command_name: command_name.to_string(),
+            command_name: BString::from(command_name.as_ref()),
             input,
             output,
         }
@@ -50,12 +50,12 @@ impl CommandEvent {
         self.output.clone()
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
-    pub fn get_command_name(&self) -> &str {
-        &self.command_name
+    pub fn get_command_name(&self) -> &bstr::BStr {
+        self.command_name.as_ref()
     }
 }
 
@@ -68,11 +68,11 @@ impl EventInterface for CommandEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<bstr::BString> {
         self.inner.get_arguments()
     }
 

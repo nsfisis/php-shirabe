@@ -1,9 +1,10 @@
 //! ref: composer/src/Composer/Util/ErrorHandler.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use bstr::{BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
     E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException, PHP_EOL,
-    STDERR, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,
+    STDERR, bconcat, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,
     set_error_handler,
 };
 use std::cell::Cell;
@@ -20,8 +21,8 @@ pub struct ErrorHandler;
 impl ErrorHandler {
     pub fn handle(
         level: i64,
-        message: String,
-        file: String,
+        message: BString,
+        file: BString,
         line: i64,
     ) -> Result<bool, ErrorException> {
         let is_deprecation_notice = level == E_DEPRECATED || level == E_USER_DEPRECATED;
@@ -35,22 +36,27 @@ impl ErrorHandler {
 
         let xdebug_scream = ini_get("xdebug.scream").unwrap_or_default();
         if filter_var_boolean(&xdebug_scream) {
-            message += "\n\nWarning: You have xdebug.scream enabled, the warning above may be\na legitimately suppressed error that you were not supposed to see.";
+            message.push_str("\n\nWarning: You have xdebug.scream enabled, the warning above may be\na legitimately suppressed error that you were not supposed to see.");
         }
 
         if !is_deprecation_notice {
             // ignore some newly introduced warnings in new php versions until dependencies
             // can be fixed as we do not want to abort execution for those
             if (level == E_WARNING || level == E_USER_WARNING)
-                && message.contains(
+                && message.contains_str(
                     "should either be used or intentionally ignored by casting it as (void)",
                 )
             {
                 Self::output_warning(
-                    &format!(
-                        "Ignored new PHP warning but it should be reported and fixed: {} in {}:{}",
-                        message, file, line
-                    ),
+                    bconcat!(
+                        "Ignored new PHP warning but it should be reported and fixed: ",
+                        message,
+                        " in ",
+                        file,
+                        ":",
+                        line
+                    )
+                    .as_bstr(),
                     true,
                 );
                 return Ok(true);
@@ -71,7 +77,7 @@ impl ErrorHandler {
             }
             HAS_SHOWN_DEPRECATION_NOTICE.with(|c| c.set(1));
             Self::output_warning(
-                &format!("Deprecation Notice: {} in {}:{}", message, file, line),
+                bconcat!("Deprecation Notice: ", message, " in ", file, ":", line).as_bstr(),
                 false,
             );
         }
@@ -81,24 +87,24 @@ impl ErrorHandler {
 
     pub fn register(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) {
         set_error_handler(|level, message, file, line| {
-            Self::handle(level, message.to_string(), file.to_string(), line).unwrap_or(true)
+            Self::handle(level, message.to_owned(), file.to_owned(), line).unwrap_or(true)
         });
         error_reporting(Some(E_ALL));
         IO.with(|cell| *cell.borrow_mut() = io);
     }
 
-    fn output_warning(message: &str, output_even_without_io: bool) {
+    fn output_warning(message: &bstr::BStr, output_even_without_io: bool) {
         let io = IO.with(|cell| cell.borrow().clone());
         if let Some(io) = io {
-            io.write_error(&format!("<warning>{}</warning>", message));
+            io.write_error(bconcat!("<warning>", message, "</warning>"));
             if io.is_verbose() {
                 io.write_error("<warning>Stack trace:</warning>");
-                let frames: Vec<String> = debug_backtrace()
+                let frames: Vec<BString> = debug_backtrace()
                     .into_iter()
                     .skip(2)
                     .filter_map(|frame| {
                         if let (Some(line), Some(file)) = (frame.line, frame.file) {
-                            Some(format!("<warning> {}:{}</warning>", file, line))
+                            Some(bconcat!("<warning> ", file, ":", line, "</warning>"))
                         } else {
                             None
                         }
@@ -112,7 +118,7 @@ impl ErrorHandler {
         }
 
         if output_even_without_io {
-            fwrite(&STDERR, format!("Warning: {}{}", message, PHP_EOL), None);
+            fwrite(&STDERR, bconcat!("Warning: ", message, PHP_EOL), None);
         }
     }
 }

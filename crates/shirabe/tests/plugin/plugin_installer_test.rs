@@ -2,7 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_runtime_available};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{Composer, ComposerHandle, PartialOrFullComposer};
@@ -34,7 +34,10 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException, UnexpectedValueException};
+use shirabe_php_shim::{
+    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, path_from_bytes,
+    path_to_bytes,
+};
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 use tempfile::TempDir;
@@ -56,55 +59,65 @@ fn shirabe_fixtures_dir() -> std::path::PathBuf {
 
 // PHP mocks `Composer\Downloader\DownloadManager`; install/update/remove resolve to null and the
 // other methods are never reached by these tests.
-mockall::mock! {
-    #[derive(Debug)]
-    pub DownloadManager {}
-    #[async_trait::async_trait(?Send)]
-    impl DownloadManagerInterface for DownloadManager {
-        fn set_prefer_source(&self, prefer_source: bool);
-        fn set_prefer_dist(&self, prefer_dist: bool);
-        fn get_downloader_for_package(
-            &self,
-            package: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>;
-        async fn download(
-            &self,
-            package: PackageInterfaceHandle,
-            target_dir: &str,
-            prev_package: Option<PackageInterfaceHandle>,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn prepare(
-            &self,
-            r#type: &str,
-            package: PackageInterfaceHandle,
-            target_dir: &str,
-            prev_package: Option<PackageInterfaceHandle>,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn install(
-            &self,
-            package: PackageInterfaceHandle,
-            target_dir: &str,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn update(
-            &self,
-            initial: PackageInterfaceHandle,
-            target: PackageInterfaceHandle,
-            target_dir: &str,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn remove(
-            &self,
-            package: PackageInterfaceHandle,
-            target_dir: &str,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        async fn cleanup(
-            &self,
-            r#type: &str,
-            package: PackageInterfaceHandle,
-            target_dir: &str,
-            prev_package: Option<PackageInterfaceHandle>,
-        ) -> anyhow::Result<Option<PhpMixed>>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_download_manager {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub DownloadManager {}
+        #[async_trait::async_trait(?Send)]
+        impl DownloadManagerInterface for DownloadManager {
+            fn set_prefer_source(&self, prefer_source: bool);
+            fn set_prefer_dist(&self, prefer_dist: bool);
+            fn get_downloader_for_package(
+                &self,
+                package: PackageInterfaceHandle,
+            ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>;
+            async fn download(
+                &self,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+                prev_package: Option<PackageInterfaceHandle>,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn prepare(
+                &self,
+                r#type: &bstr::BStr,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+                prev_package: Option<PackageInterfaceHandle>,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn install(
+                &self,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn update(
+                &self,
+                initial: PackageInterfaceHandle,
+                target: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn remove(
+                &self,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            async fn cleanup(
+                &self,
+                r#type: &bstr::BStr,
+                package: PackageInterfaceHandle,
+                target_dir: &std::path::Path,
+                prev_package: Option<PackageInterfaceHandle>,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+        }
     }
 }
+use mock_download_manager::MockDownloadManager;
 
 /// PHP mocks `Composer\Repository\RepositoryManager` so that getLocalRepository returns the
 /// test repository; the other methods are never reached.
@@ -125,9 +138,9 @@ impl RepositoryManagerInterface for MockRepositoryManager {
 
     fn create_repository(
         &self,
-        _type: &str,
+        _type: &BStr,
         _config: IndexMap<BString, PhpMixed>,
-        _name: Option<&str>,
+        _name: Option<&bstr::BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         unimplemented!("not exercised by PluginInstallerTest")
     }
@@ -178,19 +191,13 @@ impl InstallationManagerInterface for MockInstallationManager {
         Ok(())
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
-        let upstream = fixtures_dir().join(package.get_pretty_name());
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
+        let upstream = fixtures_dir().join(path_from_bytes(&package.get_pretty_name()));
         if upstream.exists() {
-            return Some(upstream.to_str().unwrap().to_string());
+            return Some(upstream);
         }
         // Shirabe-specific fixtures (subscriber_test) live next to this test binary.
-        Some(
-            shirabe_fixtures_dir()
-                .join(package.get_pretty_name())
-                .to_str()
-                .unwrap()
-                .to_string(),
-        )
+        Some(shirabe_fixtures_dir().join(path_from_bytes(&package.get_pretty_name())))
     }
 
     fn set_output_progress(&mut self, _output_progress: bool) {}
@@ -239,15 +246,19 @@ pub(crate) fn set_up() -> SetUp {
     let directory = TempDir::new().unwrap();
     let directory_path = directory.path();
     for i in 1..=8 {
-        std::fs::create_dir_all(directory_path.join(format!("Fixtures/plugin-v{}", i))).unwrap();
+        std::fs::create_dir_all(
+            directory_path.join(path_from_bytes(&bconcat!("Fixtures/plugin-v", i))),
+        )
+        .unwrap();
         packages.push(
             loader
                 .load(JsonLoaderInput::String(
-                    fixtures_dir()
-                        .join(format!("plugin-v{}/composer.json", i))
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    path_to_bytes(&fixtures_dir().join(path_from_bytes(&bconcat!(
+                        "plugin-v",
+                        i,
+                        "/composer.json"
+                    ))))
+                    .into(),
                 ))
                 .unwrap(),
         );
@@ -269,7 +280,7 @@ pub(crate) fn set_up() -> SetUp {
     let installation_manager = MockInstallationManager;
 
     let io = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
+        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
     ));
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
@@ -294,33 +305,21 @@ pub(crate) fn set_up() -> SetUp {
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".into(),
-        PhpMixed::string(
-            directory_path
-                .join("Fixtures/")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        ),
+        PhpMixed::string(bstr::BString::from(path_to_bytes(
+            &directory_path.join("Fixtures/"),
+        ))),
     );
     config_section.insert(
         "home".into(),
-        PhpMixed::string(
-            directory_path
-                .join("Fixtures")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        ),
+        PhpMixed::string(bstr::BString::from(path_to_bytes(
+            &directory_path.join("Fixtures"),
+        ))),
     );
     config_section.insert(
         "bin-dir".into(),
-        PhpMixed::string(
-            directory_path
-                .join("Fixtures/bin")
-                .to_str()
-                .unwrap()
-                .to_string(),
-        ),
+        PhpMixed::string(bstr::BString::from(path_to_bytes(
+            &directory_path.join("Fixtures/bin"),
+        ))),
     );
     config_section.insert("allow-plugins".into(), PhpMixed::Bool(true));
     let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -347,15 +346,19 @@ pub(crate) fn set_up() -> SetUp {
     composer.borrow_mut().set_event_dispatcher(real_dispatcher);
     composer.borrow_mut().set_package(
         RootPackageHandle::new(
-            "dummy/root".to_string(),
-            "1.0.0.0".to_string(),
-            "1.0.0".to_string(),
+            BString::from("dummy/root"),
+            BString::from("1.0.0.0"),
+            BString::from("1.0.0"),
         )
         .into(),
     );
     {
-        let json_file =
-            JsonFile::new(Platform::get_dev_null(), None, Some(io_dyn.clone())).unwrap();
+        let json_file = JsonFile::new(
+            path_from_bytes(Platform::get_dev_null()),
+            None,
+            Some(io_dyn.clone()),
+        )
+        .unwrap();
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io_dyn.clone(),
         ))));
@@ -394,15 +397,18 @@ pub(crate) fn set_up() -> SetUp {
 /// the property is read over RPC through the proxy's test helper.
 fn plugin_property(
     plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
-    name: &str,
-) -> String {
+    name: &BStr,
+) -> bstr::BString {
     let plugin = plugin.borrow();
     let proxy = plugin
         .__as_php_plugin_proxy()
         .expect("registered plugins are PHP-backed proxies");
-    match proxy.__get_property(name).unwrap() {
-        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-        other => panic!("property `{name}` is not a string: {other:?}"),
+    match proxy.__get_property(BStr::new(name)).unwrap() {
+        PhpMixed::String(s) => s,
+        other => panic!(
+            "property `{name}` is not a string: {other:?}",
+            name = name.display_lossy()
+        ),
     }
 }
 
@@ -430,7 +436,10 @@ fn test_install_new_plugin() {
 
     let pm = set_up.pm.borrow();
     let plugins = pm.get_plugins();
-    assert_eq!("installer-v1", plugin_property(&plugins[0], "version"));
+    assert_eq!(
+        "installer-v1",
+        plugin_property(&plugins[0], BStr::new("version"))
+    );
     assert_eq!("activate v1\n", set_up.io.borrow().get_output());
 }
 
@@ -448,13 +457,11 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
     set_up.autoload_generator.borrow_mut().set_dev_mode(true);
     let files_autoload = fixtures_dir()
         .join("files_autoload_which_should_not_run.php")
-        .to_str()
-        .unwrap()
-        .to_string();
+        .to_path_buf();
     let mut autoload: IndexMap<BString, PhpMixed> = IndexMap::new();
     autoload.insert(
         "files".into(),
-        PhpMixed::List(vec![PhpMixed::string(files_autoload)]),
+        PhpMixed::List(vec![PhpMixed::string(path_to_bytes(&files_autoload))]),
     );
     let root = set_up.composer.borrow().get_package().clone();
     root.set_autoload(autoload.clone());
@@ -465,7 +472,10 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
     let pm = set_up.pm.borrow();
     let plugins = pm.get_plugins();
     assert_eq!("activate v1\n", set_up.io.borrow().get_output());
-    assert_eq!("installer-v1", plugin_property(&plugins[0], "version"));
+    assert_eq!(
+        "installer-v1",
+        plugin_property(&plugins[0], BStr::new("version"))
+    );
 }
 
 #[test]
@@ -488,10 +498,16 @@ fn test_install_multiple_plugins() {
 
     let pm = set_up.pm.borrow();
     let plugins = pm.get_plugins();
-    assert_eq!("plugin1", plugin_property(&plugins[0], "name"));
-    assert_eq!("installer-v4", plugin_property(&plugins[0], "version"));
-    assert_eq!("plugin2", plugin_property(&plugins[1], "name"));
-    assert_eq!("installer-v4", plugin_property(&plugins[1], "version"));
+    assert_eq!("plugin1", plugin_property(&plugins[0], BStr::new("name")));
+    assert_eq!(
+        "installer-v4",
+        plugin_property(&plugins[0], BStr::new("version"))
+    );
+    assert_eq!("plugin2", plugin_property(&plugins[1], BStr::new("name")));
+    assert_eq!(
+        "installer-v4",
+        plugin_property(&plugins[1], BStr::new("version"))
+    );
     assert_eq!(
         "activate v4-plugin1\nactivate v4-plugin2\n",
         set_up.io.borrow().get_output()
@@ -527,7 +543,10 @@ fn test_upgrade_with_new_class_name() {
     // PHP: assertCount(1, $plugins); $plugins[1]->version — unset() keeps array keys, so the
     // remaining plugin sits at key 1. The Vec port reindexes; the remaining plugin is [0].
     assert_eq!(1, plugins.len());
-    assert_eq!("installer-v2", plugin_property(&plugins[0], "version"));
+    assert_eq!(
+        "installer-v2",
+        plugin_property(&plugins[0], BStr::new("version"))
+    );
     assert_eq!(
         "activate v1\ndeactivate v1\nactivate v2\n",
         set_up.io.borrow().get_output()
@@ -585,7 +604,10 @@ fn test_upgrade_with_same_class_name() {
 
     let pm = set_up.pm.borrow();
     let plugins = pm.get_plugins();
-    assert_eq!("installer-v3", plugin_property(&plugins[0], "version"));
+    assert_eq!(
+        "installer-v3",
+        plugin_property(&plugins[0], BStr::new("version"))
+    );
     assert_eq!(
         "activate v2\ndeactivate v2\nactivate v3\n",
         set_up.io.borrow().get_output()
@@ -613,7 +635,10 @@ fn test_register_plugin_only_one_time() {
     let pm = set_up.pm.borrow();
     let plugins = pm.get_plugins();
     assert_eq!(1, plugins.len());
-    assert_eq!("installer-v1", plugin_property(&plugins[0], "version"));
+    assert_eq!(
+        "installer-v1",
+        plugin_property(&plugins[0], BStr::new("version"))
+    );
     assert_eq!("activate v1\n", set_up.io.borrow().get_output());
 }
 
@@ -623,7 +648,7 @@ fn test_register_plugin_only_one_time() {
 /// package plus `plugins` (PHP mocks `getPackages`), then loads the installed plugins.
 fn set_plugin_api_version_with_plugins(
     set_up: &SetUp,
-    new_plugin_api_version: &str,
+    new_plugin_api_version: &BStr,
     plugins: Vec<PackageInterfaceHandle>,
 ) -> std::rc::Rc<std::cell::RefCell<PluginManager>> {
     let pm = std::rc::Rc::new(std::cell::RefCell::new(PluginManager::new(
@@ -633,15 +658,15 @@ fn set_plugin_api_version_with_plugins(
         DisablePlugins::None,
     )));
     pm.borrow_mut()
-        .__set_plugin_api_version(new_plugin_api_version);
+        .__set_plugin_api_version(BStr::new(new_plugin_api_version));
     set_up.composer.borrow_mut().set_plugin_manager(pm.clone());
 
     let plug_api_internal_package: PackageInterfaceHandle = CompletePackageHandle::new(
-        "composer-plugin-api".to_string(),
+        BString::from("composer-plugin-api"),
         VersionParser
             .normalize(new_plugin_api_version, None)
             .unwrap(),
-        new_plugin_api_version.to_string(),
+        bconcat!(new_plugin_api_version),
     )
     .into();
     let repository =
@@ -673,16 +698,23 @@ fn test_star_plugin_version_works_with_any_api_version() {
     let set_up = set_up();
     let star_version_plugin = || vec![PackageInterfaceHandle::dup(&set_up.packages[4])];
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "1.0.0", star_version_plugin());
+    let pm =
+        set_plugin_api_version_with_plugins(&set_up, BStr::new("1.0.0"), star_version_plugin());
     assert_eq!(1, pm.borrow().get_plugins().len());
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "1.9.9", star_version_plugin());
+    let pm =
+        set_plugin_api_version_with_plugins(&set_up, BStr::new("1.9.9"), star_version_plugin());
     assert_eq!(1, pm.borrow().get_plugins().len());
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "2.0.0-dev", star_version_plugin());
+    let pm =
+        set_plugin_api_version_with_plugins(&set_up, BStr::new("2.0.0-dev"), star_version_plugin());
     assert_eq!(1, pm.borrow().get_plugins().len());
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "100.0.0-stable", star_version_plugin());
+    let pm = set_plugin_api_version_with_plugins(
+        &set_up,
+        BStr::new("100.0.0-stable"),
+        star_version_plugin(),
+    );
     assert_eq!(1, pm.borrow().get_plugins().len());
 }
 
@@ -695,16 +727,32 @@ fn test_plugin_constraint_works_only_with_certain_api_version() {
     let set_up = set_up();
     let plugin_with_api_constraint = || vec![PackageInterfaceHandle::dup(&set_up.packages[5])];
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "1.0.0", plugin_with_api_constraint());
+    let pm = set_plugin_api_version_with_plugins(
+        &set_up,
+        BStr::new("1.0.0"),
+        plugin_with_api_constraint(),
+    );
     assert_eq!(0, pm.borrow().get_plugins().len());
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "1.1.9", plugin_with_api_constraint());
+    let pm = set_plugin_api_version_with_plugins(
+        &set_up,
+        BStr::new("1.1.9"),
+        plugin_with_api_constraint(),
+    );
     assert_eq!(0, pm.borrow().get_plugins().len());
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "1.2.0", plugin_with_api_constraint());
+    let pm = set_plugin_api_version_with_plugins(
+        &set_up,
+        BStr::new("1.2.0"),
+        plugin_with_api_constraint(),
+    );
     assert_eq!(1, pm.borrow().get_plugins().len());
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "1.9.9", plugin_with_api_constraint());
+    let pm = set_plugin_api_version_with_plugins(
+        &set_up,
+        BStr::new("1.9.9"),
+        plugin_with_api_constraint(),
+    );
     assert_eq!(1, pm.borrow().get_plugins().len());
 }
 
@@ -717,13 +765,25 @@ fn test_plugin_range_constraints_work_only_with_certain_api_version() {
     let set_up = set_up();
     let plugin_with_api_constraint = || vec![PackageInterfaceHandle::dup(&set_up.packages[6])];
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "1.0.0", plugin_with_api_constraint());
+    let pm = set_plugin_api_version_with_plugins(
+        &set_up,
+        BStr::new("1.0.0"),
+        plugin_with_api_constraint(),
+    );
     assert_eq!(0, pm.borrow().get_plugins().len());
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "3.0.0", plugin_with_api_constraint());
+    let pm = set_plugin_api_version_with_plugins(
+        &set_up,
+        BStr::new("3.0.0"),
+        plugin_with_api_constraint(),
+    );
     assert_eq!(1, pm.borrow().get_plugins().len());
 
-    let pm = set_plugin_api_version_with_plugins(&set_up, "5.5.0", plugin_with_api_constraint());
+    let pm = set_plugin_api_version_with_plugins(
+        &set_up,
+        BStr::new("5.5.0"),
+        plugin_with_api_constraint(),
+    );
     assert_eq!(0, pm.borrow().get_plugins().len());
 }
 
@@ -746,14 +806,20 @@ fn test_command_provider_capability() {
 
     let mut ctor_args = IndexMap::new();
     ctor_args.insert(
-        "composer".to_string(),
+        BString::from("composer"),
         composer_handle_value(&set_up.composer),
     );
-    ctor_args.insert("io".to_string(), io_handle_value(&set_up.io_dyn).unwrap());
+    ctor_args.insert(
+        BString::from("io"),
+        io_handle_value(&set_up.io_dyn).unwrap(),
+    );
     let caps = set_up
         .pm
         .borrow()
-        .get_plugin_capabilities("Composer\\Plugin\\Capability\\CommandProvider", ctor_args)
+        .get_plugin_capabilities(
+            BStr::new("Composer\\Plugin\\Capability\\CommandProvider"),
+            ctor_args,
+        )
         .unwrap();
     assert_eq!(1, caps.len());
     // PHP: assertInstanceOf('Composer\Plugin\Capability\CommandProvider', $caps[0]).
@@ -799,8 +865,8 @@ impl PluginInterface for NoopPlugin {
         Ok(())
     }
 
-    fn get_class_name(&self) -> String {
-        "NoopPlugin".to_string()
+    fn get_class_name(&self) -> BString {
+        BString::from("NoopPlugin")
     }
 }
 
@@ -813,7 +879,7 @@ fn test_incapable_plugin_is_correctly_detected() {
     let result = set_up
         .pm
         .borrow()
-        .get_plugin_capability(&plugin, "Fake\\Ability", IndexMap::new())
+        .get_plugin_capability(&plugin, BStr::new("Fake\\Ability"), IndexMap::new())
         .unwrap();
     assert!(result.is_none());
 }
@@ -828,7 +894,7 @@ fn load_mock_capability_class() {
         .expect("the Composer checkout must provide the plugin test mocks");
     shirabe_php_rpc::call_function(
         "__shirabe_require",
-        vec![PluginValue::string(path.to_str().unwrap())],
+        vec![PluginValue::string(path_to_bytes(&path))],
     )
     .unwrap()
     .unwrap();
@@ -851,7 +917,7 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
         std::rc::Rc::new(std::cell::RefCell::new(CapablePlugin {
             capabilities: IndexMap::from([(
                 capability_api.into(),
-                PhpMixed::string(capability_implementation.to_string()),
+                PhpMixed::string(bconcat!(capability_implementation)),
             )]),
             get_capabilities_calls: get_capabilities_calls.clone(),
         }));
@@ -861,10 +927,10 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
         .borrow()
         .get_plugin_capability(
             &plugin,
-            capability_api,
+            BStr::new(capability_api),
             IndexMap::from([
-                ("a".to_string(), PluginValue::Int(1)),
-                ("b".to_string(), PluginValue::Int(2)),
+                (BString::from("a"), PluginValue::Int(1)),
+                (BString::from("b"), PluginValue::Int(2)),
             ]),
         )
         .unwrap()
@@ -890,7 +956,7 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
             ("b".into(), PluginValue::Int(2)),
             ("plugin".into(), plugin_handle_value(&plugin)),
         ])),
-        capability.__get_property("args").unwrap()
+        capability.__get_property(BStr::new("args")).unwrap()
     );
     // PHP: ->expects($this->once())->method('getCapabilities').
     assert_eq!(1, *get_capabilities_calls.borrow());
@@ -900,10 +966,10 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
 fn invalid_implementation_class_names() -> Vec<PhpMixed> {
     vec![
         PhpMixed::Null,
-        PhpMixed::string(String::new()),
+        PhpMixed::string(BString::default()),
         PhpMixed::Int(0),
         PhpMixed::Int(1000),
-        PhpMixed::string("   ".to_string()),
+        PhpMixed::string(BString::from("   ")),
         PhpMixed::List(vec![PhpMixed::Int(1)]),
         PhpMixed::List(vec![]),
         // PHP: new \stdClass()
@@ -916,7 +982,7 @@ fn invalid_implementation_class_names() -> Vec<PhpMixed> {
 fn assert_querying_with_invalid_capability_class_name_throws(
     invalid_implementation_class_names: &PhpMixed,
     expect: fn(&anyhow::Error) -> bool,
-    expect_name: &str,
+    expect_name: &BStr,
 ) {
     let capability_api = "Composer\\Plugin\\Capability\\Capability";
     let set_up = set_up();
@@ -930,18 +996,21 @@ fn assert_querying_with_invalid_capability_class_name_throws(
             get_capabilities_calls: get_capabilities_calls.clone(),
         }));
 
-    let err =
-        match set_up
-            .pm
-            .borrow()
-            .get_plugin_capability(&plugin, capability_api, IndexMap::new())
-        {
-            Err(err) => err,
-            Ok(_) => panic!("expected {expect_name} for {invalid_implementation_class_names:?}"),
-        };
+    let err = match set_up.pm.borrow().get_plugin_capability(
+        &plugin,
+        BStr::new(capability_api),
+        IndexMap::new(),
+    ) {
+        Err(err) => err,
+        Ok(_) => panic!(
+            "expected {expect_name} for {invalid_implementation_class_names:?}",
+            expect_name = expect_name.display_lossy()
+        ),
+    };
     assert!(
         expect(&err),
-        "expected {expect_name} for {invalid_implementation_class_names:?}, got: {err}"
+        "expected {expect_name} for {invalid_implementation_class_names:?}, got: {err}",
+        expect_name = expect_name.display_lossy()
     );
     // PHP: ->expects($this->once())->method('getCapabilities').
     assert_eq!(1, *get_capabilities_calls.borrow());
@@ -953,7 +1022,7 @@ fn test_querying_with_invalid_capability_class_name_throws() {
         assert_querying_with_invalid_capability_class_name_throws(
             &invalid_implementation_class_name,
             |err| err.is_instanceof::<UnexpectedValueException>(),
-            "UnexpectedValueException",
+            BStr::new("UnexpectedValueException"),
         );
     }
 }
@@ -994,8 +1063,8 @@ impl PluginInterface for CapablePlugin {
         Ok(())
     }
 
-    fn get_class_name(&self) -> String {
-        "CapablePlugin".to_string()
+    fn get_class_name(&self) -> BString {
+        BString::from("CapablePlugin")
     }
 
     fn as_capable(&self) -> Option<&dyn Capable> {
@@ -1026,7 +1095,7 @@ fn test_querying_non_provided_capability_returns_null_safely() {
         .borrow()
         .get_plugin_capability(
             &plugin,
-            "Composer\\Plugin\\Capability\\MadeUpCapability",
+            BStr::new("Composer\\Plugin\\Capability\\MadeUpCapability"),
             IndexMap::new(),
         )
         .unwrap();
@@ -1035,8 +1104,11 @@ fn test_querying_non_provided_capability_returns_null_safely() {
 }
 
 /// PHP data provider `nonExistingOrInvalidImplementationClassTypes`.
-fn non_existing_or_invalid_implementation_class_types() -> Vec<&'static str> {
-    vec!["\\stdClass", "NonExistentClassLikeMiddleClass"]
+fn non_existing_or_invalid_implementation_class_types() -> Vec<&'static BStr> {
+    vec![
+        BStr::new("\\stdClass"),
+        BStr::new("NonExistentClassLikeMiddleClass"),
+    ]
 }
 
 #[test]
@@ -1050,9 +1122,9 @@ fn test_querying_with_non_existing_or_wrong_capability_class_types_throws() {
     load_composer_php_runtime();
     for wrong_implementation_class_type in non_existing_or_invalid_implementation_class_types() {
         assert_querying_with_invalid_capability_class_name_throws(
-            &PhpMixed::string(wrong_implementation_class_type.to_string()),
+            &PhpMixed::string(bconcat!(wrong_implementation_class_type)),
             |err| err.is_instanceof::<RuntimeException>(),
-            "RuntimeException",
+            BStr::new("RuntimeException"),
         );
     }
 }

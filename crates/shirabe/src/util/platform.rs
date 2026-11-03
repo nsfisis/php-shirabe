@@ -1,13 +1,13 @@
 //! ref: composer/src/Composer/Util/Platform.php
 
 use crate::util::ProcessExecutor;
-use bstr::ByteSlice;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, defined,
-    file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
-    mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid,
-    preg_is_match, preg_replace_callback, putenv, putenv_clear, realpath, stream_isatty, stripos,
-    strlen, strtoupper, substr, usleep,
+    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, bconcat,
+    defined, file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
+    mb_strlen, os_str_from_bytes, path_to_bytes, php_os_family, php_regex, posix_geteuid,
+    posix_getpwuid, posix_getuid, preg_is_match, preg_replace_callback, putenv, putenv_clear,
+    realpath, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 use std::sync::Mutex;
 
@@ -20,13 +20,8 @@ static IS_DOCKER: Mutex<Option<bool>> = Mutex::new(None);
 
 impl Platform {
     /// getcwd() equivalent which always returns a string
-    pub fn get_cwd(allow_empty: bool) -> anyhow::Result<String> {
-        // TODO(bytes): the cwd is returned as a String.
-        let mut cwd = getcwd().map(|cwd| {
-            cwd.into_os_string()
-                .into_string()
-                .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}"))
-        });
+    pub fn get_cwd(allow_empty: bool) -> anyhow::Result<std::path::PathBuf> {
+        let mut cwd = getcwd();
 
         // fallback to realpath('') just in case this works but odds are it would break as well if we are in a case where getcwd fails
         if cwd.is_none() {
@@ -36,12 +31,12 @@ impl Platform {
         // crappy state, assume '' and hopefully relative paths allow things to continue
         if cwd.is_none() {
             if allow_empty {
-                return Ok(String::new());
+                return Ok(std::path::PathBuf::new());
             }
 
-            return Err(RuntimeException::new(
-                "Could not determine the current working directory".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "Could not determine the current working directory",
+            ))
             .into());
         }
 
@@ -49,51 +44,48 @@ impl Platform {
     }
 
     /// Infallible realpath version that falls back on the given $path if realpath is not working
-    pub fn realpath(path: &str) -> String {
+    pub fn realpath(path: impl AsRef<std::path::Path>) -> std::path::PathBuf {
+        let path = path.as_ref();
         let real_path = realpath(path);
         if real_path.is_none() {
-            return path.to_string();
+            return path.to_path_buf();
         }
 
         real_path.unwrap()
     }
 
     /// getenv() equivalent but reads from the runtime global variables first
-    pub fn get_env(name: &str) -> Option<String> {
+    pub fn get_env(name: impl AsRef<[u8]>) -> Option<BString> {
+        let name = os_str_from_bytes(&name);
         let value = PHP_SERVER.lock().unwrap().get(name);
         let value = value.or_else(|| PHP_ENV.lock().unwrap().get(name));
         let value = value.or_else(|| getenv(name))?;
 
-        // TODO(bytes): the value is returned as a String.
-        Some(
-            value
-                .into_string()
-                .unwrap_or_else(|value| panic!("{name} is not valid UTF-8: {value:?}")),
-        )
+        Some(BString::from(path_to_bytes(&value)))
     }
 
     /// putenv() equivalent but updates the runtime global variables too
-    pub fn put_env(name: &str, value: &str) {
+    pub fn put_env(name: impl AsRef<[u8]>, value: impl AsRef<[u8]>) {
+        let name = os_str_from_bytes(&name);
+        let value = os_str_from_bytes(&value);
         unsafe { putenv(name, value) };
         PHP_SERVER.lock().unwrap().put(name.into(), value.into());
         PHP_ENV.lock().unwrap().put(name.into(), value.into());
     }
 
     /// putenv('X') equivalent but updates the runtime global variables too
-    pub fn clear_env(name: &str) {
+    pub fn clear_env(name: impl AsRef<[u8]>) {
+        let name = os_str_from_bytes(&name);
         unsafe { putenv_clear(name) };
         PHP_SERVER.lock().unwrap().clear(name);
         PHP_ENV.lock().unwrap().clear(name);
     }
 
     /// Parses tildes and environment variables in paths.
-    pub fn expand_path(path: &str) -> String {
+    pub fn expand_path(path: impl AsRef<[u8]>) -> BString {
+        let path = path.as_ref();
         if preg_is_match(php_regex!(r"#^~[\\/]#"), path) {
-            return format!(
-                "{}{}",
-                Self::get_user_directory().unwrap(),
-                substr(path, 1, None)
-            );
+            return bconcat!(Self::get_user_directory().unwrap(), substr(path, 1, None));
         }
 
         // Regex pattern compatibility:
@@ -102,29 +94,27 @@ impl Platform {
         // two forms are written as an explicit alternation: `$VAR` or `%VAR%`.
         preg_replace_callback(
             php_regex!(r"#^(?:\$(?P<dvar>\w+)|%(?P<pvar>\w+)%)(?P<path>.*)#"),
-            |matches: &PregMatches| -> anyhow::Result<String> {
+            |matches: &PregMatches| -> anyhow::Result<BString> {
                 let var = matches
                     .name("dvar")
                     .or_else(|| matches.name("pvar"))
-                    .unwrap_or("");
-                let path_part = matches.name("path").unwrap_or("");
+                    .unwrap_or_default();
+                let path_part = matches.name("path").unwrap_or_default();
                 // Treat HOME as an alias for USERPROFILE on Windows for legacy reasons
                 if Platform::is_windows() && var == "HOME" {
                     let home =
                         Platform::get_env("HOME").filter(|v| PhpMixed::string(v.clone()).to_bool());
                     if let Some(home) = home {
-                        return Ok(format!("{}{}", home, path_part));
+                        return Ok(bconcat!(home, path_part));
                     }
 
-                    return Ok(format!(
-                        "{}{}",
+                    return Ok(bconcat!(
                         Platform::get_env("USERPROFILE").unwrap_or_default(),
                         path_part,
                     ));
                 }
 
-                Ok(format!(
-                    "{}{}",
+                Ok(bconcat!(
                     Platform::get_env(var).unwrap_or_default(),
                     path_part,
                 ))
@@ -134,7 +124,7 @@ impl Platform {
         .expect("the replacement callback cannot fail")
     }
 
-    pub fn get_user_directory() -> anyhow::Result<String> {
+    pub fn get_user_directory() -> anyhow::Result<BString> {
         if let Some(home) = Self::get_env("HOME") {
             return Ok(home);
         }
@@ -149,15 +139,10 @@ impl Platform {
             && function_exists("posix_getpwuid")
             && let Some(info) = posix_getpwuid(posix_getuid())
         {
-            // TODO(bytes): the user directory is returned as a String.
-            return Ok(info
-                .dir
-                .into_os_string()
-                .into_string()
-                .unwrap_or_else(|dir| panic!("home directory is not valid UTF-8: {dir:?}")));
+            return Ok(BString::from(path_to_bytes(&info.dir)));
         }
 
-        Err(RuntimeException::new("Could not determine user directory".to_string()).into())
+        Err(RuntimeException::new(BString::from("Could not determine user directory")).into())
     }
 
     pub fn is_windows_subsystem_for_linux() -> bool {
@@ -174,8 +159,7 @@ impl Platform {
             let file_contents = file_get_contents("/proc/version").unwrap_or_default();
             if !ini_get("open_basedir").is_some_and(|s| PhpMixed::string(s).to_bool())
                 && is_readable("/proc/version")
-                // TODO(bytes)
-                && stripos(&String::from_utf8_lossy(&file_contents), "microsoft").is_some()
+                && stripos(&file_contents, "microsoft").is_some()
                 && !Self::is_docker()
             // Docker and Podman running inside WSL should not be seen as WSL
             {
@@ -240,7 +224,8 @@ impl Platform {
         false
     }
 
-    pub fn strlen(str: &str) -> i64 {
+    pub fn strlen(str: impl AsRef<[u8]>) -> i64 {
+        let str = str.as_ref();
         static USE_MB_STRING: Mutex<Option<bool>> = Mutex::new(None);
         let mut use_mb_string = USE_MB_STRING.lock().unwrap();
         if use_mb_string.is_none() {
@@ -262,8 +247,8 @@ impl Platform {
         // detect msysgit/mingw and assume this is a tty because detection
         // does not work correctly, see https://github.com/composer/composer/issues/9690
         if matches!(
-            strtoupper(&Self::get_env("MSYSTEM").unwrap_or_default()).as_str(),
-            "MINGW32" | "MINGW64"
+            strtoupper(Self::get_env("MSYSTEM").unwrap_or_default()).as_slice(),
+            b"MINGW32" | b"MINGW64"
         ) {
             return true;
         }
@@ -273,7 +258,9 @@ impl Platform {
 
     /// Whether the current command is for bash completion
     pub fn is_input_completion_process() -> bool {
-        std::env::args().nth(1).as_deref() == Some("_complete")
+        std::env::args_os()
+            .nth(1)
+            .is_some_and(|arg| arg == "_complete")
     }
 
     pub fn workaround_filesystem_issues() {
@@ -301,17 +288,17 @@ impl Platform {
                 }
             }
 
-            if Self::get_env("COMPOSER_RUNTIME_ENV").as_deref() == Some("virtualbox") {
+            if Self::get_env("COMPOSER_RUNTIME_ENV").is_some_and(|v| v == "virtualbox") {
                 *cached = Some(true);
                 return true;
             }
 
             if php_os_family() == "Linux" {
                 let process = ProcessExecutor::new(None);
-                let mut output = String::new();
+                let mut output = BString::default();
                 let result: anyhow::Result<()> = (|| {
-                    if process.execute(&["lsmod".to_string()], &mut output, None)? == 0
-                        && output.contains("vboxguest")
+                    if process.execute(&[BString::from("lsmod")], &mut output, None)? == 0
+                        && output.contains_str("vboxguest")
                     {
                         *cached = Some(true);
                         return Ok(());
@@ -328,11 +315,11 @@ impl Platform {
         cached.unwrap_or(false)
     }
 
-    pub fn get_dev_null() -> String {
+    pub fn get_dev_null() -> &'static BStr {
         if Self::is_windows() {
-            return "NUL".to_string();
+            return BStr::new("NUL");
         }
 
-        "/dev/null".to_string()
+        BStr::new("/dev/null")
     }
 }

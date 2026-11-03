@@ -4,10 +4,11 @@
 // password hiding, line splitting and argument escaping. A few data points remain unportable —
 // see the individual `// TODO(async)` comments below.
 
+use bstr::{BStr, BString, ByteSlice};
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{ConsoleIO, IOInterface};
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_php_shim::{PHP_EOL, trim};
+use shirabe_php_shim::{PHP_EOL, bconcat, trim};
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface};
 use shirabe_symfony_console::output::{
@@ -17,9 +18,9 @@ use shirabe_symfony_console::output::{
 #[test]
 fn test_execute_captures_output() {
     let process = ProcessExecutor::new(None);
-    let mut output = String::new();
+    let mut output = BString::default();
     process.execute("echo foo", &mut output, None).unwrap();
-    assert_eq!(format!("foo{}", PHP_EOL), output);
+    assert_eq!(bconcat!("foo", PHP_EOL), output);
 }
 
 #[test]
@@ -42,7 +43,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
         .unwrap();
 
     assert_eq!(
-        vec![(format!("foo{}", PHP_EOL), false)],
+        vec![(bconcat!("foo", PHP_EOL), false)],
         io.borrow().write_raw_calls()
     );
 }
@@ -50,12 +51,12 @@ fn test_use_io_is_not_null_and_if_not_captured() {
 #[test]
 fn test_execute_captures_stderr() {
     let process = ProcessExecutor::new(None);
-    let mut output = String::new();
+    let mut output = BString::default();
     process.execute("cat foo", &mut output, None).unwrap();
     assert!(
         process
             .get_error_output()
-            .contains("foo: No such file or directory")
+            .contains_str("foo: No such file or directory")
     );
 }
 
@@ -68,28 +69,41 @@ fn test_timeout() {
     ProcessExecutor::set_timeout(60_i64);
 }
 
-fn hide_password_provider() -> Vec<(&'static str, &'static str)> {
+fn hide_password_provider() -> Vec<(&'static BStr, &'static BStr)> {
     vec![
         (
-            "echo https://foo:bar@example.org/",
-            "echo https://foo:***@example.org/",
-        ),
-        ("echo http://foo@example.org", "echo http://foo@example.org"),
-        (
-            "echo http://abcdef1234567890234578:x-oauth-token@github.com/",
-            "echo http://***:***@github.com/",
+            BStr::new("echo https://foo:bar@example.org/"),
+            BStr::new("echo https://foo:***@example.org/"),
         ),
         (
-            "echo http://github_pat_1234567890abcdefghijkl_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW:x-oauth-token@github.com/",
-            "echo http://***:***@github.com/",
+            BStr::new("echo http://foo@example.org"),
+            BStr::new("echo http://foo@example.org"),
         ),
         (
-            "svn ls --verbose --non-interactive  --username 'foo' --password 'bar'  'https://foo.example.org/svn/'",
-            "svn ls --verbose --non-interactive  --username 'foo' --password '***'  'https://foo.example.org/svn/'",
+            BStr::new("echo http://abcdef1234567890234578:x-oauth-token@github.com/"),
+            BStr::new("echo http://***:***@github.com/"),
         ),
         (
-            "svn ls --verbose --non-interactive  --username 'foo' --password 'bar 'bar'  'https://foo.example.org/svn/'",
-            "svn ls --verbose --non-interactive  --username 'foo' --password '***'  'https://foo.example.org/svn/'",
+            BStr::new(
+                "echo http://github_pat_1234567890abcdefghijkl_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW:x-oauth-token@github.com/",
+            ),
+            BStr::new("echo http://***:***@github.com/"),
+        ),
+        (
+            BStr::new(
+                "svn ls --verbose --non-interactive  --username 'foo' --password 'bar'  'https://foo.example.org/svn/'",
+            ),
+            BStr::new(
+                "svn ls --verbose --non-interactive  --username 'foo' --password '***'  'https://foo.example.org/svn/'",
+            ),
+        ),
+        (
+            BStr::new(
+                "svn ls --verbose --non-interactive  --username 'foo' --password 'bar 'bar'  'https://foo.example.org/svn/'",
+            ),
+            BStr::new(
+                "svn ls --verbose --non-interactive  --username 'foo' --password '***'  'https://foo.example.org/svn/'",
+            ),
         ),
     ]
 }
@@ -98,16 +112,18 @@ fn hide_password_provider() -> Vec<(&'static str, &'static str)> {
 fn test_hide_passwords() {
     for (command, expected_command_output) in hide_password_provider() {
         let buffer = std::rc::Rc::new(std::cell::RefCell::new(
-            BufferIO::new(String::new(), VERBOSITY_DEBUG, None).unwrap(),
+            BufferIO::new(BString::default(), VERBOSITY_DEBUG, None).unwrap(),
         ));
         let process = ProcessExecutor::new(Some(
             buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
         ));
-        let mut output = String::new();
-        process.execute(command, &mut output, None).unwrap();
+        let mut output = BString::default();
+        process
+            .execute(command.to_owned(), &mut output, None)
+            .unwrap();
         assert_eq!(
-            format!("Executing command (CWD): {}", expected_command_output),
-            trim(&buffer.borrow().get_output(), None)
+            bconcat!("Executing command (CWD): ", expected_command_output),
+            trim(buffer.borrow().get_output())
         );
     }
 }
@@ -115,18 +131,18 @@ fn test_hide_passwords() {
 #[test]
 fn test_doesnt_hide_ports() {
     let buffer = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), VERBOSITY_DEBUG, None).unwrap(),
+        BufferIO::new(BString::default(), VERBOSITY_DEBUG, None).unwrap(),
     ));
     let process = ProcessExecutor::new(Some(
         buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
     ));
-    let mut output = String::new();
+    let mut output = BString::default();
     process
         .execute("echo https://localhost:1234/", &mut output, None)
         .unwrap();
     assert_eq!(
         "Executing command (CWD): echo https://localhost:1234/",
-        trim(&buffer.borrow().get_output(), None)
+        trim(buffer.borrow().get_output())
     );
 }
 
@@ -134,7 +150,7 @@ fn test_doesnt_hide_ports() {
 fn test_split_lines() {
     let process = ProcessExecutor::new(None);
     assert!(process.split_lines("").is_empty());
-    // PHP: $process->splitLines(null). `split_lines` takes `&str` where PHP takes `?string`, and
+    // PHP: $process->splitLines(null). `split_lines` takes a string where PHP takes `?string`, and
     // its body opens with `trim((string) $output)`, so the caller performs the null-to-"" cast.
     assert!(process.split_lines("").is_empty());
     assert_eq!(vec!["foo"], process.split_lines("foo"));
@@ -169,7 +185,7 @@ fn test_console_io_does_not_format_symfony_console_style() {
         )
         .unwrap();
     assert_eq!(
-        format!("<error>foo</error>{}", PHP_EOL),
+        bconcat!("<error>foo</error>", PHP_EOL),
         output.borrow().fetch()
     );
 }
@@ -184,33 +200,33 @@ fn test_execute_async_cancel() {
     todo!()
 }
 
-fn data_escape_arguments() -> Vec<(&'static str, &'static str)> {
+fn data_escape_arguments() -> Vec<(&'static BStr, &'static BStr)> {
     // (argument, unix-expected). Not on Windows, so the unix column is used.
     // null and false arguments are coerced to the empty string.
     vec![
-        ("", "''"),
-        ("", "''"),
-        ("", "''"),
-        ("a'bc", "'a'\\''bc'"),
-        ("a\nb\nc", "'a\nb\nc'"),
-        ("a b c", "'a b c'"),
-        ("a\tb\tc", "'a\tb\tc'"),
-        ("abc", "'abc'"),
-        ("a,bc", "'a,bc'"),
-        ("a\"bc", "'a\"bc'"),
-        ("a\\\"bc", "'a\\\"bc'"),
-        ("ab\\\\c\\", "'ab\\\\c\\'"),
-        ("a b c\\\\", "'a b c\\\\'"),
-        ("a \"b\" c", "'a \"b\" c'"),
-        ("%path%", "'%path%'"),
-        ("%path", "'%path'"),
-        ("%%path", "'%%path'"),
-        ("!path!", "'!path!'"),
-        ("!path", "'!path'"),
-        ("!!path", "'!!path'"),
-        ("<>\"&|()^", "'<>\"&|()^'"),
-        ("<> &| ()^", "'<> &| ()^'"),
-        ("<>&|()^", "'<>&|()^'"),
+        (BStr::new(""), BStr::new("''")),
+        (BStr::new(""), BStr::new("''")),
+        (BStr::new(""), BStr::new("''")),
+        (BStr::new("a'bc"), BStr::new("'a'\\''bc'")),
+        (BStr::new("a\nb\nc"), BStr::new("'a\nb\nc'")),
+        (BStr::new("a b c"), BStr::new("'a b c'")),
+        (BStr::new("a\tb\tc"), BStr::new("'a\tb\tc'")),
+        (BStr::new("abc"), BStr::new("'abc'")),
+        (BStr::new("a,bc"), BStr::new("'a,bc'")),
+        (BStr::new("a\"bc"), BStr::new("'a\"bc'")),
+        (BStr::new("a\\\"bc"), BStr::new("'a\\\"bc'")),
+        (BStr::new("ab\\\\c\\"), BStr::new("'ab\\\\c\\'")),
+        (BStr::new("a b c\\\\"), BStr::new("'a b c\\\\'")),
+        (BStr::new("a \"b\" c"), BStr::new("'a \"b\" c'")),
+        (BStr::new("%path%"), BStr::new("'%path%'")),
+        (BStr::new("%path"), BStr::new("'%path'")),
+        (BStr::new("%%path"), BStr::new("'%%path'")),
+        (BStr::new("!path!"), BStr::new("'!path!'")),
+        (BStr::new("!path"), BStr::new("'!path'")),
+        (BStr::new("!!path"), BStr::new("'!!path'")),
+        (BStr::new("<>\"&|()^"), BStr::new("'<>\"&|()^'")),
+        (BStr::new("<> &| ()^"), BStr::new("'<> &| ()^'")),
+        (BStr::new("<>&|()^"), BStr::new("'<>&|()^'")),
     ]
 }
 
@@ -239,7 +255,7 @@ fn test_mock_consumes_expectations_in_order() {
         MockHandler::default(),
     );
 
-    let mut output = String::new();
+    let mut output = BString::default();
     let rc = process
         .borrow_mut()
         .execute("git command", &mut output, None)
@@ -247,7 +263,7 @@ fn test_mock_consumes_expectations_in_order() {
     assert_eq!(1, rc);
     assert_eq!("out one", output);
 
-    let mut output2 = String::new();
+    let mut output2 = BString::default();
     let rc2 = process
         .borrow_mut()
         .execute(&["git", "--version"], &mut output2, None)
@@ -268,12 +284,12 @@ fn test_mock_default_handler_for_unexpected_command() {
         false,
         MockHandler {
             r#return: 7,
-            stdout: "fallback".to_string(),
-            stderr: String::new(),
+            stdout: BString::from("fallback"),
+            stderr: BString::default(),
         },
     );
 
-    let mut output = String::new();
+    let mut output = BString::default();
     let rc = process
         .borrow_mut()
         .execute("anything goes", &mut output, None)

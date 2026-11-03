@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php
 
-use bstr::ByteSlice;
+use bstr::{BStr, BString};
 use shirabe_php_shim::PhpMixed;
 
 /// The value an option or an argument can hold.
@@ -11,8 +11,8 @@ use shirabe_php_shim::PhpMixed;
 pub enum InputValue {
     Null,
     Bool(bool),
-    String(String),
-    Array(Vec<String>),
+    String(BString),
+    Array(Vec<BString>),
 }
 
 impl InputValue {
@@ -25,13 +25,13 @@ impl InputValue {
         match value {
             PhpMixed::Null => Self::Null,
             PhpMixed::Bool(b) => Self::Bool(*b),
-            PhpMixed::String(s) => Self::String(s.to_str_lossy().into_owned()),
+            PhpMixed::String(s) => Self::String(s.clone()),
             PhpMixed::List(_) | PhpMixed::Array(_) => Self::Array(
                 value
                     .values()
                     .into_iter()
                     .map(|item| match item {
-                        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
+                        PhpMixed::String(s) => s.clone(),
                         other => panic!("an input array holds {:?}, not a string", other),
                     })
                     .collect(),
@@ -58,14 +58,14 @@ impl InputValue {
         }
     }
 
-    pub fn as_string(&self) -> Option<&str> {
+    pub fn as_string(&self) -> Option<&BStr> {
         match self {
-            Self::String(s) => Some(s.as_str()),
+            Self::String(s) => Some(s.as_ref()),
             _ => None,
         }
     }
 
-    pub fn as_array(&self) -> Option<&[String]> {
+    pub fn as_array(&self) -> Option<&[BString]> {
         match self {
             Self::Array(items) => Some(items),
             _ => None,
@@ -88,14 +88,14 @@ impl InputValue {
     }
 
     /// PHP's `(string) $value`, which is a fatal error for an array.
-    pub fn to_php_string(&self) -> String {
+    pub fn to_php_string(&self) -> BString {
         match self {
-            Self::Null => String::new(),
+            Self::Null => BString::default(),
             Self::Bool(b) => {
                 if *b {
-                    "1".to_string()
+                    BString::from("1")
                 } else {
-                    String::new()
+                    BString::default()
                 }
             }
             Self::String(s) => s.clone(),
@@ -115,14 +115,21 @@ impl From<InputValue> for PhpMixed {
     }
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for InputValue {
     fn from(value: &str) -> Self {
-        Self::String(value.to_string())
+        Self::String(BString::from(value))
     }
 }
 
-impl From<String> for InputValue {
-    fn from(value: String) -> Self {
+impl From<&BStr> for InputValue {
+    fn from(value: &BStr) -> Self {
+        Self::String(BString::from(value))
+    }
+}
+
+impl From<BString> for InputValue {
+    fn from(value: BString) -> Self {
         Self::String(value)
     }
 }
@@ -133,8 +140,8 @@ impl From<bool> for InputValue {
     }
 }
 
-impl From<Option<String>> for InputValue {
-    fn from(value: Option<String>) -> Self {
+impl From<Option<BString>> for InputValue {
+    fn from(value: Option<BString>) -> Self {
         match value {
             Some(value) => Self::String(value),
             None => Self::Null,
@@ -142,8 +149,8 @@ impl From<Option<String>> for InputValue {
     }
 }
 
-impl From<Vec<String>> for InputValue {
-    fn from(value: Vec<String>) -> Self {
+impl From<Vec<BString>> for InputValue {
+    fn from(value: Vec<BString>) -> Self {
         Self::Array(value)
     }
 }

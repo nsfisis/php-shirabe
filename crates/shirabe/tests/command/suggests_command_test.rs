@@ -4,46 +4,60 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, get_version_constraint, init_temp_composer,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
+use shirabe_php_shim::{bconcat, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: SuggestsCommandTest::getPackageWithSuggestAndRequires
 fn get_package_with_suggest_and_requires(
-    name: &str,
-    version: &str,
-    suggests: &[(&str, &str)],
-    requires: &[(&str, Link)],
-    require_devs: &[(&str, Link)],
+    name: &BStr,
+    version: &BStr,
+    suggests: &[(&BStr, &BStr)],
+    requires: &[(&BStr, Link)],
+    require_devs: &[(&BStr, Link)],
 ) -> CompletePackageHandle {
     let pkg = get_complete_package(name, version);
-    let suggests_map: IndexMap<String, String> = suggests
+    let suggests_map: IndexMap<BString, BString> = suggests
         .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .map(|(k, v)| (bconcat!(k), bconcat!(v)))
         .collect();
-    pkg.__set_suggests(suggests_map);
-    let requires_map: IndexMap<String, Link> = requires
+    pkg.__set_suggests(
+        suggests_map
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    let requires_map: IndexMap<BString, Link> = requires
         .iter()
-        .map(|(k, v)| (k.to_string(), v.clone()))
+        .map(|(k, v)| (bconcat!(k), v.clone()))
         .collect();
-    pkg.__set_requires(requires_map);
-    let dev_requires_map: IndexMap<String, Link> = require_devs
+    pkg.__set_requires(
+        requires_map
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    let dev_requires_map: IndexMap<BString, Link> = require_devs
         .iter()
-        .map(|(k, v)| (k.to_string(), v.clone()))
+        .map(|(k, v)| (bconcat!(k), v.clone()))
         .collect();
-    pkg.__set_dev_requires(dev_requires_map);
+    pkg.__set_dev_requires(
+        dev_requires_map
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     pkg
 }
 
-fn link(source: &str, target: &str, description: &str) -> Link {
+fn link(source: &BStr, target: &BStr, description: &bstr::BStr) -> Link {
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bconcat!(source),
+        bconcat!(target),
         get_version_constraint(">=", "1.0"),
-        Some(description.to_string()),
-        "^1.0".to_string(),
+        Some(description.to_owned()),
+        BString::from("^1.0"),
     )
 }
 
@@ -88,7 +102,7 @@ fn test_installed_packages_with_no_suggestions() {
         .unwrap();
     assert_eq!(0, status_code);
     assert!(
-        app_tester.get_display().trim().is_empty(),
+        trim(app_tester.get_display()).is_empty(),
         "expected empty display, got: {:?}",
         app_tester.get_display()
     );
@@ -100,27 +114,34 @@ fn test_installed_packages_with_no_suggestions() {
 fn suggest_packages() -> (Vec<PackageInterfaceHandle>, Vec<PackageInterfaceHandle>) {
     let packages: Vec<PackageInterfaceHandle> = vec![
         get_package_with_suggest_and_requires(
-            "vendor1/package1",
-            "1.0.0",
-            &[("vendor3/suggested", "helpful for vendor1/package1")],
+            BStr::new("vendor1/package1"),
+            BStr::new("1.0.0"),
             &[(
-                "vendor6/package6",
-                link("vendor1/package1", "vendor6/package6", Link::TYPE_REQUIRE),
+                BStr::new("vendor3/suggested"),
+                BStr::new("helpful for vendor1/package1"),
+            )],
+            &[(
+                BStr::new("vendor6/package6"),
+                link(
+                    BStr::new("vendor1/package1"),
+                    BStr::new("vendor6/package6"),
+                    Link::TYPE_REQUIRE,
+                ),
             )],
             &[
                 (
-                    "vendor4/dev-suggested",
+                    BStr::new("vendor4/dev-suggested"),
                     link(
-                        "vendor1/package1",
-                        "vendor4/dev-suggested",
+                        BStr::new("vendor1/package1"),
+                        BStr::new("vendor4/dev-suggested"),
                         Link::TYPE_DEV_REQUIRE,
                     ),
                 ),
                 (
-                    "vendor3/suggested",
+                    BStr::new("vendor3/suggested"),
                     link(
-                        "vendor1/package1",
-                        "vendor3/suggested",
+                        BStr::new("vendor1/package1"),
+                        BStr::new("vendor3/suggested"),
                         Link::TYPE_DEV_REQUIRE,
                     ),
                 ),
@@ -128,9 +149,12 @@ fn suggest_packages() -> (Vec<PackageInterfaceHandle>, Vec<PackageInterfaceHandl
         )
         .into(),
         get_package_with_suggest_and_requires(
-            "vendor6/package6",
-            "1.0.0",
-            &[("vendor7/transitive", "helpful for vendor6/package6")],
+            BStr::new("vendor6/package6"),
+            BStr::new("1.0.0"),
+            &[(
+                BStr::new("vendor7/transitive"),
+                BStr::new("helpful for vendor6/package6"),
+            )],
             &[],
             &[],
         )
@@ -138,14 +162,17 @@ fn suggest_packages() -> (Vec<PackageInterfaceHandle>, Vec<PackageInterfaceHandl
     ];
     let dev_packages: Vec<PackageInterfaceHandle> = vec![
         get_package_with_suggest_and_requires(
-            "vendor2/package2",
-            "1.0.0",
-            &[("vendor4/dev-suggested", "helpful for vendor2/package2")],
+            BStr::new("vendor2/package2"),
+            BStr::new("1.0.0"),
             &[(
-                "vendor5/dev-package",
+                BStr::new("vendor4/dev-suggested"),
+                BStr::new("helpful for vendor2/package2"),
+            )],
+            &[(
+                BStr::new("vendor5/dev-package"),
                 link(
-                    "vendor2/package2",
-                    "vendor5/dev-package",
+                    BStr::new("vendor2/package2"),
+                    BStr::new("vendor5/dev-package"),
                     Link::TYPE_REQUIRE,
                 ),
             )],
@@ -153,15 +180,18 @@ fn suggest_packages() -> (Vec<PackageInterfaceHandle>, Vec<PackageInterfaceHandl
         )
         .into(),
         get_package_with_suggest_and_requires(
-            "vendor5/dev-package",
-            "1.0.0",
-            &[("vendor8/dev-transitive", "helpful for vendor5/dev-package")],
+            BStr::new("vendor5/dev-package"),
+            BStr::new("1.0.0"),
+            &[(
+                BStr::new("vendor8/dev-transitive"),
+                BStr::new("helpful for vendor5/dev-package"),
+            )],
             &[],
             &[(
-                "vendor8/dev-transitive",
+                BStr::new("vendor8/dev-transitive"),
                 link(
-                    "vendor5/dev-package",
-                    "vendor8/dev-transitive",
+                    BStr::new("vendor5/dev-package"),
+                    BStr::new("vendor8/dev-transitive"),
                     Link::TYPE_DEV_REQUIRE,
                 ),
             )],
@@ -171,7 +201,7 @@ fn suggest_packages() -> (Vec<PackageInterfaceHandle>, Vec<PackageInterfaceHandl
     (packages, dev_packages)
 }
 
-fn run_suggest_case(has_lock_file: bool, command: &[(&str, InputValue)], expected: &str) {
+fn run_suggest_case(has_lock_file: bool, command: &[(&BStr, InputValue)], expected: &BStr) {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
             "repositories": {
@@ -208,7 +238,7 @@ fn run_suggest_case(has_lock_file: bool, command: &[(&str, InputValue)], expecte
     let mut app_tester = get_application_tester();
     let status_code = app_tester.run(input, RunOptions::default()).unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(trim(expected), trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -217,20 +247,22 @@ fn run_suggest_case(has_lock_file: bool, command: &[(&str, InputValue)], expecte
 #[serial]
 fn test_suggest() {
     let t = InputValue::from(true);
-    let by_package = ("--by-package", t.clone());
-    let by_suggestion = ("--by-suggestion", t.clone());
-    let no_dev = ("--no-dev", t.clone());
-    let all = ("--all", t.clone());
-    let list = ("--list", t);
+    let by_package = (BStr::new("--by-package"), t.clone());
+    let by_suggestion = (BStr::new("--by-suggestion"), t.clone());
+    let no_dev = (BStr::new("--no-dev"), t.clone());
+    let all = (BStr::new("--all"), t.clone());
+    let list = (BStr::new("--list"), t);
 
     // 'with lockfile, show suggested' / 'without lockfile, show suggested'
-    let basic = "vendor1/package1 suggests:
+    let basic = BStr::new(
+        "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
 
 vendor2/package2 suggests:
  - vendor4/dev-suggested: helpful for vendor2/package2
 
-2 additional suggestions by transitive dependencies can be shown with --all";
+2 additional suggestions by transitive dependencies can be shown with --all",
+    );
     run_suggest_case(true, &[], basic);
     run_suggest_case(false, &[], basic);
 
@@ -238,15 +270,18 @@ vendor2/package2 suggests:
     run_suggest_case(
         true,
         std::slice::from_ref(&no_dev),
-        "vendor1/package1 suggests:
+        BStr::new(
+            "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
 
 1 additional suggestions by transitive dependencies can be shown with --all",
+        ),
     );
     // 'without lockfile, show suggested (excluding dev)'
     run_suggest_case(false, std::slice::from_ref(&no_dev), basic);
 
-    let all_suggested = "vendor1/package1 suggests:
+    let all_suggested = BStr::new(
+        "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
 
 vendor2/package2 suggests:
@@ -256,7 +291,8 @@ vendor5/dev-package suggests:
  - vendor8/dev-transitive: helpful for vendor5/dev-package
 
 vendor6/package6 suggests:
- - vendor7/transitive: helpful for vendor6/package6";
+ - vendor7/transitive: helpful for vendor6/package6",
+    );
     run_suggest_case(true, std::slice::from_ref(&all), all_suggested);
     run_suggest_case(false, std::slice::from_ref(&all), all_suggested);
 
@@ -264,11 +300,13 @@ vendor6/package6 suggests:
     run_suggest_case(
         true,
         &[all.clone(), no_dev.clone()],
-        "vendor1/package1 suggests:
+        BStr::new(
+            "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
 
 vendor6/package6 suggests:
  - vendor7/transitive: helpful for vendor6/package6",
+        ),
     );
     run_suggest_case(false, &[all.clone(), no_dev.clone()], all_suggested);
 
@@ -278,21 +316,25 @@ vendor6/package6 suggests:
     run_suggest_case(
         true,
         &[by_package.clone(), no_dev.clone()],
-        "vendor1/package1 suggests:
+        BStr::new(
+            "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
 
 1 additional suggestions by transitive dependencies can be shown with --all",
+        ),
     );
     run_suggest_case(false, &[by_package.clone(), no_dev.clone()], basic);
 
     // grouped by suggestion
-    let by_suggestion_out = "vendor3/suggested is suggested by:
+    let by_suggestion_out = BStr::new(
+        "vendor3/suggested is suggested by:
  - vendor1/package1: helpful for vendor1/package1
 
 vendor4/dev-suggested is suggested by:
  - vendor2/package2: helpful for vendor2/package2
 
-2 additional suggestions by transitive dependencies can be shown with --all";
+2 additional suggestions by transitive dependencies can be shown with --all",
+    );
     run_suggest_case(
         true,
         std::slice::from_ref(&by_suggestion),
@@ -306,10 +348,12 @@ vendor4/dev-suggested is suggested by:
     run_suggest_case(
         true,
         &[by_suggestion.clone(), no_dev.clone()],
-        "vendor3/suggested is suggested by:
+        BStr::new(
+            "vendor3/suggested is suggested by:
  - vendor1/package1: helpful for vendor1/package1
 
 1 additional suggestions by transitive dependencies can be shown with --all",
+        ),
     );
     run_suggest_case(
         false,
@@ -318,7 +362,8 @@ vendor4/dev-suggested is suggested by:
     );
 
     // grouped by package and suggestion
-    let by_both = "vendor1/package1 suggests:
+    let by_both = BStr::new(
+        "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
 
 vendor2/package2 suggests:
@@ -331,13 +376,15 @@ vendor3/suggested is suggested by:
 vendor4/dev-suggested is suggested by:
  - vendor2/package2: helpful for vendor2/package2
 
-2 additional suggestions by transitive dependencies can be shown with --all";
+2 additional suggestions by transitive dependencies can be shown with --all",
+    );
     run_suggest_case(true, &[by_package.clone(), by_suggestion.clone()], by_both);
     run_suggest_case(false, &[by_package.clone(), by_suggestion.clone()], by_both);
     run_suggest_case(
         true,
         &[by_package.clone(), by_suggestion.clone(), no_dev.clone()],
-        "vendor1/package1 suggests:
+        BStr::new(
+            "vendor1/package1 suggests:
  - vendor3/suggested: helpful for vendor1/package1
 
 ------------------------------------------------------------------------------
@@ -345,6 +392,7 @@ vendor3/suggested is suggested by:
  - vendor1/package1: helpful for vendor1/package1
 
 1 additional suggestions by transitive dependencies can be shown with --all",
+        ),
     );
     run_suggest_case(
         false,
@@ -353,44 +401,56 @@ vendor3/suggested is suggested by:
     );
 
     // show suggested for package
-    let for_pkg = "vendor2/package2 suggests:
- - vendor4/dev-suggested: helpful for vendor2/package2";
+    let for_pkg = BStr::new(
+        "vendor2/package2 suggests:
+ - vendor4/dev-suggested: helpful for vendor2/package2",
+    );
     run_suggest_case(
         true,
         &[(
-            "packages",
-            InputValue::Array(vec!["vendor2/package2".to_string()]),
+            BStr::new("packages"),
+            InputValue::Array(vec!["vendor2/package2".into()]),
         )],
         for_pkg,
     );
     run_suggest_case(
         false,
         &[(
-            "packages",
-            InputValue::Array(vec!["vendor2/package2".to_string()]),
+            BStr::new("packages"),
+            InputValue::Array(vec!["vendor2/package2".into()]),
         )],
         for_pkg,
     );
 
     // list suggested
-    let list_out = "vendor3/suggested
-vendor4/dev-suggested";
+    let list_out = BStr::new(
+        "vendor3/suggested
+vendor4/dev-suggested",
+    );
     run_suggest_case(true, std::slice::from_ref(&list), list_out);
     run_suggest_case(false, std::slice::from_ref(&list), list_out);
-    run_suggest_case(true, &[list.clone(), no_dev.clone()], "vendor3/suggested");
+    run_suggest_case(
+        true,
+        &[list.clone(), no_dev.clone()],
+        BStr::new("vendor3/suggested"),
+    );
     run_suggest_case(false, &[list.clone(), no_dev.clone()], list_out);
 
-    let list_all = "vendor3/suggested
+    let list_all = BStr::new(
+        "vendor3/suggested
 vendor4/dev-suggested
 vendor7/transitive
-vendor8/dev-transitive";
+vendor8/dev-transitive",
+    );
     run_suggest_case(true, &[list.clone(), all.clone()], list_all);
     run_suggest_case(false, &[list.clone(), all.clone()], list_all);
     run_suggest_case(
         true,
         &[list.clone(), all.clone(), no_dev.clone()],
-        "vendor3/suggested
+        BStr::new(
+            "vendor3/suggested
 vendor7/transitive",
+        ),
     );
     run_suggest_case(
         false,

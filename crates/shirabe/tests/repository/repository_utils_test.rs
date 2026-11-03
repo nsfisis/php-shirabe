@@ -1,33 +1,30 @@
 //! ref: composer/tests/Composer/Test/Repository/RepositoryUtilsTest.php
 
 use crate::test_case::{get_alias_package, get_package};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::array_loader::ArrayLoader;
 use shirabe::repository::RepositoryUtils;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 /// PHP `configureLinks` sets link arrays on non-root packages; the public handle API only allows
 /// link setters on root packages, so packages carrying links are built via ArrayLoader.
 fn load_with(
-    name: &str,
-    version: &str,
-    link_type: &str,
-    deps: Vec<(&str, &str)>,
+    name: &BStr,
+    version: &BStr,
+    link_type: &BStr,
+    deps: Vec<(&BStr, &BStr)>,
 ) -> PackageInterfaceHandle {
     let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config.insert("name".into(), PhpMixed::string(name.to_string()));
-    config.insert("version".into(), PhpMixed::string(version.to_string()));
+    config.insert("name".into(), PhpMixed::string(bconcat!(name)));
+    config.insert("version".into(), PhpMixed::string(bconcat!(version)));
 
     let mut links: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (dep, constraint) in deps {
-        links.insert(
-            dep.to_string().into(),
-            PhpMixed::string(constraint.to_string()),
-        );
+        links.insert(bconcat!(dep), PhpMixed::string(bconcat!(constraint)));
     }
-    config.insert(link_type.to_string().into(), PhpMixed::Array(links));
+    config.insert(bconcat!(link_type), PhpMixed::Array(links));
 
     ArrayLoader::new(None, false)
         .load_packages(vec![config])
@@ -36,36 +33,41 @@ fn load_with(
 }
 
 /// ref: RepositoryUtilsTest::getPackages
-fn build_packages() -> IndexMap<String, PackageInterfaceHandle> {
+fn build_packages() -> IndexMap<BString, PackageInterfaceHandle> {
     let package_c = get_package("required/c", "1.0.0");
     let package_c_alias = get_alias_package(&package_c, "2.0.0");
 
-    let mut pkgs: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-    pkgs.insert("0".to_string(), get_package("dummy/pkg", "1.0.0"));
-    pkgs.insert("1".to_string(), get_package("dummy/pkg2", "2.0.0"));
-    pkgs.insert("a".to_string(), get_package("required/a", "1.0.0"));
+    let mut pkgs: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
+    pkgs.insert(BString::from("0"), get_package("dummy/pkg", "1.0.0"));
+    pkgs.insert(BString::from("1"), get_package("dummy/pkg2", "2.0.0"));
+    pkgs.insert(BString::from("a"), get_package("required/a", "1.0.0"));
     pkgs.insert(
-        "b".to_string(),
-        load_with("required/b", "1.0.0", "require", vec![("required/c", "*")]),
-    );
-    pkgs.insert("c".to_string(), package_c);
-    pkgs.insert("c-alias".to_string(), package_c_alias);
-    pkgs.insert(
-        "circular".to_string(),
+        BString::from("b"),
         load_with(
-            "required/circular",
-            "1.0.0",
-            "require",
-            vec![("required/circular-b", "*")],
+            BStr::new("required/b"),
+            BStr::new("1.0.0"),
+            BStr::new("require"),
+            vec![(BStr::new("required/c"), BStr::new("*"))],
+        ),
+    );
+    pkgs.insert(BString::from("c"), package_c);
+    pkgs.insert(BString::from("c-alias"), package_c_alias);
+    pkgs.insert(
+        BString::from("circular"),
+        load_with(
+            BStr::new("required/circular"),
+            BStr::new("1.0.0"),
+            BStr::new("require"),
+            vec![(BStr::new("required/circular-b"), BStr::new("*"))],
         ),
     );
     pkgs.insert(
-        "circular-b".to_string(),
+        BString::from("circular-b"),
         load_with(
-            "required/circular-b",
-            "1.0.0",
-            "require",
-            vec![("required/circular", "*")],
+            BStr::new("required/circular-b"),
+            BStr::new("1.0.0"),
+            BStr::new("require"),
+            vec![(BStr::new("required/circular"), BStr::new("*"))],
         ),
     );
     pkgs
@@ -73,7 +75,7 @@ fn build_packages() -> IndexMap<String, PackageInterfaceHandle> {
 
 struct FilterCase {
     requirer: PackageInterfaceHandle,
-    expected: Vec<&'static str>,
+    expected: Vec<&'static BStr>,
     include_require_dev: bool,
 }
 
@@ -89,10 +91,10 @@ fn provide_filter_require_tests() -> Vec<FilterCase> {
         // 'require-dev has no effect'
         FilterCase {
             requirer: load_with(
-                "requirer/pkg",
-                "1.0.0",
-                "require-dev",
-                vec![("required/a", "*")],
+                BStr::new("requirer/pkg"),
+                BStr::new("1.0.0"),
+                BStr::new("require-dev"),
+                vec![(BStr::new("required/a"), BStr::new("*"))],
             ),
             expected: vec![],
             include_require_dev: false,
@@ -100,56 +102,56 @@ fn provide_filter_require_tests() -> Vec<FilterCase> {
         // 'require-dev works if called with it enabled'
         FilterCase {
             requirer: load_with(
-                "requirer/pkg",
-                "1.0.0",
-                "require-dev",
-                vec![("required/a", "*")],
+                BStr::new("requirer/pkg"),
+                BStr::new("1.0.0"),
+                BStr::new("require-dev"),
+                vec![(BStr::new("required/a"), BStr::new("*"))],
             ),
-            expected: vec!["a"],
+            expected: vec![BStr::new("a")],
             include_require_dev: true,
         },
         // 'simple require'
         FilterCase {
             requirer: load_with(
-                "requirer/pkg",
-                "1.0.0",
-                "require",
-                vec![("required/a", "*")],
+                BStr::new("requirer/pkg"),
+                BStr::new("1.0.0"),
+                BStr::new("require"),
+                vec![(BStr::new("required/a"), BStr::new("*"))],
             ),
-            expected: vec!["a"],
+            expected: vec![BStr::new("a")],
             include_require_dev: false,
         },
         // 'require constraint is irrelevant'
         FilterCase {
             requirer: load_with(
-                "requirer/pkg",
-                "1.0.0",
-                "require",
-                vec![("required/a", "dev-lala")],
+                BStr::new("requirer/pkg"),
+                BStr::new("1.0.0"),
+                BStr::new("require"),
+                vec![(BStr::new("required/a"), BStr::new("dev-lala"))],
             ),
-            expected: vec!["a"],
+            expected: vec![BStr::new("a")],
             include_require_dev: false,
         },
         // 'require transitive deps and aliases are included'
         FilterCase {
             requirer: load_with(
-                "requirer/pkg",
-                "1.0.0",
-                "require",
-                vec![("required/b", "*")],
+                BStr::new("requirer/pkg"),
+                BStr::new("1.0.0"),
+                BStr::new("require"),
+                vec![(BStr::new("required/b"), BStr::new("*"))],
             ),
-            expected: vec!["b", "c", "c-alias"],
+            expected: vec![BStr::new("b"), BStr::new("c"), BStr::new("c-alias")],
             include_require_dev: false,
         },
         // 'circular deps are no problem'
         FilterCase {
             requirer: load_with(
-                "requirer/pkg",
-                "1.0.0",
-                "require",
-                vec![("required/circular", "*")],
+                BStr::new("requirer/pkg"),
+                BStr::new("1.0.0"),
+                BStr::new("require"),
+                vec![(BStr::new("required/circular"), BStr::new("*"))],
             ),
-            expected: vec!["circular", "circular-b"],
+            expected: vec![BStr::new("circular"), BStr::new("circular-b")],
             include_require_dev: false,
         },
     ]

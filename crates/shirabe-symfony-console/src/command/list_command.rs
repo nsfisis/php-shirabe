@@ -4,7 +4,9 @@ use crate::command::{Command, CommandData, SetDefinitionArg};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
 use crate::descriptor::{ApplicationDescription, DescribableObject};
 use crate::helper::DescriptorHelper;
-use crate::input::{DefinitionItem, InputArgument, InputInterface, InputOption, InputValue};
+use crate::input::{
+    DefinitionItem, InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue,
+};
 use crate::output::OutputInterface;
 use shirabe_php_shim::impl_php_class;
 use std::ops::{Deref, DerefMut};
@@ -83,37 +85,37 @@ impl ListCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.inner.set_name("list")?;
+        self.inner.set_name("list".into())?;
         self.inner.set_definition(SetDefinitionArg::Array(vec![
             DefinitionItem::InputArgument(InputArgument::new(
-                "namespace".to_string(),
+                "namespace",
                 Some(InputArgument::OPTIONAL),
-                "The namespace name".to_string(),
+                "The namespace name",
                 InputValue::Null,
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "raw",
                 None,
                 Some(InputOption::VALUE_NONE),
-                "To output raw command list".to_string(),
+                "To output raw command list",
                 InputValue::Null,
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "format",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
-                "The output format (txt, xml, json, or md)".to_string(),
-                InputValue::from("txt".to_string()),
+                "The output format (txt, xml, json, or md)",
+                InputValue::from("txt"),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "short",
                 None,
                 Some(InputOption::VALUE_NONE),
-                "To skip describing commands' arguments".to_string(),
+                "To skip describing commands' arguments",
                 InputValue::Null,
             )?),
         ]));
-        self.inner.set_description("List commands");
+        self.inner.set_description("List commands".into());
         self.inner.set_help(
                 "The <info>%command.name%</info> command lists all commands:\n\
                  \n\
@@ -129,7 +131,7 @@ impl Command for ListCommand {
                  \n\
                  It's also possible to get raw list of commands (useful for embedding command runner):\n\
                  \n\
-                 \x20\x20<info>%command.full_name% --raw</info>",
+                 \x20\x20<info>%command.full_name% --raw</info>".into(),
             );
 
         Ok(())

@@ -5,22 +5,29 @@ use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, bconcat, path_from_bytes, path_to_bytes, rtrim2, strtr,
+};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct ProjectInstaller {
-    install_path: String,
+    install_path: PathBuf,
     download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
 }
 
 impl ProjectInstaller {
     pub fn new(
-        install_path: &str,
+        install_path: &Path,
         dm: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
-        let install_path = format!("{}/", install_path.replace('\\', "/").trim_end_matches('/'));
+        let install_path = PathBuf::from(path_from_bytes(&bconcat!(
+            rtrim2(strtr(path_to_bytes(install_path), "\\", "/"), "/"),
+            "/"
+        )));
         Self {
             install_path,
             download_manager: dm,
@@ -31,7 +38,7 @@ impl ProjectInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for ProjectInstaller {
-    fn supports(&self, _package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, _package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(true)
     }
 
@@ -49,16 +56,15 @@ impl InstallerInterface for ProjectInstaller {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let install_path = &self.install_path;
-        if std::path::Path::new(install_path).exists()
-            && !self.filesystem.borrow().is_dir_empty(install_path)
-        {
-            return Err(InvalidArgumentException::new(format!(
-                "Project directory {} is not empty.",
-                install_path
+        if install_path.exists() && !self.filesystem.borrow().is_dir_empty(install_path) {
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Project directory ",
+                install_path,
+                " is not empty."
             ))
             .into());
         }
-        if !std::path::Path::new(install_path).is_dir() {
+        if !install_path.is_dir() {
             std::fs::create_dir_all(install_path)?;
         }
 
@@ -70,7 +76,7 @@ impl InstallerInterface for ProjectInstaller {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -82,7 +88,7 @@ impl InstallerInterface for ProjectInstaller {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -109,7 +115,7 @@ impl InstallerInterface for ProjectInstaller {
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Err(InvalidArgumentException::new("not supported".to_string()).into())
+        Err(InvalidArgumentException::new(BString::from("not supported")).into())
     }
 
     async fn uninstall(
@@ -117,10 +123,10 @@ impl InstallerInterface for ProjectInstaller {
         _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Err(InvalidArgumentException::new("not supported".to_string()).into())
+        Err(InvalidArgumentException::new(BString::from("not supported")).into())
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<PathBuf> {
         Some(self.install_path.clone())
     }
 }

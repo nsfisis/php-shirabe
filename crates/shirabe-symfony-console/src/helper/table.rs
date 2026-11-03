@@ -6,9 +6,10 @@ use crate::helper::{
     Helper, TableCell, TableCellOption, TableCellStyle, TableRows, TableSeparator, TableStyle,
 };
 use crate::output::OutputInterface;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_splice, explode, get_debug_type, http_build_query_mixed, implode,
+    PhpMixed, array_splice, bconcat, explode, get_debug_type, http_build_query_mixed, implode,
     mb_detect_encoding, mb_str_split, mb_strwidth, php_regex, preg_is_match, sprintf, str_pad,
     str_repeat, str_replace, strlen, strstr, substr_count, to_string,
 };
@@ -21,7 +22,7 @@ use shirabe_php_shim::{
 #[derive(Debug, Clone)]
 pub enum Cell {
     Null,
-    Value(String),
+    Value(BString),
     Cell(TableCell),
     Separator(TableSeparator),
 }
@@ -62,11 +63,11 @@ impl Cell {
     }
 
     /// PHP `(string) $cell`.
-    fn to_php_string(&self) -> String {
+    fn to_php_string(&self) -> BString {
         match self {
-            Cell::Null | Cell::Separator(_) => String::new(),
+            Cell::Null | Cell::Separator(_) => BString::default(),
             Cell::Value(s) => s.clone(),
-            Cell::Cell(c) => c.to_string(),
+            Cell::Cell(c) => c.to_php_string(),
         }
     }
 
@@ -75,7 +76,7 @@ impl Cell {
     fn is_truthy(&self) -> bool {
         match self {
             Cell::Null => false,
-            Cell::Value(s) => !s.is_empty() && s != "0",
+            Cell::Value(s) => !s.is_empty() && s.as_slice() != b"0",
             Cell::Cell(_) | Cell::Separator(_) => true,
         }
     }
@@ -85,15 +86,16 @@ impl Cell {
     }
 }
 
-impl From<String> for Cell {
-    fn from(value: String) -> Self {
+impl From<BString> for Cell {
+    fn from(value: BString) -> Self {
         Cell::Value(value)
     }
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for Cell {
     fn from(value: &str) -> Self {
-        Cell::Value(value.to_string())
+        Cell::Value(value.into())
     }
 }
 
@@ -190,18 +192,19 @@ impl From<PhpMixed> for Row {
 /// registered style or a `TableStyle` instance.
 #[derive(Debug, Clone)]
 pub enum StyleName {
-    Name(String),
+    Name(BString),
     Style(TableStyle),
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl From<&str> for StyleName {
     fn from(name: &str) -> Self {
-        StyleName::Name(name.to_string())
+        StyleName::Name(name.into())
     }
 }
 
-impl From<String> for StyleName {
-    fn from(name: String) -> Self {
+impl From<BString> for StyleName {
+    fn from(name: BString) -> Self {
         StyleName::Name(name)
     }
 }
@@ -257,8 +260,8 @@ const BORDER_INSIDE: i64 = 1;
 /// Global style definitions, lazily initialized.
 ///
 /// In PHP this is `private static $styles`. Here it is a process-global cache.
-fn styles() -> &'static std::sync::Mutex<Option<IndexMap<String, TableStyle>>> {
-    static STYLES: std::sync::Mutex<Option<IndexMap<String, TableStyle>>> =
+fn styles() -> &'static std::sync::Mutex<Option<IndexMap<BString, TableStyle>>> {
+    static STYLES: std::sync::Mutex<Option<IndexMap<BString, TableStyle>>> =
         std::sync::Mutex::new(None);
     &STYLES
 }
@@ -290,7 +293,7 @@ impl Table {
 
     /// Gets a style definition by name.
     pub(crate) fn get_style_definition(
-        name: String,
+        name: BString,
     ) -> anyhow::Result<Result<TableStyle, InvalidArgumentException>> {
         let mut styles_guard = styles().lock().unwrap();
         if styles_guard.is_none() {
@@ -301,9 +304,10 @@ impl Table {
             return Ok(Ok(style.clone()));
         }
 
-        Ok(Err(InvalidArgumentException::new(format!(
-            "Style \"{}\" is not defined.",
-            name
+        Ok(Err(InvalidArgumentException::new(bconcat!(
+            "Style \"",
+            name,
+            "\" is not defined."
         ))))
     }
 
@@ -346,7 +350,7 @@ impl Table {
             panic!(
                 "Setting a maximum column width is only supported when using a \"{}\" formatter, got \"{}\".",
                 "Symfony\\Component\\Console\\Formatter\\WrappableOutputFormatterInterface",
-                get_debug_type(&PhpMixed::from(()))
+                get_debug_type(&PhpMixed::from(())).display_lossy()
             );
         }
 
@@ -396,7 +400,7 @@ impl Table {
     }
 
     /// Renders table to output.
-    pub fn render(&mut self) {
+    pub fn render(&mut self) -> anyhow::Result<()> {
         let rows: Vec<Row> = if self.horizontal {
             let mut horizontal_rows: IndexMap<i64, Vec<Cell>> = IndexMap::new();
             let header0 = self.headers.first().map(|h| h.cells()).unwrap_or_default();
@@ -435,7 +439,7 @@ impl Table {
 
         self.calculate_number_of_columns(&rows);
 
-        let row_groups = self.build_table_rows(rows);
+        let row_groups = self.build_table_rows(rows)?;
         self.calculate_columns_width(&row_groups);
 
         let mut is_header = !self.horizontal;
@@ -502,6 +506,8 @@ impl Table {
         self.render_row_separator(SEPARATOR_BOTTOM);
 
         self.cleanup();
+
+        Ok(())
     }
 
     /// Renders horizontal header separator.
@@ -553,11 +559,11 @@ impl Table {
         let mut markup = left_char;
         let mut column = 0;
         while column < count {
-            markup.push_str(&str_repeat(
+            markup.extend_from_slice(&str_repeat(
                 &horizontal,
                 self.effective_column_widths[&column] as usize,
             ));
-            markup.push_str(if column == count - 1 {
+            markup.extend_from_slice(if column == count - 1 {
                 &right_char
             } else {
                 &mid_char
@@ -567,19 +573,19 @@ impl Table {
 
         self.output.borrow().writeln(
             &[sprintf(
-                &self.style.get_border_format(),
-                &[PhpMixed::from(markup)],
+                self.style.get_border_format(),
+                &[PhpMixed::String(markup)],
             )],
             crate::output::OUTPUT_NORMAL,
         );
     }
 
     /// Renders vertical column separator.
-    fn render_column_separator(&self, r#type: i64) -> String {
+    fn render_column_separator(&self, r#type: i64) -> BString {
         let borders = self.style.get_border_chars();
 
         sprintf(
-            &self.style.get_border_format(),
+            self.style.get_border_format(),
             &[PhpMixed::from(if BORDER_OUTSIDE == r#type {
                 borders[1].clone()
             } else {
@@ -589,22 +595,22 @@ impl Table {
     }
 
     /// Renders table row.
-    fn render_row(&self, row: Vec<Cell>, cell_format: String, first_cell_format: Option<String>) {
+    fn render_row(&self, row: Vec<Cell>, cell_format: BString, first_cell_format: Option<BString>) {
         let mut row_content = self.render_column_separator(BORDER_OUTSIDE);
         let columns = self.get_row_columns(&row);
         let last = columns.len() as i64 - 1;
         for (i, column) in columns.into_iter().enumerate() {
             let i = i as i64;
             if first_cell_format.is_some() && 0 == i {
-                row_content.push_str(&self.render_cell(
+                row_content.extend_from_slice(&self.render_cell(
                     &row,
                     column,
                     first_cell_format.clone().unwrap(),
                 ));
             } else {
-                row_content.push_str(&self.render_cell(&row, column, cell_format.clone()));
+                row_content.extend_from_slice(&self.render_cell(&row, column, cell_format.clone()));
             }
-            row_content.push_str(&self.render_column_separator(if last == i {
+            row_content.extend_from_slice(&self.render_column_separator(if last == i {
                 BORDER_OUTSIDE
             } else {
                 BORDER_INSIDE
@@ -616,11 +622,11 @@ impl Table {
     }
 
     /// Renders table cell with padding.
-    fn render_cell(&self, row: &[Cell], column: i64, cell_format: String) -> String {
+    fn render_cell(&self, row: &[Cell], column: i64, cell_format: BString) -> BString {
         let cell = row
             .get(column as usize)
             .cloned()
-            .unwrap_or(Cell::Value(String::new()));
+            .unwrap_or(Cell::Value(BString::default()));
         let mut width = self.effective_column_widths[&column];
         if cell.is_table_cell() && cell.colspan() > 1 {
             // add the width of the following columns(numbers of colspan).
@@ -633,14 +639,14 @@ impl Table {
         // str_pad won't work properly with multi-byte strings, we need to fix the padding
         let cell_str = cell.to_php_string();
         if let Some(encoding) = mb_detect_encoding(&cell_str, None, true) {
-            width += strlen(&cell_str) - mb_strwidth(&cell_str, Some(&encoding));
+            width += strlen(&cell_str) - mb_strwidth(&cell_str, Some(encoding.as_bstr()));
         }
 
         let style = self.get_style();
 
         if cell.is_table_separator() {
             return sprintf(
-                &style.get_border_format(),
+                style.get_border_format(),
                 &[PhpMixed::from(str_repeat(
                     &style.get_border_chars()[2],
                     width as usize,
@@ -648,9 +654,10 @@ impl Table {
             );
         }
 
-        width += Helper::length(&cell_str) - Helper::length(&self.remove_decoration(&cell_str));
+        width +=
+            Helper::length(&cell_str) - Helper::length(self.remove_decoration(cell_str.as_ref()));
         let mut content = sprintf(
-            &style.get_cell_row_content_format(),
+            style.get_cell_row_content_format(),
             &[PhpMixed::from(cell_str.clone())],
         );
 
@@ -667,7 +674,7 @@ impl Table {
                     Some(fmt) => cell_format = fmt,
                     None => {
                         let tag = http_build_query_mixed(&cell_style.get_tag_options(), "", ";");
-                        cell_format = format!("<{}>%s</>", tag);
+                        cell_format = bconcat!("<", tag, ">%s</>");
                     }
                 }
 
@@ -689,7 +696,7 @@ impl Table {
             &[PhpMixed::from(str_pad(
                 &content,
                 width as usize,
-                &style.get_padding_char(),
+                style.get_padding_char(),
                 pad_type,
             ))],
         )
@@ -709,7 +716,7 @@ impl Table {
         self.number_of_columns = Some(*columns.iter().max().unwrap());
     }
 
-    fn build_table_rows(&mut self, rows: Vec<Row>) -> TableRows {
+    fn build_table_rows(&mut self, rows: Vec<Row>) -> anyhow::Result<TableRows> {
         let mut rows = rows;
         let mut unmerged_rows: IndexMap<i64, IndexMap<i64, Vec<Cell>>> = IndexMap::new();
         let mut row_key = 0i64;
@@ -728,20 +735,20 @@ impl Table {
                 };
 
                 if self.column_max_widths.contains_key(&column)
-                    && Helper::width(&self.remove_decoration(&cell.to_php_string()))
+                    && Helper::width(self.remove_decoration(cell.to_php_string().as_ref()))
                         > self.column_max_widths[&column]
                 {
                     let wrapped = self.format_and_wrap(
-                        &cell.to_php_string(),
+                        cell.to_php_string().as_ref(),
                         self.column_max_widths[&column] * colspan,
-                    );
+                    )?;
                     cell = Cell::Value(wrapped);
                 }
                 let cell_str = cell.to_php_string();
                 if strstr(&cell_str, "\n").is_none() {
                     continue;
                 }
-                let eol = if cell_str.contains("\r\n") {
+                let eol = if cell_str.contains_str("\r\n") {
                     "\r\n"
                 } else {
                     "\n"
@@ -750,7 +757,7 @@ impl Table {
                     eol,
                     &explode(eol, &cell_str)
                         .iter()
-                        .map(|line| OutputFormatter::escape_trailing_backslash(line))
+                        .map(OutputFormatter::escape_trailing_backslash)
                         .collect::<Vec<_>>(),
                 );
                 cell = if cell.is_table_cell() {
@@ -763,10 +770,10 @@ impl Table {
                 };
                 let lines = explode(
                     eol,
-                    &str_replace(
+                    str_replace(
                         eol,
-                        &format!("<fg=default;bg=default></>{}", eol),
-                        &cell.to_php_string(),
+                        bconcat!("<fg=default;bg=default></>", eol),
+                        cell.to_php_string(),
                     ),
                 );
                 for (line_key, line) in lines.into_iter().enumerate() {
@@ -774,7 +781,7 @@ impl Table {
                     let mut line = Cell::Value(line);
                     if colspan > 1 {
                         line = Cell::Cell(TableCell::new2(
-                            &line.to_php_string(),
+                            line.to_php_string(),
                             Self::table_cell_options_colspan(colspan),
                         ));
                     }
@@ -824,7 +831,7 @@ impl Table {
             row_groups.push(row_group);
         }
 
-        TableRows::from_row_groups(row_groups)
+        Ok(TableRows::from_row_groups(row_groups))
     }
 
     /// fill rows that contains rowspan > 1.
@@ -842,20 +849,23 @@ impl Table {
                 let cell_str = cell.to_php_string();
                 let mut lines = vec![cell.clone()];
                 if strstr(&cell_str, "\n").is_some() {
-                    let eol = if cell_str.contains("\r\n") {
+                    let eol = if cell_str.contains_str("\r\n") {
                         "\r\n"
                     } else {
                         "\n"
                     };
                     let exploded = explode(
                         eol,
-                        &str_replace(
+                        str_replace(
                             eol,
-                            &format!("<fg=default;bg=default>{}</>", eol),
+                            bconcat!("<fg=default;bg=default>", eol, "</>"),
                             &cell_str,
                         ),
                     );
-                    lines = exploded.into_iter().map(Cell::Value).collect();
+                    lines = exploded
+                        .iter()
+                        .map(|line| Cell::Value(line.clone()))
+                        .collect();
                     nb_lines = if (lines.len() as i64) > nb_lines {
                         substr_count(&cell_str, eol)
                     } else {
@@ -867,7 +877,7 @@ impl Table {
                         &mut r,
                         column,
                         Cell::Cell(TableCell::new2(
-                            &lines[0].to_php_string(),
+                            lines[0].to_php_string(),
                             Self::table_cell_options_colspan_style(cell.colspan(), cell.style()),
                         )),
                     );
@@ -884,11 +894,11 @@ impl Table {
                     let value = lines
                         .get(idx as usize)
                         .cloned()
-                        .unwrap_or(Cell::Value(String::new()));
+                        .unwrap_or(Cell::Value(BString::default()));
                     unmerged_rows.get_mut(&unmerged_row_key).unwrap().insert(
                         column,
                         Cell::Cell(TableCell::new2(
-                            &value.to_php_string(),
+                            value.to_php_string(),
                             Self::table_cell_options_colspan_style(cell.colspan(), cell.style()),
                         )),
                     );
@@ -942,7 +952,7 @@ impl Table {
             if cell.is_table_cell() && cell.colspan() > 1 {
                 for _position in (column + 1)..=(column + cell.colspan() - 1) {
                     // insert empty value at column position
-                    new_row.push(Cell::Value(String::new()));
+                    new_row.push(Cell::Value(BString::default()));
                 }
             }
         }
@@ -954,7 +964,7 @@ impl Table {
         let mut row = rows[line as usize].cells();
         for cell in &mut row {
             let cell_value = cell.clone();
-            *cell = Cell::Value(String::new());
+            *cell = Cell::Value(BString::default());
             if cell_value.is_table_cell() {
                 *cell = Cell::Cell(TableCell::new2(
                     "",
@@ -1011,7 +1021,8 @@ impl Table {
                     for i in 0..row_arr.len() {
                         let cell = row_arr[i].clone();
                         if cell.is_table_cell() {
-                            let text_content = self.remove_decoration(&cell.to_php_string());
+                            let text_content =
+                                self.remove_decoration(cell.to_php_string().as_ref());
                             let text_length = Helper::width(&text_content);
                             if text_length > 0 {
                                 let content_columns = mb_str_split(
@@ -1036,7 +1047,7 @@ impl Table {
             self.effective_column_widths.insert(
                 column,
                 *lengths.iter().max().unwrap()
-                    + Helper::width(&self.style.get_cell_row_content_format())
+                    + Helper::width(self.style.get_cell_row_content_format())
                     - 2,
             );
             column += 1;
@@ -1044,8 +1055,8 @@ impl Table {
     }
 
     fn get_column_separator_width(&self) -> i64 {
-        Helper::width(&sprintf(
-            &self.style.get_border_format(),
+        Helper::width(sprintf(
+            self.style.get_border_format(),
             &[PhpMixed::from(self.style.get_border_chars()[3].clone())],
         ))
     }
@@ -1054,7 +1065,7 @@ impl Table {
         let mut cell_width = 0;
 
         if let Some(cell) = row.get(column as usize) {
-            cell_width = Helper::width(&self.remove_decoration(&cell.to_php_string()));
+            cell_width = Helper::width(self.remove_decoration(cell.to_php_string().as_ref()));
         }
 
         let column_width = *self.column_widths.get(&column).unwrap_or(&0);
@@ -1073,41 +1084,41 @@ impl Table {
         self.number_of_columns = None;
     }
 
-    fn init_styles() -> IndexMap<String, TableStyle> {
+    fn init_styles() -> IndexMap<BString, TableStyle> {
         let mut borderless = TableStyle::default();
         borderless
-            .set_horizontal_border_chars("=".to_string(), None)
-            .set_vertical_border_chars(" ".to_string(), None)
-            .set_default_crossing_char(" ".to_string());
+            .set_horizontal_border_chars("=".into(), None)
+            .set_vertical_border_chars(" ".into(), None)
+            .set_default_crossing_char(" ".into());
 
         let mut compact = TableStyle::default();
         compact
-            .set_horizontal_border_chars("".to_string(), None)
-            .set_vertical_border_chars("".to_string(), None)
-            .set_default_crossing_char("".to_string())
-            .set_cell_row_content_format("%s ".to_string());
+            .set_horizontal_border_chars("".into(), None)
+            .set_vertical_border_chars("".into(), None)
+            .set_default_crossing_char("".into())
+            .set_cell_row_content_format("%s ".into());
 
         let mut style_guide = TableStyle::default();
         style_guide
-            .set_horizontal_border_chars("-".to_string(), None)
-            .set_vertical_border_chars(" ".to_string(), None)
-            .set_default_crossing_char(" ".to_string())
-            .set_cell_header_format("%s".to_string());
+            .set_horizontal_border_chars("-".into(), None)
+            .set_vertical_border_chars(" ".into(), None)
+            .set_default_crossing_char(" ".into())
+            .set_cell_header_format("%s".into());
 
         let mut r#box = TableStyle::default();
         r#box
-            .set_horizontal_border_chars("─".to_string(), None)
-            .set_vertical_border_chars("│".to_string(), None)
+            .set_horizontal_border_chars("─".into(), None)
+            .set_vertical_border_chars("│".into(), None)
             .set_crossing_chars(
-                "┼".to_string(),
-                "┌".to_string(),
-                "┬".to_string(),
-                "┐".to_string(),
-                "┤".to_string(),
-                "┘".to_string(),
-                "┴".to_string(),
-                "└".to_string(),
-                "├".to_string(),
+                "┼".into(),
+                "┌".into(),
+                "┬".into(),
+                "┐".into(),
+                "┤".into(),
+                "┘".into(),
+                "┴".into(),
+                "└".into(),
+                "├".into(),
                 None,
                 None,
                 None,
@@ -1115,30 +1126,30 @@ impl Table {
 
         let mut box_double = TableStyle::default();
         box_double
-            .set_horizontal_border_chars("═".to_string(), Some("─".to_string()))
-            .set_vertical_border_chars("║".to_string(), Some("│".to_string()))
+            .set_horizontal_border_chars("═".into(), Some("─".into()))
+            .set_vertical_border_chars("║".into(), Some("│".into()))
             .set_crossing_chars(
-                "┼".to_string(),
-                "╔".to_string(),
-                "╤".to_string(),
-                "╗".to_string(),
-                "╢".to_string(),
-                "╝".to_string(),
-                "╧".to_string(),
-                "╚".to_string(),
-                "╟".to_string(),
-                Some("╠".to_string()),
-                Some("╪".to_string()),
-                Some("╣".to_string()),
+                "┼".into(),
+                "╔".into(),
+                "╤".into(),
+                "╗".into(),
+                "╢".into(),
+                "╝".into(),
+                "╧".into(),
+                "╚".into(),
+                "╟".into(),
+                Some("╠".into()),
+                Some("╪".into()),
+                Some("╣".into()),
             );
 
-        let mut result: IndexMap<String, TableStyle> = IndexMap::new();
-        result.insert("default".to_string(), TableStyle::default());
-        result.insert("borderless".to_string(), borderless);
-        result.insert("compact".to_string(), compact);
-        result.insert("symfony-style-guide".to_string(), style_guide);
-        result.insert("box".to_string(), r#box);
-        result.insert("box-double".to_string(), box_double);
+        let mut result: IndexMap<BString, TableStyle> = IndexMap::new();
+        result.insert("default".into(), TableStyle::default());
+        result.insert("borderless".into(), borderless);
+        result.insert("compact".into(), compact);
+        result.insert("symfony-style-guide".into(), style_guide);
+        result.insert("box".into(), r#box);
+        result.insert("box-double".into(), box_double);
 
         result
     }
@@ -1157,9 +1168,10 @@ impl Table {
             return Ok(Ok(style.clone()));
         }
 
-        Ok(Err(InvalidArgumentException::new(format!(
-            "Style \"{}\" is not defined.",
-            name
+        Ok(Err(InvalidArgumentException::new(bconcat!(
+            "Style \"",
+            name,
+            "\" is not defined."
         ))))
     }
 
@@ -1175,47 +1187,84 @@ impl Table {
     /// `setColumnMaxWidth` guarantees the formatter is a `WrappableOutputFormatterInterface`, and
     /// `OutputFormatter` is the sole implementor in this port, so `instanceof` reduces to this
     /// downcast.
-    fn format_and_wrap(&self, string: &str, width: i64) -> String {
+    fn format_and_wrap(&self, string: &BStr, width: i64) -> anyhow::Result<BString> {
         let formatter = self.output.borrow().get_formatter();
         let mut formatter = formatter.borrow_mut();
         let formatter = formatter
             .as_any_mut()
             .downcast_mut::<OutputFormatter>()
             .expect("formatter must be a WrappableOutputFormatterInterface");
-        formatter
-            .format_and_wrap(Some(string), width)
-            .unwrap()
-            .unwrap_or_default()
+        Ok(formatter
+            .format_and_wrap(Some(string), width)?
+            .unwrap_or_default())
     }
 
     /// PHP `Helper::removeDecoration($this->output->getFormatter(), $string)`.
-    fn remove_decoration(&self, string: &str) -> String {
+    fn remove_decoration(&self, string: &BStr) -> BString {
         let formatter = self.output.borrow().get_formatter();
         let mut formatter = formatter.borrow_mut();
         Helper::remove_decoration(&mut *formatter, string)
     }
 
-    fn table_cell_options_colspan(colspan: i64) -> IndexMap<String, TableCellOption> {
+    fn table_cell_options_colspan(colspan: i64) -> IndexMap<BString, TableCellOption> {
         // PHP: ['colspan' => $colspan]
         let mut options = IndexMap::new();
-        options.insert("colspan".to_string(), TableCellOption::Int(colspan));
+        options.insert("colspan".into(), TableCellOption::Int(colspan));
         options
     }
 
     fn table_cell_options_colspan_style(
         colspan: i64,
         style: Option<std::rc::Rc<TableCellStyle>>,
-    ) -> IndexMap<String, TableCellOption> {
+    ) -> IndexMap<BString, TableCellOption> {
         // PHP: ['colspan' => $colspan, 'style' => $style]
         let mut options = IndexMap::new();
-        options.insert("colspan".to_string(), TableCellOption::Int(colspan));
+        options.insert("colspan".into(), TableCellOption::Int(colspan));
         options.insert(
-            "style".to_string(),
+            "style".into(),
             match style {
                 Some(style) => TableCellOption::Style(style),
                 None => TableCellOption::Null,
             },
         );
         options
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::output::BufferedOutput;
+    use bstr::ByteSlice;
+
+    #[test]
+    fn style_characters_and_cell_format_keep_their_bytes() {
+        let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+            None, false, None,
+        )));
+        let mut style = TableStyle::default();
+        style.set_vertical_border_chars(BString::from(b"\xE9".as_slice()), None);
+        let cell_style = TableCellStyle::new(IndexMap::from([(
+            BString::from("cellFormat"),
+            PhpMixed::string(b"f\xE8 %s".as_slice()),
+        )]))
+        .unwrap();
+        let cell = TableCell::new(
+            "value",
+            IndexMap::from([(
+                BString::from("style"),
+                TableCellOption::Style(std::rc::Rc::new(cell_style)),
+            )]),
+        )
+        .unwrap();
+
+        let mut table = Table::new(output.clone());
+        table.set_style(style.into()).unwrap().unwrap();
+        table.add_row(vec![Cell::from(cell)].into());
+        table.render().unwrap();
+
+        let rendered = output.borrow().fetch();
+        assert!(rendered.contains_str(b"\xE9"));
+        assert!(rendered.contains_str(b"f\xE8 "));
     }
 }

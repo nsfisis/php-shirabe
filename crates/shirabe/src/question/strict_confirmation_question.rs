@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Question/StrictConfirmationQuestion.php
 
-use bstr::ByteSlice;
 use shirabe_php_shim::{PhpMixed, empty, is_bool, preg_is_match};
 use shirabe_symfony_console::exception::InvalidArgumentException;
 use shirabe_symfony_console::question::{Question, QuestionInterface};
@@ -8,22 +7,22 @@ use shirabe_symfony_console::question::{Question, QuestionInterface};
 #[derive(Debug)]
 pub struct StrictConfirmationQuestion {
     inner: Question,
-    true_answer_regex: String,
-    false_answer_regex: String,
+    true_answer_regex: bstr::BString,
+    false_answer_regex: bstr::BString,
 }
 
 impl StrictConfirmationQuestion {
     pub fn new(
-        question: String,
+        question: impl Into<bstr::BString>,
         default: bool,
-        true_answer_regex: String,
-        false_answer_regex: String,
+        true_answer_regex: impl Into<bstr::BString>,
+        false_answer_regex: impl Into<bstr::BString>,
     ) -> Self {
         let inner = Question::new(question, Some(PhpMixed::Bool(default)));
         let mut this = Self {
             inner,
-            true_answer_regex,
-            false_answer_regex,
+            true_answer_regex: true_answer_regex.into(),
+            false_answer_regex: false_answer_regex.into(),
         };
         let normalizer = this.get_default_normalizer();
         let validator = this.get_default_validator();
@@ -53,10 +52,10 @@ impl StrictConfirmationQuestion {
                 return default.clone();
             }
             if let PhpMixed::String(s) = &answer {
-                if preg_is_match(&true_regex, &s.to_str_lossy()) {
+                if preg_is_match(&true_regex, s) {
                     return PhpMixed::Bool(true);
                 }
-                if preg_is_match(&false_regex, &s.to_str_lossy()) {
+                if preg_is_match(&false_regex, s) {
                     return PhpMixed::Bool(false);
                 }
             }
@@ -71,7 +70,7 @@ impl StrictConfirmationQuestion {
             let answer = answer.unwrap_or(PhpMixed::Null);
             if !is_bool(&answer) {
                 return Err(InvalidArgumentException::new(
-                    "Please answer yes, y, no, or n.".to_string(),
+                    "Please answer yes, y, no, or n.",
                 ));
             }
             Ok(answer)
@@ -83,7 +82,7 @@ impl StrictConfirmationQuestion {
 // so it is not an instanceof ChoiceQuestion/ConfirmationQuestion and keeps the default
 // downcasts returning None.
 impl QuestionInterface for StrictConfirmationQuestion {
-    fn get_question(&self) -> &str {
+    fn get_question(&self) -> &bstr::BStr {
         self.inner.get_question()
     }
 
@@ -107,7 +106,7 @@ impl QuestionInterface for StrictConfirmationQuestion {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&bstr::BStr) -> Option<Vec<PhpMixed>>> {
         self.inner.get_autocompleter_callback()
     }
 

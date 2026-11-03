@@ -9,7 +9,7 @@ pub trait LoaderInterface: std::fmt::Debug {
     fn load(
         &self,
         config: IndexMap<BString, PhpMixed>,
-        class: Option<String>,
+        class: Option<BString>,
     ) -> anyhow::Result<PackageInterfaceHandle>;
 
     fn as_any(&self) -> &dyn std::any::Any;

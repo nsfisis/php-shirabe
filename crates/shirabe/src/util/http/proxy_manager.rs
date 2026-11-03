@@ -3,7 +3,10 @@
 use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;
 use crate::util::http::{ProxyItem, RequestProxy};
-use shirabe_php_shim::PHP_SERVER;
+use bstr::{BStr, BString};
+use shirabe_php_shim::{
+    PHP_SERVER, bconcat, error_message, parse_url, path_from_bytes, strtolower, strtoupper,
+};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -15,7 +18,7 @@ static NEXT_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 pub struct ProxyManager {
-    error: Option<String>,
+    error: Option<BString>,
     http_proxy: Option<ProxyItem>,
     https_proxy: Option<ProxyItem>,
     no_proxy_handler: std::cell::RefCell<Option<NoProxyPattern>>,
@@ -32,7 +35,7 @@ impl ProxyManager {
             generation: NEXT_GENERATION.fetch_add(1, Ordering::Relaxed),
         };
         if let Err(e) = instance.get_proxy_data() {
-            instance.error = Some(e.to_string());
+            instance.error = Some(error_message(&e));
         }
         instance
     }
@@ -70,16 +73,19 @@ impl ProxyManager {
 
     pub fn get_proxy_for_request(
         &self,
-        request_url: &str,
+        request_url: impl AsRef<[u8]>,
     ) -> Result<RequestProxy, Box<TransportException>> {
+        let request_url = request_url.as_ref();
         if let Some(ref error) = self.error {
             return Err(Box::new(TransportException::new(
-                format!("Unable to use a proxy: {}", error),
+                bconcat!("Unable to use a proxy: ", error),
                 0,
             )));
         }
 
-        let scheme = request_url.split("://").next().unwrap_or("").to_string();
+        let scheme = parse_url(request_url)
+            .and_then(|parsed| parsed.scheme)
+            .unwrap_or_default();
         let proxy = self.get_proxy_for_scheme(&scheme);
 
         if proxy.is_none() {
@@ -93,11 +99,11 @@ impl ProxyManager {
         Ok(proxy.unwrap().to_request_proxy(scheme))
     }
 
-    fn get_proxy_for_scheme(&self, scheme: &str) -> Option<&ProxyItem> {
-        if scheme == "http" {
+    fn get_proxy_for_scheme(&self, scheme: &[u8]) -> Option<&ProxyItem> {
+        if scheme == b"http" {
             return self.http_proxy.as_ref();
         }
-        if scheme == "https" {
+        if scheme == b"https" {
             return self.https_proxy.as_ref();
         }
         None
@@ -106,47 +112,43 @@ impl ProxyManager {
     fn get_proxy_data(&mut self) -> anyhow::Result<()> {
         // handle http_proxy/HTTP_PROXY on CLI only for security reasons
         // PHP_SAPI is always 'cli' for this application
-        let (env, name) = Self::get_proxy_env("http_proxy");
+        let (env, name) = Self::get_proxy_env(BStr::new("http_proxy"));
         if let Some(env) = env {
-            self.http_proxy = Some(ProxyItem::new(env, name)?);
+            self.http_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
         }
 
         if self.http_proxy.is_none() {
-            let (env, name) = Self::get_proxy_env("cgi_http_proxy");
+            let (env, name) = Self::get_proxy_env(BStr::new("cgi_http_proxy"));
             if let Some(env) = env {
-                self.http_proxy = Some(ProxyItem::new(env, name)?);
+                self.http_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
             }
         }
 
-        let (env, name) = Self::get_proxy_env("https_proxy");
+        let (env, name) = Self::get_proxy_env(BStr::new("https_proxy"));
         if let Some(env) = env {
-            self.https_proxy = Some(ProxyItem::new(env, name)?);
+            self.https_proxy = Some(ProxyItem::new(env.as_encoded_bytes(), name)?);
         }
 
-        let (env, _name) = Self::get_proxy_env("no_proxy");
+        let (env, _name) = Self::get_proxy_env(BStr::new("no_proxy"));
         if let Some(env) = env {
-            *self.no_proxy_handler.borrow_mut() = Some(NoProxyPattern::new(&env));
+            *self.no_proxy_handler.borrow_mut() = Some(NoProxyPattern::new(env.as_encoded_bytes()));
         }
 
         Ok(())
     }
 
-    fn get_proxy_env(env_name: &str) -> (Option<String>, String) {
-        for name in [env_name.to_lowercase(), env_name.to_uppercase()] {
-            if let Some(val) = PHP_SERVER.lock().unwrap().get(&name)
+    fn get_proxy_env(env_name: &BStr) -> (Option<std::ffi::OsString>, BString) {
+        for name in [strtolower(env_name), strtoupper(env_name)] {
+            if let Some(val) = PHP_SERVER.lock().unwrap().get(path_from_bytes(&name))
                 && !val.is_empty()
             {
-                // TODO(bytes): the proxy URL is returned as a String.
-                let val = val
-                    .into_string()
-                    .unwrap_or_else(|val| panic!("{name} is not valid UTF-8: {val:?}"));
                 return (Some(val), name);
             }
         }
-        (None, String::new())
+        (None, BString::default())
     }
 
-    fn no_proxy(&self, request_url: &str) -> bool {
+    fn no_proxy(&self, request_url: &[u8]) -> bool {
         match self.no_proxy_handler.borrow_mut().as_mut() {
             None => false,
             Some(handler) => handler.test(request_url).unwrap_or(false),

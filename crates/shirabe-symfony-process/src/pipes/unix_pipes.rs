@@ -4,7 +4,9 @@ use crate::pipes::abstract_pipes::AbstractPipes;
 use crate::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};
 use crate::process::Process;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource, fclose, feof, fread, stream_select};
+use shirabe_php_shim::{
+    Descriptor, PhpMixed, PhpResource, bconcat, fclose, feof, fread, stream_select,
+};
 
 /// UnixPipes implementation uses unix pipes as handles.
 #[derive(Debug)]
@@ -22,10 +24,10 @@ impl UnixPipes {
     }
 }
 
-fn descriptor(items: &[&str]) -> Descriptor {
+fn descriptor(items: &[&[u8]]) -> Descriptor {
     match items {
-        ["pipe", mode] => Descriptor::Pipe(mode.to_string()),
-        ["file", path, mode] => Descriptor::File(path.to_string(), mode.to_string()),
+        [b"pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
+        [b"file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
         _ => panic!("unsupported descriptor spec: {:?}", items),
     }
 }
@@ -34,28 +36,28 @@ impl PipesInterface for UnixPipes {
     fn get_descriptors(&mut self) -> Vec<Descriptor> {
         if self.tty_mode == Some(true) {
             return vec![
-                descriptor(&["file", "/dev/tty", "r"]),
-                descriptor(&["file", "/dev/tty", "w"]),
-                descriptor(&["file", "/dev/tty", "w"]),
+                descriptor(&[b"file", b"/dev/tty", b"r"]),
+                descriptor(&[b"file", b"/dev/tty", b"w"]),
+                descriptor(&[b"file", b"/dev/tty", b"w"]),
             ];
         }
 
         vec![
-            descriptor(&["pipe", "r"]),
-            descriptor(&["pipe", "w"]),
-            descriptor(&["pipe", "w"]),
+            descriptor(&[b"pipe", b"r"]),
+            descriptor(&[b"pipe", b"w"]),
+            descriptor(&[b"pipe", b"w"]),
         ]
     }
 
-    fn get_files(&self) -> IndexMap<i64, String> {
+    fn get_files(&self) -> IndexMap<i64, bstr::BString> {
         IndexMap::new()
     }
 
-    fn read_and_write(&mut self, blocking: bool, close: bool) -> IndexMap<i64, String> {
+    fn read_and_write(&mut self, blocking: bool, close: bool) -> IndexMap<i64, bstr::BString> {
         self.inner.unblock();
         let w = self.inner.write();
 
-        let mut read: IndexMap<i64, String> = IndexMap::new();
+        let mut read: IndexMap<i64, bstr::BString> = IndexMap::new();
         // $r = $this->pipes; unset($r[0]);
         let r: Vec<(i64, PhpResource)> = self
             .inner
@@ -106,8 +108,7 @@ impl PipesInterface for UnixPipes {
             }
 
             if !data.is_empty() {
-                // TODO(bytes): PipesInterface hands the process output back as a String.
-                read.insert(*fd, String::from_utf8_lossy(&data).into_owned());
+                read.insert(*fd, data.into());
             }
 
             if close && feof(pipe) {

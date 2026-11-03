@@ -1,23 +1,20 @@
 //! ref: composer/vendor/symfony/console/Completion/Suggestion.php
 
+use bstr::BString;
 /// Represents a single suggested value.
 #[derive(Debug)]
 pub struct Suggestion {
-    value: String,
+    value: BString,
 }
 
 impl Suggestion {
-    pub fn new(value: String) -> Self {
-        Self { value }
+    pub fn new(value: impl Into<BString>) -> Self {
+        Self {
+            value: value.into(),
+        }
     }
 
-    pub fn get_value(&self) -> String {
+    pub fn get_value(&self) -> BString {
         self.value.clone()
-    }
-}
-
-impl std::fmt::Display for Suggestion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_value())
     }
 }

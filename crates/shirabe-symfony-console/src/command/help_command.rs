@@ -4,7 +4,9 @@ use crate::command::{Command, CommandData, SetDefinitionArg};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
 use crate::descriptor::{ApplicationDescription, DescribableObject};
 use crate::helper::DescriptorHelper;
-use crate::input::{DefinitionItem, InputArgument, InputInterface, InputOption, InputValue};
+use crate::input::{
+    DefinitionItem, InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue,
+};
 use crate::output::OutputInterface;
 use shirabe_php_shim::impl_php_class;
 use std::ops::{Deref, DerefMut};
@@ -91,30 +93,31 @@ impl Command for HelpCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.inner.ignore_validation_errors();
 
-        self.inner.set_name("help")?;
+        self.inner.set_name("help".into())?;
         self.inner.set_definition(SetDefinitionArg::Array(vec![
             DefinitionItem::InputArgument(InputArgument::new(
-                "command_name".to_string(),
+                "command_name",
                 Some(InputArgument::OPTIONAL),
-                "The command name".to_string(),
-                InputValue::from("help".to_string()),
+                "The command name",
+                InputValue::from("help"),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "format",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
-                "The output format (txt, xml, json, or md)".to_string(),
-                InputValue::from("txt".to_string()),
+                "The output format (txt, xml, json, or md)",
+                InputValue::from("txt"),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "raw",
                 None,
                 Some(InputOption::VALUE_NONE),
-                "To output raw command help".to_string(),
+                "To output raw command help",
                 InputValue::Null,
             )?),
         ]));
-        self.inner.set_description("Display help for a command");
+        self.inner
+            .set_description("Display help for a command".into());
         self.inner.set_help(
                 "The <info>%command.name%</info> command displays help for a given command:\n\
                  \n\
@@ -124,7 +127,7 @@ impl Command for HelpCommand {
                  \n\
                  \x20\x20<info>%command.full_name% --format=xml list</info>\n\
                  \n\
-                 To display the list of available commands, please use the <info>list</info> command.",
+                 To display the list of available commands, please use the <info>list</info> command.".into(),
             );
 
         Ok(())
@@ -138,7 +141,7 @@ impl Command for HelpCommand {
         if self.command.borrow().is_none() {
             let application = self.get_application().unwrap();
             let command_name = input.borrow().get_argument("command_name")?.to_php_string();
-            let found = application.borrow_mut().find(&command_name)?;
+            let found = application.borrow_mut().find(command_name.as_ref())?;
             *self.command.borrow_mut() = Some(found);
         }
 

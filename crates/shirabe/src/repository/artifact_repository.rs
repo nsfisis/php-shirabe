@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Repository/ArtifactRepository.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::JsonFile;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};
@@ -9,10 +9,12 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use crate::util::{Platform, Tar, Zip};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file,
+    PATHINFO_EXTENSION, PhpMixed, RuntimeException, UnexpectedValueException, basename, bconcat,
+    error_message, extension_loaded, hash_file, path_from_bytes, path_to_bytes, pathinfo,
+    php_regex, preg_is_match, realpath, strtr,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -20,7 +22,7 @@ use std::path::Path;
 pub struct ArtifactRepository {
     inner: ArrayRepository,
     loader: Box<dyn LoaderInterface>,
-    lookup: String,
+    lookup: BString,
     repo_config: IndexMap<BString, PhpMixed>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
@@ -40,17 +42,13 @@ impl ArtifactRepository {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<Self> {
         if !extension_loaded("zip") {
-            return Err(RuntimeException::new(
-                "The artifact repository requires PHP's zip extension".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "The artifact repository requires PHP's zip extension",
+            ))
             .into());
         }
 
-        let url = repo_config[B("url")]
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
-        let lookup = Platform::expand_path(&url);
+        let lookup = Platform::expand_path(repo_config[B("url")].as_string().unwrap_or_default());
         Ok(Self {
             inner: ArrayRepository::new(Vec::new())?,
             loader: Box::new(ArrayLoader::new(None, true)),
@@ -60,8 +58,8 @@ impl ArtifactRepository {
         })
     }
 
-    pub fn get_repo_name(&self) -> String {
-        format!("artifact repo ({})", self.lookup)
+    pub fn get_repo_name(&self) -> BString {
+        bconcat!("artifact repo (", self.lookup, ")")
     }
 
     /// For testing only: drives `initialize` (scanning the lookup directory) and returns the
@@ -75,8 +73,7 @@ impl ArtifactRepository {
 
     fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
-        let lookup = self.lookup.clone();
-        self.scan_directory(&lookup)
+        self.scan_directory(path_from_bytes(&self.lookup))
     }
 
     // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to scan
@@ -90,7 +87,7 @@ impl ArtifactRepository {
         Ok(())
     }
 
-    fn scan_directory(&self, path: &str) -> anyhow::Result<()> {
+    fn scan_directory(&self, path: &Path) -> anyhow::Result<()> {
         let entries = std::fs::read_dir(path)?;
         for entry in entries {
             let entry = entry?;
@@ -99,13 +96,13 @@ impl ArtifactRepository {
             if file_path.is_symlink() {
                 let resolved = std::fs::canonicalize(&file_path)?;
                 if resolved.is_dir() {
-                    self.scan_directory(resolved.to_str().unwrap_or(""))?;
+                    self.scan_directory(&resolved)?;
                     continue;
                 }
             }
 
             if file_path.is_dir() {
-                self.scan_directory(file_path.to_str().unwrap_or(""))?;
+                self.scan_directory(&file_path)?;
                 continue;
             }
 
@@ -113,35 +110,41 @@ impl ArtifactRepository {
                 continue;
             }
 
-            let ext = file_path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-            if !matches!(ext.as_str(), "zip" | "tar" | "gz" | "tgz") {
+            if !preg_is_match(
+                php_regex!(r"/^.+\.(zip|tar|gz|tgz)$/i"),
+                path_to_bytes(&file_path),
+            ) {
                 continue;
             }
 
             let package = self.get_composer_information(&file_path)?;
-            let basename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let basename = basename(path_to_bytes(&file_path));
             match package {
                 None => {
                     self.io.write_error3(
-                        &format!(
-                            "File <comment>{}</comment> doesn't seem to hold a package",
-                            basename
+                        bconcat!(
+                            "File <comment>",
+                            basename,
+                            "</comment> doesn't seem to hold a package"
                         ),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 Some(package) => {
-                    self.io.write_error3(&format!(
-                        "Found package <info>{}</info> (<comment>{}</comment>) in file <info>{}</info>",
-                        package.get_name(),
-                        package.get_pretty_version(),
-                        basename,
-                    ), true, io_interface::VERBOSE);
+                    self.io.write_error3(
+                        bconcat!(
+                            "Found package <info>",
+                            package.get_name(),
+                            "</info> (<comment>",
+                            package.get_pretty_version(),
+                            "</comment>) in file <info>",
+                            basename,
+                            "</info>"
+                        ),
+                        true,
+                        io_interface::VERBOSE,
+                    );
                     self.inner.add_package(package);
                 }
             }
@@ -153,27 +156,20 @@ impl ArtifactRepository {
         &self,
         file: &Path,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
-        let mut json: Option<String> = None;
-        let file_extension = file
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
+        let mut json: Option<BString> = None;
+        let pathname = path_to_bytes(file).as_bstr();
+        let file_extension = pathinfo(pathname, PATHINFO_EXTENSION);
 
-        let file_type: &str;
-        if matches!(file_extension.as_str(), "gz" | "tar" | "tgz") {
-            file_type = "tar";
+        let file_type: &BStr;
+        if matches!(file_extension.as_slice(), b"gz" | b"tar" | b"tgz") {
+            file_type = BStr::new("tar");
         } else if file_extension == "zip" {
-            file_type = "zip";
+            file_type = BStr::new("zip");
         } else {
-            return Err(RuntimeException::new(format!(
-                "Files with \"{}\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported.",
-                file_extension
-            ))
+            return Err(RuntimeException::new(bconcat!("Files with \"", file_extension, "\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported."))
             .into());
         }
 
-        let pathname = file.to_str().unwrap_or("");
         let get_result = if file_type == "tar" {
             Tar::get_composer_json(file)
         } else {
@@ -183,7 +179,12 @@ impl ArtifactRepository {
             Ok(j) => json = j,
             Err(exception) => {
                 self.io.write3(
-                    &format!("Failed loading package {}: {}", pathname, exception),
+                    bconcat!(
+                        "Failed loading package ",
+                        pathname,
+                        ": ",
+                        error_message(&exception)
+                    ),
                     false,
                     io_interface::VERBOSE,
                 );
@@ -195,18 +196,14 @@ impl ArtifactRepository {
         }
 
         let json_str = json.unwrap();
-        let pathname_label = format!("{}#composer.json", pathname);
-        let mut package = JsonFile::parse_json(Some(&json_str), Some(&pathname_label))?;
-        let url_normalized = pathname.replace('\\', "/");
-        let real_path = file
-            .canonicalize()
-            .ok()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .unwrap_or_default();
+        let pathname_label = bconcat!(pathname, "#composer.json");
+        let mut package = JsonFile::parse_json(Some(&json_str), Some(pathname_label.as_bstr()))?;
+        let url_normalized = strtr(pathname, "\\", "/");
+        let real_path = realpath(file).unwrap_or_default();
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
-        dist.insert("type".into(), PhpMixed::string(file_type.to_string()));
+        dist.insert("type".into(), PhpMixed::string(bconcat!(file_type)));
         dist.insert("url".into(), PhpMixed::string(url_normalized));
         dist.insert("shasum".into(), PhpMixed::string(shasum));
         if let Some(arr) = package.as_array_mut() {
@@ -221,7 +218,12 @@ impl ArtifactRepository {
         match self.loader.load(cfg, None) {
             Ok(package) => Ok(Some(package)),
             Err(exception) => {
-                let message = format!("Failed loading package in {}: {}", pathname, exception);
+                let message = bconcat!(
+                    "Failed loading package in ",
+                    pathname,
+                    ": ",
+                    error_message(&exception)
+                );
                 Err(UnexpectedValueException::with_code_and_previous(
                     message,
                     0,
@@ -255,7 +257,7 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -264,7 +266,7 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -278,10 +280,10 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         self.ensure_initialized()?;
         self.inner.load_packages(
@@ -294,9 +296,9 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.ensure_initialized()?;
         self.inner.search(query, mode, r#type)
@@ -304,13 +306,13 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         Ok(ArtifactRepository::get_repo_name(self))
     }
 

@@ -3,17 +3,17 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::base_package::{self};
 use crate::repository::{CompositeRepository, RepositoryInterface};
-use bstr::B;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class, php_regex, preg_match};
+use shirabe_php_shim::{PhpMixed, bconcat, impl_php_class, implode, php_regex, preg_match};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -41,20 +41,24 @@ impl FundCommand {
     }
 
     fn insert_funding_data(
-        fundings: &mut IndexMap<String, IndexMap<String, Vec<String>>>,
+        fundings: &mut IndexMap<BString, IndexMap<BString, Vec<BString>>>,
         package: &crate::package::CompletePackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         let pretty_name = package.get_pretty_name();
-        let (vendor, package_name) = pretty_name
-            .split_once('/')
-            .unwrap_or(("", pretty_name.as_str()));
+        let (vendor, package_name) = match pretty_name.find("/") {
+            Some(pos) => (
+                pretty_name[..pos].as_bstr(),
+                pretty_name[pos + 1..].as_bstr(),
+            ),
+            None => (b"".as_bstr(), pretty_name.as_bstr()),
+        };
 
         for funding_option in package.get_funding() {
             let url_val = funding_option.get(B("url")).and_then(|v| v.as_string());
             if url_val.is_none_or(|s| s.is_empty()) {
                 continue;
             }
-            let mut url = url_val.unwrap().to_string();
+            let mut url = BString::from(url_val.unwrap());
             let r#type = funding_option
                 .get(B("type"))
                 .and_then(|v| v.as_string())
@@ -62,16 +66,16 @@ impl FundCommand {
             if r#type == "github"
                 && let Some(matches) =
                     preg_match(php_regex!(r"{^https://github.com/([^/]+)$}"), &url)
-                && let Some(sponsor) = matches.get(1).map(str::to_string)
+                && let Some(sponsor) = matches.get(1)
             {
-                url = format!("https://github.com/sponsors/{}", sponsor);
+                url = bconcat!("https://github.com/sponsors/", sponsor);
             }
             fundings
-                .entry(vendor.to_string())
+                .entry(BString::from(vendor))
                 .or_default()
                 .entry(url)
                 .or_default()
-                .push(package_name.to_string());
+                .push(BString::from(package_name));
         }
         Ok(())
     }
@@ -80,15 +84,17 @@ impl FundCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for FundCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("fund")?;
-        self.set_description("Discover how to help fund the maintenance of your dependencies");
+        self.set_name("fund".into())?;
+        self.set_description(
+            "Discover how to help fund the maintenance of your dependencies".into(),
+        );
         self.set_definition(&[InputOption::new6(
             "format",
-            Some("f"),
+            Some("f".into()),
             Some(InputOption::VALUE_REQUIRED),
             "Format of the output: text or json",
-            Some(InputValue::String("text".to_string())),
-            SuggestedValues::List(vec!["text".to_string(), "json".to_string()]),
+            Some(InputValue::from("text")),
+            SuggestedValues::List(vec![BString::from("text"), BString::from("json")]),
         )
         .unwrap()
         .into()]);
@@ -108,10 +114,10 @@ impl Command for FundCommand {
         let repo = repository_manager.get_local_repository();
         let mut remote_repos =
             CompositeRepository::new(repository_manager.get_repositories().to_vec());
-        let mut fundings: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();
+        let mut fundings: IndexMap<BString, IndexMap<BString, Vec<BString>>> = IndexMap::new();
 
-        let mut packages_to_load: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-        let mut packages_to_load_names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
+        let mut packages_to_load: IndexMap<BString, Option<AnyConstraint>> = IndexMap::new();
+        let mut packages_to_load_names: indexmap::IndexSet<BString> = indexmap::IndexSet::new();
         for package in repo.get_packages()? {
             if package.as_alias().is_some() {
                 continue;
@@ -126,7 +132,7 @@ impl Command for FundCommand {
         // load all packages dev versions in parallel
         let result = remote_repos.load_packages(
             packages_to_load,
-            IndexMap::from([("dev".to_string(), base_package::STABILITY_DEV)]),
+            IndexMap::from([(BString::from("dev"), base_package::STABILITY_DEV)]),
             IndexMap::new(),
             IndexMap::new(),
         )?;
@@ -161,38 +167,42 @@ impl Command for FundCommand {
 
         let io = self.get_io();
 
-        let format = input
-            .borrow()
-            .get_option("format")?
-            .as_string()
-            .unwrap_or("text")
-            .to_string();
-        if !matches!(format.as_str(), "text" | "json") {
-            io.write_error(&format!(
-                "Unsupported format \"{}\". See help for supported formats.",
-                format
+        let format = BString::from(
+            input
+                .borrow()
+                .get_option("format")?
+                .as_string()
+                .unwrap_or(bstr::BStr::new("text")),
+        );
+        if !matches!(format.as_slice(), b"text" | b"json") {
+            io.write_error(bconcat!(
+                "Unsupported format \"",
+                format,
+                "\". See help for supported formats."
             ));
             return Ok(1);
         }
 
         if !fundings.is_empty() && format == "text" {
-            let mut prev: Option<String> = None;
+            let mut prev: Option<BString> = None;
 
             io.write("The following packages were found in your dependencies which publish funding information:");
 
             for (vendor, links) in &fundings {
                 io.write("");
-                io.write(&format!("<comment>{}</comment>", vendor));
+                io.write(bconcat!("<comment>", vendor, "</comment>"));
                 for (url, packages) in links {
-                    let line = format!("  <info>{}</info>", packages.join(", "));
-                    if prev.as_deref() != Some(&line) {
+                    let line = bconcat!("  <info>", implode(", ", packages), "</info>");
+                    if prev.as_ref() != Some(&line) {
                         io.write(&line);
                         prev = Some(line);
                     }
-                    io.write(&format!(
-                        "    <href={}>{}</>",
+                    io.write(bconcat!(
+                        "    <href=",
                         OutputFormatter::escape(url)?,
-                        url
+                        ">",
+                        url,
+                        "</>"
                     ));
                 }
             }

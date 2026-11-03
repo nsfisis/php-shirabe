@@ -1,19 +1,20 @@
 //! ref: composer/src/Composer/Util/Svn.php
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{Platform, ProcessExecutor};
-use bstr::B;
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, preg_match, stripos,
-    strpos, trim,
+    LogicException, PhpMixed, RuntimeException, bconcat, implode, parse_url, path_to_bytes,
+    php_regex, preg_match, stripos, strpos, trim,
 };
+use std::path::Path;
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct SvnCredentials {
-    pub username: String,
-    pub password: String,
+    pub username: BString,
+    pub password: BString,
 }
 
 #[derive(Debug)]
@@ -21,20 +22,20 @@ pub struct Svn {
     credentials: Option<SvnCredentials>,
     has_auth: Option<bool>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    url: String,
+    url: BString,
     cache_credentials: bool,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     qty_auth_tries: i64,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
 }
 
-static VERSION: Mutex<Option<String>> = Mutex::new(None);
+static VERSION: Mutex<Option<BString>> = Mutex::new(None);
 
 impl Svn {
     const MAX_QTY_AUTH_TRIES: i64 = 5;
 
     pub fn new(
-        url: String,
+        url: BString,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -65,12 +66,12 @@ impl Svn {
     /// if necessary.
     pub fn execute(
         &mut self,
-        command: Vec<String>,
-        url: &str,
-        cwd: Option<&str>,
-        path: Option<&str>,
+        command: Vec<BString>,
+        url: &BStr,
+        cwd: Option<&Path>,
+        path: Option<&Path>,
         verbose: bool,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         // Ensure we are allowed to use this URL by config
         self.config.borrow_mut().prohibit_url_by_config(
             url,
@@ -86,33 +87,33 @@ impl Svn {
     /// if necessary.
     pub fn execute_local(
         &mut self,
-        command: Vec<String>,
-        path: &str,
-        cwd: Option<&str>,
+        command: Vec<BString>,
+        path: &Path,
+        cwd: Option<&Path>,
         verbose: bool,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         // A local command has no remote url
-        self.execute_with_auth_retry(command, cwd, "", Some(path), verbose)
+        self.execute_with_auth_retry(command, cwd, BStr::new(""), Some(path), verbose)
             .map(|o| o.unwrap_or_default())
     }
 
     fn execute_with_auth_retry(
         &mut self,
-        svn_command: Vec<String>,
-        cwd: Option<&str>,
-        url: &str,
-        path: Option<&str>,
+        svn_command: Vec<BString>,
+        cwd: Option<&Path>,
+        url: &BStr,
+        path: Option<&Path>,
         verbose: bool,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<BString>> {
         // Regenerate the command at each try, to use the newly user-provided credentials
         let command = self.get_command(svn_command.clone(), url, path);
 
-        let output: std::rc::Rc<std::cell::RefCell<Option<String>>> =
+        let output: std::rc::Rc<std::cell::RefCell<Option<BString>>> =
             std::rc::Rc::new(std::cell::RefCell::new(None));
         let io = self.io.clone();
         let output_for_handler = output.clone();
-        let handler: Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>> =
-            Box::new(move |r#type: &str, buffer: &str| {
+        let handler: Box<dyn FnMut(&bstr::BStr, &bstr::BStr) -> anyhow::Result<bool>> =
+            Box::new(move |r#type: &bstr::BStr, buffer: &bstr::BStr| {
                 if r#type != "out" {
                     return Ok(false);
                 }
@@ -121,7 +122,7 @@ impl Svn {
                 }
                 output_for_handler
                     .borrow_mut()
-                    .get_or_insert_with(String::new)
+                    .get_or_insert_with(BString::default)
                     .push_str(buffer);
                 if verbose {
                     io.borrow().write_error2(buffer, false);
@@ -137,11 +138,8 @@ impl Svn {
             return Ok(output);
         }
 
-        let error_output = self.process.borrow().get_error_output().to_string();
-        let full_output = trim(
-            &implode("\n", &[output.unwrap_or_default(), error_output]),
-            None,
-        );
+        let error_output = self.process.borrow().get_error_output();
+        let full_output = trim(implode("\n", &[output.unwrap_or_default(), error_output]));
 
         // the error is not auth-related
         if stripos(&full_output, "Could not authenticate to server:").is_none()
@@ -149,7 +147,7 @@ impl Svn {
             && stripos(&full_output, "svn: E170001:").is_none()
             && stripos(&full_output, "svn: E215004:").is_none()
         {
-            return Err(RuntimeException::new(full_output).into());
+            return Err(RuntimeException::new(full_output.to_owned()).into());
         }
 
         if !self.has_auth() {
@@ -164,7 +162,10 @@ impl Svn {
             return self.execute_with_auth_retry(svn_command, cwd, url, path, verbose);
         }
 
-        Err(RuntimeException::new(format!("wrong credentials provided ({})", full_output)).into())
+        Err(
+            RuntimeException::new(bconcat!("wrong credentials provided (", full_output, ")"))
+                .into(),
+        )
     }
 
     pub fn set_cache_credentials(&mut self, cache_credentials: bool) {
@@ -175,16 +176,17 @@ impl Svn {
     fn do_auth_dance(&mut self) -> anyhow::Result<&mut Self> {
         // cannot ask for credentials in non interactive mode
         if !self.io.is_interactive() {
-            return Err(RuntimeException::new(
-                "can not ask for authentication in non interactive mode".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "can not ask for authentication in non interactive mode",
+            ))
             .into());
         }
 
         self.io.write_error3(
-            &format!(
-                "The Subversion server ({}) requested credentials:",
+            bconcat!(
+                "The Subversion server (",
                 self.url,
+                ") requested credentials:"
             ),
             true,
             io_interface::NORMAL,
@@ -194,33 +196,37 @@ impl Svn {
         self.credentials = Some(SvnCredentials {
             username: self
                 .io
-                .ask("Username: ".into(), PhpMixed::string("".to_string()))?
+                .ask("Username: ", PhpMixed::string(""))?
                 .as_string()
                 .unwrap_or_default()
-                .to_string(),
+                .to_owned(),
             password: self
                 .io
-                .ask_and_hide_answer("Password: ".to_string())?
+                .ask_and_hide_answer("Password: ")?
                 .unwrap_or_default(),
         });
 
-        self.cache_credentials = self.io.ask_confirmation(
-            "Should Subversion cache these credentials? (yes/no) ".to_string(),
-            true,
-        )?;
+        self.cache_credentials = self
+            .io
+            .ask_confirmation("Should Subversion cache these credentials? (yes/no) ", true)?;
 
         Ok(self)
     }
 
     /// A method to create the svn commands run.
-    fn get_command(&mut self, mut cmd: Vec<String>, url: &str, path: Option<&str>) -> Vec<String> {
-        cmd.push("--non-interactive".to_string());
+    fn get_command(
+        &mut self,
+        mut cmd: Vec<BString>,
+        url: &BStr,
+        path: Option<&Path>,
+    ) -> Vec<BString> {
+        cmd.push("--non-interactive".into());
         cmd.extend(self.get_credential_args());
-        cmd.push("--".to_string());
-        cmd.push(url.to_string());
+        cmd.push("--".into());
+        cmd.push(url.to_owned());
 
         if let Some(path) = path {
-            cmd.push(path.to_string());
+            cmd.push(path_to_bytes(path).into());
         }
 
         cmd
@@ -229,15 +235,15 @@ impl Svn {
     /// Return the credential string for the svn command.
     ///
     /// Adds --no-auth-cache when credentials are present.
-    fn get_credential_args(&mut self) -> Vec<String> {
+    fn get_credential_args(&mut self) -> Vec<BString> {
         if !self.has_auth() {
             return vec![];
         }
 
         let mut args = self.get_auth_cache_args();
-        args.push("--username".to_string());
+        args.push("--username".into());
         args.push(self.get_username().unwrap());
-        args.push("--password".to_string());
+        args.push("--password".into());
         args.push(self.get_password().unwrap());
         args
     }
@@ -245,31 +251,31 @@ impl Svn {
     /// For testing only: invoke the crate-private `get_command`.
     pub fn __get_command(
         &mut self,
-        cmd: Vec<String>,
-        url: &str,
-        path: Option<&str>,
-    ) -> Vec<String> {
+        cmd: Vec<BString>,
+        url: &BStr,
+        path: Option<&Path>,
+    ) -> Vec<BString> {
         self.get_command(cmd, url, path)
     }
 
     /// For testing only: invoke the crate-private `get_credential_args`.
-    pub fn __get_credential_args(&mut self) -> Vec<String> {
+    pub fn __get_credential_args(&mut self) -> Vec<BString> {
         self.get_credential_args()
     }
 
     /// Get the password for the svn command. Can be empty.
-    fn get_password(&self) -> anyhow::Result<String> {
+    fn get_password(&self) -> anyhow::Result<BString> {
         if self.credentials.is_none() {
-            return Err(LogicException::new("No svn auth detected.".to_string()).into());
+            return Err(LogicException::new(BString::from("No svn auth detected.")).into());
         }
 
         Ok(self.credentials.as_ref().unwrap().password.clone())
     }
 
     /// Get the username for the svn command.
-    fn get_username(&self) -> anyhow::Result<String> {
+    fn get_username(&self) -> anyhow::Result<BString> {
         if self.credentials.is_none() {
-            return Err(LogicException::new("No svn auth detected.".to_string()).into());
+            return Err(LogicException::new(BString::from("No svn auth detected.")).into());
         }
 
         Ok(self.credentials.as_ref().unwrap().username.clone())
@@ -289,11 +295,11 @@ impl Svn {
     }
 
     /// Return the no-auth-cache switch.
-    fn get_auth_cache_args(&self) -> Vec<String> {
+    fn get_auth_cache_args(&self) -> Vec<BString> {
         if self.cache_credentials {
             vec![]
         } else {
-            vec!["--no-auth-cache".to_string()]
+            vec!["--no-auth-cache".into()]
         }
     }
 
@@ -306,11 +312,12 @@ impl Svn {
 
         let auth_config = self.config.borrow_mut().get("http-basic");
 
-        let host = parse_url(&self.url).and_then(|parsed| parsed.host);
-        let host_str = host.as_deref().unwrap_or("");
+        let host = parse_url(&self.url)
+            .and_then(|parsed| parsed.host)
+            .unwrap_or_default();
         let auth_for_host = auth_config
             .as_array()
-            .and_then(|m| m.get(B(host_str)))
+            .and_then(|m| m.get(host.as_bstr()))
             .cloned();
         if let Some(entry) = auth_for_host
             && let Some(entry_arr) = entry.as_array()
@@ -320,12 +327,12 @@ impl Svn {
                     .get(B("username"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
-                    .to_string(),
+                    .to_owned(),
                 password: entry_arr
                     .get(B("password"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
-                    .to_string(),
+                    .to_owned(),
             });
 
             self.has_auth = Some(true);
@@ -360,17 +367,17 @@ impl Svn {
     }
 
     /// Returns the version of the svn binary contained in PATH
-    pub fn binary_version(&mut self) -> anyhow::Result<Option<String>> {
+    pub fn binary_version(&mut self) -> anyhow::Result<Option<BString>> {
         let mut cached = VERSION.lock().unwrap();
         if cached.is_none() {
-            let mut output = String::new();
+            let mut output = BString::default();
             if 0 == self.process.borrow_mut().execute(
-                &["svn".to_string(), "--version".to_string()],
+                &[BString::from("svn"), "--version".into()],
                 &mut output,
                 None,
             )? && let Some(matches) = preg_match(php_regex!(r"{(\d+(?:\.\d+)+)}"), &output)
             {
-                *cached = Some(matches.get(1).unwrap_or_default().to_string());
+                *cached = Some(matches.get(1).unwrap_or_default().to_owned());
             }
         }
 

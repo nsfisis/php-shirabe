@@ -4,16 +4,17 @@ use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, IgnoreListPlatformRequirementFilter,
     PlatformRequirementFilterFactory, PlatformRequirementFilterInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::package::{PackageInterfaceHandle, base_package};
 use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySetInterface};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, UnexpectedValueException, php_regex, preg_is_match, preg_replace, strtolower,
-    version_compare,
+    CmpOp, UnexpectedValueException, bconcat, explode, explode_with_limit, implode, php_regex,
+    preg_is_match, preg_replace, str_replace, strtolower, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -27,7 +28,7 @@ pub enum ShowWarnings {
 #[derive(Debug)]
 pub struct VersionSelector {
     repository_set: std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>>,
-    platform_constraints: IndexMap<String, Vec<AnyConstraint>>,
+    platform_constraints: IndexMap<BString, Vec<AnyConstraint>>,
     parser: Option<VersionParser>,
 }
 
@@ -36,16 +37,12 @@ impl VersionSelector {
         repository_set: std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>>,
         platform_repo: Option<&mut crate::repository::PlatformRepository>,
     ) -> anyhow::Result<Self> {
-        let mut platform_constraints: IndexMap<String, Vec<AnyConstraint>> = IndexMap::new();
+        let mut platform_constraints: IndexMap<BString, Vec<AnyConstraint>> = IndexMap::new();
         if let Some(platform_repo) = platform_repo {
             for package in platform_repo.get_packages()? {
-                let constraint = SimpleConstraint::new(
-                    "==".to_string(),
-                    package.get_version().to_string(),
-                    None,
-                );
+                let constraint = SimpleConstraint::new("==", package.get_version(), None);
                 platform_constraints
-                    .entry(package.get_name().to_string())
+                    .entry(package.get_name())
                     .or_default()
                     .push(constraint.into());
             }
@@ -60,21 +57,21 @@ impl VersionSelector {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn find_best_candidate(
         &mut self,
-        package_name: &str,
-        target_package_version: Option<&str>,
-        preferred_stability: &str,
+        package_name: &BStr,
+        target_package_version: Option<&BStr>,
+        preferred_stability: &BStr,
         platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
         repo_set_flags: i64,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         show_warnings: ShowWarnings,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
-        if !base_package::STABILITIES.contains_key(preferred_stability) {
-            return Err(UnexpectedValueException::new(format!(
-                "Expected a valid stability name as 3rd argument, got {}",
+        let Some(min_priority) = base_package::stability_priority(preferred_stability) else {
+            return Err(UnexpectedValueException::new(bconcat!(
+                "Expected a valid stability name as 3rd argument, got ",
                 preferred_stability
             ))
             .into());
-        }
+        };
 
         let platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface> =
             match platform_requirement_filter {
@@ -87,21 +84,16 @@ impl VersionSelector {
             None => None,
         };
         let mut candidates = self.repository_set.borrow().find_packages(
-            &strtolower(package_name),
+            strtolower(package_name).as_bstr(),
             constraint,
             repo_set_flags,
         )?;
 
-        let min_priority = *base_package::STABILITIES.get(preferred_stability).unwrap();
         candidates.sort_by(|a, b| {
             // BasePackage::get_stability_priority() is not forwarded by the handle; compute it
             // directly from the stability name.
-            let a_priority = *base_package::STABILITIES
-                .get(a.get_stability().as_str())
-                .unwrap();
-            let b_priority = *base_package::STABILITIES
-                .get(b.get_stability().as_str())
-                .unwrap();
+            let a_priority = base_package::stability_priority(a.get_stability()).unwrap();
+            let b_priority = base_package::stability_priority(b.get_stability()).unwrap();
 
             if min_priority < a_priority && b_priority < a_priority {
                 return std::cmp::Ordering::Greater;
@@ -113,9 +105,9 @@ impl VersionSelector {
                 return std::cmp::Ordering::Less;
             }
 
-            if version_compare(&b.get_version(), &a.get_version(), CmpOp::Gt) {
+            if version_compare(b.get_version(), a.get_version(), CmpOp::Gt) {
                 std::cmp::Ordering::Greater
-            } else if version_compare(&b.get_version(), &a.get_version(), CmpOp::Lt) {
+            } else if version_compare(b.get_version(), a.get_version(), CmpOp::Lt) {
                 std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Equal
@@ -130,8 +122,8 @@ impl VersionSelector {
 
         let package: Option<crate::package::PackageInterfaceHandle>;
         if !self.platform_constraints.is_empty() && !is_ignore_all {
-            let mut already_warned_names: IndexMap<String, bool> = IndexMap::new();
-            let mut already_seen_names: IndexMap<String, bool> = IndexMap::new();
+            let mut already_warned_names: IndexMap<BString, bool> = IndexMap::new();
+            let mut already_seen_names: IndexMap<BString, bool> = IndexMap::new();
             let mut found_package: Option<crate::package::PackageInterfaceHandle> = None;
 
             for pkg in candidates.iter() {
@@ -139,12 +131,14 @@ impl VersionSelector {
                 let mut skip = false;
                 'reqs: for (name, link) in reqs.iter() {
                     if !PlatformRepository::is_platform_package(name)
-                        || platform_requirement_filter.is_ignored(name)
+                        || platform_requirement_filter.is_ignored(name.as_bstr())
                     {
                         continue;
                     }
                     let reason;
-                    if let Some(provided_constraints) = self.platform_constraints.get(name) {
+                    if let Some(provided_constraints) =
+                        self.platform_constraints.get(name.as_bstr())
+                    {
                         for provided_constraint in provided_constraints {
                             if link.get_constraint().matches(provided_constraint) {
                                 continue 'reqs;
@@ -155,10 +149,10 @@ impl VersionSelector {
                                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                             );
                             if let Some(list_filter) = list_filter_opt
-                                && list_filter.is_upper_bound_ignored(name)
+                                && list_filter.is_upper_bound_ignored(name.as_bstr())
                             {
                                 let filtered_constraint = list_filter.filter_constraint(
-                                    name,
+                                    name.as_bstr(),
                                     link.get_constraint().clone(),
                                     false,
                                 )?;
@@ -172,15 +166,16 @@ impl VersionSelector {
                         reason = "is missing from your platform";
                     }
 
-                    let is_latest_version = !already_seen_names.contains_key(&pkg.get_name());
-                    already_seen_names.insert(pkg.get_name().to_string(), true);
+                    let is_latest_version =
+                        !already_seen_names.contains_key(pkg.get_name().as_bstr());
+                    already_seen_names.insert(pkg.get_name(), true);
                     if let Some(ref io) = io {
                         let should_warn = match &show_warnings {
                             ShowWarnings::Always => true,
                             ShowWarnings::Predicate(f) => f(pkg),
                         };
                         if should_warn {
-                            let warn_key = format!("{}/{}", pkg.get_name(), link.get_target());
+                            let warn_key = bconcat!(pkg.get_name(), "/", link.get_target());
                             let is_first_warning = !already_warned_names.contains_key(&warn_key);
                             already_warned_names.insert(warn_key, true);
                             let latest = if is_latest_version {
@@ -189,15 +184,21 @@ impl VersionSelector {
                                 ""
                             };
                             io.write_error3(
-                                &format!(
-                                    "<warning>Cannot use {}{} {} as it {} {} {} which {}.</>",
+                                bconcat!(
+                                    "<warning>Cannot use ",
                                     pkg.get_pretty_name(),
                                     latest,
+                                    " ",
                                     pkg.get_pretty_version(),
+                                    " as it ",
                                     link.get_description(),
+                                    " ",
                                     link.get_target(),
+                                    " ",
                                     link.get_pretty_constraint(),
-                                    reason
+                                    " which ",
+                                    reason,
+                                    ".</>"
                                 ),
                                 true,
                                 if is_first_warning {
@@ -249,24 +250,24 @@ impl VersionSelector {
     pub fn find_recommended_require_version(
         &mut self,
         package: PackageInterfaceHandle,
-    ) -> anyhow::Result<String> {
-        if package.get_name().starts_with("ext-") {
+    ) -> anyhow::Result<BString> {
+        if package.get_name().starts_with(b"ext-") {
             let php = shirabe_php_rpc::get_php_version();
-            let php_version = format!("{}.{}.{}", php.major, php.minor, php.release);
+            let php_version = bconcat!(php.major, ".", php.minor, ".", php.release);
             let package_version = package.get_version();
-            let ext_parts: Vec<&str> = package_version.splitn(4, '.').collect();
-            let ext_version = ext_parts[..3.min(ext_parts.len())].join(".");
-            if php_version == ext_version {
-                return Ok("*".to_string());
+            let ext_parts = explode_with_limit(".", package_version, 4);
+            let ext_version = implode(".", &ext_parts[..3.min(ext_parts.len())]);
+            if php_version.as_bytes() == ext_version.as_slice() {
+                return Ok("*".into());
             }
         }
 
         let version = package.get_version();
         if !package.is_dev() {
             return self.transform_version(
-                &version,
-                &package.get_pretty_version(),
-                &package.get_stability(),
+                version.as_bstr(),
+                package.get_pretty_version().as_bstr(),
+                package.get_stability().as_bstr(),
             );
         }
 
@@ -282,8 +283,12 @@ impl VersionSelector {
                 &extra,
             );
             if new_extra != extra {
-                let new_extra = new_extra.replace(".9999999", ".0");
-                return self.transform_version(&new_extra, &new_extra, "dev");
+                let new_extra = str_replace(".9999999", ".0", &new_extra);
+                return self.transform_version(
+                    new_extra.as_bstr(),
+                    new_extra.as_bstr(),
+                    BStr::new("dev"),
+                );
             }
         }
 
@@ -292,36 +297,31 @@ impl VersionSelector {
 
     fn transform_version(
         &self,
-        version: &str,
-        pretty_version: &str,
-        stability: &str,
-    ) -> anyhow::Result<String> {
-        let semantic_version_parts: Vec<&str> = version.split('.').collect();
+        version: &BStr,
+        pretty_version: &BStr,
+        stability: &BStr,
+    ) -> anyhow::Result<BString> {
+        let mut semantic_version_parts = explode(".", version);
 
         if semantic_version_parts.len() == 4
-            && preg_is_match(php_regex!(r"{^\d+\D?}"), semantic_version_parts[3])
+            && preg_is_match(php_regex!(r"{^\d+\D?}"), &semantic_version_parts[3])
         {
-            let mut parts: Vec<String> = semantic_version_parts
-                .iter()
-                .map(|s| s.to_string())
-                .collect();
-            let version = if parts[0] == "0" {
-                parts.truncate(3);
-                parts.join(".")
+            if semantic_version_parts[0] == "0" {
+                semantic_version_parts.truncate(3);
             } else {
-                parts.truncate(2);
-                parts.join(".")
-            };
+                semantic_version_parts.truncate(2);
+            }
+            let version = implode(".", &semantic_version_parts);
 
             let version = if stability != "stable" {
-                format!("{}@{}", version, stability)
+                bconcat!(version, "@", stability)
             } else {
                 version
             };
 
-            Ok(format!("^{}", version))
+            Ok(bconcat!("^", version))
         } else {
-            Ok(pretty_version.to_string())
+            Ok(pretty_version.into())
         }
     }
 

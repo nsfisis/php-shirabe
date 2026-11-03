@@ -4,19 +4,19 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonManipulator};
 use crate::package::base_package;
 use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
-use bstr::B;
+use bstr::{B, BStr, BString};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, file_get_contents, file_put_contents, impl_php_class, is_writable,
-    php_regex, preg_is_match, preg_replace, strtolower,
+    PhpMixed, RuntimeException, bconcat, file_get_contents, file_put_contents, impl_php_class,
+    is_writable, php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -52,14 +52,14 @@ impl BumpCommand {
         dev_only: bool,
         no_dev_only: bool,
         dry_run: bool,
-        packages_filter: Vec<String>,
-        dev_only_flag_hint: String,
+        packages_filter: Vec<BString>,
+        dev_only_flag_hint: BString,
     ) -> anyhow::Result<i64> {
         let composer_json_path = Factory::get_composer_file()?;
 
         if !Filesystem::is_readable(&composer_json_path) {
             io.write_error3(
-                &format!("<error>{} is not readable.</error>", composer_json_path),
+                bconcat!("<error>", composer_json_path, " is not readable.</error>"),
                 true,
                 io_interface::NORMAL,
             );
@@ -71,7 +71,7 @@ impl BumpCommand {
             Ok(c) => c,
             Err(_) => {
                 io.write_error3(
-                    &format!("<error>{} is not readable.</error>", composer_json_path),
+                    bconcat!("<error>", composer_json_path, " is not readable.</error>"),
                     true,
                     io_interface::NORMAL,
                 );
@@ -83,7 +83,7 @@ impl BumpCommand {
             && file_put_contents(&composer_json_path, &contents).is_none()
         {
             io.write_error3(
-                &format!("<error>{} is not writable.</error>", composer_json_path),
+                bconcat!("<error>", composer_json_path, " is not writable.</error>"),
                 true,
                 io_interface::NORMAL,
             );
@@ -144,9 +144,10 @@ impl BumpCommand {
                     io_interface::NORMAL,
                 );
                 io.write_error3(
-                    &format!(
-                        "<warning>Alternatively you can use {} to only bump dependencies within \"require-dev\".</warning>",
-                        dev_only_flag_hint
+                    bconcat!(
+                        "<warning>Alternatively you can use ",
+                        dev_only_flag_hint,
+                        " to only bump dependencies within \"require-dev\".</warning>"
                     ),
                     true,
                     io_interface::NORMAL,
@@ -167,17 +168,18 @@ impl BumpCommand {
         }
 
         let packages_filter = if !packages_filter.is_empty() {
-            let packages_filter: Vec<String> = packages_filter
+            let packages_filter: Vec<BString> = packages_filter
                 .iter()
                 .map(|constraint| preg_replace(php_regex!(r"{[:= ].+}"), "", constraint))
                 .collect();
-            let unique_lower: Vec<String> = packages_filter
+            let unique_lower: Vec<BString> = packages_filter
                 .iter()
-                .map(|s| strtolower(s))
+                .map(strtolower)
                 .collect::<indexmap::IndexSet<_>>()
                 .into_iter()
                 .collect();
-            let pattern = base_package::package_names_to_regexp(&unique_lower, "{^(?:%s)$}iD");
+            let pattern =
+                base_package::package_names_to_regexp(&unique_lower, BStr::new("{^(?:%s)$}iD"));
             for (key, reqs) in tasks.iter_mut() {
                 reqs.retain(|pkg_name, _| preg_is_match(&pattern, pkg_name));
             }
@@ -186,7 +188,7 @@ impl BumpCommand {
             packages_filter
         };
 
-        let mut updates: indexmap::IndexMap<&str, indexmap::IndexMap<String, String>> =
+        let mut updates: indexmap::IndexMap<&BStr, indexmap::IndexMap<BString, BString>> =
             indexmap::IndexMap::new();
         for (key, reqs) in &tasks {
             for (pkg_name, link) in reqs.iter() {
@@ -196,8 +198,8 @@ impl BumpCommand {
                 let current_constraint = link.get_pretty_constraint();
 
                 let package_opt = repo.find_package(
-                    pkg_name,
-                    crate::repository::FindPackageConstraint::String("*".to_string()),
+                    bstr::BStr::new(pkg_name),
+                    crate::repository::FindPackageConstraint::String(BString::from("*")),
                 )?;
                 let mut package = match package_opt {
                     None => continue,
@@ -214,7 +216,7 @@ impl BumpCommand {
                 }
 
                 updates
-                    .entry(*key)
+                    .entry(BStr::new(*key))
                     .or_default()
                     .insert(pkg_name.clone(), bumped);
             }
@@ -228,10 +230,10 @@ impl BumpCommand {
             for (key, packages) in &updates {
                 for (package, version) in packages {
                     let section = composer_definition
-                        .entry(key.to_string().into())
+                        .entry(bconcat!(key))
                         .or_insert_with(|| PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(map) = section {
-                        map.insert(package.as_str().into(), PhpMixed::string(version.clone()));
+                        map.insert(package.clone(), PhpMixed::string(version.clone()));
                     }
                 }
             }
@@ -241,28 +243,38 @@ impl BumpCommand {
         let change_count: usize = updates.values().map(|m| m.len()).sum();
         if change_count > 0 {
             if dry_run {
-                io.write(&format!(
-                    "<info>{} would be updated with:</info>",
-                    composer_json_path
+                io.write(bconcat!(
+                    "<info>",
+                    composer_json_path,
+                    " would be updated with:</info>"
                 ));
                 for (require_type, packages) in &updates {
                     for (package, version) in packages {
-                        io.write(&format!(
-                            "<info> - {}.{}: {}</info>",
-                            require_type, package, version
+                        io.write(bconcat!(
+                            "<info> - ",
+                            *require_type,
+                            ".",
+                            package,
+                            ": ",
+                            version,
+                            "</info>"
                         ));
                     }
                 }
             } else {
-                io.write(&format!(
-                    "<info>{} has been updated ({} changes).</info>",
-                    composer_json_path, change_count
+                io.write(bconcat!(
+                    "<info>",
+                    composer_json_path,
+                    " has been updated (",
+                    change_count,
+                    " changes).</info>"
                 ));
             }
         } else {
-            io.write(&format!(
-                "<info>No requirements to update in {}.</info>",
-                composer_json_path
+            io.write(bconcat!(
+                "<info>No requirements to update in ",
+                composer_json_path,
+                ".</info>"
             ));
         }
 
@@ -292,15 +304,15 @@ impl BumpCommand {
     fn update_file_cleanly(
         &self,
         json: &JsonFile,
-        updates: &indexmap::IndexMap<&str, indexmap::IndexMap<String, String>>,
+        updates: &indexmap::IndexMap<&BStr, indexmap::IndexMap<BString, BString>>,
     ) -> anyhow::Result<bool> {
         let contents = match file_get_contents(json.get_path()) {
-            // TODO(bytes): JsonManipulator takes the JSON as a String.
-            Ok(c) => String::from_utf8_lossy(&c).into_owned(),
+            Ok(c) => c,
             Err(_) => {
-                return Err(RuntimeException::new(format!(
-                    "Unable to read {} contents.",
-                    json.get_path()
+                return Err(RuntimeException::new(bconcat!(
+                    "Unable to read ",
+                    json.get_path(),
+                    " contents."
                 ))
                 .into());
             }
@@ -316,11 +328,12 @@ impl BumpCommand {
             }
         }
 
-        match file_put_contents(json.get_path(), manipulator.get_contents().as_bytes()) {
+        match file_put_contents(json.get_path(), manipulator.get_contents()) {
             Some(_) => Ok(true),
-            None => Err(RuntimeException::new(format!(
-                "Unable to write new {} contents.",
-                json.get_path()
+            None => Err(RuntimeException::new(bconcat!(
+                "Unable to write new ",
+                json.get_path(),
+                " contents."
             ))
             .into()),
         }
@@ -330,8 +343,8 @@ impl BumpCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for BumpCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("bump")?;
-        self.set_description("Increases the lower limit of your composer.json requirements to the currently installed versions");
+        self.set_name("bump".into())?;
+        self.set_description("Increases the lower limit of your composer.json requirements to the currently installed versions".into());
         self.set_definition(&[
             InputArgument::new5(
                 "packages",
@@ -344,7 +357,7 @@ impl Command for BumpCommand {
             .into(),
             InputOption::new(
                 "dev-only",
-                Some("D"),
+                Some("D".into()),
                 Some(InputOption::VALUE_NONE),
                 "Only bump requirements in \"require-dev\".",
                 None,
@@ -353,7 +366,7 @@ impl Command for BumpCommand {
             .into(),
             InputOption::new(
                 "no-dev-only",
-                Some("R"),
+                Some("R".into()),
                 Some(InputOption::VALUE_NONE),
                 "Only bump requirements in \"require\".",
                 None,
@@ -379,7 +392,7 @@ impl Command for BumpCommand {
                 Running this blindly on libraries is **NOT** recommended as it will narrow down\n\
                 your allowed dependencies, which may cause dependency hell for your users.\n\
                 Running it with <info>--dev-only</info> on libraries may be fine however as dev requirements\n\
-                are local to the library and do not affect consumers of the package.\n"
+                are local to the library and do not affect consumers of the package.\n".into()
             );
         Ok(())
     }
@@ -389,11 +402,11 @@ impl Command for BumpCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let packages_filter: Vec<String> = input
+        let packages_filter: Vec<bstr::BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
         let dev_only = input
@@ -418,7 +431,7 @@ impl Command for BumpCommand {
             no_dev_only,
             dry_run,
             packages_filter,
-            "--dev-only".to_string(),
+            BString::from("--dev-only"),
         )
     }
 

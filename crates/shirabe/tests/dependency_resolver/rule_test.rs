@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleTest.php
 
 use crate::test_case::get_package;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::{
     GenericRule, Pool, RULE_PACKAGE_REQUIRES, RULE_ROOT_REQUIRE, ReasonData, Request, Rule, RuleSet,
@@ -12,7 +13,7 @@ use shirabe_semver::constraint::MatchAllConstraint;
 
 fn root_require_reason() -> ReasonData {
     ReasonData::RootRequire {
-        package_name: String::new(),
+        package_name: bstr::BString::default(),
         constraint: MatchAllConstraint::new(None).into(),
     }
 }
@@ -121,17 +122,17 @@ fn test_pretty_string() {
     );
     let request = Request::new(None);
 
-    let empty_constraint = MatchAllConstraint::new(Some("*".to_string()));
+    let empty_constraint = MatchAllConstraint::new(Some(BString::from("*")));
 
     let rule = Rule::Generic(GenericRule::new(
         vec![p1.get_id(), -p2.get_id()],
         RULE_PACKAGE_REQUIRES,
         ReasonData::Link(Link::new(
-            "baz".to_string(),
-            "foo".to_string(),
+            BString::from("baz"),
+            BString::from("foo"),
             empty_constraint.into(),
             None,
-            "*".to_string(),
+            BString::from("*"),
         )),
     ));
 

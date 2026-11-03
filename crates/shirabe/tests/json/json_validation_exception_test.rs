@@ -1,11 +1,19 @@
 //! ref: composer/tests/Composer/Test/Json/JsonValidationExceptionTest.php
 
+use bstr::{BStr, BString, ByteSlice};
 use shirabe::json::json_validation_exception::JsonValidationException;
+use shirabe_php_shim::bconcat;
 
 #[test]
 fn test_get_errors() {
     for (message, errors, expected_message, expected_errors) in error_provider() {
-        let object = JsonValidationException::new(message.to_string(), errors.clone());
+        let object = JsonValidationException::new(
+            bconcat!(message),
+            errors
+                .iter()
+                .map(|e| bstr::BString::from(e.as_bstr()))
+                .collect(),
+        );
         assert_eq!(expected_message, object.get_message());
         assert_eq!(&expected_errors, object.get_errors());
     }
@@ -13,13 +21,23 @@ fn test_get_errors() {
 
 #[test]
 fn test_get_errors_when_no_errors_provided() {
-    let object = JsonValidationException::new("test message".to_string(), vec![]);
-    assert_eq!(&Vec::<String>::new(), object.get_errors());
+    let object = JsonValidationException::new(BString::from("test message"), vec![]);
+    assert_eq!(&Vec::<BString>::new(), object.get_errors());
 }
 
-fn error_provider() -> Vec<(&'static str, Vec<String>, &'static str, Vec<String>)> {
+fn error_provider() -> Vec<(&'static BStr, Vec<BString>, &'static BStr, Vec<BString>)> {
     vec![
-        ("test message", vec![], "test message", vec![]),
-        ("", vec!["foo".to_string()], "", vec!["foo".to_string()]),
+        (
+            BStr::new("test message"),
+            vec![],
+            BStr::new("test message"),
+            vec![],
+        ),
+        (
+            BStr::new(""),
+            vec![BString::from("foo")],
+            BStr::new(""),
+            vec![BString::from("foo")],
+        ),
     ]
 }

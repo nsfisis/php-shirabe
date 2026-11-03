@@ -3,12 +3,12 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
-use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class};
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use bstr::{BStr, BString};
+use shirabe_php_shim::{InvalidArgumentException, bconcat, file_exists, impl_php_class};
+use shirabe_symfony_console::input::InputInterfaceByName;
+use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
 pub struct DumpAutoloadCommand {
@@ -38,12 +38,12 @@ impl DumpAutoloadCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DumpAutoloadCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("dump-autoload")?;
-        self.set_aliases(vec!["dumpautoload".to_string()])?;
-        self.set_description("Dumps the autoloader");
+        self.set_name("dump-autoload".into())?;
+        self.set_aliases(vec!["dumpautoload".into()])?;
+        self.set_description("Dumps the autoloader".into());
         self.set_definition(&[
-            InputOption::new("optimize", Some("o"), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None).unwrap().into(),
-        InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize`.", None).unwrap().into(),
+            InputOption::new("optimize", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None).unwrap().into(),
+        InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize`.", None).unwrap().into(),
         InputOption::new("apcu", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
         InputOption::new("apcu-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu", None).unwrap().into(),
         InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything.", None).unwrap().into(),
@@ -56,7 +56,8 @@ impl Command for DumpAutoloadCommand {
         ]);
         self.set_help(
             "<info>shirabe dump-autoload</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#dump-autoload-dumpautoload",
+            Read more at https://getcomposer.org/doc/03-cli.md#dump-autoload-dumpautoload"
+                .into(),
         );
         Ok(())
     }
@@ -75,11 +76,11 @@ impl Command for DumpAutoloadCommand {
             input.clone(),
             output,
         );
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let config = composer.get_config();
 
@@ -126,7 +127,7 @@ impl Command for DumpAutoloadCommand {
             .borrow()
             .get_option("apcu-prefix")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
@@ -147,7 +148,7 @@ impl Command for DumpAutoloadCommand {
             && !optimize
             && !authoritative
         {
-            return Err(InvalidArgumentException::new("--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string())
+            return Err(InvalidArgumentException::new(BString::from("--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value."))
             .into());
         }
         if input
@@ -158,7 +159,7 @@ impl Command for DumpAutoloadCommand {
             && !optimize
             && !authoritative
         {
-            return Err(InvalidArgumentException::new("--strict-ambiguous mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string())
+            return Err(InvalidArgumentException::new(BString::from("--strict-ambiguous mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value."))
             .into());
         }
 
@@ -200,10 +201,9 @@ impl Command for DumpAutoloadCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException::new(
-                    "You can not use both --no-dev and --dev as they conflict with each other."
-                        .to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "You can not use both --no-dev and --dev as they conflict with each other.",
+                ))
                 .into());
             }
             composer
@@ -248,7 +248,7 @@ impl Command for DumpAutoloadCommand {
             local_repo_handle,
             package,
             installation_manager,
-            "composer",
+            BStr::new("composer"),
             optimize,
             None,
             Some(locker),
@@ -257,11 +257,16 @@ impl Command for DumpAutoloadCommand {
         let number_of_classes = class_map.map.len();
 
         if authoritative {
-            self.get_io().write(&format!("<info>Generated optimized autoload files (authoritative) containing {} classes</info>", number_of_classes));
+            self.get_io().write(bconcat!(
+                "<info>Generated optimized autoload files (authoritative) containing ",
+                number_of_classes,
+                " classes</info>"
+            ));
         } else if optimize {
-            self.get_io().write(&format!(
-                "<info>Generated optimized autoload files containing {} classes</info>",
-                number_of_classes
+            self.get_io().write(bconcat!(
+                "<info>Generated optimized autoload files containing ",
+                number_of_classes,
+                " classes</info>"
             ));
         } else {
             self.get_io().write("<info>Generated autoload files</info>");

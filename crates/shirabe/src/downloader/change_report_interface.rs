@@ -7,6 +7,6 @@ pub trait ChangeReportInterface {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>>;
+        path: &std::path::Path,
+    ) -> anyhow::Result<Option<bstr::BString>>;
 }

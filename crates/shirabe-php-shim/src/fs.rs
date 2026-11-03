@@ -1,8 +1,11 @@
-use crate::{PhpResource, StreamBacking, StreamState, UnexpectedValueException};
-use bstr::BString;
+use crate::{
+    PhpResource, StreamBacking, StreamState, UnexpectedValueException, path_from_bytes,
+    path_to_bytes,
+};
+use bstr::{BStr, BString, ByteSlice};
 use std::io::{Read as _, Write as _};
 
-pub const PHP_EOL: &str = "\n";
+pub const PHP_EOL: &BStr = crate::php_str(b"\n");
 
 pub const FILE_APPEND: i64 = 8;
 
@@ -59,9 +62,10 @@ pub fn filesystem_iterator(
     );
     let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| {
-        UnexpectedValueException::new(format!(
-            "FilesystemIterator::__construct({}): Failed to open directory",
-            base.display()
+        UnexpectedValueException::new(crate::bconcat!(
+            "FilesystemIterator::__construct(",
+            base,
+            "): Failed to open directory"
         ))
     })?;
     Ok(rd.flatten().map(|entry| entry.path()).collect())
@@ -202,9 +206,9 @@ impl RecursiveIteratorFileInfo {
     pub fn get_size(&self) -> anyhow::Result<i64> {
         match filesize(&self.path) {
             Some(size) => Ok(size),
-            None => Err(crate::RuntimeException::new(format!(
-                "SplFileInfo::getSize(): stat failed for {}",
-                self.path.display()
+            None => Err(crate::RuntimeException::new(crate::bconcat!(
+                "SplFileInfo::getSize(): stat failed for ",
+                self.path
             ))
             .into()),
         }
@@ -224,9 +228,10 @@ pub fn recursive_directory_iterator(
 ) -> Result<RecursiveDirectoryIterator, UnexpectedValueException> {
     let root = path.as_ref().to_path_buf();
     if !root.is_dir() {
-        return Err(UnexpectedValueException::new(format!(
-            "RecursiveDirectoryIterator::__construct({}): Failed to open directory",
-            root.display()
+        return Err(UnexpectedValueException::new(crate::bconcat!(
+            "RecursiveDirectoryIterator::__construct(",
+            root,
+            "): Failed to open directory"
         )));
     }
     Ok(RecursiveDirectoryIterator { root, flags })
@@ -290,9 +295,10 @@ pub fn directory_iterator(
 ) -> Result<Vec<DirectoryIteratorEntry>, UnexpectedValueException> {
     let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| {
-        UnexpectedValueException::new(format!(
-            "DirectoryIterator::__construct({}): Failed to open directory",
-            base.display()
+        UnexpectedValueException::new(crate::bconcat!(
+            "DirectoryIterator::__construct(",
+            base,
+            "): Failed to open directory"
         ))
     })?;
     // PHP's DirectoryIterator yields the "." and ".." entries before the real ones.
@@ -312,58 +318,68 @@ pub fn directory_iterator(
 
 /// PHP `fopen()`. Returns a stream resource, or an error mirroring PHP's `false`-on-failure
 /// (the I/O error carries the reason so callers that surface the warning text can use it).
-pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
+pub fn fopen(
+    file: impl AsRef<std::path::Path>,
+    mode: impl AsRef<[u8]>,
+) -> Result<PhpResource, std::io::Error> {
+    let mode = BStr::new(mode.as_ref());
+    let path = file.as_ref();
+    let file = crate::path_to_bytes(path);
     match file {
-        "php://output" | "php://stdout" => return Ok(PhpResource::Stdout),
-        "php://stderr" => return Ok(PhpResource::Stderr),
-        "php://stdin" | "php://input" => return Ok(PhpResource::Stdin),
+        b"php://output" | b"php://stdout" => return Ok(PhpResource::Stdout),
+        b"php://stderr" => return Ok(PhpResource::Stderr),
+        b"php://stdin" | b"php://input" => return Ok(PhpResource::Stdin),
         _ => {}
     }
     // Strip the binary/text flags PHP accepts as part of the mode.
-    let base_mode: String = mode.chars().filter(|c| *c != 'b' && *c != 't').collect();
-    let (readable, writable) = match base_mode.as_str() {
-        "r" => (true, false),
-        "w" | "a" | "x" | "c" => (false, true),
+    let base_mode: Vec<u8> = mode
+        .iter()
+        .copied()
+        .filter(|c| *c != b'b' && *c != b't')
+        .collect();
+    let (readable, writable) = match base_mode.as_slice().as_bytes() {
+        b"r" => (true, false),
+        b"w" | b"a" | b"x" | b"c" => (false, true),
         _ => (true, true), // r+, w+, a+, x+, c+, rw, ...
     };
     // php://memory and php://temp are in-memory streams. PHP's memory wrapper ignores the read /
     // write restrictions implied by the mode: a memory stream opened with "w" is still readable
     // (this is what Symfony's ApplicationTester relies on -- it opens "php://memory" with "w" and
     // then rewinds + reads it back). So memory streams are always both readable and writable.
-    if file == "php://memory" || file.starts_with("php://temp") {
+    if file == b"php://memory" || file.starts_with(b"php://temp") {
         return Ok(PhpResource::Stream(std::rc::Rc::new(
             std::cell::RefCell::new(StreamState::new(
                 StreamBacking::Memory(std::io::Cursor::new(Vec::new())),
                 true,
                 true,
-                mode.to_string(),
-                file.to_string(),
+                BString::from(mode),
+                BString::from(file),
             )),
         )));
     }
-    let uri = file.to_string();
+    let uri = BString::from(file);
     let mut options = std::fs::OpenOptions::new();
-    match base_mode.as_str() {
-        "r" => options.read(true),
-        "r+" => options.read(true).write(true),
-        "w" => options.write(true).create(true).truncate(true),
-        "w+" => options.read(true).write(true).create(true).truncate(true),
-        "a" => options.append(true).create(true),
-        "a+" => options.read(true).append(true).create(true),
-        "x" => options.write(true).create_new(true),
-        "x+" => options.read(true).write(true).create_new(true),
+    match base_mode.as_slice() {
+        b"r" => options.read(true),
+        b"r+" => options.read(true).write(true),
+        b"w" => options.write(true).create(true).truncate(true),
+        b"w+" => options.read(true).write(true).create(true).truncate(true),
+        b"a" => options.append(true).create(true),
+        b"a+" => options.read(true).append(true).create(true),
+        b"x" => options.write(true).create_new(true),
+        b"x+" => options.read(true).write(true).create_new(true),
         // "c"/"c+": open or create without truncating, position at start.
-        "c" => options.write(true).create(true),
-        "c+" => options.read(true).write(true).create(true),
+        b"c" => options.write(true).create(true),
+        b"c+" => options.read(true).write(true).create(true),
         _ => options.read(true),
     };
-    let file = options.open(file)?;
+    let file = options.open(path)?;
     Ok(PhpResource::Stream(std::rc::Rc::new(
         std::cell::RefCell::new(StreamState::new(
             StreamBacking::File(file),
             readable,
             writable,
-            mode.to_string(),
+            BString::from(mode),
             uri,
         )),
     )))
@@ -730,7 +746,7 @@ pub fn fflush_resource(resource: &PhpResource) {
     fflush(resource);
 }
 
-pub fn fwrite_resource(resource: &PhpResource, data: &str) {
+pub fn fwrite_resource(resource: &PhpResource, data: impl AsRef<[u8]>) {
     fwrite(resource, data, None);
 }
 
@@ -854,12 +870,18 @@ pub fn unlink_silent(path: impl AsRef<std::path::Path>) -> bool {
     std::fs::remove_file(path.as_ref()).is_ok()
 }
 
-pub fn file_put_contents(path: &str, data: &[u8]) -> Option<i64> {
+pub fn file_put_contents(path: impl AsRef<std::path::Path>, data: impl AsRef<[u8]>) -> Option<i64> {
+    let data = data.as_ref();
     std::fs::write(path, data).ok().map(|_| data.len() as i64)
 }
 
 /// Only `FILE_APPEND` is honored; `LOCK_EX` and `FILE_USE_INCLUDE_PATH` have no effect.
-pub fn file_put_contents3(filename: &str, data: &str, flags: i64) -> Option<i64> {
+pub fn file_put_contents3(
+    filename: impl AsRef<std::path::Path>,
+    data: impl AsRef<[u8]>,
+    flags: i64,
+) -> Option<i64> {
+    let data = data.as_ref();
     let append = flags & FILE_APPEND != 0;
     let mut opts = std::fs::OpenOptions::new();
     opts.write(true).create(true);
@@ -869,17 +891,16 @@ pub fn file_put_contents3(filename: &str, data: &str, flags: i64) -> Option<i64>
         opts.truncate(true);
     }
     let mut file = opts.open(filename).ok()?;
-    file.write_all(data.as_bytes()).ok()?;
+    file.write_all(data).ok()?;
     Some(data.len() as i64)
 }
 
 pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> std::io::Result<Vec<u8>> {
     let path = path.as_ref();
     // PHP supports the file:// stream wrapper; strip it to read the local file.
-    let path = path
-        .to_str()
-        .and_then(|s| s.strip_prefix("file://"))
-        .map_or(path, std::path::Path::new);
+    let path = path_to_bytes(path)
+        .strip_prefix(b"file://")
+        .map_or(path, path_from_bytes);
     std::fs::read(path)
 }
 
@@ -889,10 +910,9 @@ pub fn file_get_contents_with_max_length(
 ) -> std::io::Result<Vec<u8>> {
     let path = path.as_ref();
     // PHP supports the file:// stream wrapper; strip it to read the local file.
-    let path = path
-        .to_str()
-        .and_then(|s| s.strip_prefix("file://"))
-        .map_or(path, std::path::Path::new);
+    let path = path_to_bytes(path)
+        .strip_prefix(b"file://")
+        .map_or(path, path_from_bytes);
     let mut buf = Vec::new();
     std::fs::File::open(path)?
         .take(length as u64)
@@ -908,26 +928,25 @@ pub fn chdir(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
     Ok(std::env::set_current_dir(path.as_ref())?)
 }
 
-pub fn glob(pattern: &str) -> Vec<String> {
+pub fn glob(pattern: impl AsRef<[u8]>) -> Vec<BString> {
     glob_with_flags(pattern, 0)
 }
 
 pub const FILE_SKIP_EMPTY_LINES: i64 = 4;
 
-pub fn file(filename: &str, flags: i64) -> Option<Vec<String>> {
+pub fn file(filename: impl AsRef<std::path::Path>, flags: i64) -> Option<Vec<BString>> {
     let content = std::fs::read(filename).ok()?;
-    let s = String::from_utf8_lossy(&content);
     let ignore_newlines = flags & FILE_IGNORE_NEW_LINES != 0;
     let skip_empty = flags & FILE_SKIP_EMPTY_LINES != 0;
     let mut lines = Vec::new();
     // PHP keeps the trailing newline on each element unless FILE_IGNORE_NEW_LINES is set.
-    for line in s.split_inclusive('\n') {
-        let mut l = line.to_string();
+    for line in content.split_inclusive(|&b| b == b'\n') {
+        let mut l = BString::from(line);
         if ignore_newlines {
-            if l.ends_with('\n') {
+            if l.ends_with(b"\n") {
                 l.pop();
             }
-            if l.ends_with('\r') {
+            if l.ends_with(b"\r") {
                 l.pop();
             }
         }
@@ -941,14 +960,12 @@ pub fn file(filename: &str, flags: i64) -> Option<Vec<String>> {
 
 pub fn umask() -> u32 {
     // Linux exposes the current umask via /proc/self/status, which reads it without disturbing it.
-    let from_proc = std::fs::read_to_string("/proc/self/status")
-        .ok()
-        .and_then(|status| {
-            status.lines().find_map(|line| {
-                line.strip_prefix("Umask:")
-                    .and_then(|v| u32::from_str_radix(v.trim(), 8).ok())
-            })
-        });
+    let from_proc = std::fs::read("/proc/self/status").ok().and_then(|status| {
+        status.split(|b| *b == b'\n').find_map(|line| {
+            let value = crate::utf8_text(line.strip_prefix(b"Umask:")?)?;
+            u32::from_str_radix(value.trim(), 8).ok()
+        })
+    });
     if let Some(mask) = from_proc {
         return mask;
     }
@@ -1026,21 +1043,22 @@ pub fn sys_get_temp_dir() -> std::path::PathBuf {
     std::env::temp_dir()
 }
 
-pub fn pathinfo(path: &str, option: i64) -> String {
+pub fn pathinfo(path: impl AsRef<[u8]>, option: i64) -> BString {
+    let path = path.as_ref();
     match option {
         PATHINFO_DIRNAME => dirname(path),
         PATHINFO_BASENAME => basename(path),
         PATHINFO_EXTENSION => {
             let base = basename(path);
-            match base.rfind('.') {
-                Some(index) => base[index + 1..].to_string(),
-                None => String::new(),
+            match base.rfind_byte(b'.') {
+                Some(index) => BString::from(&base[index + 1..]),
+                None => BString::default(),
             }
         }
         PATHINFO_FILENAME => {
             let base = basename(path);
-            match base.rfind('.') {
-                Some(index) => base[..index].to_string(),
+            match base.rfind_byte(b'.') {
+                Some(index) => BString::from(&base[..index]),
                 None => base,
             }
         }
@@ -1048,42 +1066,45 @@ pub fn pathinfo(path: &str, option: i64) -> String {
     }
 }
 
-// TODO(type-model): returns Option<PathBuf>
-pub fn realpath(path: impl AsRef<std::path::Path>) -> Option<String> {
-    path.as_ref()
-        .canonicalize()
-        .ok()
-        .and_then(|p| p.to_str().map(ToOwned::to_owned))
+pub fn realpath(path: impl AsRef<std::path::Path>) -> Option<std::path::PathBuf> {
+    path.as_ref().canonicalize().ok()
 }
 
-pub fn dirname(path: &str) -> String {
+pub fn dirname(path: impl AsRef<[u8]>) -> BString {
+    let path = path.as_ref();
     if path.is_empty() {
-        return String::new();
+        return BString::default();
     }
-    match std::path::Path::new(path).parent() {
+    match path_from_bytes(path).parent() {
         // No parent: the root itself, or a path made up solely of slashes.
-        None => "/".to_string(),
+        None => BString::from("/"),
         // Path::parent yields an empty path where PHP's dirname returns ".".
-        Some(parent) if parent.as_os_str().is_empty() => ".".to_string(),
-        Some(parent) => parent.to_str().expect("input was valid UTF-8").to_string(),
+        Some(parent) if parent.as_os_str().is_empty() => BString::from("."),
+        Some(parent) => BString::from(path_to_bytes(parent)),
     }
 }
 
-pub fn basename(path: &str) -> String {
+pub fn basename(path: impl AsRef<[u8]>) -> BString {
     // PHP basename(): the trailing name component, after stripping trailing directory separators.
-    let trimmed = path.trim_end_matches(['/', '\\']);
-    match trimmed.rfind(['/', '\\']) {
-        Some(index) => trimmed[index + 1..].to_string(),
-        None => trimmed.to_string(),
+    let path = path.as_ref();
+    let end = path
+        .iter()
+        .rposition(|&b| b != b'/' && b != b'\\')
+        .map_or(0, |i| i + 1);
+    let trimmed = &path[..end];
+    match trimmed.iter().rposition(|&b| b == b'/' || b == b'\\') {
+        Some(index) => BString::from(&trimmed[index + 1..]),
+        None => BString::from(trimmed),
     }
 }
 
-pub fn basename_with_suffix(path: &str, suffix: &str) -> String {
+pub fn basename_with_suffix(path: impl AsRef<[u8]>, suffix: impl AsRef<[u8]>) -> BString {
+    let suffix = suffix.as_ref();
     let base = basename(path);
     // PHP strips the suffix only when it is a proper trailing part of the name,
     // never when it equals the whole basename.
     if base != suffix && base.ends_with(suffix) {
-        base[..base.len() - suffix.len()].to_string()
+        BString::from(&base[..base.len() - suffix.len()])
     } else {
         base
     }
@@ -1110,13 +1131,14 @@ pub const GLOB_MARK: i64 = 8;
 pub const GLOB_ONLYDIR: i64 = 1024;
 pub const GLOB_BRACE: i64 = 4096;
 
-pub fn glob_with_flags(pattern: &str, flags: i64) -> Vec<String> {
+pub fn glob_with_flags(pattern: impl AsRef<[u8]>, flags: i64) -> Vec<BString> {
+    let pattern = pattern.as_ref();
     let patterns = if flags & GLOB_BRACE != 0 {
         glob_expand_braces(pattern)
     } else {
-        vec![pattern.to_string()]
+        vec![BString::from(pattern)]
     };
-    let mut results: Vec<String> = Vec::new();
+    let mut results: Vec<BString> = Vec::new();
     for pattern in patterns {
         glob_collect(&pattern, flags, &mut results);
     }
@@ -1126,31 +1148,29 @@ pub fn glob_with_flags(pattern: &str, flags: i64) -> Vec<String> {
     results
 }
 
-fn glob_collect(pattern: &str, flags: i64, out: &mut Vec<String>) {
-    let (mut current, rest) = match pattern.strip_prefix('/') {
-        Some(rest) => (vec!["/".to_string()], rest),
-        None => (vec![String::new()], pattern),
+fn glob_collect(pattern: &[u8], flags: i64, out: &mut Vec<BString>) {
+    let (mut current, rest) = match pattern.strip_prefix(b"/") {
+        Some(rest) => (vec![BString::from("/")], rest),
+        None => (vec![BString::default()], pattern),
     };
-    let segments: Vec<&str> = rest.split('/').collect();
+    let segments: Vec<&[u8]> = rest.split(|&b| b == b'/').collect();
     for (idx, seg) in segments.iter().enumerate() {
         let is_last = idx == segments.len() - 1;
-        let mut next: Vec<String> = Vec::new();
+        let mut next: Vec<BString> = Vec::new();
         for base in &current {
             if seg.is_empty() {
                 next.push(base.clone());
                 continue;
             }
             if glob_has_wildcard(seg) {
-                let read_base = if base.is_empty() { "." } else { base.as_str() };
-                if let Ok(rd) = std::fs::read_dir(read_base) {
+                let read_base: &[u8] = if base.is_empty() { b"." } else { base };
+                if let Ok(rd) = std::fs::read_dir(path_from_bytes(read_base)) {
                     for entry in rd.flatten() {
-                        // TODO(bytes): glob matches and returns paths as Strings.
-                        let name = entry.file_name().into_string().unwrap_or_else(|name| {
-                            panic!("glob: file name is not valid UTF-8: {name:?}")
-                        });
-                        if glob_fnmatch(seg, &name) {
-                            let path = glob_join(base, &name);
-                            if is_last || std::path::Path::new(&path).is_dir() {
+                        let name = entry.file_name();
+                        let name = name.as_encoded_bytes();
+                        if glob_fnmatch(seg, name) {
+                            let path = glob_join(base, name);
+                            if is_last || path_from_bytes(&path).is_dir() {
                                 next.push(path);
                             }
                         }
@@ -1158,7 +1178,7 @@ fn glob_collect(pattern: &str, flags: i64, out: &mut Vec<String>) {
                 }
             } else {
                 let path = glob_join(base, seg);
-                let p = std::path::Path::new(&path);
+                let p = path_from_bytes(&path);
                 if (is_last && p.exists()) || (!is_last && p.is_dir()) {
                     next.push(path);
                 }
@@ -1167,37 +1187,37 @@ fn glob_collect(pattern: &str, flags: i64, out: &mut Vec<String>) {
         current = next;
     }
     for mut path in current {
-        let is_dir = std::path::Path::new(&path).is_dir();
+        let is_dir = path_from_bytes(&path).is_dir();
         if flags & GLOB_ONLYDIR != 0 && !is_dir {
             continue;
         }
-        if flags & GLOB_MARK != 0 && is_dir && !path.ends_with('/') {
-            path.push('/');
+        if flags & GLOB_MARK != 0 && is_dir && !path.ends_with(b"/") {
+            path.push(b'/');
         }
         out.push(path);
     }
 }
 
-fn glob_join(base: &str, seg: &str) -> String {
+fn glob_join(base: &[u8], seg: &[u8]) -> BString {
     if base.is_empty() {
-        seg.to_string()
-    } else if base == "/" {
-        format!("/{}", seg)
+        BString::from(seg)
+    } else if base == b"/" {
+        crate::bconcat!("/", seg)
     } else {
-        format!("{}/{}", base, seg)
+        crate::bconcat!(base, "/", seg)
     }
 }
 
-fn glob_has_wildcard(seg: &str) -> bool {
-    seg.bytes().any(|b| matches!(b, b'*' | b'?' | b'['))
+fn glob_has_wildcard(seg: &[u8]) -> bool {
+    seg.iter().any(|b| matches!(b, b'*' | b'?' | b'['))
 }
 
-fn glob_fnmatch(pattern: &str, name: &str) -> bool {
+fn glob_fnmatch(pattern: &[u8], name: &[u8]) -> bool {
     // A leading '.' is only matched by an explicit leading '.' in the pattern.
-    if name.starts_with('.') && !pattern.starts_with('.') {
+    if name.starts_with(b".") && !pattern.starts_with(b".") {
         return false;
     }
-    glob_fnmatch_bytes(pattern.as_bytes(), name.as_bytes())
+    glob_fnmatch_bytes(pattern, name)
 }
 
 fn glob_fnmatch_bytes(p: &[u8], s: &[u8]) -> bool {
@@ -1288,15 +1308,14 @@ fn glob_match_bracket(p: &[u8], start: usize, c: u8) -> Option<(bool, usize)> {
     None
 }
 
-fn glob_expand_braces(pattern: &str) -> Vec<String> {
-    let bytes = pattern.as_bytes();
-    let Some(open) = pattern.find('{') else {
-        return vec![pattern.to_string()];
+fn glob_expand_braces(pattern: &[u8]) -> Vec<BString> {
+    let Some(open) = pattern.find_byte(b'{') else {
+        return vec![BString::from(pattern)];
     };
     // Find the matching '}'.
     let mut depth = 0;
     let mut close = None;
-    for (i, &b) in bytes.iter().enumerate().skip(open) {
+    for (i, &b) in pattern.iter().enumerate().skip(open) {
         match b {
             b'{' => depth += 1,
             b'}' => {
@@ -1310,36 +1329,35 @@ fn glob_expand_braces(pattern: &str) -> Vec<String> {
         }
     }
     let Some(close) = close else {
-        return vec![pattern.to_string()];
+        return vec![BString::from(pattern)];
     };
     let prefix = &pattern[..open];
     let suffix = &pattern[close + 1..];
     let inner = &pattern[open + 1..close];
     let mut result = Vec::new();
     for alt in glob_split_top_commas(inner) {
-        let combined = format!("{}{}{}", prefix, alt, suffix);
+        let combined = crate::bconcat!(prefix, alt, suffix);
         result.extend(glob_expand_braces(&combined));
     }
     result
 }
 
-fn glob_split_top_commas(inner: &str) -> Vec<String> {
+fn glob_split_top_commas(inner: &[u8]) -> Vec<&[u8]> {
     let mut parts = Vec::new();
     let mut depth = 0;
     let mut start = 0;
-    let bytes = inner.as_bytes();
-    for (i, &b) in bytes.iter().enumerate() {
+    for (i, &b) in inner.iter().enumerate() {
         match b {
             b'{' => depth += 1,
             b'}' => depth -= 1,
             b',' if depth == 0 => {
-                parts.push(inner[start..i].to_string());
+                parts.push(&inner[start..i]);
                 start = i + 1;
             }
             _ => {}
         }
     }
-    parts.push(inner[start..].to_string());
+    parts.push(&inner[start..]);
     parts
 }
 
@@ -1414,7 +1432,7 @@ mod tests {
         std::fs::write(dir.path().join("completion.bash"), b"").unwrap();
         std::fs::create_dir(dir.path().join("sub")).unwrap();
 
-        let entries = directory_iterator(dir.path().to_str().unwrap()).unwrap();
+        let entries = directory_iterator(dir.path()).unwrap();
         let basenames: Vec<std::ffi::OsString> = entries.iter().map(|e| e.get_basename()).collect();
         // PHP's DirectoryIterator includes the "." and ".." entries.
         assert!(basenames.contains(&".".into()));

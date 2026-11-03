@@ -4,12 +4,15 @@ use crate::application::Application;
 use crate::completion::{CompletionInput, CompletionSuggestions};
 use crate::exception::InvalidArgumentException;
 use crate::helper::HelperSet;
-use crate::input::{InputArgument, InputDefinition, InputInterface, InputOption, InputValue};
+use crate::input::{
+    InputArgument, InputDefinition, InputInterface, InputInterfaceByName, InputOption, InputValue,
+};
 use crate::output::OutputInterface;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_SERVER, PhpClass, PhpMixed, is_numeric_to_int, php_regex, preg_is_match,
-    str_replace_array,
+    AsAny, PHP_SERVER, PhpClass, PhpMixed, bconcat, explode, is_numeric_to_int, path_to_bytes,
+    php_regex, preg_is_match, str_replace_array, trim,
 };
 use std::cell::{Cell, Ref};
 
@@ -22,20 +25,20 @@ use std::cell::{Cell, Ref};
 /// transitively through `BaseCommandData`) and forward the state methods to it.
 pub struct CommandData {
     application: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn Application>>>>,
-    name: std::cell::RefCell<Option<String>>,
-    aliases: std::cell::RefCell<Vec<String>>,
+    name: std::cell::RefCell<Option<BString>>,
+    aliases: std::cell::RefCell<Vec<BString>>,
     definition: std::cell::RefCell<Option<InputDefinition>>,
     hidden: Cell<bool>,
-    help: std::cell::RefCell<String>,
-    description: std::cell::RefCell<String>,
+    help: std::cell::RefCell<BString>,
+    description: std::cell::RefCell<BString>,
     full_definition: std::cell::RefCell<Option<InputDefinition>>,
     ignore_validation_errors: Cell<bool>,
     // A callable(InputInterface, OutputInterface) -> i64.
     code: std::cell::RefCell<
         Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>,
     >,
-    synopsis: std::cell::RefCell<IndexMap<String, String>>,
-    usages: std::cell::RefCell<Vec<String>>,
+    synopsis: std::cell::RefCell<IndexMap<BString, bstr::BString>>,
+    usages: std::cell::RefCell<Vec<BString>>,
     helper_set: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>>,
 }
 
@@ -51,7 +54,7 @@ impl CommandData {
     /// Unlike PHP's `__construct`, this does not call `configure()` — the concrete
     /// command's `new()` calls `configure()` after embedding the data, mirroring the
     /// virtual dispatch of `$this->configure()` from the parent constructor.
-    pub fn new(name: Option<String>) -> Self {
+    pub fn new(name: Option<BString>) -> Self {
         let this = CommandData {
             application: std::cell::RefCell::new(None),
             name: std::cell::RefCell::new(None),
@@ -60,8 +63,8 @@ impl CommandData {
                 InputDefinition::new(Vec::new()).expect("an empty InputDefinition cannot fail"),
             )),
             hidden: Cell::new(false),
-            help: std::cell::RefCell::new(String::new()),
-            description: std::cell::RefCell::new(String::new()),
+            help: std::cell::RefCell::new(BString::default()),
+            description: std::cell::RefCell::new(BString::default()),
             full_definition: std::cell::RefCell::new(None),
             ignore_validation_errors: Cell::new(false),
             code: std::cell::RefCell::new(None),
@@ -80,18 +83,18 @@ impl CommandData {
     /// Applies a `$defaultName`-style name (PHP `Command::__construct` when `$name` is null and a
     /// `static $defaultName` exists). The string is `|`-separated; a leading empty segment marks the
     /// command hidden, the next segment is the name, and the rest are aliases.
-    pub fn apply_default_name(&self, default_name: &str) -> anyhow::Result<()> {
-        let mut aliases: Vec<String> = default_name.split('|').map(|s| s.to_string()).collect();
+    pub fn apply_default_name(&self, default_name: impl AsRef<[u8]>) -> anyhow::Result<()> {
+        let mut aliases = explode("|", default_name);
         let mut name = aliases.remove(0);
         if name.is_empty() {
             self.set_hidden(true);
             name = if aliases.is_empty() {
-                String::new()
+                BString::default()
             } else {
                 aliases.remove(0)
             };
         }
-        self.set_name(&name)?;
+        self.set_name(name.as_bstr())?;
         self.set_aliases(aliases)?;
         Ok(())
     }
@@ -101,11 +104,12 @@ impl CommandData {
     /// It must be non-empty and parts can optionally be separated by ":".
     ///
     /// Throws InvalidArgumentException when the name is invalid.
-    fn validate_name(&self, name: &str) -> anyhow::Result<Result<(), InvalidArgumentException>> {
+    fn validate_name(&self, name: &BStr) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         if !preg_is_match(php_regex!(r"/^[^\:]++(\:[^\:]++)*$/"), name) {
-            return Ok(Err(InvalidArgumentException::new(format!(
-                "Command name \"{}\" is invalid.",
-                name
+            return Ok(Err(InvalidArgumentException::new(bconcat!(
+                "Command name \"",
+                name,
+                "\" is invalid."
             ))));
         }
 
@@ -139,28 +143,25 @@ impl CommandData {
     /// Throws InvalidArgumentException when argument mode is not valid.
     pub fn add_argument(
         &self,
-        name: &str,
+        name: impl AsRef<[u8]>,
         mode: Option<i64>,
-        description: &str,
+        description: impl AsRef<[u8]>,
         default: InputValue,
     ) -> anyhow::Result<&Self> {
+        let name = name.as_ref();
+        let description = description.as_ref();
         self.definition
             .borrow_mut()
             .as_mut()
             .unwrap()
             .add_argument(InputArgument::new(
-                name.to_string(),
+                name,
                 mode,
-                description.to_string(),
+                description,
                 default.clone(),
             )?)?;
         if let Some(full_definition) = self.full_definition.borrow_mut().as_mut() {
-            full_definition.add_argument(InputArgument::new(
-                name.to_string(),
-                mode,
-                description.to_string(),
-                default,
-            )?)?;
+            full_definition.add_argument(InputArgument::new(name, mode, description, default)?)?;
         }
 
         Ok(self)
@@ -171,12 +172,14 @@ impl CommandData {
     /// Throws InvalidArgumentException if option mode is invalid or incompatible.
     pub fn add_option(
         &self,
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
-        description: &str,
+        description: impl AsRef<[u8]>,
         default: InputValue,
     ) -> anyhow::Result<&Self> {
+        let name = name.as_ref();
+        let description = description.as_ref();
         self.definition
             .borrow_mut()
             .as_mut()
@@ -185,7 +188,7 @@ impl CommandData {
                 name,
                 shortcut,
                 mode,
-                description.to_string(),
+                description,
                 default.clone(),
             )?)?;
         if let Some(full_definition) = self.full_definition.borrow_mut().as_mut() {
@@ -193,7 +196,7 @@ impl CommandData {
                 name,
                 shortcut,
                 mode,
-                description.to_string(),
+                description,
                 default,
             )?)?;
         }
@@ -265,21 +268,21 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn merge_application_definition(&self, merge_args: bool));
         $crate::delegate_to_inner!($field, fn get_definition(&self) -> std::cell::Ref<'_, $crate::input::InputDefinition>);
         $crate::delegate_to_inner!($field, fn get_native_definition(&self) -> std::cell::Ref<'_, $crate::input::InputDefinition>);
-        $crate::delegate_to_inner!($field, fn set_name(&self, name: &str) -> anyhow::Result<()>);
-        $crate::delegate_to_inner!($field, fn get_name(&self) -> Option<String>);
+        $crate::delegate_to_inner!($field, fn set_name(&self, name: &bstr::BStr) -> anyhow::Result<()>);
+        $crate::delegate_to_inner!($field, fn get_name(&self) -> Option<bstr::BString>);
         $crate::delegate_to_inner!($field, fn set_hidden(&self, hidden: bool));
         $crate::delegate_to_inner!($field, fn is_hidden(&self) -> bool);
-        $crate::delegate_to_inner!($field, fn set_description(&self, description: &str));
-        $crate::delegate_to_inner!($field, fn get_description(&self) -> String);
-        $crate::delegate_to_inner!($field, fn set_help(&self, help: &str));
-        $crate::delegate_to_inner!($field, fn get_help(&self) -> String);
-        $crate::delegate_to_inner!($field, fn get_processed_help(&self) -> String);
-        $crate::delegate_to_inner!($field, fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()>);
-        $crate::delegate_to_inner!($field, fn get_aliases(&self) -> Vec<String>);
-        $crate::delegate_to_inner!($field, fn get_synopsis(&self, short: bool) -> String);
-        $crate::delegate_to_inner!($field, fn add_usage(&self, usage: &str));
-        $crate::delegate_to_inner!($field, fn get_usages(&self) -> Vec<String>);
-        $crate::delegate_to_inner!($field, fn get_helper(&self, name: &str) -> anyhow::Result<Result<shirabe_php_shim::PhpMixed, $crate::exception::LogicException>>);
+        $crate::delegate_to_inner!($field, fn set_description(&self, description: &bstr::BStr));
+        $crate::delegate_to_inner!($field, fn get_description(&self) -> bstr::BString);
+        $crate::delegate_to_inner!($field, fn set_help(&self, help: &bstr::BStr));
+        $crate::delegate_to_inner!($field, fn get_help(&self) -> bstr::BString);
+        $crate::delegate_to_inner!($field, fn get_processed_help(&self) -> bstr::BString);
+        $crate::delegate_to_inner!($field, fn set_aliases(&self, aliases: Vec<bstr::BString>) -> anyhow::Result<()>);
+        $crate::delegate_to_inner!($field, fn get_aliases(&self) -> Vec<bstr::BString>);
+        $crate::delegate_to_inner!($field, fn get_synopsis(&self, short: bool) -> bstr::BString);
+        $crate::delegate_to_inner!($field, fn add_usage(&self, usage: &bstr::BStr));
+        $crate::delegate_to_inner!($field, fn get_usages(&self) -> Vec<bstr::BString>);
+        $crate::delegate_to_inner!($field, fn get_helper(&self, name: &bstr::BStr) -> anyhow::Result<Result<shirabe_php_shim::PhpMixed, $crate::exception::LogicException>>);
         $crate::delegate_to_inner!($field, fn set_code(&self, code: Box<dyn Fn(&mut dyn $crate::input::InputInterface, &mut dyn $crate::output::OutputInterface) -> shirabe_php_shim::PhpMixed>));
         $crate::delegate_to_inner!($field, fn get_code(&self) -> std::cell::Ref<'_, Option<Box<dyn Fn(&mut dyn $crate::input::InputInterface, &mut dyn $crate::output::OutputInterface) -> shirabe_php_shim::PhpMixed>>>);
         $crate::delegate_to_inner!($field, fn ignore_validation_errors(&self));
@@ -441,37 +444,37 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
 
     fn get_native_definition(&self) -> Ref<'_, InputDefinition>;
 
-    fn set_name(&self, name: &str) -> anyhow::Result<()>;
+    fn set_name(&self, name: &BStr) -> anyhow::Result<()>;
 
-    fn get_name(&self) -> Option<String>;
+    fn get_name(&self) -> Option<BString>;
 
     fn set_hidden(&self, hidden: bool);
 
     fn is_hidden(&self) -> bool;
 
-    fn set_description(&self, description: &str);
+    fn set_description(&self, description: &BStr);
 
-    fn get_description(&self) -> String;
+    fn get_description(&self) -> BString;
 
-    fn set_help(&self, help: &str);
+    fn set_help(&self, help: &BStr);
 
-    fn get_help(&self) -> String;
+    fn get_help(&self) -> BString;
 
-    fn get_processed_help(&self) -> String;
+    fn get_processed_help(&self) -> bstr::BString;
 
-    fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()>;
+    fn set_aliases(&self, aliases: Vec<BString>) -> anyhow::Result<()>;
 
-    fn get_aliases(&self) -> Vec<String>;
+    fn get_aliases(&self) -> Vec<BString>;
 
-    fn get_synopsis(&self, short: bool) -> String;
+    fn get_synopsis(&self, short: bool) -> bstr::BString;
 
-    fn add_usage(&self, usage: &str);
+    fn add_usage(&self, usage: &BStr);
 
-    fn get_usages(&self) -> Vec<String>;
+    fn get_usages(&self) -> Vec<BString>;
 
     fn get_helper(
         &self,
-        name: &str,
+        name: &BStr,
     ) -> anyhow::Result<Result<PhpMixed, crate::exception::LogicException>>;
 
     fn set_code(
@@ -489,7 +492,7 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
 }
 
 impl PhpClass for CommandData {
-    fn php_class_name(&self) -> String {
+    fn php_class_name(&self) -> &BStr {
         panic!(
             "php_class_name called on the base command state; concrete commands supply their class name"
         );
@@ -627,17 +630,17 @@ impl Command for CommandData {
         })
     }
 
-    fn set_name(&self, name: &str) -> anyhow::Result<()> {
+    fn set_name(&self, name: &BStr) -> anyhow::Result<()> {
         if let Err(e) = self.validate_name(name)? {
             return Err(e.into());
         }
 
-        *self.name.borrow_mut() = Some(name.to_string());
+        *self.name.borrow_mut() = Some(name.into());
 
         Ok(())
     }
 
-    fn get_name(&self) -> Option<String> {
+    fn get_name(&self) -> Option<BString> {
         self.name.borrow().clone()
     }
 
@@ -649,47 +652,38 @@ impl Command for CommandData {
         self.hidden.get()
     }
 
-    fn set_description(&self, description: &str) {
-        *self.description.borrow_mut() = description.to_string();
+    fn set_description(&self, description: &BStr) {
+        *self.description.borrow_mut() = description.into();
     }
 
-    fn get_description(&self) -> String {
+    fn get_description(&self) -> BString {
         self.description.borrow().clone()
     }
 
-    fn set_help(&self, help: &str) {
-        *self.help.borrow_mut() = help.to_string();
+    fn set_help(&self, help: &BStr) {
+        *self.help.borrow_mut() = help.into();
     }
 
-    fn get_help(&self) -> String {
+    fn get_help(&self) -> BString {
         self.help.borrow().clone()
     }
 
-    fn get_processed_help(&self) -> String {
+    fn get_processed_help(&self) -> bstr::BString {
         let name = self.name.borrow().clone();
         let is_single_command = match &*self.application.borrow() {
             Some(application) => application.borrow().is_single_command(),
             None => false,
         };
 
-        let placeholders = [
-            "%command.name%".to_string(),
-            "%command.full_name%".to_string(),
-        ];
-        // TODO(bytes): the help text is built as a String.
-        let php_self = PHP_SERVER
-            .lock()
-            .unwrap()
-            .php_self()
-            .unwrap_or_default()
-            .into_string()
-            .unwrap_or_else(|php_self| panic!("PHP_SELF is not valid UTF-8: {php_self:?}"));
+        let placeholders = ["%command.name%", "%command.full_name%"];
+        let php_self = PHP_SERVER.lock().unwrap().php_self().unwrap_or_default();
+        let php_self = path_to_bytes(&php_self);
         let replacements = [
             name.clone().unwrap_or_default(),
             if is_single_command {
-                php_self
+                php_self.into()
             } else {
-                format!("{} {}", php_self, name.unwrap_or_default())
+                bconcat!(php_self, " ", name.unwrap_or_default())
             },
         ];
 
@@ -703,11 +697,11 @@ impl Command for CommandData {
         str_replace_array(&placeholders, &replacements, &subject)
     }
 
-    fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()> {
+    fn set_aliases(&self, aliases: Vec<BString>) -> anyhow::Result<()> {
         let mut list = Vec::new();
 
         for alias in &aliases {
-            if let Err(e) = self.validate_name(alias)? {
+            if let Err(e) = self.validate_name(alias.as_bstr())? {
                 return Err(e.into());
             }
             list.push(alias.clone());
@@ -720,55 +714,54 @@ impl Command for CommandData {
         Ok(())
     }
 
-    fn get_aliases(&self) -> Vec<String> {
+    fn get_aliases(&self) -> Vec<BString> {
         self.aliases.borrow().clone()
     }
 
-    fn get_synopsis(&self, short: bool) -> String {
-        let key = if short { "short" } else { "long" }.to_string();
+    fn get_synopsis(&self, short: bool) -> bstr::BString {
+        let key = BString::from(if short { "short" } else { "long" });
 
         if !self.synopsis.borrow().contains_key(&key) {
-            let value = format!(
-                "{} {}",
+            let value = trim(bconcat!(
                 self.name.borrow().clone().unwrap_or_default(),
+                " ",
                 self.definition
                     .borrow()
                     .as_ref()
                     .unwrap()
                     .get_synopsis(short)
-            )
-            .trim()
-            .to_string();
+            ));
             self.synopsis.borrow_mut().insert(key.clone(), value);
         }
 
         self.synopsis.borrow()[&key].clone()
     }
 
-    fn add_usage(&self, usage: &str) {
-        let mut usage = usage.to_string();
+    fn add_usage(&self, usage: &BStr) {
+        let mut usage = BString::from(usage);
         let name = self.name.borrow().clone().unwrap_or_default();
         if !usage.starts_with(&name) {
-            usage = format!("{} {}", name, usage);
+            usage = bconcat!(name, " ", usage);
         }
 
         self.usages.borrow_mut().push(usage);
     }
 
-    fn get_usages(&self) -> Vec<String> {
+    fn get_usages(&self) -> Vec<BString> {
         self.usages.borrow().clone()
     }
 
     fn get_helper(
         &self,
-        name: &str,
+        name: &BStr,
     ) -> anyhow::Result<Result<PhpMixed, crate::exception::LogicException>> {
         let helper_set_ref = self.helper_set.borrow();
         let helper_set = match &*helper_set_ref {
             None => {
-                return Ok(Err(crate::exception::LogicException::new(format!(
-                    "Cannot retrieve helper \"{}\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method.",
-                    name
+                return Ok(Err(crate::exception::LogicException::new(bconcat!(
+                    "Cannot retrieve helper \"",
+                    name,
+                    "\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method."
                 ))));
             }
             Some(helper_set) => helper_set,

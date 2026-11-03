@@ -3,6 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
+use bstr::BString;
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -12,7 +13,7 @@ use shirabe_symfony_console::output::OutputInterface;
 pub struct ProhibitsCommand {
     base_command_data: BaseCommandData,
 
-    colors: std::cell::RefCell<Vec<String>>,
+    colors: std::cell::RefCell<Vec<BString>>,
 }
 
 impl_php_class!(ProhibitsCommand, r"Composer\Command\ProhibitsCommand");
@@ -37,11 +38,11 @@ impl ProhibitsCommand {
 }
 
 impl BaseDependencyCommand for ProhibitsCommand {
-    fn colors(&self) -> std::cell::Ref<'_, Vec<String>> {
+    fn colors(&self) -> std::cell::Ref<'_, Vec<BString>> {
         self.colors.borrow()
     }
 
-    fn set_colors(&self, colors: Vec<String>) {
+    fn set_colors(&self, colors: Vec<BString>) {
         *self.colors.borrow_mut() = colors;
     }
 }
@@ -49,9 +50,11 @@ impl BaseDependencyCommand for ProhibitsCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ProhibitsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("prohibits")?;
-        self.set_aliases(vec!["why-not".to_string()])?;
-        self.set_description("Shows which packages prevent the given package from being installed");
+        self.set_name("prohibits".into())?;
+        self.set_aliases(vec!["why-not".into()])?;
+        self.set_description(
+            "Shows which packages prevent the given package from being installed".into(),
+        );
         self.set_definition(&[
             InputArgument::new5(
                 <Self as BaseDependencyCommand>::ARGUMENT_PACKAGE,
@@ -72,7 +75,7 @@ impl Command for ProhibitsCommand {
             .into(),
             InputOption::new(
                 <Self as BaseDependencyCommand>::OPTION_RECURSIVE,
-                Some("r"),
+                Some("r".into()),
                 Some(InputOption::VALUE_NONE),
                 "Recursively resolves up to the root package",
                 None,
@@ -81,7 +84,7 @@ impl Command for ProhibitsCommand {
             .into(),
             InputOption::new(
                 <Self as BaseDependencyCommand>::OPTION_TREE,
-                Some("t"),
+                Some("t".into()),
                 Some(InputOption::VALUE_NONE),
                 "Prints the results as a nested tree",
                 None,
@@ -101,7 +104,8 @@ impl Command for ProhibitsCommand {
         self.set_help(
             "Displays detailed information about why a package cannot be installed.\n\n\
             <info>shirabe prohibits composer/composer</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#prohibits-why-not",
+            Read more at https://getcomposer.org/doc/03-cli.md#prohibits-why-not"
+                .into(),
         );
         Ok(())
     }

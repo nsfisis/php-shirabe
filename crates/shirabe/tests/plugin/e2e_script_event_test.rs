@@ -7,6 +7,9 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::os_str_from_bytes;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -16,17 +19,17 @@ fn fixture_dir() -> PathBuf {
 
 struct Run {
     exit_code: i32,
-    trace: String,
-    stdout: String,
+    trace: BString,
+    stdout: BString,
 }
 
 /// Runs `dump-autoload` in a fresh copy of the fixture and returns the exit code with what the
 /// script wrote to its trace file and through the event's IO.
-fn dump_autoload(program: &str, prefix_args: &[&str]) -> Run {
+fn dump_autoload(program: &BStr, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
-    let output = std::process::Command::new(program)
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
         .arg("dump-autoload")
         .current_dir(&project)
@@ -39,8 +42,10 @@ fn dump_autoload(program: &str, prefix_args: &[&str]) -> Run {
         .unwrap();
     Run {
         exit_code: output.status.code().unwrap_or(-1),
-        trace: std::fs::read_to_string(project.join("script-event-trace.txt")).unwrap_or_default(),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        trace: BString::from(
+            std::fs::read(project.join("script-event-trace.txt")).unwrap_or_default(),
+        ),
+        stdout: BString::from(output.stdout),
     }
 }
 
@@ -53,10 +58,9 @@ fn test_script_event_object_graph_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = dump_autoload("php", &[composer_bin.as_str()]);
-    let shirabe = dump_autoload(env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream = dump_autoload(BStr::new("php"), &[composer_bin.as_os_str()]);
+    let shirabe = dump_autoload(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(0, upstream.exit_code, "upstream dump-autoload must succeed");
     assert_eq!(upstream.exit_code, shirabe.exit_code);
@@ -74,12 +78,17 @@ bin-dir=bin
         upstream.trace
     );
 
-    let io_line = |run: &Run| -> String {
-        run.stdout
-            .lines()
-            .find(|line| line.starts_with("script-event: "))
-            .unwrap_or_default()
-            .to_string()
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the test splits a child process's output into lines, which no PHP code does"
+    )]
+    let io_line = |run: &Run| -> BString {
+        BString::from(
+            run.stdout
+                .lines()
+                .find(|line| line.starts_with(b"script-event: "))
+                .unwrap_or_default(),
+        )
     };
     assert_eq!(io_line(&upstream), io_line(&shirabe));
     assert_eq!(

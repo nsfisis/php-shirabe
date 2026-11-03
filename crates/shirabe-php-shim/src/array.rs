@@ -1,5 +1,5 @@
-use crate::{PhpMixed, canonical_int_key, php_to_string};
-use bstr::{B, BString, ByteSlice};
+use crate::{PhpMixed, bconcat, canonical_int_key, php_to_string};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 
 pub fn array_values<K, V: Clone>(array: &IndexMap<K, V>) -> Vec<V> {
@@ -18,17 +18,16 @@ pub fn array_keys<K: Clone, V>(array: &IndexMap<K, V>) -> Vec<K> {
     array.keys().cloned().collect()
 }
 
-pub fn array_push(array: &mut Vec<String>, value: String) -> i64 {
+pub fn array_push<T>(array: &mut Vec<T>, value: T) -> i64 {
     array.push(value);
     array.len() as i64
 }
 
-pub fn array_search_in_vec(needle: &str, haystack: &[String]) -> Option<usize> {
-    haystack.iter().position(|s| s.as_str() == needle)
-}
-
-pub fn array_map_str_fn<F: Fn(&str) -> String>(_callback: F, _array: &[String]) -> Vec<String> {
-    _array.iter().map(|s| _callback(s)).collect()
+pub fn array_search_in_vec(
+    needle: impl AsRef<[u8]>,
+    haystack: &[impl AsRef<[u8]>],
+) -> Option<usize> {
+    haystack.iter().position(|s| s.as_ref() == needle.as_ref())
 }
 
 pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
@@ -51,7 +50,7 @@ pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> 
     }
 }
 
-pub fn array_slice_strs(value: &[String], offset: i64, length: Option<i64>) -> Vec<String> {
+pub fn array_slice_strs<T: Clone>(value: &[T], offset: i64, length: Option<i64>) -> Vec<T> {
     let (start, end) = php_slice_bounds(value.len() as i64, offset, length);
     value[start..end].to_vec()
 }
@@ -64,7 +63,7 @@ pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
     };
     let mut result: IndexMap<BString, PhpMixed> = IndexMap::new();
     for key in entries {
-        result.insert(php_to_string(key).into(), value.clone());
+        result.insert(php_to_string(key), value.clone());
     }
     PhpMixed::Array(result)
 }
@@ -88,14 +87,14 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
         match array {
             PhpMixed::List(items) => {
                 for value in items {
-                    result.insert(next_int.to_string().into(), value);
+                    result.insert(crate::bconcat!(next_int), value);
                     next_int += 1;
                 }
             }
             PhpMixed::Array(map) => {
                 for (key, value) in map {
                     if canonical_int_key(&key).is_some() {
-                        result.insert(next_int.to_string().into(), value);
+                        result.insert(crate::bconcat!(next_int), value);
                         next_int += 1;
                         continue;
                     }
@@ -105,10 +104,7 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
             _ => panic!("array_merge(): Argument must be of type array"),
         }
     }
-    let is_list = result
-        .keys()
-        .enumerate()
-        .all(|(i, k)| *k == i.to_string().as_bytes());
+    let is_list = result.keys().enumerate().all(|(i, k)| *k == bconcat!(i));
     if is_list {
         PhpMixed::List(result.into_values().collect())
     } else {
@@ -126,14 +122,14 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
 /// per entry is INCORRECT because it would collide on shared integer keys.
 pub fn array_merge_map<K, V>(array1: IndexMap<K, V>, array2: IndexMap<K, V>) -> IndexMap<K, V>
 where
-    K: std::hash::Hash + Eq + AsRef<[u8]> + From<String>,
+    K: std::hash::Hash + Eq + AsRef<[u8]> + From<BString>,
 {
     let mut result: IndexMap<K, V> = IndexMap::new();
     let mut next_int: i64 = 0;
     for array in [array1, array2] {
         for (key, value) in array {
             if canonical_int_key(key.as_ref()).is_some() {
-                result.insert(next_int.to_string().into(), value);
+                result.insert(crate::bconcat!(next_int).into(), value);
                 next_int += 1;
                 continue;
             }
@@ -143,7 +139,7 @@ where
     result
 }
 
-pub fn array_diff(array1: &[String], array2: &[String]) -> Vec<String> {
+pub fn array_diff<T: Clone + PartialEq>(array1: &[T], array2: &[T]) -> Vec<T> {
     array1
         .iter()
         .filter(|&x| !array2.contains(x))
@@ -260,10 +256,13 @@ pub fn array_search_mixed(
     }
 }
 
-pub fn array_search(needle: &str, haystack: &IndexMap<String, String>) -> Option<String> {
+pub fn array_search<K: Clone, V: AsRef<[u8]>>(
+    needle: impl AsRef<[u8]>,
+    haystack: &IndexMap<K, V>,
+) -> Option<K> {
     haystack
         .iter()
-        .find(|(_, value)| value.as_str() == needle)
+        .find(|(_, value)| value.as_ref() == needle.as_ref())
         .map(|(key, _)| key.clone())
 }
 
@@ -344,7 +343,7 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
             for (i, value) in items.iter().enumerate() {
                 match value {
                     PhpMixed::Int(n) => {
-                        result.insert(n.to_string().into(), PhpMixed::Int(i as i64));
+                        result.insert(bconcat!(n), PhpMixed::Int(i as i64));
                     }
                     PhpMixed::String(s) => {
                         result.insert(s.clone(), PhpMixed::Int(i as i64));
@@ -358,7 +357,7 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
             for (key, value) in map {
                 match value {
                     PhpMixed::Int(n) => {
-                        result.insert(n.to_string().into(), php_key_to_mixed(key));
+                        result.insert(bconcat!(n), php_key_to_mixed(key));
                     }
                     PhpMixed::String(s) => {
                         result.insert(s.clone(), php_key_to_mixed(key));
@@ -372,14 +371,6 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
     PhpMixed::Array(result)
 }
 
-pub fn array_flip_strings(array: &[String]) -> IndexMap<BString, PhpMixed> {
-    array
-        .iter()
-        .enumerate()
-        .map(|(i, s)| (s.as_str().into(), PhpMixed::Int(i as i64)))
-        .collect()
-}
-
 pub fn array_key_exists<Q, K, V>(key: &Q, array: &IndexMap<K, V>) -> bool
 where
     Q: ?Sized + std::hash::Hash + indexmap::Equivalent<K>,
@@ -390,7 +381,7 @@ where
 pub fn array_is_list(array: &PhpMixed) -> bool {
     match array {
         PhpMixed::List(_) => true,
-        PhpMixed::Array(map) => map.keys().enumerate().all(|(i, k)| *k == i.to_string()),
+        PhpMixed::Array(map) => map.keys().enumerate().all(|(i, k)| *k == bconcat!(i)),
         _ => panic!("array_is_list(): Argument #1 ($array) must be of type array"),
     }
 }
@@ -504,7 +495,7 @@ fn merge_build(acc: Vec<(MergeKey, PhpMixed)>) -> PhpMixed {
         PhpMixed::Array(
             acc.into_iter()
                 .map(|(k, v)| match k {
-                    MergeKey::Int(n) => (n.to_string().into(), v),
+                    MergeKey::Int(n) => (bconcat!(n), v),
                     MergeKey::Str(s) => (s, v),
                 })
                 .collect(),
@@ -589,19 +580,19 @@ pub fn in_array_loose<'a>(
 }
 
 /// PHP numeric-string-aware conversion to a number, used by loose comparison.
-fn loose_to_number(s: &str) -> Option<f64> {
+fn loose_to_number(s: &[u8]) -> Option<f64> {
     if crate::var::is_numeric_string(s) {
-        s.trim().parse::<f64>().ok()
+        crate::utf8_text(s)?.trim().parse::<f64>().ok()
     } else {
         None
     }
 }
 
-fn loose_num_to_string(value: &PhpMixed) -> String {
+fn loose_num_to_string(value: &PhpMixed) -> BString {
     match value {
-        PhpMixed::Int(i) => i.to_string(),
-        PhpMixed::Float(f) => f.to_string(),
-        _ => String::new(),
+        PhpMixed::Int(i) => bconcat!(i),
+        PhpMixed::Float(f) => crate::display_to_bytes(f),
+        _ => BString::default(),
     }
 }
 
@@ -625,18 +616,15 @@ pub fn loose_eq(a: &PhpMixed, b: &PhpMixed) -> bool {
         (other, Bool(y)) => crate::var::to_bool(other) == *y,
         (Int(x), Int(y)) => x == y,
         (Int(_) | Float(_), Int(_) | Float(_)) => loose_num_value(a) == loose_num_value(b),
-        (String(x), String(y)) => match (
-            loose_to_number(&x.to_str_lossy()),
-            loose_to_number(&y.to_str_lossy()),
-        ) {
+        (String(x), String(y)) => match (loose_to_number(x), loose_to_number(y)) {
             (Some(nx), Some(ny)) => nx == ny,
             _ => x == y,
         },
-        (Int(_) | Float(_), String(s)) => match loose_to_number(&s.to_str_lossy()) {
+        (Int(_) | Float(_), String(s)) => match loose_to_number(s) {
             Some(ns) => loose_num_value(a) == ns,
             None => loose_num_to_string(a) == *s,
         },
-        (String(s), Int(_) | Float(_)) => match loose_to_number(&s.to_str_lossy()) {
+        (String(s), Int(_) | Float(_)) => match loose_to_number(s) {
             Some(ns) => loose_num_value(b) == ns,
             None => *s == loose_num_to_string(b),
         },
@@ -719,7 +707,7 @@ where
     array.sort_by(|k1, _, k2, _| callback(k1.as_ref(), k2.as_ref()).cmp(&0));
 }
 
-pub fn sort_natural_flag_case(values: &mut [String]) {
+pub fn sort_natural_flag_case<T: AsRef<[u8]>>(values: &mut [T]) {
     values.sort_by(|a, b| crate::strnatcasecmp(a, b).cmp(&0));
 }
 

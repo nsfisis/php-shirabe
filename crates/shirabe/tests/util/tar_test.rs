@@ -3,7 +3,7 @@
 use shirabe::util::tar::Tar;
 
 /// Reuses the PHP fixtures under composer/tests/Composer/Test/Util/Fixtures/Tar.
-fn fixture(name: &str) -> std::path::PathBuf {
+fn fixture(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Util/Fixtures/Tar")
         .join(name)
@@ -35,19 +35,13 @@ fn test_throws_exception_if_the_composer_json_is_in_a_sub_subfolder() {
 #[test]
 fn test_returns_composer_json_in_tar_root() {
     let result = Tar::get_composer_json(&fixture("root.tar.gz")).unwrap();
-    assert_eq!(
-        Some("{\n    \"name\": \"foo/bar\"\n}\n".to_string()),
-        result
-    );
+    assert_eq!(Some("{\n    \"name\": \"foo/bar\"\n}\n".into()), result);
 }
 
 #[test]
 fn test_returns_composer_json_in_first_folder() {
     let result = Tar::get_composer_json(&fixture("folder.tar.gz")).unwrap();
-    assert_eq!(
-        Some("{\n    \"name\": \"foo/bar\"\n}\n".to_string()),
-        result
-    );
+    assert_eq!(Some("{\n    \"name\": \"foo/bar\"\n}\n".into()), result);
 }
 
 #[test]

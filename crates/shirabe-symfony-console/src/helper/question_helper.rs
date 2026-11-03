@@ -10,14 +10,14 @@ use crate::output::{
 };
 use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::terminal::Terminal;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, copy, dir, explode, feof, fgetc, fgets,
-    fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
-    php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv, sapi_windows_cp_get,
-    sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat, stream_copy_to_stream,
-    stream_get_meta_data, stream_isatty_resource, stream_select, stream_set_blocking, strlen,
-    substr, sys_get_temp_dir, trim, unlink,
+    Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc,
+    fgets, fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
+    path_from_bytes, path_to_bytes, php_fopen_resource, php_to_string, rewind, rtrim,
+    sapi_windows_cp_conv, sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand,
+    str_repeat, stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
+    stream_set_blocking, strlen, substr, sys_get_temp_dir, trim, unlink,
 };
 use shirabe_symfony_string::s;
 
@@ -118,7 +118,7 @@ pub trait QuestionHelperInterface {
             let callback = autocomplete;
             // The autocompleter callback yields an iterable (Option here); PHP
             // treats a null result as an empty list of suggestions.
-            let callback = move |input: &str| callback(input).unwrap_or_default();
+            let callback = move |input: &BStr| callback(input).unwrap_or_default();
             let autocomplete = match self.inner().autocomplete(
                 std::rc::Rc::clone(&output),
                 question,
@@ -129,7 +129,7 @@ pub trait QuestionHelperInterface {
                 Err(exception) => return Ok(Err(exception)),
             };
             ret = PhpMixed::string(if question.is_trimmable() {
-                trim(&autocomplete, None)
+                trim(&autocomplete)
             } else {
                 autocomplete
             });
@@ -143,7 +143,7 @@ pub trait QuestionHelperInterface {
                 )? {
                     Ok(hidden_response) => {
                         r = PhpMixed::string(if question.is_trimmable() {
-                            trim(&hidden_response, None)
+                            trim(&hidden_response)
                         } else {
                             hidden_response
                         });
@@ -170,11 +170,11 @@ pub trait QuestionHelperInterface {
                 }
 
                 if matches!(read, PhpMixed::Bool(false)) {
-                    return Ok(Err(MissingInputException::new("Aborted.".to_string())));
+                    return Ok(Err(MissingInputException::new("Aborted.")));
                 }
                 r = read;
                 if question.is_trimmable() {
-                    r = PhpMixed::string(trim(&r.to_string(), None));
+                    r = PhpMixed::string(trim(php_to_string(&r)));
                 }
             }
             ret = r;
@@ -186,11 +186,11 @@ pub trait QuestionHelperInterface {
             if let Some(section_output) =
                 (*borrowed).as_any().downcast_ref::<ConsoleSectionOutput>()
             {
-                section_output.add_content(&ret.to_string());
+                section_output.add_content(php_to_string(&ret).as_bstr());
             }
         }
 
-        ret = if strlen(&ret.to_string()) > 0 {
+        ret = if strlen(php_to_string(&ret)) > 0 {
             ret
         } else {
             question.get_default()
@@ -238,7 +238,7 @@ pub trait QuestionHelperInterface {
                     // RuntimeException rethrow branch is statically unreachable; record the error
                     // and retry.
                     error = Some(Exception::with_code(
-                        e.get_message().to_string(),
+                        e.get_message().to_owned(),
                         e.get_code(),
                     ));
                 }
@@ -246,11 +246,7 @@ pub trait QuestionHelperInterface {
         }
 
         // throw $error;
-        Err(anyhow::Error::msg(
-            error
-                .map(|e| e.get_message().to_string())
-                .unwrap_or_default(),
-        ))
+        Err(error.expect("a question has at least one attempt").into())
     }
 
     /// Outputs the question prompt (PHP protected; the overridable hook).
@@ -283,8 +279,8 @@ impl QuestionHelperInterface for QuestionHelper {
 }
 
 impl QuestionHelper {
-    pub fn get_name(&self) -> String {
-        "question".to_string()
+    pub fn get_name(&self) -> BString {
+        "question".into()
     }
 
     /// Prevents usage of stty.
@@ -307,21 +303,21 @@ impl QuestionHelper {
 
             if !choice_question.is_multiselect() {
                 return choices
-                    .get(B(&default.to_string()))
+                    .get(B(&php_to_string(&default)))
                     .cloned()
                     .unwrap_or(default);
             }
 
-            let default_parts = explode(",", &default.to_string());
+            let default_parts = explode(",", php_to_string(&default));
             let mut resolved: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             for (k, v) in default_parts.iter().enumerate() {
                 let v = if question.is_trimmable() {
-                    trim(v, None)
+                    trim(v)
                 } else {
                     v.clone()
                 };
                 let value = choices.get(B(&v)).cloned().unwrap_or(PhpMixed::string(v));
-                resolved.insert(k.to_string().into(), value);
+                resolved.insert(bconcat!(k), value);
             }
 
             return PhpMixed::Array(resolved);
@@ -336,16 +332,16 @@ impl QuestionHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
     ) {
-        let mut message = question.get_question().to_string();
+        let mut message = BString::from(question.get_question());
 
         if let Some(choice_question) = question.as_choice() {
-            let mut lines = vec![question.get_question().to_string()];
-            lines.extend(self.format_choice_question_choices(choice_question, "info"));
+            let mut lines = vec![BString::from(question.get_question())];
+            lines.extend(self.format_choice_question_choices(choice_question, "info".into()));
             output
                 .borrow()
                 .writeln(&lines, output_interface::OUTPUT_NORMAL);
 
-            message = choice_question.get_prompt().to_string();
+            message = BString::from(choice_question.get_prompt());
         }
 
         output
@@ -356,28 +352,26 @@ impl QuestionHelper {
     pub(crate) fn format_choice_question_choices(
         &self,
         question: &ChoiceQuestion,
-        tag: &str,
-    ) -> Vec<String> {
-        let mut messages: Vec<String> = vec![];
+        tag: &BStr,
+    ) -> Vec<BString> {
+        let mut messages: Vec<BString> = vec![];
 
         let choices = question.get_choices();
-        let max_width = choices
-            .keys()
-            // TODO(bytes): widths are measured on UTF-8 text, so non-UTF-8 bytes are replaced.
-            .map(|key| Helper::width(&key.to_str_lossy()))
-            .max()
-            .unwrap_or(0);
+        let max_width = choices.keys().map(Helper::width).max().unwrap_or(0);
 
         for (key, value) in choices {
-            let padding = str_repeat(
-                " ",
-                (max_width - Helper::width(&key.to_str_lossy())) as usize,
-            );
+            let padding = str_repeat(" ", (max_width - Helper::width(key)) as usize);
 
-            messages.push(format!(
-                "  [<{tag}>{}{padding}</{tag}>] {}",
-                key.clone(),
-                value.clone(),
+            messages.push(bconcat!(
+                "  [<",
+                tag,
+                ">",
+                key,
+                padding,
+                "</",
+                tag,
+                ">] ",
+                php_to_string(value),
             ));
         }
 
@@ -394,12 +388,12 @@ impl QuestionHelper {
             let formatter = helper_set.borrow().get_formatter();
 
             formatter.borrow().format_block(
-                FormatBlockMessages::String(error.get_message().to_string()),
-                "error",
+                FormatBlockMessages::String(error.get_message().into()),
+                "error".into(),
                 false,
             )
         } else {
-            format!("<error>{}</error>", error.get_message())
+            bconcat!("<error>", error.get_message(), "</error>")
         };
 
         output
@@ -413,20 +407,22 @@ impl QuestionHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
         input_stream: &PhpResource,
-        autocomplete: &dyn Fn(&str) -> Vec<PhpMixed>,
-    ) -> Result<String, MissingInputException> {
+        autocomplete: &dyn Fn(&BStr) -> Vec<PhpMixed>,
+    ) -> Result<BString, MissingInputException> {
         let cursor = Cursor::new(std::rc::Rc::clone(&output), Some(input_stream.clone()));
 
-        let mut full_choice = String::new();
-        let mut ret = String::new();
+        let mut full_choice = BString::default();
+        let mut ret = BString::default();
 
         let mut i: i64 = 0;
         let mut ofs: i64 = -1;
-        let mut matches = autocomplete(&ret);
+        let mut matches = autocomplete(ret.as_ref());
         let mut num_matches = matches.len() as i64;
 
         let stty_mode = shell_exec("stty -g").unwrap_or_default();
-        let is_stdin = stream_get_meta_data(input_stream).uri.as_deref() == Some("php://stdin");
+        let is_stdin = stream_get_meta_data(input_stream)
+            .uri
+            .is_some_and(|uri| uri == "php://stdin");
         let mut r = vec![input_stream.clone()];
         let w: Vec<PhpResource> = vec![];
 
@@ -435,10 +431,10 @@ impl QuestionHelper {
 
         // Add highlighted text style
         output.borrow().get_formatter().borrow_mut().set_style(
-            "hl",
+            bstr::BStr::new("hl"),
             Box::new(OutputFormatterStyle::new(
-                Some("black"),
-                Some("white"),
+                Some(bstr::BStr::new("black")),
+                Some(bstr::BStr::new("white")),
                 vec![],
             )),
         );
@@ -459,27 +455,27 @@ impl QuestionHelper {
                     && c.as_deref() == Some(b"".as_slice())
                     && matches!(question.get_default(), PhpMixed::Null))
             {
-                shell_exec(&format!("stty {}", stty_mode));
-                return Err(MissingInputException::new("Aborted.".to_string()));
+                shell_exec(bconcat!("stty ", stty_mode));
+                return Err(MissingInputException::new("Aborted."));
             } else if c.as_deref() == Some(b"\x7f".as_slice()) {
                 // Backspace Character
                 if 0 == num_matches && 0 != i {
                     i -= 1;
                     cursor.move_left(s(&full_choice).slice(-1, None).width(false));
 
-                    full_choice = QuestionHelper::substr(Some(&full_choice), 0, Some(i));
+                    full_choice = Helper::substr(&full_choice, 0, Some(i));
                 }
 
                 if 0 == i {
                     ofs = -1;
-                    matches = autocomplete(&ret);
+                    matches = autocomplete(ret.as_ref());
                     num_matches = matches.len() as i64;
                 } else {
                     num_matches = 0;
                 }
 
                 // Pop the last character off the end of our string
-                ret = QuestionHelper::substr(Some(&ret), 0, Some(i));
+                ret = Helper::substr(&ret, 0, Some(i));
             } else if c.as_deref() == Some(b"\x1b".as_slice()) {
                 // Did we read an escape sequence?
                 let escape = fread(input_stream, 2).unwrap_or_default();
@@ -504,11 +500,11 @@ impl QuestionHelper {
                 if c.as_deref() == Some(b"\t".as_slice()) || c.as_deref() == Some(b"\n".as_slice())
                 {
                     if num_matches > 0 && -1 != ofs {
-                        ret = matches[ofs as usize].to_string();
+                        ret = php_to_string(&matches[ofs as usize]);
                         // Echo out remaining chars for current match
                         let remaining_characters = substr(
                             &ret,
-                            strlen(&trim(&self.most_recently_entered_value(&full_choice), None)),
+                            strlen(trim(self.most_recently_entered_value(&full_choice))),
                             None,
                         );
                         output.borrow().write(
@@ -516,18 +512,18 @@ impl QuestionHelper {
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
-                        full_choice.push_str(&remaining_characters);
+                        full_choice.extend_from_slice(&remaining_characters);
                         i = match mb_detect_encoding(&full_choice, None, true) {
                             None => strlen(&full_choice),
                             Some(encoding) => mb_strlen(&full_choice, &encoding),
                         };
 
                         let ret_for_filter = ret.clone();
-                        matches = autocomplete(&ret)
+                        matches = autocomplete(ret.as_ref())
                             .into_iter()
                             .filter(|m| {
                                 ret_for_filter.is_empty()
-                                    || m.to_string().starts_with(&ret_for_filter)
+                                    || php_to_string(m).starts_with(ret_for_filter.as_slice())
                             })
                             .collect();
                         ofs = -1;
@@ -535,7 +531,7 @@ impl QuestionHelper {
 
                     if c.as_deref() == Some(b"\n".as_slice()) {
                         output.borrow().write(
-                            &["\n".to_string()],
+                            &[bstr::BString::from("\n")],
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
@@ -560,16 +556,14 @@ impl QuestionHelper {
                     c = Some([cur, extra].concat());
                 }
 
-                // TODO(bytes): the output, the answer and the autocomplete matching all work on
-                // Strings.
-                let cur = String::from_utf8_lossy(&c.clone().unwrap_or_default()).into_owned();
+                let cur = BString::from(c.clone().unwrap_or_default());
                 output.borrow().write(
                     std::slice::from_ref(&cur),
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );
-                ret.push_str(&cur);
-                full_choice.push_str(&cur);
+                ret.extend_from_slice(&cur);
+                full_choice.extend_from_slice(&cur);
                 i += 1;
 
                 let mut temp_ret = ret.clone();
@@ -583,9 +577,9 @@ impl QuestionHelper {
                 num_matches = 0;
                 ofs = 0;
 
-                for value in autocomplete(&ret) {
+                for value in autocomplete(ret.as_ref()) {
                     // If typed characters match the beginning chunk of value (e.g. [AcmeDe]moBundle)
-                    if value.to_string().starts_with(&temp_ret) {
+                    if php_to_string(&value).starts_with(temp_ret.as_slice()) {
                         if (num_matches as usize) < matches.len() {
                             matches[num_matches as usize] = value;
                         } else {
@@ -602,15 +596,16 @@ impl QuestionHelper {
                 cursor.save_position();
                 // Write highlighted text, complete the partially entered response
                 let characters_entered =
-                    strlen(&trim(&self.most_recently_entered_value(&full_choice), None));
+                    strlen(trim(self.most_recently_entered_value(&full_choice)));
                 output.borrow().write(
-                    &[format!(
-                        "<hl>{}</hl>",
-                        OutputFormatter::escape_trailing_backslash(&substr(
-                            &matches[ofs as usize].to_string(),
+                    &[bconcat!(
+                        "<hl>",
+                        OutputFormatter::escape_trailing_backslash(substr(
+                            php_to_string(&matches[ofs as usize]),
                             characters_entered,
                             None,
-                        ))
+                        )),
+                        "</hl>"
                     )],
                     false,
                     output_interface::OUTPUT_NORMAL,
@@ -620,24 +615,24 @@ impl QuestionHelper {
         }
 
         // Reset stty so it behaves normally again
-        shell_exec(&format!("stty {}", stty_mode));
+        shell_exec(bconcat!("stty ", stty_mode));
 
         Ok(full_choice)
     }
 
-    fn most_recently_entered_value(&self, entered: &str) -> String {
+    fn most_recently_entered_value(&self, entered: &[u8]) -> BString {
         // Determine the most recent value that the user entered
-        if !entered.contains(',') {
-            return entered.to_string();
+        if !entered.contains(&b',') {
+            return entered.into();
         }
 
         let choices = explode(",", entered);
-        let last_choice = trim(&choices[choices.len() - 1], None);
+        let last_choice = trim(&choices[choices.len() - 1]);
         if !last_choice.is_empty() {
             return last_choice;
         }
 
-        entered.to_string()
+        entered.into()
     }
 
     /// Gets a hidden response from user.
@@ -646,77 +641,65 @@ impl QuestionHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         input_stream: &PhpResource,
         trimmable: bool,
-    ) -> anyhow::Result<Result<String, RuntimeException>> {
+    ) -> anyhow::Result<Result<BString, RuntimeException>> {
         if cfg!(windows) {
-            let mut exe = format!("{}/../Resources/bin/hiddeninput.exe", dir());
+            let mut exe = bconcat!(dir(), "/../Resources/bin/hiddeninput.exe");
 
             // handle code running from a phar
-            let mut tmp_exe: Option<String> = None;
-            if substr(&magic_file(), 0, Some(5)) == "phar:" {
-                // TODO(bytes): the executable path is kept as a String.
-                let tmp_dir = sys_get_temp_dir()
-                    .into_os_string()
-                    .into_string()
-                    .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
-                let tmp = format!("{}/hiddeninput.exe", tmp_dir);
-                let _ = copy(&exe, &tmp);
+            let mut tmp_exe: Option<BString> = None;
+            if substr(magic_file(), 0, Some(5)) == "phar:" {
+                let tmp = bconcat!(sys_get_temp_dir(), "/hiddeninput.exe");
+                let _ = copy(path_from_bytes(&exe), path_from_bytes(&tmp));
                 exe = tmp.clone();
                 tmp_exe = Some(tmp);
             }
 
-            let s_exec = shell_exec(&format!("\"{}\"", exe)).unwrap_or_default();
-            let value = if trimmable {
-                rtrim(&s_exec, None)
-            } else {
-                s_exec
-            };
+            let s_exec = shell_exec(bconcat!("\"", exe, "\"")).unwrap_or_default();
+            let value = if trimmable { rtrim(&s_exec) } else { s_exec };
             output
                 .borrow()
-                .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
+                .writeln(&[bstr::BString::default()], output_interface::OUTPUT_NORMAL);
 
             if let Some(tmp) = tmp_exe {
-                unlink(&tmp);
+                unlink(path_from_bytes(&tmp));
             }
 
             return Ok(Ok(value));
         }
 
-        let mut stty_mode = String::new();
+        let mut stty_mode = BString::default();
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
             stty_mode = shell_exec("stty -g").unwrap_or_default();
             shell_exec("stty -echo");
         } else if self.is_interactive_input(input_stream) {
-            return Ok(Err(RuntimeException::new(
-                "Unable to hide the response.".to_string(),
-            )));
+            return Ok(Err(RuntimeException::new("Unable to hide the response.")));
         }
 
         let value = fgets(input_stream, Some(4096));
 
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
-            shell_exec(&format!("stty {}", stty_mode));
+            shell_exec(bconcat!("stty ", stty_mode));
         }
 
         let mut value = match value {
-            // TODO(bytes): the answer is returned as a String.
-            Some(value) => String::from_utf8_lossy(&value).into_owned(),
+            Some(value) => value,
             None => {
-                return Err(MissingInputException::new("Aborted.".to_string()).into());
+                return Err(MissingInputException::new("Aborted.").into());
             }
         };
         if trimmable {
-            value = trim(&value, None);
+            value = trim(&value);
         }
         output
             .borrow()
-            .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
+            .writeln(&[bstr::BString::default()], output_interface::OUTPUT_NORMAL);
 
         Ok(Ok(value))
     }
 
     fn is_interactive_input(&self, input_stream: &PhpResource) -> bool {
         let uri = stream_get_meta_data(input_stream).uri;
-        if uri.as_deref() != Some("php://stdin") {
+        if uri.is_none_or(|uri| uri != "php://stdin") {
             return false;
         }
 
@@ -773,7 +756,7 @@ impl QuestionHelper {
     fn set_io_codepage(&self) -> i64 {
         if function_exists("sapi_windows_cp_set") {
             let cp = sapi_windows_cp_get(None);
-            sapi_windows_cp_set(sapi_windows_cp_get(Some("oem")));
+            sapi_windows_cp_set(sapi_windows_cp_get(Some(BStr::new("oem"))));
 
             return cp;
         }
@@ -787,11 +770,11 @@ impl QuestionHelper {
         if 0 != cp {
             sapi_windows_cp_set(cp);
 
-            if !matches!(input, PhpMixed::Bool(false)) && input.to_string() != "" {
+            if !matches!(input, PhpMixed::Bool(false)) && !php_to_string(&input).is_empty() {
                 input = PhpMixed::string(sapi_windows_cp_conv(
-                    sapi_windows_cp_get(Some("oem")),
+                    sapi_windows_cp_get(Some(BStr::new("oem"))),
                     cp,
-                    &input.to_string(),
+                    &php_to_string(&input),
                 ));
             }
         }
@@ -809,11 +792,11 @@ impl QuestionHelper {
 
         let uri = uri?;
 
-        let clone_stream = fopen(&uri, &mode).ok()?;
+        let clone_stream = fopen(path_from_bytes(&uri), &mode).ok()?;
 
         // For seekable and writable streams, add all the same data to the
         // cloned stream and then seek to the same offset.
-        if seekable && !["r", "rb", "rt"].contains(&mode.as_str()) {
+        if seekable && !matches!(mode.as_slice(), b"r" | b"rb" | b"rt") {
             let offset = ftell(input_stream).unwrap_or(0);
             rewind(input_stream);
             stream_copy_to_stream(input_stream, &clone_stream);
@@ -823,21 +806,15 @@ impl QuestionHelper {
 
         Some(clone_stream)
     }
-
-    /// Helper::substr proxy (inherited static helper).
-    fn substr(string: Option<&str>, from: i64, length: Option<i64>) -> String {
-        Helper::substr(string.unwrap_or(""), from, length)
-    }
 }
 
 /// PHP `__FILE__` magic constant. The executing code lives in the Shirabe binary itself, which is
 /// the closest analogue for a native executable; it never carries the `phar:` scheme, so the
 /// phar-relocation branch in `get_hidden_response` correctly never triggers.
-fn magic_file() -> String {
-    std::env::current_exe()
-        .expect("current executable path")
-        .display()
-        .to_string()
+fn magic_file() -> BString {
+    BString::from(path_to_bytes(
+        &std::env::current_exe().expect("current executable path"),
+    ))
 }
 
 impl HelperInterface for QuestionHelper {
@@ -849,7 +826,7 @@ impl HelperInterface for QuestionHelper {
         self.inner.get_helper_set()
     }
 
-    fn get_name(&self) -> String {
+    fn get_name(&self) -> BString {
         self.get_name()
     }
 }

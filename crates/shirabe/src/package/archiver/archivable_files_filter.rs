@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFilter.php
 
-use shirabe_php_shim::PharData;
+use shirabe_php_shim::{PharData, bconcat, path_to_bytes, str_replace};
 use std::path::{Path, PathBuf};
 
 pub struct ArchivableFilesFilter {
     inner: Box<dyn Iterator<Item = PathBuf>>,
-    dirs: Vec<String>,
+    dirs: Vec<PathBuf>,
 }
 
 impl ArchivableFilesFilter {
@@ -18,20 +18,16 @@ impl ArchivableFilesFilter {
 
     fn accept(&mut self, file: &Path) -> bool {
         if file.is_dir() {
-            // TODO(bytes): the directories are kept as Strings.
-            self.dirs.push(
-                file.to_str()
-                    .unwrap_or_else(|| panic!("path is not valid UTF-8: {}", file.display()))
-                    .to_string(),
-            );
+            self.dirs.push(file.to_path_buf());
             return false;
         }
         true
     }
 
-    pub fn add_empty_dir(&self, phar: &PharData, sources: &str) -> anyhow::Result<()> {
+    pub fn add_empty_dir(&self, phar: &PharData, sources: &Path) -> anyhow::Result<()> {
+        let prefix = bconcat!(sources, "/");
         for filepath in &self.dirs {
-            let localname = filepath.replace(&format!("{}/", sources), "");
+            let localname = str_replace(&prefix, "", path_to_bytes(filepath));
             phar.add_empty_dir(&localname)?;
         }
         Ok(())

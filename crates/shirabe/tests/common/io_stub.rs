@@ -27,7 +27,8 @@ impl<T: Clone> CallRecorder<T> {
 
 #[derive(Debug, Default)]
 pub struct IOStub {
-    authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+    authentications:
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 
     is_interactive: Option<bool>,
     is_decorated: Option<bool>,
@@ -39,7 +40,7 @@ pub struct IOStub {
     // willReturn that applies to any argument, so a single Option<bool> matches.
     has_authentication: Option<bool>,
     // `getAuthentication` willReturn is a `['username' => ..., 'password' => ...]` array.
-    get_authentication: Option<indexmap::IndexMap<String, Option<String>>>,
+    get_authentication: Option<indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 
     ask: Option<PhpMixed>,
     // When set, `askAndValidate` invokes the caller's validator with this value and returns/
@@ -47,26 +48,26 @@ pub struct IOStub {
     // validator directly. When unset, `askAndValidate` just returns `default` (unvalidated).
     ask_and_validate_answer: Option<PhpMixed>,
     ask_confirmation: Option<bool>,
-    ask_and_hide_answer: Option<Option<String>>,
+    ask_and_hide_answer: Option<Option<bstr::BString>>,
     // Keyed `askAndHideAnswer` replies, mirroring tests whose willReturnCallback
     // switches on the question string. Unknown questions return `''` like PHP's
     // `switch` default.
-    ask_and_hide_answer_responses: Option<indexmap::IndexMap<String, String>>,
+    ask_and_hide_answer_responses: Option<indexmap::IndexMap<bstr::BString, bstr::BString>>,
 
     // Records `writeError` calls.
-    write_error_calls: CallRecorder<(String, bool)>,
+    write_error_calls: CallRecorder<(bstr::BString, bool)>,
     // Records `writeRaw` calls.
-    write_raw_calls: CallRecorder<(String, bool)>,
+    write_raw_calls: CallRecorder<(bstr::BString, bool)>,
     // Records `setAuthentication` calls. Kept separate from `authentications` so
     // `with_has_authentication`/`with_get_authentication` stay static (matching a PHPUnit
     // `willReturn`) even while `setAuthentication` is invoked.
-    set_authentication_calls: CallRecorder<(String, String, Option<String>)>,
+    set_authentication_calls: CallRecorder<(bstr::BString, bstr::BString, Option<bstr::BString>)>,
     // Records `askAndValidate` calls (question, attempts, default).
-    ask_and_validate_calls: CallRecorder<(String, Option<i64>, PhpMixed)>,
+    ask_and_validate_calls: CallRecorder<(bstr::BString, Option<i64>, PhpMixed)>,
     // Records `hasAuthentication` calls.
-    has_authentication_calls: CallRecorder<String>,
+    has_authentication_calls: CallRecorder<bstr::BString>,
     // Records `getAuthentication` calls.
-    get_authentication_calls: CallRecorder<String>,
+    get_authentication_calls: CallRecorder<bstr::BString>,
 }
 
 impl IOStub {
@@ -100,7 +101,7 @@ impl IOStub {
     }
     pub fn with_get_authentication(
         mut self,
-        value: indexmap::IndexMap<String, Option<String>>,
+        value: indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
     ) -> Self {
         self.get_authentication = Some(value);
         self
@@ -108,7 +109,10 @@ impl IOStub {
     // Mutator counterpart of `with_get_authentication`, for tests that reconfigure the stub's
     // response between calls (equivalent to PHPUnit's `willReturnCallback` sequencing via
     // `array_shift`).
-    pub fn set_get_authentication(&mut self, value: indexmap::IndexMap<String, Option<String>>) {
+    pub fn set_get_authentication(
+        &mut self,
+        value: indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    ) {
         self.get_authentication = Some(value);
     }
     pub fn with_ask(mut self, value: PhpMixed) -> Self {
@@ -123,15 +127,15 @@ impl IOStub {
         self.ask_confirmation = Some(value);
         self
     }
-    pub fn with_ask_and_hide_answer(mut self, value: Option<String>) -> Self {
+    pub fn with_ask_and_hide_answer(mut self, value: Option<bstr::BString>) -> Self {
         self.ask_and_hide_answer = Some(value);
         self
     }
     pub fn with_ask_and_hide_answer_responses(
         mut self,
-        value: indexmap::IndexMap<String, String>,
+        value: indexmap::IndexMap<bstr::BString, bstr::BString>,
     ) -> Self {
-        self.ask_and_hide_answer_responses = Some(value);
+        self.ask_and_hide_answer_responses = Some(value.into_iter().collect());
         self
     }
 
@@ -140,44 +144,46 @@ impl IOStub {
     // `with_has_authentication`/`with_get_authentication` overrides are left unset.
     pub fn with_authentication(
         mut self,
-        repository_name: impl Into<String>,
-        username: impl Into<String>,
-        password: Option<String>,
+        repository_name: impl Into<bstr::BString>,
+        username: impl Into<bstr::BString>,
+        password: Option<bstr::BString>,
     ) -> Self {
         let mut auth = indexmap::IndexMap::new();
-        auth.insert("username".to_string(), Some(username.into()));
-        auth.insert("password".to_string(), password);
+        auth.insert(bstr::BString::from("username"), Some(username.into()));
+        auth.insert(bstr::BString::from("password"), password);
         self.authentications.insert(repository_name.into(), auth);
         self
     }
 
     // For testing only. Returns the recorded `writeError` calls in call order.
-    pub fn write_error_calls(&self) -> Vec<(String, bool)> {
+    pub fn write_error_calls(&self) -> Vec<(bstr::BString, bool)> {
         self.write_error_calls.calls()
     }
 
     // For testing only. Returns the recorded `writeRaw` calls in call order.
-    pub fn write_raw_calls(&self) -> Vec<(String, bool)> {
+    pub fn write_raw_calls(&self) -> Vec<(bstr::BString, bool)> {
         self.write_raw_calls.calls()
     }
 
     // For testing only. Returns the recorded `setAuthentication` calls in call order.
-    pub fn set_authentication_calls(&self) -> Vec<(String, String, Option<String>)> {
+    pub fn set_authentication_calls(
+        &self,
+    ) -> Vec<(bstr::BString, bstr::BString, Option<bstr::BString>)> {
         self.set_authentication_calls.calls()
     }
 
     // For testing only. Returns the recorded `askAndValidate` calls in call order.
-    pub fn ask_and_validate_calls(&self) -> Vec<(String, Option<i64>, PhpMixed)> {
+    pub fn ask_and_validate_calls(&self) -> Vec<(bstr::BString, Option<i64>, PhpMixed)> {
         self.ask_and_validate_calls.calls()
     }
 
     // For testing only. Returns the recorded `hasAuthentication` calls in call order.
-    pub fn has_authentication_calls(&self) -> Vec<String> {
+    pub fn has_authentication_calls(&self) -> Vec<bstr::BString> {
         self.has_authentication_calls.calls()
     }
 
     // For testing only. Returns the recorded `getAuthentication` calls in call order.
-    pub fn get_authentication_calls(&self) -> Vec<String> {
+    pub fn get_authentication_calls(&self) -> Vec<bstr::BString> {
         self.get_authentication_calls.calls()
     }
 }
@@ -199,57 +205,71 @@ impl IOInterfaceImmutable for IOStub {
         self.is_decorated.unwrap_or(false)
     }
 
-    fn write3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
-    fn write_error3(&self, message: &str, newline: bool, _verbosity: i64) {
-        self.write_error_calls.push((message.to_string(), newline));
+    fn write_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
+    fn write_error_bytes(&self, message: &bstr::BStr, newline: bool, _verbosity: i64) {
+        self.write_error_calls.push((message.to_owned(), newline));
     }
-    fn write_raw3(&self, message: &str, newline: bool, _verbosity: i64) {
-        self.write_raw_calls.push((message.to_string(), newline));
+    fn write_raw_bytes(&self, message: &bstr::BStr, newline: bool, _verbosity: i64) {
+        self.write_raw_calls.push((message.to_owned(), newline));
     }
-    fn write_error_raw3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
-    fn overwrite4(&self, _message: &str, _newline: bool, _size: Option<i64>, _verbosity: i64) {}
-    fn overwrite_error4(
+    fn write_error_raw_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
+    fn overwrite_bytes(
         &self,
-        _message: &str,
+        _message: &bstr::BStr,
+        _newline: bool,
+        _size: Option<i64>,
+        _verbosity: i64,
+    ) {
+    }
+    fn overwrite_error_bytes(
+        &self,
+        _message: &bstr::BStr,
         _newline: bool,
         _size: Option<i64>,
         _verbosity: i64,
     ) {
     }
 
-    fn ask(&self, _question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask_bytes(&self, _question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         Ok(self.ask.clone().unwrap_or(default))
     }
-    fn ask_confirmation(&self, _question: String, default: bool) -> anyhow::Result<bool> {
+    fn ask_confirmation_bytes(
+        &self,
+        _question: &bstr::BStr,
+        default: bool,
+    ) -> anyhow::Result<bool> {
         Ok(self.ask_confirmation.unwrap_or(default))
     }
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
         self.ask_and_validate_calls
-            .push((question, attempts, default.clone()));
+            .push((question.to_owned(), attempts, default.clone()));
         match &self.ask_and_validate_answer {
             Some(answer) => validator(answer.clone()),
             None => Ok(default),
         }
     }
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
+    fn ask_and_hide_answer_bytes(
+        &self,
+        question: &bstr::BStr,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         if let Some(responses) = &self.ask_and_hide_answer_responses {
-            return Ok(Some(responses.get(&question).cloned().unwrap_or_default()));
+            return Ok(Some(responses.get(question).cloned().unwrap_or_default()));
         }
         Ok(self.ask_and_hide_answer.clone().unwrap_or(None))
     }
-    fn select(
+    fn select_bytes(
         &self,
-        _question: String,
+        _question: &bstr::BStr,
         _choices: PhpMixed,
         default: PhpMixed,
         _attempts: PhpMixed,
-        _error_message: String,
+        _error_message: &bstr::BStr,
         _multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
         Ok(default)
@@ -257,12 +277,13 @@ impl IOInterfaceImmutable for IOStub {
 
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         <Self as BaseIO>::get_authentications(self)
     }
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
         self.has_authentication_calls
-            .push(repository_name.to_string());
+            .push(repository_name.to_owned());
         match self.has_authentication {
             Some(value) => value,
             None => <Self as BaseIO>::has_authentication(self, repository_name),
@@ -270,23 +291,23 @@ impl IOInterfaceImmutable for IOStub {
     }
     fn get_authentication(
         &self,
-        repository_name: &str,
-    ) -> indexmap::IndexMap<String, Option<String>> {
+        repository_name: &bstr::BStr,
+    ) -> indexmap::IndexMap<bstr::BString, Option<bstr::BString>> {
         self.get_authentication_calls
-            .push(repository_name.to_string());
+            .push(repository_name.to_owned());
         match &self.get_authentication {
             Some(value) => value.clone(),
             None => <Self as BaseIO>::get_authentication(self, repository_name),
         }
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
+    fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::error(self, message, context);
     }
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+    fn warning_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::warning(self, message, context);
     }
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+    fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
 }
@@ -294,9 +315,9 @@ impl IOInterfaceImmutable for IOStub {
 impl IOInterfaceMutable for IOStub {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: bstr::BString,
+        username: bstr::BString,
+        password: Option<bstr::BString>,
     ) {
         self.set_authentication_calls.push((
             repository_name.clone(),
@@ -322,12 +343,16 @@ impl IOInterface for IOStub {
 impl BaseIO for IOStub {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         &self.authentications
     }
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &mut indexmap::IndexMap<
+        bstr::BString,
+        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    > {
         &mut self.authentications
     }
 }

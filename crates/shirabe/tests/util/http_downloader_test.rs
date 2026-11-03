@@ -10,7 +10,7 @@ use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::Platform;
 use shirabe::util::http_downloader::HttpDownloader;
-use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed};
+use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, bconcat};
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
 // PHP performs a live HTTP get to assert the URL's user:pass is captured via
@@ -28,7 +28,7 @@ fn test_capture_authentication_params_from_url() {
             vec![Expectation::auth(
                 "github.com",
                 "user",
-                Some("pass".to_string()),
+                Some(BString::from("pass")),
             )],
             false,
         )
@@ -58,7 +58,7 @@ fn test_capture_authentication_params_from_url() {
 #[test]
 fn test_output_warnings() {
     let io: std::rc::Rc<std::cell::RefCell<BufferIO>> = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
+        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
     ));
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
@@ -68,30 +68,36 @@ fn test_output_warnings() {
     let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
     data.insert(
         "warning".into(),
-        PhpMixed::string("old warning msg".to_string()),
+        PhpMixed::string(BString::from("old warning msg")),
     );
     data.insert(
         "warning-versions".into(),
-        PhpMixed::string(">=2.0".to_string()),
+        PhpMixed::string(BString::from(">=2.0")),
     );
-    data.insert("info".into(), PhpMixed::string("old info msg".to_string()));
+    data.insert(
+        "info".into(),
+        PhpMixed::string(BString::from("old info msg")),
+    );
     data.insert(
         "info-versions".into(),
-        PhpMixed::string(">=2.0".to_string()),
+        PhpMixed::string(BString::from(">=2.0")),
     );
 
     let mut warning_should_not = IndexMap::new();
     warning_should_not.insert(
         "message".into(),
-        PhpMixed::string("should not appear".to_string()),
+        PhpMixed::string(BString::from("should not appear")),
     );
-    warning_should_not.insert("versions".into(), PhpMixed::string("<2.2".to_string()));
+    warning_should_not.insert("versions".into(), PhpMixed::string(BString::from("<2.2")));
     let mut warning_visible = IndexMap::new();
     warning_visible.insert(
         "message".into(),
-        PhpMixed::string("visible warning".to_string()),
+        PhpMixed::string(BString::from("visible warning")),
     );
-    warning_visible.insert("versions".into(), PhpMixed::string(">=2.2-dev".to_string()));
+    warning_visible.insert(
+        "versions".into(),
+        PhpMixed::string(BString::from(">=2.2-dev")),
+    );
     data.insert(
         "warnings".into(),
         PhpMixed::List(vec![
@@ -103,15 +109,18 @@ fn test_output_warnings() {
     let mut info_should_not = IndexMap::new();
     info_should_not.insert(
         "message".into(),
-        PhpMixed::string("should not appear".to_string()),
+        PhpMixed::string(BString::from("should not appear")),
     );
-    info_should_not.insert("versions".into(), PhpMixed::string("<2.2".to_string()));
+    info_should_not.insert("versions".into(), PhpMixed::string(BString::from("<2.2")));
     let mut info_visible = IndexMap::new();
     info_visible.insert(
         "message".into(),
-        PhpMixed::string("visible info".to_string()),
+        PhpMixed::string(BString::from("visible info")),
     );
-    info_visible.insert("versions".into(), PhpMixed::string(">=2.2-dev".to_string()));
+    info_visible.insert(
+        "versions".into(),
+        PhpMixed::string(BString::from(">=2.2-dev")),
+    );
     data.insert(
         "infos".into(),
         PhpMixed::List(vec![
@@ -124,12 +133,18 @@ fn test_output_warnings() {
 
     // the <info> tag are consumed by the OutputFormatter, but not <warning> as that is not a default output format
     assert_eq!(
-        format!(
-            "<warning>Warning from $URL: old warning msg</warning>{eol}\
-             Info from $URL: old info msg{eol}\
-             <warning>Warning from $URL: visible warning</warning>{eol}\
-             Info from $URL: visible info{eol}",
-            eol = PHP_EOL
+        bconcat!(
+            "<warning>Warning from $URL: old warning msg</warning>",
+            PHP_EOL,
+            "\
+             Info from $URL: old info msg",
+            PHP_EOL,
+            "\
+             <warning>Warning from $URL: visible warning</warning>",
+            PHP_EOL,
+            "\
+             Info from $URL: visible info",
+            PHP_EOL
         ),
         io.borrow().get_output()
     );

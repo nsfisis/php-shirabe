@@ -1,8 +1,10 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RequestTest.php
 
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::request::Request;
 use shirabe::package::version::version_parser::VersionParser;
+use shirabe_php_shim::{bconcat, display_to_bytes};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 
 // AnyConstraint does not implement PartialEq (it lives in another crate), so
@@ -13,43 +15,43 @@ use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstr
 // are never read by the assertions (the Request does not consult them), so the
 // repository setup is omitted here.
 
-fn get_version_constraint(operator: &str, version: &str) -> AnyConstraint {
+fn get_version_constraint(operator: &BStr, version: &BStr) -> AnyConstraint {
     let normalized = VersionParser::new().normalize(version, None).unwrap();
     AnyConstraint::Simple(SimpleConstraint::new(
-        operator.to_string(),
+        operator,
         normalized,
-        Some(format!("{} {}", operator, version)),
+        Some(bconcat!(operator, " ", version)),
     ))
 }
 
 #[test]
 fn test_request_install() {
     let mut request = Request::new(None);
-    request.require_name("foo", None).unwrap();
+    request.require_name(bstr::BStr::new("foo"), None).unwrap();
 
-    let mut expected: IndexMap<String, AnyConstraint> = IndexMap::new();
-    expected.insert("foo".to_string(), MatchAllConstraint::new(None).into());
+    let mut expected: IndexMap<BString, AnyConstraint> = IndexMap::new();
+    expected.insert(BString::from("foo"), MatchAllConstraint::new(None).into());
 
     assert_eq!(
-        format!("{:?}", expected),
-        format!("{:?}", request.get_requires())
+        display_to_bytes(format_args!("{expected:?}")),
+        display_to_bytes(format_args!("{:?}", request.get_requires()))
     );
 }
 
 #[test]
 fn test_request_install_same_package_from_different_repositories() {
-    let constraint = get_version_constraint("=", "1");
+    let constraint = get_version_constraint(BStr::new("="), BStr::new("1"));
 
     let mut request = Request::new(None);
     request
-        .require_name("foo", Some(constraint.clone()))
+        .require_name(bstr::BStr::new("foo"), Some(constraint.clone()))
         .unwrap();
 
-    let mut expected: IndexMap<String, AnyConstraint> = IndexMap::new();
-    expected.insert("foo".to_string(), constraint);
+    let mut expected: IndexMap<BString, AnyConstraint> = IndexMap::new();
+    expected.insert(BString::from("foo"), constraint);
 
     assert_eq!(
-        format!("{:?}", expected),
-        format!("{:?}", request.get_requires())
+        display_to_bytes(format_args!("{expected:?}")),
+        display_to_bytes(format_args!("{:?}", request.get_requires()))
     );
 }

@@ -28,7 +28,7 @@ shirabe-symfony-string = { path = "crates/shirabe-symfony-string" }
 anyhow = "1.0.102"
 async-trait = "0.1.89"
 base64 = "0.22.1"
-bstr = { version = "1.13.1", features = ["serde"] }
+bstr = "1.13.1"
 bzip2 = "0.6.1"
 chrono = { version = "0.4.44", features = ["serde"] }
 criterion = { version = "0.8.2", features = ["async_tokio", "html_reports"] }
@@ -43,11 +43,9 @@ mimalloc = "0.1.52"
 mockall = "0.14.0"
 nix = { version = "0.31.3", features = ["feature", "fs", "poll", "process", "sched", "signal", "user"] }
 regex = "1.12.3"
-regex-macro = "0.3.0"
 reqwest = { version = "0.13.4", features = ["blocking"] }
 serde = { version = "1.0.228", features = ["derive", "rc"] }
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
-serde_urlencoded = "0.7.1"
 serial_test = "3.5.0"
 sha1 = "0.11.0"
 sha2 = "0.11.0"
@@ -59,7 +57,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 twox-hash = "2.1.2"
 tzfile = "0.1.3"
 url = "2.5.8"
-zip = "8.6.0"
+zip = "9.2.1"
 
 [workspace.lints.rust]
 async_fn_in_trait = "allow"
@@ -70,6 +68,9 @@ unused_variables = "allow"
 
 [workspace.lints.clippy]
 await_holding_refcell_ref = "allow"
+disallowed_macros = "deny"
+disallowed_methods = "deny"
+disallowed_types = "deny"
 diverging_sub_expression = "allow"
 if_same_then_else = "allow"
 large_enum_variant = "allow"
@@ -79,3 +80,6 @@ type_complexity = "allow"
 
 [profile.release]
 strip = "debuginfo"
+
+[patch.crates-io]
+bstr = { git = "https://github.com/nsfisis/bstr", branch = "php-shirabe" }

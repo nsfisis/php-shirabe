@@ -7,26 +7,27 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::installer::{InstallerInterface, PackageEvents};
-use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfaceHandle};
 use crate::signal::SignalSubscription;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
-    str_replace, strip_tags, strpos, strtolower, ucfirst,
+    InvalidArgumentException, PhpMixed, array_splice, array_unshift, bconcat, http_build_query,
+    json_encode, path_from_bytes, str_replace, strip_tags, strpos, strtolower, ucfirst,
 };
+use std::path::PathBuf;
 
 /// Package operation manager.
 #[derive(Debug)]
 pub struct InstallationManager {
     installers: std::cell::RefCell<Vec<std::rc::Rc<dyn InstallerInterface>>>,
     /// Maps a package type to its installer.
-    cache: std::cell::RefCell<IndexMap<String, std::rc::Rc<dyn InstallerInterface>>>,
-    notifiable_packages: std::cell::RefCell<IndexMap<String, Vec<PackageInterfaceHandle>>>,
+    cache: std::cell::RefCell<IndexMap<BString, std::rc::Rc<dyn InstallerInterface>>>,
+    notifiable_packages: std::cell::RefCell<IndexMap<BString, Vec<PackageInterfaceHandle>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -43,7 +44,7 @@ struct InstallationManagerMockState {
     installed: Vec<PackageInterfaceHandle>,
     updated: Vec<(PackageInterfaceHandle, PackageInterfaceHandle)>,
     uninstalled: Vec<PackageInterfaceHandle>,
-    trace: Vec<String>,
+    trace: Vec<BString>,
 }
 
 impl InstallationManager {
@@ -80,7 +81,7 @@ impl InstallationManager {
     }
 
     /// For testing only: the trace of stringified operations recorded by the mock.
-    pub fn __get_trace(&self) -> Vec<String> {
+    pub fn __get_trace(&self) -> Vec<BString> {
         self.mock
             .as_ref()
             .map(|m| m.borrow().trace.clone())
@@ -153,11 +154,11 @@ impl InstallationManager {
     /// Returns installer for a specific package type.
     pub fn get_installer(
         &self,
-        r#type: &str,
+        r#type: impl AsRef<[u8]>,
     ) -> anyhow::Result<std::rc::Rc<dyn InstallerInterface>> {
         let r#type = strtolower(r#type);
 
-        if let Some(installer) = self.cache.borrow().get(&r#type) {
+        if let Some(installer) = self.cache.borrow().get(r#type.as_bstr()) {
             return Ok(installer.clone());
         }
 
@@ -165,13 +166,15 @@ impl InstallationManager {
         // it can register a further installer from that call.
         let installers = self.installers.borrow().clone();
         for installer in installers {
-            if installer.supports(&r#type)? {
-                self.cache.borrow_mut().insert(r#type, installer.clone());
+            if installer.supports(r#type.as_bstr())? {
+                self.cache
+                    .borrow_mut()
+                    .insert(r#type.clone(), installer.clone());
                 return Ok(installer);
             }
         }
 
-        Err(InvalidArgumentException::new(format!("Unknown installer type: {}", r#type)).into())
+        Err(InvalidArgumentException::new(bconcat!("Unknown installer type: ", r#type)).into())
     }
 
     /// Checks whether provided package is installed in one of the registered installers.
@@ -191,14 +194,14 @@ impl InstallationManager {
                 && self.is_package_installed(repo, alias_of)?);
         }
 
-        self.get_installer(&package.get_type())?
+        self.get_installer(package.get_type())?
             .is_installed(repo, package)
     }
 
     /// Install binary for the given package.
     /// If the installer associated to this package doesn't handle that function, it'll do nothing.
     pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
-        let installer = self.get_installer(&package.get_type());
+        let installer = self.get_installer(package.get_type());
         let installer = match installer {
             Ok(i) => i,
             Err(_e) => {
@@ -232,7 +235,7 @@ impl InstallationManager {
             let _ = (dev_mode, run_scripts, download_only);
             let mut repo = repo.borrow_mut();
             for operation in operations {
-                let trace = strip_tags(&operation.to_string());
+                let trace = strip_tags(operation.show(false));
                 match &*operation {
                     AnyOperation::Install(op) => {
                         let package = op.get_package();
@@ -405,7 +408,13 @@ impl InstallationManager {
             let op_type = operation.get_operation_type();
 
             // ignoring alias ops as they don't need to execute anything at this stage
-            if !["update", "install", "uninstall"].contains(&op_type) {
+            if ![
+                BStr::new("update"),
+                BStr::new("install"),
+                BStr::new("uninstall"),
+            ]
+            .contains(&op_type)
+            {
                 continue;
             }
 
@@ -414,7 +423,7 @@ impl InstallationManager {
                 AnyOperation::Update(update_op) => Some(update_op.get_initial_package()),
                 _ => None,
             };
-            let installer = self.get_installer(&package.get_type())?;
+            let installer = self.get_installer(package.get_type())?;
 
             // PHP: $cleanupPromises[$index] = static function () use ($opType, $installer, $package, $initialPackage) {
             //   if (null === $package->getInstallationSource()) { return \React\Promise\resolve(null); }
@@ -562,11 +571,17 @@ impl InstallationManager {
             let op_type = operation.get_operation_type();
 
             // ignoring alias ops as they don't need to execute anything
-            if !["update", "install", "uninstall"].contains(&op_type) {
+            if ![
+                BStr::new("update"),
+                BStr::new("install"),
+                BStr::new("uninstall"),
+            ]
+            .contains(&op_type)
+            {
                 // output alias ops in debug verbosity as they have no output otherwise
                 if self.io.is_debug() {
                     self.io.write_error3(
-                        &format!("  - {}", operation.show(false)),
+                        bconcat!("  - ", operation.show(false)),
                         true,
                         io_interface::NORMAL,
                     );
@@ -590,11 +605,11 @@ impl InstallationManager {
                 _ => None,
             };
 
-            let event_name = match op_type {
-                "install" => PackageEvents::PRE_PACKAGE_INSTALL,
-                "update" => PackageEvents::PRE_PACKAGE_UPDATE,
-                "uninstall" => PackageEvents::PRE_PACKAGE_UNINSTALL,
-                _ => "",
+            let event_name = match op_type.as_bytes() {
+                b"install" => PackageEvents::PRE_PACKAGE_INSTALL,
+                b"update" => PackageEvents::PRE_PACKAGE_UPDATE,
+                b"uninstall" => PackageEvents::PRE_PACKAGE_UNINSTALL,
+                _ => BStr::new(""),
             };
 
             if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
@@ -607,7 +622,7 @@ impl InstallationManager {
                 )?;
             }
 
-            let installer = self.get_installer(&package.get_type())?;
+            let installer = self.get_installer(package.get_type())?;
 
             // PHP: $promise = $installer->prepare(...)
             //      ->then(fn() => $this->{$opType}($repo, $operation))
@@ -650,10 +665,12 @@ impl InstallationManager {
 
                 // PHP rejects the promise with an "<op> of <name> failed" message before rethrowing.
                 if let Err(e) = chain_result {
-                    self.io.write_error(&format!(
-                        "    <error>{} of {} failed</error>",
+                    self.io.write_error(bconcat!(
+                        "    <error>",
                         ucfirst(op_type),
-                        package.get_pretty_name()
+                        " of ",
+                        package.get_pretty_name(),
+                        " failed</error>"
                     ));
                     return Err(e);
                 }
@@ -664,11 +681,11 @@ impl InstallationManager {
                 Ok(())
             }));
 
-            let event_name = match op_type {
-                "install" => PackageEvents::POST_PACKAGE_INSTALL,
-                "update" => PackageEvents::POST_PACKAGE_UPDATE,
-                "uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
-                _ => "",
+            let event_name = match op_type.as_bytes() {
+                b"install" => PackageEvents::POST_PACKAGE_INSTALL,
+                b"update" => PackageEvents::POST_PACKAGE_UPDATE,
+                b"uninstall" => PackageEvents::POST_PACKAGE_UNINSTALL,
+                _ => BStr::new(""),
             };
 
             if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
@@ -708,9 +725,12 @@ impl InstallationManager {
 
     /// Executes download operation.
     pub async fn download(&self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
-        let installer = self.get_installer(&package.get_type()).ok()?;
+        let installer = self.get_installer(package.get_type()).ok()?;
 
-        installer.cleanup("install", package, None).await.ok()?
+        installer
+            .cleanup(BStr::new("install"), package, None)
+            .await
+            .ok()?
     }
 
     /// Executes install operation.
@@ -720,8 +740,7 @@ impl InstallationManager {
         operation: &InstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
-        let package_type = package.get_type();
-        let installer = self.get_installer(&package_type)?;
+        let installer = self.get_installer(package.get_type())?;
         let promise = installer.install(repo, package.clone()).await?;
         self.mark_for_notification(package.clone());
 
@@ -763,8 +782,7 @@ impl InstallationManager {
         operation: &UninstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
-        let package_type = package.get_type();
-        let installer = self.get_installer(&package_type)?;
+        let installer = self.get_installer(package.get_type())?;
 
         installer.uninstall(repo, package).await
     }
@@ -796,13 +814,16 @@ impl InstallationManager {
     }
 
     /// Returns the installation path of a package
-    pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
         // For testing only (ref InstallationManagerMock::getInstallPath).
         if self.mock.is_some() {
-            return Some(format!("vendor/{}", package.get_name()));
+            return Some(PathBuf::from(path_from_bytes(&bconcat!(
+                "vendor/",
+                package.get_name()
+            ))));
         }
 
-        let installer = self.get_installer(&package.get_type()).ok()?;
+        let installer = self.get_installer(package.get_type()).ok()?;
 
         installer.get_install_path(package)
     }
@@ -826,27 +847,30 @@ impl InstallationManager {
             > = vec![];
             for (repo_url, packages) in self.notifiable_packages.borrow().iter() {
                 // non-batch API, deprecated
-                if repo_url.contains("%package%") {
+                if repo_url.contains_str("%package%") {
                     for package in packages {
-                        let url = str_replace("%package%", &package.get_pretty_name(), repo_url);
+                        let url = str_replace("%package%", package.get_pretty_name(), repo_url);
 
-                        let mut params: IndexMap<String, String> = IndexMap::new();
-                        params.insert("version".to_string(), package.get_pretty_version());
-                        params.insert("version_normalized".to_string(), package.get_version());
+                        let mut params: IndexMap<BString, BString> = IndexMap::new();
+                        params.insert(
+                            BString::from("version"),
+                            bstr::BString::from(&package.get_pretty_version()[..]),
+                        );
+                        params.insert(
+                            BString::from("version_normalized"),
+                            bstr::BString::from(&package.get_version()[..]),
+                        );
                         let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
                         opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
                         let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-                        http.insert("method".into(), PhpMixed::string("POST".to_string()));
+                        http.insert("method".into(), PhpMixed::string(BString::from("POST")));
                         http.insert(
                             "header".into(),
-                            PhpMixed::List(vec![PhpMixed::string(
-                                "Content-type: application/x-www-form-urlencoded".to_string(),
-                            )]),
+                            PhpMixed::List(vec![PhpMixed::string(BString::from(
+                                "Content-type: application/x-www-form-urlencoded",
+                            ))]),
                         );
-                        let params_vec: Vec<(&str, &str)> = params
-                            .iter()
-                            .map(|(k, v)| (k.as_str(), v.as_str()))
-                            .collect();
+                        let params_vec: Vec<(&BString, &BString)> = params.iter().collect();
                         http.insert(
                             "content".into(),
                             PhpMixed::string(http_build_query(&params_vec)),
@@ -888,12 +912,12 @@ impl InstallationManager {
                 let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
                 opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
                 let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-                http.insert("method".into(), PhpMixed::string("POST".to_string()));
+                http.insert("method".into(), PhpMixed::string(BString::from("POST")));
                 http.insert(
                     "header".into(),
-                    PhpMixed::List(vec![PhpMixed::string(
-                        "Content-Type: application/json".to_string(),
-                    )]),
+                    PhpMixed::List(vec![PhpMixed::string(BString::from(
+                        "Content-Type: application/json",
+                    ))]),
                 );
                 http.insert(
                     "content".into(),
@@ -925,7 +949,7 @@ impl InstallationManager {
         if let Some(notification_url) = package.get_notification_url() {
             self.notifiable_packages
                 .borrow_mut()
-                .entry(notification_url)
+                .entry(bstr::BString::from(&notification_url[..]))
                 .or_default()
                 .push(package);
         }
@@ -1019,7 +1043,7 @@ impl InstallationManager {
         >,
     ) {
         self.io.write_error3(
-            &format!("Received {}, aborting", signals.last_signal().as_str()),
+            bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
             true,
             io_interface::DEBUG,
         );
@@ -1056,7 +1080,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         run_scripts: bool,
         download_only: bool,
     ) -> anyhow::Result<()>;
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf>;
     fn set_output_progress(&mut self, output_progress: bool);
     async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
 }
@@ -1103,7 +1127,7 @@ impl InstallationManagerInterface for InstallationManager {
             .await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
         self.get_install_path(package)
     }
 

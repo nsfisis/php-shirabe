@@ -1,3 +1,4 @@
+use bstr::BStr;
 use std::io::{Read as _, Write as _};
 
 /// Handle returned by `gzopen()`. PHP models this as a zlib stream resource;
@@ -6,9 +7,13 @@ use std::io::{Read as _, Write as _};
 #[derive(Debug, Clone)]
 pub struct GzFile(std::rc::Rc<std::cell::RefCell<flate2::read::MultiGzDecoder<std::fs::File>>>);
 
-pub fn gzopen(file: impl AsRef<std::path::Path>, mode: &str) -> Result<GzFile, std::io::Error> {
+pub fn gzopen(
+    file: impl AsRef<std::path::Path>,
+    mode: impl AsRef<[u8]>,
+) -> Result<GzFile, std::io::Error> {
+    let mode = BStr::new(mode.as_ref());
     assert!(
-        mode.starts_with('r'),
+        mode.starts_with(b"r"),
         "gzopen: only read modes are supported (got {mode:?})"
     );
     let f = std::fs::File::open(file.as_ref())?;

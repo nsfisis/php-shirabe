@@ -1,19 +1,20 @@
 //! ref: composer/src/Composer/Platform/HhvmDetector.php
 
 use crate::util::{Platform, ProcessExecutor};
+use bstr::BString;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
 
 // None = null (uninitialized), Some(None) = false (not found), Some(Some(v)) = version
-static HHVM_VERSION_CACHE: Mutex<Option<Option<String>>> = Mutex::new(None);
+static HHVM_VERSION_CACHE: Mutex<Option<Option<BString>>> = Mutex::new(None);
 
 /// Seam over HHVM detection so PlatformRepository can be tested with a mocked version.
 /// PHP mocks the concrete `Composer\Platform\HhvmDetector` directly; the trait is
 /// introduced here to keep the consumer dependent only on trait methods.
 pub trait HhvmDetectorInterface: std::fmt::Debug {
     fn reset(&self);
-    fn get_version(&mut self) -> Option<String>;
+    fn get_version(&mut self) -> Option<BString>;
 }
 
 #[derive(Debug)]
@@ -39,7 +40,7 @@ impl HhvmDetectorInterface for HhvmDetector {
         *HHVM_VERSION_CACHE.lock().unwrap() = None;
     }
 
-    fn get_version(&mut self) -> Option<String> {
+    fn get_version(&mut self) -> Option<BString> {
         let cached = HHVM_VERSION_CACHE.lock().unwrap().clone();
         if cached.is_some() {
             return cached.flatten();
@@ -59,19 +60,19 @@ impl HhvmDetectorInterface for HhvmDetector {
                 });
                 let mut version_output = PhpMixed::Null;
                 let cmd = [
-                    hhvm_path.as_str(),
-                    "--php",
-                    "-d",
-                    "hhvm.jit=0",
-                    "-r",
-                    "echo HHVM_VERSION;",
+                    hhvm_path.clone(),
+                    "--php".into(),
+                    "-d".into(),
+                    "hhvm.jit=0".into(),
+                    "-r".into(),
+                    "echo HHVM_VERSION;".into(),
                 ];
                 let exit_code = executor
                     .borrow_mut()
                     .execute(&cmd, &mut version_output, None)
                     .unwrap_or(1);
                 if exit_code == 0 {
-                    *cache = Some(version_output.as_string().map(|s| s.to_string()));
+                    *cache = Some(version_output.as_string().map(BString::from));
                 }
             }
         }

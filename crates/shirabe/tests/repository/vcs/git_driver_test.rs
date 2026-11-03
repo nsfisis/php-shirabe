@@ -3,7 +3,7 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -13,13 +13,13 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException};
+use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
     home: TempDir,
     config: Config,
-    network_env: Option<String>,
+    network_env: Option<bstr::BString>,
 }
 
 fn set_up() -> SetUp {
@@ -27,10 +27,7 @@ fn set_up() -> SetUp {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     let network_env = Platform::get_env("COMPOSER_DISABLE_NETWORK");
@@ -42,7 +39,7 @@ fn set_up() -> SetUp {
     }
 }
 
-fn tear_down(home: &std::path::Path, network_env: &Option<String>) {
+fn tear_down(home: &std::path::Path, network_env: &Option<bstr::BString>) {
     let mut fs = Filesystem::new(None);
     fs.remove_directory(home).unwrap();
     match network_env {
@@ -53,11 +50,11 @@ fn tear_down(home: &std::path::Path, network_env: &Option<String>) {
 
 struct TearDown {
     home: std::path::PathBuf,
-    network_env: Option<String>,
+    network_env: Option<bstr::BString>,
 }
 
 impl TearDown {
-    fn new(home: std::path::PathBuf, network_env: Option<String>) -> Self {
+    fn new(home: std::path::PathBuf, network_env: Option<bstr::BString>) -> Self {
         TearDown { home, network_env }
     }
 }
@@ -76,7 +73,7 @@ fn test_get_root_identifier_from_remote_local_repository() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_str().unwrap().to_string();
+    let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -95,10 +92,10 @@ fn test_get_root_identifier_from_remote_local_repository() {
     );
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(home_path.clone()));
+    repo_config.insert("url".into(), PhpMixed::string(path_to_bytes(&home_path)));
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(home_path);
+    driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -111,7 +108,7 @@ fn test_get_root_identifier_from_remote() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_str().unwrap().to_string();
+    let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -161,11 +158,11 @@ fn test_get_root_identifier_from_remote() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(home_path);
+    driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -178,7 +175,7 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_str().unwrap().to_string();
+    let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
@@ -201,11 +198,11 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(home_path);
+    driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -217,7 +214,7 @@ fn test_get_branches_filter_invalid_branch_names() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_str().unwrap().to_string();
+    let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -245,23 +242,32 @@ fn test_get_branches_filter_invalid_branch_names() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(home_path);
+    driver.__set_repo_dir(bstr::BString::from(path_to_bytes(&home_path)));
 
     let branches = driver.get_branches().unwrap();
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "main".to_string(),
-        "089681446ba44d6d9004350192486f2ceb4eaa06".to_string(),
+        BString::from("main"),
+        BString::from("089681446ba44d6d9004350192486f2ceb4eaa06"),
     );
     expected.insert(
-        "2.2".to_string(),
-        "12681446ba44d6d9004350192486f2ceb4eaa06".to_string(),
+        BString::from("2.2"),
+        BString::from("12681446ba44d6d9004350192486f2ceb4eaa06"),
     );
-    assert_eq!(expected, branches);
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_bstr()),
+                bstr::BString::from(v.as_bstr())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        branches
+    );
 }
 
 #[test]
@@ -286,14 +292,21 @@ fn test_file_get_content_invalid_identifier() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
 
-    assert_eq!(None, driver.get_file_content("file.txt", "h").unwrap());
+    assert_eq!(
+        None,
+        driver
+            .get_file_content(bstr::BStr::new("file.txt"), bstr::BStr::new("h"))
+            .unwrap()
+    );
 
-    let err = driver.get_file_content("file.txt", "-h").unwrap_err();
+    let err = driver
+        .get_file_content(bstr::BStr::new("file.txt"), bstr::BStr::new("-h"))
+        .unwrap_err();
     assert!(err.is_instanceof::<RuntimeException>());
 }
 
@@ -319,11 +332,13 @@ fn test_get_change_date_invalid_identifier() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
 
-    let err = driver.get_change_date("-n1 --format=%at HEAD").unwrap_err();
+    let err = driver
+        .get_change_date(bstr::BStr::new("-n1 --format=%at HEAD"))
+        .unwrap_err();
     assert!(err.is_instanceof::<RuntimeException>());
 }

@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/MultiConflictRule.php
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
-use shirabe_php_shim::{RuntimeException, hash_raw};
+use bstr::BString;
+use shirabe_php_shim::{RuntimeException, bconcat, hash_raw, implode};
 
 #[derive(Debug)]
 pub struct MultiConflictRule {
@@ -16,9 +17,9 @@ impl MultiConflictRule {
         reason_data: ReasonData,
     ) -> anyhow::Result<Self> {
         if literals.len() < 3 {
-            return Err(RuntimeException::new(
-                "multi conflict rule requires at least 3 literals".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "multi conflict rule requires at least 3 literals",
+            ))
             .into());
         }
 
@@ -44,16 +45,18 @@ impl MultiConflictRule {
     }
 
     pub fn get_hash(&self) -> anyhow::Result<i64> {
-        let joined = self
-            .literals
-            .iter()
-            .map(|l| l.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-        let binary = hash_raw("xxh3", format!("c:{}", joined));
+        let joined = implode(
+            ",",
+            &self
+                .literals
+                .iter()
+                .map(|l| bconcat!(l))
+                .collect::<Vec<_>>(),
+        );
+        let binary = hash_raw("xxh3", bconcat!("c:", joined));
         match binary.get(..4) {
             Some(chunk) => Ok(i32::from_ne_bytes(chunk.try_into().unwrap()) as i64),
-            None => Err(RuntimeException::new(format!("Failed unpacking: {}", joined)).into()),
+            None => Err(RuntimeException::new(bconcat!("Failed unpacking: ", joined)).into()),
         }
     }
 

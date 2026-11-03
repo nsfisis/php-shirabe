@@ -1,7 +1,8 @@
 //! ref: composer/vendor/symfony/process/PhpExecutableFinder.php
 
 use super::executable_finder::ExecutableFinder;
-use shirabe_php_shim::{getenv, is_dir, is_executable};
+use bstr::BString;
+use shirabe_php_shim::{getenv, is_dir, is_executable, path_from_bytes, path_to_bytes};
 
 #[derive(Debug)]
 pub struct PhpExecutableFinder {
@@ -22,20 +23,17 @@ impl PhpExecutableFinder {
     }
 
     /// Finds The PHP executable.
-    pub fn find(&self, _include_args: bool) -> Option<String> {
+    pub fn find(&self, _include_args: bool) -> Option<BString> {
         if let Some(php) = getenv("PHP_BINARY").filter(|v| !v.is_empty()) {
-            // TODO(bytes): the PHP executable path is returned as a String.
-            let mut php = php
-                .into_string()
-                .unwrap_or_else(|php| panic!("PHP_BINARY is not valid UTF-8: {php:?}"));
-            if !is_executable(&php) {
+            let mut php = BString::from(path_to_bytes(&php));
+            if !is_executable(path_from_bytes(&php)) {
                 match self.executable_finder.find(&php, None, &[]) {
                     Some(found) => php = found,
                     None => return None,
                 }
             }
 
-            if is_dir(&php) {
+            if is_dir(path_from_bytes(&php)) {
                 return None;
             }
 
@@ -46,11 +44,8 @@ impl PhpExecutableFinder {
         // These constants cannot be obtained in Rust, the branch is skipped here.
 
         if let Some(php) = getenv("PHP_PATH").filter(|v| !v.is_empty()) {
-            // TODO(bytes): the PHP executable path is returned as a String.
-            let php = php
-                .into_string()
-                .unwrap_or_else(|php| panic!("PHP_PATH is not valid UTF-8: {php:?}"));
-            if !is_executable(&php) || is_dir(&php) {
+            let php = BString::from(path_to_bytes(&php));
+            if !is_executable(path_from_bytes(&php)) || is_dir(path_from_bytes(&php)) {
                 return None;
             }
 
@@ -58,11 +53,8 @@ impl PhpExecutableFinder {
         }
 
         if let Some(php) = getenv("PHP_PEAR_PHP_BIN").filter(|v| !v.is_empty()) {
-            // TODO(bytes): the PHP executable path is returned as a String.
-            let php = php
-                .into_string()
-                .unwrap_or_else(|php| panic!("PHP_PEAR_PHP_BIN is not valid UTF-8: {php:?}"));
-            if is_executable(&php) && !is_dir(&php) {
+            let php = BString::from(path_to_bytes(&php));
+            if is_executable(path_from_bytes(&php)) && !is_dir(path_from_bytes(&php)) {
                 return Some(php);
             }
         }
@@ -72,7 +64,7 @@ impl PhpExecutableFinder {
     }
 
     /// Finds the PHP executable arguments.
-    pub fn find_arguments(&self) -> Vec<String> {
+    pub fn find_arguments(&self) -> Vec<BString> {
         // If PHP_SAPI is not "phpdbg", returns an empty array. In Rust, PHP_SAPI is always "cli",
         // so always returns an empty array.
         vec![]

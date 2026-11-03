@@ -5,11 +5,16 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Hg as HgUtils, ProcessExecutor};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, realpath};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, bconcat, impl_php_class, implode, path_from_bytes, path_to_bytes,
+    realpath, trim,
+};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct HgDownloader {
@@ -48,21 +53,21 @@ impl VcsDownloader for HgDownloader {
         &self.inner.filesystem
     }
 
-    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.inner.has_cleaned_changes
     }
 
     async fn do_download(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &str,
-        _url: &str,
+        _path: &Path,
+        _url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if HgUtils::get_version(&self.inner.process)?.is_none() {
-            return Err(RuntimeException::new(
-                "hg was not found in your PATH, skipping source download".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "hg was not found in your PATH, skipping source download",
+            ))
             .into());
         }
 
@@ -72,8 +77,8 @@ impl VcsDownloader for HgDownloader {
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             self.inner.io.clone(),
@@ -81,34 +86,35 @@ impl VcsDownloader for HgDownloader {
             self.inner.process.clone(),
         );
 
-        let path_clone = path.to_string();
-        let clone_command = move |url: String| -> Vec<String> {
+        let path_clone = BString::from(path_to_bytes(path));
+        let clone_command = move |url: BString| -> Vec<BString> {
             vec![
-                "hg".to_string(),
-                "clone".to_string(),
-                "--".to_string(),
+                "hg".into(),
+                "clone".into(),
+                "--".into(),
                 url,
                 path_clone.clone(),
             ]
         };
-        hg_utils.run_command(clone_command, url.to_string(), Some(path.to_string()));
+        hg_utils.run_command(clone_command, url.as_bytes().as_bstr(), Some(path))?;
 
-        let command = vec![
-            "hg".to_string(),
-            "up".to_string(),
-            "--".to_string(),
+        let command: Vec<BString> = vec![
+            "hg".into(),
+            "up".into(),
+            "--".into(),
             package.get_source_reference().unwrap_or_default(),
         ];
-        let mut ignored_output = String::new();
+        let mut ignored_output = BString::default();
         if self.inner.process.borrow_mut().execute(
             &command,
             &mut ignored_output,
             realpath(path).as_deref(),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                command.join(" "),
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -121,8 +127,8 @@ impl VcsDownloader for HgDownloader {
         &self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             self.inner.io.clone(),
@@ -131,62 +137,58 @@ impl VcsDownloader for HgDownloader {
         );
 
         let ref_ = target.get_source_reference().unwrap_or_default();
-        self.inner.io.write_error(&format!(
-            " Updating to {}",
+        self.inner.io.write_error(bconcat!(
+            " Updating to ",
             target.get_source_reference().unwrap_or_default()
         ));
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException::new(format!(
-                "The .hg directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                path
-            )).into());
+            return Err(RuntimeException::new(bconcat!(
+                "The .hg directory is missing from ",
+                path,
+                ", see https://getcomposer.org/commit-deps for more information"
+            ))
+            .into());
         }
 
-        let pull_command = |url: String| -> Vec<String> {
-            vec!["hg".to_string(), "pull".to_string(), "--".to_string(), url]
-        };
-        hg_utils.run_command(pull_command, url.to_string(), Some(path.to_string()));
+        let pull_command =
+            |url: BString| -> Vec<BString> { vec!["hg".into(), "pull".into(), "--".into(), url] };
+        hg_utils.run_command(pull_command, url.as_bytes().as_bstr(), Some(path))?;
 
-        let ref_clone = ref_;
-        let up_command = move |_url: String| -> Vec<String> {
-            vec![
-                "hg".to_string(),
-                "up".to_string(),
-                "--".to_string(),
-                ref_clone.clone(),
-            ]
+        let up_command = move |_url: BString| -> Vec<BString> {
+            vec!["hg".into(), "up".into(), "--".into(), ref_.clone()]
         };
-        hg_utils.run_command(up_command, url.to_string(), Some(path.to_string()));
+        hg_utils.run_command(up_command, url.as_bytes().as_bstr(), Some(path))?;
 
         Ok(None)
     }
 
     fn get_commit_logs(
         &self,
-        from_reference: &str,
-        to_reference: &str,
-        path: &str,
-    ) -> anyhow::Result<String> {
-        let command = vec![
-            "hg".to_string(),
-            "log".to_string(),
-            "-r".to_string(),
-            format!("{}:{}", from_reference, to_reference),
-            "--style".to_string(),
-            "compact".to_string(),
+        from_reference: &bstr::BStr,
+        to_reference: &bstr::BStr,
+        path: &Path,
+    ) -> anyhow::Result<bstr::BString> {
+        let command: Vec<BString> = vec![
+            "hg".into(),
+            "log".into(),
+            "-r".into(),
+            bconcat!(from_reference, ":", to_reference),
+            "--style".into(),
+            "compact".into(),
         ];
 
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
             &command,
             &mut output,
             realpath(path).as_deref(),
         )? != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                command.join(" "),
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -195,8 +197,8 @@ impl VcsDownloader for HgDownloader {
         Ok(output)
     }
 
-    fn has_metadata_repository(&self, path: &str) -> bool {
-        std::path::Path::new(&format!("{}/.hg", path)).is_dir()
+    fn has_metadata_repository(&self, path: &Path) -> bool {
+        path_from_bytes(&bconcat!(path, "/.hg")).is_dir()
     }
 }
 
@@ -205,20 +207,20 @@ impl ChangeReportInterface for HgDownloader {
     async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
-        if !std::path::Path::new(&format!("{}/.hg", path)).is_dir() {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
+        if !path_from_bytes(&bconcat!(path, "/.hg")).is_dir() {
             return Ok(None);
         }
 
-        let mut output = String::new();
+        let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
-            &["hg".to_string(), "st".to_string()],
+            &["hg", "st"],
             &mut output,
             realpath(path).as_deref(),
         )?;
 
-        let output = output.trim().to_string();
+        let output = trim(&output);
 
         Ok(if !output.is_empty() {
             Some(output)
@@ -229,8 +231,12 @@ impl ChangeReportInterface for HgDownloader {
 }
 
 impl VcsCapableDownloaderInterface for HgDownloader {
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
-        self.inner.get_vcs_reference(package, &path)
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
+        self.inner.get_vcs_reference(package, path)
     }
 }
 
@@ -246,14 +252,14 @@ impl DownloaderInterface for HgDownloader {
         Some(self)
     }
 
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         <Self as VcsDownloader>::get_installation_source(self)
     }
 
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -262,9 +268,9 @@ impl DownloaderInterface for HgDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -273,7 +279,7 @@ impl DownloaderInterface for HgDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
@@ -283,7 +289,7 @@ impl DownloaderInterface for HgDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
@@ -291,7 +297,7 @@ impl DownloaderInterface for HgDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
@@ -299,9 +305,9 @@ impl DownloaderInterface for HgDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await

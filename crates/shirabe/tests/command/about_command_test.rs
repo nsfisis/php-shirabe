@@ -1,8 +1,10 @@
 //! ref: composer/tests/Composer/Test/Command/AboutCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester};
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::composer;
+use shirabe_php_shim::bconcat;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 #[test]
@@ -19,16 +21,20 @@ fn test_about() {
         .unwrap();
     assert_eq!(0, status_code);
 
-    assert!(app_tester.get_display().contains(&format!(
-        "Shirabe - Dependency Manager for PHP - version {shirabe_version} (based on Composer {composer_version})"
+    assert!(app_tester.get_display().contains_str(bconcat!(
+        "Shirabe - Dependency Manager for PHP - version ",
+        shirabe_version,
+        " (based on Composer ",
+        composer_version,
+        ")"
     )));
 
-    assert!(app_tester.get_display().contains(
+    assert!(app_tester.get_display().contains_str(
         "Shirabe is a dependency manager tracking local dependencies of your projects and libraries."
     ));
     assert!(
         app_tester
             .get_display()
-            .contains("See https://getcomposer.org/ for more information.")
+            .contains_str("See https://getcomposer.org/ for more information.")
     );
 }

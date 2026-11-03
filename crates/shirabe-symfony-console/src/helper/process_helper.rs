@@ -2,8 +2,10 @@
 
 use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};
-use bstr::BString;
-use shirabe_php_shim::{AsAny, InvalidArgumentException, PhpMixed, spl_object_hash, str_replace};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{
+    AsAny, InvalidArgumentException, PhpMixed, bconcat, spl_object_hash, str_replace,
+};
 use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;
 
@@ -23,7 +25,7 @@ pub enum ProcessHelperCmd {
 
 #[derive(Debug)]
 pub enum ProcessHelperCmdElement {
-    String(String),
+    String(BString),
     Process(Process),
 }
 
@@ -33,8 +35,8 @@ impl ProcessHelper {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
-        error: Option<&str>,
-        callback: Option<Box<dyn FnMut(&str, &str)>>,
+        error: Option<&BStr>,
+        callback: Option<Box<dyn FnMut(&BStr, &BStr)>>,
         verbosity: i64,
     ) -> anyhow::Result<Process> {
         // `class_exists(Process::class)` guards against the optional symfony/process
@@ -71,7 +73,7 @@ impl ProcessHelper {
         let mut process: Process;
         match cmd.first() {
             Some(ProcessHelperCmdElement::String(_)) => {
-                let command: Vec<String> = cmd
+                let command: Vec<BString> = cmd
                     .iter()
                     .map(|element| match element {
                         ProcessHelperCmdElement::String(s) => s.clone(),
@@ -89,18 +91,17 @@ impl ProcessHelper {
                 };
             }
             None => {
-                anyhow::bail!(InvalidArgumentException::new(format!(
-                    "Invalid command provided to \"{}()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
-                    PhpMixed::string("ProcessHelper::run".to_string()),
-                )));
+                anyhow::bail!(InvalidArgumentException::new(
+                    "Invalid command provided to \"ProcessHelper::run()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
+                ));
             }
         }
 
         if verbosity <= output.borrow().get_verbosity() {
             let started = Self::formatter_start(
                 &formatter,
-                &spl_object_hash(&process),
-                &self.escape_string(&process.get_command_line()),
+                BStr::new(&spl_object_hash(&process)),
+                Self::escape_string(process.get_command_line()).as_ref(),
             );
             output
                 .borrow()
@@ -119,36 +120,38 @@ impl ProcessHelper {
             .enumerate()
             .filter_map(|(i, element)| match element {
                 ProcessHelperCmdElement::String(s) => {
-                    Some((i.to_string().into(), PhpMixed::string(s.clone())))
+                    Some((bconcat!(i), PhpMixed::string(s.clone())))
                 }
                 ProcessHelperCmdElement::Process(_) => None,
             })
             .collect();
-        let callback: Option<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>> =
+        let callback: Option<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>> =
             callback.map(|mut cb| {
-                Box::new(move |r#type: &str, buffer: &str| -> anyhow::Result<bool> {
-                    cb(r#type, buffer);
-                    Ok(false)
-                }) as Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>
+                Box::new(
+                    move |r#type: &BStr, buffer: &BStr| -> anyhow::Result<bool> {
+                        cb(r#type, buffer);
+                        Ok(false)
+                    },
+                ) as Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>
             });
         process.run(callback, env)?;
 
         if verbosity <= output.borrow().get_verbosity() {
             let message = if process.is_successful() {
-                "Command ran successfully".to_string()
+                BString::from("Command ran successfully")
             } else {
-                format!(
-                    "{} Command did not run successfully",
-                    match process.get_exit_code() {
-                        Some(code) => PhpMixed::Int(code),
-                        None => PhpMixed::Null,
-                    },
+                bconcat!(
+                    process
+                        .get_exit_code()
+                        .map(|code| bconcat!(code))
+                        .unwrap_or_default(),
+                    " Command did not run successfully"
                 )
             };
             let stopped = Self::formatter_stop(
                 &formatter,
-                &spl_object_hash(&process),
-                &message,
+                BStr::new(&spl_object_hash(&process)),
+                message.as_ref(),
                 process.is_successful(),
             );
             output
@@ -160,7 +163,7 @@ impl ProcessHelper {
             && let Some(error) = error
         {
             output.borrow().writeln(
-                &[format!("<error>{}</error>", self.escape_string(error))],
+                &[bconcat!("<error>", Self::escape_string(error), "</error>")],
                 output_interface::OUTPUT_NORMAL,
             );
         }
@@ -176,8 +179,8 @@ impl ProcessHelper {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
-        error: Option<&str>,
-        callback: Option<Box<dyn FnMut(&str, &str)>>,
+        error: Option<&BStr>,
+        callback: Option<Box<dyn FnMut(&BStr, &BStr)>>,
     ) -> anyhow::Result<Process> {
         let mut process = self.run(
             output,
@@ -199,8 +202,8 @@ impl ProcessHelper {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         process: &Process,
-        mut callback: Option<Box<dyn FnMut(&str, &str)>>,
-    ) -> Box<dyn FnMut(&str, &str)> {
+        mut callback: Option<Box<dyn FnMut(&BStr, &BStr)>>,
+    ) -> Box<dyn FnMut(&BStr, &BStr)> {
         // PHP: `if ($output instanceof ConsoleOutputInterface) { $output =
         // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
         // implementor that also implements ConsoleOutputInterface, so the check
@@ -220,11 +223,11 @@ impl ProcessHelper {
 
         let object_hash = spl_object_hash(process);
 
-        Box::new(move |r#type: &str, buffer: &str| {
+        Box::new(move |r#type: &BStr, buffer: &BStr| {
             let progressed = Self::formatter_progress(
                 &formatter,
-                &object_hash,
-                &Self::escape_string_static(buffer),
+                BStr::new(&object_hash),
+                Self::escape_string(buffer).as_ref(),
                 Process::ERR == r#type,
             );
             output
@@ -237,40 +240,38 @@ impl ProcessHelper {
         })
     }
 
-    fn escape_string(&self, str: &str) -> String {
-        str_replace("<", "\\<", str)
-    }
-
-    fn escape_string_static(str: &str) -> String {
+    fn escape_string(str: impl AsRef<[u8]>) -> BString {
         str_replace("<", "\\<", str)
     }
 
     fn formatter_start(
         formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
-        id: &str,
-        message: &str,
-    ) -> String {
-        formatter.borrow_mut().start(id, message, "RUN")
+        id: &BStr,
+        message: &BStr,
+    ) -> BString {
+        formatter.borrow_mut().start(id, message, "RUN".into())
     }
 
     fn formatter_stop(
         formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
-        id: &str,
-        message: &str,
+        id: &BStr,
+        message: &BStr,
         successful: bool,
-    ) -> String {
-        formatter.borrow_mut().stop(id, message, successful, "RES")
+    ) -> BString {
+        formatter
+            .borrow_mut()
+            .stop(id, message, successful, "RES".into())
     }
 
     fn formatter_progress(
         formatter: &std::rc::Rc<std::cell::RefCell<DebugFormatterHelper>>,
-        id: &str,
-        buffer: &str,
+        id: &BStr,
+        buffer: &BStr,
         error: bool,
-    ) -> String {
+    ) -> BString {
         formatter
             .borrow_mut()
-            .progress(id, buffer, error, "OUT", "ERR")
+            .progress(id, buffer, error, "OUT".into(), "ERR".into())
     }
 }
 
@@ -283,7 +284,7 @@ impl HelperInterface for ProcessHelper {
         self.inner.get_helper_set()
     }
 
-    fn get_name(&self) -> String {
-        "process".to_string()
+    fn get_name(&self) -> BString {
+        "process".into()
     }
 }

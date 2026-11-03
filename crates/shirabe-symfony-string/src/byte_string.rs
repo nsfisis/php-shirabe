@@ -1,38 +1,58 @@
 //! ref: composer/vendor/symfony/string/ByteString.php
 
 use crate::code_point_string::CodePointString;
-use shirabe_php_shim::{mb_convert_encoding, mb_detect_encoding};
+use crate::exception::InvalidArgumentException;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{bconcat, mb_convert_encoding, mb_detect_encoding, utf8_text};
 
 #[derive(Debug, Clone)]
 pub struct ByteString {
-    string: String,
+    string: BString,
 }
 
 impl ByteString {
-    pub fn new(string: &str) -> Self {
+    pub fn new(string: impl AsRef<[u8]>) -> Self {
         Self {
-            string: string.to_string(),
+            string: BString::from(string.as_ref()),
         }
     }
 
     /// `from_encoding` is `""` for PHP's `null`.
-    pub fn to_code_point_string(&self, from_encoding: &str) -> CodePointString {
-        // The source `string` is always valid UTF-8 (Rust `String`/`&str` guarantee), so
-        // `preg_match('//u', ...)` always holds.
-        if matches!(from_encoding, "" | "utf8" | "utf-8" | "UTF8" | "UTF-8") {
-            return CodePointString {
-                string: self.string.clone(),
-            };
+    pub fn to_code_point_string(
+        &self,
+        from_encoding: &BStr,
+    ) -> Result<CodePointString, InvalidArgumentException> {
+        if matches!(
+            from_encoding.as_bytes(),
+            b"" | b"utf8" | b"utf-8" | b"UTF8" | b"UTF-8"
+        ) && let Some(string) = utf8_text(&self.string)
+        {
+            return Ok(CodePointString {
+                string: string.to_owned(),
+            });
         }
+
+        let from_encoding = if from_encoding.is_empty() {
+            BStr::new("Windows-1252")
+        } else {
+            from_encoding
+        };
 
         let valid_encoding =
-            mb_detect_encoding(&self.string, Some(vec![from_encoding.to_string()]), true).is_some();
-        // PHP throws InvalidArgumentException. Callers detect `from_encoding` from this very
-        // string, so a mismatch is a programming error.
-        assert!(valid_encoding, "Invalid \"{}\" string.", from_encoding);
-
-        CodePointString {
-            string: mb_convert_encoding(self.string.clone().into(), "UTF-8", from_encoding),
+            mb_detect_encoding(&self.string, Some(vec![from_encoding.to_owned()]), true).is_some();
+        if !valid_encoding {
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Invalid \"",
+                from_encoding,
+                "\" string."
+            )));
         }
+
+        let converted = mb_convert_encoding(&self.string, "UTF-8", from_encoding);
+        Ok(CodePointString {
+            string: utf8_text(&converted)
+                .expect("mb_convert_encoding() to UTF-8 yields valid UTF-8")
+                .to_owned(),
+        })
     }
 }

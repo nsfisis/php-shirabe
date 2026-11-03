@@ -4,20 +4,20 @@ use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::util::http::{NativeHttpDownloader, Response};
 use crate::util::{
     GetResult, LocalFilesystem, Platform, RemoteFilesystem, StreamContextFactory, Url,
     sync_executor,
 };
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
-    array_replace_recursive, empty, extension_loaded, file_get_contents, implode, is_numeric,
-    php_regex, preg_is_match, preg_match, preg_replace, rawurldecode, stream_context_create,
-    stripos, strpos, substr, ucfirst,
+    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed,
+    array_replace_recursive, bconcat, empty, extension_loaded, file_get_contents, implode, intval,
+    is_numeric, path_to_bytes, pcre_check_utf8_subject, php_regex, preg_is_match, preg_match,
+    preg_replace, rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -59,7 +59,7 @@ pub struct HttpDownloaderMockState {
     expectations: Option<Vec<HttpDownloaderMockExpectation>>,
     strict: bool,
     default_handler: HttpDownloaderMockHandler,
-    log: Vec<String>,
+    log: Vec<BString>,
 }
 
 /// For testing only. A single expected HTTP request and the canned response to return.
@@ -67,26 +67,26 @@ pub struct HttpDownloaderMockState {
 /// exactly equal (PHP `===`).
 #[derive(Debug, Clone)]
 pub struct HttpDownloaderMockExpectation {
-    pub url: String,
+    pub url: BString,
     pub options: Option<IndexMap<BString, PhpMixed>>,
     pub status: i64,
-    pub body: String,
-    pub headers: Vec<String>,
+    pub body: BString,
+    pub headers: Vec<BString>,
 }
 
 /// For testing only. The default response handler used for undefined requests when not strict.
 #[derive(Debug, Clone)]
 pub struct HttpDownloaderMockHandler {
     pub status: i64,
-    pub body: String,
-    pub headers: Vec<String>,
+    pub body: BString,
+    pub headers: Vec<BString>,
 }
 
 impl Default for HttpDownloaderMockHandler {
     fn default() -> Self {
         Self {
             status: 200,
-            body: String::new(),
+            body: BString::default(),
             headers: Vec::new(),
         }
     }
@@ -132,12 +132,7 @@ impl HttpDownloader {
             None => PhpMixed::Bool(false),
         };
         if is_numeric(&max_jobs_env_mixed) {
-            max_jobs = max_jobs_env
-                .as_deref()
-                .unwrap_or("0")
-                .parse()
-                .unwrap_or(0)
-                .clamp(1, 50);
+            max_jobs = intval(&max_jobs_env_mixed).clamp(1, 50);
         }
 
         Self {
@@ -155,66 +150,76 @@ impl HttpDownloader {
     }
 
     /// Download a file synchronously
-    pub fn get(&self, url: &str, options: IndexMap<BString, PhpMixed>) -> anyhow::Result<Response> {
-        sync_executor::block_on(self.execute(url, options, None, true))
+    pub fn get(
+        &self,
+        url: impl AsRef<[u8]>,
+        options: IndexMap<BString, PhpMixed>,
+    ) -> anyhow::Result<Response> {
+        sync_executor::block_on(self.execute(url.as_ref().as_bstr(), options, None, true))
     }
 
     /// Create an async download operation
     pub async fn add(
         &self,
-        url: &str,
+        url: impl AsRef<[u8]>,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Response> {
-        self.execute(url, options, None, false).await
+        self.execute(url.as_ref().as_bstr(), options, None, false)
+            .await
     }
 
     /// Copy a file synchronously
     pub fn copy(
         &self,
-        url: &str,
-        to: &str,
+        url: impl AsRef<[u8]>,
+        to: impl AsRef<std::path::Path>,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Response> {
-        sync_executor::block_on(self.execute(url, options, Some(to), true))
+        sync_executor::block_on(self.execute(
+            url.as_ref().as_bstr(),
+            options,
+            Some(to.as_ref()),
+            true,
+        ))
     }
 
     /// Create an async copy operation
     pub async fn add_copy(
         &self,
-        url: &str,
-        to: &str,
+        url: impl AsRef<[u8]>,
+        to: impl AsRef<std::path::Path>,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Response> {
-        self.execute(url, options, Some(to), false).await
+        self.execute(url.as_ref().as_bstr(), options, Some(to.as_ref()), false)
+            .await
     }
 
     /// Shared core of `get`/`add`/`copy`/`add_copy`: mock short-circuit, empty-URL guard, the
     /// sync/allow_async gate, and the resolver PHP's `addJob` picks for the request.
     async fn execute(
         &self,
-        url: &str,
+        url: &BStr,
         options: IndexMap<BString, PhpMixed>,
-        copy_to: Option<&str>,
+        copy_to: Option<&std::path::Path>,
         sync: bool,
     ) -> anyhow::Result<Response> {
         if self.mock.is_some() {
             return self.mock_get(url, &options);
         }
         if url.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "$url must not be an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "$url must not be an empty string",
+            ))
             .into());
         }
         if !sync && !self.allow_async {
-            return Err(LogicException::new("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"
-                .to_string())
+            return Err(LogicException::new(BString::from("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"))
             .into());
         }
 
         let (options, origin) = self.prepare_request(url, options);
         if !self.can_use_native(url, &options) {
-            return self.download_with_filesystem(&origin, url, options, copy_to);
+            return self.download_with_filesystem(origin.as_bstr(), url, options, copy_to);
         }
 
         // PHP keeps async jobs in a table `Loop::abortJobs()` can reach through the promises
@@ -225,7 +230,7 @@ impl HttpDownloader {
                 self.native.clone().unwrap(),
                 self.disabled,
                 origin,
-                url.to_string(),
+                url.to_owned(),
                 options,
                 copy_to.map(ToOwned::to_owned),
                 None,
@@ -242,7 +247,7 @@ impl HttpDownloader {
             self.native.clone().unwrap(),
             self.disabled,
             origin,
-            url.to_string(),
+            url.to_owned(),
             options,
             copy_to.map(ToOwned::to_owned),
             None,
@@ -254,10 +259,11 @@ impl HttpDownloader {
     }
 
     /// The exception PHP's canceler raises for a job that had started.
-    pub(crate) fn canceled(url: &str) -> IrrecoverableDownloadException {
-        IrrecoverableDownloadException::new(format!(
-            "Download of {} canceled",
-            Url::sanitize(url.to_string())
+    pub(crate) fn canceled(url: &BStr) -> IrrecoverableDownloadException {
+        IrrecoverableDownloadException::new(bconcat!(
+            "Download of ",
+            Url::sanitize(url),
+            " canceled"
         ))
     }
 
@@ -265,9 +271,9 @@ impl HttpDownloader {
     /// over the downloader's own, the origin, and the credentials a URL carries.
     fn prepare_request(
         &self,
-        url: &str,
+        url: &BStr,
         options: IndexMap<BString, PhpMixed>,
-    ) -> (IndexMap<BString, PhpMixed>, String) {
+    ) -> (IndexMap<BString, PhpMixed>, BString) {
         let options = array_replace_recursive(self.options.clone(), options);
         let origin = Url::get_origin(&self.config.borrow(), url);
 
@@ -275,10 +281,8 @@ impl HttpDownloader {
         if let Some(m) = preg_match(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url) {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
-                rawurldecode(m.get(1).unwrap_or_default().to_string().as_str()),
-                Some(rawurldecode(
-                    m.get(2).unwrap_or_default().to_string().as_str(),
-                )),
+                rawurldecode(m.get(1).unwrap_or_default()),
+                Some(rawurldecode(m.get(2).unwrap_or_default())),
             );
         }
 
@@ -292,8 +296,8 @@ impl HttpDownloader {
     /// `started` tells whether the job budget has let the job through.
     pub(crate) fn add_job(
         &self,
-        url: &str,
-        copy_to: Option<&str>,
+        url: &BStr,
+        copy_to: Option<&std::path::Path>,
         options: IndexMap<BString, PhpMixed>,
         started: std::rc::Rc<std::cell::Cell<bool>>,
     ) -> anyhow::Result<HttpDownloaderJob> {
@@ -304,22 +308,24 @@ impl HttpDownloader {
             ));
         }
         if url.is_empty() {
-            return Err(InvalidArgumentException::new(
-                "$url must not be an empty string".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "$url must not be an empty string",
+            ))
             .into());
         }
         if !self.allow_async {
-            return Err(LogicException::new("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"
-                .to_string())
+            return Err(LogicException::new(BString::from("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"))
             .into());
         }
 
         let (options, origin) = self.prepare_request(url, options);
         if !self.can_use_native(url, &options) {
-            return Ok(HttpDownloaderJob::Settled(
-                self.download_with_filesystem(&origin, url, options, copy_to),
-            ));
+            return Ok(HttpDownloaderJob::Settled(self.download_with_filesystem(
+                origin.as_bstr(),
+                url,
+                options,
+                copy_to,
+            )));
         }
 
         // PHP starts the job before `add()` returns when the job budget has room. Nothing of the
@@ -333,7 +339,7 @@ impl HttpDownloader {
                 self.native.clone().unwrap(),
                 self.disabled,
                 origin,
-                url.to_string(),
+                url.to_owned(),
                 options,
                 copy_to.map(ToOwned::to_owned),
                 Some(started),
@@ -348,10 +354,10 @@ impl HttpDownloader {
         semaphore: std::rc::Rc<tokio::sync::Semaphore>,
         native: std::rc::Rc<NativeHttpDownloader>,
         disabled: bool,
-        origin: String,
-        url: String,
+        origin: BString,
+        url: BString,
         options: IndexMap<BString, PhpMixed>,
-        copy_to: Option<String>,
+        copy_to: Option<std::path::PathBuf>,
         started: Option<std::rc::Rc<std::cell::Cell<bool>>>,
     ) -> anyhow::Result<Response> {
         let _permit = semaphore
@@ -376,7 +382,7 @@ impl HttpDownloader {
                         "",
                         &list
                             .iter()
-                            .map(|v| v.as_string().unwrap_or_default().to_string())
+                            .map(|v| v.as_string().unwrap_or_default())
                             .collect::<Vec<_>>(),
                     );
                     stripos(&joined, "if-modified-since").is_some()
@@ -384,7 +390,7 @@ impl HttpDownloader {
                     let joined = implode(
                         "",
                         &m.values()
-                            .map(|v| v.as_string().unwrap_or_default().to_string())
+                            .map(|v| v.as_string().unwrap_or_default())
                             .collect::<Vec<_>>(),
                     );
                     stripos(&joined, "if-modified-since").is_some()
@@ -393,16 +399,11 @@ impl HttpDownloader {
                 }
             };
             if has_if_modified_since {
-                return Ok(Response::new(
-                    url,
-                    Some(304),
-                    Vec::new(),
-                    Some(String::new()),
-                ));
+                return Ok(Response::new(url, Some(304), Vec::new(), Some(Vec::new())));
             }
 
             let mut e = TransportException::new(
-                format!("Network disabled, request canceled: {}", Url::sanitize(url)),
+                bconcat!("Network disabled, request canceled: ", Url::sanitize(&url)),
                 499,
             );
             e.set_status_code(Some(499));
@@ -410,7 +411,7 @@ impl HttpDownloader {
         }
 
         match native
-            .download(&origin, &url, options, copy_to.as_deref())
+            .download(origin.as_bstr(), url.as_bstr(), options, copy_to.as_deref())
             .await
         {
             Ok(Ok(response)) => Ok(response),
@@ -426,27 +427,27 @@ impl HttpDownloader {
     /// handles jobs the curl resolver queued.
     fn download_with_filesystem(
         &self,
-        origin: &str,
-        url: &str,
+        origin: &BStr,
+        url: &BStr,
         options: IndexMap<BString, PhpMixed>,
-        copy_to: Option<&str>,
+        copy_to: Option<&std::path::Path>,
     ) -> anyhow::Result<Response> {
         if LocalFilesystem::handles(url) {
             return if let Some(copy_to) = copy_to {
                 self.local.copy(origin, url, copy_to, false, options)?;
 
                 Ok(Response::new(
-                    url.to_string(),
+                    url.to_owned(),
                     None,
                     Vec::new(),
-                    Some(format!("{}~", copy_to)),
+                    Some(bconcat!(path_to_bytes(copy_to), "~").into()),
                 ))
             } else {
                 let body = match self.local.get_contents(origin, url, false, options)? {
                     GetResult::Content(s) => Some(s),
                     _ => None,
                 };
-                Ok(Response::new(url.to_string(), None, Vec::new(), body))
+                Ok(Response::new(url.to_owned(), None, Vec::new(), body))
             };
         }
 
@@ -455,8 +456,8 @@ impl HttpDownloader {
 
             let headers = self.rfs.get_last_headers()?;
             let code = RemoteFilesystem::find_status_code(&headers);
-            let body = Some(format!("{}~", copy_to));
-            Ok(Response::new(url.to_string(), code, headers, body))
+            let body = Some(bconcat!(path_to_bytes(copy_to), "~").into());
+            Ok(Response::new(url.to_owned(), code, headers, body))
         } else {
             let result = self.rfs.get_contents(origin, url, false, options)?;
             let body = match result {
@@ -465,7 +466,7 @@ impl HttpDownloader {
             };
             let headers = self.rfs.get_last_headers()?;
             let code = RemoteFilesystem::find_status_code(&headers);
-            Ok(Response::new(url.to_string(), code, headers, body))
+            Ok(Response::new(url.to_owned(), code, headers, body))
         }
     }
 
@@ -485,15 +486,17 @@ impl HttpDownloader {
 
     pub fn output_warnings(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        url: &str,
+        url: impl AsRef<[u8]>,
         data: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let clean_message = |msg: &str| -> anyhow::Result<String> {
+        let url = url.as_ref();
+        let clean_message = |msg: &BStr| -> anyhow::Result<BString> {
             if !io.is_decorated() {
+                pcre_check_utf8_subject("preg_replace", "{\x1b\\[[;\\d]*m}u", msg)?;
                 return Ok(preg_replace("{\x1b\\[[;\\d]*m}u", "", msg));
             }
 
-            Ok(msg.to_string())
+            Ok(msg.to_owned())
         };
 
         // legacy warning/info keys
@@ -503,22 +506,16 @@ impl HttpDownloader {
                 continue;
             }
 
-            let versions_key = format!("{}-versions", r#type);
+            let versions_key = bconcat!(r#type, "-versions");
             if let Some(versions_value) = data.get(B(&versions_key))
                 && !empty(versions_value)
             {
                 let version_parser: VersionParser = VersionParser::new();
-                let constraint = version_parser.parse_constraints(
-                    &versions_value
-                        .as_string()
-                        .unwrap_or_default()
-                        .to_str_lossy(),
-                )?;
+                let constraint = version_parser
+                    .parse_constraints(versions_value.as_string().unwrap_or_default())?;
                 let composer_constraint = SimpleConstraint::new(
-                    "==".to_string(),
-                    version_parser
-                        .normalize(&composer::get_version(), None)?
-                        .to_string(),
+                    "==",
+                    version_parser.normalize(composer::get_version(), None)?,
                     None,
                 );
                 if !constraint.matches(&composer_constraint.into()) {
@@ -526,18 +523,18 @@ impl HttpDownloader {
                 }
             }
 
-            io.write_error(&format!(
-                "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
-                tp = r#type,
-                capitalized = ucfirst(r#type),
-                url = Url::sanitize(url.to_string()),
-                msg = clean_message(
-                    &entry
-                        .unwrap()
-                        .as_string()
-                        .unwrap_or_default()
-                        .to_str_lossy()
-                )?
+            io.write_error(bconcat!(
+                "<",
+                r#type,
+                ">",
+                ucfirst(r#type),
+                " from ",
+                Url::sanitize(url),
+                ": ",
+                clean_message(entry.unwrap().as_string().unwrap_or_default())?,
+                "</",
+                r#type,
+                ">"
             ));
         }
 
@@ -554,35 +551,37 @@ impl HttpDownloader {
                     let r#type = substr(key, 0, Some(-1));
                     if let PhpMixed::Array(spec_map) = spec {
                         let constraint = version_parser.parse_constraints(
-                            &spec_map
+                            spec_map
                                 .get(B("versions"))
                                 .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_str_lossy(),
+                                .unwrap_or_default(),
                         )?;
                         let composer_constraint = SimpleConstraint::new(
-                            "==".to_string(),
-                            version_parser
-                                .normalize(&composer::get_version(), None)?
-                                .to_string(),
+                            "==",
+                            version_parser.normalize(composer::get_version(), None)?,
                             None,
                         );
                         if !constraint.matches(&composer_constraint.into()) {
                             continue;
                         }
 
-                        io.write_error(&format!(
-                            "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
-                            tp = r#type,
-                            capitalized = ucfirst(&r#type),
-                            url = Url::sanitize(url.to_string()),
-                            msg = clean_message(
-                                &spec_map
+                        io.write_error(bconcat!(
+                            "<",
+                            r#type,
+                            ">",
+                            ucfirst(&r#type),
+                            " from ",
+                            Url::sanitize(url),
+                            ": ",
+                            clean_message(
+                                spec_map
                                     .get(B("message"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default()
-                                    .to_str_lossy()
-                            )?
+                            )?,
+                            "</",
+                            r#type,
+                            ">"
                         ));
                     }
                 }
@@ -592,7 +591,7 @@ impl HttpDownloader {
         Ok(())
     }
 
-    pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<String>> {
+    pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<BString>> {
         let e_as_transport: Option<&TransportException> = e.catch::<TransportException>();
         e_as_transport?;
         let e_as_transport = e_as_transport.unwrap();
@@ -613,14 +612,14 @@ impl HttpDownloader {
             let _ = stream_context_create(&ctx_options, None);
             let test_connectivity = file_get_contents("https://8.8.8.8");
             if test_connectivity.is_ok() {
-                return Some(vec![
-                    "<error>The following exception probably indicates you have misconfigured DNS resolver(s)</error>".to_string(),
-                ]);
+                return Some(vec![BString::from(
+                    "<error>The following exception probably indicates you have misconfigured DNS resolver(s)</error>",
+                )]);
             }
 
-            return Some(vec![
-                "<error>The following exception probably indicates you are offline or have misconfigured DNS resolver(s)</error>".to_string(),
-            ]);
+            return Some(vec![BString::from(
+                "<error>The following exception probably indicates you are offline or have misconfigured DNS resolver(s)</error>",
+            )]);
         }
 
         None
@@ -628,7 +627,7 @@ impl HttpDownloader {
 
     /// PHP's `canUseCurl`, asked of the native downloader: Composer's reasons to keep a request
     /// away from curl hold for it too.
-    fn can_use_native(&self, url: &str, options: &IndexMap<BString, PhpMixed>) -> bool {
+    fn can_use_native(&self, url: &BStr, options: &IndexMap<BString, PhpMixed>) -> bool {
         if self.native.is_none() {
             return false;
         }
@@ -706,16 +705,16 @@ impl HttpDownloader {
             return;
         };
         if !expectations.is_empty() {
-            let urls: Vec<String> = expectations.iter().map(|e| e.url.clone()).collect();
+            let urls: Vec<&BStr> = expectations.iter().map(|e| e.url.as_bstr()).collect();
             panic!(
                 "There are still {} expected HTTP requests which have not been consumed:{}{}{}{}Received calls:{}{}",
                 expectations.len(),
-                PHP_EOL,
-                urls.join(PHP_EOL),
-                PHP_EOL,
-                PHP_EOL,
-                PHP_EOL,
-                mock.log.join(PHP_EOL),
+                PHP_EOL.display_lossy(),
+                implode("\n", &urls).display_lossy(),
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
+                implode(PHP_EOL, &mock.log).display_lossy(),
             );
         }
     }
@@ -724,11 +723,11 @@ impl HttpDownloader {
     /// (or falls back to the default handler when not strict) and returns the canned response.
     fn mock_get(
         &self,
-        file_url: &str,
+        file_url: &BStr,
         options: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Response> {
         if file_url.is_empty() {
-            return Err(LogicException::new("url cannot be an empty string".to_string()).into());
+            return Err(LogicException::new(BString::from("url cannot be an empty string")).into());
         }
 
         let mock = self
@@ -737,7 +736,7 @@ impl HttpDownloader {
             .expect("mock_get called without a mock")
             .clone();
         let mut mock = mock.borrow_mut();
-        mock.log.push(file_url.to_string());
+        mock.log.push(file_url.to_owned());
 
         let matches_first = mock
             .expectations
@@ -764,56 +763,61 @@ impl HttpDownloader {
             .and_then(|e| e.first())
             .map(|first| {
                 let opts = if first.options.is_some() {
-                    format!(
-                        "\" with options \"{}",
-                        serde_json::to_string(&first.options.clone().map(PhpMixed::Array))
+                    bconcat!(
+                        "\" with options \"",
+                        BString::from(
+                            serde_json::to_vec(&PhpJson::new(
+                                &first.options.clone().map(PhpMixed::Array),
+                            ))
                             .unwrap_or_default()
+                        )
                     )
                 } else {
-                    String::new()
+                    BString::default()
                 };
-                format!("Expected \"{}{}\" at this point.", first.url, opts)
+                bconcat!("Expected \"", first.url, opts, "\" at this point.")
             })
-            .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
+            .unwrap_or_else(|| BString::from("Expected no more calls at this point."));
         let prior_calls = if mock.log.len() > 1 {
-            mock.log[..mock.log.len() - 1].join(PHP_EOL)
+            implode(PHP_EOL, &mock.log[..mock.log.len() - 1])
         } else {
-            String::new()
+            BString::default()
         };
         panic!(
             "Received unexpected request for \"{}\" with options \"{}\"{}{}{}Received calls:{}{}",
-            file_url,
-            serde_json::to_string(&PhpMixed::Array(options.clone())).unwrap_or_default(),
-            PHP_EOL,
-            next_expected,
-            PHP_EOL,
-            PHP_EOL,
-            prior_calls,
+            file_url.display_lossy(),
+            serde_json::to_string(&PhpJson::new(&PhpMixed::Array(options.clone())))
+                .unwrap_or_default(),
+            PHP_EOL.display_lossy(),
+            next_expected.display_lossy(),
+            PHP_EOL.display_lossy(),
+            PHP_EOL.display_lossy(),
+            prior_calls.display_lossy(),
         );
     }
 
     /// For testing only. Mirrors HttpDownloaderMock::respond.
     fn mock_respond(
-        url: &str,
+        url: &BStr,
         status: i64,
-        headers: Vec<String>,
-        body: String,
+        headers: Vec<BString>,
+        body: BString,
     ) -> anyhow::Result<Response> {
         if status < 400 {
             return Ok(Response::new(
-                url.to_string(),
+                url.to_owned(),
                 Some(status),
                 headers,
-                Some(body),
+                Some(body.into()),
             ));
         }
 
         let mut e = TransportException::new(
-            format!("The \"{}\" file could not be downloaded", url),
+            bconcat!("The \"", url, "\" file could not be downloaded"),
             status,
         );
         e.set_headers(headers);
-        e.set_response(Some(body));
+        e.set_response(Some(body.into()));
 
         Err(e.into())
     }

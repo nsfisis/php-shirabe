@@ -1,9 +1,11 @@
 //! ref: composer/vendor/symfony/console/Terminal.php
 
+use bstr::BString;
 use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, php_fopen_resource,
-    php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get, sapi_windows_cp_set,
-    sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
+    Descriptor, PhpMixed, PhpResource, bconcat, fclose, function_exists, getenv, intval,
+    path_to_bytes, php_fopen_resource, php_regex, preg_match, proc_close, proc_open,
+    sapi_windows_cp_get, sapi_windows_cp_set, sapi_windows_vt100_support, shell_exec,
+    stream_get_contents, trim,
 };
 use std::cell::Cell;
 
@@ -31,11 +33,7 @@ impl Terminal {
     pub fn get_width(&self) -> i64 {
         let width = getenv("COLUMNS");
         if let Some(width) = width {
-            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-            let width = width
-                .into_string()
-                .unwrap_or_else(|width| panic!("COLUMNS is not valid UTF-8: {width:?}"));
-            return intval(&PhpMixed::string(trim(&width, None)));
+            return intval(&PhpMixed::string(trim(path_to_bytes(&width))));
         }
 
         if WIDTH.with(|w| w.get()).is_none() {
@@ -49,11 +47,7 @@ impl Terminal {
     pub fn get_height(&self) -> i64 {
         let height = getenv("LINES");
         if let Some(height) = height {
-            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
-            let height = height
-                .into_string()
-                .unwrap_or_else(|height| panic!("LINES is not valid UTF-8: {height:?}"));
-            return intval(&PhpMixed::string(trim(&height, None)));
+            return intval(&PhpMixed::string(trim(path_to_bytes(&height))));
         }
 
         if HEIGHT.with(|h| h.get()).is_none() {
@@ -68,8 +62,8 @@ impl Terminal {
             return stty;
         }
 
-        let result = shell_exec(&format!(
-            "stty 2> {}",
+        let result = shell_exec(bconcat!(
+            "stty 2> ",
             if cfg!(windows) { "NUL" } else { "/dev/null" }
         ))
         .is_some();
@@ -79,34 +73,25 @@ impl Terminal {
 
     fn init_dimensions() {
         if cfg!(windows) {
-            // TODO(bytes): preg_match matches over a &str.
-            let ansicon = getenv("ANSICON").map(|ansicon| {
-                ansicon
-                    .into_string()
-                    .unwrap_or_else(|ansicon| panic!("ANSICON is not valid UTF-8: {ansicon:?}"))
-            });
+            let ansicon = getenv("ANSICON").map(|ansicon| trim(path_to_bytes(&ansicon)));
             if let Some(ansicon) = &ansicon
                 && let Some(matches) = preg_match(
                     php_regex!("/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/"),
-                    &trim(ansicon, None),
+                    ansicon,
                 )
             {
                 // extract [w, H] from "wxh (WxH)"
                 // or [w, h] from "wxh"
                 WIDTH.with(|w| {
                     w.set(Some(intval(&PhpMixed::string(
-                        matches.get(1).unwrap_or_default().to_string(),
+                        matches.get(1).unwrap_or_default(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     let value = if matches.get(4).is_some() {
-                        intval(&PhpMixed::string(
-                            matches.get(4).unwrap_or_default().to_string(),
-                        ))
+                        intval(&PhpMixed::string(matches.get(4).unwrap_or_default()))
                     } else {
-                        intval(&PhpMixed::string(
-                            matches.get(2).unwrap_or_default().to_string(),
-                        ))
+                        intval(&PhpMixed::string(matches.get(2).unwrap_or_default()))
                     };
                     h.set(Some(value));
                 });
@@ -147,12 +132,12 @@ impl Terminal {
                 // extract [w, h] from "rows h; columns w;"
                 WIDTH.with(|w| {
                     w.set(Some(intval(&PhpMixed::string(
-                        matches.get(2).unwrap_or_default().to_string(),
+                        matches.get(2).unwrap_or_default(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     h.set(Some(intval(&PhpMixed::string(
-                        matches.get(1).unwrap_or_default().to_string(),
+                        matches.get(1).unwrap_or_default(),
                     ))))
                 });
             } else if let Some(matches) =
@@ -161,12 +146,12 @@ impl Terminal {
                 // extract [w, h] from "; h rows; w columns"
                 WIDTH.with(|w| {
                     w.set(Some(intval(&PhpMixed::string(
-                        matches.get(2).unwrap_or_default().to_string(),
+                        matches.get(2).unwrap_or_default(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     h.set(Some(intval(&PhpMixed::string(
-                        matches.get(1).unwrap_or_default().to_string(),
+                        matches.get(1).unwrap_or_default(),
                     ))))
                 });
             }
@@ -186,26 +171,22 @@ impl Terminal {
         )?;
 
         Some(vec![
-            intval(&PhpMixed::string(
-                matches.get(2).unwrap_or_default().to_string(),
-            )),
-            intval(&PhpMixed::string(
-                matches.get(1).unwrap_or_default().to_string(),
-            )),
+            intval(&PhpMixed::string(matches.get(2).unwrap_or_default())),
+            intval(&PhpMixed::string(matches.get(1).unwrap_or_default())),
         ])
     }
 
     /// Runs and parses stty -a if it's available, suppressing any error output.
-    fn get_stty_columns() -> Option<String> {
+    fn get_stty_columns() -> Option<Vec<u8>> {
         Self::read_from_process("stty -a | grep columns")
     }
 
-    fn read_from_process(command: &str) -> Option<String> {
+    fn read_from_process(command: impl AsRef<[u8]>) -> Option<Vec<u8>> {
         // Sparse PHP descriptorspec `[1 => ['pipe', 'w'], 2 => ['pipe', 'w']]`: fd 0 is inherited.
         let descriptorspec = [
             Descriptor::Inherit,
-            Descriptor::Pipe("w".to_string()),
-            Descriptor::Pipe("w".to_string()),
+            Descriptor::Pipe(BString::from("w")),
+            Descriptor::Pipe(BString::from("w")),
         ];
 
         let cp = if function_exists("sapi_windows_cp_set") {
@@ -215,16 +196,19 @@ impl Terminal {
         };
 
         let mut pipes: indexmap::IndexMap<i64, PhpResource> = indexmap::IndexMap::new();
-        let process = match proc_open(command, &descriptorspec, &mut pipes, None, None, None) {
+        let process = match proc_open(
+            command.as_ref(),
+            &descriptorspec,
+            &mut pipes,
+            None,
+            None,
+            None,
+        ) {
             Ok(process) => process,
             Err(_) => return None,
         };
 
-        // TODO(bytes): the stty/mode output is returned as a String.
-        let info = pipes
-            .get(&1)
-            .and_then(stream_get_contents)
-            .map(|info| String::from_utf8_lossy(&info).into_owned());
+        let info = pipes.get(&1).and_then(stream_get_contents);
         if let Some(pipe) = pipes.get(&1) {
             fclose(pipe);
         }

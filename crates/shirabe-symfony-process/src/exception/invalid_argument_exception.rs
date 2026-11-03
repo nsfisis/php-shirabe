@@ -1,5 +1,7 @@
 //! ref: composer/vendor/symfony/process/Exception/InvalidArgumentException.php
 
+use bstr::BString;
+
 #[derive(Debug)]
 pub struct InvalidArgumentException {
     inner: shirabe_php_shim::InvalidArgumentException,
@@ -7,7 +9,7 @@ pub struct InvalidArgumentException {
 
 impl InvalidArgumentException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self {
             inner: shirabe_php_shim::InvalidArgumentException::new(message),
         }

@@ -2,11 +2,14 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::input::{
-    ArgvInput, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
+    ArgvInput, InputDefinition, InputInterface, InputInterfaceByName, InputValue,
+    StreamableInputInterface,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, php_regex, preg_match, str_replace_arr, stripcslashes, strlen, substr,
+    PhpResource, bconcat, php_regex, php_str, preg_match, str_replace_arr, stripcslashes, strlen,
+    substr,
 };
 
 /// StringInput represents an input provided as a string.
@@ -22,38 +25,38 @@ pub struct StringInput {
 }
 
 impl StringInput {
-    pub const REGEX_STRING: &'static str = r#"([^\s]+?)(?:\s|(?<!\\)"|(?<!\\)'|$)"#;
-    pub const REGEX_UNQUOTED_STRING: &'static str = r#"([^\s\\]+?)"#;
-    pub const REGEX_QUOTED_STRING: &'static str =
-        r#"(?:"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)')"#;
+    pub const REGEX_STRING: &'static BStr = php_str(br#"([^\s]+?)(?:\s|(?<!\\)"|(?<!\\)'|$)"#);
+    pub const REGEX_UNQUOTED_STRING: &'static BStr = php_str(br#"([^\s\\]+?)"#);
+    pub const REGEX_QUOTED_STRING: &'static BStr =
+        php_str(br#"(?:"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)')"#);
 
-    pub fn new(input: &str) -> anyhow::Result<Self> {
+    pub fn new(input: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         // parent::__construct([])
         let inner = ArgvInput::new(Some(vec![]), None)?;
 
         let mut string_input = StringInput { inner };
 
-        let tokens = string_input.tokenize(input)?;
+        let tokens = string_input.tokenize(BStr::new(input.as_ref()))?;
         string_input.inner.set_tokens(tokens);
 
         Ok(string_input)
     }
 
     /// Tokenizes a string.
-    fn tokenize(&self, input: &str) -> anyhow::Result<Vec<String>> {
-        let bytes = input.as_bytes();
-        let mut tokens: Vec<String> = vec![];
+    fn tokenize(&self, input: &BStr) -> anyhow::Result<Vec<BString>> {
+        let bytes: &[u8] = input;
+        let mut tokens: Vec<BString> = vec![];
         let length = strlen(input);
         let mut cursor: i64 = 0;
-        let mut token: Option<String> = None;
+        let mut token: Option<BString> = None;
         while cursor < length {
             if bytes[cursor as usize] == b'\\' {
                 cursor += 1;
-                let next: String = match bytes.get(cursor as usize) {
-                    Some(b) => String::from_utf8_lossy(&[*b]).into_owned(),
-                    None => String::new(),
-                };
-                token = Some(format!("{}{}", token.unwrap_or_default(), next));
+                let mut t = token.unwrap_or_default();
+                if let Some(b) = bytes.get(cursor as usize) {
+                    t.push(*b);
+                }
+                token = Some(t);
                 cursor += 1;
                 continue;
             }
@@ -63,47 +66,52 @@ impl StringInput {
             // exactly there. The `regex` crate anchors only at the head of the haystack, so the
             // search runs over the part of the input that begins at the cursor and each pattern
             // carries a leading `^` instead of the `A` modifier.
-            let rest = &input[cursor as usize..];
+            let rest = &bytes[cursor as usize..];
 
             if let Some(m) = preg_match(php_regex!(r"/^\s+/"), rest) {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
-                cursor += strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(
-                format!(r#"/^([^="'\s]+?)(=?)({}+)/"#, Self::REGEX_QUOTED_STRING),
+                bconcat!(
+                    r#"/^([^="'\s]+?)(=?)("#,
+                    Self::REGEX_QUOTED_STRING,
+                    r#"+)/"#
+                ),
                 rest,
             ) {
-                let inner = substr(m.get(3).unwrap_or(""), 1, Some(-1));
+                let inner = substr(m.get(3).unwrap_or_default(), 1, Some(-1));
                 let replaced = str_replace_arr(&["\"'", "'\"", "''", "\"\""], "", &inner);
-                token = Some(format!(
-                    "{}{}{}{}",
+                token = Some(bconcat!(
                     token.unwrap_or_default(),
-                    m.get(1).unwrap_or(""),
-                    m.get(2).unwrap_or(""),
+                    m.get(1).unwrap_or_default(),
+                    m.get(2).unwrap_or_default(),
                     stripcslashes(&replaced)
                 ));
-                cursor += strlen(m.get(0).unwrap_or(""));
-            } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_QUOTED_STRING), rest) {
-                token = Some(format!(
-                    "{}{}",
-                    token.unwrap_or_default(),
-                    stripcslashes(&substr(m.get(0).unwrap_or(""), 1, Some(-1)))
-                ));
-                cursor += strlen(m.get(0).unwrap_or(""));
-            } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_UNQUOTED_STRING), rest)
+                cursor += strlen(m.get(0).unwrap_or_default());
+            } else if let Some(m) =
+                preg_match(bconcat!(r"/^", Self::REGEX_QUOTED_STRING, r"/"), rest)
             {
-                token = Some(format!(
-                    "{}{}",
+                token = Some(bconcat!(
                     token.unwrap_or_default(),
-                    m.get(1).unwrap_or("")
+                    stripcslashes(substr(m.get(0).unwrap_or_default(), 1, Some(-1)))
                 ));
-                cursor += strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or_default());
+            } else if let Some(m) =
+                preg_match(bconcat!(r"/^", Self::REGEX_UNQUOTED_STRING, r"/"), rest)
+            {
+                token = Some(bconcat!(
+                    token.unwrap_or_default(),
+                    m.get(1).unwrap_or_default()
+                ));
+                cursor += strlen(m.get(0).unwrap_or_default());
             } else {
                 // should never happen
-                return Err(InvalidArgumentException::new(format!(
-                    "Unable to parse input near \"... {} ...\".",
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Unable to parse input near \"... ",
                     substr(input, cursor, Some(10)),
+                    " ...\"."
                 ))
                 .into());
             }
@@ -117,32 +125,26 @@ impl StringInput {
     }
 }
 
-impl std::fmt::Display for StringInput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
 impl InputInterface for StringInput {
     fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
         std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
     }
 
-    fn get_first_argument(&self) -> Option<String> {
+    fn get_first_argument(&self) -> Option<BString> {
         self.inner.get_first_argument()
     }
 
-    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
-        InputInterface::has_parameter_option(&self.inner, values, only_params)
+    fn has_parameter_option_bytes(&self, values: &[&BStr], only_params: bool) -> bool {
+        InputInterface::has_parameter_option_bytes(&self.inner, values, only_params)
     }
 
-    fn get_parameter_option(
+    fn get_parameter_option_bytes(
         &self,
-        values: &[&str],
+        values: &[&BStr],
         default: InputValue,
         only_params: bool,
     ) -> InputValue {
-        InputInterface::get_parameter_option(&self.inner, values, default, only_params)
+        InputInterface::get_parameter_option_bytes(&self.inner, values, default, only_params)
     }
 
     fn bind(&mut self, definition: &InputDefinition) -> anyhow::Result<()> {
@@ -153,35 +155,35 @@ impl InputInterface for StringInput {
         self.inner.validate()
     }
 
-    fn get_arguments(&self) -> IndexMap<String, InputValue> {
+    fn get_arguments(&self) -> IndexMap<BString, InputValue> {
         InputInterface::get_arguments(&self.inner)
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
+    fn get_argument_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
         self.inner.get_argument(name)
     }
 
-    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    fn set_argument_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_argument(name, value)
     }
 
-    fn has_argument(&self, name: &str) -> bool {
+    fn has_argument_bytes(&self, name: &BStr) -> bool {
         self.inner.has_argument(name)
     }
 
-    fn get_options(&self) -> IndexMap<String, InputValue> {
+    fn get_options(&self) -> IndexMap<BString, InputValue> {
         InputInterface::get_options(&self.inner)
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
+    fn get_option_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
         self.inner.get_option(name)
     }
 
-    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+    fn set_option_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_option(name, value)
     }
 
-    fn has_option(&self, name: &str) -> bool {
+    fn has_option_bytes(&self, name: &BStr) -> bool {
         self.inner.has_option(name)
     }
 
@@ -193,8 +195,8 @@ impl InputInterface for StringInput {
         self.inner.set_interactive(interactive)
     }
 
-    fn __to_string(&self) -> String {
-        self.to_string()
+    fn __to_string(&self) -> BString {
+        self.inner.__to_string()
     }
 
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {

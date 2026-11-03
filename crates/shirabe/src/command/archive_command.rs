@@ -6,7 +6,7 @@ use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::archiver::ArchiveManagerInterface;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -15,13 +15,14 @@ use crate::repository::{CompositeRepository, RepositoryFactory, RepositorySet};
 use crate::script::ScriptEvents;
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, get_debug_type, impl_php_class, php_regex, preg_match,
+    LogicException, PhpMixed, bconcat, get_debug_type, impl_php_class, implode, path_from_bytes,
+    path_to_bytes, php_regex, php_str, preg_match, strtolower,
 };
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::input::InputInterfaceByName;
+use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
 pub struct ArchiveCommand {
@@ -43,11 +44,11 @@ pub struct ArchiveCommandTestHooks {
 /// For testing only: the scalar arguments captured from a stubbed `archive` call.
 #[derive(Debug, Clone)]
 pub struct ArchiveCallRecord {
-    pub package_name: Option<String>,
-    pub version: Option<String>,
-    pub format: String,
-    pub dest: String,
-    pub file_name: Option<String>,
+    pub package_name: Option<BString>,
+    pub version: Option<BString>,
+    pub format: BString,
+    pub dest: BString,
+    pub file_name: Option<BString>,
     pub ignore_filters: bool,
     pub had_composer: bool,
 }
@@ -59,7 +60,12 @@ impl Default for ArchiveCommand {
 }
 
 impl ArchiveCommand {
-    const FORMATS: &'static [&'static str] = &["tar", "tar.gz", "tar.bz2", "zip"];
+    const FORMATS: &'static [&'static BStr] = &[
+        php_str(b"tar"),
+        php_str(b"tar.gz"),
+        php_str(b"tar.bz2"),
+        php_str(b"zip"),
+    ];
 
     pub fn new() -> Self {
         let command = ArchiveCommand {
@@ -93,11 +99,11 @@ impl ArchiveCommand {
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        package_name: Option<String>,
-        version: Option<String>,
-        format: &str,
-        dest: &str,
-        file_name: Option<String>,
+        package_name: Option<BString>,
+        version: Option<BString>,
+        format: &BStr,
+        dest: &BStr,
+        file_name: Option<BString>,
         ignore_filters: bool,
         composer: Option<&PartialComposerHandle>,
     ) -> anyhow::Result<i64> {
@@ -109,8 +115,8 @@ impl ArchiveCommand {
                 .push(ArchiveCallRecord {
                     package_name,
                     version,
-                    format: format.to_string(),
-                    dest: dest.to_string(),
+                    format: format.into(),
+                    dest: dest.into(),
                     file_name,
                     ignore_filters,
                     had_composer: composer.is_some(),
@@ -151,7 +157,11 @@ impl ArchiveCommand {
 
         let package: crate::package::CompletePackageInterfaceHandle =
             if let Some(name) = package_name {
-                match self.select_package(io.clone(), &name, version.as_deref())? {
+                match self.select_package(
+                    io.clone(),
+                    name.as_bstr(),
+                    version.as_ref().map(|v| v.as_bstr()),
+                )? {
                     Some(p) => p,
                     None => return Ok(1),
                 }
@@ -161,15 +171,16 @@ impl ArchiveCommand {
                 composer.get_package().clone().into()
             };
 
-        io.write_error(&format!(
-            "<info>Creating the archive into \"{}\".</info>",
-            dest
+        io.write_error(bconcat!(
+            "<info>Creating the archive into \"",
+            dest,
+            "\".</info>"
         ));
-        let package_path: String = archive_manager
+        let package_path = archive_manager
             .archive(
                 package,
-                format.to_string(),
-                dest.to_string(),
+                format.into(),
+                path_from_bytes(dest).to_path_buf(),
                 file_name,
                 ignore_filters,
             )
@@ -179,12 +190,13 @@ impl ArchiveCommand {
             fs.find_shortest_path(&Platform::get_cwd(false)?, &package_path, true, false)?;
 
         io.write_error_no_newline("Created: ");
-        let display = if short_path.len() < package_path.len() {
-            &short_path
+        let short_path = path_to_bytes(&short_path);
+        let package_path = path_to_bytes(&package_path);
+        io.write(if short_path.len() < package_path.len() {
+            short_path
         } else {
-            &package_path
-        };
-        io.write(display);
+            package_path
+        });
 
         Ok(0)
     }
@@ -192,12 +204,12 @@ impl ArchiveCommand {
     pub fn select_package(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        package_name: &str,
-        version: Option<&str>,
+        package_name: &BStr,
+        version: Option<&BStr>,
     ) -> anyhow::Result<Option<crate::package::CompletePackageInterfaceHandle>> {
         io.write_error("<info>Searching for the specified package.</info>");
 
-        let mut version = version.map(|v| v.to_string());
+        let mut version = version.map(BString::from);
         let mut min_stability;
         let repo;
 
@@ -212,24 +224,24 @@ impl ArchiveCommand {
             min_stability = composer.get_package().get_minimum_stability();
         } else {
             let default_repos = RepositoryFactory::default_repos_with_default_manager(io.clone())?;
-            let repo_names: Vec<String> = default_repos.keys().cloned().collect();
-            io.write_error(&format!(
-                "No composer.json found in the current directory, searching packages from {}",
-                repo_names.join(", ")
+            let repo_names: Vec<&BString> = default_repos.keys().collect();
+            io.write_error(bconcat!(
+                "No composer.json found in the current directory, searching packages from ",
+                implode(", ", &repo_names)
             ));
             repo = CompositeRepository::new(default_repos.into_values().collect());
-            min_stability = "stable".to_string();
+            min_stability = BString::from("stable");
         }
 
         if let Some(version_str) = &version
             && let Some(matches) =
                 preg_match(php_regex!(r"{@(stable|RC|beta|alpha|dev)$}i"), version_str)
         {
-            let m1 = matches.get(1).unwrap_or_default().to_string();
-            let m0 = matches.get(0).unwrap_or_default().to_string();
-            min_stability = VersionParser::normalize_stability(&m1)?;
-            let full_match_len = m0.len();
-            version = Some(version_str[..version_str.len() - full_match_len].to_string());
+            min_stability = VersionParser::normalize_stability(matches.get(1).unwrap_or_default())?;
+            let full_match_len = matches.get(0).unwrap_or_default().len();
+            version = Some(BString::from(
+                &version_str[..version_str.len() - full_match_len],
+            ));
         }
 
         let mut repo_set = RepositorySet::new(
@@ -242,20 +254,19 @@ impl ArchiveCommand {
         );
         repo_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(repo))?;
         let parser = VersionParser::new();
-        let constraint: Option<shirabe_semver::constraint::AnyConstraint> = match version.as_deref()
-        {
+        let constraint: Option<shirabe_semver::constraint::AnyConstraint> = match &version {
             Some(v) => Some(parser.parse_constraints(v)?),
             None => None,
         };
-        let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0)?;
+        let packages = repo_set.find_packages(strtolower(package_name).as_ref(), constraint, 0)?;
 
         let package = if packages.len() > 1 {
             let mut version_selector =
                 VersionSelector::new(std::rc::Rc::new(std::cell::RefCell::new(repo_set)), None)?;
             let best = version_selector.find_best_candidate(
-                &package_name.to_lowercase(),
-                version.as_deref(),
-                &min_stability,
+                strtolower(package_name).as_ref(),
+                version.as_ref().map(BString::as_ref),
+                bstr::BStr::new(&min_stability),
                 None,
                 0,
                 None,
@@ -263,31 +274,34 @@ impl ArchiveCommand {
             )?;
             let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
 
-            io.write_error(&format!(
-                "<info>Found multiple matches, selected {}.</info>",
-                p.get_pretty_string()
+            io.write_error(bconcat!(
+                "<info>Found multiple matches, selected ",
+                p.get_pretty_string(),
+                ".</info>"
             ));
             // alternatives message omitted for brevity (already logged via p being selected)
             io.write_error("<comment>Please use a more specific constraint to pick a different package.</comment>");
             p
         } else if packages.len() == 1 {
             let p: crate::package::PackageInterfaceHandle = packages.into_iter().next().unwrap();
-            io.write_error(&format!(
-                "<info>Found an exact match {}.</info>",
-                p.get_pretty_string()
+            io.write_error(bconcat!(
+                "<info>Found an exact match ",
+                p.get_pretty_string(),
+                ".</info>"
             ));
             p
         } else {
-            io.write_error(&format!(
-                "<error>Could not find a package matching {}.</error>",
-                package_name
+            io.write_error(bconcat!(
+                "<error>Could not find a package matching ",
+                package_name,
+                ".</error>"
             ));
             return Ok(None);
         };
 
         let Some(complete) = package.as_complete() else {
-            return Err(LogicException::new(format!(
-                "Expected a CompletePackageInterface instance but found {}",
+            return Err(LogicException::new(bconcat!(
+                "Expected a CompletePackageInterface instance but found ",
                 get_debug_type(&PhpMixed::Null)
             ))
             .into());
@@ -300,12 +314,12 @@ impl ArchiveCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ArchiveCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("archive")?;
-        self.set_description("Creates an archive of this composer package");
+        self.set_name("archive".into())?;
+        self.set_description("Creates an archive of this composer package".into());
         self.set_definition(&[
             InputArgument::new5("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, self.suggest_available_package(99)).unwrap().into(),
             InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
-            InputOption::new6("format", Some("f"), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("format", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| BString::from(*s)).collect())).unwrap().into(),
             InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
             InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
             InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),
@@ -315,7 +329,7 @@ impl Command for ArchiveCommand {
             containing the files and directories of the Composer project or the specified\n\
             package in the specified version and writes it to the specified directory.\n\n\
             <info>shirabe archive [--format=zip] [--dir=/foo] [--file=filename] [package [version]]</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#archive"
+            Read more at https://getcomposer.org/doc/03-cli.md#archive".into()
         );
         Ok(())
     }
@@ -331,11 +345,11 @@ impl Command for ArchiveCommand {
             let config = composer.borrow_partial().get_config();
             let mut command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
-            let command_event_name = command_event.get_name().to_string();
+            let command_event_name = command_event.get_name().to_owned();
             let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
             event_dispatcher
                 .borrow_mut()
-                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+                .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
             event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::PRE_ARCHIVE_CMD,
                 true,
@@ -351,28 +365,30 @@ impl Command for ArchiveCommand {
             .borrow()
             .get_option("format")?
             .as_string()
-            .map(|s| s.to_string())
+            .map(BString::from)
             .unwrap_or_else(|| {
-                config
-                    .borrow_mut()
-                    .get("archive-format")
-                    .as_string()
-                    .unwrap_or("tar".into())
-                    .to_string()
+                BString::from(
+                    config
+                        .borrow_mut()
+                        .get("archive-format")
+                        .as_string()
+                        .unwrap_or("tar".into()),
+                )
             });
 
         let dir = input
             .borrow()
             .get_option("dir")?
             .as_string()
-            .map(|s| s.to_string())
+            .map(BString::from)
             .unwrap_or_else(|| {
-                config
-                    .borrow_mut()
-                    .get("archive-dir")
-                    .as_string()
-                    .unwrap_or(".".into())
-                    .to_string()
+                BString::from(
+                    config
+                        .borrow_mut()
+                        .get("archive-dir")
+                        .as_string()
+                        .unwrap_or(".".into()),
+                )
             });
 
         let io = self.get_io().clone();
@@ -384,19 +400,19 @@ impl Command for ArchiveCommand {
                     .borrow()
                     .get_argument("package")?
                     .as_string()
-                    .map(|s| s.to_string()),
+                    .map(BString::from),
                 input
                     .borrow()
                     .get_argument("version")?
                     .as_string()
-                    .map(|s| s.to_string()),
-                &format,
-                &dir,
+                    .map(BString::from),
+                format.as_bstr(),
+                dir.as_bstr(),
                 input
                     .borrow()
                     .get_option("file")?
                     .as_string()
-                    .map(|s| s.to_string()),
+                    .map(BString::from),
                 input
                     .borrow()
                     .get_option("ignore-filters")?

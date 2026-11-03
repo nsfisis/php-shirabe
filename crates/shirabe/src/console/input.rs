@@ -1,3 +1,4 @@
+use bstr::{BString, ByteSlice};
 pub mod input_argument;
 pub mod input_option;
 
@@ -18,17 +19,17 @@ pub type SuggestedValuesClosure = Box<
         &dyn crate::command::BaseCommand,
         &CompletionInput,
         &mut CompletionSuggestions,
-    ) -> anyhow::Result<Vec<String>>,
+    ) -> anyhow::Result<Vec<BString>>,
 >;
 
 /// PHP: the `list<string>|\Closure(...)` union taken by the suggestedValues parameter of the
 /// `Composer\Console\Input\InputArgument` / `InputOption` backport.
 ///
-/// The closure returns `Vec<String>` rather than `list<string|Suggestion>`: every Composer
+/// The closure returns `Vec<BString>` rather than `list<string|Suggestion>`: every Composer
 /// closure returns plain strings, and `complete` lifts them into suggestions. PHP's runtime
 /// "Closure must return an array" LogicException is statically guaranteed by the type.
 pub enum SuggestedValues {
-    List(Vec<String>),
+    List(Vec<BString>),
     Closure(SuggestedValuesClosure),
 }
 
@@ -55,7 +56,10 @@ impl SuggestedValues {
         suggestions: &mut CompletionSuggestions,
     ) -> anyhow::Result<()> {
         let values = match self {
-            SuggestedValues::List(values) => values.clone(),
+            SuggestedValues::List(values) => values
+                .iter()
+                .map(|value| BString::from(value.as_bstr()))
+                .collect(),
             SuggestedValues::Closure(closure) => closure(this, input, suggestions)?,
         };
         if !values.is_empty() {
@@ -72,7 +76,7 @@ impl SuggestedValues {
         this: &dyn crate::command::BaseCommand,
         input: &CompletionInput,
         suggestions: &mut CompletionSuggestions,
-    ) -> anyhow::Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<BString>> {
         match self {
             SuggestedValues::Closure(closure) => closure(this, input, suggestions),
             SuggestedValues::List(_) => panic!("SuggestedValues::call on a non-closure"),

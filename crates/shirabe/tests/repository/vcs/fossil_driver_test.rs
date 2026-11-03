@@ -1,13 +1,13 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/FossilDriverTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::FossilDriver;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -20,10 +20,7 @@ fn set_up() -> SetUp {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 
@@ -51,14 +48,14 @@ impl Drop for TearDown {
     }
 }
 
-fn support_provider() -> Vec<(&'static str, bool)> {
+fn support_provider() -> Vec<(&'static BStr, bool)> {
     vec![
-        ("http://fossil.kd2.org/kd2fw/", true),
+        (BStr::new("http://fossil.kd2.org/kd2fw/"), true),
         (
-            "https://chiselapp.com/user/rkeene/repository/flint/index",
+            BStr::new("https://chiselapp.com/user/rkeene/repository/flint/index"),
             true,
         ),
-        ("ssh://fossil.kd2.org/kd2fw.fossil", true),
+        (BStr::new("ssh://fossil.kd2.org/kd2fw.fossil"), true),
     ]
 }
 
@@ -68,7 +65,7 @@ fn test_support() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
-        let result = FossilDriver::supports(io, config, url, false).unwrap();
+        let result = FossilDriver::supports(io, config, bstr::BStr::new(url), false).unwrap();
         assert_eq!(assertion, result);
     }
 }

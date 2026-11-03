@@ -3,16 +3,16 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::http::Response;
 use crate::util::{Forgejo, ForgejoRepositoryData, ForgejoUrl};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, base64_decode, date_create, explode, extension_loaded,
-    php_regex, preg_match, urlencode,
+    Catch as _, PhpMixed, RuntimeException, base64_decode, bconcat, date_create, explode,
+    extension_loaded, path_from_bytes, php_regex, preg_match, strtolower, urlencode,
 };
 
 #[derive(Debug)]
@@ -21,8 +21,8 @@ pub struct ForgejoDriver {
     forgejo_url: Option<ForgejoUrl>,
     repository_data: Option<ForgejoRepositoryData>,
     git_driver: Option<GitDriver>,
-    tags: Option<IndexMap<String, String>>,
-    branches: Option<IndexMap<String, String>>,
+    tags: Option<IndexMap<BString, BString>>,
+    branches: Option<IndexMap<BString, BString>>,
 }
 
 impl ForgejoDriver {
@@ -44,26 +44,28 @@ impl ForgejoDriver {
     }
 
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let forgejo_url = ForgejoUrl::create(&self.inner.url)?;
+        let forgejo_url = ForgejoUrl::create(self.inner.url.as_bstr())?;
         self.inner.origin_url = forgejo_url.origin_url.clone();
 
-        let cache_dir = format!(
-            "{}/{}/{}/{}",
+        let cache_dir = bconcat!(
             self.inner
                 .config
                 .borrow_mut()
                 .get("cache-repo-dir")
                 .as_string()
                 .unwrap_or_default(),
+            "/",
             forgejo_url.origin_url,
+            "/",
             forgejo_url.owner,
+            "/",
             forgejo_url.repository
         );
         self.forgejo_url = Some(forgejo_url);
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            &cache_dir,
+            path_from_bytes(&cache_dir),
             None,
             None,
             false,
@@ -86,21 +88,16 @@ impl ForgejoDriver {
 
     pub fn get_file_content(
         &mut self,
-        file: &str,
-        identifier: &str,
-    ) -> anyhow::Result<Option<String>> {
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_file_content(file, identifier);
         }
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-        let resource_url = format!(
-            "{}/contents/{}?ref={}",
-            api_url,
-            file,
-            urlencode(identifier)
-        );
-        let response = self.get_contents(&resource_url, false)??;
+        let resource_url = bconcat!(api_url, "/contents/", file, "?ref=", urlencode(identifier));
+        let response = self.get_contents(resource_url.as_bstr(), false)??;
         let mut resource = response.decode_json()?;
 
         // The Forgejo contents API only returns files up to 1MB as base64 encoded files;
@@ -119,14 +116,12 @@ impl ForgejoDriver {
 
         if needs_git_blob {
             let git_url = if let PhpMixed::Array(ref arr) = resource {
-                arr.get(B("git_url"))
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_str_lossy().into_owned())
+                arr.get(B("git_url")).and_then(|v| v.as_string())
             } else {
                 None
             };
             if let Some(git_url) = git_url {
-                resource = self.get_contents(&git_url, false)??.decode_json()?;
+                resource = self.get_contents(git_url, false)??.decode_json()?;
             }
         }
 
@@ -135,9 +130,7 @@ impl ForgejoDriver {
             let encoding_ok =
                 arr.get(B("encoding")).and_then(|v| v.as_string()) == Some("base64".into());
             if has_content && encoding_ok {
-                arr.get(B("content"))
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_str_lossy().into_owned())
+                arr.get(B("content")).and_then(|v| v.as_string())
             } else {
                 None
             }
@@ -146,24 +139,21 @@ impl ForgejoDriver {
         };
 
         match content_b64 {
-            Some(b64) => match base64_decode(&b64) {
-                Some(bytes) => match String::from_utf8(bytes) {
-                    Ok(s) => Ok(Some(s)),
-                    Err(_) => Err(RuntimeException::new(format!(
-                        "Could not retrieve {} for {}",
-                        file, identifier
-                    ))
-                    .into()),
-                },
-                None => Err(RuntimeException::new(format!(
-                    "Could not retrieve {} for {}",
-                    file, identifier
+            Some(b64) => match base64_decode(b64) {
+                Some(bytes) => Ok(Some(bstr::BString::from(bytes))),
+                None => Err(RuntimeException::new(bconcat!(
+                    "Could not retrieve ",
+                    file,
+                    " for ",
+                    identifier
                 ))
                 .into()),
             },
-            None => Err(RuntimeException::new(format!(
-                "Could not retrieve {} for {}",
-                file, identifier
+            None => Err(RuntimeException::new(bconcat!(
+                "Could not retrieve ",
+                file,
+                " for ",
+                identifier
             ))
             .into()),
         }
@@ -171,19 +161,22 @@ impl ForgejoDriver {
 
     pub fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_change_date(identifier);
         }
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-        let resource_url = format!(
-            "{}/git/commits/{}?verification=false&files=false",
+        let resource_url = bconcat!(
             api_url,
-            urlencode(identifier)
+            "/git/commits/",
+            urlencode(identifier),
+            "?verification=false&files=false"
         );
-        let commit = self.get_contents(&resource_url, false)??.decode_json()?;
+        let commit = self
+            .get_contents(resource_url.as_bstr(), false)??
+            .decode_json()?;
 
         let date_str = if let PhpMixed::Array(ref arr) = commit {
             arr.get(B("commit"))
@@ -192,20 +185,19 @@ impl ForgejoDriver {
                 .and_then(|v| v.as_array())
                 .and_then(|c| c.get(B("date")))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_str_lossy().into_owned())
         } else {
             None
         };
 
         let date_str = date_str.ok_or_else(|| {
-            RuntimeException::new(format!("Could not parse commit date for {}", identifier))
+            RuntimeException::new(bconcat!("Could not parse commit date for ", identifier))
         })?;
 
-        let date: chrono::DateTime<chrono::FixedOffset> = date_create(&date_str)?;
+        let date: chrono::DateTime<chrono::FixedOffset> = date_create(date_str)?;
         Ok(Some(date))
     }
 
-    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_root_identifier();
         }
@@ -218,7 +210,7 @@ impl ForgejoDriver {
             .clone())
     }
 
-    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_branches();
         }
@@ -226,10 +218,10 @@ impl ForgejoDriver {
         if self.branches.is_none() {
             let mut branches = IndexMap::new();
             let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-            let mut resource: Option<String> = Some(format!("{}/branches?per_page=100", api_url));
+            let mut resource: Option<BString> = Some(bconcat!(api_url, "/branches?per_page=100"));
 
             while let Some(url) = resource {
-                let response = self.get_contents(&url, false)??;
+                let response = self.get_contents(url.as_bstr(), false)??;
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
@@ -237,13 +229,13 @@ impl ForgejoDriver {
                             let name = arr
                                 .get(B("name"))
                                 .and_then(|v| v.as_string())
-                                .map(|s| s.to_str_lossy().into_owned());
+                                .map(BString::from);
                             let id = arr
                                 .get(B("commit"))
                                 .and_then(|v| v.as_array())
                                 .and_then(|c| c.get(B("id")))
                                 .and_then(|v| v.as_string())
-                                .map(|s| s.to_str_lossy().into_owned());
+                                .map(BString::from);
                             if let (Some(n), Some(i)) = (name, id) {
                                 branches.insert(n, i);
                             }
@@ -259,7 +251,7 @@ impl ForgejoDriver {
         Ok(self.branches.clone().unwrap_or_default())
     }
 
-    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_tags();
         }
@@ -267,10 +259,10 @@ impl ForgejoDriver {
         if self.tags.is_none() {
             let mut tags = IndexMap::new();
             let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-            let mut resource: Option<String> = Some(format!("{}/tags?per_page=100", api_url));
+            let mut resource: Option<BString> = Some(bconcat!(api_url, "/tags?per_page=100"));
 
             while let Some(url) = resource {
-                let response = self.get_contents(&url, false)??;
+                let response = self.get_contents(url.as_bstr(), false)??;
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
@@ -278,13 +270,13 @@ impl ForgejoDriver {
                             let name = arr
                                 .get(B("name"))
                                 .and_then(|v| v.as_string())
-                                .map(|s| s.to_str_lossy().into_owned());
+                                .map(BString::from);
                             let sha = arr
                                 .get(B("commit"))
                                 .and_then(|v| v.as_array())
                                 .and_then(|c| c.get(B("sha")))
                                 .and_then(|v| v.as_string())
-                                .map(|s| s.to_str_lossy().into_owned());
+                                .map(BString::from);
                             if let (Some(n), Some(s)) = (name, sha) {
                                 tags.insert(n, s);
                             }
@@ -300,23 +292,24 @@ impl ForgejoDriver {
         Ok(self.tags.clone().unwrap_or_default())
     }
 
-    pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
-        let url = format!(
-            "{}/archive/{}.zip",
+    pub fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
+        let url = bconcat!(
             self.forgejo_url.as_ref().unwrap().api_url,
-            identifier
+            "/archive/",
+            identifier,
+            ".zip"
         );
         let mut map = IndexMap::new();
-        map.insert("type".to_string(), "zip".to_string());
-        map.insert("url".to_string(), url);
-        map.insert("reference".to_string(), identifier.to_string());
-        map.insert("shasum".to_string(), "".to_string());
+        map.insert(BString::from("type"), BString::from("zip"));
+        map.insert(BString::from("url"), url);
+        map.insert(BString::from("reference"), BString::from(identifier));
+        map.insert(BString::from("shasum"), BString::from(""));
         Some(map)
     }
 
     pub fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_composer_information(identifier);
@@ -325,10 +318,11 @@ impl ForgejoDriver {
         if !self.inner.info_cache.contains_key(identifier) {
             let composer = if self.inner.should_cache(identifier) {
                 if let Some(res) = self.inner.cache.as_mut().and_then(|c| c.read(identifier)) {
-                    let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
+                    let parsed = JsonFile::parse_json(Some(&res), None)?;
                     parsed.as_array().cloned()
                 } else {
-                    let file_content = self.get_file_content("composer.json", identifier)?;
+                    let file_content =
+                        self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
                     let c = VcsDriverBase::finish_base_composer_information(
                         identifier,
                         file_content,
@@ -357,7 +351,8 @@ impl ForgejoDriver {
                     c
                 }
             } else {
-                let file_content = self.get_file_content("composer.json", identifier)?;
+                let file_content =
+                    self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
                 VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
                     self.get_change_date(identifier)
                 })?
@@ -394,15 +389,15 @@ impl ForgejoDriver {
                         .find(|(_, v)| v == identifier)
                         .map(|(k, _)| k)
                     {
-                        format!("{}/tag/{}", html_url, label)
+                        bconcat!(html_url, "/tag/", label)
                     } else if let Some(label) = branches
                         .into_iter()
                         .find(|(_, v)| v == identifier)
                         .map(|(k, _)| k)
                     {
-                        format!("{}/branch/{}", html_url, label)
+                        bconcat!(html_url, "/branch/", label)
                     } else {
-                        format!("{}/commit/{}", html_url, identifier)
+                        bconcat!(html_url, "/commit/", identifier)
                     };
 
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut(B("support")) {
@@ -416,12 +411,12 @@ impl ForgejoDriver {
                     .is_some_and(|arr| arr.contains_key(B("issues")));
 
                 if !has_issues && self.repository_data.as_ref().is_some_and(|r| r.has_issues) {
-                    let issues_url = format!(
-                        "{}/issues",
+                    let issues_url = bconcat!(
                         self.repository_data
                             .as_ref()
                             .map(|r| r.html_url.clone())
-                            .unwrap_or_default()
+                            .unwrap_or_default(),
+                        "/issues"
                     );
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut(B("support")) {
                         support.insert("issues".into(), PhpMixed::string(issues_url));
@@ -437,7 +432,7 @@ impl ForgejoDriver {
 
             self.inner
                 .info_cache
-                .insert(identifier.to_string(), composer);
+                .insert(bstr::BString::from(identifier), composer);
         }
 
         Ok(self
@@ -447,19 +442,19 @@ impl ForgejoDriver {
             .and_then(|v| v.clone()))
     }
 
-    pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    pub fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         if let Some(ref git_driver) = self.git_driver {
             return git_driver.get_source(identifier);
         }
 
         let mut map = IndexMap::new();
-        map.insert("type".to_string(), "git".to_string());
-        map.insert("url".to_string(), self.get_url());
-        map.insert("reference".to_string(), identifier.to_string());
+        map.insert(BString::from("type"), BString::from("git"));
+        map.insert(BString::from("url"), BString::from(&self.get_url()[..]));
+        map.insert(BString::from("reference"), BString::from(identifier));
         map
     }
 
-    pub fn get_url(&self) -> String {
+    pub fn get_url(&self) -> BString {
         if let Some(ref git_driver) = self.git_driver {
             return git_driver.get_url();
         }
@@ -475,7 +470,7 @@ impl ForgejoDriver {
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         _deep: bool,
     ) -> anyhow::Result<bool> {
         let forgejo_url = ForgejoUrl::try_from(Some(url));
@@ -487,9 +482,8 @@ impl ForgejoDriver {
         let forgejo_domains = config.borrow().get("forgejo-domains");
         let in_domains = if let Some(list) = forgejo_domains.as_list() {
             list.iter().any(|d| {
-                d.as_string().is_some_and(|s| {
-                    s.to_str_lossy().to_lowercase() == forgejo_url.origin_url.to_lowercase()
-                })
+                d.as_string()
+                    .is_some_and(|s| s == strtolower(&forgejo_url.origin_url))
             })
         } else {
             false
@@ -500,9 +494,10 @@ impl ForgejoDriver {
 
         if !extension_loaded("openssl") {
             io.write_error3(
-                &format!(
-                    "Skipping Forgejo driver for {} because the OpenSSL PHP extension is missing.",
-                    url
+                bconcat!(
+                    "Skipping Forgejo driver for ",
+                    url,
+                    " because the OpenSSL PHP extension is missing."
                 ),
                 true,
                 io_interface::VERBOSE,
@@ -514,12 +509,12 @@ impl ForgejoDriver {
         Ok(true)
     }
 
-    fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
+    fn setup_git_driver(&mut self, url: &BStr) -> anyhow::Result<()> {
         let mut git_driver = GitDriver {
             inner: VcsDriverBase::new(
                 {
                     let mut m = IndexMap::new();
-                    m.insert("url".into(), PhpMixed::string(url.to_string()));
+                    m.insert("url".into(), PhpMixed::string(BString::from(url)));
                     m
                 },
                 self.inner.io.clone(),
@@ -530,7 +525,7 @@ impl ForgejoDriver {
             tags: None,
             branches: None,
             root_identifier: None,
-            repo_dir: String::new(),
+            repo_dir: BString::default(),
         };
         git_driver.initialize()?;
         self.git_driver = Some(git_driver);
@@ -543,13 +538,8 @@ impl ForgejoDriver {
         }
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-        match self.get_contents(&api_url, true)? {
-            Err(_) => {
-                if self.git_driver.is_some() {
-                    return Ok(());
-                }
-                return Err(anyhow::anyhow!("Failed to fetch repository data"));
-            }
+        match self.get_contents(bstr::BStr::new(&api_url), true)? {
+            Err(e) => return Err(e.into()),
             Ok(response) => {
                 let data = response.decode_json()?;
                 if data.is_null() && self.git_driver.is_some() {
@@ -564,15 +554,15 @@ impl ForgejoDriver {
         Ok(())
     }
 
-    fn get_next_page(&self, response: &Response) -> Option<String> {
-        let header = response.get_header("link")?;
+    fn get_next_page(&self, response: &Response) -> Option<BString> {
+        let header = response.get_header(BStr::new("link"))?;
 
         let links = explode(",", &header);
         for link in links {
             if let Some(m) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &link)
                 && let Some(url) = m.get(1)
             {
-                return Some(url.to_string());
+                return Some(BString::from(url));
             }
         }
 
@@ -581,7 +571,7 @@ impl ForgejoDriver {
 
     fn get_contents(
         &mut self,
-        url: &str,
+        url: &BStr,
         fetching_repo_data: bool,
     ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
         let e = match self.inner.get_contents(url)? {
@@ -599,19 +589,24 @@ impl ForgejoDriver {
                     self.attempt_clone_fallback()?;
 
                     return Ok(Ok(Response::new(
-                        "dummy".to_string(),
+                        "dummy".into(),
                         Some(200),
                         vec![],
-                        Some("null".to_string()),
+                        Some(b"null".to_vec()),
                     )));
                 }
 
-                if !self.inner.io.has_authentication(&self.inner.origin_url) {
+                if !self
+                    .inner
+                    .io
+                    .has_authentication(self.inner.origin_url.as_bstr())
+                {
                     let origin_url = self.forgejo_url.as_ref().unwrap().origin_url.clone();
                     let message = if e.get_code() == 429 {
-                        Some(format!(
-                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>{}</info>)",
-                            self.inner.url
+                        Some(bconcat!(
+                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>",
+                            self.inner.url,
+                            "</info>)"
                         ))
                     } else {
                         None
@@ -622,8 +617,10 @@ impl ForgejoDriver {
                         self.inner.config.clone(),
                         self.inner.http_downloader.clone(),
                     );
-                    let auth_result =
-                        forgejo.authorize_o_auth_interactively(&origin_url, message.as_deref())?;
+                    let auth_result = forgejo.authorize_o_auth_interactively(
+                        origin_url.as_bstr(),
+                        message.as_ref().map(|m| m.as_bstr()),
+                    )?;
 
                     if let Ok(true) = auth_result {
                         return self.inner.get_contents(url);
@@ -639,14 +636,11 @@ impl ForgejoDriver {
     // Returns true on success, throws on failure.
     fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         let ssh_url = self.forgejo_url.as_ref().unwrap().generate_ssh_url();
-        match self.setup_git_driver(&ssh_url) {
+        match self.setup_git_driver(ssh_url.as_bstr()) {
             Ok(()) => Ok(true),
             Err(e) => {
                 self.git_driver = None;
-                self.inner.io.write_error3(&format!(
-                    "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Forgejo credentials</error>",
-                    ssh_url
-                ), true, io_interface::NORMAL);
+                self.inner.io.write_error3(bconcat!("<error>Failed to clone the ", ssh_url, " repository, try running in interactive mode so that you can enter your Forgejo credentials</error>"), true, io_interface::NORMAL);
                 Err(e)
             }
         }
@@ -660,47 +654,51 @@ impl crate::repository::vcs::VcsDriverInterface for ForgejoDriver {
 
     fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         ForgejoDriver::get_composer_information(self, identifier)
     }
 
-    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+    fn get_file_content(
+        &mut self,
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         ForgejoDriver::get_file_content(self, file, identifier)
     }
 
     fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         ForgejoDriver::get_change_date(self, identifier)
     }
 
-    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         ForgejoDriver::get_root_identifier(self)
     }
 
-    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         ForgejoDriver::get_branches(self)
     }
 
-    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         ForgejoDriver::get_tags(self)
     }
 
-    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
+    fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         ForgejoDriver::get_dist(self, identifier)
     }
 
-    fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         ForgejoDriver::get_source(self, identifier)
     }
 
-    fn get_url(&self) -> String {
+    fn get_url(&self) -> BString {
         ForgejoDriver::get_url(self)
     }
 
-    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+    fn has_composer_file(&mut self, identifier: &BStr) -> anyhow::Result<bool> {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
@@ -720,7 +718,7 @@ impl crate::repository::vcs::VcsDriverInterface for ForgejoDriver {
     fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
         ForgejoDriver::supports(io, config, url, deep)

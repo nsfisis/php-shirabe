@@ -1,11 +1,20 @@
 //! ref: composer/vendor/symfony/console/Helper/DebugFormatterHelper.php
 
 use crate::helper::{Helper, HelperInterface, HelperSet};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::str_replace;
+use shirabe_php_shim::{bconcat, php_str, str_replace};
 
-const COLORS: [&str; 9] = [
-    "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white", "default",
+const COLORS: [&BStr; 9] = [
+    php_str(b"black"),
+    php_str(b"red"),
+    php_str(b"green"),
+    php_str(b"yellow"),
+    php_str(b"blue"),
+    php_str(b"magenta"),
+    php_str(b"cyan"),
+    php_str(b"white"),
+    php_str(b"default"),
 ];
 
 /// Helps outputting debug information when running an external program from a command.
@@ -14,7 +23,7 @@ const COLORS: [&str; 9] = [
 #[derive(Debug)]
 pub struct DebugFormatterHelper {
     inner: Helper,
-    started: IndexMap<String, DebugFormatterSession>,
+    started: IndexMap<BString, DebugFormatterSession>,
     count: i64,
 }
 
@@ -39,10 +48,10 @@ impl Default for DebugFormatterHelper {
 
 impl DebugFormatterHelper {
     /// Starts a debug formatting session.
-    pub fn start(&mut self, id: &str, message: &str, prefix: &str) -> String {
+    pub fn start(&mut self, id: &BStr, message: &BStr, prefix: &BStr) -> BString {
         self.count += 1;
         self.started.insert(
-            id.to_string(),
+            id.to_owned(),
             DebugFormatterSession {
                 border: self.count % COLORS.len() as i64,
                 out: false,
@@ -50,68 +59,76 @@ impl DebugFormatterHelper {
             },
         );
 
-        format!(
-            "{}<bg=blue;fg=white> {} </> <fg=blue>{}</>\n",
+        bconcat!(
             self.get_border(id),
+            "<bg=blue;fg=white> ",
             prefix,
+            " </> <fg=blue>",
             message,
+            "</>\n"
         )
     }
 
     /// Adds progress to a formatting session.
     pub fn progress(
         &mut self,
-        id: &str,
-        buffer: &str,
+        id: &BStr,
+        buffer: &BStr,
         error: bool,
-        prefix: &str,
-        error_prefix: &str,
-    ) -> String {
-        let mut message = String::new();
+        prefix: &BStr,
+        error_prefix: &BStr,
+    ) -> BString {
+        let mut message = BString::default();
 
         if error {
             if self.started[id].out {
-                message.push('\n');
+                message.push(b'\n');
                 self.started.get_mut(id).unwrap().out = false;
             }
             if !self.started[id].err {
-                message.push_str(&format!(
-                    "{}<bg=red;fg=white> {} </> ",
+                message.extend_from_slice(&bconcat!(
                     self.get_border(id),
+                    "<bg=red;fg=white> ",
                     error_prefix,
+                    " </> "
                 ));
                 self.started.get_mut(id).unwrap().err = true;
             }
 
-            message.push_str(&str_replace(
+            message.extend_from_slice(&str_replace(
                 "\n",
-                &format!(
-                    "\n{}<bg=red;fg=white> {} </> ",
+                bconcat!(
+                    "\n",
                     self.get_border(id),
+                    "<bg=red;fg=white> ",
                     error_prefix,
+                    " </> "
                 ),
                 buffer,
             ));
         } else {
             if self.started[id].err {
-                message.push('\n');
+                message.push(b'\n');
                 self.started.get_mut(id).unwrap().err = false;
             }
             if !self.started[id].out {
-                message.push_str(&format!(
-                    "{}<bg=green;fg=white> {} </> ",
+                message.extend_from_slice(&bconcat!(
                     self.get_border(id),
+                    "<bg=green;fg=white> ",
                     prefix,
+                    " </> "
                 ));
                 self.started.get_mut(id).unwrap().out = true;
             }
 
-            message.push_str(&str_replace(
+            message.extend_from_slice(&str_replace(
                 "\n",
-                &format!(
-                    "\n{}<bg=green;fg=white> {} </> ",
+                bconcat!(
+                    "\n",
                     self.get_border(id),
+                    "<bg=green;fg=white> ",
                     prefix,
+                    " </> "
                 ),
                 buffer,
             ));
@@ -121,7 +138,7 @@ impl DebugFormatterHelper {
     }
 
     /// Stops a formatting session.
-    pub fn stop(&mut self, id: &str, message: &str, successful: bool, prefix: &str) -> String {
+    pub fn stop(&mut self, id: &BStr, message: &BStr, successful: bool, prefix: &BStr) -> BString {
         let trailing_eol = if self.started[id].out || self.started[id].err {
             "\n"
         } else {
@@ -129,21 +146,25 @@ impl DebugFormatterHelper {
         };
 
         if successful {
-            return format!(
-                "{}{}<bg=green;fg=white> {} </> <fg=green>{}</>\n",
+            return bconcat!(
                 trailing_eol,
                 self.get_border(id),
+                "<bg=green;fg=white> ",
                 prefix,
+                " </> <fg=green>",
                 message,
+                "</>\n"
             );
         }
 
-        let message = format!(
-            "{}{}<bg=red;fg=white> {} </> <fg=red>{}</>\n",
+        let message = bconcat!(
             trailing_eol,
             self.get_border(id),
+            "<bg=red;fg=white> ",
             prefix,
+            " </> <fg=red>",
             message,
+            "</>\n"
         );
 
         if let Some(session) = self.started.get_mut(id) {
@@ -154,8 +175,8 @@ impl DebugFormatterHelper {
         message
     }
 
-    fn get_border(&self, id: &str) -> String {
-        format!("<bg={}> </>", COLORS[self.started[id].border as usize])
+    fn get_border(&self, id: &BStr) -> BString {
+        bconcat!("<bg=", COLORS[self.started[id].border as usize], "> </>")
     }
 }
 
@@ -168,7 +189,25 @@ impl HelperInterface for DebugFormatterHelper {
         self.inner.get_helper_set()
     }
 
-    fn get_name(&self) -> String {
-        "debug_formatter".to_string()
+    fn get_name(&self) -> BString {
+        "debug_formatter".into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bstr::ByteSlice;
+
+    #[test]
+    fn id_prefix_and_message_keep_their_bytes() {
+        let id = BStr::new(b"id\xE9");
+        let mut helper = DebugFormatterHelper::default();
+        helper.start(id, "start".into(), "RUN".into());
+
+        let stopped = helper.stop(id, BStr::new(b"stop\xE9"), true, BStr::new(b"RES\xE9"));
+
+        assert!(stopped.contains_str(b"RES\xE9"));
+        assert!(stopped.contains_str(b"stop\xE9"));
     }
 }

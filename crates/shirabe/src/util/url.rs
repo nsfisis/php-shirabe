@@ -2,15 +2,22 @@
 
 use crate::config::Config;
 use crate::util::GitHub;
+use bstr::BString;
 use shirabe_php_shim::{
-    PhpMixed, in_array_strict, parse_url, php_regex, preg_is_match, preg_match, preg_replace,
-    preg_replace_callback,
+    PhpMixed, bconcat, in_array_strict, parse_url, php_regex, preg_is_match, preg_match,
+    preg_replace, preg_replace_callback,
 };
 
 pub struct Url;
 
 impl Url {
-    pub fn update_dist_reference(config: &Config, mut url: String, r#ref: &str) -> String {
+    pub fn update_dist_reference(
+        config: &Config,
+        url: impl AsRef<[u8]>,
+        r#ref: impl AsRef<[u8]>,
+    ) -> BString {
+        let mut url = BString::from(url.as_ref());
+        let r#ref = r#ref.as_ref();
         let host = parse_url(&url)
             .and_then(|parsed| parsed.host)
             .unwrap_or_default();
@@ -22,12 +29,15 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://api.github.com/repos/{}/{}/{}ball/{}",
+                url = bconcat!(
+                    "https://api.github.com/repos/",
                     m.get(1).unwrap_or_default(),
+                    "/",
                     m.get(2).unwrap_or_default(),
+                    "/",
                     m.get(3).unwrap_or_default(),
-                    r#ref
+                    "ball/",
+                    r#ref,
                 );
             } else if let Some(m) = preg_match(
                 php_regex!(
@@ -35,12 +45,15 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://api.github.com/repos/{}/{}/{}ball/{}",
+                url = bconcat!(
+                    "https://api.github.com/repos/",
                     m.get(1).unwrap_or_default(),
+                    "/",
                     m.get(2).unwrap_or_default(),
+                    "/",
                     m.get(3).unwrap_or_default(),
-                    r#ref
+                    "ball/",
+                    r#ref,
                 );
             } else if let Some(m) = preg_match(
                 php_regex!(
@@ -48,12 +61,15 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://api.github.com/repos/{}/{}/{}ball/{}",
+                url = bconcat!(
+                    "https://api.github.com/repos/",
                     m.get(1).unwrap_or_default(),
+                    "/",
                     m.get(2).unwrap_or_default(),
+                    "/",
                     m.get(3).unwrap_or_default(),
-                    r#ref
+                    "ball/",
+                    r#ref,
                 );
             }
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
@@ -63,12 +79,15 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://bitbucket.org/{}/{}/get/{}.{}",
+                url = bconcat!(
+                    "https://bitbucket.org/",
                     m.get(1).unwrap_or_default(),
+                    "/",
                     m.get(2).unwrap_or_default(),
+                    "/get/",
                     r#ref,
-                    m.get(4).unwrap_or_default()
+                    ".",
+                    m.get(4).unwrap_or_default(),
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
@@ -78,25 +97,33 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",
+                url = bconcat!(
+                    "https://gitlab.com/api/v4/projects/",
                     m.get(1).unwrap_or_default(),
+                    "/repository/archive.",
                     m.get(2).unwrap_or_default(),
-                    r#ref
+                    "?sha=",
+                    r#ref,
                 );
             }
-        } else if in_array_strict(host.clone(), config.get("github-domains").values()) {
+        } else if in_array_strict(
+            PhpMixed::string(host.clone()),
+            config.get("github-domains").values(),
+        ) {
             url = preg_replace(
                 php_regex!(r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i"),
-                &format!("$1/{}", r#ref),
+                bconcat!("$1/", r#ref),
                 &url,
             );
-        } else if in_array_strict(host, config.get("gitlab-domains").values()) {
+        } else if in_array_strict(
+            PhpMixed::string(host),
+            config.get("gitlab-domains").values(),
+        ) {
             url = preg_replace(
                 php_regex!(
                     r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i"
                 ),
-                &format!("${{1}}{}", r#ref),
+                bconcat!("${1}", r#ref),
                 &url,
             );
         }
@@ -106,9 +133,10 @@ impl Url {
         url
     }
 
-    pub fn get_origin(config: &Config, url: &str) -> String {
-        if url.starts_with("file://") {
-            return url.to_string();
+    pub fn get_origin(config: &Config, url: impl AsRef<[u8]>) -> BString {
+        let url = url.as_ref();
+        if url.starts_with(b"file://") {
+            return url.into();
         }
 
         let parsed = parse_url(url);
@@ -120,30 +148,33 @@ impl Url {
             .and_then(|parsed| parsed.port)
             .filter(|port| *port != 0)
         {
-            origin = format!("{}:{}", origin, port);
+            origin = bconcat!(origin, ":", port);
         }
 
-        if origin.ends_with(".github.com") && origin != "codeload.github.com" {
-            return "github.com".to_string();
+        if origin.ends_with(b".github.com") && origin != "codeload.github.com" {
+            return "github.com".into();
         }
 
         if origin == "repo.packagist.org" {
-            return "packagist.org".to_string();
+            return "packagist.org".into();
         }
 
         if origin.is_empty() {
-            origin = url.to_string();
+            origin = url.into();
         }
 
         // Gitlab can be installed in a non-root context (i.e. gitlab.com/foo). When downloading archives the originUrl
         // is the host without the path, so we look for the registered gitlab-domains matching the host here
-        if !origin.contains('/')
-            && !in_array_strict(origin.clone(), config.get("gitlab-domains").values())
+        if !origin.contains(&b'/')
+            && !in_array_strict(
+                PhpMixed::string(origin.clone()),
+                config.get("gitlab-domains").values(),
+            )
         {
-            let gitlab_domains: Vec<String> = match config.get("gitlab-domains") {
+            let gitlab_domains: Vec<BString> = match config.get("gitlab-domains") {
                 PhpMixed::List(list) => list
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_string().map(BString::from))
                     .collect(),
                 _ => vec![],
             };
@@ -157,21 +188,21 @@ impl Url {
         origin
     }
 
-    pub fn sanitize(url: String) -> String {
+    pub fn sanitize(url: impl AsRef<[u8]>) -> BString {
         // GitHub repository rename result in redirect locations containing the access_token as GET parameter
         // e.g. https://api.github.com/repositories/9999999999?access_token=github_token
-        let url = preg_replace(php_regex!(r"{([&?]access_token=)[^&]+}"), "$1***", &url);
+        let url = preg_replace(php_regex!(r"{([&?]access_token=)[^&]+}"), "$1***", url);
 
         preg_replace_callback(
             php_regex!(r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i"),
             |m| {
-                let user = m.name("user").unwrap_or_default().to_string();
-                let prefix = m.name("prefix").unwrap_or_default().to_string();
+                let user = m.name("user").unwrap_or_default();
+                let prefix = m.name("prefix").unwrap_or_default();
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                Ok(if preg_is_match(GitHub::GITHUB_TOKEN_REGEX, &user) {
-                    format!("{}***:***@", prefix)
+                Ok(if preg_is_match(GitHub::GITHUB_TOKEN_REGEX, user) {
+                    bconcat!(prefix, "***:***@")
                 } else {
-                    format!("{}{}:***@", prefix, user)
+                    bconcat!(prefix, user, ":***@")
                 })
             },
             &url,

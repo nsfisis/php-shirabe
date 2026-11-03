@@ -1,0 +1,42 @@
+# PHP strings are byte strings. These calls decode bytes, paths or OS strings as UTF-8, so they
+# either corrupt bytes that are not valid UTF-8 or fail where PHP does not; or they produce a
+# String; or they share a name with a PHP function and not its behaviour. See
+# docs/dev/strings-porting.md.
+disallowed-methods = [
+    { path = "std::string::String::from_utf8", reason = "keep the bytes; see docs/dev/strings-porting.md" },
+    { path = "std::string::String::from_utf8_lossy", reason = "keep the bytes; see docs/dev/strings-porting.md" },
+    { path = "std::string::String::from_utf8_unchecked", reason = "keep the bytes; see docs/dev/strings-porting.md" },
+    { path = "std::str::from_utf8", reason = "keep the bytes; see docs/dev/strings-porting.md" },
+    { path = "std::str::from_utf8_unchecked", reason = "keep the bytes; see docs/dev/strings-porting.md" },
+    { path = "std::path::Path::to_str", reason = "use path_to_bytes(); see docs/dev/strings-porting.md" },
+    { path = "std::path::Path::to_string_lossy", reason = "use display() or path_to_bytes(); see docs/dev/strings-porting.md" },
+    { path = "std::ffi::OsStr::to_str", reason = "use as_encoded_bytes(); see docs/dev/strings-porting.md" },
+    { path = "std::ffi::OsStr::to_string_lossy", reason = "use display() or as_encoded_bytes(); see docs/dev/strings-porting.md" },
+    { path = "std::ffi::OsString::into_string", reason = "use as_encoded_bytes(); see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::to_str", reason = "keep the bytes; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::to_str_lossy", reason = "use display_lossy() for a message; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::to_str_lossy_into", reason = "use display_lossy() for a message; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteVec::into_string", reason = "keep the bytes; see docs/dev/strings-porting.md" },
+    { path = "std::string::ToString::to_string", reason = "use bconcat!(), display_to_bytes() or error_message(); see docs/dev/strings-porting.md" },
+    { path = "std::fs::read_to_string", reason = "use std::fs::read(); see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::trim", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::trim_start", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::trim_end", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::to_lowercase", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::to_uppercase", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::chars", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::char_indices", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::lines", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteSlice::fields", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
+    { path = "bstr::ByteVec::into_string_lossy", reason = "use display_lossy() for a message; see docs/dev/strings-porting.md" },
+]
+
+# Every string is bytes unless it has a reason to be UTF-8. A site that has a reason says so:
+# `#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]`.
+disallowed-types = [
+    { path = "std::string::String", reason = "use BString unless the value has a reason to be UTF-8; see docs/dev/strings-porting.md" },
+    { path = "str", reason = "use &BStr unless the value has a reason to be UTF-8; see docs/dev/strings-porting.md" },
+]
+disallowed-macros = [
+    { path = "std::format", reason = "use bconcat! or sprintf() unless the destination is core::fmt; see docs/dev/strings-porting.md" },
+]

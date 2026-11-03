@@ -14,9 +14,11 @@ mod bootstrap;
 #[path = "common/isolated_cwd.rs"]
 mod isolated_cwd;
 
+use bstr::{BStr, BString, ByteSlice};
 #[cfg(not(target_os = "linux"))]
 use serial_test::serial;
 use shirabe::console::application::{Application, ApplicationHandle};
+use shirabe_php_shim::{implode, php_str};
 use shirabe_symfony_console::tester::CommandCompletionTester;
 
 /// PHP runs from the Composer dev checkout; chdir into the vendored checkout to reproduce
@@ -31,14 +33,14 @@ fn chdir_composer_checkout() -> isolated_cwd::RestoreCwd {
 ///
 /// `expected_suggestions` are sample expected suggestions (a subset). None if nothing is
 /// expected.
-fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
+fn assert_complete(input: &BStr, expected_suggestions: Option<&[&BStr]>) {
     bootstrap::bootstrap();
     let _guard = chdir_composer_checkout();
 
-    let mut input: Vec<&str> = input.split(' ').collect();
+    let mut input: Vec<&BStr> = input.split_str(" ").map(BStr::new).collect();
     let command_name = input.remove(0);
     // PHP: $this->getApplication()->get($commandName)
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     let base = application.__base_application();
     let command = {
         let mut app_ref = base.borrow_mut();
@@ -47,7 +49,7 @@ fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
             .as_any_mut()
             .downcast_mut::<Application>()
             .expect("ApplicationHandle wraps the shirabe Application");
-        app.get(command_name).unwrap()
+        app.get(bstr::BStr::new(command_name)).unwrap()
     };
 
     let tester = CommandCompletionTester::new(command);
@@ -57,12 +59,12 @@ fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
         assert!(
             suggestions.is_empty(),
             "Expected no suggestions. Got \"{}\".",
-            suggestions.join("\", \"")
+            implode("\", \"", &suggestions).display_lossy()
         );
         return;
     };
 
-    let diff: Vec<&str> = expected_suggestions
+    let diff: Vec<&BStr> = expected_suggestions
         .iter()
         .copied()
         .filter(|expected| !suggestions.iter().any(|s| s == expected))
@@ -70,48 +72,54 @@ fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
     assert!(
         diff.is_empty(),
         "Suggestions must contain \"{}\". Got \"{}\".",
-        diff.join("\", \""),
-        suggestions.join("\", \"")
+        implode("\", \"", &diff).display_lossy(),
+        implode("\", \"", &suggestions).display_lossy()
     );
 }
 
 // PHP: $randomVendor = 'a/'; $installedPackages = [...]; $preferInstall = [...]
-const RANDOM_VENDOR: &str = "a/";
-const INSTALLED_PACKAGES: &[&str] = &["composer/semver", "psr/log"];
-const PREFER_INSTALL: &[&str] = &["dist", "source", "auto"];
+const RANDOM_VENDOR: &BStr = php_str(b"a/");
+const INSTALLED_PACKAGES: &[&BStr] = &[php_str(b"composer/semver"), php_str(b"psr/log")];
+const PREFER_INSTALL: &[&BStr] = &[php_str(b"dist"), php_str(b"source"), php_str(b"auto")];
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_archive() {
-    assert_complete("archive ", Some(&[RANDOM_VENDOR]));
+    assert_complete(BStr::new("archive "), Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_archive_package_prefix() {
     assert_complete(
-        "archive symfony/http-",
-        Some(&["symfony/http-kernel", "symfony/http-foundation"]),
+        BStr::new("archive symfony/http-"),
+        Some(&[
+            BStr::new("symfony/http-kernel"),
+            BStr::new("symfony/http-foundation"),
+        ]),
     );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_archive_format() {
-    assert_complete("archive --format ", Some(&["tar", "zip"]));
+    assert_complete(
+        BStr::new("archive --format "),
+        Some(&[BStr::new("tar"), BStr::new("zip")]),
+    );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_create_project() {
-    assert_complete("create-project ", Some(&[RANDOM_VENDOR]));
+    assert_complete(BStr::new("create-project "), Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_create_project_prefer_install() {
     assert_complete(
-        "create-project symfony/skeleton --prefer-install ",
+        BStr::new("create-project symfony/skeleton --prefer-install "),
         Some(PREFER_INSTALL),
     );
 }
@@ -119,13 +127,13 @@ fn test_complete_create_project_prefer_install() {
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_depends() {
-    assert_complete("depends ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("depends "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_why() {
-    assert_complete("why ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("why "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
@@ -133,14 +141,14 @@ fn test_complete_why() {
 #[ignore = "expects the Composer dev checkout's fully installed vendor/bin (phpstan, simple-phpunit, ...); the vendored checkout ships only jsonlint and validate-json"]
 fn test_complete_exec() {
     assert_complete(
-        "exec ",
+        BStr::new("exec "),
         Some(&[
-            "composer",
-            "jsonlint",
-            "phpstan",
-            "phpstan.phar",
-            "simple-phpunit",
-            "validate-json",
+            BStr::new("composer"),
+            BStr::new("jsonlint"),
+            BStr::new("phpstan"),
+            BStr::new("phpstan.phar"),
+            BStr::new("simple-phpunit"),
+            BStr::new("validate-json"),
         ]),
     );
 }
@@ -148,26 +156,26 @@ fn test_complete_exec() {
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_browse() {
-    assert_complete("browse ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("browse "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_home_h() {
-    assert_complete("home -H ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("home -H "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_init_require() {
-    assert_complete("init --require ", Some(&[RANDOM_VENDOR]));
+    assert_complete(BStr::new("init --require "), Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_init_require_dev() {
     assert_complete(
-        "init --require-dev foo/bar --require-dev ",
+        BStr::new("init --require-dev foo/bar --require-dev "),
         Some(&[RANDOM_VENDOR]),
     );
 }
@@ -175,155 +183,177 @@ fn test_complete_init_require_dev() {
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_install_prefer_install() {
-    assert_complete("install --prefer-install ", Some(PREFER_INSTALL));
+    assert_complete(BStr::new("install --prefer-install "), Some(PREFER_INSTALL));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_install() {
-    assert_complete("install ", None);
+    assert_complete(BStr::new("install "), None);
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_outdated() {
-    assert_complete("outdated ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("outdated "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_prohibits() {
-    assert_complete("prohibits ", Some(&[RANDOM_VENDOR]));
+    assert_complete(BStr::new("prohibits "), Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_why_not() {
-    assert_complete("why-not symfony/http-ker", Some(&["symfony/http-kernel"]));
+    assert_complete(
+        BStr::new("why-not symfony/http-ker"),
+        Some(&[BStr::new("symfony/http-kernel")]),
+    );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_reinstall_prefer_install() {
-    assert_complete("reinstall --prefer-install ", Some(PREFER_INSTALL));
+    assert_complete(
+        BStr::new("reinstall --prefer-install "),
+        Some(PREFER_INSTALL),
+    );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_reinstall() {
-    assert_complete("reinstall ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("reinstall "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_remove() {
-    assert_complete("remove ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("remove "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_require_prefer_install() {
-    assert_complete("require --prefer-install ", Some(PREFER_INSTALL));
+    assert_complete(BStr::new("require --prefer-install "), Some(PREFER_INSTALL));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_require() {
-    assert_complete("require ", Some(&[RANDOM_VENDOR]));
+    assert_complete(BStr::new("require "), Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_require_dev_package_prefix() {
     assert_complete(
-        "require --dev symfony/http-",
-        Some(&["symfony/http-kernel", "symfony/http-foundation"]),
+        BStr::new("require --dev symfony/http-"),
+        Some(&[
+            BStr::new("symfony/http-kernel"),
+            BStr::new("symfony/http-foundation"),
+        ]),
     );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_run_script() {
-    assert_complete("run-script ", Some(&["compile", "test", "phpstan"]));
+    assert_complete(
+        BStr::new("run-script "),
+        Some(&[
+            BStr::new("compile"),
+            BStr::new("test"),
+            BStr::new("phpstan"),
+        ]),
+    );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_run_script_args() {
-    assert_complete("run-script test ", None);
+    assert_complete(BStr::new("run-script test "), None);
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_search_format() {
-    assert_complete("search --format ", Some(&["text", "json"]));
+    assert_complete(
+        BStr::new("search --format "),
+        Some(&[BStr::new("text"), BStr::new("json")]),
+    );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_show_format() {
-    assert_complete("show --format ", Some(&["text", "json"]));
+    assert_complete(
+        BStr::new("show --format "),
+        Some(&[BStr::new("text"), BStr::new("json")]),
+    );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_info() {
-    assert_complete("info ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("info "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_suggests() {
-    assert_complete("suggests ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("suggests "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_update_prefer_install() {
-    assert_complete("update --prefer-install ", Some(PREFER_INSTALL));
+    assert_complete(BStr::new("update --prefer-install "), Some(PREFER_INSTALL));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_update() {
-    assert_complete("update ", Some(INSTALLED_PACKAGES));
+    assert_complete(BStr::new("update "), Some(INSTALLED_PACKAGES));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_list() {
-    assert_complete("config --list ", None);
+    assert_complete(BStr::new("config --list "), None);
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_editor() {
-    assert_complete("config --editor ", None);
+    assert_complete(BStr::new("config --editor "), None);
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_auth() {
-    assert_complete("config --auth ", None);
+    assert_complete(BStr::new("config --auth "), None);
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config() {
     assert_complete(
-        "config ",
+        BStr::new("config "),
         Some(&[
-            "bin-compat",
-            "extra",
-            "extra.branch-alias",
-            "home",
-            "name",
-            "repositories",
-            "repositories.packagist.org",
-            "suggest",
-            "suggest.ext-zip",
-            "type",
-            "version",
+            BStr::new("bin-compat"),
+            BStr::new("extra"),
+            BStr::new("extra.branch-alias"),
+            BStr::new("home"),
+            BStr::new("name"),
+            BStr::new("repositories"),
+            BStr::new("repositories.packagist.org"),
+            BStr::new("suggest"),
+            BStr::new("suggest.ext-zip"),
+            BStr::new("type"),
+            BStr::new("version"),
         ]),
     );
 }
@@ -332,29 +362,32 @@ fn test_complete_config() {
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_bin() {
-    assert_complete("config bin", Some(&["bin-dir"]));
+    assert_complete(BStr::new("config bin"), Some(&[BStr::new("bin-dir")]));
 }
 
 // existing package-property
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_nam() {
-    assert_complete("config nam", Some(&["name"]));
+    assert_complete(BStr::new("config nam"), Some(&[BStr::new("name")]));
 }
 
 // non-existing package-property
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_ver() {
-    assert_complete("config ver", Some(&["version"]));
+    assert_complete(BStr::new("config ver"), Some(&[BStr::new("version")]));
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_repo() {
     assert_complete(
-        "config repo",
-        Some(&["repositories", "repositories.packagist.org"]),
+        BStr::new("config repo"),
+        Some(&[
+            BStr::new("repositories"),
+            BStr::new("repositories.packagist.org"),
+        ]),
     );
 }
 
@@ -362,29 +395,39 @@ fn test_complete_config_repo() {
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_repositories_dot() {
     assert_complete(
-        "config repositories.",
-        Some(&["repositories.packagist.org"]),
+        BStr::new("config repositories."),
+        Some(&[BStr::new("repositories.packagist.org")]),
     );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_sug() {
-    assert_complete("config sug", Some(&["suggest", "suggest.ext-zip"]));
+    assert_complete(
+        BStr::new("config sug"),
+        Some(&[BStr::new("suggest"), BStr::new("suggest.ext-zip")]),
+    );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_suggest_ext() {
-    assert_complete("config suggest.ext-", Some(&["suggest.ext-zip"]));
+    assert_complete(
+        BStr::new("config suggest.ext-"),
+        Some(&[BStr::new("suggest.ext-zip")]),
+    );
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_ext() {
     assert_complete(
-        "config ext",
-        Some(&["extra", "extra.branch-alias", "extra.branch-alias.dev-main"]),
+        BStr::new("config ext"),
+        Some(&[
+            BStr::new("extra"),
+            BStr::new("extra.branch-alias"),
+            BStr::new("extra.branch-alias.dev-main"),
+        ]),
     );
 }
 
@@ -396,15 +439,15 @@ fn test_complete_config_ext() {
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset() {
     assert_complete(
-        "config --unset ",
+        BStr::new("config --unset "),
         Some(&[
-            "extra",
-            "extra.branch-alias",
-            "extra.branch-alias.dev-main",
-            "name",
-            "suggest",
-            "suggest.ext-zip",
-            "type",
+            BStr::new("extra"),
+            BStr::new("extra.branch-alias"),
+            BStr::new("extra.branch-alias.dev-main"),
+            BStr::new("name"),
+            BStr::new("suggest"),
+            BStr::new("suggest.ext-zip"),
+            BStr::new("type"),
         ]),
     );
 }
@@ -413,29 +456,32 @@ fn test_complete_config_unset() {
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset_bin_dir() {
-    assert_complete("config --unset bin-dir", None);
+    assert_complete(BStr::new("config --unset bin-dir"), None);
 }
 
 // existing package-property
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset_nam() {
-    assert_complete("config --unset nam", Some(&["name"]));
+    assert_complete(BStr::new("config --unset nam"), Some(&[BStr::new("name")]));
 }
 
 // non-existing package-property
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset_version() {
-    assert_complete("config --unset version", None);
+    assert_complete(BStr::new("config --unset version"), None);
 }
 
 #[test]
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset_extra_dot() {
     assert_complete(
-        "config --unset extra.",
-        Some(&["extra.branch-alias", "extra.branch-alias.dev-main"]),
+        BStr::new("config --unset extra."),
+        Some(&[
+            BStr::new("extra.branch-alias"),
+            BStr::new("extra.branch-alias.dev-main"),
+        ]),
     );
 }
 
@@ -447,12 +493,12 @@ fn test_complete_config_unset_extra_dot() {
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_global() {
     assert_complete(
-        "config --global ",
+        BStr::new("config --global "),
         Some(&[
-            "bin-compat",
-            "home",
-            "repositories",
-            "repositories.packagist.org",
+            BStr::new("bin-compat"),
+            BStr::new("home"),
+            BStr::new("repositories"),
+            BStr::new("repositories.packagist.org"),
         ]),
     );
 }
@@ -461,8 +507,11 @@ fn test_complete_config_global() {
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_global_repo() {
     assert_complete(
-        "config --global repo",
-        Some(&["repositories", "repositories.packagist.org"]),
+        BStr::new("config --global repo"),
+        Some(&[
+            BStr::new("repositories"),
+            BStr::new("repositories.packagist.org"),
+        ]),
     );
 }
 
@@ -470,8 +519,8 @@ fn test_complete_config_global_repo() {
 #[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_global_repositories_dot() {
     assert_complete(
-        "config --global repositories.",
-        Some(&["repositories.packagist.org"]),
+        BStr::new("config --global repositories."),
+        Some(&[BStr::new("repositories.packagist.org")]),
     );
 }
 

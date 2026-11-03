@@ -1,19 +1,20 @@
 //! ref: composer/tests/Composer/Test/Package/RootAliasPackageTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::{Link, RootAliasPackageHandle, RootPackageHandle};
 use shirabe_semver::constraint::MatchAllConstraint;
 
-fn links(link_type: &str) -> IndexMap<String, Link> {
-    let mut map: IndexMap<String, Link> = IndexMap::new();
+fn links(link_type: &bstr::BStr) -> IndexMap<BString, Link> {
+    let mut map: IndexMap<BString, Link> = IndexMap::new();
     map.insert(
-        "b".to_string(),
+        BString::from("b"),
         Link::new(
-            "a".to_string(),
-            "b".to_string(),
+            BString::from("a"),
+            BString::from("b"),
             MatchAllConstraint::new(None).into(),
-            Some(link_type.to_string()),
-            "self.version".to_string(),
+            Some(link_type.to_owned()),
+            BString::from("self.version"),
         ),
     );
     map
@@ -21,18 +22,22 @@ fn links(link_type: &str) -> IndexMap<String, Link> {
 
 fn alias() -> RootAliasPackageHandle {
     let root = RootPackageHandle::new(
-        "something/something".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0".to_string(),
+        BString::from("something/something"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0"),
     );
-    RootAliasPackageHandle::new(root, "1.0".to_string(), "1.0.0.0".to_string())
+    RootAliasPackageHandle::new(root, BString::from("1.0"), BString::from("1.0.0.0"))
 }
 
 #[test]
 fn test_update_requires() {
     let alias = alias();
     assert!(alias.get_requires().is_empty());
-    alias.set_requires(links(Link::TYPE_REQUIRE));
+    alias.set_requires(
+        links(Link::TYPE_REQUIRE)
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     assert!(!alias.get_requires().is_empty());
 }
 
@@ -40,7 +45,11 @@ fn test_update_requires() {
 fn test_update_dev_requires() {
     let alias = alias();
     assert!(alias.get_dev_requires().is_empty());
-    alias.set_dev_requires(links(Link::TYPE_DEV_REQUIRE));
+    alias.set_dev_requires(
+        links(Link::TYPE_DEV_REQUIRE)
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     assert!(!alias.get_dev_requires().is_empty());
 }
 
@@ -48,7 +57,11 @@ fn test_update_dev_requires() {
 fn test_update_conflicts() {
     let alias = alias();
     assert!(alias.get_conflicts().is_empty());
-    alias.set_conflicts(links(Link::TYPE_CONFLICT));
+    alias.set_conflicts(
+        links(Link::TYPE_CONFLICT)
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     assert!(!alias.get_conflicts().is_empty());
 }
 
@@ -56,7 +69,11 @@ fn test_update_conflicts() {
 fn test_update_provides() {
     let alias = alias();
     assert!(alias.get_provides().is_empty());
-    alias.set_provides(links(Link::TYPE_PROVIDE));
+    alias.set_provides(
+        links(Link::TYPE_PROVIDE)
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     assert!(!alias.get_provides().is_empty());
 }
 
@@ -64,6 +81,10 @@ fn test_update_provides() {
 fn test_update_replaces() {
     let alias = alias();
     assert!(alias.get_replaces().is_empty());
-    alias.set_replaces(links(Link::TYPE_REPLACE));
+    alias.set_replaces(
+        links(Link::TYPE_REPLACE)
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     assert!(!alias.get_replaces().is_empty());
 }

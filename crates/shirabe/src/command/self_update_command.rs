@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::{IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterfaceWrite, io_interface};
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -37,11 +37,11 @@ impl SelfUpdateCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SelfUpdateCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("self-update")?;
-        self.set_aliases(vec!["selfupdate".to_string()])?;
-        self.set_description("Updates composer.phar to the latest version");
+        self.set_name("self-update".into())?;
+        self.set_aliases(vec!["selfupdate".into()])?;
+        self.set_description("Updates composer.phar to the latest version".into());
         self.set_definition(&[
-            InputOption::new("rollback", Some("r"), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None).unwrap().into(),
+            InputOption::new("rollback", Some("r".into()), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None).unwrap().into(),
             InputOption::new("clean-backups", None, Some(InputOption::VALUE_NONE), "Delete old backups during an update. This makes the current version of composer the only backup available after the update", None).unwrap().into(),
             InputArgument::new("version", Some(InputArgument::OPTIONAL), "The version to update to", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
@@ -60,7 +60,8 @@ impl Command for SelfUpdateCommand {
             \n\
             <info>shirabe self-update</info>\n\
             \n\
-            Read more at https://getcomposer.org/doc/03-cli.md#self-update-selfupdate",
+            Read more at https://getcomposer.org/doc/03-cli.md#self-update-selfupdate"
+                .into(),
         );
         Ok(())
     }

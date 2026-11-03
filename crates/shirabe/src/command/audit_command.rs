@@ -5,14 +5,15 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::console::input::{InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::repository::{InstalledRepository, RepositoryInterface, RepositorySet, RepositoryUtils};
+use bstr::BString;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, impl_php_class, implode,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, bconcat, impl_php_class, implode,
     in_array_strict,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -54,7 +55,7 @@ impl AuditCommand {
             let locker = composer.get_locker().clone();
             let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
-                return Err(UnexpectedValueException::new("Valid composer.json and composer.lock files are required to run this command with --locked".to_string()).into());
+                return Err(UnexpectedValueException::new(BString::from("Valid composer.json and composer.lock files are required to run this command with --locked")).into());
             }
             let locked_repo = locker.get_locked_repository(
                 !input
@@ -94,8 +95,10 @@ impl AuditCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AuditCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("audit")?;
-        self.set_description("Checks for security vulnerability advisories for installed packages");
+        self.set_name("audit".into())?;
+        self.set_description(
+            "Checks for security vulnerability advisories for installed packages".into(),
+        );
         self.set_definition(&[
             InputOption::new(
                 "no-dev",
@@ -108,11 +111,11 @@ impl Command for AuditCommand {
             .into(),
             InputOption::new6(
                 "format",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
-                Some(InputValue::String(Auditor::FORMAT_TABLE.to_string())),
-                SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect()),
+                Some(InputValue::from(Auditor::FORMAT_TABLE)),
+                SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect()),
             )
             .unwrap()
             .into(),
@@ -131,7 +134,12 @@ impl Command for AuditCommand {
                 Some(InputOption::VALUE_REQUIRED),
                 "Behavior on abandoned packages. Must be \"ignore\", \"report\", or \"fail\".",
                 None,
-                SuggestedValues::List(Auditor::ABANDONEDS.iter().map(|s| s.to_string()).collect()),
+                SuggestedValues::List(
+                    Auditor::ABANDONEDS
+                        .iter()
+                        .map(|s| BString::from(*s))
+                        .collect(),
+                ),
             )
             .unwrap()
             .into(),
@@ -142,10 +150,10 @@ impl Command for AuditCommand {
                 "Ignore advisories of a certain severity level.",
                 Some(InputValue::Array(vec![])),
                 SuggestedValues::List(vec![
-                    "low".to_string(),
-                    "medium".to_string(),
-                    "high".to_string(),
-                    "critical".to_string(),
+                    BString::from("low"),
+                    BString::from("medium"),
+                    BString::from("high"),
+                    BString::from("critical"),
                 ]),
             )
             .unwrap()
@@ -164,7 +172,7 @@ impl Command for AuditCommand {
             "The <info>audit</info> command checks for security vulnerability advisories for installed packages.\n\n\
             If you do not want to include dev dependencies in the audit you can omit them with --no-dev\n\n\
             If you want to ignore repositories that are unreachable or return a non-200 status code, use --ignore-unreachable\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#audit"
+            Read more at https://getcomposer.org/doc/03-cli.md#audit".into()
         );
         Ok(())
     }
@@ -210,32 +218,33 @@ impl Command for AuditCommand {
             .borrow()
             .get_option("abandoned")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BString::from);
         if abandoned.is_some()
             && !in_array_strict(
                 abandoned.clone().unwrap(),
                 &Auditor::ABANDONEDS
                     .iter()
-                    .map(|s| PhpMixed::string(s.to_string()))
+                    .map(|s| PhpMixed::string(bconcat!(s)))
                     .collect::<Vec<_>>(),
             )
         {
-            return Err(InvalidArgumentException::new(format!(
-                "--abandoned must be one of {}.",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "--abandoned must be one of ",
                 implode(
                     ", ",
                     &Auditor::ABANDONEDS
                         .iter()
-                        .map(|s| s.to_string())
+                        .map(|s| bconcat!(s))
                         .collect::<Vec<_>>()
-                )
+                ),
+                "."
             ))
             .into());
         }
 
         let abandoned = abandoned.unwrap_or_else(|| audit_config.audit_abandoned.clone());
 
-        let mut ignore_severities: indexmap::IndexMap<String, Option<String>> =
+        let mut ignore_severities: indexmap::IndexMap<BString, Option<BString>> =
             indexmap::IndexMap::new();
         let cli_severities = input.borrow().get_option("ignore-severity")?;
         for severity in cli_severities.as_array().unwrap_or_default() {
@@ -251,16 +260,16 @@ impl Command for AuditCommand {
             .unwrap_or(false)
             || audit_config.ignore_unreachable;
 
-        let audit_format = self.get_audit_format(input, "format")?;
+        let audit_format = self.get_audit_format(input, bstr::BStr::new("format"))?;
         Ok(auditor
             .audit(
                 &self.get_io(),
                 &repo_set,
                 packages,
-                &audit_format,
+                bstr::BStr::new(&audit_format),
                 false,
                 audit_config.ignore_list_for_audit.clone(),
-                &abandoned,
+                bstr::BStr::new(&abandoned),
                 ignore_severities,
                 ignore_unreachable,
                 audit_config.ignore_abandoned_for_audit,

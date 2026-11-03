@@ -10,29 +10,30 @@ use crate::downloader::{
 };
 use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable, NullIO, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
 use crate::plugin::{
     FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
 };
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, Url as UrlUtil};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
-    RuntimeException, UnexpectedValueException, array_search, chmod, dirname, extension_loaded,
-    file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable,
-    parse_url, pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask,
-    usleep,
+    RuntimeException, UnexpectedValueException, bconcat, chmod, dirname, error_message, explode,
+    extension_loaded, file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir,
+    is_executable, parse_url, path_from_bytes, path_to_bytes, pathinfo, realpath, rtrim2,
+    spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
 pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<BString, PhpMixed>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Collects response headers when running on GH Actions
-pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<String, Vec<String>>>> =
+pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<BString, Vec<BString>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Base downloader for files
@@ -45,8 +46,8 @@ pub struct FileDownloader {
     cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    last_cache_writes: Mutex<IndexMap<String, String>>,
-    additional_cleanup_paths: std::cell::RefCell<IndexMap<String, Vec<String>>>,
+    last_cache_writes: Mutex<IndexMap<BString, BString>>,
+    additional_cleanup_paths: std::cell::RefCell<IndexMap<BString, Vec<PathBuf>>>,
 }
 
 impl_php_class!(FileDownloader, r"Composer\Downloader\FileDownloader");
@@ -129,8 +130,8 @@ impl FileDownloader {
         &self,
         this: &dyn DownloaderInterface,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         let prev_io = std::mem::replace(
             &mut *self.io.borrow_mut(),
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
@@ -144,31 +145,26 @@ impl FileDownloader {
         // PHP attaches an onRejected handler to capture the error and drives the promise via
         // httpDownloader->wait() / process->wait(); awaiting the download/install futures
         // surfaces a rejection directly as the Err captured below.
-        let result: anyhow::Result<String> = async {
-            if is_dir(format!("{}_compare", target_dir)) {
+        let compare_dir = PathBuf::from(path_from_bytes(&bconcat!(target_dir, "_compare")));
+        let result: anyhow::Result<BString> = async {
+            if is_dir(&compare_dir) {
                 self.filesystem
                     .borrow_mut()
-                    .remove_directory(format!("{}_compare", target_dir))?;
+                    .remove_directory(&compare_dir)?;
             }
 
-            this.download(
-                package.clone(),
-                &format!("{}_compare", target_dir),
-                None,
-                false,
-            )
-            .await?;
-            this.install(package.clone(), &format!("{}_compare", target_dir), false)
+            this.download(package.clone(), &compare_dir, None, false)
                 .await?;
+            this.install(package.clone(), &compare_dir, false).await?;
 
             let mut comparer = Comparer::new();
-            comparer.set_source(format!("{}_compare", target_dir));
+            comparer.set_source(compare_dir.clone());
             comparer.set_update(target_dir.clone());
             comparer.do_compare();
             let output = comparer.get_changed_as_string(true, false);
             self.filesystem
                 .borrow_mut()
-                .remove_directory(format!("{}_compare", target_dir))?;
+                .remove_directory(&compare_dir)?;
             Ok(output)
         }
         .await;
@@ -177,7 +173,7 @@ impl FileDownloader {
 
         let (e, output) = match result {
             Ok(output) => (None, output),
-            Err(err) => (Some(err), String::new()),
+            Err(err) => (Some(err), BString::default()),
         };
 
         if let Some(err) = e {
@@ -185,14 +181,15 @@ impl FileDownloader {
                 return Err(err);
             }
 
-            return Ok(Some(format!(
-                "Failed to detect changes: [{}] {}",
+            return Ok(Some(bconcat!(
+                "Failed to detect changes: [",
                 get_class(&PhpMixed::Null),
-                err
+                "] ",
+                error_message(&err)
             )));
         }
 
-        let output = trim(&output, None);
+        let output = trim(&output);
 
         Ok(if strlen(&output) > 0 {
             Some(output)
@@ -207,13 +204,13 @@ impl FileDownloader {
     pub(crate) async fn base_update(
         &self,
         this: &dyn DownloaderInterface,
-        install_operation_appendix: &str,
+        install_operation_appendix: &BStr,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.borrow().write_error(&format!(
-            "  - {}{}",
+        self.io.borrow().write_error(bconcat!(
+            "  - ",
             UpdateOperation::format(initial.clone(), target.clone(), false),
             install_operation_appendix
         ));
@@ -223,15 +220,11 @@ impl FileDownloader {
         this.install(target, path, false).await
     }
 
-    fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
+    fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> BString {
         pathinfo(
-            &parse_url(&strtr(
-                &package.get_dist_url().unwrap_or_default(),
-                "\\",
-                "/",
-            ))
-            .and_then(|url| url.path)
-            .unwrap_or_default(),
+            parse_url(strtr(package.get_dist_url().unwrap_or_default(), "\\", "/"))
+                .and_then(|url| url.path)
+                .unwrap_or_default(),
             component,
         )
     }
@@ -239,39 +232,41 @@ impl FileDownloader {
     pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
         let mut last_cache_writes = self.last_cache_writes.lock().unwrap();
         if let Some(cache) = &self.cache
-            && last_cache_writes.contains_key(&package.get_name())
+            && last_cache_writes.contains_key(package.get_name().as_bstr())
         {
-            let key = last_cache_writes.get(&package.get_name()).unwrap().clone();
+            let key = last_cache_writes
+                .get(package.get_name().as_bstr())
+                .unwrap()
+                .clone();
             cache.borrow_mut().remove(&key);
-            last_cache_writes.shift_remove(&package.get_name());
+            last_cache_writes.shift_remove(package.get_name().as_bstr());
         }
     }
 
-    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
+    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &Path) {
         self.additional_cleanup_paths
             .borrow_mut()
             .entry(package.get_name())
             .or_default()
-            .push(path.to_string());
+            .push(path.to_path_buf());
     }
 
-    pub(crate) fn remove_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
+    pub(crate) fn remove_cleanup_path(&self, package: PackageInterfaceHandle, path: &Path) {
         if let Some(paths) = self
             .additional_cleanup_paths
             .borrow_mut()
-            .get_mut(&package.get_name())
+            .get_mut(package.get_name().as_bstr())
         {
             // PHP: array_search($path, ..., true)
-            let idx = paths.iter().position(|p| p == path);
+            let idx = paths.iter().position(|p| p.as_os_str() == path.as_os_str());
             if let Some(i) = idx {
                 paths.remove(i);
             }
-            let _ = array_search;
         }
     }
 
     /// Gets file name for specific package
-    pub(crate) fn get_file_name(&self, package: PackageInterfaceHandle, _path: &str) -> String {
+    pub(crate) fn get_file_name(&self, package: PackageInterfaceHandle, _path: &Path) -> PathBuf {
         let extension = self.get_dist_path(package.clone(), PATHINFO_EXTENSION);
         let extension = if extension.is_empty() {
             package.get_dist_type().unwrap_or_default()
@@ -279,35 +274,36 @@ impl FileDownloader {
             extension
         };
 
-        rtrim(
-            &format!(
-                "{}/composer/tmp-{}.{}",
+        PathBuf::from(path_from_bytes(&rtrim2(
+            bconcat!(
                 self.config
                     .borrow_mut()
                     .get("vendor-dir")
                     .as_string()
                     .unwrap_or_default(),
+                "/composer/tmp-",
                 hash(
                     "md5",
-                    format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
+                    bconcat!(package.to_php_string(), spl_object_hash(&PhpMixed::Null))
                 ),
-                extension
+                ".",
+                extension,
             ),
-            Some("."),
-        )
+            ".",
+        )))
     }
 
     /// Gets appendix message to add to the "- Upgrading x" string being output on update
     fn get_install_operation_appendix(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &str,
-    ) -> String {
-        String::new()
+        _path: &Path,
+    ) -> BString {
+        BString::default()
     }
 
     /// For testing only: invoke the crate-private `get_file_name`.
-    pub fn __get_file_name(&self, package: PackageInterfaceHandle, path: &str) -> String {
+    pub fn __get_file_name(&self, package: PackageInterfaceHandle, path: &Path) -> PathBuf {
         self.get_file_name(package, path)
     }
 
@@ -315,8 +311,8 @@ impl FileDownloader {
     pub fn __process_url(
         &self,
         package: PackageInterfaceHandle,
-        url: &str,
-    ) -> anyhow::Result<String> {
+        url: impl AsRef<[u8]>,
+    ) -> anyhow::Result<BString> {
         self.process_url(package, url)
     }
 
@@ -324,22 +320,19 @@ impl FileDownloader {
     pub(crate) fn process_url(
         &self,
         package: PackageInterfaceHandle,
-        url: &str,
-    ) -> anyhow::Result<String> {
+        url: impl AsRef<[u8]>,
+    ) -> anyhow::Result<BString> {
+        let url = url.as_ref();
         if !extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
-            return Err(RuntimeException::new(
-                "You must enable the openssl extension to download files via https".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "You must enable the openssl extension to download files via https",
+            ))
             .into());
         }
 
-        let mut url = url.to_string();
-        if package.get_dist_reference().is_some() {
-            url = UrlUtil::update_dist_reference(
-                &self.config.borrow(),
-                url,
-                &package.get_dist_reference().unwrap(),
-            );
+        let mut url = BString::from(url);
+        if let Some(dist_reference) = package.get_dist_reference() {
+            url = UrlUtil::update_dist_reference(&self.config.borrow(), &url, &dist_reference);
         }
 
         Ok(url)
@@ -348,8 +341,8 @@ impl FileDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for FileDownloader {
-    fn get_installation_source(&self) -> String {
-        "dist".to_owned()
+    fn get_installation_source(&self) -> BString {
+        BString::from("dist")
     }
 
     fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
@@ -359,24 +352,25 @@ impl DownloaderInterface for FileDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_dist_url().is_none() {
-            return Err(InvalidArgumentException::new(
-                "The given package is missing url information".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "The given package is missing url information",
+            ))
             .into());
         }
 
-        let cache_key_generator = |package: PackageInterfaceHandle, key: &str| -> String {
+        let cache_key_generator = |package: PackageInterfaceHandle, key: &BStr| -> BString {
             let cache_key = hash("sha1", key);
 
-            format!(
-                "{}/{}.{}",
+            bconcat!(
                 package.get_name(),
+                "/",
                 cache_key,
+                ".",
                 package.get_dist_type().unwrap_or_default()
             )
         };
@@ -387,7 +381,7 @@ impl DownloaderInterface for FileDownloader {
         let mut urls: Vec<UrlEntry> = vec![];
         for url in dist_urls {
             let processed_url = self.process_url(package.clone(), &url)?;
-            let cache_key = cache_key_generator(package.clone(), &processed_url);
+            let cache_key = cache_key_generator(package.clone(), processed_url.as_bstr());
             urls.push(UrlEntry {
                 base: url,
                 processed: processed_url,
@@ -402,10 +396,10 @@ impl DownloaderInterface for FileDownloader {
 
         let file_name = self.get_file_name(package.clone(), path);
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
-        let dir_of_file = dirname(&file_name);
+        let dir_of_file = dirname(path_to_bytes(&file_name));
         self.filesystem
             .borrow_mut()
-            .ensure_directory_exists(&dir_of_file)?;
+            .ensure_directory_exists(path_from_bytes(&dir_of_file))?;
 
         // The PHP $download/$accept/$reject closures form a retry loop driven by recursion; here it
         // is expressed as a loop. $reject's "return $download()" maps to `continue`, "throw" to
@@ -416,15 +410,15 @@ impl DownloaderInterface for FileDownloader {
 
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
-                    PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
+                    bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
                     self.http_downloader.clone(),
                     url.processed.clone(),
-                    "package".to_string(),
+                    "package".into(),
                     Some(FileDownloadContext::Package(package.clone())),
                 );
-                let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
+                let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
                 event_dispatcher.borrow_mut().dispatch(
-                    Some(&pre_file_download_event_name),
+                    Some(pre_file_download_event_name.as_ref()),
                     Some(&mut pre_file_download_event),
                 )?;
                 if let Some(custom_cache_key) = pre_file_download_event.get_custom_cache_key() {
@@ -435,7 +429,7 @@ impl DownloaderInterface for FileDownloader {
                         pre_file_download_event.get_processed_url(),
                     );
                 }
-                url.processed = pre_file_download_event.get_processed_url().to_string();
+                url.processed = BString::from(pre_file_download_event.get_processed_url());
             }
 
             urls[0] = url.clone();
@@ -446,9 +440,10 @@ impl DownloaderInterface for FileDownloader {
             // use from cache if it is present and has a valid checksum or we have no checksum to check against
             let mut from_cache = false;
             if let Some(cache) = self.cache.clone() {
-                let checksum_matches = match checksum.as_deref() {
-                    None | Some("") => true,
-                    Some(c) => Some(c) == cache.borrow_mut().sha1(&cache_key).as_deref(),
+                let checksum_matches = match checksum.as_ref() {
+                    None => true,
+                    Some(c) if c.is_empty() => true,
+                    Some(c) => cache.borrow_mut().sha1(&cache_key).as_ref() == Some(c),
                 };
                 if checksum_matches && cache.borrow_mut().copy_to(&cache_key, &file_name)? {
                     from_cache = true;
@@ -458,13 +453,15 @@ impl DownloaderInterface for FileDownloader {
             if from_cache {
                 if output {
                     self.io.borrow().write_error3(
-                        &format!(
-                            "  - Loading <info>{}</info> (<comment>{}</comment>) from cache",
+                        bconcat!(
+                            "  - Loading <info>",
                             package.get_name(),
+                            "</info> (<comment>",
                             package.get_full_pretty_version(
                                 true,
                                 crate::package::DisplayMode::SourceRefIfDev
-                            )
+                            ),
+                            "</comment>) from cache"
                         ),
                         true,
                         io_interface::VERY_VERBOSE,
@@ -483,13 +480,15 @@ impl DownloaderInterface for FileDownloader {
                 }
             } else {
                 if output {
-                    self.io.borrow().write_error(&format!(
-                        "  - Downloading <info>{}</info> (<comment>{}</comment>)",
+                    self.io.borrow().write_error(bconcat!(
+                        "  - Downloading <info>",
                         package.get_name(),
+                        "</info> (<comment>",
                         package.get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev
-                        )
+                        ),
+                        "</comment>)"
                     ));
                 }
 
@@ -506,14 +505,14 @@ impl DownloaderInterface for FileDownloader {
                             Some(size) => PhpMixed::Int(size),
                             None => PhpMixed::string(
                                 response
-                                    .get_header("Content-Length")
-                                    .unwrap_or_else(|| "?".to_string()),
+                                    .get_header(BStr::new("Content-Length"))
+                                    .unwrap_or_else(|| "?".into()),
                             ),
                         };
                         DOWNLOAD_METADATA
                             .lock()
                             .unwrap()
-                            .insert(package.get_name().into(), file_size);
+                            .insert(package.get_name(), file_size);
 
                         if Platform::get_env("GITHUB_ACTIONS").is_some()
                             && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
@@ -581,23 +580,29 @@ impl DownloaderInterface for FileDownloader {
                                 .catch::<TransportException>()
                                 .map_or(0, |te| te.get_code());
                             if self.io.borrow().is_debug() {
-                                self.io.borrow().write_error(&format!(
-                                    "    Failed downloading {}: [{}] {}: {}",
+                                self.io.borrow().write_error(bconcat!(
+                                    "    Failed downloading ",
                                     package.get_name(),
+                                    ": [",
                                     get_class(&PhpMixed::Null),
+                                    "] ",
                                     code,
-                                    e
+                                    ": ",
+                                    error_message(&e)
                                 ));
-                                self.io.borrow().write_error(&format!(
-                                    "    Trying the next URL for {}",
+                                self.io.borrow().write_error(bconcat!(
+                                    "    Trying the next URL for ",
                                     package.get_name()
                                 ));
                             } else {
-                                self.io.borrow().write_error(&format!(
-                                    "    Failed downloading {}, trying the next URL ({}: {})",
+                                self.io.borrow().write_error(bconcat!(
+                                    "    Failed downloading ",
                                     package.get_name(),
+                                    ", trying the next URL (",
                                     code,
-                                    e
+                                    ": ",
+                                    error_message(&e),
+                                    ")"
                                 ));
                             }
 
@@ -614,49 +619,53 @@ impl DownloaderInterface for FileDownloader {
 
             // === $result->then(verify) ===
             if !file_exists(&file_name) {
-                return Err(UnexpectedValueException::new(format!(
-                    "{} could not be saved to {}, make sure the directory is writable and you have internet connectivity",
-                    url.base, file_name
+                return Err(UnexpectedValueException::new(bconcat!(
+                    url.base,
+                    " could not be saved to ",
+                    file_name,
+                    ", make sure the directory is writable and you have internet connectivity"
                 ))
                 .into());
             }
 
             if let Some(checksum) = checksum.as_deref()
                 && !checksum.is_empty()
-                && hash_file("sha1", &file_name).as_deref() != Some(checksum)
+                && hash_file("sha1", &file_name).as_ref().map(|h| h.as_slice())
+                    != Some(checksum.as_bytes())
             {
-                return Err(UnexpectedValueException::new(format!(
-                    "The checksum verification of the file failed (downloaded from {})",
-                    url.base
+                return Err(UnexpectedValueException::new(bconcat!(
+                    "The checksum verification of the file failed (downloaded from ",
+                    url.base,
+                    ")"
                 ))
                 .into());
             }
 
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let mut post_file_download_event = PostFileDownloadEvent::new(
-                    PluginEvents::POST_FILE_DOWNLOAD.to_string(),
+                    bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                     Some(file_name.clone()),
                     checksum.clone(),
                     url.processed.clone(),
-                    "package".to_string(),
+                    "package".into(),
                     Some(FileDownloadContext::Package(package.clone())),
                 );
-                let post_file_download_event_name = post_file_download_event.get_name().to_string();
+                let post_file_download_event_name = post_file_download_event.get_name().to_owned();
                 event_dispatcher.borrow_mut().dispatch(
-                    Some(&post_file_download_event_name),
+                    Some(post_file_download_event_name.as_ref()),
                     Some(&mut post_file_download_event),
                 )?;
             }
 
-            return Ok(Some(PhpMixed::string(file_name)));
+            return Ok(Some(PhpMixed::string(path_to_bytes(&file_name))));
         }
     }
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &BStr,
         _package: PackageInterfaceHandle,
-        _path: &str,
+        _path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(Some(PhpMixed::Null))
@@ -664,9 +673,9 @@ impl DownloaderInterface for FileDownloader {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let file_name = self.get_file_name(package.clone(), path);
@@ -680,24 +689,22 @@ impl DownloaderInterface for FileDownloader {
             .get("vendor-dir")
             .as_string()
             .unwrap_or_default()
-            .to_string();
-        let first_segment = package
-            .get_pretty_name()
-            .split('/')
-            .next()
-            .unwrap_or("")
-            .to_string();
-        let dirs_to_clean_up: Vec<String> = vec![
-            path.to_string(),
-            format!("{}/{}", vendor_dir, first_segment),
-            format!("{}/composer/", vendor_dir),
-            vendor_dir,
+            .to_owned();
+        let first_segment = explode("/", package.get_pretty_name())
+            .first()
+            .cloned()
+            .unwrap_or_default();
+        let dirs_to_clean_up: Vec<PathBuf> = vec![
+            path.to_path_buf(),
+            PathBuf::from(path_from_bytes(&bconcat!(vendor_dir, "/", first_segment))),
+            PathBuf::from(path_from_bytes(&bconcat!(vendor_dir, "/composer/"))),
+            PathBuf::from(path_from_bytes(&vendor_dir)),
         ];
 
         if let Some(paths) = self
             .additional_cleanup_paths
             .borrow()
-            .get(&package.get_name())
+            .get(package.get_name().as_bstr())
             .cloned()
         {
             for path_to_clean in &paths {
@@ -708,7 +715,8 @@ impl DownloaderInterface for FileDownloader {
         for dir in &dirs_to_clean_up {
             if is_dir(dir)
                 && self.filesystem.borrow_mut().is_dir_empty(dir)
-                && realpath(dir).as_deref() != Some(&Platform::get_cwd(false).unwrap_or_default())
+                && realpath(dir).as_deref().map(Path::as_os_str)
+                    != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
             {
                 self.filesystem.borrow_mut().remove_directory_php(dir)?;
             }
@@ -720,12 +728,12 @@ impl DownloaderInterface for FileDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.borrow().write_error(&format!(
-                "  - {}",
+            self.io.borrow().write_error(bconcat!(
+                "  - ",
                 InstallOperation::format(package.clone(), false)
             ));
         }
@@ -736,36 +744,45 @@ impl DownloaderInterface for FileDownloader {
             .get("vendor-dir")
             .as_string()
             .unwrap_or_default()
-            .to_string();
+            .to_owned();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the file to be installed. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
         if !{
-            let normalized_vendor = self.filesystem.borrow_mut().normalize_path(&vendor_dir);
-            let normalized_path = self.filesystem.borrow().normalize_path(&format!(
-                "{}{}",
-                path,
-                std::path::MAIN_SEPARATOR
-            ));
-            strpos(&normalized_vendor, &normalized_path).is_some()
+            let normalized_vendor = self
+                .filesystem
+                .borrow_mut()
+                .normalize_path(path_from_bytes(&vendor_dir));
+            let normalized_path =
+                self.filesystem
+                    .borrow()
+                    .normalize_path(path_from_bytes(&bconcat!(
+                        path,
+                        std::path::MAIN_SEPARATOR_STR
+                    )));
+            strpos(
+                path_to_bytes(&normalized_vendor),
+                path_to_bytes(&normalized_path),
+            )
+            .is_some()
         } {
             self.filesystem.borrow_mut().empty_directory(path, true)?;
         }
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         self.filesystem.borrow_mut().rename(
             self.get_file_name(package.clone(), path),
-            format!(
-                "{}/{}",
+            path_from_bytes(&bconcat!(
                 path,
+                "/",
                 self.get_dist_path(package.clone(), PATHINFO_BASENAME)
-            ),
+            )),
         )?;
 
         // Single files can not have a mode set like files in archives
         // so we make sure if the file is a binary that it is executable
         for bin in package.get_binaries() {
-            let bin_path = format!("{}/{}", path, bin);
+            let bin_path = PathBuf::from(path_from_bytes(&bconcat!(path, "/", bin)));
             if file_exists(&bin_path) && !is_executable(&bin_path) {
                 chmod(&bin_path, 0o777 & !umask());
             }
@@ -778,30 +795,30 @@ impl DownloaderInterface for FileDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
-        self.base_update(self, &appendix, initial, target, path)
+        self.base_update(self, appendix.as_bstr(), initial, target, path)
             .await
     }
 
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.borrow().write_error(&format!(
-                "  - {}",
-                UninstallOperation::format(package, false)
-            ));
+            self.io
+                .borrow()
+                .write_error(bconcat!("  - ", UninstallOperation::format(package, false)));
         }
         let result = Filesystem::remove_directory_async_via(&self.filesystem, path).await?;
         if !result {
-            return Err(RuntimeException::new(format!(
-                "Could not completely delete {}, aborting.",
-                path
+            return Err(RuntimeException::new(bconcat!(
+                "Could not completely delete ",
+                path,
+                ", aborting."
             ))
             .into());
         }
@@ -815,15 +832,15 @@ impl ChangeReportInterface for FileDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.base_get_local_changes(self, package, path).await
     }
 }
 
 #[derive(Debug, Clone)]
 struct UrlEntry {
-    base: String,
-    processed: String,
-    cache_key: String,
+    base: BString,
+    processed: BString,
+    cache_key: BString,
 }

@@ -1,8 +1,10 @@
 //! ref: composer/tests/Composer/Test/Command/DumpAutoloadCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use regex::Regex;
+use bstr::ByteSlice;
+use regex::bytes::Regex;
 use serial_test::serial;
+use shirabe_php_shim::error_message;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: DumpAutoloadCommandTest::testDumpAutoload
@@ -24,8 +26,8 @@ fn test_dump_autoload() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating autoload files"));
-    assert!(output.contains("Generated autoload files"));
+    assert!(output.contains_str("Generating autoload files"));
+    assert!(output.contains_str("Generated autoload files"));
 
     drop(tear_down);
 }
@@ -52,8 +54,8 @@ fn test_dump_dev_autoload() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating autoload files"));
-    assert!(output.contains("Generated autoload files"));
+    assert!(output.contains_str("Generating autoload files"));
+    assert!(output.contains_str("Generated autoload files"));
 
     drop(tear_down);
 }
@@ -80,8 +82,8 @@ fn test_dump_no_dev_autoload() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating autoload files"));
-    assert!(output.contains("Generated autoload files"));
+    assert!(output.contains_str("Generating autoload files"));
+    assert!(output.contains_str("Generated autoload files"));
 
     drop(tear_down);
 }
@@ -109,7 +111,7 @@ fn test_using_optimize_and_strict_psr() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating optimized autoload files"));
+    assert!(output.contains_str("Generating optimized autoload files"));
     let re = Regex::new(r"Generated optimized autoload files containing \d+ classes").unwrap();
     assert!(re.is_match(&output));
 
@@ -191,7 +193,7 @@ fn test_using_classmap_authoritative() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating optimized autoload files (authoritative)"));
+    assert!(output.contains_str("Generating optimized autoload files (authoritative)"));
     let re =
         Regex::new(r"Generated optimized autoload files \(authoritative\) containing \d+ classes")
             .unwrap();
@@ -226,7 +228,7 @@ fn test_using_classmap_authoritative_and_strict_psr() {
     assert_eq!(0, status_code);
 
     let output = app_tester.get_display();
-    assert!(output.contains("Generating optimized autoload files"));
+    assert!(output.contains_str("Generating optimized autoload files"));
     let re =
         Regex::new(r"Generated optimized autoload files \(authoritative\) containing \d+ classes")
             .unwrap();
@@ -254,7 +256,7 @@ fn test_strict_psr_does_not_work_without_optimized_autoloader() {
             RunOptions::default(),
         )
         .expect_err("expected --strict-psr without optimize to error");
-    assert!(err.to_string().contains(
+    assert!(error_message(&err).contains_str(
         "--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value."
     ));
 
@@ -282,8 +284,9 @@ fn test_dev_and_no_dev_cannot_be_combined() {
         )
         .expect_err("expected --dev and --no-dev combination to error");
     assert!(
-        err.to_string()
-            .contains("You can not use both --no-dev and --dev as they conflict with each other.")
+        error_message(&err).contains_str(
+            "You can not use both --no-dev and --dev as they conflict with each other."
+        )
     );
 
     drop(tear_down);
@@ -317,8 +320,9 @@ fn test_with_custom_autoloader_suffix() {
         .unwrap();
     assert_eq!(0, status_code);
 
-    let contents = std::fs::read_to_string(dir.join("vendor/autoload.php")).unwrap_or_default();
-    assert!(contents.contains("ComposerAutoloaderInitFoobar"));
+    let contents =
+        bstr::BString::from(std::fs::read(dir.join("vendor/autoload.php")).unwrap_or_default());
+    assert!(contents.contains_str("ComposerAutoloaderInitFoobar"));
 
     drop(tear_down);
 }
@@ -368,8 +372,9 @@ fn test_with_existing_composer_lock_and_autoloader_suffix() {
         .unwrap();
     assert_eq!(0, status_code);
 
-    let contents = std::fs::read_to_string(dir.join("vendor/autoload.php")).unwrap_or_default();
-    assert!(contents.contains("ComposerAutoloaderInitFoobar"));
+    let contents =
+        bstr::BString::from(std::fs::read(dir.join("vendor/autoload.php")).unwrap_or_default());
+    assert!(contents.contains_str("ComposerAutoloaderInitFoobar"));
 
     drop(tear_down);
 }
@@ -417,8 +422,9 @@ fn test_with_existing_composer_lock_without_autoloader_suffix() {
         .unwrap();
     assert_eq!(0, status_code);
 
-    let contents = std::fs::read_to_string(dir.join("vendor/autoload.php")).unwrap_or_default();
-    assert!(contents.contains("ComposerAutoloaderInit2d4a6be9a93712c5d6a119b26734a047"));
+    let contents =
+        bstr::BString::from(std::fs::read(dir.join("vendor/autoload.php")).unwrap_or_default());
+    assert!(contents.contains_str("ComposerAutoloaderInit2d4a6be9a93712c5d6a119b26734a047"));
 
     drop(tear_down);
 }

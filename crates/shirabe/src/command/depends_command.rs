@@ -3,6 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
+use bstr::BString;
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -12,7 +13,7 @@ use shirabe_symfony_console::output::OutputInterface;
 pub struct DependsCommand {
     base_command_data: BaseCommandData,
 
-    colors: std::cell::RefCell<Vec<String>>,
+    colors: std::cell::RefCell<Vec<BString>>,
 }
 
 impl_php_class!(DependsCommand, r"Composer\Command\DependsCommand");
@@ -37,11 +38,11 @@ impl DependsCommand {
 }
 
 impl BaseDependencyCommand for DependsCommand {
-    fn colors(&self) -> std::cell::Ref<'_, Vec<String>> {
+    fn colors(&self) -> std::cell::Ref<'_, Vec<BString>> {
         self.colors.borrow()
     }
 
-    fn set_colors(&self, colors: Vec<String>) {
+    fn set_colors(&self, colors: Vec<BString>) {
         *self.colors.borrow_mut() = colors;
     }
 }
@@ -49,9 +50,9 @@ impl BaseDependencyCommand for DependsCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DependsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("depends")?;
-        self.set_aliases(vec!["why".to_string()])?;
-        self.set_description("Shows which packages cause the given package to be installed");
+        self.set_name("depends".into())?;
+        self.set_aliases(vec!["why".into()])?;
+        self.set_description("Shows which packages cause the given package to be installed".into());
         self.set_definition(&[
             InputArgument::new5(
                 crate::command::ARGUMENT_PACKAGE,
@@ -64,7 +65,7 @@ impl Command for DependsCommand {
             .into(),
             InputOption::new(
                 crate::command::OPTION_RECURSIVE,
-                Some("r"),
+                Some("r".into()),
                 Some(InputOption::VALUE_NONE),
                 "Recursively resolves up to the root package",
                 None,
@@ -73,7 +74,7 @@ impl Command for DependsCommand {
             .into(),
             InputOption::new(
                 crate::command::OPTION_TREE,
-                Some("t"),
+                Some("t".into()),
                 Some(InputOption::VALUE_NONE),
                 "Prints the results as a nested tree",
                 None,
@@ -93,7 +94,8 @@ impl Command for DependsCommand {
         self.set_help(
             "Displays detailed information about where a package is referenced.\n\n\
             <info>shirabe depends composer/composer</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#depends-why",
+            Read more at https://getcomposer.org/doc/03-cli.md#depends-why"
+                .into(),
         );
         Ok(())
     }

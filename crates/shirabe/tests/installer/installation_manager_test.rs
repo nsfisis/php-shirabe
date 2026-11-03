@@ -2,6 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::test_case::get_package;
+use bstr::BStr;
 use shirabe::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,
 };
@@ -13,7 +14,7 @@ use shirabe::package::handle::CompletePackageHandle;
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 use shirabe_semver::VersionParser;
 
 /// ref: setUp(): the PHP loop/io mocks are never exercised by these tests (the loop has its
@@ -45,29 +46,39 @@ fn set_up() -> SetUp {
 // configured by any test (is_installed/download/prepare/cleanup/get_install_path, and the defaulted
 // as_binary_presence_interface/as_plugin_installer_mut) return the same defaults as an unconfigured
 // PHPUnit mock.
-mockall::mock! {
-    #[derive(Debug)]
-    pub Installer {
-        fn supports(&self, package_type: &str) -> bool;
-        fn install(
-            &self,
-            package: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        fn update(
-            &self,
-            initial: PackageInterfaceHandle,
-            target: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<PhpMixed>>;
-        fn uninstall(
-            &self,
-            package: PackageInterfaceHandle,
-        ) -> anyhow::Result<Option<PhpMixed>>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_installer {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub Installer {
+            pub fn supports(&self, package_type: &bstr::BStr) -> bool;
+            pub fn install(
+                &self,
+                package: PackageInterfaceHandle,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            pub fn update(
+                &self,
+                initial: PackageInterfaceHandle,
+                target: PackageInterfaceHandle,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+            pub fn uninstall(
+                &self,
+                package: PackageInterfaceHandle,
+            ) -> anyhow::Result<Option<PhpMixed>>;
+        }
     }
 }
+use mock_installer::MockInstaller;
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for MockInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(MockInstaller::supports(self, package_type))
     }
 
@@ -89,7 +100,7 @@ impl InstallerInterface for MockInstaller {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -123,14 +134,14 @@ impl InstallerInterface for MockInstaller {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         None
     }
 }
@@ -140,7 +151,7 @@ impl InstallerInterface for MockInstaller {
 /// are exercised).
 #[derive(Debug, Default)]
 struct BinaryInstallerCalls {
-    supports_args: Vec<String>,
+    supports_args: Vec<bstr::BString>,
     ensure_binaries_presence: Vec<PackageInterfaceHandle>,
 }
 
@@ -163,11 +174,11 @@ impl BinaryInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for BinaryInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         self.calls
             .borrow_mut()
             .supports_args
-            .push(package_type.to_string());
+            .push(package_type.to_owned());
         Ok(package_type == "library")
     }
 
@@ -189,7 +200,7 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -223,14 +234,14 @@ impl InstallerInterface for BinaryInstaller {
 
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         None
     }
 
@@ -251,10 +262,10 @@ impl BinaryPresenceInterface for BinaryInstaller {
 
 /// Builds a `CompletePackage` of the given type, mirroring TestCase::getPackage but with a custom
 /// type set via `__set_type` (PackageInterfaceHandle does not expose the setter).
-fn typed_package(name: &str, version: &str, r#type: &str) -> PackageInterfaceHandle {
+fn typed_package(name: &BStr, version: &BStr, r#type: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    let handle = CompletePackageHandle::new(name.to_string(), norm_version, version.to_string());
-    handle.__set_type(r#type.to_string());
+    let handle = CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(version));
+    handle.__set_type(bconcat!(r#type));
     handle.into()
 }
 
@@ -398,8 +409,16 @@ fn test_update_with_equal_types() {
 #[test]
 fn test_update_with_not_equal_types() {
     let set_up = set_up();
-    let initial = typed_package("test/initial", "1.0.0", "library");
-    let target = typed_package("test/target", "1.0.1", "bundles");
+    let initial = typed_package(
+        BStr::new("test/initial"),
+        BStr::new("1.0.0"),
+        BStr::new("library"),
+    );
+    let target = typed_package(
+        BStr::new("test/target"),
+        BStr::new("1.0.1"),
+        BStr::new("bundles"),
+    );
 
     let mut lib_installer = MockInstaller::new();
     lib_installer
@@ -478,7 +497,10 @@ fn test_install_binary() {
     let package = get_package("test/pkg", "1.0.0");
     manager.ensure_binaries_presence(package.clone()).unwrap();
 
-    assert_eq!(calls.borrow().supports_args, vec!["library".to_string()]);
+    assert_eq!(
+        calls.borrow().supports_args,
+        vec![bstr::BString::from("library")]
+    );
     assert_eq!(calls.borrow().ensure_binaries_presence.len(), 1);
     assert!(same_handle(
         &calls.borrow().ensure_binaries_presence[0],

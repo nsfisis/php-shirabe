@@ -7,7 +7,7 @@ use crate::composer::PartialComposerHandle;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::base_package;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::version_selector::ShowWarnings;
@@ -16,18 +16,21 @@ use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
     CanonicalPackagesTrait, CompositeRepository, PlatformRepository, RepositorySet,
 };
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, preg_is_match,
+    array_merge_map, array_search_in_vec, bconcat, impl_php_class, php_regex, preg_is_match,
     preg_match, preg_replace, strtolower,
 };
-use shirabe_semver::Intervals;
-use shirabe_semver::constraint::MultiConstraint;
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::helper::Table;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_semver::{Intervals, constraint::MultiConstraint};
+use shirabe_symfony_console::input::InputInterfaceByName;
+use shirabe_symfony_console::{
+    command::Command,
+    helper::Table,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct UpdateCommand {
@@ -59,12 +62,12 @@ impl UpdateCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         composer: &PartialComposerHandle,
-        packages: Vec<String>,
-    ) -> anyhow::Result<Vec<String>> {
+        packages: Vec<BString>,
+    ) -> anyhow::Result<Vec<BString>> {
         if !input.borrow().is_interactive() {
-            return Err(InvalidArgumentException::new(
-                "--interactive cannot be used in non-interactive terminals.".to_string(),
-            )
+            return Err(InvalidArgumentException::new(BString::from(
+                "--interactive cannot be used in non-interactive terminals.",
+            ))
             .into());
         }
 
@@ -76,8 +79,11 @@ impl UpdateCommand {
             (*composer_ref.get_package().get_dev_requires()).clone(),
         );
 
-        let filter: Option<String> = if !packages.is_empty() {
-            Some(base_package::package_names_to_regexp(&packages, "%s"))
+        let filter: Option<BString> = if !packages.is_empty() {
+            Some(base_package::package_names_to_regexp(
+                &packages,
+                BStr::new("%s"),
+            ))
         } else {
             None
         };
@@ -87,7 +93,7 @@ impl UpdateCommand {
             true,
             io_interface::NORMAL,
         );
-        let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
+        let mut autocompleter_values: IndexMap<BString, BString> = IndexMap::new();
         let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
             if composer_ref.get_locker().borrow_mut().is_locked() {
                 let locked_repo = composer_ref
@@ -105,7 +111,7 @@ impl UpdateCommand {
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
             if let Some(filter) = &filter
-                && !preg_is_match(filter, &package.get_name())
+                && !preg_is_match(filter, package.get_name())
             {
                 continue;
             }
@@ -117,14 +123,14 @@ impl UpdateCommand {
                 Some(flag) => base_package::STABILITIES
                     .iter()
                     .find(|&(_, v)| v == flag)
-                    .map(|(k, _)| k.to_string())
+                    .map(|(k, _)| BString::from(*k))
                     .unwrap_or_default(),
                 None => composer_ref.get_package().get_minimum_stability(),
             };
             let latest_version = version_selector.find_best_candidate(
-                &package.get_name(),
+                bstr::BStr::new(&package.get_name()),
                 constraint,
-                &stability,
+                bstr::BStr::new(&stability),
                 None,
                 0,
                 None,
@@ -136,10 +142,12 @@ impl UpdateCommand {
             {
                 autocompleter_values.insert(
                     package.get_name(),
-                    format!(
-                        "<comment>{}</comment> => <comment>{}</comment>",
+                    bconcat!(
+                        "<comment>",
                         current_version,
+                        "</comment> => <comment>",
                         latest.get_pretty_version(),
+                        "</comment>",
                     ),
                 );
             }
@@ -149,34 +157,34 @@ impl UpdateCommand {
                 if PlatformRepository::is_platform_package(req) {
                     continue;
                 }
-                autocompleter_values.insert(req.to_string(), String::new());
+                autocompleter_values.insert(BString::from(req.as_bstr()), BString::default());
             }
         }
 
         if autocompleter_values.is_empty() {
-            return Err(RuntimeException::new(
-                "Could not find any package with new versions available".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "Could not find any package with new versions available",
+            ))
             .into());
         }
 
         let select_result = io.select(
-            "Select packages: (Select more than one value separated by comma) ".into(),
+            "Select packages: (Select more than one value separated by comma) ",
             PhpMixed::Array(
                 autocompleter_values
                     .iter()
-                    .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
+                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
             PhpMixed::Bool(false),
             PhpMixed::Int(1),
-            "No package named \"%s\" is installed.".to_string(),
+            "No package named \"%s\" is installed.",
             true,
         )?;
-        let packages: Vec<String> = match select_result {
+        let packages: Vec<BString> = match select_result {
             PhpMixed::List(l) => l
                 .into_iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .filter_map(|v| v.as_string().map(BString::from))
                 .collect(),
             _ => Vec::new(),
         };
@@ -186,19 +194,20 @@ impl UpdateCommand {
         for package in &packages {
             table.add_row(PhpMixed::List(vec![PhpMixed::string(package.clone())]).into());
         }
-        table.render();
+        table.render()?;
 
         if io.ask_confirmation(
-            format!(
-                "Would you like to continue and update the above package{} [<comment>yes</comment>]? ",
+            bconcat!(
+                "Would you like to continue and update the above package",
                 if 1 == packages.len() { "" } else { "s" },
+                " [<comment>yes</comment>]? "
             ),
             true,
         )? {
             return Ok(packages);
         }
 
-        Err(RuntimeException::new("Installation aborted.".to_string()).into())
+        Err(RuntimeException::new(BString::from("Installation aborted.")).into())
     }
 
     fn create_version_selector(
@@ -211,14 +220,17 @@ impl UpdateCommand {
             .get_aliases()
             .into_iter()
             .map(|alias| crate::repository::RootAliasInput {
-                package: alias.get("package").cloned().unwrap_or_default(),
-                version: alias.get("version").cloned().unwrap_or_default(),
-                alias: alias.get("alias").cloned().unwrap_or_default(),
-                alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
+                package: alias.get(bstr::B("package")).cloned().unwrap_or_default(),
+                version: alias.get(bstr::B("version")).cloned().unwrap_or_default(),
+                alias: alias.get(bstr::B("alias")).cloned().unwrap_or_default(),
+                alias_normalized: alias
+                    .get(bstr::B("alias_normalized"))
+                    .cloned()
+                    .unwrap_or_default(),
             })
             .collect();
         let mut repository_set = RepositorySet::new(
-            &composer.get_package().get_minimum_stability(),
+            composer.get_package().get_minimum_stability(),
             composer.get_package().get_stability_flags(),
             root_aliases,
             composer.get_package().get_references(),
@@ -247,9 +259,9 @@ impl UpdateCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for UpdateCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("update")?;
-        self.set_aliases(vec!["u".to_string(), "upgrade".to_string()])?;
-        self.set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file");
+        self.set_name("update".into())?;
+        self.set_aliases(vec!["u".into(), "upgrade".into()])?;
+        self.set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file".into());
         self.set_definition(&[
             InputArgument::new5("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that should be updated, if not provided all packages are.", None, self.suggest_installed_package(false, false)).unwrap().into(),
             InputOption::new("with", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Temporary version constraint to add, e.g. foo/bar:1.0.0 or foo/bar=1.0.0", None).unwrap().into(),
@@ -262,27 +274,27 @@ impl Command for UpdateCommand {
             InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Overwrites the lock file hash to suppress warning about the lock file being out of date without updating package versions. Package metadata like mirrors and URLs are updated if they changed.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
             InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
             InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-            InputOption::new("with-dependencies", Some("w"), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, except those which are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
-            InputOption::new("with-all-dependencies", Some("W"), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, including those which are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).", None).unwrap().into(),
-            InputOption::new("verbose", Some("v|vv|vvv"), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
-            InputOption::new("optimize-autoloader", Some("o"), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump.", None).unwrap().into(),
-            InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("with-dependencies", Some("w".into()), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, except those which are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
+            InputOption::new("with-all-dependencies", Some("W".into()), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, including those which are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).", None).unwrap().into(),
+            InputOption::new("verbose", Some("v|vv|vvv".into()), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump.", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
             InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
             InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
             InputOption::new("prefer-stable", None, Some(InputOption::VALUE_NONE), "Prefer stable versions of dependencies (can also be set via the COMPOSER_PREFER_STABLE=1 env var).", None).unwrap().into(),
             InputOption::new("prefer-lowest", None, Some(InputOption::VALUE_NONE), "Prefer lowest versions of dependencies (can also be set via the COMPOSER_PREFER_LOWEST=1 env var).", None).unwrap().into(),
-            InputOption::new("minimal-changes", Some("m"), Some(InputOption::VALUE_NONE), "Only perform absolutely necessary changes to dependencies. If packages cannot be kept at their currently locked version they are updated. For partial updates the allow-listed packages are always updated fully. (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).", None).unwrap().into(),
+            InputOption::new("minimal-changes", Some("m".into()), Some(InputOption::VALUE_NONE), "Only perform absolutely necessary changes to dependencies. If packages cannot be kept at their currently locked version they are updated. For partial updates the allow-listed packages are always updated fully. (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).", None).unwrap().into(),
             InputOption::new("patch-only", None, Some(InputOption::VALUE_NONE), "Only allow patch version updates for currently installed dependencies.", None).unwrap().into(),
-            InputOption::new("interactive", Some("i"), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
+            InputOption::new("interactive", Some("i".into()), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
             InputOption::new("root-reqs", None, Some(InputOption::VALUE_NONE), "Restricts the update to your first degree dependencies.", None).unwrap().into(),
-            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), crate::console::input::SuggestedValues::List(vec!["dev".to_string(), "no-dev".to_string(), "all".to_string()])).unwrap().into(),
+            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), crate::console::input::SuggestedValues::List(vec![BString::from("dev"), BString::from("no-dev"), BString::from("all")])).unwrap().into(),
         ]);
         self.set_help(
             "The <info>update</info> command reads the composer.json file from the\n\
@@ -300,7 +312,7 @@ impl Command for UpdateCommand {
             To run a partial update with more restrictive constraints you can use the shorthand:\n\n\
             <info>shirabe update vendor/package:1.0.*</info>\n\n\
             To select packages names interactively with auto-completion use <info>-i</info>.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#update-u-upgrade\n",
+            Read more at https://getcomposer.org/doc/03-cli.md#update-u-upgrade\n".into(),
         );
         Ok(())
     }
@@ -337,25 +349,25 @@ impl Command for UpdateCommand {
         // Composer warns here that it runs slower without the curl extension. Shirabe does not use
         // curl for its own downloads, so there is nothing to warn about.
 
-        let mut packages: Vec<String> = input
+        let mut packages: Vec<BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[BString]>::to_vec)
             .unwrap_or_default();
-        let mut reqs: IndexMap<String, String> = self.format_requirements(
+        let mut reqs: IndexMap<BString, BString> = self.format_requirements(
             input
                 .borrow()
                 .get_option("with")?
                 .as_array()
-                .map(<[String]>::to_vec)
+                .map(<[BString]>::to_vec)
                 .unwrap_or_default(),
         )?;
 
         // extract --with shorthands from the allowlist
         if !packages.is_empty() {
-            let allowlist_packages_with_requirements: Vec<String> =
-                array_filter(&packages, |pkg: &String| -> bool {
+            let allowlist_packages_with_requirements: Vec<BString> =
+                array_filter(&packages, |pkg: &BString| -> bool {
                     preg_is_match(php_regex!(r"{\S+[ =:]\S+}"), pkg)
                 });
             for (package, constraint) in
@@ -380,12 +392,12 @@ impl Command for UpdateCommand {
         ));
         root_package.set_stability_flags(RootPackageLoader::extract_stability_flags(
             &reqs,
-            &root_package.get_minimum_stability(),
+            root_package.get_minimum_stability().as_bstr(),
             root_package.get_stability_flags(),
         ));
 
         let parser = VersionParser::new();
-        let mut temporary_constraints: IndexMap<String, _> = IndexMap::new();
+        let mut temporary_constraints: IndexMap<BString, _> = IndexMap::new();
         let root_requirements = array_merge_map(
             (*root_package.get_requires()).clone(),
             (*root_package.get_dev_requires()).clone(),
@@ -398,19 +410,27 @@ impl Command for UpdateCommand {
                 && !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())?
             {
                 io.write_error3(
-                        &format!(
-                            "<error>The temporary constraint \"{}\" for \"{}\" must be a subset of the constraint in your composer.json ({})</error>",
-                            constraint,
-                            package,
-                            root_req.get_pretty_constraint(),
-                        ),
-                        true,
-                        io_interface::NORMAL,
-                    );
-                io.write(&format!(
-                        "<info>Run `shirabe require {}` or `shirabe require {}:{}` instead to replace the constraint</info>",
-                        package, package, constraint,
-                    ));
+                    bconcat!(
+                        "<error>The temporary constraint \"",
+                        constraint,
+                        "\" for \"",
+                        package,
+                        "\" must be a subset of the constraint in your composer.json (",
+                        root_req.get_pretty_constraint(),
+                        ")</error>"
+                    ),
+                    true,
+                    io_interface::NORMAL,
+                );
+                io.write(bconcat!(
+                    "<info>Run `shirabe require ",
+                    package,
+                    "` or `shirabe require ",
+                    package,
+                    ":",
+                    constraint,
+                    "` instead to replace the constraint</info>"
+                ));
 
                 return Ok(crate::command::FAILURE);
             }
@@ -423,9 +443,9 @@ impl Command for UpdateCommand {
             .unwrap_or(false)
         {
             if !composer.get_locker().borrow_mut().is_locked() {
-                return Err(InvalidArgumentException::new(
-                    "patch-only can only be used with a lock file present".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "patch-only can only be used with a lock file present",
+                ))
                 .into());
             }
             for package in composer
@@ -443,8 +463,8 @@ impl Command for UpdateCommand {
                 let Some(matches) = matches else {
                     continue;
                 };
-                let constraint = parser
-                    .parse_constraints(&format!("~{}", matches.get(1).unwrap_or_default()))?;
+                let constraint =
+                    parser.parse_constraints(bconcat!("~", matches.get(1).unwrap_or_default()))?;
                 if let Some(existing) = temporary_constraints.get(&package.get_name()) {
                     temporary_constraints.insert(
                         package.get_name(),
@@ -477,14 +497,14 @@ impl Command for UpdateCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let mut requires: Vec<String> = array_keys(&root_package.get_requires());
+            let mut requires: Vec<BString> = root_package.get_requires().keys().cloned().collect();
             if !input
                 .borrow()
                 .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false)
             {
-                requires.extend(array_keys(&root_package.get_dev_requires()));
+                requires.extend(root_package.get_dev_requires().keys().cloned());
             }
 
             if !packages.is_empty() {
@@ -496,9 +516,10 @@ impl Command for UpdateCommand {
 
         // the arguments lock/nothing/mirrors are not package names but trigger a mirror update instead
         // they are further mutually exclusive with listing actual package names
-        let filtered_packages: Vec<String> = array_filter(&packages, |package: &String| -> bool {
-            !matches!(package.as_str(), "lock" | "nothing" | "mirrors")
-        });
+        let filtered_packages: Vec<BString> =
+            array_filter(&packages, |package: &BString| -> bool {
+                package != "lock" && package != "nothing" && package != "mirrors"
+            });
         let update_mirrors = input
             .borrow()
             .get_option("lock")?
@@ -515,11 +536,11 @@ impl Command for UpdateCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "update", input.clone(), output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         composer
             .get_installation_manager()
@@ -558,11 +579,11 @@ impl Command for UpdateCommand {
                 .get("classmap-authoritative")
                 .as_bool()
                 .unwrap_or(false);
-        let apcu_prefix: Option<String> = input
+        let apcu_prefix: Option<BString> = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BStr::to_owned);
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
@@ -716,9 +737,9 @@ impl Command for UpdateCommand {
                         .borrow()
                         .get_argument("packages")?
                         .as_array()
-                        .map(<[String]>::to_vec)
+                        .map(<[bstr::BString]>::to_vec)
                         .unwrap_or_default(),
-                    "--bump-after-update=dev".to_string(),
+                    BString::from("--bump-after-update=dev"),
                 )?;
             }
         }

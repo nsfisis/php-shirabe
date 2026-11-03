@@ -2,7 +2,9 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::helper::TableCellStyle;
+use bstr::{B, BString};
 use indexmap::IndexMap;
+use shirabe_php_shim::{bconcat, implode};
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.
 #[derive(Debug, Clone)]
@@ -14,39 +16,39 @@ pub enum TableCellOption {
 
 #[derive(Debug, Clone)]
 pub struct TableCell {
-    value: String,
-    options: IndexMap<String, TableCellOption>,
+    value: BString,
+    options: IndexMap<BString, TableCellOption>,
 }
 
 impl TableCell {
     pub fn new(
-        value: &str,
-        options: IndexMap<String, TableCellOption>,
+        value: impl AsRef<[u8]>,
+        options: IndexMap<BString, TableCellOption>,
     ) -> Result<Self, InvalidArgumentException> {
-        let mut this_options: IndexMap<String, TableCellOption> = IndexMap::new();
-        this_options.insert("rowspan".to_string(), TableCellOption::Int(1));
-        this_options.insert("colspan".to_string(), TableCellOption::Int(1));
-        this_options.insert("style".to_string(), TableCellOption::Null);
+        let mut this_options: IndexMap<BString, TableCellOption> = IndexMap::new();
+        this_options.insert("rowspan".into(), TableCellOption::Int(1));
+        this_options.insert("colspan".into(), TableCellOption::Int(1));
+        this_options.insert("style".into(), TableCellOption::Null);
 
         // check option names
-        let diff: Vec<String> = options
+        let diff: Vec<&BString> = options
             .keys()
             .filter(|key| !this_options.contains_key(*key))
-            .cloned()
             .collect();
         if !diff.is_empty() {
-            return Err(InvalidArgumentException::new(format!(
-                "The TableCell does not support the following options: '{}'.",
-                diff.join("', '"),
+            return Err(InvalidArgumentException::new(bconcat!(
+                "The TableCell does not support the following options: '",
+                implode("', '", &diff),
+                "'."
             )));
         }
 
-        if let Some(style) = options.get("style")
+        if let Some(style) = options.get(B("style"))
             && !matches!(style, TableCellOption::Style(_))
             && !matches!(style, TableCellOption::Null)
         {
             return Err(InvalidArgumentException::new(
-                "The style option must be an instance of \"TableCellStyle\".".to_string(),
+                "The style option must be an instance of \"TableCellStyle\".",
             ));
         }
 
@@ -55,7 +57,7 @@ impl TableCell {
         }
 
         Ok(Self {
-            value: value.to_string(),
+            value: BString::from(value.as_ref()),
             options: this_options,
         })
     }
@@ -64,13 +66,13 @@ impl TableCell {
     ///
     /// The options used by the Table helper are internally controlled, so a malformed-option
     /// error here would be a programming bug rather than a recoverable condition.
-    pub fn new2(value: &str, options: IndexMap<String, TableCellOption>) -> Self {
+    pub fn new2(value: impl AsRef<[u8]>, options: IndexMap<BString, TableCellOption>) -> Self {
         Self::new(value, options).expect("TableCell options built internally are always valid")
     }
 
     /// Gets number of colspan.
     pub fn get_colspan(&self) -> i64 {
-        match self.options["colspan"] {
+        match self.options[B("colspan")] {
             TableCellOption::Int(colspan) => colspan,
             _ => 0,
         }
@@ -78,22 +80,21 @@ impl TableCell {
 
     /// Gets number of rowspan.
     pub fn get_rowspan(&self) -> i64 {
-        match self.options["rowspan"] {
+        match self.options[B("rowspan")] {
             TableCellOption::Int(rowspan) => rowspan,
             _ => 0,
         }
     }
 
+    /// PHP `__toString()`.
+    pub fn to_php_string(&self) -> BString {
+        self.value.clone()
+    }
+
     pub fn get_style(&self) -> Option<std::rc::Rc<TableCellStyle>> {
-        match &self.options["style"] {
+        match &self.options[B("style")] {
             TableCellOption::Style(style) => Some(style.clone()),
             _ => None,
         }
-    }
-}
-
-impl std::fmt::Display for TableCell {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
     }
 }

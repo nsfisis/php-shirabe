@@ -1,36 +1,40 @@
 //! ref: composer/src/Composer/EventDispatcher/Event.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Event {
-    name: String,
-    args: Vec<String>,
+    name: BString,
+    args: Vec<BString>,
     flags: IndexMap<BString, PhpMixed>,
     propagation_stopped: bool,
 }
 
 impl Event {
-    pub fn new(name: String, args: Vec<String>, flags: IndexMap<BString, PhpMixed>) -> Self {
+    pub fn new(
+        name: impl Into<BString>,
+        args: Vec<BString>,
+        flags: IndexMap<BString, PhpMixed>,
+    ) -> Self {
         Self {
-            name,
+            name: name.into(),
             args,
             flags,
             propagation_stopped: false,
         }
     }
 
-    pub fn from_name(name: String) -> Self {
+    pub fn from_name(name: impl Into<BString>) -> Self {
         Event::new(name, Vec::new(), IndexMap::new())
     }
 
-    pub fn get_name(&self) -> &str {
-        &self.name
+    pub fn get_name(&self) -> &BStr {
+        self.name.as_ref()
     }
 
-    pub fn get_arguments(&self) -> &Vec<String> {
+    pub fn get_arguments(&self) -> &Vec<BString> {
         &self.args
     }
 
@@ -52,8 +56,8 @@ pub trait EventInterface: std::fmt::Debug {
     /// `IOInterface::as_any`.
     fn as_any(&self) -> &dyn std::any::Any;
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
-    fn get_name(&self) -> &str;
-    fn get_arguments(&self) -> &Vec<String>;
+    fn get_name(&self) -> &BStr;
+    fn get_arguments(&self) -> &Vec<BString>;
     fn get_flags(&self) -> &IndexMap<BString, PhpMixed>;
     fn is_propagation_stopped(&self) -> bool;
     fn stop_propagation(&mut self);
@@ -68,11 +72,11 @@ impl EventInterface for Event {
         self
     }
 
-    fn get_name(&self) -> &str {
-        &self.name
+    fn get_name(&self) -> &BStr {
+        self.name.as_ref()
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<BString> {
         &self.args
     }
 

@@ -5,7 +5,7 @@ use serial_test::serial;
 use shirabe::factory::Factory;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, error_message, path_to_bytes};
 
 #[path = "common/config_stub.rs"]
 mod config_stub;
@@ -56,7 +56,10 @@ fn test_default_values_are_as_expected() {
 fn test_get_composer_json_path() {
     let _tear_down = TearDown;
 
-    assert_eq!("./composer.json", Factory::get_composer_file().unwrap());
+    assert_eq!(
+        bstr::BStr::new("./composer.json"),
+        bstr::BStr::new(path_to_bytes(&Factory::get_composer_file().unwrap()))
+    );
 }
 
 #[test]
@@ -68,11 +71,12 @@ fn test_get_composer_json_path_fails_if_dir() {
     Platform::put_env("COMPOSER", dir);
     let err = Factory::get_composer_file().unwrap_err();
     assert_eq!(
-        format!(
-            "The COMPOSER environment variable is set to {} which is a directory, this variable should point to a composer.json or be left unset.",
-            dir
+        bconcat!(
+            "The COMPOSER environment variable is set to ",
+            dir,
+            " which is a directory, this variable should point to a composer.json or be left unset."
         ),
-        err.to_string()
+        error_message(&err)
     );
 }
 
@@ -82,5 +86,8 @@ fn test_get_composer_json_path_from_env() {
     let _tear_down = TearDown;
 
     Platform::put_env("COMPOSER", " foo.json ");
-    assert_eq!("foo.json", Factory::get_composer_file().unwrap());
+    assert_eq!(
+        bstr::BStr::new("foo.json"),
+        bstr::BStr::new(path_to_bytes(&Factory::get_composer_file().unwrap()))
+    );
 }

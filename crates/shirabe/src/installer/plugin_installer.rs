@@ -2,13 +2,13 @@
 
 use crate::composer::PartialComposerWeakHandle;
 use crate::installer::{BinaryPresenceInterface, InstallerInterface, LibraryInstaller};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
-use bstr::B;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
+use bstr::{B, BStr};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, bconcat, empty, error_message};
 
 #[derive(Debug)]
 pub struct PluginInstaller {
@@ -28,7 +28,7 @@ impl PluginInstaller {
             inner: LibraryInstaller::new(
                 io,
                 composer,
-                Some("composer-plugin".to_string()),
+                Some("composer-plugin".into()),
                 fs,
                 binary_installer,
             ),
@@ -46,9 +46,10 @@ impl PluginInstaller {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
-        self.inner.io.write_error(&format!(
-            "Plugin initialization failed ({}), uninstalling plugin",
-            e
+        self.inner.io.write_error(bconcat!(
+            "Plugin initialization failed (",
+            error_message(&e),
+            "), uninstalling plugin"
         ));
         self.inner.uninstall(repo, package).await?;
         Err(e)
@@ -70,7 +71,7 @@ impl PluginInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for PluginInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(package_type == "composer-plugin" || package_type == "composer-installer")
     }
 
@@ -84,7 +85,7 @@ impl InstallerInterface for PluginInstaller {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -92,7 +93,7 @@ impl InstallerInterface for PluginInstaller {
             && !self
                 .get_plugin_manager()
                 .borrow()
-                .are_plugins_disabled("local")
+                .are_plugins_disabled(BStr::new("local"))
         {
             let plugin_optional = package
                 .get_extra()
@@ -100,7 +101,7 @@ impl InstallerInterface for PluginInstaller {
                 .map(|v| matches!(v, PhpMixed::Bool(true)))
                 .unwrap_or(false);
             self.get_plugin_manager().borrow_mut().is_plugin_allowed(
-                &package.get_name(),
+                package.get_name(),
                 false,
                 plugin_optional,
                 true,
@@ -118,10 +119,7 @@ impl InstallerInterface for PluginInstaller {
         let extra = package.get_extra();
         let class = extra.get(B("class")).cloned().unwrap_or(PhpMixed::Null);
         if empty(&class) {
-            return Err(UnexpectedValueException::new(format!(
-                "Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.",
-                package.get_pretty_name()
-            )).into());
+            return Err(UnexpectedValueException::new(bconcat!("Error while installing ", package.get_pretty_name(), ", composer-plugin packages should have a class defined in their extra key to be usable.")).into());
         }
 
         self.inner.download(package, prev_package).await
@@ -185,14 +183,14 @@ impl InstallerInterface for PluginInstaller {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.cleanup(r#type, package, prev_package).await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         self.inner.get_install_path(package)
     }
 

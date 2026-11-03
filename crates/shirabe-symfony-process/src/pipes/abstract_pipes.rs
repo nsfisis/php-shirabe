@@ -1,19 +1,20 @@
 //! ref: composer/vendor/symfony/process/Pipes/AbstractPipes.php
 
-use bstr::ByteSlice;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, PhpResource, fclose, fwrite, php_truthy, stream_select, stream_set_blocking,
+    PhpMixed, PhpResource, fclose, fwrite, php_to_string, php_truthy, stream_select,
+    stream_set_blocking, stripos,
 };
 
 #[derive(Debug)]
 pub struct AbstractPipes {
     pub pipes: IndexMap<i64, PhpResource>,
 
-    input_buffer: String,
+    input_buffer: BString,
     input: PhpMixed,
     blocked: bool,
-    last_error: Option<String>,
+    last_error: Option<BString>,
 }
 
 impl AbstractPipes {
@@ -23,12 +24,10 @@ impl AbstractPipes {
         // TODO(plugin): `$input instanceof \Iterator` is not modeled. The PHP `is_resource($input)`
         // branch never applies: a PhpMixed is never a resource, so input is never stored as-is here.
         if let PhpMixed::String(s) = &input {
-            // TODO(bytes): input_buffer is a String, so non-UTF-8 input is replaced before it
-            // reaches the child's stdin.
-            input_buffer = s.to_str_lossy().into_owned();
+            input_buffer = s.clone();
             stored_input = PhpMixed::Null;
         } else {
-            input_buffer = input.as_string().map(|s| s.to_string()).unwrap_or_default();
+            input_buffer = php_to_string(&input);
             stored_input = PhpMixed::Null;
         }
 
@@ -57,7 +56,7 @@ impl AbstractPipes {
 
         // stream_select returns false when the `select` system call is interrupted by an incoming signal
         last_error
-            .map(|e| e.to_lowercase().contains("interrupted system call"))
+            .map(|e| stripos(&e, "interrupted system call").is_some())
             .unwrap_or(false)
     }
 
@@ -93,7 +92,7 @@ impl AbstractPipes {
 
         if !self.input_buffer.is_empty() {
             let written = fwrite(&stdin, &self.input_buffer, None).unwrap_or(0) as usize;
-            self.input_buffer = self.input_buffer.get(written..).unwrap_or("").to_string();
+            self.input_buffer = self.input_buffer[written..].into();
             if !self.input_buffer.is_empty() {
                 return Some(vec![stdin]);
             }

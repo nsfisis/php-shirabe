@@ -2,20 +2,22 @@
 
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{FilterRepository, RepositoryInterfaceHandle};
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException, json_encode};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, RuntimeException, bconcat, json_encode,
+};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct RepositoryManager {
     local_repository: Option<RepositoryInterfaceHandle>,
     repositories: Vec<RepositoryInterfaceHandle>,
-    repository_classes: IndexMap<String, String>,
+    repository_classes: IndexMap<BString, BString>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -50,7 +52,7 @@ impl RepositoryManager {
 
     pub fn find_package(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: &AnyConstraint,
     ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         for repository in &self.repositories {
@@ -66,7 +68,7 @@ impl RepositoryManager {
 
     pub fn find_packages(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: &AnyConstraint,
     ) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
         let mut packages: Vec<PackageInterfaceHandle> = vec![];
@@ -93,13 +95,13 @@ impl RepositoryManager {
 
     pub fn create_repository(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
-        name: Option<&str>,
+        name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         if !self.repository_classes.contains_key(r#type) {
-            return Err(InvalidArgumentException::new(format!(
-                "Repository type is not registered: {}",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Repository type is not registered: ",
                 r#type
             ))
             .into());
@@ -110,7 +112,13 @@ impl RepositoryManager {
                 config.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             ))
             .unwrap_or_default();
-            self.io.write_error(&format!("<warning>Repository \"{}\" ({}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or(""), config_json));
+            self.io.write_error(bconcat!(
+                "<warning>Repository \"",
+                name.unwrap_or_default(),
+                "\" (",
+                config_json,
+                ") has a packagist key which should be in its own repository definition</warning>"
+            ));
         }
 
         let class = self.repository_classes[r#type].clone();
@@ -131,7 +139,7 @@ impl RepositoryManager {
 
         // PHP instantiates `new $class(...)` dynamically; the port matches on the known
         // repository class names instead.
-        let repository = self.create_repository_by_class(&class, cleaned_config)?;
+        let repository = self.create_repository_by_class(class.as_bstr(), cleaned_config)?;
 
         if let Some(filter_config) = filter_config {
             return Ok(RepositoryInterfaceHandle::new(FilterRepository::new(
@@ -145,14 +153,14 @@ impl RepositoryManager {
 
     fn create_repository_by_class(
         &self,
-        class: &str,
+        class: &BStr,
         config: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         // PHP: `new $class($config, $this->io, $this->config, $this->httpDownloader,
         // $this->eventDispatcher, $this->process)`. Rust cannot instantiate by string class name, so
         // dispatch over the classes registered in `createDefaultRepositoryManager`.
-        match class {
-            "Composer\\Repository\\ComposerRepository" => Ok(RepositoryInterfaceHandle::new(
+        match class.as_bytes() {
+            b"Composer\\Repository\\ComposerRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::ComposerRepository::new(
                     config,
                     self.io.clone(),
@@ -161,10 +169,10 @@ impl RepositoryManager {
                     self.event_dispatcher.clone(),
                 )?,
             )),
-            "Composer\\Repository\\PackageRepository" => Ok(RepositoryInterfaceHandle::new(
+            b"Composer\\Repository\\PackageRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::PackageRepository::new(config),
             )),
-            "Composer\\Repository\\VcsRepository" => Ok(RepositoryInterfaceHandle::new(
+            b"Composer\\Repository\\VcsRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::VcsRepository::new(
                     config,
                     self.io.clone(),
@@ -176,10 +184,10 @@ impl RepositoryManager {
                     None,
                 )?,
             )),
-            "Composer\\Repository\\ArtifactRepository" => Ok(RepositoryInterfaceHandle::new(
+            b"Composer\\Repository\\ArtifactRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::ArtifactRepository::new(config, self.io.clone())?,
             )),
-            "Composer\\Repository\\PathRepository" => Ok(RepositoryInterfaceHandle::new(
+            b"Composer\\Repository\\PathRepository" => Ok(RepositoryInterfaceHandle::new(
                 crate::repository::PathRepository::new(
                     config,
                     self.io.clone(),
@@ -191,16 +199,17 @@ impl RepositoryManager {
             )),
             // TODO(plugin): `setRepositoryClass` lets a plugin register a repository class of
             // its own, which needs a Rust-side counterpart before it can be built here.
-            other => Err(RuntimeException::new(format!(
-                "Repository class has no Rust implementation: {other}"
+            _ => Err(RuntimeException::new(bconcat!(
+                "Repository class has no Rust implementation: ",
+                class
             ))
             .into()),
         }
     }
 
-    pub fn set_repository_class(&mut self, r#type: &str, class: &str) {
+    pub fn set_repository_class(&mut self, r#type: &BStr, class: &BStr) {
         self.repository_classes
-            .insert(r#type.to_string(), class.to_string());
+            .insert(bstr::BString::from(r#type), bconcat!(class));
     }
 
     pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
@@ -209,7 +218,7 @@ impl RepositoryManager {
 
     /// For testing only: exposes the private `repository_classes` map so tests
     /// can assert on its registered type keys (PHP reads it via ReflectionProperty).
-    pub fn __repository_classes(&self) -> &IndexMap<String, String> {
+    pub fn __repository_classes(&self) -> &IndexMap<BString, BString> {
         &self.repository_classes
     }
 
@@ -230,9 +239,9 @@ pub trait RepositoryManagerInterface: std::fmt::Debug {
     fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
     fn create_repository(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
-        name: Option<&str>,
+        name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle>;
     fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
     fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
@@ -249,9 +258,9 @@ impl RepositoryManagerInterface for RepositoryManager {
 
     fn create_repository(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
-        name: Option<&str>,
+        name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         self.create_repository(r#type, config, name)
     }

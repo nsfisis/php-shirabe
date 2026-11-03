@@ -2,13 +2,14 @@
 
 use super::command_not_found_exception::CommandNotFoundException;
 use super::exception_interface::ExceptionInterface;
+use bstr::BString;
 
 #[derive(Debug)]
 pub struct NamespaceNotFoundException(pub CommandNotFoundException);
 
 impl NamespaceNotFoundException {
     #[track_caller]
-    pub fn new(message: String, alternatives: Vec<String>, code: i64) -> Self {
+    pub fn new(message: impl Into<BString>, alternatives: Vec<BString>, code: i64) -> Self {
         Self(CommandNotFoundException::new(message, alternatives, code))
     }
 }

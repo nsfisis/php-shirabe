@@ -3,17 +3,20 @@
 use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, parse_url, php_regex,
-    preg_is_match, strtolower,
+    InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class, parse_url,
+    path_to_bytes, php_regex, php_to_string, preg_is_match, strtolower,
 };
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::input::InputInterfaceByName;
+use shirabe_symfony_console::{
+    command::Command,
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 #[derive(Debug)]
 pub struct RepositoryCommand {
@@ -60,10 +63,10 @@ impl RepositoryCommand {
                     .get(B("url"))
                     .and_then(|v| v.as_string())
                     .map(|url| {
-                        parse_url(&url.to_str_lossy())
+                        parse_url(url)
                             .and_then(|parsed| parsed.host)
                             .unwrap_or_default()
-                            .ends_with("packagist.org")
+                            .ends_with(b"packagist.org")
                     })
                     .unwrap_or(false);
                 if has_type_and_url && is_composer_type && url_host_ends_with_packagist {
@@ -75,10 +78,7 @@ impl RepositoryCommand {
         if !packagist_present {
             let mut packagist_entry = IndexMap::new();
             packagist_entry.insert("packagist.org".into(), PhpMixed::Bool(false));
-            repos.insert(
-                repos.len().to_string().into(),
-                PhpMixed::Array(packagist_entry),
-            );
+            repos.insert(bconcat!(repos.len()), PhpMixed::Array(packagist_entry));
         }
 
         if repos.is_empty() {
@@ -88,7 +88,7 @@ impl RepositoryCommand {
 
         for (key, repo) in &repos {
             if matches!(*repo, PhpMixed::Bool(false)) {
-                io.write(&format!("[{}] <info>disabled</info>", key));
+                io.write(bconcat!("[", key, "] <info>disabled</info>"));
                 continue;
             }
 
@@ -98,7 +98,7 @@ impl RepositoryCommand {
                     && matches!(*first_val, PhpMixed::Bool(false))
                 {
                     let first_key = repo_map.keys().next().unwrap();
-                    io.write(&format!("[{}] <info>disabled</info>", first_key));
+                    io.write(bconcat!("[", first_key, "] <info>disabled</info>"));
                     continue;
                 }
 
@@ -110,15 +110,11 @@ impl RepositoryCommand {
                     .get(B("type"))
                     .and_then(|v| v.as_string())
                     .unwrap_or("unknown".into());
-                let url = match repo_map
-                    .get(B("url"))
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_string())
-                {
-                    Some(url) => url,
+                let url = match repo_map.get(B("url")).and_then(|v| v.as_string()) {
+                    Some(url) => BString::from(url),
                     None => JsonFile::encode(repo)?,
                 };
-                io.write(&format!("[{}] <info>{}</info> {}", name, r#type, url));
+                io.write(bconcat!("[", name, "] <info>", r#type, "</info> ", url));
             }
         }
 
@@ -130,10 +126,10 @@ impl RepositoryCommand {
         crate::console::input::SuggestedValues::Closure(Box::new(|_this, input, _suggestions| {
             if input.get_argument("action")?.to_php_string() == "add" {
                 return Ok(vec![
-                    "composer".to_string(),
-                    "vcs".to_string(),
-                    "artifact".to_string(),
-                    "path".to_string(),
+                    "composer".into(),
+                    "vcs".into(),
+                    "artifact".into(),
+                    "path".into(),
                 ]);
             }
 
@@ -144,11 +140,11 @@ impl RepositoryCommand {
     fn suggest_repo_names(&self) -> crate::console::input::SuggestedValues {
         crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             let action = input.get_argument("action")?.to_php_string();
-            if ["enable", "disable"].contains(&action.as_str()) {
-                return Ok(vec!["packagist.org".to_string()]);
+            if action == "enable" || action == "disable" {
+                return Ok(vec!["packagist.org".into()]);
             }
 
-            if !["remove", "set-url", "get-url"].contains(&action.as_str()) {
+            if action != "remove" && action != "set-url" && action != "get-url" {
                 return Ok(vec![]);
             }
 
@@ -169,19 +165,19 @@ impl RepositoryCommand {
             )?;
 
             let data = config_file.read()?;
-            let mut repos: Vec<String> = vec![];
+            let mut repos: Vec<BString> = vec![];
 
             if let Some(repositories) = data.as_array().and_then(|d| d.get(B("repositories"))) {
                 if let Some(list) = repositories.as_list() {
                     for repo in list {
                         if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
-                            repos.push(name.to_string());
+                            repos.push(php_to_string(name));
                         }
                     }
                 } else if let Some(map) = repositories.as_array() {
                     for repo in map.values() {
                         if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
-                            repos.push(name.to_string());
+                            repos.push(php_to_string(name));
                         }
                     }
                 }
@@ -197,13 +193,13 @@ impl RepositoryCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("repository")?;
-        self.set_aliases(vec!["repo".to_string()])?;
-        self.set_description("Manages repositories");
+        self.set_name("repository".into())?;
+        self.set_aliases(vec!["repo".into()])?;
+        self.set_description("Manages repositories".into());
         self.set_definition(&[
             InputOption::new(
                 "global",
-                Some("g"),
+                Some("g".into()),
                 Some(InputOption::VALUE_NONE),
                 "Apply command to the global config file",
                 None,
@@ -212,7 +208,7 @@ impl Command for RepositoryCommand {
             .into(),
             InputOption::new(
                 "file",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "If you want to choose a different composer.json or config.json",
                 None,
@@ -252,15 +248,15 @@ impl Command for RepositoryCommand {
                 "action",
                 Some(InputArgument::OPTIONAL),
                 "Action to perform: list, add, remove, set-url, get-url, enable, disable",
-                Some(InputValue::String("list".to_string())),
+                Some(InputValue::from("list")),
                 crate::console::input::SuggestedValues::List(vec![
-                    "list".to_string(),
-                    "add".to_string(),
-                    "remove".to_string(),
-                    "set-url".to_string(),
-                    "get-url".to_string(),
-                    "enable".to_string(),
-                    "disable".to_string(),
+                    BString::from("list"),
+                    BString::from("add"),
+                    BString::from("remove"),
+                    BString::from("set-url"),
+                    BString::from("get-url"),
+                    BString::from("enable"),
+                    BString::from("disable"),
                 ]),
             )
             .unwrap()
@@ -307,7 +303,8 @@ impl Command for RepositoryCommand {
             shirabe repo disable packagist.org\n  \
             shirabe repo enable packagist.org\n\n\
             Use --global/-g to alter the global config.json instead.\n\
-            Use --file to alter a specific file.",
+            Use --file to alter a specific file."
+                .into(),
         );
         Ok(())
     }
@@ -328,21 +325,21 @@ impl Command for RepositoryCommand {
             .borrow()
             .get_argument("name")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BString::from);
         let arg1 = input
             .borrow()
             .get_argument("arg1")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BString::from);
         let arg2 = input
             .borrow()
             .get_argument("arg2")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BString::from);
 
         let config_file = self.config_file.borrow().as_ref().unwrap().clone();
         let config_data = config_file.borrow_mut().read()?;
-        let config_file_path = config_file.borrow().get_path().to_string();
+        let config_file_path = config_file.borrow().get_path().to_path_buf();
         let config_data_map: IndexMap<BString, PhpMixed> = match config_data {
             PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
@@ -350,33 +347,33 @@ impl Command for RepositoryCommand {
         let config = self.config.borrow().as_ref().unwrap().clone();
         config
             .borrow_mut()
-            .merge(&config_data_map, &config_file_path);
+            .merge(&config_data_map, path_to_bytes(&config_file_path));
         let repos = config.borrow().get_repositories();
 
-        match action.as_str() {
-            "list" | "ls" | "show" => {
+        match action.as_slice() {
+            b"list" | b"ls" | b"show" => {
                 self.list_repositories(repos)?;
                 Ok(0)
             }
-            "add" => {
+            b"add" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new("You must pass a repository name. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
+                    return Err(RuntimeException::new(BString::from("You must pass a repository name. Example: shirabe repo add foo vcs https://example.org")).into());
                 }
                 if arg1.is_none() {
-                    return Err(RuntimeException::new(
-                        "You must pass the type and a url, or a JSON string.".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "You must pass the type and a url, or a JSON string.",
+                    ))
                     .into());
                 }
-                let arg1_str = arg1.as_deref().unwrap();
+                let arg1_str = arg1.as_ref().unwrap();
                 let repo_config: PhpMixed = if preg_is_match(php_regex!(r"{^\s*\{}"), arg1_str) {
                     JsonFile::parse_json(Some(arg1_str), None)?
                 } else {
                     if arg2.is_none() {
-                        return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
+                        return Err(RuntimeException::new(BString::from("You must pass the type and a url. Example: shirabe repo add foo vcs https://example.org")).into());
                     }
                     let mut m = IndexMap::new();
-                    m.insert("type".into(), PhpMixed::string(arg1_str.to_string()));
+                    m.insert("type".into(), PhpMixed::string(arg1_str.clone()));
                     m.insert("url".into(), PhpMixed::string(arg2.unwrap()));
                     PhpMixed::Array(m)
                 };
@@ -385,37 +382,36 @@ impl Command for RepositoryCommand {
                     .borrow()
                     .get_option("before")?
                     .as_string()
-                    .map(|s| s.to_string());
+                    .map(BString::from);
                 let after = input
                     .borrow()
                     .get_option("after")?
                     .as_string()
-                    .map(|s| s.to_string());
+                    .map(BString::from);
                 if before.is_some() && after.is_some() {
-                    return Err(RuntimeException::new(
-                        "You can not combine --before and --after".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "You can not combine --before and --after",
+                    ))
                     .into());
                 }
 
                 if before.is_some() || after.is_some() {
                     if matches!(repo_config, PhpMixed::Bool(false)) {
-                        return Err(RuntimeException::new(
-                            "Cannot use --before/--after with boolean repository values"
-                                .to_string(),
-                        )
+                        return Err(RuntimeException::new(BString::from(
+                            "Cannot use --before/--after with boolean repository values",
+                        ))
                         .into());
                     }
-                    let reference_name = before.as_deref().or(after.as_deref()).unwrap();
+                    let reference_name = before.as_ref().or(after.as_ref()).unwrap();
                     let offset: i64 = if after.is_some() { 1 } else { 0 };
                     self.config_source
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
                         .insert_repository(
-                            name.as_deref().unwrap(),
+                            bstr::BStr::new(name.as_ref().unwrap()),
                             repo_config,
-                            reference_name,
+                            bstr::BStr::new(reference_name),
                             offset,
                         )?;
                     return Ok(0);
@@ -430,99 +426,105 @@ impl Command for RepositoryCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_repository(name.as_deref().unwrap(), repo_config, append)?;
+                    .add_repository(bstr::BStr::new(name.as_ref().unwrap()), repo_config, append)?;
                 Ok(0)
             }
-            "remove" | "rm" | "delete" => {
+            b"remove" | b"rm" | b"delete" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new(
-                        "You must pass the repository name to remove.".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "You must pass the repository name to remove.",
+                    ))
                     .into());
                 }
-                let name_str = name.as_deref().unwrap();
+                let name_str = name.as_ref().unwrap();
                 self.config_source
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_repository(name_str)?;
-                if ["packagist", "packagist.org"].contains(&name_str) {
+                    .remove_repository(bstr::BStr::new(name_str))?;
+                if matches!(name_str.as_slice(), b"packagist" | b"packagist.org") {
                     self.config_source
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
-                        .add_repository("packagist.org", PhpMixed::Null, false)?;
+                        .add_repository(bstr::BStr::new("packagist.org"), PhpMixed::Null, false)?;
                 }
                 Ok(0)
             }
-            "set-url" | "seturl" => {
+            b"set-url" | b"seturl" => {
                 if name.is_none() || arg1.is_none() {
-                    return Err(RuntimeException::new(
-                        "Usage: shirabe repo set-url <name> <new-url>".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Usage: shirabe repo set-url <name> <new-url>",
+                    ))
                     .into());
                 }
                 self.config_source
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .set_repository_url(name.as_deref().unwrap(), arg1.as_deref().unwrap());
+                    .set_repository_url(
+                        bstr::BStr::new(name.as_ref().unwrap()),
+                        bstr::BStr::new(arg1.as_ref().unwrap()),
+                    );
                 Ok(0)
             }
-            "get-url" | "geturl" => {
+            b"get-url" | b"geturl" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new(
-                        "Usage: shirabe repo get-url <name>".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Usage: shirabe repo get-url <name>",
+                    ))
                     .into());
                 }
-                let name_str = name.as_deref().unwrap();
+                let name_str = name.as_ref().unwrap();
                 if let Some(repo) = repos.get(B(name_str))
                     && let PhpMixed::Array(ref repo_map) = *repo
                 {
                     let url = repo_map.get(B("url")).and_then(|v| v.as_string());
                     if let Some(url) = url {
-                        self.get_io().write(&url.to_str_lossy());
+                        self.get_io().write(url);
                         return Ok(0);
                     }
-                    return Err(InvalidArgumentException::new(format!(
-                        "The {} repository does not have a URL",
-                        name_str
+                    return Err(InvalidArgumentException::new(bconcat!(
+                        "The ",
+                        name_str,
+                        " repository does not have a URL"
                     ))
                     .into());
                 }
                 for (_key, val) in &repos {
                     if let PhpMixed::Array(ref repo_map) = *val
                         && let Some(n) = repo_map.get(B("name")).and_then(|v| v.as_string())
-                        && n == name_str
+                        && n == name_str.as_bstr()
                     {
                         let url = repo_map.get(B("url")).and_then(|v| v.as_string());
                         if let Some(url) = url {
-                            self.get_io().write(&url.to_str_lossy());
+                            self.get_io().write(url);
                             return Ok(0);
                         }
-                        return Err(InvalidArgumentException::new(format!(
-                            "The {} repository does not have a URL",
-                            name_str
+                        return Err(InvalidArgumentException::new(bconcat!(
+                            "The ",
+                            name_str,
+                            " repository does not have a URL"
                         ))
                         .into());
                     }
                 }
-                Err(InvalidArgumentException::new(format!(
-                    "There is no {} repository defined",
-                    name_str
+                Err(InvalidArgumentException::new(bconcat!(
+                    "There is no ",
+                    name_str,
+                    " repository defined"
                 ))
                 .into())
             }
-            "disable" => {
+            b"disable" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new(
-                        "Usage: shirabe repo disable packagist.org".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Usage: shirabe repo disable packagist.org",
+                    ))
                     .into());
                 }
-                let name_str = name.as_deref().unwrap();
-                if ["packagist", "packagist.org"].contains(&name_str) {
+                let name_str = name.as_ref().unwrap();
+                if matches!(name_str.as_slice(), b"packagist" | b"packagist.org") {
                     let append = input
                         .borrow()
                         .get_option("append")?
@@ -532,35 +534,40 @@ impl Command for RepositoryCommand {
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
-                        .add_repository("packagist.org", PhpMixed::Bool(false), append);
+                        .add_repository(
+                            bstr::BStr::new("packagist.org"),
+                            PhpMixed::Bool(false),
+                            append,
+                        );
                     return Ok(0);
                 }
-                Err(RuntimeException::new("Only packagist.org can be enabled/disabled using this command. Use add/remove for other repositories.".to_string()).into())
+                Err(RuntimeException::new(BString::from("Only packagist.org can be enabled/disabled using this command. Use add/remove for other repositories.")).into())
             }
-            "enable" => {
+            b"enable" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new(
-                        "Usage: shirabe repo enable packagist.org".to_string(),
-                    )
+                    return Err(RuntimeException::new(BString::from(
+                        "Usage: shirabe repo enable packagist.org",
+                    ))
                     .into());
                 }
-                let name_str = name.as_deref().unwrap();
-                if ["packagist", "packagist.org"].contains(&name_str) {
+                let name_str = name.as_ref().unwrap();
+                if matches!(name_str.as_slice(), b"packagist" | b"packagist.org") {
                     self.config_source
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
-                        .remove_repository("packagist.org");
+                        .remove_repository(bstr::BStr::new("packagist.org"));
                     return Ok(0);
                 }
-                Err(RuntimeException::new(
-                    "Only packagist.org can be enabled/disabled using this command.".to_string(),
-                )
+                Err(RuntimeException::new(BString::from(
+                    "Only packagist.org can be enabled/disabled using this command.",
+                ))
                 .into())
             }
-            _ => Err(InvalidArgumentException::new(format!(
-                "Unknown action \"{}\". Use list, add, remove, set-url, get-url, enable, disable",
-                action
+            _ => Err(InvalidArgumentException::new(bconcat!(
+                "Unknown action \"",
+                action,
+                "\". Use list, add, remove, set-url, get-url, enable, disable"
             ))
             .into()),
         }

@@ -3,6 +3,7 @@
 use crate::installer::InstallationManager;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::RepositoryInterface;
+use bstr::BString;
 
 pub trait WritableRepositoryInterface: RepositoryInterface {
     fn write(
@@ -19,7 +20,7 @@ pub trait WritableRepositoryInterface: RepositoryInterface {
 
     fn reload(&mut self) -> anyhow::Result<()>;
 
-    fn set_dev_package_names(&mut self, dev_package_names: Vec<String>);
+    fn set_dev_package_names(&mut self, dev_package_names: Vec<BString>);
 
-    fn get_dev_package_names(&self) -> Vec<String>;
+    fn get_dev_package_names(&self) -> Vec<BString>;
 }

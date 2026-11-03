@@ -2,6 +2,8 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::AliasPackageHandle;
+use bstr::BStr;
+use shirabe_php_shim::{bconcat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct MarkAliasInstalledOperation {
@@ -17,26 +19,30 @@ impl MarkAliasInstalledOperation {
         self.package.clone()
     }
 
-    pub fn show(&self, _lock: bool) -> String {
-        format!(
-            "Marking <info>{}</info> (<comment>{}</comment>) as installed, alias of <info>{}</info> (<comment>{}</comment>)",
+    pub fn show(&self, _lock: bool) -> bstr::BString {
+        bconcat!(
+            "Marking <info>",
             self.package.get_pretty_name(),
+            "</info> (<comment>",
             self.package
                 .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+            "</comment>) as installed, alias of <info>",
             self.package.get_alias_of().get_pretty_name(),
+            "</info> (<comment>",
             self.package
                 .get_alias_of()
                 .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+            "</comment>)"
         )
     }
 }
 
 impl SolverOperation for MarkAliasInstalledOperation {
-    const TYPE: &'static str = "markAliasInstalled";
+    const TYPE: &'static BStr = php_str(b"markAliasInstalled");
 }
 
 impl std::fmt::Display for MarkAliasInstalledOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false))
+        write!(f, "{}", self.show(false).display_lossy())
     }
 }

@@ -1,59 +1,68 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Constraint.php
 
 use crate::constraint::Bound;
-use shirabe_php_shim::{CmpOp, var_export_str, version_compare};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{CmpOp, bconcat, implode, str_replace, var_export_str, version_compare};
 
 /// Corresponds to PHP's `Constraint`.
 #[derive(Debug, Clone)]
 pub struct SimpleConstraint {
     operator: CmpOp,
-    version: String,
-    pub(crate) pretty_string: Option<String>,
+    version: BString,
+    pub(crate) pretty_string: Option<BString>,
 }
 
 impl SimpleConstraint {
-    fn trans_op_str(op: &str) -> Option<CmpOp> {
+    fn trans_op_str(op: &[u8]) -> Option<CmpOp> {
         match op {
-            "=" => Some(CmpOp::Eq),
-            "==" => Some(CmpOp::Eq),
-            "<" => Some(CmpOp::Lt),
-            "<=" => Some(CmpOp::Le),
-            ">" => Some(CmpOp::Gt),
-            ">=" => Some(CmpOp::Ge),
-            "<>" => Some(CmpOp::Ne),
-            "!=" => Some(CmpOp::Ne),
+            b"=" => Some(CmpOp::Eq),
+            b"==" => Some(CmpOp::Eq),
+            b"<" => Some(CmpOp::Lt),
+            b"<=" => Some(CmpOp::Le),
+            b">" => Some(CmpOp::Gt),
+            b">=" => Some(CmpOp::Ge),
+            b"<>" => Some(CmpOp::Ne),
+            b"!=" => Some(CmpOp::Ne),
             _ => None,
         }
     }
 
-    pub fn new(operator: String, version: String, pretty_string: Option<String>) -> Self {
-        let op = Self::trans_op_str(&operator).unwrap_or_else(|| {
+    pub fn new(
+        operator: impl AsRef<[u8]>,
+        version: impl Into<BString>,
+        pretty_string: Option<BString>,
+    ) -> Self {
+        let operator = operator.as_ref();
+        let op = Self::trans_op_str(operator).unwrap_or_else(|| {
             // PHP raises InvalidArgumentException; in the Rust port keep that as a panic
             // because invalid operators are programmer errors caught during porting.
             panic!(
                 "Invalid operator \"{}\" given, expected one of: {}",
-                operator,
-                Self::get_supported_operators().join(", ")
+                operator.as_bstr().display_lossy(),
+                implode(", ", &Self::get_supported_operators()).display_lossy()
             )
         });
 
         Self {
             operator: op,
-            version,
+            version: version.into(),
             pretty_string,
         }
     }
 
-    pub fn get_version(&self) -> &str {
-        &self.version
+    pub fn get_version(&self) -> &BStr {
+        self.version.as_bstr()
     }
 
     pub fn get_operator(&self) -> CmpOp {
         self.operator
     }
 
-    pub fn get_supported_operators() -> Vec<&'static str> {
-        vec!["=", "==", "<", "<=", ">", ">=", "<>", "!="]
+    pub fn get_supported_operators() -> Vec<&'static BStr> {
+        ["=", "==", "<", "<=", ">", ">=", "<>", "!="]
+            .into_iter()
+            .map(BStr::new)
+            .collect()
     }
 
     pub fn get_operator_constant(operator: CmpOp) -> i64 {
@@ -81,13 +90,13 @@ impl SimpleConstraint {
 
     pub fn version_compare(
         &self,
-        a: &str,
-        b: &str,
+        a: &[u8],
+        b: &[u8],
         operator: CmpOp,
         compare_branches: bool,
     ) -> bool {
-        let a_is_branch = a.starts_with("dev-");
-        let b_is_branch = b.starts_with("dev-");
+        let a_is_branch = a.starts_with(b"dev-");
+        let b_is_branch = b.starts_with(b"dev-");
 
         if operator == CmpOp::Ne && (a_is_branch || b_is_branch) {
             return a != b;
@@ -105,104 +114,102 @@ impl SimpleConstraint {
         version_compare(a, b, operator)
     }
 
-    pub fn compile_constraint(&self, other_operator: CmpOp) -> String {
-        if self.version.starts_with("dev-") {
+    pub fn compile_constraint(&self, other_operator: CmpOp) -> BString {
+        let version = var_export_str(&self.version, true);
+        if self.version.starts_with(b"dev-") {
             if CmpOp::Eq == self.operator {
                 if CmpOp::Eq == other_operator {
-                    return format!("$b && $v === {}", var_export_str(&self.version, true));
+                    return bconcat!("$b && $v === ", version);
                 }
                 if CmpOp::Ne == other_operator {
-                    return format!("!$b || $v !== {}", var_export_str(&self.version, true));
+                    return bconcat!("!$b || $v !== ", version);
                 }
-                return "false".to_string();
+                return "false".into();
             }
 
             if CmpOp::Ne == self.operator {
                 if CmpOp::Eq == other_operator {
-                    return format!("!$b || $v !== {}", var_export_str(&self.version, true));
+                    return bconcat!("!$b || $v !== ", version);
                 }
                 if CmpOp::Ne == other_operator {
-                    return "true".to_string();
+                    return "true".into();
                 }
-                return "!$b".to_string();
+                return "!$b".into();
             }
 
-            return "false".to_string();
+            return "false".into();
         }
 
         if CmpOp::Eq == self.operator {
             if CmpOp::Eq == other_operator {
-                return format!(
-                    "\\version_compare($v, {}, '==')",
-                    var_export_str(&self.version, true)
-                );
+                return bconcat!("\\version_compare($v, ", version, ", '==')");
             }
             if CmpOp::Ne == other_operator {
-                return format!(
-                    "$b || \\version_compare($v, {}, '!=')",
-                    var_export_str(&self.version, true)
-                );
+                return bconcat!("$b || \\version_compare($v, ", version, ", '!=')");
             }
-            return format!(
-                "!$b && \\version_compare({}, $v, '{}')",
-                var_export_str(&self.version, true),
-                other_operator
+            return bconcat!(
+                "!$b && \\version_compare(",
+                version,
+                ", $v, '",
+                other_operator.as_str(),
+                "')"
             );
         }
 
         if CmpOp::Ne == self.operator {
             if CmpOp::Eq == other_operator {
-                return format!(
-                    "$b || (!$b && \\version_compare($v, {}, '!='))",
-                    var_export_str(&self.version, true)
-                );
+                return bconcat!("$b || (!$b && \\version_compare($v, ", version, ", '!='))");
             }
             if CmpOp::Ne == other_operator {
-                return "true".to_string();
+                return "true".into();
             }
-            return "!$b".to_string();
+            return "!$b".into();
         }
 
         if CmpOp::Lt == self.operator || CmpOp::Le == self.operator {
             if CmpOp::Lt == other_operator || CmpOp::Le == other_operator {
-                return "!$b".to_string();
+                return "!$b".into();
             }
         } else if CmpOp::Gt == other_operator || CmpOp::Ge == other_operator {
-            return "!$b".to_string();
+            return "!$b".into();
         }
 
         if CmpOp::Ne == other_operator {
-            return "true".to_string();
+            return "true".into();
         }
 
-        let code_comparison = format!(
-            "\\version_compare($v, {}, '{}')",
-            var_export_str(&self.version, true),
-            self.operator
+        let code_comparison = bconcat!(
+            "\\version_compare($v, ",
+            version,
+            ", '",
+            self.operator.as_str(),
+            "')"
         );
 
         if self.operator == CmpOp::Le && other_operator == CmpOp::Gt {
-            return format!(
-                "!$b && \\version_compare($v, {}, '!=') && {}",
-                var_export_str(&self.version, true),
+            return bconcat!(
+                "!$b && \\version_compare($v, ",
+                version,
+                ", '!=') && ",
                 code_comparison
             );
         }
 
         if self.operator == CmpOp::Ge && other_operator == CmpOp::Lt {
-            return format!(
-                "!$b && \\version_compare($v, {}, '!=') && {}",
-                var_export_str(&self.version, true),
+            return bconcat!(
+                "!$b && \\version_compare($v, ",
+                version,
+                ", '!=') && ",
                 code_comparison
             );
         }
 
-        format!("!$b && {}", code_comparison)
+        bconcat!("!$b && ", code_comparison)
     }
 
     pub fn match_specific(&self, provider: &SimpleConstraint, compare_branches: bool) -> bool {
-        let no_equal_op = self.operator.to_string().replace('=', "");
-        let provider_no_equal_op = provider.operator.to_string().replace('=', "");
+        let no_equal_op = str_replace("=", "", self.operator.as_str());
+        let provider_no_equal_op = str_replace("=", "", provider.operator.as_str());
 
         let is_equal_op = CmpOp::Eq == self.operator;
         let is_non_equal_op = CmpOp::Ne == self.operator;
@@ -213,7 +220,7 @@ impl SimpleConstraint {
             if is_non_equal_op
                 && !is_provider_non_equal_op
                 && !is_provider_equal_op
-                && provider.version.starts_with("dev-")
+                && provider.version.starts_with(b"dev-")
             {
                 return false;
             }
@@ -221,7 +228,7 @@ impl SimpleConstraint {
             if is_provider_non_equal_op
                 && !is_non_equal_op
                 && !is_equal_op
-                && self.version.starts_with("dev-")
+                && self.version.starts_with(b"dev-")
             {
                 return false;
             }
@@ -238,7 +245,7 @@ impl SimpleConstraint {
         }
 
         if self.operator != CmpOp::Eq && no_equal_op == provider_no_equal_op {
-            return !(self.version.starts_with("dev-") || provider.version.starts_with("dev-"));
+            return !(self.version.starts_with(b"dev-") || provider.version.starts_with(b"dev-"));
         }
 
         let (version1, version2, operator) = if is_equal_op {
@@ -248,8 +255,8 @@ impl SimpleConstraint {
         };
 
         if self.version_compare(version1, version2, operator, compare_branches) {
-            return !(provider.operator.to_string() == provider_no_equal_op
-                && self.operator.to_string() != no_equal_op
+            return !(provider.operator.as_str() == provider_no_equal_op
+                && self.operator.as_str() != no_equal_op
                 && version_compare(&provider.version, &self.version, CmpOp::Eq));
         }
 
@@ -259,7 +266,7 @@ impl SimpleConstraint {
     /// Composer memoizes the result; this port recomputes on every call. It is not heavy
     /// calculation so caching is a premature optimization.
     fn extract_bounds(&self) -> (Bound, Bound) {
-        if self.version.starts_with("dev-") {
+        if self.version.starts_with(b"dev-") {
             return (Bound::zero(), Bound::positive_infinity());
         }
 
@@ -282,17 +289,31 @@ impl SimpleConstraint {
         }
     }
 
-    pub fn compile(&self, other_operator: CmpOp) -> String {
+    pub fn compile(&self, other_operator: CmpOp) -> BString {
         self.compile_constraint(other_operator)
     }
 
-    pub fn get_pretty_string(&self) -> String {
+    pub fn get_pretty_string(&self) -> BString {
         if let Some(ref s) = self.pretty_string
             && !s.is_empty()
         {
             return s.clone();
         }
-        self.to_string()
+        self.to_php_string()
+    }
+
+    /// PHP's `__toString()`.
+    pub fn to_php_string(&self) -> BString {
+        let mut out = BString::default();
+        self.append_php_string(&mut out);
+        out
+    }
+
+    /// Appends PHP's `__toString()` to `out`.
+    pub fn append_php_string(&self, out: &mut BString) {
+        out.extend_from_slice(self.operator.as_str().as_bytes());
+        out.push(b' ');
+        out.extend_from_slice(&self.version);
     }
 
     pub fn get_lower_bound(&self) -> Bound {
@@ -301,11 +322,5 @@ impl SimpleConstraint {
 
     pub fn get_upper_bound(&self) -> Bound {
         self.extract_bounds().1
-    }
-}
-
-impl std::fmt::Display for SimpleConstraint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.operator, self.version)
     }
 }

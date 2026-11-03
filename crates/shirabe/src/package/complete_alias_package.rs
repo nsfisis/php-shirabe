@@ -4,7 +4,7 @@ use crate::package::handle::delegate_package_interface_to_inner;
 use crate::package::{
     AliasPackage, CompletePackageHandle, CompletePackageInterface, PackageHandle,
 };
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -16,7 +16,7 @@ pub struct CompleteAliasPackage {
 }
 
 impl CompleteAliasPackage {
-    pub fn new(alias_of: CompletePackageHandle, version: String, pretty_version: String) -> Self {
+    pub fn new(alias_of: CompletePackageHandle, version: BString, pretty_version: BString) -> Self {
         let inner = AliasPackage::new(
             PackageHandle::from(alias_of.clone()),
             version,
@@ -44,18 +44,12 @@ impl CompleteAliasPackage {
 
 delegate_package_interface_to_inner!(CompleteAliasPackage, inner);
 
-impl std::fmt::Display for CompleteAliasPackage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.inner, f)
-    }
-}
-
 impl CompletePackageInterface for CompleteAliasPackage {
-    fn get_scripts(&self) -> IndexMap<String, Vec<String>> {
+    fn get_scripts(&self) -> IndexMap<BString, Vec<BString>> {
         self.alias_of.get_scripts()
     }
 
-    fn set_scripts(&mut self, scripts: IndexMap<String, Vec<String>>) {
+    fn set_scripts(&mut self, scripts: IndexMap<BString, Vec<BString>>) {
         self.alias_of.set_scripts(scripts);
     }
 
@@ -67,51 +61,51 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.set_repositories(repositories);
     }
 
-    fn get_license(&self) -> Vec<String> {
+    fn get_license(&self) -> Vec<BString> {
         self.alias_of.get_license()
     }
 
-    fn set_license(&mut self, license: Vec<String>) {
+    fn set_license(&mut self, license: Vec<BString>) {
         self.alias_of.set_license(license);
     }
 
-    fn get_keywords(&self) -> Vec<String> {
+    fn get_keywords(&self) -> Vec<BString> {
         self.alias_of.get_keywords()
     }
 
-    fn set_keywords(&mut self, keywords: Vec<String>) {
+    fn set_keywords(&mut self, keywords: Vec<BString>) {
         self.alias_of.set_keywords(keywords);
     }
 
-    fn get_description(&self) -> Option<String> {
+    fn get_description(&self) -> Option<BString> {
         self.alias_of.get_description()
     }
 
-    fn set_description(&mut self, description: String) {
+    fn set_description(&mut self, description: BString) {
         self.alias_of.set_description(description);
     }
 
-    fn get_homepage(&self) -> Option<String> {
+    fn get_homepage(&self) -> Option<BString> {
         self.alias_of.get_homepage()
     }
 
-    fn set_homepage(&mut self, homepage: String) {
+    fn set_homepage(&mut self, homepage: BString) {
         self.alias_of.set_homepage(homepage);
     }
 
-    fn get_authors(&self) -> Vec<IndexMap<String, String>> {
+    fn get_authors(&self) -> Vec<IndexMap<BString, BString>> {
         self.alias_of.get_authors()
     }
 
-    fn set_authors(&mut self, authors: Vec<IndexMap<String, String>>) {
+    fn set_authors(&mut self, authors: Vec<IndexMap<BString, BString>>) {
         self.alias_of.set_authors(authors);
     }
 
-    fn get_support(&self) -> IndexMap<String, String> {
+    fn get_support(&self) -> IndexMap<BString, BString> {
         self.alias_of.get_support()
     }
 
-    fn set_support(&mut self, support: IndexMap<String, String>) {
+    fn set_support(&mut self, support: IndexMap<BString, BString>) {
         self.alias_of.set_support(support);
     }
 
@@ -127,7 +121,7 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.is_abandoned()
     }
 
-    fn get_replacement_package(&self) -> Option<String> {
+    fn get_replacement_package(&self) -> Option<BString> {
         self.alias_of.get_replacement_package()
     }
 
@@ -135,19 +129,19 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.set_abandoned(abandoned);
     }
 
-    fn get_archive_name(&self) -> Option<String> {
+    fn get_archive_name(&self) -> Option<BString> {
         self.alias_of.get_archive_name()
     }
 
-    fn set_archive_name(&mut self, name: String) {
+    fn set_archive_name(&mut self, name: BString) {
         self.alias_of.set_archive_name(name);
     }
 
-    fn get_archive_excludes(&self) -> Vec<String> {
+    fn get_archive_excludes(&self) -> Vec<BString> {
         self.alias_of.get_archive_excludes()
     }
 
-    fn set_archive_excludes(&mut self, excludes: Vec<String>) {
+    fn set_archive_excludes(&mut self, excludes: Vec<BString>) {
         self.alias_of.set_archive_excludes(excludes);
     }
 

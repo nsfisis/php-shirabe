@@ -4,6 +4,7 @@
 //! `#[path = "../common/test_case.rs"] mod test_case;`.
 #![allow(dead_code)]
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::console::application::ApplicationHandle;
@@ -22,8 +23,9 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{
-    PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, function_exists, fwrite_resource, getenv,
-    php_fopen_resource, putenv, putenv_clear, rewind, stream_get_contents,
+    PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, bconcat, function_exists, fwrite_resource, getenv,
+    path_from_bytes, path_to_bytes, php_fopen_resource, putenv, putenv_clear, rewind,
+    stream_get_contents,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -37,35 +39,52 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
-pub fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
+pub fn get_package(name: impl AsRef<[u8]>, version: impl AsRef<[u8]>) -> PackageInterfaceHandle {
+    let norm_version = VersionParser.normalize(version.as_ref(), None).unwrap();
+    CompletePackageHandle::new(
+        BString::from(name.as_ref()),
+        norm_version,
+        BString::from(version.as_ref()),
+    )
+    .into()
 }
 
 /// ref: TestCase::getPackage but returning the concrete `CompletePackageHandle` so the
 /// `CompletePackage`-only setters (`set_license`, `set_homepage`, ...) are reachable.
-pub fn get_complete_package(name: &str, version: &str) -> CompletePackageHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string())
+pub fn get_complete_package(
+    name: impl AsRef<[u8]>,
+    version: impl AsRef<[u8]>,
+) -> CompletePackageHandle {
+    let norm_version = VersionParser.normalize(version.as_ref(), None).unwrap();
+    CompletePackageHandle::new(
+        BString::from(name.as_ref()),
+        norm_version,
+        BString::from(version.as_ref()),
+    )
 }
 
 /// ref: TestCase::getAliasPackage (default class CompleteAliasPackage)
 pub fn get_alias_package(
     package: &PackageInterfaceHandle,
-    version: &str,
+    version: impl AsRef<[u8]>,
 ) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+    let norm_version = VersionParser.normalize(version.as_ref(), None).unwrap();
     let complete = CompletePackageHandle::from_rc_unchecked(package.as_rc().clone());
-    CompleteAliasPackageHandle::new(complete, norm_version, version.to_string()).into()
+    CompleteAliasPackageHandle::new(complete, norm_version, BString::from(version.as_ref())).into()
 }
 
 /// ref: TestCase::getVersionConstraint
-pub fn get_version_constraint(operator: &str, version: &str) -> AnyConstraint {
+pub fn get_version_constraint(
+    operator: impl AsRef<[u8]>,
+    version: impl AsRef<[u8]>,
+) -> AnyConstraint {
+    let operator = operator.as_ref();
+    let version = version.as_ref();
     let normalized = VersionParser.normalize(version, None).unwrap();
     AnyConstraint::Simple(SimpleConstraint::new(
-        operator.to_string(),
+        operator,
         normalized,
-        Some(format!("{} {}", operator, version)),
+        Some(bconcat!(operator, " ", version)),
     ))
 }
 
@@ -77,7 +96,7 @@ pub fn get_version_constraint(operator: &str, version: &str) -> AnyConstraint {
 pub struct TearDown {
     temp_dir: TempDir,
     prev_cwd: PathBuf,
-    prev_composer_home: Option<String>,
+    prev_composer_home: Option<bstr::BString>,
 }
 
 impl TearDown {
@@ -112,7 +131,7 @@ pub fn init_temp_composer(
     let prev_cwd = std::env::current_dir().unwrap();
     let prev_composer_home = Platform::get_env("COMPOSER_HOME");
 
-    Platform::put_env("COMPOSER_HOME", dir.join("composer-home").to_str().unwrap());
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&dir.join("composer-home")));
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");
 
     let mut composer_json = composer_json
@@ -138,7 +157,7 @@ pub fn init_temp_composer(
                         .get_mut("repositories")
                         .and_then(|r| r.as_object_mut())
                     {
-                        map.insert("packagist.org".to_string(), serde_json::Value::Bool(false));
+                        map.insert("packagist.org".into(), serde_json::Value::Bool(false));
                     }
                 }
             }
@@ -192,21 +211,24 @@ impl Drop for GitVersionGuard {
 /// let _restore = RestoreEnv::new("HOME", original);
 /// ```
 pub struct RestoreEnv {
-    name: &'static str,
-    original: Option<String>,
+    name: BString,
+    original: Option<bstr::BString>,
 }
 
 impl RestoreEnv {
-    pub fn new(name: &'static str, original: Option<String>) -> Self {
-        Self { name, original }
+    pub fn new(name: impl Into<BString>, original: Option<bstr::BString>) -> Self {
+        Self {
+            name: name.into(),
+            original,
+        }
     }
 }
 
 impl Drop for RestoreEnv {
     fn drop(&mut self) {
         match &self.original {
-            Some(value) => Platform::put_env(self.name, value),
-            None => Platform::clear_env(self.name),
+            Some(value) => Platform::put_env(&self.name, value),
+            None => Platform::clear_env(&self.name),
         }
     }
 }
@@ -243,8 +265,7 @@ pub fn create_installed_json(
     dev_mode: bool,
 ) {
     std::fs::create_dir_all("vendor/composer").unwrap();
-    let json_file =
-        JsonFile::new("vendor/composer/installed.json".to_string(), None, None).unwrap();
+    let json_file = JsonFile::new("vendor/composer/installed.json", None, None).unwrap();
     let mut repo = InstalledFilesystemRepository::new(json_file, false, None, None).unwrap();
     repo.set_dev_package_names(
         dev_packages
@@ -254,7 +275,7 @@ pub fn create_installed_json(
     );
     for pkg in packages.iter().chain(dev_packages.iter()) {
         repo.add_package(pkg.clone()).unwrap();
-        std::fs::create_dir_all(format!("vendor/{}", pkg.get_name())).unwrap();
+        std::fs::create_dir_all(path_from_bytes(&bconcat!("vendor/", pkg.get_name()))).unwrap();
     }
 
     let io = null_io();
@@ -271,8 +292,8 @@ pub fn create_composer_lock(
     dev_packages: &[PackageInterfaceHandle],
 ) {
     let io = null_io();
-    let json_file = JsonFile::new("./composer.lock".to_string(), None, None).unwrap();
-    let composer_file_contents = std::fs::read_to_string("./composer.json").unwrap_or_default();
+    let json_file = JsonFile::new("./composer.lock", None, None).unwrap();
+    let composer_file_contents = std::fs::read("./composer.json").unwrap_or_default();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
@@ -290,7 +311,7 @@ pub fn create_composer_lock(
             IndexMap::new(),
             IndexMap::new(),
             vec![],
-            "dev",
+            bstr::BStr::new("dev"),
             IndexMap::new(),
             false,
             false,
@@ -304,7 +325,7 @@ pub fn create_composer_lock(
 pub fn get_application_tester() -> ApplicationTester {
     crate::bootstrap::bootstrap();
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new("Shirabe", "").unwrap();
     application.set_catch_exceptions(false);
     ApplicationTester::new(application)
 }
@@ -327,7 +348,7 @@ pub struct RunOptions {
 /// is ported.
 pub struct ApplicationTester {
     application: ApplicationHandle,
-    inputs: Vec<String>,
+    inputs: Vec<BString>,
     status_code: Option<i32>,
     output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     /// Handles retained before injection so `get_display`/`get_error_output` can read the memory
@@ -350,8 +371,8 @@ impl ApplicationTester {
         }
     }
 
-    pub fn set_inputs(&mut self, inputs: Vec<String>) -> &mut Self {
-        self.inputs = inputs;
+    pub fn set_inputs(&mut self, inputs: Vec<impl Into<BString>>) -> &mut Self {
+        self.inputs = inputs.into_iter().map(Into::into).collect();
         self
     }
 
@@ -457,10 +478,10 @@ impl ApplicationTester {
         }
     }
 
-    fn create_stream(inputs: &[String]) -> PhpResource {
+    fn create_stream(inputs: &[BString]) -> PhpResource {
         let stream = php_fopen_resource("php://memory", "r+");
         for input in inputs {
-            fwrite_resource(&stream, &format!("{}{}", input, PHP_EOL));
+            fwrite_resource(&stream, bconcat!(input, PHP_EOL));
         }
         rewind(&stream);
         stream
@@ -471,17 +492,16 @@ impl ApplicationTester {
             .expect("status code not initialized; did you run() before requesting it?")
     }
 
-    pub fn get_display(&self) -> String {
+    pub fn get_display(&self) -> bstr::BString {
         let stream = self
             .output_stream
             .as_ref()
             .expect("output not initialized; did you run() before requesting the display?");
         rewind(stream);
-        // TODO(bytes): the captured output is returned as a String.
-        String::from_utf8_lossy(&stream_get_contents(stream).unwrap_or_default()).into_owned()
+        stream_get_contents(stream).unwrap_or_default().into()
     }
 
-    pub fn get_error_output(&self) -> String {
+    pub fn get_error_output(&self) -> bstr::BString {
         assert!(
             self.capture_streams_independently,
             "The error output is not available when the tester is run without \"capture_stderr_separately\" option set."
@@ -491,7 +511,6 @@ impl ApplicationTester {
             .as_ref()
             .expect("error output not initialized; did you run() before requesting it?");
         rewind(stream);
-        // TODO(bytes): the captured output is returned as a String.
-        String::from_utf8_lossy(&stream_get_contents(stream).unwrap_or_default()).into_owned()
+        stream_get_contents(stream).unwrap_or_default().into()
     }
 }

@@ -4,6 +4,7 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, init_temp_composer,
 };
+use bstr::{BStr, ByteSlice};
 use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::handle::PackageInterfaceHandle;
@@ -13,7 +14,7 @@ use shirabe_symfony_console::input::{InputValue, ParameterName};
 /// ref: BumpCommandTest::testBump (data provider rolled into one body).
 fn run_bump_case(
     composer_json: serde_json::Value,
-    command: &[(&str, InputValue)],
+    command: &[(&BStr, InputValue)],
     expected: serde_json::Value,
     lock: bool,
     exit_code: i32,
@@ -42,10 +43,10 @@ fn run_bump_case(
     let status_code = app_tester.run(input, RunOptions::default()).unwrap();
     assert_eq!(exit_code, status_code);
 
-    let json = JsonFile::new("./composer.json".to_string(), None, None).unwrap();
+    let json = JsonFile::new("./composer.json", None, None).unwrap();
     let read = json.read().unwrap();
     let actual: serde_json::Value =
-        serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap();
+        serde_json::from_slice(&JsonFile::encode(&read).unwrap()).unwrap();
     assert_eq!(expected, actual);
 
     drop(tear_down);
@@ -75,7 +76,7 @@ fn test_bump() {
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "~2.0" },
         }),
-        &[("--dev-only", InputValue::from(true))],
+        &[(BStr::new("--dev-only"), InputValue::from(true))],
         serde_json::json!({
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "^2.3.4.5" },
@@ -90,7 +91,7 @@ fn test_bump() {
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "~2.0" },
         }),
-        &[("--no-dev-only", InputValue::from(true))],
+        &[(BStr::new("--no-dev-only"), InputValue::from(true))],
         serde_json::json!({
             "require": { "first/pkg": "^2.3.4", "second/pkg": "^3.4" },
             "require-dev": { "dev/pkg": "~2.0" },
@@ -106,8 +107,8 @@ fn test_bump() {
             "require-dev": { "dev/pkg": "~2.0" },
         }),
         &[(
-            "packages",
-            InputValue::Array(vec!["first/pkg:3.0.1".to_string(), "dev/*".to_string()]),
+            BStr::new("packages"),
+            InputValue::Array(vec!["first/pkg:3.0.1".into(), "dev/*".into()]),
         )],
         serde_json::json!({
             "require": { "first/pkg": "^2.3.4", "second/pkg": "3.*" },
@@ -136,7 +137,7 @@ fn test_bump() {
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "~2.0" },
         }),
-        &[("--dry-run", InputValue::from(true))],
+        &[(BStr::new("--dry-run"), InputValue::from(true))],
         serde_json::json!({
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "~2.0" },
@@ -151,7 +152,7 @@ fn test_bump() {
             "require": { "first/pkg": "^2.3.4", "second/pkg": "^3.4" },
             "require-dev": { "dev/pkg": "^2.3.4.5" },
         }),
-        &[("--dry-run", InputValue::from(true))],
+        &[(BStr::new("--dry-run"), InputValue::from(true))],
         serde_json::json!({
             "require": { "first/pkg": "^2.3.4", "second/pkg": "^3.4" },
             "require-dev": { "dev/pkg": "^2.3.4.5" },
@@ -223,7 +224,7 @@ fn test_bump_fails_on_non_existing_composer_file() {
     assert_eq!(1, status_code);
     let error_output = app_tester.get_error_output();
     assert!(
-        error_output.contains("./composer.json is not readable."),
+        error_output.contains_str("./composer.json is not readable."),
         "expected error output to mention composer.json not readable, got: {:?}",
         error_output,
     );
@@ -257,7 +258,7 @@ fn test_bump_fails_on_write_error_to_composer_file() {
     assert_eq!(1, status_code);
     let error_output = app_tester.get_error_output();
     assert!(
-        error_output.contains("./composer.json is not writable."),
+        error_output.contains_str("./composer.json is not writable."),
         "expected error output to mention composer.json not writable, got: {:?}",
         error_output,
     );

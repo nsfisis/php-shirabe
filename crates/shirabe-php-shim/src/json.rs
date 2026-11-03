@@ -3,6 +3,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use std::fmt;
+use std::io::Write as _;
 
 pub trait JsonSerializable {
     fn json_serialize(&self) -> PhpMixed;
@@ -19,7 +20,7 @@ pub const JSON_PRETTY_PRINT: i64 = 128;
 pub const JSON_THROW_ON_ERROR: i64 = 4194304;
 pub const JSON_INVALID_UTF8_IGNORE: i64 = 1048576;
 
-pub fn json_encode<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<String> {
+pub fn json_encode<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<BString> {
     // PHP's json_encode() with no flags escapes slashes and non-ASCII characters.
     json_encode_ex(value, 0)
 }
@@ -27,41 +28,46 @@ pub fn json_encode<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<St
 pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
     value: &T,
     flags: i64,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<BString> {
     // serde_json's compact output already matches PHP's `json_encode` with both
     // JSON_UNESCAPED_SLASHES and JSON_UNESCAPED_UNICODE set: forward slashes and non-ASCII
     // characters are emitted verbatim. The two flags below re-apply PHP's default escaping when
     // they are absent.
     // TODO(php-semantics): other flags (e.g. JSON_HEX_*, JSON_THROW_ON_ERROR) are not handled yet; add
     // them when a call site needs them.
+    let value =
+        crate::PhpJson::with_invalid_utf8_ignore(value, flags & JSON_INVALID_UTF8_IGNORE != 0);
     let mut s = if flags & JSON_PRETTY_PRINT != 0 {
         // PHP's JSON_PRETTY_PRINT uses a 4-space indent.
         let mut buf = Vec::new();
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-        value.serialize(&mut ser)?;
-        String::from_utf8(buf)?
+        serde::Serialize::serialize(&value, &mut ser)?;
+        BString::from(buf)
     } else {
-        serde_json::to_string(value)?
+        BString::from(serde_json::to_vec(&value)?)
     };
 
     if flags & JSON_UNESCAPED_SLASHES == 0 {
-        s = s.replace('/', "\\/");
+        s = crate::str_replace("/", "\\/", &s);
     }
 
     if flags & JSON_UNESCAPED_UNICODE == 0 {
-        let mut out = String::with_capacity(s.len());
-        for c in s.chars() {
+        let mut out = Vec::with_capacity(s.len());
+        for c in crate::utf8_text(&s)
+            .expect("serde_json writes valid UTF-8")
+            .chars()
+        {
             if (c as u32) <= 0x7F {
-                out.push(c);
+                out.push(c as u8);
             } else {
                 let mut buf = [0u16; 2];
                 for unit in c.encode_utf16(&mut buf) {
-                    out.push_str(&format!("\\u{:04x}", unit));
+                    write!(out, "\\u{:04x}", unit).expect("writing to a Vec cannot fail");
                 }
             }
         }
-        s = out;
+        s = BString::from(out);
     }
 
     Ok(s)
@@ -139,10 +145,12 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
         Ok(PhpMixed::Float(v))
     }
 
+    #[expect(clippy::disallowed_types, reason = "imposed by serde::de::Visitor")]
     fn visit_str<E>(self, v: &str) -> Result<PhpMixed, E> {
-        Ok(PhpMixed::string(v.to_owned()))
+        Ok(PhpMixed::string(v))
     }
 
+    #[expect(clippy::disallowed_types, reason = "imposed by serde::de::Visitor")]
     fn visit_string<E>(self, v: String) -> Result<PhpMixed, E> {
         Ok(PhpMixed::string(v))
     }
@@ -158,6 +166,10 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
         Ok(PhpMixed::List(items))
     }
 
+    #[expect(
+        clippy::disallowed_types,
+        reason = "serde deserializes a JSON key as text"
+    )]
     fn visit_map<A>(self, mut map: A) -> Result<PhpMixed, A::Error>
     where
         A: MapAccess<'de>,
@@ -178,6 +190,20 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invalid_utf8_ignore_drops_only_the_invalid_bytes() {
+        let value = PhpMixed::Array(IndexMap::from([(
+            BString::from(b"pa\xfeth".to_vec()),
+            PhpMixed::String(BString::from(b"/tmp/caf\xe9".to_vec())),
+        )]));
+        assert!(json_encode_ex(&value, JSON_UNESCAPED_SLASHES).is_err());
+        assert_eq!(
+            json_encode_ex(&value, JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES).unwrap(),
+            r#"{"path":"/tmp/caf"}"#
+        );
+        assert!(json_encode_ex(&value, JSON_UNESCAPED_SLASHES).is_err());
+    }
 
     #[test]
     fn input_that_is_not_utf8_decodes_to_null() {

@@ -1,13 +1,14 @@
 //! ref: composer/vendor/symfony/console/Exception/LogicException.php
 
 use super::exception_interface::ExceptionInterface;
+use bstr::BString;
 
 #[derive(Debug)]
 pub struct LogicException(pub shirabe_php_shim::LogicException);
 
 impl LogicException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self(shirabe_php_shim::LogicException::new(message))
     }
 }

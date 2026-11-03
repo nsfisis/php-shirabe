@@ -1,15 +1,17 @@
 //! ref: composer/tests/Composer/Test/Command/RepositoryCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::{BStr, ByteSlice};
 use serial_test::serial;
 use shirabe::json::JsonFile;
+use shirabe_php_shim::{error_message, trim, utf8_text};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// Read the composer.json in the CWD and decode it.
 fn read_composer_json() -> serde_json::Value {
-    let json = JsonFile::new("./composer.json".to_string(), None, None).unwrap();
+    let json = JsonFile::new("./composer.json", None, None).unwrap();
     let read = json.read().unwrap();
-    serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap()
+    serde_json::from_slice(&JsonFile::encode(&read).unwrap()).unwrap()
 }
 
 #[test]
@@ -31,7 +33,7 @@ fn test_list_with_no_repositories() {
 
     assert_eq!(
         "[packagist.org] composer https://repo.packagist.org",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     // composer.json should remain unchanged
     assert_eq!(serde_json::json!([]), read_composer_json());
@@ -72,7 +74,7 @@ fn test_list_with_repositories_as_list() {
 [foo] vcs https://old.example.org
 [bar] vcs https://other.example.org
 [packagist.org] disabled",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     drop(tear_down);
@@ -111,7 +113,7 @@ fn test_list_with_repositories_as_assoc() {
 [foo] vcs https://old.example.org
 [bar] vcs https://other.example.org
 [packagist.org] disabled",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     drop(tear_down);
@@ -138,7 +140,12 @@ fn test_add_repository_with_type_and_url() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -223,7 +230,7 @@ fn test_remove_repository() {
 }
 
 /// ref: RepositoryCommandTest::testSetAndGetUrlInRepositoryAssoc (data provider).
-fn run_set_and_get_url_assoc_case(name: &str, index: &str, new_url: &str) {
+fn run_set_and_get_url_assoc_case(name: &BStr, index: &BStr, new_url: &BStr) {
     let repositories = serde_json::json!({
         "first": {"type": "composer", "url": "https://first.test"},
         "foo": {"type": "vcs", "url": "https://old.example.org"},
@@ -248,14 +255,19 @@ fn run_set_and_get_url_assoc_case(name: &str, index: &str, new_url: &str) {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     let json = read_composer_json();
     // calling it still in assoc means, the repository has not been converted, which is good
     assert_eq!(
-        Some(&serde_json::Value::String(new_url.to_string())),
+        Some(&serde_json::Value::from(utf8_text(new_url).unwrap())),
         json.get("repositories")
-            .and_then(|r| r.get(index))
+            .and_then(|r| r.get(utf8_text(index).unwrap()))
             .and_then(|r| r.get("url"))
     );
 
@@ -271,7 +283,7 @@ fn run_set_and_get_url_assoc_case(name: &str, index: &str, new_url: &str) {
         )
         .unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(new_url, app_tester.get_display().trim());
+    assert_eq!(new_url, trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -280,15 +292,27 @@ fn run_set_and_get_url_assoc_case(name: &str, index: &str, new_url: &str) {
 #[serial]
 fn test_set_and_get_url_in_repository_assoc() {
     // change first of three
-    run_set_and_get_url_assoc_case("first", "first", "https://new.example.org");
+    run_set_and_get_url_assoc_case(
+        BStr::new("first"),
+        BStr::new("first"),
+        BStr::new("https://new.example.org"),
+    );
     // change middle of three
-    run_set_and_get_url_assoc_case("foo", "foo", "https://new.example.org");
+    run_set_and_get_url_assoc_case(
+        BStr::new("foo"),
+        BStr::new("foo"),
+        BStr::new("https://new.example.org"),
+    );
     // change last of three
-    run_set_and_get_url_assoc_case("bar", "bar", "https://new.example.org");
+    run_set_and_get_url_assoc_case(
+        BStr::new("bar"),
+        BStr::new("bar"),
+        BStr::new("https://new.example.org"),
+    );
 }
 
 /// ref: RepositoryCommandTest::testSetAndGetUrlInRepositoryList (data provider).
-fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
+fn run_set_and_get_url_list_case(name: &BStr, index: usize, new_url: &BStr) {
     let repositories = serde_json::json!([
         {"name": "first", "type": "composer", "url": "https://first.test"},
         {"name": "foo", "type": "vcs", "url": "https://old.example.org"},
@@ -313,17 +337,22 @@ fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     let json = read_composer_json();
     assert_eq!(
-        Some(&serde_json::Value::String(name.to_string())),
+        Some(&serde_json::Value::from(utf8_text(name).unwrap())),
         json.get("repositories")
             .and_then(|r| r.get(index))
             .and_then(|r| r.get("name"))
     );
     assert_eq!(
-        Some(&serde_json::Value::String(new_url.to_string())),
+        Some(&serde_json::Value::from(utf8_text(new_url).unwrap())),
         json.get("repositories")
             .and_then(|r| r.get(index))
             .and_then(|r| r.get("url"))
@@ -341,7 +370,7 @@ fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
         )
         .unwrap();
     assert_eq!(0, status_code);
-    assert_eq!(new_url, app_tester.get_display().trim());
+    assert_eq!(new_url, trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -350,11 +379,11 @@ fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
 #[serial]
 fn test_set_and_get_url_in_repository_list() {
     // change first of three
-    run_set_and_get_url_list_case("first", 0, "https://new.example.org");
+    run_set_and_get_url_list_case(BStr::new("first"), 0, BStr::new("https://new.example.org"));
     // change middle of three
-    run_set_and_get_url_list_case("foo", 1, "https://new.example.org");
+    run_set_and_get_url_list_case(BStr::new("foo"), 1, BStr::new("https://new.example.org"));
     // change last of three
-    run_set_and_get_url_list_case("bar", 2, "https://new.example.org");
+    run_set_and_get_url_list_case(BStr::new("bar"), 2, BStr::new("https://new.example.org"));
 }
 
 #[test]
@@ -415,8 +444,7 @@ fn test_invalid_arg_combination_throws() {
         )
         .expect_err("expected RuntimeException for --file and --global combination");
     assert!(
-        err.to_string()
-            .contains("--file and --global can not be combined"),
+        error_message(&err).contains_str("--file and --global can not be combined"),
         "got: {}",
         err
     );
@@ -447,7 +475,12 @@ fn test_prepend_repository_by_name_list_to_assoc() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -488,7 +521,12 @@ fn test_append_repository_by_name_list_to_assoc() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -528,7 +566,12 @@ fn test_prepend_repository_assoc_with_packagist_disabled() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -570,7 +613,12 @@ fn test_append_repository_assoc_with_packagist_disabled() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     assert_eq!(
         serde_json::json!({
@@ -621,7 +669,12 @@ fn test_add_before_and_after_by_name() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     // Insert after alpha
     let mut app_tester = get_application_tester();
@@ -641,7 +694,12 @@ fn test_add_before_and_after_by_name() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     // Expect order: alpha, gamma, beta, omega, then packagist.org boolean preserved
     assert_eq!(
@@ -682,7 +740,12 @@ fn test_add_same_name_replaces_existing() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     // second add with same name but different url
     let mut app_tester = get_application_tester();
@@ -702,7 +765,12 @@ fn test_add_same_name_replaces_existing() {
             RunOptions::default(),
         )
         .unwrap();
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
 
     let json = read_composer_json();
 
@@ -717,7 +785,7 @@ fn test_add_same_name_replaces_existing() {
                     count_foo += 1;
                     url = repo.get("url");
                 } else if repo.is_object()
-                    && repo.get("name") == Some(&serde_json::Value::String("foo".to_string()))
+                    && repo.get("name") == Some(&serde_json::Value::from("foo"))
                 {
                     count_foo += 1;
                     url = repo.get("url");
@@ -726,9 +794,7 @@ fn test_add_same_name_replaces_existing() {
         }
         Some(serde_json::Value::Array(list)) => {
             for repo in list {
-                if repo.is_object()
-                    && repo.get("name") == Some(&serde_json::Value::String("foo".to_string()))
-                {
+                if repo.is_object() && repo.get("name") == Some(&serde_json::Value::from("foo")) {
                     count_foo += 1;
                     url = repo.get("url");
                 }
@@ -741,9 +807,7 @@ fn test_add_same_name_replaces_existing() {
         "Exactly one repository entry with name foo should exist"
     );
     assert_eq!(
-        Some(&serde_json::Value::String(
-            "https://example.org/new".to_string()
-        )),
+        Some(&serde_json::Value::from("https://example.org/new")),
         url,
         "The foo repository should have been updated to the new URL"
     );

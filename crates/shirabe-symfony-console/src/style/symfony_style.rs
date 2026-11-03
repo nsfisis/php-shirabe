@@ -10,9 +10,10 @@ use crate::question::{ConfirmationQuestion, QuestionInterface};
 use crate::style::output_style::OutputStyle;
 use crate::style::style_interface::StyleInterface;
 use crate::terminal::Terminal;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, array_unshift, boolval, explode, str_repeat, str_replace, strlen,
-    substr, substr_count, wordwrap,
+    AsAny, PHP_EOL, PhpMixed, array_unshift, bconcat, boolval, explode, str_repeat, str_replace,
+    strlen, substr, substr_count, wordwrap,
 };
 
 /// Output decorator helpers for the Symfony Style Guide.
@@ -63,10 +64,10 @@ impl SymfonyStyle {
     /// Formats a message as a block of text.
     pub fn block(
         &mut self,
-        messages: &[String],
-        r#type: Option<&str>,
-        style: Option<&str>,
-        prefix: &str,
+        messages: &[BString],
+        r#type: Option<&BStr>,
+        style: Option<&BStr>,
+        prefix: &BStr,
         padding: bool,
         escape: bool,
     ) {
@@ -105,7 +106,7 @@ impl SymfonyStyle {
         if self.input.borrow().is_interactive() {
             self.new_line(1);
             self.buffered_output
-                .write(&["\n".to_string()], false, OUTPUT_NORMAL);
+                .write(&["\n".into()], false, OUTPUT_NORMAL);
         }
 
         answer
@@ -120,10 +121,10 @@ impl SymfonyStyle {
             } else {
                 self.output.clone()
             };
-        let mut style = Table::get_style_definition("symfony-style-guide".to_string())
+        let mut style = Table::get_style_definition("symfony-style-guide".into())
             .expect("style definition lookup")
             .expect("undefined style definition");
-        style.set_cell_header_format("<info>%s</info>".to_string());
+        style.set_cell_header_format("<info>%s</info>".into());
 
         let mut table = Table::new(output);
         let _ = table.set_style(crate::helper::StyleName::Style(style));
@@ -132,7 +133,7 @@ impl SymfonyStyle {
 
     fn auto_prepend_block(&mut self) {
         let chars = substr(
-            &str_replace(PHP_EOL, "\n", &self.buffered_output.fetch()),
+            str_replace(PHP_EOL, "\n", self.buffered_output.fetch()),
             -2,
             None,
         );
@@ -146,32 +147,32 @@ impl SymfonyStyle {
         self.new_line(2 - substr_count(&chars, "\n"));
     }
 
-    fn write_buffer(&mut self, message: &str, new_line: bool, r#type: i64) {
+    fn write_buffer(&mut self, message: &BStr, new_line: bool, r#type: i64) {
         // We need to know if the last chars are PHP_EOL
         self.buffered_output
-            .write(&[message.to_string()], new_line, r#type);
+            .write(&[BString::from(message)], new_line, r#type);
     }
 
     fn create_block(
         &mut self,
-        messages: &[String],
-        r#type: Option<&str>,
-        style: Option<&str>,
-        prefix: &str,
+        messages: &[BString],
+        r#type: Option<&BStr>,
+        style: Option<&BStr>,
+        prefix: &BStr,
         padding: bool,
         escape: bool,
-    ) -> Vec<String> {
+    ) -> Vec<BString> {
         let mut indent_length: i64 = 0;
-        let prefix_length = Helper::width(&Helper::remove_decoration(
+        let prefix_length = Helper::width(Helper::remove_decoration(
             &mut *self.get_formatter().borrow_mut(),
             prefix,
         ));
-        let mut lines: Vec<String> = Vec::new();
+        let mut lines: Vec<BString> = Vec::new();
 
-        let mut r#type = r#type.map(|t| t.to_string());
-        let mut line_indentation = String::new();
+        let mut r#type = r#type.map(BString::from);
+        let mut line_indentation = BString::default();
         if let Some(t) = &r#type {
-            let formatted = format!("[{}] ", t.clone());
+            let formatted = bconcat!("[", t, "] ");
             indent_length = strlen(&formatted);
             line_indentation = str_repeat(" ", indent_length as usize);
             r#type = Some(formatted);
@@ -187,7 +188,7 @@ impl SymfonyStyle {
             }
 
             let decoration_length = Helper::width(&message)
-                - Helper::width(&Helper::remove_decoration(
+                - Helper::width(Helper::remove_decoration(
                     &mut *self.get_formatter().borrow_mut(),
                     &message,
                 ));
@@ -197,47 +198,48 @@ impl SymfonyStyle {
             );
             let message_lines = explode(
                 PHP_EOL,
-                &wordwrap(&message, message_line_length, PHP_EOL, true),
+                wordwrap(&message, message_line_length, PHP_EOL, true),
             );
             for message_line in message_lines {
                 lines.push(message_line);
             }
 
             if messages_count > 1 && key < messages_count - 1 {
-                lines.push(String::new());
+                lines.push(BString::default());
             }
         }
 
         let mut first_line_index: i64 = 0;
         if padding && self.inner.is_decorated() {
             first_line_index = 1;
-            array_unshift(&mut lines, String::new());
-            lines.push(String::new());
+            array_unshift(&mut lines, BString::default());
+            lines.push(BString::default());
         }
 
         for (i, line) in lines.iter_mut().enumerate() {
             let i = i as i64;
             if let Some(t) = &r#type {
                 *line = if first_line_index == i {
-                    format!("{}{}", t, line)
+                    bconcat!(t, &*line)
                 } else {
-                    format!("{}{}", line_indentation, line)
+                    bconcat!(line_indentation, &*line)
                 };
             }
 
-            *line = format!("{}{}", prefix, line);
-            line.push_str(&str_repeat(
+            *line = bconcat!(prefix, &*line);
+            let padding = str_repeat(
                 " ",
                 (self.line_length
-                    - Helper::width(&Helper::remove_decoration(
+                    - Helper::width(Helper::remove_decoration(
                         &mut *self.output.borrow().get_formatter().borrow_mut(),
-                        line,
+                        &line,
                     )))
                 .max(0) as usize,
-            ));
+            );
+            line.extend_from_slice(&padding);
 
             if let Some(style) = style {
-                *line = format!("<{}>{}</>", style, line.clone());
+                *line = bconcat!("<", style, ">", &*line, "</>");
             }
         }
 
@@ -269,41 +271,39 @@ impl SymfonyStyle {
         .ok()
     }
 
-    pub fn writeln(&mut self, messages: &[String], r#type: i64) {
+    pub fn writeln(&mut self, messages: &[BString], r#type: i64) {
         for message in messages {
             self.inner.writeln(std::slice::from_ref(message), r#type);
-            self.write_buffer(message, true, r#type);
+            self.write_buffer(message.as_bstr(), true, r#type);
         }
     }
 }
 
 impl StyleInterface for SymfonyStyle {
-    fn error(&mut self, message: &[String]) {
+    fn error(&mut self, message: &[BString]) {
         self.block(
             message,
-            Some("ERROR"),
-            Some("fg=white;bg=red"),
-            " ",
+            Some("ERROR".into()),
+            Some("fg=white;bg=red".into()),
+            " ".into(),
             true,
             true,
         );
     }
 
-    fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) {
+    fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) -> anyhow::Result<()> {
         self.create_table()
             .set_headers(headers)
             .set_rows(rows)
-            .render();
+            .render()?;
 
         self.new_line(1);
+
+        Ok(())
     }
 
-    fn confirm(&mut self, question: &str, default: bool) -> bool {
-        let answer = self.ask_question(&ConfirmationQuestion::new(
-            question.to_string(),
-            default,
-            "/^y/i".to_string(),
-        ));
+    fn confirm(&mut self, question: &BStr, default: bool) -> bool {
+        let answer = self.ask_question(&ConfirmationQuestion::new(question, default, "/^y/i"));
 
         boolval(&answer)
     }

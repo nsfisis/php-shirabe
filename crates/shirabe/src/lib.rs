@@ -1,4 +1,5 @@
-use shirabe_php_shim::realpath;
+use bstr::BString;
+use shirabe_php_shim::{path_from_bytes, path_to_bytes, realpath};
 pub mod advisory;
 pub mod autoload;
 pub mod cache;
@@ -35,7 +36,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 // See also `__shirabe_installed_versions_reload` in crates/shirabe-php-rpc/php/worker.php.
 
 /// ref: composer/bin/composer
-pub async fn run(argv: Vec<String>) -> anyhow::Result<i32> {
+pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
     use crate::console::ApplicationHandle;
     use crate::util::Platform;
     use shirabe_symfony_console::input::ArgvInput;
@@ -44,10 +45,14 @@ pub async fn run(argv: Vec<String>) -> anyhow::Result<i32> {
     // somewhere else that communicates with the real PHP runtime.
     Platform::put_env(
         "COMPOSER_BINARY",
-        &realpath(argv.first().map(String::as_str).unwrap_or_default()).unwrap_or_default(),
+        realpath(path_from_bytes(
+            argv.first().cloned().unwrap_or_default().as_slice(),
+        ))
+        .map(|p| bstr::BString::from(path_to_bytes(&p)))
+        .unwrap_or_default(),
     );
 
-    let application = ApplicationHandle::new("Shirabe".to_string(), String::new())?;
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::default())?;
     let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?));
     application.run(Some(input), None).await
 }

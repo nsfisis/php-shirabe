@@ -3,7 +3,7 @@
 use shirabe::util::zip::Zip;
 
 /// Reuses the PHP fixtures under composer/tests/Composer/Test/Util/Fixtures/Zip.
-fn fixture(name: &str) -> std::path::PathBuf {
+fn fixture(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Util/Fixtures/Zip")
         .join(name)
@@ -47,20 +47,14 @@ fn test_throws_exception_if_the_composer_json_is_in_a_sub_subfolder() {
 fn test_returns_composer_json_in_zip_root() {
     let result = Zip::get_composer_json(&fixture("root.zip")).unwrap();
 
-    assert_eq!(
-        Some("{\n    \"name\": \"foo/bar\"\n}\n".to_string()),
-        result
-    );
+    assert_eq!(Some("{\n    \"name\": \"foo/bar\"\n}\n".into()), result);
 }
 
 #[test]
 fn test_returns_composer_json_in_first_folder() {
     let result = Zip::get_composer_json(&fixture("folder.zip")).unwrap();
 
-    assert_eq!(
-        Some("{\n    \"name\": \"foo/bar\"\n}\n".to_string()),
-        result
-    );
+    assert_eq!(Some("{\n    \"name\": \"foo/bar\"\n}\n".into()), result);
 }
 
 #[test]
@@ -72,8 +66,5 @@ fn test_multiple_top_level_dirs_is_invalid() {
 fn test_returns_composer_json_from_first_subfolder() {
     let result = Zip::get_composer_json(&fixture("single-sub.zip")).unwrap();
 
-    assert_eq!(
-        Some("{\n    \"name\": \"foo/bar\"\n}\n".to_string()),
-        result
-    );
+    assert_eq!(Some("{\n    \"name\": \"foo/bar\"\n}\n".into()), result);
 }

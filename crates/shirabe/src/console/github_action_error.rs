@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Console/GithubActionError.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::Platform;
+use bstr::{BStr, BString};
+use shirabe_php_shim::{bconcat, str_replace};
 
 #[derive(Debug)]
 pub struct GithubActionError {
@@ -13,7 +15,7 @@ impl GithubActionError {
         Self { io }
     }
 
-    pub fn emit(&mut self, message: &str, file: Option<&str>, line: Option<i64>) {
+    pub fn emit(&mut self, message: &BStr, file: Option<&BStr>, line: Option<i64>) {
         if Platform::get_env("GITHUB_ACTIONS").is_some_and(|v| !v.is_empty())
             && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none_or(|v| v.is_empty())
         {
@@ -24,37 +26,39 @@ impl GithubActionError {
 
             if file_truthy && line_truthy {
                 let file = self.escape_property(file.unwrap());
-                self.io.write(&format!(
-                    "::error file={},line={}::{}",
+                self.io.write(bconcat!(
+                    "::error file=",
                     file,
+                    ",line=",
                     line.unwrap(),
+                    "::",
                     message
                 ));
             } else if file_truthy {
                 let file = self.escape_property(file.unwrap());
                 self.io
-                    .write(&format!("::error file={}::{}", file, message));
+                    .write(bconcat!("::error file=", file, "::", message));
             } else {
-                self.io.write(&format!("::error ::{}", message));
+                self.io.write(bconcat!("::error ::", message));
             }
         }
     }
 
-    fn escape_data(&self, data: &str) -> String {
+    fn escape_data(&self, data: &BStr) -> BString {
         // see https://github.com/actions/toolkit/blob/4f7fb6513a355689f69f0849edeb369a4dc81729/packages/core/src/command.ts#L80-L85
-        let data = data.replace('%', "%25");
-        let data = data.replace('\r', "%0D");
+        let data = str_replace("%", "%25", data);
+        let data = str_replace("\r", "%0D", &data);
 
-        data.replace('\n', "%0A")
+        str_replace("\n", "%0A", &data)
     }
 
-    fn escape_property(&self, property: &str) -> String {
+    fn escape_property(&self, property: &BStr) -> BString {
         // see https://github.com/actions/toolkit/blob/4f7fb6513a355689f69f0849edeb369a4dc81729/packages/core/src/command.ts#L87-L94
-        let property = property.replace('%', "%25");
-        let property = property.replace('\r', "%0D");
-        let property = property.replace('\n', "%0A");
-        let property = property.replace(':', "%3A");
+        let property = str_replace("%", "%25", property);
+        let property = str_replace("\r", "%0D", &property);
+        let property = str_replace("\n", "%0A", &property);
+        let property = str_replace(":", "%3A", &property);
 
-        property.replace(',', "%2C")
+        str_replace(",", "%2C", &property)
     }
 }

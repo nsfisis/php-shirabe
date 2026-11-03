@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetTest.php
 
 use crate::test_case::get_package;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::{
     GenericRule, Pool, RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Request, Rule, RuleSet,
@@ -10,7 +11,7 @@ use shirabe_semver::constraint::{MatchAllConstraint, MatchNoneConstraint};
 
 fn root_require_reason() -> ReasonData {
     ReasonData::RootRequire {
-        package_name: String::new(),
+        package_name: bstr::BString::default(),
         constraint: MatchAllConstraint::new(None).into(),
     }
 }
@@ -180,7 +181,7 @@ fn test_pretty_string() {
         vec![literal],
         RULE_ROOT_REQUIRE,
         ReasonData::RootRequire {
-            package_name: "foo/bar".to_string(),
+            package_name: bstr::BString::from("foo/bar"),
             constraint: MatchNoneConstraint::new(None).into(),
         },
     ))));
@@ -196,6 +197,8 @@ fn test_pretty_string() {
         )
         .unwrap();
     assert!(
-        pretty.contains("REQUEST : No package found to satisfy root composer.json require foo/bar")
+        pretty.contains_str(
+            "REQUEST : No package found to satisfy root composer.json require foo/bar"
+        )
     );
 }

@@ -1,27 +1,28 @@
 //! ref: composer/src/Composer/Downloader/ZipDownloader.php
 
 use crate::downloader::{ArchiveDownloader, ChangeReportInterface, FileDownloader};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{IniHelper, Platform};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
-    ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, hash_file,
-    impl_php_class, is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen,
-    substr_bytes, version_compare,
+    ZipArchive, bconcat, bin2hex, class_exists, error_message, file_exists, file_get_contents,
+    filesize, hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex,
+    preg_match, random_int, rtrim, str_replace, strlen, substr, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
 
-static UNZIP_COMMANDS: Mutex<Option<Vec<Vec<String>>>> = Mutex::new(None);
+static UNZIP_COMMANDS: Mutex<Option<Vec<Vec<BString>>>> = Mutex::new(None);
 static HAS_ZIP_ARCHIVE: Mutex<Option<bool>> = Mutex::new(None);
 static IS_WINDOWS: Mutex<Option<bool>> = Mutex::new(None);
 
 #[derive(Debug)]
 pub struct ZipDownloader {
     inner: FileDownloader,
-    cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
+    cleanup_executed: std::cell::RefCell<IndexMap<bstr::BString, bool>>,
     zip_archive_object: std::cell::RefCell<Option<ZipArchive>>,
 }
 
@@ -57,8 +58,8 @@ impl ZipDownloader {
     async fn extract_with_system_unzip(
         &self,
         package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &std::path::Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         static WARNED_7ZIP_LINUX: Mutex<bool> = Mutex::new(false);
 
@@ -75,20 +76,26 @@ impl ZipDownloader {
 
         let command_spec = UNZIP_COMMANDS.lock().unwrap().as_ref().unwrap()[0].clone();
         let executable = command_spec[0].clone();
-        let map: IndexMap<&str, String> = [
+        let map: IndexMap<&BStr, BString> = [
             // normalize separators to backslashes to avoid problems with 7-zip on windows
             // see https://github.com/composer/composer/issues/10058
-            ("%file%", file.replace('/', std::path::MAIN_SEPARATOR_STR)),
-            ("%path%", path.replace('/', std::path::MAIN_SEPARATOR_STR)),
+            (
+                BStr::new("%file%"),
+                str_replace("/", std::path::MAIN_SEPARATOR_STR, path_to_bytes(file)),
+            ),
+            (
+                BStr::new("%path%"),
+                str_replace("/", std::path::MAIN_SEPARATOR_STR, path_to_bytes(path)),
+            ),
         ]
         .into_iter()
         .collect();
-        let command: Vec<String> = command_spec[1..]
+        let command: Vec<BString> = command_spec[1..]
             .iter()
             .map(|value| {
                 let mut v = value.clone();
                 for (from, to) in &map {
-                    v = v.replace(from, to.as_str());
+                    v = str_replace(from, to, &v);
                 }
                 v
             })
@@ -96,25 +103,30 @@ impl ZipDownloader {
 
         if !*WARNED_7ZIP_LINUX.lock().unwrap()
             && !Platform::is_windows()
-            && ["7z", "7zz", "7za"].contains(&executable.as_str())
+            && ["7z", "7zz", "7za"].iter().any(|e| executable == *e)
         {
             *WARNED_7ZIP_LINUX.lock().unwrap() = true;
-            let mut output = String::new();
+            let mut output = BString::default();
             if self
                 .inner
                 .process
                 .borrow_mut()
-                .execute(&[command_spec[1].as_str()], &mut output, None::<&str>)
+                .execute(&[command_spec[1].clone()], &mut output, None)
                 .unwrap_or(1)
                 == 0
                 && let Some(m) =
                     preg_match(php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"), &output)
             {
-                let m1 = m.get(1).unwrap_or_default().to_string();
-                if version_compare(&m1, "21.01", CmpOp::Lt) {
-                    self.inner.io.borrow().write_error(&format!(
-                        "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
-                        executable, m1, executable,
+                let m1 = m.get(1).unwrap_or_default();
+                if version_compare(m1, "21.01", CmpOp::Lt) {
+                    self.inner.io.borrow().write_error(bconcat!(
+                        "    <warning>Unzipping using ",
+                        executable,
+                        " ",
+                        m1,
+                        " may result in incorrect file permissions. Install ",
+                        executable,
+                        " 21.01+ or unzip to ensure you get correct permissions.</warning>"
                     ));
                 }
             }
@@ -132,29 +144,33 @@ impl ZipDownloader {
                     if self
                         .cleanup_executed
                         .borrow()
-                        .contains_key(&package.get_name())
+                        .contains_key(package.get_name().as_bstr())
                     {
-                        return Err(RuntimeException::new(format!(
-                            "Failed to extract {} as the installation was aborted by another package operation.",
-                            package.get_name()
+                        return Err(RuntimeException::new(bconcat!(
+                            "Failed to extract ",
+                            package.get_name(),
+                            " as the installation was aborted by another package operation."
                         ))
                         .into());
                     }
 
                     let output = process.get_error_output()?;
                     let output =
-                        str_replace(&format!(", {}.zip or {}.ZIP", file, file), "", &output);
+                        str_replace(bconcat!(", ", file, ".zip or ", file, ".ZIP"), "", &output);
 
                     return self
                         .try_fallback(
-                            RuntimeException::new(format!(
-                                "Failed to extract {}: ({}) {}\n\n{}",
+                            RuntimeException::new(bconcat!(
+                                "Failed to extract ",
                                 package.get_name(),
+                                ": (",
                                 process
                                     .get_exit_code()
-                                    .map(|c| c.to_string())
+                                    .map(|c| bconcat!(c))
                                     .unwrap_or_default(),
-                                command.join(" "),
+                                ") ",
+                                implode(" ", &command),
+                                "\n\n",
                                 output
                             ))
                             .into(),
@@ -180,35 +196,38 @@ impl ZipDownloader {
         &self,
         process_error: anyhow::Error,
         is_last_chance: bool,
-        file: &str,
-        path: &str,
+        file: &std::path::Path,
+        path: &std::path::Path,
         package: PackageInterfaceHandle,
-        executable: &str,
+        executable: &BString,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if is_last_chance {
             return Err(process_error);
         }
 
-        if process_error.to_string().contains("zip bomb") {
+        if error_message(&process_error).contains_str("zip bomb") {
             return Err(process_error);
         }
 
         if !is_file(file) {
-            self.inner
-                .io
-                .borrow()
-                .write_error(&format!("    <warning>{}</warning>", process_error));
+            self.inner.io.borrow().write_error(bconcat!(
+                "    <warning>",
+                error_message(&process_error),
+                "</warning>"
+            ));
             self.inner.io.borrow().write_error("    <warning>This most likely is due to a custom installer plugin not handling the returned Promise from the downloader</warning>");
             self.inner.io.borrow().write_error("    <warning>See https://github.com/composer/installers/commit/5006d0c28730ade233a8f42ec31ac68fb1c5c9bb for an example fix</warning>");
         } else {
-            self.inner
-                .io
-                .borrow()
-                .write_error(&format!("    <warning>{}</warning>", process_error));
+            self.inner.io.borrow().write_error(bconcat!(
+                "    <warning>",
+                error_message(&process_error),
+                "</warning>"
+            ));
             self.inner.io.borrow().write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
-            self.inner.io.borrow().write_error(&format!(
-                "    Unzip with {} command failed, falling back to ZipArchive class",
-                executable
+            self.inner.io.borrow().write_error(bconcat!(
+                "    Unzip with ",
+                executable,
+                " command failed, falling back to ZipArchive class"
             ));
 
             // additional debug data to try to figure out GH actions issues https://github.com/composer/composer/issues/11148
@@ -216,51 +235,51 @@ impl ZipDownloader {
                 && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
             {
                 self.inner.io.borrow().write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
-                self.inner.io.borrow().write_error(&format!(
-                    "File size: {}",
-                    filesize(file).map(|s| s.to_string()).unwrap_or_default()
+                self.inner.io.borrow().write_error(bconcat!(
+                    "File size: ",
+                    filesize(file).map(|s| bconcat!(s)).unwrap_or_default()
                 ));
-                self.inner.io.borrow().write_error(&format!(
-                    "File SHA1: {}",
+                self.inner.io.borrow().write_error(bconcat!(
+                    "File SHA1: ",
                     hash_file("sha1", file).unwrap_or_default()
                 ));
-                self.inner.io.borrow().write_error(&format!(
-                    "First 100 bytes (hex): {}",
-                    bin2hex(&substr_bytes(
-                        &file_get_contents(file).unwrap_or_default(),
+                self.inner.io.borrow().write_error(bconcat!(
+                    "First 100 bytes (hex): ",
+                    bin2hex(substr(
+                        file_get_contents(file).unwrap_or_default(),
                         0,
                         Some(100)
                     ))
                 ));
-                self.inner.io.borrow().write_error(&format!(
-                    "Last 100 bytes (hex): {}",
-                    bin2hex(&substr_bytes(
-                        &file_get_contents(file).unwrap_or_default(),
+                self.inner.io.borrow().write_error(bconcat!(
+                    "Last 100 bytes (hex): ",
+                    bin2hex(substr(
+                        file_get_contents(file).unwrap_or_default(),
                         -100,
                         None
                     ))
                 ));
-                if strlen(&package.get_dist_url().unwrap_or_default()) > 0 {
-                    self.inner.io.borrow().write_error(&format!(
-                        "Origin URL: {}",
+                if strlen(package.get_dist_url().unwrap_or_default()) > 0 {
+                    self.inner.io.borrow().write_error(bconcat!(
+                        "Origin URL: ",
                         self.inner.process_url(
                             package.clone(),
-                            &package.get_dist_url().unwrap_or_default()
+                            package.get_dist_url().unwrap_or_default()
                         )?
                     ));
                     let headers = {
                         let response_headers = crate::downloader::file_downloader::RESPONSE_HEADERS
                             .lock()
                             .unwrap();
-                        match response_headers.get(&package.get_name()) {
+                        match response_headers.get(package.get_name().as_bstr()) {
                             Some(list) => PhpMixed::List(
                                 list.iter().map(|s| PhpMixed::string(s.clone())).collect(),
                             ),
                             None => PhpMixed::List(vec![]),
                         }
                     };
-                    self.inner.io.borrow().write_error(&format!(
-                        "Response Headers: {}",
+                    self.inner.io.borrow().write_error(bconcat!(
+                        "Response Headers: ",
                         json_encode(&headers).unwrap_or_default()
                     ));
                 }
@@ -273,8 +292,8 @@ impl ZipDownloader {
     async fn extract_with_zip_archive(
         &self,
         package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &std::path::Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut zip_archive = self
             .zip_archive_object
@@ -319,10 +338,12 @@ impl ZipDownloader {
                             && total_size > archive_sz * 100
                             && total_size > 50 * 1024 * 1024
                         {
-                            return Err(RuntimeException::new(format!(
-                                "Invalid zip file for \"{}\" with compression ratio >99% (possible zip bomb)",
+                            return Err(RuntimeException::new(bconcat!(
+                                "Invalid zip file for \"",
                                 package.get_name(),
-                            )).into());
+                                "\" with compression ratio >99% (possible zip bomb)"
+                            ))
+                            .into());
                         }
                     }
 
@@ -333,13 +354,15 @@ impl ZipDownloader {
                         return Ok(None);
                     }
 
-                    Err(RuntimeException::new(format!(
-                        "There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.",
+                    Err(RuntimeException::new(bconcat!(
+                        "There was an error extracting the ZIP file for \"",
                         package.get_name(),
-                    )).into())
+                        "\", it is either corrupted or using an invalid format."
+                    ))
+                    .into())
                 }
                 Err(code) => Err(UnexpectedValueException::with_code(
-                    self.get_error_message(code, file).trim_end().to_string(),
+                    rtrim(bconcat!(self.get_error_message(code, file), "\n")),
                     code,
                 )
                 .into()),
@@ -348,11 +371,7 @@ impl ZipDownloader {
 
         result.map_err(|e| {
             if let Some(err) = e.catch::<ErrorException>() {
-                let message = format!(
-                    "The archive for \"{}\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): {}",
-                    package.get_name(),
-                    err.get_message(),
-                );
+                let message = bconcat!("The archive for \"", package.get_name(), "\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): ", err.get_message());
                 RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))
                     .into()
             } else {
@@ -361,24 +380,27 @@ impl ZipDownloader {
         })
     }
 
-    pub fn get_error_message(&self, retval: i64, file: &str) -> String {
+    pub fn get_error_message(&self, retval: i64, file: &std::path::Path) -> BString {
         match retval {
-            ZipArchive::ER_EXISTS => format!("File '{}' already exists.", file),
-            ZipArchive::ER_INCONS => format!("Zip archive '{}' is inconsistent.", file),
-            ZipArchive::ER_INVAL => format!("Invalid argument ({})", file),
-            ZipArchive::ER_MEMORY => format!("Malloc failure ({})", file),
-            ZipArchive::ER_NOENT => format!("No such zip file: '{}'", file),
-            ZipArchive::ER_NOZIP => format!("'{}' is not a zip archive.", file),
-            ZipArchive::ER_OPEN => format!("Can't open zip file: {}", file),
-            ZipArchive::ER_READ => format!("Zip read error ({})", file),
-            ZipArchive::ER_SEEK => format!("Zip seek error ({})", file),
-            -1 => format!(
-                "'{}' is a corrupted zip archive (0 bytes), try again.",
-                file
+            ZipArchive::ER_EXISTS => bconcat!("File '", file, "' already exists."),
+            ZipArchive::ER_INCONS => bconcat!("Zip archive '", file, "' is inconsistent."),
+            ZipArchive::ER_INVAL => bconcat!("Invalid argument (", file, ")"),
+            ZipArchive::ER_MEMORY => bconcat!("Malloc failure (", file, ")"),
+            ZipArchive::ER_NOENT => bconcat!("No such zip file: '", file, "'"),
+            ZipArchive::ER_NOZIP => bconcat!("'", file, "' is not a zip archive."),
+            ZipArchive::ER_OPEN => bconcat!("Can't open zip file: ", file),
+            ZipArchive::ER_READ => bconcat!("Zip read error (", file, ")"),
+            ZipArchive::ER_SEEK => bconcat!("Zip seek error (", file, ")"),
+            -1 => bconcat!(
+                "'",
+                file,
+                "' is a corrupted zip archive (0 bytes), try again."
             ),
-            _ => format!(
-                "'{}' is not a valid zip archive, got error code: {}",
-                file, retval
+            _ => bconcat!(
+                "'",
+                file,
+                "' is not a valid zip archive, got error code: ",
+                retval
             ),
         }
     }
@@ -395,7 +417,7 @@ impl ZipDownloader {
     }
 
     /// For testing only. Mirrors the test's `setPrivateProperty('unzipCommands', ...)` reflection.
-    pub fn __set_unzip_commands(value: Option<Vec<Vec<String>>>) {
+    pub fn __set_unzip_commands(value: Option<Vec<Vec<BString>>>) {
         *UNZIP_COMMANDS.lock().unwrap() = value;
     }
 
@@ -411,15 +433,15 @@ impl ArchiveDownloader for ZipDownloader {
         &self.inner
     }
 
-    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.cleanup_executed
     }
 
     async fn extract(
         &self,
         package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &std::path::Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.extract_with_system_unzip(package, file, path).await
     }
@@ -430,15 +452,15 @@ impl ChangeReportInterface for ZipDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &std::path::Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.base_get_local_changes(self, package, path).await
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl crate::downloader::DownloaderInterface for ZipDownloader {
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         self.inner.get_installation_source()
     }
 
@@ -449,7 +471,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -461,61 +483,61 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                 let commands = unzip_commands.as_mut().unwrap();
                 if Platform::is_windows()
                     && let Some(cmd) =
-                        finder.find("7z", None, &[r"C:\Program Files\7-Zip".to_string()])
+                        finder.find("7z", None, &[BString::from(r"C:\Program Files\7-Zip")])
                 {
                     commands.push(vec![
-                        "7z".to_string(),
+                        "7z".into(),
                         cmd,
-                        "x".to_string(),
-                        "-bb0".to_string(),
-                        "-y".to_string(),
-                        "%file%".to_string(),
-                        "-o%path%".to_string(),
+                        "x".into(),
+                        "-bb0".into(),
+                        "-y".into(),
+                        "%file%".into(),
+                        "-o%path%".into(),
                     ]);
                 }
                 if let Some(cmd) = finder.find("unzip", None, &[]) {
                     commands.push(vec![
-                        "unzip".to_string(),
+                        "unzip".into(),
                         cmd,
-                        "-qq".to_string(),
-                        "%file%".to_string(),
-                        "-d".to_string(),
-                        "%path%".to_string(),
+                        "-qq".into(),
+                        "%file%".into(),
+                        "-d".into(),
+                        "%path%".into(),
                     ]);
                 }
                 if !Platform::is_windows() {
                     if let Some(cmd) = finder.find("7z", None, &[]) {
                         // 7z linux/macOS support is only used if unzip is not present
                         commands.push(vec![
-                            "7z".to_string(),
+                            "7z".into(),
                             cmd,
-                            "x".to_string(),
-                            "-bb0".to_string(),
-                            "-y".to_string(),
-                            "%file%".to_string(),
-                            "-o%path%".to_string(),
+                            "x".into(),
+                            "-bb0".into(),
+                            "-y".into(),
+                            "%file%".into(),
+                            "-o%path%".into(),
                         ]);
                     } else if let Some(cmd) = finder.find("7zz", None, &[]) {
                         // 7zz linux/macOS support is only used if unzip is not present
                         commands.push(vec![
-                            "7zz".to_string(),
+                            "7zz".into(),
                             cmd,
-                            "x".to_string(),
-                            "-bb0".to_string(),
-                            "-y".to_string(),
-                            "%file%".to_string(),
-                            "-o%path%".to_string(),
+                            "x".into(),
+                            "-bb0".into(),
+                            "-y".into(),
+                            "%file%".into(),
+                            "-o%path%".into(),
                         ]);
                     } else if let Some(cmd) = finder.find("7za", None, &[]) {
                         // 7za linux/macOS support is only used if unzip is not present
                         commands.push(vec![
-                            "7za".to_string(),
+                            "7za".into(),
                             cmd,
-                            "x".to_string(),
-                            "-bb0".to_string(),
-                            "-y".to_string(),
-                            "%file%".to_string(),
-                            "-o%path%".to_string(),
+                            "x".into(),
+                            "-bb0".into(),
+                            "-y".into(),
+                            "%file%".into(),
+                            "-o%path%".into(),
                         ]);
                     }
                 }
@@ -538,8 +560,8 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
         if !has_zip_archive && unzip_commands_empty {
             let ini_message = IniHelper::get_message();
-            let error = format!(
-                "The zip extension and unzip/7z commands are both missing, skipping.\n{}",
+            let error = bconcat!(
+                "The zip extension and unzip/7z commands are both missing, skipping.\n",
                 ini_message
             );
             return Err(RuntimeException::new(error).into());
@@ -565,9 +587,9 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -576,7 +598,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
@@ -586,7 +608,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
         self.inner
@@ -597,7 +619,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
@@ -605,9 +627,9 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await

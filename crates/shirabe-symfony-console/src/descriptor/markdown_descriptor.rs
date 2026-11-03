@@ -10,7 +10,9 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, preg_replace, str_repeat, str_replace, var_export};
+use shirabe_php_shim::{
+    PhpMixed, bconcat, implode, preg_replace, str_repeat, str_replace, var_export,
+};
 
 /// Markdown descriptor.
 #[derive(Debug, Default)]
@@ -40,29 +42,34 @@ impl MarkdownDescriptor {
         _options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let name = if !argument.get_name().is_empty() {
-            argument.get_name().to_string()
+            BString::from(argument.get_name())
         } else {
-            "<none>".to_string()
+            BString::from("<none>")
         };
         self.write(
-            &format!(
-                "#### `{}`\n\n{}* Is required: {}\n* Is array: {}\n* Default: `{}`",
+            bconcat!(
+                "#### `",
                 name,
+                "`\n\n",
                 if !argument.get_description().is_empty() {
-                    format!(
-                        "{}\n\n",
-                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description())
+                    bconcat!(
+                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description()),
+                        "\n\n"
                     )
                 } else {
-                    String::new()
+                    BString::default()
                 },
+                "* Is required: ",
                 if argument.is_required() { "yes" } else { "no" },
+                "\n* Is array: ",
                 if argument.is_array() { "yes" } else { "no" },
+                "\n* Default: `",
                 str_replace(
                     "\n",
                     "",
-                    &var_export(&argument.get_default().to_php_mixed(), true),
+                    var_export(&argument.get_default().to_php_mixed(), true),
                 ),
+                "`",
             ),
             true,
         );
@@ -74,35 +81,46 @@ impl MarkdownDescriptor {
         option: &InputOption,
         _options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let mut name = format!("--{}", option.get_name());
+        let mut name = bconcat!("--", option.get_name());
         if option.is_negatable() {
-            name += &format!("|--no-{}", option.get_name());
+            name = bconcat!(name, "|--no-", option.get_name());
         }
         if let Some(shortcut) = option.get_shortcut() {
-            name += &format!("|-{}", str_replace("|", "|-", shortcut));
+            name = bconcat!(name, "|-", str_replace("|", "|-", shortcut));
         }
 
         self.write(
-            &format!(
-                "#### `{}`\n\n{}* Accept value: {}\n* Is value required: {}\n* Is multiple: {}\n* Is negatable: {}\n* Default: `{}`",
+            bconcat!(
+                "#### `",
                 name,
+                "`\n\n",
                 if !option.get_description().is_empty() {
-                    format!(
-                        "{}\n\n",
-                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description())
+                    bconcat!(
+                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description()),
+                        "\n\n"
                     )
                 } else {
-                    String::new()
+                    BString::default()
                 },
+                "* Accept value: ",
                 if option.accept_value() { "yes" } else { "no" },
-                if option.is_value_required() { "yes" } else { "no" },
+                "\n* Is value required: ",
+                if option.is_value_required() {
+                    "yes"
+                } else {
+                    "no"
+                },
+                "\n* Is multiple: ",
                 if option.is_array() { "yes" } else { "no" },
+                "\n* Is negatable: ",
                 if option.is_negatable() { "yes" } else { "no" },
+                "\n* Default: `",
                 str_replace(
                     "\n",
                     "",
-                    &var_export(&option.get_default().to_php_mixed(), true),
+                    var_export(&option.get_default().to_php_mixed(), true),
                 ),
+                "`",
             ),
             true,
         );
@@ -146,23 +164,26 @@ impl MarkdownDescriptor {
     ) -> anyhow::Result<()> {
         if matches!(options.get(B("short")), Some(PhpMixed::Bool(true))) {
             self.write(
-                &format!(
-                    "`{}`\n{}\n\n{}### Usage\n\n{}",
+                bconcat!(
+                    "`",
                     command.get_name().unwrap_or_default(),
+                    "`\n",
                     str_repeat(
                         "-",
-                        (Helper::width(command.get_name().as_deref().unwrap_or("")) + 2) as usize
+                        (Helper::width(command.get_name().unwrap_or_default()) + 2) as usize
                     ),
+                    "\n\n",
                     if !command.get_description().is_empty() {
-                        format!("{}\n\n", command.get_description())
+                        bconcat!(command.get_description(), "\n\n")
                     } else {
-                        String::new()
+                        BString::default()
                     },
+                    "### Usage\n\n",
                     command
                         .get_aliases()
                         .iter()
-                        .fold(String::new(), |carry, usage| {
-                            format!("{}* `{}`\n", carry, usage)
+                        .fold(BString::default(), |carry, usage| {
+                            bconcat!(carry, "* `", usage, "`\n")
                         }),
                 ),
                 true,
@@ -177,20 +198,23 @@ impl MarkdownDescriptor {
         usages.extend(command.get_aliases());
         usages.extend(command.get_usages());
         self.write(
-            &format!(
-                "`{}`\n{}\n\n{}### Usage\n\n{}",
+            bconcat!(
+                "`",
                 command.get_name().unwrap_or_default(),
+                "`\n",
                 str_repeat(
                     "-",
-                    (Helper::width(command.get_name().as_deref().unwrap_or("")) + 2) as usize
+                    (Helper::width(command.get_name().unwrap_or_default()) + 2) as usize
                 ),
+                "\n\n",
                 if !command.get_description().is_empty() {
-                    format!("{}\n\n", command.get_description())
+                    bconcat!(command.get_description(), "\n\n")
                 } else {
-                    String::new()
+                    BString::default()
                 },
-                usages.iter().fold(String::new(), |carry, usage| {
-                    format!("{}* `{}`\n", carry, usage)
+                "### Usage\n\n",
+                usages.iter().fold(BString::default(), |carry, usage| {
+                    bconcat!(carry, "* `", usage, "`\n")
                 }),
             ),
             true,
@@ -216,7 +240,7 @@ impl MarkdownDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
+            Some(PhpMixed::String(s)) => Some(s.clone()),
             _ => None,
         };
         let mut description =
@@ -224,52 +248,52 @@ impl MarkdownDescriptor {
         let title = self.get_application_title(&*application.borrow());
 
         self.write(
-            &format!(
-                "{}\n{}",
-                title,
-                str_repeat("=", Helper::width(&title) as usize)
-            ),
+            bconcat!(title, "\n", str_repeat("=", Helper::width(&title) as usize)),
             true,
         );
 
         for namespace in description.get_namespaces().values() {
             let namespace_id = match namespace.get(B("id")) {
-                Some(PhpMixed::String(s)) => s.to_str_lossy().into_owned(),
-                _ => String::new(),
+                Some(PhpMixed::String(s)) => s.clone(),
+                _ => BString::default(),
             };
             if ApplicationDescription::GLOBAL_NAMESPACE != namespace_id {
                 self.write("\n\n", true);
-                self.write(&format!("**{}:**", namespace_id), true);
+                self.write(bconcat!("**", namespace_id, ":**"), true);
             }
 
             self.write("\n\n", true);
-            let command_names: Vec<String> = match namespace.get(B("commands")) {
+            let command_names: Vec<BString> = match namespace.get(B("commands")) {
                 Some(PhpMixed::List(names)) => names
                     .iter()
-                    .filter_map(|n| n.as_string().map(|s| s.to_string()))
+                    .filter_map(|n| n.as_string().map(BString::from))
                     .collect(),
                 _ => vec![],
             };
             self.write(
-                &command_names
-                    .iter()
-                    .map(|command_name| {
-                        Ok(format!(
-                            "* [`{}`](#{})",
-                            command_name.clone(),
-                            str_replace(
-                                ":",
-                                "",
-                                &description
-                                    .get_command(command_name)?
-                                    .borrow()
-                                    .get_name()
-                                    .unwrap_or_default(),
-                            ),
-                        ))
-                    })
-                    .collect::<anyhow::Result<Vec<String>>>()?
-                    .join("\n"),
+                implode(
+                    "\n",
+                    &command_names
+                        .iter()
+                        .map(|command_name| {
+                            Ok(bconcat!(
+                                "* [`",
+                                command_name,
+                                "`](#",
+                                str_replace(
+                                    ":",
+                                    "",
+                                    description
+                                        .get_command(command_name.as_bstr())?
+                                        .borrow()
+                                        .get_name()
+                                        .unwrap_or_default(),
+                                ),
+                                ")",
+                            ))
+                        })
+                        .collect::<anyhow::Result<Vec<BString>>>()?,
+                ),
                 true,
             );
         }
@@ -283,16 +307,16 @@ impl MarkdownDescriptor {
         Ok(())
     }
 
-    fn get_application_title(&self, application: &dyn Application) -> String {
+    fn get_application_title(&self, application: &dyn Application) -> BString {
         if "UNKNOWN" != application.get_name() {
             if "UNKNOWN" != application.get_version() {
-                return format!("{} {}", application.get_name(), application.get_version());
+                return bconcat!(application.get_name(), " ", application.get_version());
             }
 
             return application.get_name();
         }
 
-        "Console Tool".to_string()
+        "Console Tool".into()
     }
 }
 
@@ -316,12 +340,12 @@ impl Descriptor for MarkdownDescriptor {
         self.output = Some(output);
     }
 
-    fn write(&self, content: &str, decorated: bool) {
+    fn write(&self, content: impl AsRef<[u8]>, decorated: bool) {
         // PHP overrides write() only to flip the default of $decorated to true;
         // it still delegates to parent::write.
         let _ = decorated;
         self.output().borrow().write(
-            &[content.to_string()],
+            &[bstr::BString::from(content.as_ref())],
             false,
             if decorated {
                 crate::output::OUTPUT_NORMAL

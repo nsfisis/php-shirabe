@@ -3,27 +3,28 @@
 use crate::event_dispatcher::{Event, EventInterface};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::FileDownloadContext;
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct PostFileDownloadEvent {
     inner: Event,
-    file_name: Option<String>,
-    checksum: Option<String>,
-    url: String,
+    file_name: Option<PathBuf>,
+    checksum: Option<BString>,
+    url: BString,
     context: Option<FileDownloadContext>,
-    r#type: String,
+    r#type: BString,
 }
 
 impl PostFileDownloadEvent {
     pub fn new(
-        name: String,
-        file_name: Option<String>,
-        checksum: Option<String>,
-        url: String,
-        r#type: String,
+        name: impl Into<BString>,
+        file_name: Option<PathBuf>,
+        checksum: Option<BString>,
+        url: BString,
+        r#type: BString,
         context: Option<FileDownloadContext>,
     ) -> Self {
         Self {
@@ -36,20 +37,20 @@ impl PostFileDownloadEvent {
         }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
-    pub fn get_file_name(&self) -> Option<&str> {
+    pub fn get_file_name(&self) -> Option<&Path> {
         self.file_name.as_deref()
     }
 
-    pub fn get_checksum(&self) -> Option<&str> {
-        self.checksum.as_deref()
+    pub fn get_checksum(&self) -> Option<&BStr> {
+        self.checksum.as_ref().map(|checksum| checksum.as_bstr())
     }
 
-    pub fn get_url(&self) -> &str {
-        &self.url
+    pub fn get_url(&self) -> &BStr {
+        self.url.as_bstr()
     }
 
     pub fn get_context(&self) -> Option<&FileDownloadContext> {
@@ -66,8 +67,8 @@ impl PostFileDownloadEvent {
         }
     }
 
-    pub fn get_type(&self) -> &str {
-        &self.r#type
+    pub fn get_type(&self) -> &BStr {
+        self.r#type.as_bstr()
     }
 }
 
@@ -80,11 +81,11 @@ impl EventInterface for PostFileDownloadEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<bstr::BString> {
         self.inner.get_arguments()
     }
 

@@ -1,78 +1,91 @@
 //! ref: composer/tests/Composer/Test/Json/JsonManipulatorTest.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::json::{JsonFile, JsonManipulator};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
-fn s(v: &str) -> PhpMixed {
-    PhpMixed::string(v.to_string())
+fn s(v: &BStr) -> PhpMixed {
+    PhpMixed::string(bconcat!(v))
 }
 
-fn arr(pairs: &[(&str, PhpMixed)]) -> PhpMixed {
+fn arr(pairs: &[(&BStr, PhpMixed)]) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        m.insert(k.to_string().into(), v.clone());
+        m.insert(bconcat!(k), v.clone());
     }
     PhpMixed::Array(m)
 }
 
 #[test]
 fn test_add_link() {
-    let cases: Vec<(&str, &str, &str, &str, &str)> = vec![
+    let cases: Vec<(&BStr, &BStr, &BStr, &BStr, &BStr)> = vec![
         (
-            r#"{}"#,
-            r#"require"#,
-            r#"vendor/baz"#,
-            r#"qux"#,
-            r#"{
+            BStr::new(r#"{}"#),
+            BStr::new(r#"require"#),
+            BStr::new(r#"vendor/baz"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require": {
         "vendor/baz": "qux"
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "foo": "bar"
 }"#,
-            r#"require"#,
-            r#"vendor/baz"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"vendor/baz"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "foo": "bar",
     "require": {
         "vendor/baz": "qux"
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
     }
 }"#,
-            r#"require"#,
-            r#"vendor/baz"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"vendor/baz"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require": {
         "vendor/baz": "qux"
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "empty": "",
     "require": {
         "foo": "bar"
     }
 }"#,
-            r#"require"#,
-            r#"vendor/baz"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"vendor/baz"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "empty": "",
     "require": {
         "foo": "bar",
@@ -80,19 +93,23 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require":
     {
         "foo": "bar",
         "vendor/baz": "baz"
     }
 }"#,
-            r#"require"#,
-            r#"vendor/baz"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"vendor/baz"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require":
     {
         "foo": "bar",
@@ -100,19 +117,23 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require":
     {
         "foo": "bar",
         "vendor/baz": "baz"
     }
 }"#,
-            r#"require"#,
-            r#"vEnDoR/bAz"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"vEnDoR/bAz"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require":
     {
         "foo": "bar",
@@ -120,19 +141,23 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require":
     {
         "foo": "bar",
         "vendor\/baz": "baz"
     }
 }"#,
-            r#"require"#,
-            r#"vendor/baz"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"vendor/baz"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require":
     {
         "foo": "bar",
@@ -140,19 +165,23 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require":
     {
         "foo": "bar",
         "vendor\/baz": "baz"
     }
 }"#,
-            r#"require"#,
-            r#"vEnDoR/bAz"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"vEnDoR/bAz"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require":
     {
         "foo": "bar",
@@ -160,9 +189,11 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "foo": "bar"
     },
@@ -175,10 +206,12 @@ fn test_add_link() {
         }
     }]
 }"#,
-            r#"require"#,
-            r#"foo"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require": {
         "foo": "qux"
     },
@@ -192,9 +225,11 @@ fn test_add_link() {
     }]
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [{
         "type": "package",
         "package": {
@@ -204,10 +239,12 @@ fn test_add_link() {
         }
     }]
 }"#,
-            r#"require"#,
-            r#"foo"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "repositories": [{
         "type": "package",
         "package": {
@@ -221,17 +258,21 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "php": "5.*"
     }
 }"#,
-            r#"require-dev"#,
-            r#"foo"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require-dev"#),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require": {
         "php": "5.*"
     },
@@ -240,9 +281,11 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "php": "5.*"
     },
@@ -250,10 +293,12 @@ fn test_add_link() {
         "foo": "bar"
     }
 }"#,
-            r#"require-dev"#,
-            r#"foo"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require-dev"#),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "require": {
         "php": "5.*"
     },
@@ -262,9 +307,11 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [{
         "type": "package",
         "package": {
@@ -285,10 +332,12 @@ fn test_add_link() {
         "foo": "bar"
     }
 }"#,
-            r#"require-dev"#,
-            r#"foo"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require-dev"#),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "repositories": [{
         "type": "package",
         "package": {
@@ -310,9 +359,11 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "config": {
         "cache-files-ttl": 0,
         "discard-changes": true
@@ -790,10 +841,12 @@ fn test_add_link() {
         "heroku-sys/nginx": "~1.8.0"
     }
 }"#,
-            r#"require"#,
-            r#"foo"#,
-            r#"qux"#,
-            r#"{
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"qux"#),
+            BStr::new(
+                r#"{
     "config": {
         "cache-files-ttl": 0,
         "discard-changes": true
@@ -1273,10 +1326,11 @@ fn test_add_link() {
     }
 }
 "#,
+            ),
         ),
     ];
     for (json, r#type, package, constraint, expected) in cases {
-        let mut manipulator = JsonManipulator::new(json.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(json).unwrap();
         assert!(
             manipulator
                 .add_link(r#type, package, constraint, false)
@@ -1288,45 +1342,54 @@ fn test_add_link() {
 
 #[test]
 fn test_add_link_and_sort_packages() {
-    let cases: Vec<(&str, &str, &str, &str, bool, &str)> = vec![
+    let cases: Vec<(&BStr, &BStr, &BStr, &BStr, bool, &BStr)> = vec![
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "vendor/baz": "qux"
     }
 }"#,
-            r#"require"#,
-            r#"foo"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"bar"#),
             true,
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "foo": "bar",
         "vendor/baz": "qux"
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "vendor/baz": "qux"
     }
 }"#,
-            r#"require"#,
-            r#"foo"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"bar"#),
             false,
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "vendor/baz": "qux",
         "foo": "bar"
     }
 }
 "#,
+            ),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "foo": "baz",
         "ext-10gd": "*",
@@ -1336,11 +1399,13 @@ fn test_add_link_and_sort_packages() {
         "php": ">=5.5"
     }
 }"#,
-            r#"require"#,
-            r#"igorw/retry"#,
-            r#"*"#,
+            ),
+            BStr::new(r#"require"#),
+            BStr::new(r#"igorw/retry"#),
+            BStr::new(r#"*"#),
             true,
-            r#"{
+            BStr::new(
+                r#"{
     "require": {
         "php": ">=5.5",
         "hhvm": "*",
@@ -1352,10 +1417,11 @@ fn test_add_link_and_sort_packages() {
     }
 }
 "#,
+            ),
         ),
     ];
     for (json, r#type, package, constraint, sort_packages, expected) in cases {
-        let mut manipulator = JsonManipulator::new(json.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(json).unwrap();
         assert!(
             manipulator
                 .add_link(r#type, package, constraint, sort_packages)
@@ -1367,9 +1433,10 @@ fn test_add_link_and_sort_packages() {
 
 #[test]
 fn test_remove_sub_node() {
-    let cases: Vec<(&str, &str, bool, Option<&str>)> = vec![
+    let cases: Vec<(&BStr, &BStr, bool, Option<&BStr>)> = vec![
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "foo": {
             "foo": "bar",
@@ -1381,9 +1448,10 @@ fn test_remove_sub_node() {
         }
     }
 }"#,
-            r#"foo"#,
+            ),
+            BStr::new(r#"foo"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
         "bar": {
@@ -1393,10 +1461,11 @@ fn test_remove_sub_node() {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "foo": {
             "foo": "bar",
@@ -1408,9 +1477,10 @@ fn test_remove_sub_node() {
         }
     }
 }"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"bar"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
         "foo": {
@@ -1420,10 +1490,11 @@ fn test_remove_sub_node() {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "foo": {
             "foo": "bar",
@@ -1431,36 +1502,40 @@ fn test_remove_sub_node() {
         }
     }
 }"#,
-            r#"foo"#,
+            ),
+            BStr::new(r#"foo"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "foo\/bar": {
             "bar": "baz"
         }
     }
 }"#,
-            r#"foo/bar"#,
+            ),
+            BStr::new(r#"foo/bar"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "foo": {
             "foo": "bar",
@@ -1476,9 +1551,10 @@ fn test_remove_sub_node() {
         }
     }
 }"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"bar"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
         "foo": {
@@ -1492,10 +1568,11 @@ fn test_remove_sub_node() {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "main": {
             "foo": "bar",
@@ -1503,9 +1580,10 @@ fn test_remove_sub_node() {
         }
     }
 }"#,
-            r#"removenotthere"#,
+            ),
+            BStr::new(r#"removenotthere"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
         "main": {
@@ -1515,10 +1593,11 @@ fn test_remove_sub_node() {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "baz": {
             "foo": "bar",
@@ -1526,9 +1605,10 @@ fn test_remove_sub_node() {
         }
     }
 }"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"bar"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
         "baz": {
@@ -1538,10 +1618,11 @@ fn test_remove_sub_node() {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "foo": {
             "baz": "qux"
@@ -1552,9 +1633,10 @@ fn test_remove_sub_node() {
         }
     }
 }"#,
-            r#"baz"#,
+            ),
+            BStr::new(r#"baz"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
         "foo": {
@@ -1563,79 +1645,94 @@ fn test_remove_sub_node() {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
     }
 }"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"bar"#),
             true,
             None,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {}
 }"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"bar"#),
             true,
             None,
         ),
         (
-            r#"{
-}"#, r#"bar"#, true, None,
+            BStr::new(
+                r#"{
+}"#,
+            ),
+            BStr::new(r#"bar"#),
+            true,
+            None,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "foo": {
             "package": { "bar": "baz" }
         }
     }
 }"#,
-            r#"foo"#,
+            ),
+            BStr::new(r#"foo"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
-    "repositories": {
-        "foo": {
-            "package": { "bar": "ba{z" }
-        }
-    }
-}"#,
-            r#"bar"#,
-            true,
-            Some(
+            BStr::new(
                 r#"{
     "repositories": {
         "foo": {
             "package": { "bar": "ba{z" }
         }
     }
+}"#,
+            ),
+            BStr::new(r#"bar"#),
+            true,
+            Some(BStr::new(
+                r#"{
+    "repositories": {
+        "foo": {
+            "package": { "bar": "ba{z" }
+        }
+    }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "foo": {
             "package": { "bar": "ba}z" }
         }
     }
 }"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"bar"#),
             true,
-            Some(
+            Some(BStr::new(
                 r#"{
     "repositories": {
         "foo": {
@@ -1644,35 +1741,39 @@ fn test_remove_sub_node() {
     }
 }
 "#,
-            ),
+            )),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "package": { "bar": "ba[z" }
         }
     ]
 }"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"bar"#),
             false,
             None,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "package": { "bar": "ba]z" }
         }
     ]
 }"#,
-            r#"bar"#,
+            ),
+            BStr::new(r#"bar"#),
             false,
             None,
         ),
     ];
     for (json, name, expected, expected_content) in cases {
-        let mut manipulator = JsonManipulator::new(json.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(json).unwrap();
         assert_eq!(
             expected,
             manipulator.remove_sub_node("repositories", name).unwrap()
@@ -1685,9 +1786,10 @@ fn test_remove_sub_node() {
 
 #[test]
 fn test_add_repository() {
-    let cases: Vec<(&str, &str, &str, PhpMixed, bool)> = vec![
+    let cases: Vec<(&BStr, &BStr, &BStr, PhpMixed, bool)> = vec![
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "git",
@@ -1696,7 +1798,9 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "path",
@@ -1709,12 +1813,17 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#""#,
-            arr(&[(r#"type"#, s(r#"path"#)), (r#"url"#, s(r#"foo/bar"#))]),
+            ),
+            BStr::new(r#""#),
+            arr(&[
+                (BStr::new(r#"type"#), s(BStr::new(r#"path"#))),
+                (BStr::new(r#"url"#), s(BStr::new(r#"foo/bar"#))),
+            ]),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "git",
@@ -1723,7 +1832,9 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "git",
@@ -1736,12 +1847,17 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#""#,
-            arr(&[(r#"type"#, s(r#"path"#)), (r#"url"#, s(r#"foo/bar"#))]),
+            ),
+            BStr::new(r#""#),
+            arr(&[
+                (BStr::new(r#"type"#), s(BStr::new(r#"path"#))),
+                (BStr::new(r#"url"#), s(BStr::new(r#"foo/bar"#))),
+            ]),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "0": {
             "type": "git",
@@ -1751,7 +1867,9 @@ fn test_add_repository() {
     }
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "name": "foo",
@@ -1768,12 +1886,17 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#"foo"#,
-            arr(&[(r#"type"#, s(r#"path"#)), (r#"url"#, s(r#"foo/bar"#))]),
+            ),
+            BStr::new(r#"foo"#),
+            arr(&[
+                (BStr::new(r#"type"#), s(BStr::new(r#"path"#))),
+                (BStr::new(r#"url"#), s(BStr::new(r#"foo/bar"#))),
+            ]),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "0": {
             "type": "git",
@@ -1783,7 +1906,9 @@ fn test_add_repository() {
     }
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "git",
@@ -1800,12 +1925,17 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#"foo"#,
-            arr(&[(r#"type"#, s(r#"path"#)), (r#"url"#, s(r#"foo/bar"#))]),
+            ),
+            BStr::new(r#"foo"#),
+            arr(&[
+                (BStr::new(r#"type"#), s(BStr::new(r#"path"#))),
+                (BStr::new(r#"url"#), s(BStr::new(r#"foo/bar"#))),
+            ]),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "git",
@@ -1814,7 +1944,9 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "name": "foo",
@@ -1828,12 +1960,17 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#"foo"#,
-            arr(&[(r#"type"#, s(r#"path"#)), (r#"url"#, s(r#"foo/bar"#))]),
+            ),
+            BStr::new(r#"foo"#),
+            arr(&[
+                (BStr::new(r#"type"#), s(BStr::new(r#"path"#))),
+                (BStr::new(r#"url"#), s(BStr::new(r#"foo/bar"#))),
+            ]),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "git",
@@ -1842,7 +1979,9 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "git",
@@ -1856,12 +1995,17 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#"foo"#,
-            arr(&[(r#"type"#, s(r#"path"#)), (r#"url"#, s(r#"foo/bar"#))]),
+            ),
+            BStr::new(r#"foo"#),
+            arr(&[
+                (BStr::new(r#"type"#), s(BStr::new(r#"path"#))),
+                (BStr::new(r#"url"#), s(BStr::new(r#"foo/bar"#))),
+            ]),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "0": {
             "type": "git",
@@ -1871,7 +2015,9 @@ fn test_add_repository() {
     }
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "path",
@@ -1887,12 +2033,17 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#""#,
-            arr(&[(r#"type"#, s(r#"path"#)), (r#"url"#, s(r#"foo/bar"#))]),
+            ),
+            BStr::new(r#""#),
+            arr(&[
+                (BStr::new(r#"type"#), s(BStr::new(r#"path"#))),
+                (BStr::new(r#"url"#), s(BStr::new(r#"foo/bar"#))),
+            ]),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "0": {
             "type": "git",
@@ -1902,7 +2053,9 @@ fn test_add_repository() {
     }
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "type": "git",
@@ -1918,13 +2071,17 @@ fn test_add_repository() {
     ]
 }
 "#,
-            r#""#,
-            arr(&[(r#"type"#, s(r#"path"#)), (r#"url"#, s(r#"foo/bar"#))]),
+            ),
+            BStr::new(r#""#),
+            arr(&[
+                (BStr::new(r#"type"#), s(BStr::new(r#"path"#))),
+                (BStr::new(r#"url"#), s(BStr::new(r#"foo/bar"#))),
+            ]),
             true,
         ),
     ];
     for (from, to, name, config, append) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(manipulator.add_repository(name, config, append).unwrap());
         assert_eq!(to, manipulator.get_contents());
     }
@@ -1932,9 +2089,10 @@ fn test_add_repository() {
 
 #[test]
 fn test_set_url_in_repository() {
-    let cases: Vec<(&str, &str, &str, &str)> = vec![
+    let cases: Vec<(&BStr, &BStr, &BStr, &BStr)> = vec![
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "first": {
             "type": "package",
@@ -1951,7 +2109,9 @@ fn test_set_url_in_repository() {
     }
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": {
         "first": {
             "type": "package",
@@ -1968,11 +2128,13 @@ fn test_set_url_in_repository() {
     }
 }
 "#,
-            r#"first"#,
-            r#"https://new.example.org"#,
+            ),
+            BStr::new(r#"first"#),
+            BStr::new(r#"https://new.example.org"#),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "first": {
             "type": "package",
@@ -1989,7 +2151,9 @@ fn test_set_url_in_repository() {
     }
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": {
         "first": {
             "type": "package",
@@ -2006,11 +2170,13 @@ fn test_set_url_in_repository() {
     }
 }
 "#,
-            r#"foo"#,
-            r#"https://new.example.org"#,
+            ),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"https://new.example.org"#),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": {
         "first": {
             "type": "package",
@@ -2027,7 +2193,9 @@ fn test_set_url_in_repository() {
     }
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": {
         "first": {
             "type": "package",
@@ -2044,11 +2212,13 @@ fn test_set_url_in_repository() {
     }
 }
 "#,
-            r#"bar"#,
-            r#"https://new.example.org"#,
+            ),
+            BStr::new(r#"bar"#),
+            BStr::new(r#"https://new.example.org"#),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "name": "first",
@@ -2068,7 +2238,9 @@ fn test_set_url_in_repository() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "name": "first",
@@ -2088,11 +2260,13 @@ fn test_set_url_in_repository() {
     ]
 }
 "#,
-            r#"first"#,
-            r#"https://new.example.org"#,
+            ),
+            BStr::new(r#"first"#),
+            BStr::new(r#"https://new.example.org"#),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "name": "first",
@@ -2112,7 +2286,9 @@ fn test_set_url_in_repository() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "name": "first",
@@ -2132,11 +2308,13 @@ fn test_set_url_in_repository() {
     ]
 }
 "#,
-            r#"foo"#,
-            r#"https://new.example.org"#,
+            ),
+            BStr::new(r#"foo"#),
+            BStr::new(r#"https://new.example.org"#),
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "name": "first",
@@ -2156,7 +2334,9 @@ fn test_set_url_in_repository() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "repositories": [
         {
             "name": "first",
@@ -2176,12 +2356,13 @@ fn test_set_url_in_repository() {
     ]
 }
 "#,
-            r#"bar"#,
-            r#"https://new.example.org"#,
+            ),
+            BStr::new(r#"bar"#),
+            BStr::new(r#"https://new.example.org"#),
         ),
     ];
     for (from, to, name, url) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(manipulator.set_repository_url(name, url).unwrap());
         assert_eq!(to, manipulator.get_contents());
     }
@@ -2189,126 +2370,157 @@ fn test_set_url_in_repository() {
 
 #[test]
 fn test_add_list_item() {
-    let cases: Vec<(&str, &str, &str, PhpMixed, bool)> = vec![
+    let cases: Vec<(&BStr, &BStr, &BStr, PhpMixed, bool)> = vec![
         (
-            r#"{}"#,
-            r#"{
+            BStr::new(r#"{}"#),
+            BStr::new(
+                r#"{
     "main": [1]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(1),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [ ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [1]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(1),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [ 1 ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [ 1, 2 ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(2),
             true,
         ),
         (
-            r#"{}"#,
-            r#"{
+            BStr::new(r#"{}"#),
+            BStr::new(
+                r#"{
     "main": [{
         "value": 1
     }]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(1))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(1))]),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [ ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [{
         "value": 2
     }]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(2))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(2))]),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [ 1 ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [ 1, {
         "value": 2
     } ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(2))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(2))]),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         1
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(1),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         1,
         2
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(2),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         {
             "value": 1
@@ -2316,18 +2528,22 @@ fn test_add_list_item() {
     ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(1))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(1))]),
             true,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         1,
         {
@@ -2336,129 +2552,161 @@ fn test_add_list_item() {
     ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(2))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(2))]),
             true,
         ),
         (
-            r#"{}"#,
-            r#"{
+            BStr::new(r#"{}"#),
+            BStr::new(
+                r#"{
     "main": [1]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(1),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [ ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [1]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(1),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [ 1 ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [ 2, 1 ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(2),
             false,
         ),
         (
-            r#"{}"#,
-            r#"{
+            BStr::new(r#"{}"#),
+            BStr::new(
+                r#"{
     "main": [{
         "value": 1
     }]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(1))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(1))]),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [ ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [{
         "value": 1
     }]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(1))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(1))]),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [ 1 ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [ {
         "value": 2
     }, 1 ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(2))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(2))]),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         1
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(1),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         2,
         1
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             PhpMixed::Int(2),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         {
             "value": 1
@@ -2466,18 +2714,22 @@ fn test_add_list_item() {
     ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(1))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(1))]),
             false,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         {
             "value": 2
@@ -2486,126 +2738,155 @@ fn test_add_list_item() {
     ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"value"#, PhpMixed::Int(2))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"value"#), PhpMixed::Int(2))]),
             false,
         ),
     ];
     for (from, to, main_node, value, append) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
-        assert!(manipulator.add_list_item(main_node, value, append).unwrap());
+        let mut manipulator = JsonManipulator::new(from).unwrap();
+        assert!(
+            manipulator
+                .add_list_item(bstr::BStr::new(main_node), value, append)
+                .unwrap()
+        );
         assert_eq!(to, manipulator.get_contents());
     }
 }
 
 #[test]
 fn test_remove_list_item() {
-    let cases: Vec<(&str, &str, &str, i64)> = vec![
+    let cases: Vec<(&BStr, &BStr, &BStr, i64)> = vec![
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1, 2, 3
     ]
 }"#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         2, 3
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             0,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1, 2, 3
     ]
 }"#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         1, 3
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             1,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1, 2, 3
     ]
 }"#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         1, 2
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             2,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1,
         2,
         3
     ]
 }"#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         2,
         3
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             0,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1,
         2,
         3
     ]
 }"#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         1,
         3
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             1,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         1,
         2,
         3
     ]
 }"#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         1,
         2
     ]
 }
 "#,
-            r#"main"#,
+            ),
+            BStr::new(r#"main"#),
             2,
         ),
     ];
     for (from, to, main_node, index_to_remove) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(
             manipulator
-                .remove_list_item(main_node, index_to_remove)
+                .remove_list_item(bstr::BStr::new(main_node), index_to_remove)
                 .unwrap()
         );
         assert_eq!(to, manipulator.get_contents());
@@ -2614,28 +2895,35 @@ fn test_remove_list_item() {
 
 #[test]
 fn test_insert_list_item() {
-    let cases: Vec<(&str, &str, &str, PhpMixed, i64)> = vec![
+    let cases: Vec<(&BStr, &BStr, &BStr, PhpMixed, i64)> = vec![
         (
-            r#"{
+            BStr::new(
+                r#"{
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [{
         "foo": 1
     }]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"foo"#, PhpMixed::Int(1))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"foo"#), PhpMixed::Int(1))]),
             0,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         {
             "foo": 1
@@ -2643,12 +2931,14 @@ fn test_insert_list_item() {
     ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"foo"#, PhpMixed::Int(1))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"foo"#), PhpMixed::Int(1))]),
             0,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         {
             "foo": 2
@@ -2659,7 +2949,9 @@ fn test_insert_list_item() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         {
             "foo": 1
@@ -2673,12 +2965,14 @@ fn test_insert_list_item() {
     ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"foo"#, PhpMixed::Int(1))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"foo"#), PhpMixed::Int(1))]),
             0,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         {
             "foo": 2
@@ -2689,7 +2983,9 @@ fn test_insert_list_item() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         {
             "foo": 2
@@ -2703,12 +2999,14 @@ fn test_insert_list_item() {
     ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"foo"#, PhpMixed::Int(3))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"foo"#), PhpMixed::Int(3))]),
             1,
         ),
         (
-            r#"{
+            BStr::new(
+                r#"{
     "main": [
         {
             "foo": 2
@@ -2719,7 +3017,9 @@ fn test_insert_list_item() {
     ]
 }
 "#,
-            r#"{
+            ),
+            BStr::new(
+                r#"{
     "main": [
         {
             "foo": 2
@@ -2733,16 +3033,17 @@ fn test_insert_list_item() {
     ]
 }
 "#,
-            r#"main"#,
-            arr(&[(r#"foo"#, PhpMixed::Int(5))]),
+            ),
+            BStr::new(r#"main"#),
+            arr(&[(BStr::new(r#"foo"#), PhpMixed::Int(5))]),
             2,
         ),
     ];
     for (from, to, main_node, value, index_to_insert_at) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(
             manipulator
-                .insert_list_item(main_node, value, index_to_insert_at)
+                .insert_list_item(bstr::BStr::new(main_node), value, index_to_insert_at)
                 .unwrap()
         );
         assert_eq!(to, manipulator.get_contents());
@@ -2773,8 +3074,7 @@ fn test_remove_sub_node_from_require() {
     "require-dev": {
         "package/d": "*"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2815,8 +3115,7 @@ fn test_remove_sub_node_preserves_object_type_when_empty() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "test": {"0": "foo"}
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2838,8 +3137,7 @@ fn test_remove_sub_node_preserves_object_type_when_empty2() {
     "config": {
         "preferred-install": {"foo/*": "source"}
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2883,19 +3181,18 @@ fn test_add_sub_node_in_require() {
     "require-dev": {
         "package/d": "*"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_sub_node("require", "package/c", s("*"), true)
+            .add_sub_node("require", "package/c", s(BStr::new("*")), true)
             .unwrap()
     );
     assert!(
         manipulator
-            .add_sub_node("require-dev", "package/e", s("*"), true)
+            .add_sub_node("require-dev", "package/e", s(BStr::new("*")), true)
             .unwrap()
     );
     assert_eq!(
@@ -2945,8 +3242,7 @@ fn test_add_extra_with_package() {
     "extra": {
         "auto-append-gitignore": true
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2998,8 +3294,7 @@ fn test_add_config_with_package() {
             "php": "5.3.9"
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3007,7 +3302,7 @@ fn test_add_config_with_package() {
         manipulator
             .add_config_setting(
                 "preferred-install.my-organization/stable-package",
-                s("dist")
+                s(BStr::new("dist"))
             )
             .unwrap()
     );
@@ -3056,14 +3351,13 @@ fn test_add_suggest_with_package() {
     "suggest": {
         "package": "Description"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_property("suggest.new-package", s("new-description"))
+            .add_property("suggest.new-package", s(BStr::new("new-description")))
             .unwrap()
     );
     assert_eq!(
@@ -3095,14 +3389,17 @@ fn test_add_repository_can_initialize_empty_repositories() {
         r#"{
   "repositories": {
   }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_repository("bar", arr(&[("type", s("composer"))]), false)
+            .add_repository(
+                "bar",
+                arr(&[(BStr::new("type"), s(BStr::new("composer")))]),
+                false
+            )
             .unwrap()
     );
     assert_eq!(
@@ -3121,11 +3418,15 @@ fn test_add_repository_can_initialize_empty_repositories() {
 
 #[test]
 fn test_add_repository_can_initialize_from_scratch() {
-    let mut manipulator = JsonManipulator::new("{\n\t\"a\": \"b\"\n}".to_string()).unwrap();
+    let mut manipulator = JsonManipulator::new("{\n\t\"a\": \"b\"\n}").unwrap();
 
     assert!(
         manipulator
-            .add_repository("bar2", arr(&[("type", s("composer"))]), false)
+            .add_repository(
+                "bar2",
+                arr(&[(BStr::new("type"), s(BStr::new("composer")))]),
+                false
+            )
             .unwrap()
     );
     assert_eq!(
@@ -3145,14 +3446,17 @@ fn test_add_repository_can_append() {
             "url": "lala"
         }
     ]
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_repository("bar", arr(&[("type", s("composer"))]), true)
+            .add_repository(
+                "bar",
+                arr(&[(BStr::new("type"), s(BStr::new("composer")))]),
+                true
+            )
             .unwrap()
     );
     assert_eq!(
@@ -3185,14 +3489,17 @@ fn test_add_repository_can_prepend() {
             "url": "lala"
         }
     ]
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_repository("bar", arr(&[("type", s("composer"))]), false)
+            .add_repository(
+                "bar",
+                arr(&[(BStr::new("type"), s(BStr::new("composer")))]),
+                false
+            )
             .unwrap()
     );
     assert_eq!(
@@ -3224,14 +3531,17 @@ fn test_add_repository_can_override_deep_repos() {
             "package": {}
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_repository("baz", arr(&[("type", s("composer"))]), false)
+            .add_repository(
+                "baz",
+                arr(&[(BStr::new("type"), s(BStr::new("composer")))]),
+                false
+            )
             .unwrap()
     );
     assert_eq!(
@@ -3263,15 +3573,17 @@ fn test_insert_repository_before_and_after_by_name() {
         },
         "packagist.org": false
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
     assert!(
         manipulator
             .insert_repository(
                 "beta",
-                arr(&[("type", s("vcs")), ("url", s("https://example.org/b"))]),
+                arr(&[
+                    (BStr::new("type"), s(BStr::new("vcs"))),
+                    (BStr::new("url"), s(BStr::new("https://example.org/b")))
+                ]),
                 "omega",
                 0
             )
@@ -3281,7 +3593,10 @@ fn test_insert_repository_before_and_after_by_name() {
         manipulator
             .insert_repository(
                 "gamma",
-                arr(&[("type", s("vcs")), ("url", s("https://example.org/g"))]),
+                arr(&[
+                    (BStr::new("type"), s(BStr::new("vcs"))),
+                    (BStr::new("url"), s(BStr::new("https://example.org/g")))
+                ]),
                 "alpha",
                 1
             )
@@ -3291,7 +3606,10 @@ fn test_insert_repository_before_and_after_by_name() {
         manipulator
             .insert_repository(
                 "alpha",
-                arr(&[("type", s("vcs")), ("url", s("https://example.org/alpha"))]),
+                arr(&[
+                    (BStr::new("type"), s(BStr::new("vcs"))),
+                    (BStr::new("url"), s(BStr::new("https://example.org/alpha")))
+                ]),
                 "gamma",
                 0
             )
@@ -3341,8 +3659,7 @@ fn test_remove_repository_removes_from_assoc_but_does_not_converts_from_assoc_to
         },
         "packagist.org": false
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3373,8 +3690,7 @@ fn test_remove_repository_removes_from_list() {
             "packagist.org": false
         }
     ]
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3403,14 +3719,17 @@ fn test_add_repository_converts_from_assoc_to_list() {
         },
         "packagist.org": false
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_repository("foo", arr(&[("type", s("composer"))]), true)
+            .add_repository(
+                "foo",
+                arr(&[(BStr::new("type"), s(BStr::new("composer")))]),
+                true
+            )
             .unwrap()
     );
     assert_eq!(
@@ -3442,15 +3761,18 @@ fn test_add_config_setting_escapes() {
         r#"{
     "config": {
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_config_setting("test", s(r#"a\b"#)).unwrap());
     assert!(
         manipulator
-            .add_config_setting("test2", s("a\nb\u{0C}a"))
+            .add_config_setting("test", s(BStr::new(r#"a\b"#)))
+            .unwrap()
+    );
+    assert!(
+        manipulator
+            .add_config_setting("test2", s(BStr::new("a\nb\u{0C}a")))
             .unwrap()
     );
     assert_eq!(
@@ -3469,12 +3791,15 @@ fn test_add_config_setting_escapes() {
 fn test_add_config_setting_works_from_scratch() {
     let mut manipulator = JsonManipulator::new(
         r#"{
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_config_setting("foo.bar", s("baz")).unwrap());
+    assert!(
+        manipulator
+            .add_config_setting("foo.bar", s(BStr::new("baz")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "config": {
@@ -3495,12 +3820,15 @@ fn test_add_config_setting_can_add() {
     "config": {
         "foo": "bar"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_config_setting("bar", s("baz")).unwrap());
+    assert!(
+        manipulator
+            .add_config_setting("bar", s(BStr::new("baz")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "config": {
@@ -3521,12 +3849,15 @@ fn test_add_config_setting_can_overwrite() {
         "foo": "bar",
         "bar": "baz"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_config_setting("foo", s("zomg")).unwrap());
+    assert!(
+        manipulator
+            .add_config_setting("foo", s(BStr::new("zomg")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "config": {
@@ -3546,8 +3877,7 @@ fn test_add_config_setting_can_overwrite_numbers() {
     "config": {
         "foo": 500
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3577,8 +3907,7 @@ fn test_add_config_setting_can_overwrite_arrays() {
         },
         "github-protocols": ["https"]
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3586,7 +3915,7 @@ fn test_add_config_setting_can_overwrite_arrays() {
         manipulator
             .add_config_setting(
                 "github-protocols",
-                PhpMixed::List(vec![s("https"), s("http")])
+                PhpMixed::List(vec![s(BStr::new("https")), s(BStr::new("http"))])
             )
             .unwrap()
     );
@@ -3607,7 +3936,10 @@ fn test_add_config_setting_can_overwrite_arrays() {
         manipulator
             .add_config_setting(
                 "github-oauth",
-                arr(&[("github.com", s("bar")), ("alt.example.org", s("baz"))])
+                arr(&[
+                    (BStr::new("github.com"), s(BStr::new("bar"))),
+                    (BStr::new("alt.example.org"), s(BStr::new("baz")))
+                ])
             )
             .unwrap()
     );
@@ -3632,14 +3964,13 @@ fn test_add_config_setting_can_add_sub_key_in_empty_config() {
         r#"{
     "config": {
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_config_setting("github-oauth.bar", s("baz"))
+            .add_config_setting("github-oauth.bar", s(BStr::new("baz")))
             .unwrap()
     );
     assert_eq!(
@@ -3664,24 +3995,23 @@ fn test_add_config_setting_can_add_sub_key_in_empty_val() {
         "github-oauth2": {
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_config_setting("github-oauth.bar", s("baz"))
+            .add_config_setting("github-oauth.bar", s(BStr::new("baz")))
             .unwrap()
     );
     assert!(
         manipulator
-            .add_config_setting("github-oauth2.a.bar", s("baz2"))
+            .add_config_setting("github-oauth2.a.bar", s(BStr::new("baz2")))
             .unwrap()
     );
     assert!(
         manipulator
-            .add_config_setting("github-oauth3.b", s("c"))
+            .add_config_setting("github-oauth3.b", s(BStr::new("c")))
             .unwrap()
     );
     assert_eq!(
@@ -3712,14 +4042,13 @@ fn test_add_config_setting_can_add_sub_key_in_hash() {
             "github.com": "foo"
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_config_setting("github-oauth.bar", s("baz"))
+            .add_config_setting("github-oauth.bar", s(BStr::new("baz")))
             .unwrap()
     );
     assert_eq!(
@@ -3743,14 +4072,13 @@ fn test_add_root_setting_does_not_break_dots() {
     "github-oauth": {
         "github.com": "foo"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_sub_node("github-oauth", "bar", s("baz"), true)
+            .add_sub_node("github-oauth", "bar", s(BStr::new("baz")), true)
             .unwrap()
     );
     assert_eq!(
@@ -3775,8 +4103,7 @@ fn test_remove_config_setting_can_remove_sub_key_in_hash() {
             "bar": "baz"
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3809,8 +4136,7 @@ fn test_remove_config_setting_can_remove_sub_key_in_hash_with_siblings() {
             "bar": "baz"
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3838,12 +4164,15 @@ fn test_add_main_key() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "foo": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_main_key("bar", s("baz")).unwrap());
+    assert!(
+        manipulator
+            .add_main_key("bar", s(BStr::new("baz")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "foo": "bar",
@@ -3859,12 +4188,15 @@ fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "foo": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_main_key("bar", s("$1baz")).unwrap());
+    assert!(
+        manipulator
+            .add_main_key("bar", s(BStr::new("$1baz")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "foo": "bar",
@@ -3877,9 +4209,13 @@ fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit() {
 
 #[test]
 fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit2() {
-    let mut manipulator = JsonManipulator::new("{}".to_string()).unwrap();
+    let mut manipulator = JsonManipulator::new("{}").unwrap();
 
-    assert!(manipulator.add_main_key("foo", s("$1bar")).unwrap());
+    assert!(
+        manipulator
+            .add_main_key("foo", s(BStr::new("$1bar")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "foo": "$1bar"
@@ -3894,12 +4230,15 @@ fn test_update_main_key() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "foo": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_main_key("foo", s("baz")).unwrap());
+    assert!(
+        manipulator
+            .add_main_key("foo", s(BStr::new("baz")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "foo": "baz"
@@ -3919,13 +4258,20 @@ fn test_update_main_key2() {
     },
     "foo": "bar",
     "baz": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_main_key("foo", s("baz")).unwrap());
-    assert!(manipulator.add_main_key("baz", s("quux")).unwrap());
+    assert!(
+        manipulator
+            .add_main_key("foo", s(BStr::new("baz")))
+            .unwrap()
+    );
+    assert!(
+        manipulator
+            .add_main_key("baz", s(BStr::new("quux")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "a": {
@@ -3950,14 +4296,16 @@ fn test_update_main_key3() {
     "require-dev": {
         "foo": "bar"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
     assert!(
         manipulator
-            .add_main_key("require-dev", arr(&[("foo", s("qux"))]))
+            .add_main_key(
+                "require-dev",
+                arr(&[(BStr::new("foo"), s(BStr::new("qux")))])
+            )
             .unwrap()
     );
     assert_eq!(
@@ -3979,12 +4327,15 @@ fn test_update_main_key_with_content_having_dollar_sign_followed_by_digit() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "foo": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
-    assert!(manipulator.add_main_key("foo", s("$1bar")).unwrap());
+    assert!(
+        manipulator
+            .add_main_key("foo", s(BStr::new("$1bar")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "foo": "$1bar"
@@ -4019,8 +4370,7 @@ fn test_remove_main_key() {
     "require-dev": {
         "package/d": "*"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -4081,8 +4431,7 @@ fn test_remove_main_key_if_empty() {
     "foo": "bar",
     "require-dev": {
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -4125,11 +4474,11 @@ fn test_remove_main_key_if_empty() {
 
 #[test]
 fn test_remove_main_key_removes_key_where_value_is_null() {
-    let mut manipulator = JsonManipulator::new(r#"{"foo":9000,"bar":null}"#.to_string()).unwrap();
+    let mut manipulator = JsonManipulator::new(r#"{"foo":9000,"bar":null}"#).unwrap();
 
     manipulator.remove_main_key("bar").unwrap();
 
-    let expected = JsonFile::encode(&arr(&[("foo", PhpMixed::Int(9000))])).unwrap();
+    let expected = JsonFile::encode(&arr(&[(BStr::new("foo"), PhpMixed::Int(9000))])).unwrap();
 
     assert_eq!(
         JsonFile::parse_json(Some(&expected), None).unwrap(),
@@ -4140,12 +4489,14 @@ fn test_remove_main_key_removes_key_where_value_is_null() {
 #[test]
 fn test_indent_detection() {
     let mut manipulator =
-        JsonManipulator::new("{\n\n  \"require\": {\n    \"php\": \"5.*\"\n  }\n}".to_string())
-            .unwrap();
+        JsonManipulator::new("{\n\n  \"require\": {\n    \"php\": \"5.*\"\n  }\n}").unwrap();
 
     assert!(
         manipulator
-            .add_main_key("require-dev", arr(&[("foo", s("qux"))]))
+            .add_main_key(
+                "require-dev",
+                arr(&[(BStr::new("foo"), s(BStr::new("qux")))])
+            )
             .unwrap()
     );
     assert_eq!(
@@ -4156,12 +4507,19 @@ fn test_indent_detection() {
 
 #[test]
 fn test_remove_main_key_at_end_of_file() {
-    let mut manipulator = JsonManipulator::new(
-        "{\n    \"require\": {\n        \"package/a\": \"*\"\n    }\n}\n".to_string(),
-    )
-    .unwrap();
-    assert!(manipulator.add_main_key("homepage", s("http...")).unwrap());
-    assert!(manipulator.add_main_key("license", s("mit")).unwrap());
+    let mut manipulator =
+        JsonManipulator::new("{\n    \"require\": {\n        \"package/a\": \"*\"\n    }\n}\n")
+            .unwrap();
+    assert!(
+        manipulator
+            .add_main_key("homepage", s(BStr::new("http...")))
+            .unwrap()
+    );
+    assert!(
+        manipulator
+            .add_main_key("license", s(BStr::new("mit")))
+            .unwrap()
+    );
     assert_eq!(
         r#"{
     "require": {
@@ -4195,8 +4553,7 @@ fn test_escaped_unicode_does_not_cause_backtrack_limit_error_github_issue8131() 
   "require": {
     "foo/bar": "^1.0"
   }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -4869,8 +5226,7 @@ fn test_large_file_does_not_cause_backtrack_limit_error_github_issue9595() {
     },
     "minimum-stability": "dev",
     "prefer-stable": true
-}"#
-            .to_string(),
+}"#,
     )
     .unwrap();
 

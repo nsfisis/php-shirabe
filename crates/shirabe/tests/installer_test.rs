@@ -7,11 +7,16 @@ mod config_stub;
 #[path = "common/test_case.rs"]
 mod test_case;
 
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
+use shirabe_php_shim::{
+    PHP_EOL, PhpJson, PhpMixed, bconcat, error_message, implode, path_to_bytes, php_fopen_resource,
+    php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind, rtrim,
+    str_replace, stream_get_contents, trim, utf8_text,
+};
 use shirabe_symfony_console::input::{
-    InputArgument, InputInterface, InputOption, InputValue, StringInput,
+    InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue, StringInput,
 };
 use test_case::{get_package, get_version_constraint};
 
@@ -46,10 +51,6 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, php_fopen_resource, php_regex, preg_is_match, preg_match, preg_replace,
-    preg_split_delim_capture, rewind, stream_get_contents,
-};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::command::{Command as SymfonyCommand, CommandData};
@@ -107,16 +108,16 @@ impl DownloadManagerInterface for StubDownloadManager {
     async fn download(
         &self,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
     async fn prepare(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -124,7 +125,7 @@ impl DownloadManagerInterface for StubDownloadManager {
     async fn install(
         &self,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -132,22 +133,22 @@ impl DownloadManagerInterface for StubDownloadManager {
         &self,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
     async fn remove(
         &self,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
     async fn cleanup(
         &self,
-        _type: &str,
+        _type: &bstr::BStr,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -162,30 +163,30 @@ struct StubEventDispatcher;
 impl EventDispatcherInterface for StubEventDispatcher {
     fn dispatch(
         &mut self,
-        _event_name: Option<&str>,
+        _event_name: Option<&bstr::BStr>,
         _event: Option<&mut dyn EventInterface>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
     fn dispatch_script(
         &mut self,
-        _event_name: &str,
+        _event_name: &bstr::BStr,
         _dev_mode: bool,
-        _additional_args: Vec<String>,
+        _additional_args: Vec<bstr::BString>,
         _flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
     fn dispatch_installer_event(
         &mut self,
-        _event_name: &str,
+        _event_name: &bstr::BStr,
         _dev_mode: bool,
         _execute_operations: bool,
         _transaction: std::rc::Rc<AnyTransaction>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
-    fn add_listener(&mut self, _event_name: &str, _listener: Callable, _priority: i64) {}
+    fn add_listener(&mut self, _event_name: &bstr::BStr, _listener: Callable, _priority: i64) {}
     fn add_subscriber(
         &mut self,
         _subscriber: &dyn shirabe::event_dispatcher::EventSubscriberInterface,
@@ -206,7 +207,7 @@ struct StubAutoloadGenerator;
 impl AutoloadGeneratorInterface for StubAutoloadGenerator {
     fn set_dev_mode(&self, _dev_mode: bool) {}
     fn set_class_map_authoritative(&self, _class_map_authoritative: bool) {}
-    fn set_apcu(&self, _apcu: bool, _apcu_prefix: Option<String>) {}
+    fn set_apcu(&self, _apcu: bool, _apcu_prefix: Option<bstr::BString>) {}
     fn set_run_scripts(&self, _run_scripts: bool) {}
     fn set_dry_run(&self, _dry_run: bool) {}
     fn set_platform_requirement_filter(
@@ -223,9 +224,9 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         _installation_manager: std::rc::Rc<
             std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>,
         >,
-        _target_dir: &str,
+        _target_dir: &bstr::BStr,
         _scan_psr_packages: bool,
-        _suffix: Option<String>,
+        _suffix: Option<bstr::BString>,
         _locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         _strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
@@ -238,12 +239,12 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         >,
         _root_package: RootPackageInterfaceHandle,
         _packages: Vec<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {
         Ok(vec![])
     }
     fn parse_autoloads(
         &self,
-        _package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+        _package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         _root_package: RootPackageInterfaceHandle,
         _filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed> {
@@ -252,26 +253,26 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
     fn create_loader(
         &self,
         _autoloads: &IndexMap<BString, PhpMixed>,
-        _vendor_dir: Option<String>,
+        _vendor_dir: Option<bstr::BString>,
     ) -> anyhow::Result<ClassLoader> {
         unimplemented!("create_loader is not reached by the installer test path")
     }
 }
 
 /// ref: TestCase::getPackage with class `Composer\Package\RootPackage`.
-fn root_package(name: &str, version: &str) -> RootPackageHandle {
+fn root_package(name: &BStr, version: &BStr) -> RootPackageHandle {
     let normalized = VersionParser.normalize(version, None).unwrap();
-    RootPackageHandle::new(name.to_string(), normalized, version.to_string())
+    RootPackageHandle::new(bconcat!(name), normalized, bconcat!(version))
 }
 
 /// ref: `new Link($source, $target, $constraint, $type, $constraint->getPrettyString())`.
-fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
+fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bconcat!(source),
+        bconcat!(target),
         constraint,
-        Some(r#type.to_string()),
+        Some(r#type.to_owned()),
         pretty,
     )
 }
@@ -291,28 +292,34 @@ fn provide_installer() -> Vec<InstallerCase> {
 
     // when A requires B and B requires A, and A is a non-published root package
     // the install of B should succeed
-    let a = root_package("A", "1.0.0");
-    a.set_requires(IndexMap::from([(
-        "b".to_string(),
-        link(
-            "A",
-            "B",
-            get_version_constraint("=", "1.0.0"),
-            Link::TYPE_REQUIRE,
-        ),
-    )]));
-    let b = get_package("B", "1.0.0");
-    b.as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
-            "a".to_string(),
+    let a = root_package(BStr::new("A"), BStr::new("1.0.0"));
+    a.set_requires(
+        IndexMap::from([(
+            BString::from("b"),
             link(
-                "B",
-                "A",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    let b = get_package("B", "1.0.0");
+    b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
+            BString::from("a"),
+            link(
+                BStr::new("B"),
+                BStr::new("A"),
+                get_version_constraint("=", "1.0.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     cases.push(InstallerCase {
         root_package: a,
@@ -326,28 +333,34 @@ fn provide_installer() -> Vec<InstallerCase> {
 
     // #480: when A requires B and B requires A, and A is a published root package
     // only B should be installed, as A is the root
-    let a = root_package("A", "1.0.0");
-    a.set_requires(IndexMap::from([(
-        "b".to_string(),
-        link(
-            "A",
-            "B",
-            get_version_constraint("=", "1.0.0"),
-            Link::TYPE_REQUIRE,
-        ),
-    )]));
-    let b = get_package("B", "1.0.0");
-    b.as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
-            "a".to_string(),
+    let a = root_package(BStr::new("A"), BStr::new("1.0.0"));
+    a.set_requires(
+        IndexMap::from([(
+            BString::from("b"),
             link(
-                "B",
-                "A",
+                BStr::new("A"),
+                BStr::new("B"),
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    let b = get_package("B", "1.0.0");
+    b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
+            BString::from("a"),
+            link(
+                BStr::new("B"),
+                BStr::new("A"),
+                get_version_constraint("=", "1.0.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     cases.push(InstallerCase {
         root_package: a.clone(),
@@ -379,12 +392,12 @@ fn test_installer() {
 
     for case in provide_installer() {
         let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
-            BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
+            BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
         ));
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
 
         let config = ConfigStubBuilder::new()
-            .with("vendor-dir", PhpMixed::string("foo".to_string()))
+            .with("vendor-dir", PhpMixed::string(BString::from("foo")))
             .with("lock", PhpMixed::Bool(true))
             .with("notify-on-install", PhpMixed::Bool(true))
             .build_shared();
@@ -427,7 +440,7 @@ fn test_installer() {
         // the installer falls back to an update; PHP uses an in-memory JsonFile mock instead).
         let lock_dir = tempfile::TempDir::new().unwrap();
         let lock_path = lock_dir.path().join("composer.lock");
-        let lock_json = JsonFile::new(lock_path.to_str().unwrap().to_string(), None, None).unwrap();
+        let lock_json = JsonFile::new(&lock_path, None, None).unwrap();
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
@@ -462,15 +475,15 @@ fn test_installer() {
         );
         let result = shirabe::util::sync_executor::block_on(installer.run()).unwrap();
 
-        let output = io_buffer.borrow().get_output().replace('\r', "");
-        assert_eq!(0, result, "{}", output);
+        let output = str_replace("\r", "", io_buffer.borrow().get_output());
+        assert_eq!(0, result, "{}", output.display_lossy());
 
         let installed = installation_manager.borrow().__get_installed_packages();
         assert_eq!(
             make_packages_comparable(&case.expected_install),
             make_packages_comparable(&installed),
             "{}",
-            output
+            output.display_lossy()
         );
 
         let updated = installation_manager.borrow().__get_updated_packages();
@@ -482,6 +495,7 @@ fn test_installer() {
 }
 
 /// ref: PHPUnit assertStringMatchesFormat's StringMatchesFormatDescription::createPatternFromFormat.
+#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
 fn create_pattern_from_format(format: &str) -> String {
     let escaped = regex::escape(format);
     let bytes = escaped.as_bytes();
@@ -490,7 +504,7 @@ fn create_pattern_from_format(format: &str) -> String {
     while i < bytes.len() {
         // regex::escape turns "%" into "%" (it is not special) so the format codes survive intact.
         if bytes[i] == b'%' && i + 1 < bytes.len() {
-            let replacement: Option<&str> = match bytes[i + 1] {
+            let replacement = match bytes[i + 1] {
                 b'%' => Some("%"),
                 b'e' => Some("\\/"),
                 b's' => Some("[^\\r\\n]+"),
@@ -519,16 +533,16 @@ fn create_pattern_from_format(format: &str) -> String {
 }
 
 /// ref: PHPUnit self::assertStringMatchesFormat.
-fn assert_string_matches_format(format: &str, subject: &str, context: &str) {
-    let pattern = create_pattern_from_format(format);
-    let re = regex::Regex::new(&pattern)
+fn assert_string_matches_format(format: &[u8], subject: &[u8], context: &[u8]) {
+    let pattern = create_pattern_from_format(utf8_text(format).unwrap());
+    let re = regex::bytes::Regex::new(&pattern)
         .unwrap_or_else(|e| panic!("invalid format pattern {}: {}", pattern, e));
     assert!(
         re.is_match(subject),
         "output does not match format.\n--- format ---\n{}\n--- output ---\n{}\n--- context ---\n{}",
-        format,
-        subject,
-        context
+        format.as_bstr().display_lossy(),
+        subject.as_bstr().display_lossy(),
+        context.as_bstr().display_lossy()
     );
 }
 
@@ -546,36 +560,37 @@ enum ExpectLock {
 enum ExpectResult {
     ExitCode(i64),
     /// EXPECT-EXCEPTION: the class-string of an expected exception.
-    Exception(String),
+    Exception(BString),
 }
 
 #[derive(Debug, Clone)]
 struct IntegrationCase {
-    file: String,
-    message: String,
-    condition: Option<String>,
+    file: BString,
+    message: BString,
+    condition: Option<BString>,
     composer: serde_json::Value,
     lock: Option<serde_json::Value>,
     installed: Option<serde_json::Value>,
-    run: String,
+    run: BString,
     expect_lock: ExpectLock,
     expect_installed: Option<serde_json::Value>,
-    expect_output: Option<String>,
-    expect_output_optimized: Option<String>,
-    expect: String,
+    expect_output: Option<BString>,
+    expect_output_optimized: Option<BString>,
+    expect: BString,
     expect_result: ExpectResult,
 }
 
 /// The fixtures come from Composer's tree and name the `composer` binary in the hints they expect
 /// on stdout; Shirabe prints its own name there.
-fn rename_binary_in_expected_output(expected: String) -> String {
-    regex::Regex::new(r"\bcomposer (?P<cmd>config|fund|suggest|update)\b")
+fn rename_binary_in_expected_output(expected: BString) -> BString {
+    regex::bytes::Regex::new(r"\bcomposer (?P<cmd>config|fund|suggest|update)\b")
         .unwrap()
-        .replace_all(&expected, "shirabe $cmd")
+        .replace_all(&expected, &b"shirabe $cmd"[..])
         .into_owned()
+        .into()
 }
 
-fn fixtures_dir(path: &str) -> std::path::PathBuf {
+fn fixtures_dir(path: impl AsRef<std::path::Path>) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Fixtures")
         .join(path)
@@ -587,39 +602,39 @@ fn fixtures_dir(path: &str) -> std::path::PathBuf {
 fn read_test_file(
     file: &std::path::Path,
     fixtures_dir: &std::path::Path,
-) -> IndexMap<String, String> {
-    let contents = std::fs::read_to_string(file).unwrap();
+) -> IndexMap<BString, BString> {
+    let contents = std::fs::read(file).unwrap();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
-    let section_info: [(&str, bool); 13] = [
-        ("TEST", true),
-        ("CONDITION", false),
-        ("COMPOSER", true),
-        ("LOCK", false),
-        ("INSTALLED", false),
-        ("RUN", true),
-        ("EXPECT-LOCK", false),
-        ("EXPECT-INSTALLED", false),
-        ("EXPECT-OUTPUT", false),
-        ("EXPECT-OUTPUT-OPTIMIZED", false),
-        ("EXPECT-EXIT-CODE", false),
-        ("EXPECT-EXCEPTION", false),
-        ("EXPECT", true),
+    let section_info: [(&BStr, bool); 13] = [
+        (BStr::new("TEST"), true),
+        (BStr::new("CONDITION"), false),
+        (BStr::new("COMPOSER"), true),
+        (BStr::new("LOCK"), false),
+        (BStr::new("INSTALLED"), false),
+        (BStr::new("RUN"), true),
+        (BStr::new("EXPECT-LOCK"), false),
+        (BStr::new("EXPECT-INSTALLED"), false),
+        (BStr::new("EXPECT-OUTPUT"), false),
+        (BStr::new("EXPECT-OUTPUT-OPTIMIZED"), false),
+        (BStr::new("EXPECT-EXIT-CODE"), false),
+        (BStr::new("EXPECT-EXCEPTION"), false),
+        (BStr::new("EXPECT"), true),
     ];
-    let known: indexmap::IndexSet<&str> = section_info.iter().map(|(k, _)| *k).collect();
+    let known: indexmap::IndexSet<&BStr> = section_info.iter().map(|(k, _)| *k).collect();
 
-    let mut section: Option<String> = None;
-    let mut data: IndexMap<String, String> = IndexMap::new();
+    let mut section: Option<BString> = None;
+    let mut data: IndexMap<BString, BString> = IndexMap::new();
     for token in tokens {
         if section.is_none() && token.is_empty() {
             continue; // skip leading blank
         }
         if section.is_none() {
             assert!(
-                known.contains(token.as_str()),
+                known.iter().any(|name| *name == token),
                 "The test file \"{}\" must not contain a section named \"{}\".",
                 file.display(),
-                token
+                token.display_lossy()
             );
             section = Some(token);
             continue;
@@ -631,10 +646,10 @@ fn read_test_file(
     for (sec, required) in section_info {
         if required {
             assert!(
-                data.contains_key(sec),
+                data.contains_key(B(sec)),
                 "The test file \"{}\" must have a section named \"{}\".",
                 file.display(),
-                sec
+                sec.display_lossy()
             );
         }
     }
@@ -660,14 +675,14 @@ fn collect_test_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) 
         let path = entry.path();
         if path.is_dir() {
             collect_test_files(&path, out);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("test") {
+        } else if path.extension() == Some(std::ffi::OsStr::new("test")) {
             out.push(path);
         }
     }
 }
 
 /// ref: InstallerTest::loadIntegrationTests
-fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
+fn load_integration_tests(path: impl AsRef<std::path::Path>) -> Vec<IntegrationCase> {
     let dir = fixtures_dir(path);
     let mut files = Vec::new();
     collect_test_files(&dir, &mut files);
@@ -679,23 +694,24 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
 
         // skip 64bit related tests on 32bit (usize is 64-bit here, so this never triggers).
         if test_data
-            .get("EXPECT-OUTPUT")
-            .map(|s| s.contains("php-64bit"))
+            .get(B("EXPECT-OUTPUT"))
+            .map(|s| s.contains_str("php-64bit"))
             .unwrap_or(false)
             && (usize::BITS == 32)
         {
             continue;
         }
 
-        let message = test_data["TEST"].clone();
+        let message = test_data[B("TEST")].clone();
         let condition = test_data
-            .get("CONDITION")
+            .get(B("CONDITION"))
             .filter(|s| !s.is_empty())
             .cloned();
-        let mut composer: serde_json::Value = serde_json::from_str(&test_data["COMPOSER"]).unwrap();
+        let mut composer: serde_json::Value =
+            serde_json::from_slice(&test_data[B("COMPOSER")]).unwrap();
 
         if let Some(repositories) = composer.get_mut("repositories") {
-            let fixtures_str = dir.to_str().unwrap().replace('\\', "/");
+            let fixtures_str = str_replace("\\", "/", path_to_bytes(&dir));
             let rewrite = |repo: &mut serde_json::Value| {
                 if repo.get("type").and_then(|t| t.as_str()) != Some("composer") {
                     return;
@@ -703,8 +719,8 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
                 if let Some(url) = repo.get("url").and_then(|u| u.as_str())
                     && preg_is_match(php_regex!(r"{^file://[^/]}"), url)
                 {
-                    let new_url = format!("file://{}/{}", fixtures_str, &url[7..]);
-                    repo["url"] = serde_json::Value::String(new_url);
+                    let new_url = bconcat!("file://", fixtures_str, "/", &url[7..]);
+                    repo["url"] = serde_json::Value::from(utf8_text(&new_url).unwrap());
                 }
             };
             match repositories {
@@ -714,14 +730,15 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
             }
         }
 
-        let lock = test_data.get("LOCK").filter(|s| !s.is_empty()).map(|s| {
-            let mut lock: serde_json::Value = serde_json::from_str(s).unwrap();
+        let lock = test_data.get(B("LOCK")).filter(|s| !s.is_empty()).map(|s| {
+            let mut lock: serde_json::Value = serde_json::from_slice(s).unwrap();
             if lock.get("hash").is_none() {
                 let encoded = JsonFile::encode_with_options(
                     &composer,
                     shirabe::json::JsonEncodeOptions::none(),
                 )
                 .unwrap();
+                #[expect(clippy::disallowed_macros, reason = "serde_json holds text")]
                 let hash = format!("{:x}", md5::compute(encoded.as_bytes()));
                 lock["hash"] = serde_json::Value::String(hash);
             }
@@ -729,11 +746,11 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
         });
 
         let installed = test_data
-            .get("INSTALLED")
+            .get(B("INSTALLED"))
             .filter(|s| !s.is_empty())
-            .map(|s| serde_json::from_str(s).unwrap());
+            .map(|s| serde_json::from_slice(s).unwrap());
 
-        let run = test_data["RUN"].clone();
+        let run = test_data[B("RUN")].clone();
 
         // PHP: `$expectLock === 'false' ? false : JsonFile::parseJson(...)`, then branches on
         // truthiness (`if ($expectLock)` / `elseif ($expectLock === false)`). A bare `false`
@@ -741,10 +758,10 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
         // collapse to the same outcome; mirror that by checking truthiness of the parsed value
         // rather than the raw string (the section's trailing newline defeats a literal "false"
         // string comparison when it is the file's last section).
-        let expect_lock = match test_data.get("EXPECT-LOCK").filter(|s| !s.is_empty()) {
+        let expect_lock = match test_data.get(B("EXPECT-LOCK")).filter(|s| !s.is_empty()) {
             None => ExpectLock::Unset,
             Some(s) => {
-                let parsed: serde_json::Value = serde_json::from_str(s).unwrap();
+                let parsed: serde_json::Value = serde_json::from_slice(s).unwrap();
                 if php_json_truthy(&parsed) {
                     ExpectLock::Json(parsed)
                 } else {
@@ -754,43 +771,43 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
         };
 
         let expect_installed = test_data
-            .get("EXPECT-INSTALLED")
+            .get(B("EXPECT-INSTALLED"))
             .filter(|s| !s.is_empty())
-            .map(|s| serde_json::from_str(s).unwrap());
+            .map(|s| serde_json::from_slice(s).unwrap());
 
         let expect_output = test_data
-            .get("EXPECT-OUTPUT")
+            .get(B("EXPECT-OUTPUT"))
             .cloned()
             .map(rename_binary_in_expected_output);
         let expect_output_optimized = test_data
-            .get("EXPECT-OUTPUT-OPTIMIZED")
+            .get(B("EXPECT-OUTPUT-OPTIMIZED"))
             .cloned()
             .map(rename_binary_in_expected_output);
-        let expect = test_data["EXPECT"].clone();
+        let expect = test_data[B("EXPECT")].clone();
 
-        let expect_result =
-            if let Some(exc) = test_data.get("EXPECT-EXCEPTION").filter(|s| !s.is_empty()) {
-                assert!(
-                    test_data
-                        .get("EXPECT-EXIT-CODE")
-                        .filter(|s| !s.is_empty())
-                        .is_none(),
-                    "EXPECT-EXCEPTION and EXPECT-EXIT-CODE are mutually exclusive"
-                );
-                ExpectResult::Exception(exc.clone())
-            } else if let Some(code) = test_data.get("EXPECT-EXIT-CODE").filter(|s| !s.is_empty()) {
-                ExpectResult::ExitCode(code.trim().parse().unwrap())
-            } else {
-                ExpectResult::ExitCode(0)
-            };
+        let expect_result = if let Some(exc) = test_data
+            .get(B("EXPECT-EXCEPTION"))
+            .filter(|s| !s.is_empty())
+        {
+            assert!(
+                test_data
+                    .get(B("EXPECT-EXIT-CODE"))
+                    .filter(|s| !s.is_empty())
+                    .is_none(),
+                "EXPECT-EXCEPTION and EXPECT-EXIT-CODE are mutually exclusive"
+            );
+            ExpectResult::Exception(exc.clone())
+        } else if let Some(code) = test_data
+            .get(B("EXPECT-EXIT-CODE"))
+            .filter(|s| !s.is_empty())
+        {
+            ExpectResult::ExitCode(utf8_text(&trim(code)).unwrap().parse().unwrap())
+        } else {
+            ExpectResult::ExitCode(0)
+        };
 
         tests.push(IntegrationCase {
-            file: file
-                .strip_prefix(&dir)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string(),
+            file: BString::from(path_to_bytes(file.strip_prefix(&dir).unwrap())),
             message,
             condition,
             composer,
@@ -810,25 +827,29 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
 }
 
 /// ref: the inline `eval($condition)` in doTestIntegration, ported for the known fixture conditions.
-fn evaluate_condition(condition: &str) -> bool {
-    match condition.trim() {
+fn evaluate_condition(condition: &BString) -> bool {
+    let condition = trim(condition);
+    match condition.as_bytes() {
         // putenv() returns true on success, so these conditions always run the test (with the env set).
-        "putenv('COMPOSER_FUND=1')" => {
+        b"putenv('COMPOSER_FUND=1')" => {
             Platform::put_env("COMPOSER_FUND", "1");
             true
         }
-        "putenv('COMPOSER_FUND=0')" => {
+        b"putenv('COMPOSER_FUND=0')" => {
             Platform::put_env("COMPOSER_FUND", "0");
             true
         }
         // HHVM is never defined under the Rust port.
-        "!defined('HHVM_VERSION')" => true,
+        b"!defined('HHVM_VERSION')" => true,
         // TODO(php-runtime): unported CONDITION expression (PHP eval has no Rust equivalent).
-        other => panic!("// TODO(php-runtime): unported CONDITION: {}", other),
+        other => panic!(
+            "// TODO(php-runtime): unported CONDITION: {}",
+            other.as_bstr().display_lossy()
+        ),
     }
 }
 
-fn opt_bool(input: &dyn InputInterface, name: &str) -> bool {
+fn opt_bool(input: &dyn InputInterface, name: &BStr) -> bool {
     input
         .get_option(name)
         .ok()
@@ -838,7 +859,7 @@ fn opt_bool(input: &dyn InputInterface, name: &str) -> bool {
 
 /// ref: `$ignorePlatformReqs = true === getOption('ignore-platform-reqs') ?: (getOption('ignore-platform-req') ?: false)`.
 fn ignore_platform_reqs_value(input: &dyn InputInterface) -> PhpMixed {
-    if opt_bool(input, "ignore-platform-reqs") {
+    if opt_bool(input, BStr::new("ignore-platform-reqs")) {
         return PhpMixed::Bool(true);
     }
     let list = input
@@ -855,7 +876,7 @@ fn write_json(path: &std::path::Path, value: &serde_json::Value) {
 }
 
 /// ref: InstallerTest::doTestIntegration
-fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
+fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) {
     bootstrap::bootstrap();
 
     if let Some(condition) = &case.condition
@@ -865,7 +886,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     }
 
     let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), VERBOSITY_NORMAL, None).unwrap(),
+        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
     ));
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
 
@@ -888,14 +909,14 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     // expected from the fixture can come from composer construction itself, not just the later
     // install/update run; check for that here since Rust has no equivalent ambient wrapper.
     if is_exception && let Err(e) = &composer_result {
-        let normalized = case.expect.replace('\n', PHP_EOL);
-        let normalized = normalized.trim_end();
-        let err = format!("{}", e);
+        let normalized = case.expect.replace("\n", PHP_EOL);
+        let normalized = rtrim(&normalized);
+        let err = error_message(e);
         assert!(
-            err.contains(normalized),
+            err.as_bytes().contains_str(&normalized),
             "expected exception message containing:\n{}\n--- got ---\n{}",
-            normalized,
-            err
+            normalized.display_lossy(),
+            err.display_lossy()
         );
         return;
     }
@@ -909,8 +930,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         &installed_path,
         case.installed.as_ref().unwrap_or(&serde_json::json!([])),
     );
-    let installed_json =
-        JsonFile::new(installed_path.to_str().unwrap().to_string(), None, None).unwrap();
+    let installed_json = JsonFile::new(&installed_path, None, None).unwrap();
     let local_repo = shirabe::repository::InstalledFilesystemRepository::__new_mock(
         installed_json,
         false,
@@ -929,8 +949,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     if let Some(lock) = &case.lock {
         write_json(&lock_path, lock);
     }
-    let lock_before = std::fs::read_to_string(&lock_path).ok();
-    let lock_json = JsonFile::new(lock_path.to_str().unwrap().to_string(), None, None).unwrap();
+    let lock_before = std::fs::read(&lock_path).ok().map(bstr::BString::from);
+    let lock_json = JsonFile::new(&lock_path, None, None).unwrap();
 
     // The Locker needs a concrete InstallationManager; build a fresh recording mock just for it. The
     // asserted trace comes from the composer's own installation manager (read via as_any below).
@@ -972,14 +992,14 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     )));
 
     // Application with inline install/update commands (setCode closures).
-    let application = ApplicationHandle::new("Shirabe".to_string(), "".to_string()).unwrap();
+    let application = ApplicationHandle::new(BString::from("Shirabe"), BString::from("")).unwrap();
     application.set_catch_exceptions(false);
 
     let run_result: std::rc::Rc<std::cell::RefCell<Option<anyhow::Result<i64>>>> =
         std::rc::Rc::new(std::cell::RefCell::new(None));
 
     let install = std::rc::Rc::new(std::cell::RefCell::new(CommandData::new(Some(
-        "install".to_string(),
+        "install".into(),
     ))));
     {
         let install_ref = install.borrow();
@@ -1025,8 +1045,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         install_ref.set_code(Box::new(move |input, _output| {
             let ignore = ignore_platform_reqs_value(input);
             let mut inst = installer_cl.borrow_mut();
-            inst.set_dev_mode(!opt_bool(input, "no-dev"))
-                .set_dry_run(opt_bool(input, "dry-run"))
+            inst.set_dev_mode(!opt_bool(input, BStr::new("no-dev")))
+                .set_dry_run(opt_bool(input, BStr::new("dry-run")))
                 .set_platform_requirement_filter(
                     PlatformRequirementFilterFactory::from_bool_or_list(ignore).unwrap(),
                 )
@@ -1052,7 +1072,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         .unwrap();
 
     let update = std::rc::Rc::new(std::cell::RefCell::new(CommandData::new(Some(
-        "update".to_string(),
+        "update".into(),
     ))));
     {
         let update_ref = update.borrow();
@@ -1093,21 +1113,22 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         let composer_cl = composer.clone();
         let run_result_cl = run_result.clone();
         update_ref.set_code(Box::new(move |input, _output| {
-            let packages: Vec<String> =
+            let packages: Vec<bstr::BString> =
                 match input.get_argument("packages").unwrap_or(InputValue::Null) {
                     InputValue::Array(items) => items,
                     _ => vec![],
                 };
-            let filtered: Vec<String> = packages
+            let filtered: Vec<bstr::BString> = packages
                 .iter()
-                .filter(|p| !["lock", "nothing", "mirrors"].contains(&p.as_str()))
+                .filter(|p| *p != "lock" && *p != "nothing" && *p != "mirrors")
                 .cloned()
                 .collect();
-            let update_mirrors = opt_bool(input, "lock") || filtered.len() != packages.len();
+            let update_mirrors =
+                opt_bool(input, BStr::new("lock")) || filtered.len() != packages.len();
 
-            let update_allow_transitive = if opt_bool(input, "with-all-dependencies") {
+            let update_allow_transitive = if opt_bool(input, BStr::new("with-all-dependencies")) {
                 UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps
-            } else if opt_bool(input, "with-dependencies") {
+            } else if opt_bool(input, BStr::new("with-dependencies")) {
                 UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire
             } else {
                 UpdateAllowTransitiveDeps::UpdateOnlyListed
@@ -1116,16 +1137,16 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
             let ignore = ignore_platform_reqs_value(input);
 
             let mut inst = installer_cl.borrow_mut();
-            inst.set_dev_mode(!opt_bool(input, "no-dev"))
+            inst.set_dev_mode(!opt_bool(input, BStr::new("no-dev")))
                 .set_update(true)
-                .set_install(!opt_bool(input, "no-install"))
-                .set_dry_run(opt_bool(input, "dry-run"))
+                .set_install(!opt_bool(input, BStr::new("no-install")))
+                .set_dry_run(opt_bool(input, BStr::new("dry-run")))
                 .set_update_mirrors(update_mirrors)
                 .set_update_allow_list(filtered)
                 .set_update_allow_transitive_dependencies(update_allow_transitive)
                 .unwrap()
-                .set_prefer_stable(opt_bool(input, "prefer-stable"))
-                .set_prefer_lowest(opt_bool(input, "prefer-lowest"))
+                .set_prefer_stable(opt_bool(input, BStr::new("prefer-stable")))
+                .set_prefer_lowest(opt_bool(input, BStr::new("prefer-lowest")))
                 .set_platform_requirement_filter(
                     PlatformRequirementFilterFactory::from_bool_or_list(ignore).unwrap(),
                 )
@@ -1137,7 +1158,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                     )
                     .unwrap(),
                 )
-                .set_minimal_update(opt_bool(input, "minimal-changes"));
+                .set_minimal_update(opt_bool(input, BStr::new("minimal-changes")));
             let r = shirabe::util::sync_executor::block_on(inst.run());
             let code = match &r {
                 Ok(c) => *c,
@@ -1160,7 +1181,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let app_output = StreamOutput::new(app_output_stream.clone(), None, None, None)
         .unwrap()
         .expect("php://memory is a valid stream");
-    let mut string_input = StringInput::new(&format!("{} -vvv", case.run)).unwrap();
+    let mut string_input = StringInput::new(bconcat!(case.run, " -vvv")).unwrap();
     string_input.set_interactive(false);
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(string_input));
@@ -1170,35 +1191,39 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let app_run =
         shirabe::util::sync_executor::block_on(application.run(Some(input), Some(output)));
 
-    let output_string = io_buffer.borrow().get_output().replace('\r', "");
+    let output_string: BString = io_buffer.borrow().get_output().replace("\r", "").into();
 
     // Shouldn't check output and results if an exception was expected by this point.
     if is_exception {
         let ExpectResult::Exception(_) = &case.expect_result else {
             unreachable!()
         };
-        let normalized = case.expect.replace('\n', PHP_EOL);
-        let normalized = normalized.trim_end();
+        let normalized = case.expect.replace("\n", PHP_EOL);
+        let normalized = rtrim(&normalized);
         let err = match run_result.borrow().as_ref() {
-            Some(Err(e)) => format!("{}", e),
+            Some(Err(e)) => error_message(e),
             _ => app_run
                 .as_ref()
                 .err()
-                .map(|e| format!("{}", e))
+                .map(error_message)
                 .unwrap_or_default(),
         };
         assert!(
-            err.contains(normalized),
+            err.as_bytes().contains_str(&normalized),
             "expected exception message containing:\n{}\n--- got ---\n{}",
-            normalized,
-            err
+            normalized.display_lossy(),
+            err.display_lossy()
         );
         return;
     }
 
     let result = match run_result.borrow().as_ref() {
         Some(Ok(c)) => *c,
-        Some(Err(e)) => panic!("installer run failed: {}\n{}", e, output_string),
+        Some(Err(e)) => panic!(
+            "installer run failed: {}\n{}",
+            e,
+            output_string.display_lossy()
+        ),
         None => app_run.unwrap_or(-1) as i64,
     };
 
@@ -1211,13 +1236,13 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         *expect_result,
         result,
         "{}{}",
-        output_string,
-        bstr::BStr::new(&app_output_contents)
+        output_string.display_lossy(),
+        bstr::BStr::new(&app_output_contents).display_lossy()
     );
 
     if let ExpectLock::Json(expect_lock) = &case.expect_lock {
-        let actual = std::fs::read_to_string(&lock_path).unwrap();
-        let mut actual_lock: serde_json::Value = serde_json::from_str(&actual).unwrap();
+        let actual = bstr::BString::from(std::fs::read(&lock_path).unwrap());
+        let mut actual_lock: serde_json::Value = serde_json::from_slice(&actual).unwrap();
         if let Some(obj) = actual_lock.as_object_mut() {
             for k in ["hash", "content-hash", "_readme", "plugin-api-version"] {
                 obj.remove(k);
@@ -1229,13 +1254,13 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         if let Some(obj) = expect_lock.as_object_mut() {
             for k in ["stability-flags", "platform", "platform-dev"] {
                 if obj.get(k) == Some(&serde_json::json!([])) {
-                    obj.insert(k.to_string(), serde_json::json!({}));
+                    obj.insert(k.into(), serde_json::json!({}));
                 }
             }
         }
         assert_eq!(expect_lock, actual_lock);
     } else if let ExpectLock::Never = &case.expect_lock {
-        let lock_after = std::fs::read_to_string(&lock_path).ok();
+        let lock_after = std::fs::read(&lock_path).ok().map(bstr::BString::from);
         assert_eq!(lock_before, lock_after, "lock file must not be written");
     }
 
@@ -1257,12 +1282,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                 let an = a
                     .get(B("name"))
                     .and_then(|m| m.as_string())
-                    .map(|s| s.to_string())
+                    .map(|s| s.to_owned())
                     .unwrap_or_default();
                 let bn = b
                     .get(B("name"))
                     .and_then(|m| m.as_string())
-                    .map(|s| s.to_string())
+                    .map(|s| s.to_owned())
                     .unwrap_or_default();
                 an.cmp(&bn)
             },
@@ -1287,7 +1312,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         .downcast_ref::<InstallationManager>()
         .expect("composer installation manager is the recording mock")
         .__get_trace();
-    assert_eq!(case.expect.trim_end(), trace.join("\n"));
+    assert_eq!(rtrim(&case.expect), implode("\n", &trace));
 
     if let Some(expect_output) = expect_output
         && !expect_output.is_empty()
@@ -1302,12 +1327,13 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
             "__inilist__\n",
             &output,
         );
-        assert_string_matches_format(expect_output.trim_end(), output.trim_end(), &output_string);
+        assert_string_matches_format(&rtrim(expect_output), &rtrim(&output), &output_string);
     }
 }
 
 fn php_mixed_map_to_json(map: &IndexMap<BString, PhpMixed>) -> serde_json::Value {
-    serde_json::to_value(PhpMixed::Array(map.clone())).unwrap_or(serde_json::Value::Null)
+    serde_json::to_value(PhpJson::new(&PhpMixed::Array(map.clone())))
+        .unwrap_or(serde_json::Value::Null)
 }
 
 #[test]
@@ -1331,7 +1357,7 @@ fn test_slow_integration() {
         Platform::clear_env("COMPOSER_FUND");
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
         let expect_output = case.expect_output.clone();
-        do_test_integration(&case, expect_output.as_deref());
+        do_test_integration(&case, expect_output.as_ref());
     }
 }
 
@@ -1347,7 +1373,7 @@ fn test_integration_with_pool_optimizer() {
             .clone()
             .filter(|s| !s.is_empty())
             .or_else(|| case.expect_output.clone());
-        do_test_integration(&case, expect_output.as_deref());
+        do_test_integration(&case, expect_output.as_ref());
     }
 }
 
@@ -1359,6 +1385,6 @@ fn test_integration_with_raw_pool() {
         Platform::clear_env("COMPOSER_FUND");
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
         let expect_output = case.expect_output.clone();
-        do_test_integration(&case, expect_output.as_deref());
+        do_test_integration(&case, expect_output.as_ref());
     }
 }

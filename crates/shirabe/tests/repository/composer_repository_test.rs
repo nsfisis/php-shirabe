@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/ComposerRepositoryTest.php
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -9,17 +9,17 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::composer_repository::{ComposerRepository, ProviderListingEntry};
 use shirabe::repository::{RepositoryInterface, SEARCH_FULLTEXT};
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe_php_shim::{PhpMixed, hash, uniqid};
+use shirabe_php_shim::{PhpMixed, bconcat, hash, path_to_bytes, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use tempfile::TempDir;
 
 // Mirrors PHP's `['url' => .., 'body' => ..]` mock entry (status defaults to 200,
 // options match any executed options).
 fn http_body(
-    url: &str,
-    body: impl Into<String>,
+    url: &BStr,
+    body: impl Into<BString>,
 ) -> shirabe::util::http_downloader::HttpDownloaderMockExpectation {
-    expect_full(url, None, 200, body, vec![String::new()])
+    expect_full(url, None, 200, body, vec![BString::default()])
 }
 
 // Equivalent to FactoryMock::createConfig(): a real Config with a writable, unique
@@ -29,10 +29,7 @@ fn create_config() -> (Config, TempDir) {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     top.insert("config".into(), PhpMixed::Array(config_section));
     let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
     repositories.insert("packagist".into(), PhpMixed::Bool(false));
@@ -55,41 +52,52 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
 }
 
-fn repo_config(url: &str) -> IndexMap<BString, PhpMixed> {
+fn repo_config(url: &BStr) -> IndexMap<BString, PhpMixed> {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(url.to_string()));
+    repo_config.insert("url".into(), PhpMixed::string(bconcat!(url)));
     repo_config
 }
 
-fn json_encode(value: &PhpMixed) -> String {
-    shirabe::json::json_file::JsonFile::encode(value).unwrap()
+fn json_encode(value: &PhpMixed) -> BString {
+    shirabe::json::json_file::JsonFile::encode(value)
+        .unwrap()
+        .to_owned()
 }
 
-fn str_kv(pairs: &[(&str, PhpMixed)]) -> PhpMixed {
+fn str_kv(pairs: &[(&BStr, PhpMixed)]) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        m.insert(k.to_string().into(), v.clone());
+        m.insert(bconcat!(k), v.clone());
     }
     PhpMixed::Array(m)
 }
 
 // loadDataProvider cases: (expected name/version pairs, repoPackages body).
-fn load_data_provider() -> Vec<(Vec<(&'static str, &'static str)>, PhpMixed)> {
+fn load_data_provider() -> Vec<(Vec<(&'static BStr, &'static BStr)>, PhpMixed)> {
     vec![
         // Old repository format
         (
-            vec![("foo/bar", "1.0.0")],
+            vec![(BStr::new("foo/bar"), BStr::new("1.0.0"))],
             str_kv(&[(
-                "foo/bar",
+                BStr::new("foo/bar"),
                 str_kv(&[
-                    ("name", PhpMixed::string("foo/bar".to_string())),
                     (
-                        "versions",
+                        BStr::new("name"),
+                        PhpMixed::string(BString::from("foo/bar")),
+                    ),
+                    (
+                        BStr::new("versions"),
                         str_kv(&[(
-                            "1.0.0",
+                            BStr::new("1.0.0"),
                             str_kv(&[
-                                ("name", PhpMixed::string("foo/bar".to_string())),
-                                ("version", PhpMixed::string("1.0.0".to_string())),
+                                (
+                                    BStr::new("name"),
+                                    PhpMixed::string(BString::from("foo/bar")),
+                                ),
+                                (
+                                    BStr::new("version"),
+                                    PhpMixed::string(BString::from("1.0.0")),
+                                ),
                             ]),
                         )]),
                     ),
@@ -98,24 +106,39 @@ fn load_data_provider() -> Vec<(Vec<(&'static str, &'static str)>, PhpMixed)> {
         ),
         // New repository format
         (
-            vec![("bar/foo", "3.14"), ("bar/foo", "3.145")],
+            vec![
+                (BStr::new("bar/foo"), BStr::new("3.14")),
+                (BStr::new("bar/foo"), BStr::new("3.145")),
+            ],
             str_kv(&[(
-                "packages",
+                BStr::new("packages"),
                 str_kv(&[(
-                    "bar/foo",
+                    BStr::new("bar/foo"),
                     str_kv(&[
                         (
-                            "3.14",
+                            BStr::new("3.14"),
                             str_kv(&[
-                                ("name", PhpMixed::string("bar/foo".to_string())),
-                                ("version", PhpMixed::string("3.14".to_string())),
+                                (
+                                    BStr::new("name"),
+                                    PhpMixed::string(BString::from("bar/foo")),
+                                ),
+                                (
+                                    BStr::new("version"),
+                                    PhpMixed::string(BString::from("3.14")),
+                                ),
                             ]),
                         ),
                         (
-                            "3.145",
+                            BStr::new("3.145"),
                             str_kv(&[
-                                ("name", PhpMixed::string("bar/foo".to_string())),
-                                ("version", PhpMixed::string("3.145".to_string())),
+                                (
+                                    BStr::new("name"),
+                                    PhpMixed::string(BString::from("bar/foo")),
+                                ),
+                                (
+                                    BStr::new("version"),
+                                    PhpMixed::string(BString::from("3.145")),
+                                ),
                             ]),
                         ),
                     ]),
@@ -124,19 +147,34 @@ fn load_data_provider() -> Vec<(Vec<(&'static str, &'static str)>, PhpMixed)> {
         ),
         // New repository format but without versions as keys should also be supported
         (
-            vec![("bar/foo", "3.14"), ("bar/foo", "3.145")],
+            vec![
+                (BStr::new("bar/foo"), BStr::new("3.14")),
+                (BStr::new("bar/foo"), BStr::new("3.145")),
+            ],
             str_kv(&[(
-                "packages",
+                BStr::new("packages"),
                 str_kv(&[(
-                    "bar/foo",
+                    BStr::new("bar/foo"),
                     PhpMixed::List(vec![
                         str_kv(&[
-                            ("name", PhpMixed::string("bar/foo".to_string())),
-                            ("version", PhpMixed::string("3.14".to_string())),
+                            (
+                                BStr::new("name"),
+                                PhpMixed::string(BString::from("bar/foo")),
+                            ),
+                            (
+                                BStr::new("version"),
+                                PhpMixed::string(BString::from("3.14")),
+                            ),
                         ]),
                         str_kv(&[
-                            ("name", PhpMixed::string("bar/foo".to_string())),
-                            ("version", PhpMixed::string("3.145".to_string())),
+                            (
+                                BStr::new("name"),
+                                PhpMixed::string(BString::from("bar/foo")),
+                            ),
+                            (
+                                BStr::new("version"),
+                                PhpMixed::string(BString::from("3.145")),
+                            ),
                         ]),
                     ]),
                 )]),
@@ -152,7 +190,7 @@ fn test_load_data() {
 
         let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
             vec![http_body(
-                "http://example.org/packages.json",
+                BStr::new("http://example.org/packages.json"),
                 json_encode(&repo_packages),
             )],
             true,
@@ -160,7 +198,7 @@ fn test_load_data() {
         );
 
         let mut repository = ComposerRepository::new(
-            repo_config("http://example.org"),
+            repo_config(BStr::new("http://example.org")),
             null_io(),
             &config,
             http_downloader,
@@ -173,10 +211,10 @@ fn test_load_data() {
         assert_eq!(expected.len(), packages.len());
         for (index, (name, version)) in expected.iter().enumerate() {
             assert_eq!(
-                format!("{} {}", name, version),
-                format!(
-                    "{} {}",
+                bconcat!(name, " ", version),
+                bconcat!(
                     packages[index].get_name(),
+                    " ",
                     packages[index].get_pretty_version()
                 )
             );
@@ -193,36 +231,48 @@ fn test_what_provides() {
     // sha256 against the providerListing hash, so the listing hash is the actual hash
     // of this body.
     let body = json_encode(&str_kv(&[(
-        "packages",
+        BStr::new("packages"),
         PhpMixed::List(vec![
             PhpMixed::List(vec![str_kv(&[
-                ("uid", PhpMixed::Int(1)),
-                ("name", PhpMixed::string("a".to_string())),
-                ("version", PhpMixed::string("dev-master".to_string())),
+                (BStr::new("uid"), PhpMixed::Int(1)),
+                (BStr::new("name"), PhpMixed::string(BString::from("a"))),
                 (
-                    "extra",
+                    BStr::new("version"),
+                    PhpMixed::string(BString::from("dev-master")),
+                ),
+                (
+                    BStr::new("extra"),
                     str_kv(&[(
-                        "branch-alias",
-                        str_kv(&[("dev-master", PhpMixed::string("1.0.x-dev".to_string()))]),
+                        BStr::new("branch-alias"),
+                        str_kv(&[(
+                            BStr::new("dev-master"),
+                            PhpMixed::string(BString::from("1.0.x-dev")),
+                        )]),
                     )]),
                 ),
             ])]),
             PhpMixed::List(vec![str_kv(&[
-                ("uid", PhpMixed::Int(2)),
-                ("name", PhpMixed::string("a".to_string())),
-                ("version", PhpMixed::string("dev-develop".to_string())),
+                (BStr::new("uid"), PhpMixed::Int(2)),
+                (BStr::new("name"), PhpMixed::string(BString::from("a"))),
                 (
-                    "extra",
+                    BStr::new("version"),
+                    PhpMixed::string(BString::from("dev-develop")),
+                ),
+                (
+                    BStr::new("extra"),
                     str_kv(&[(
-                        "branch-alias",
-                        str_kv(&[("dev-develop", PhpMixed::string("1.1.x-dev".to_string()))]),
+                        BStr::new("branch-alias"),
+                        str_kv(&[(
+                            BStr::new("dev-develop"),
+                            PhpMixed::string(BString::from("1.1.x-dev")),
+                        )]),
                     )]),
                 ),
             ])]),
             PhpMixed::List(vec![str_kv(&[
-                ("uid", PhpMixed::Int(3)),
-                ("name", PhpMixed::string("a".to_string())),
-                ("version", PhpMixed::string("0.6".to_string())),
+                (BStr::new("uid"), PhpMixed::Int(3)),
+                (BStr::new("name"), PhpMixed::string(BString::from("a"))),
+                (BStr::new("version"), PhpMixed::string(BString::from("0.6"))),
             ])]),
         ]),
     )]));
@@ -230,13 +280,16 @@ fn test_what_provides() {
     let sha256 = hash("sha256", &body);
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
-        vec![http_body("https://dummy.test.link/to/a/file", body)],
+        vec![http_body(
+            BStr::new("https://dummy.test.link/to/a/file"),
+            body,
+        )],
         true,
         HttpDownloaderMockHandler::default(),
     );
 
     let repo = ComposerRepository::new(
-        repo_config("https://dummy.test.link"),
+        repo_config(BStr::new("https://dummy.test.link")),
         null_io(),
         &config,
         http_downloader,
@@ -248,22 +301,22 @@ fn test_what_provides() {
     let rc_dyn: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> = rc.clone();
     rc.borrow().set_self_handle(std::rc::Rc::downgrade(&rc_dyn));
 
-    let mut provider_listing: IndexMap<String, ProviderListingEntry> = IndexMap::new();
-    provider_listing.insert("a".to_string(), ProviderListingEntry { sha256 });
+    let mut provider_listing: IndexMap<BString, ProviderListingEntry> = IndexMap::new();
+    provider_listing.insert("a".into(), ProviderListingEntry { sha256 });
     rc.borrow_mut().__set_provider_listing(provider_listing);
     rc.borrow_mut()
         .__set_providers_url("https://dummy.test.link/to/%package%/file");
 
-    let packages = rc.borrow_mut().__what_provides("a").unwrap();
+    let packages = rc.borrow_mut().__what_provides("a".into()).unwrap();
 
     assert_eq!(5, packages.len());
     assert_eq!(
         vec!["1", "1-alias", "2", "2-alias", "3"],
         packages.keys().cloned().collect::<Vec<_>>()
     );
-    let alias = packages["2-alias"].as_alias().unwrap();
+    let alias = packages[B("2-alias")].as_alias().unwrap();
     let aliased: shirabe::package::handle::PackageInterfaceHandle = alias.get_alias_of().into();
-    assert!(packages["2"].ptr_eq(&aliased));
+    assert!(packages[B("2")].ptr_eq(&aliased));
 }
 
 #[test]
@@ -271,28 +324,28 @@ fn test_search_with_type() {
     let (config, _home) = create_config_read_only();
 
     let result = str_kv(&[(
-        "results",
+        BStr::new("results"),
         PhpMixed::List(vec![str_kv(&[
-            ("name", PhpMixed::string("foo".to_string())),
-            ("description", PhpMixed::Null),
+            (BStr::new("name"), PhpMixed::string(BString::from("foo"))),
+            (BStr::new("description"), PhpMixed::Null),
         ])]),
     )]);
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![
             http_body(
-                "http://example.org/packages.json",
+                BStr::new("http://example.org/packages.json"),
                 json_encode(&str_kv(&[(
-                    "search",
-                    PhpMixed::string("/search.json?q=%query%&type=%type%".to_string()),
+                    BStr::new("search"),
+                    PhpMixed::string(BString::from("/search.json?q=%query%&type=%type%")),
                 )])),
             ),
             http_body(
-                "http://example.org/search.json?q=foo&type=composer-plugin",
+                BStr::new("http://example.org/search.json?q=foo&type=composer-plugin"),
                 json_encode(&result),
             ),
             http_body(
-                "http://example.org/search.json?q=foo&type=library",
+                BStr::new("http://example.org/search.json?q=foo&type=library"),
                 json_encode(&PhpMixed::List(vec![])),
             ),
         ],
@@ -301,7 +354,7 @@ fn test_search_with_type() {
     );
 
     let mut repository = ComposerRepository::new(
-        repo_config("http://example.org"),
+        repo_config(BStr::new("http://example.org")),
         null_io(),
         &config,
         http_downloader,
@@ -311,9 +364,9 @@ fn test_search_with_type() {
 
     let plugin_results = repository
         .search(
-            "foo".to_string(),
+            "foo".into(),
             SEARCH_FULLTEXT,
-            Some("composer-plugin".to_string()),
+            Some("composer-plugin".into()),
         )
         .unwrap();
     assert_eq!(1, plugin_results.len());
@@ -327,11 +380,7 @@ fn test_search_with_type() {
     ));
 
     let library_results = repository
-        .search(
-            "foo".to_string(),
-            SEARCH_FULLTEXT,
-            Some("library".to_string()),
-        )
+        .search("foo".into(), SEARCH_FULLTEXT, Some("library".into()))
         .unwrap();
     assert!(library_results.is_empty());
 }
@@ -343,14 +392,14 @@ fn test_search_with_special_chars() {
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![
             http_body(
-                "http://example.org/packages.json",
+                BStr::new("http://example.org/packages.json"),
                 json_encode(&str_kv(&[(
-                    "search",
-                    PhpMixed::string("/search.json?q=%query%&type=%type%".to_string()),
+                    BStr::new("search"),
+                    PhpMixed::string(BString::from("/search.json?q=%query%&type=%type%")),
                 )])),
             ),
             http_body(
-                "http://example.org/search.json?q=foo+bar&type=",
+                BStr::new("http://example.org/search.json?q=foo+bar&type="),
                 json_encode(&PhpMixed::List(vec![])),
             ),
         ],
@@ -359,7 +408,7 @@ fn test_search_with_special_chars() {
     );
 
     let mut repository = ComposerRepository::new(
-        repo_config("http://example.org"),
+        repo_config(BStr::new("http://example.org")),
         null_io(),
         &config,
         http_downloader,
@@ -368,7 +417,7 @@ fn test_search_with_special_chars() {
     .unwrap();
 
     let results = repository
-        .search("foo bar".to_string(), SEARCH_FULLTEXT, None)
+        .search("foo bar".into(), SEARCH_FULLTEXT, None)
         .unwrap();
     assert!(results.is_empty());
 }
@@ -378,17 +427,20 @@ fn test_search_with_abandoned_packages() {
     let (config, _home) = create_config_read_only();
 
     let result = str_kv(&[(
-        "results",
+        BStr::new("results"),
         PhpMixed::List(vec![
             str_kv(&[
-                ("name", PhpMixed::string("foo1".to_string())),
-                ("description", PhpMixed::Null),
-                ("abandoned", PhpMixed::Bool(true)),
+                (BStr::new("name"), PhpMixed::string(BString::from("foo1"))),
+                (BStr::new("description"), PhpMixed::Null),
+                (BStr::new("abandoned"), PhpMixed::Bool(true)),
             ]),
             str_kv(&[
-                ("name", PhpMixed::string("foo2".to_string())),
-                ("description", PhpMixed::Null),
-                ("abandoned", PhpMixed::string("bar".to_string())),
+                (BStr::new("name"), PhpMixed::string(BString::from("foo2"))),
+                (BStr::new("description"), PhpMixed::Null),
+                (
+                    BStr::new("abandoned"),
+                    PhpMixed::string(BString::from("bar")),
+                ),
             ]),
         ]),
     )]);
@@ -396,20 +448,23 @@ fn test_search_with_abandoned_packages() {
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![
             http_body(
-                "http://example.org/packages.json",
+                BStr::new("http://example.org/packages.json"),
                 json_encode(&str_kv(&[(
-                    "search",
-                    PhpMixed::string("/search.json?q=%query%".to_string()),
+                    BStr::new("search"),
+                    PhpMixed::string(BString::from("/search.json?q=%query%")),
                 )])),
             ),
-            http_body("http://example.org/search.json?q=foo", json_encode(&result)),
+            http_body(
+                BStr::new("http://example.org/search.json?q=foo"),
+                json_encode(&result),
+            ),
         ],
         true,
         HttpDownloaderMockHandler::default(),
     );
 
     let mut repository = ComposerRepository::new(
-        repo_config("http://example.org"),
+        repo_config(BStr::new("http://example.org")),
         null_io(),
         &config,
         http_downloader,
@@ -418,7 +473,7 @@ fn test_search_with_abandoned_packages() {
     .unwrap();
 
     let results = repository
-        .search("foo".to_string(), SEARCH_FULLTEXT, None)
+        .search("foo".into(), SEARCH_FULLTEXT, None)
         .unwrap();
 
     assert_eq!(2, results.len());
@@ -448,31 +503,35 @@ fn test_search_with_abandoned_packages() {
     );
 }
 
-fn canonicalize_url_test_cases() -> Vec<(&'static str, &'static str, &'static str)> {
+fn canonicalize_url_test_cases() -> Vec<(&'static BStr, &'static BStr, &'static BStr)> {
     vec![
         (
-            "https://example.org/path/to/file",
-            "/path/to/file",
-            "https://example.org",
+            BStr::new("https://example.org/path/to/file"),
+            BStr::new("/path/to/file"),
+            BStr::new("https://example.org"),
         ),
         (
-            "https://example.org/canonic_url",
-            "https://example.org/canonic_url",
-            "https://should-not-see-me.test",
+            BStr::new("https://example.org/canonic_url"),
+            BStr::new("https://example.org/canonic_url"),
+            BStr::new("https://should-not-see-me.test"),
         ),
         (
-            "file:///path/to/repository/file",
-            "/path/to/repository/file",
-            "file:///path/to/repository",
+            BStr::new("file:///path/to/repository/file"),
+            BStr::new("/path/to/repository/file"),
+            BStr::new("file:///path/to/repository"),
         ),
         // Repository URL returned unchanged if it is not a URL (BC test).
-        ("invalid_repo_url", "/path/to/file", "invalid_repo_url"),
+        (
+            BStr::new("invalid_repo_url"),
+            BStr::new("/path/to/file"),
+            BStr::new("invalid_repo_url"),
+        ),
         // URLs may contain sequences resembling preg_replace() pattern references
         // without messing up the result (regression test).
         (
-            "https://example.org/path/to/unusual_$0_filename",
-            "/path/to/unusual_$0_filename",
-            "https://example.org",
+            BStr::new("https://example.org/path/to/unusual_$0_filename"),
+            BStr::new("/path/to/unusual_$0_filename"),
+            BStr::new("https://example.org"),
         ),
     ]
 }
@@ -508,24 +567,30 @@ fn test_get_provider_names_will_return_partial_package_names() {
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![http_body(
-            "http://example.org/packages.json",
+            BStr::new("http://example.org/packages.json"),
             json_encode(&str_kv(&[
                 (
-                    "providers-lazy-url",
-                    PhpMixed::string("/foo/p/%package%.json".to_string()),
+                    BStr::new("providers-lazy-url"),
+                    PhpMixed::string(BString::from("/foo/p/%package%.json")),
                 ),
                 (
-                    "packages",
+                    BStr::new("packages"),
                     str_kv(&[(
-                        "foo/bar",
+                        BStr::new("foo/bar"),
                         str_kv(&[
                             (
-                                "dev-branch",
-                                str_kv(&[("name", PhpMixed::string("foo/bar".to_string()))]),
+                                BStr::new("dev-branch"),
+                                str_kv(&[(
+                                    BStr::new("name"),
+                                    PhpMixed::string(BString::from("foo/bar")),
+                                )]),
                             ),
                             (
-                                "v1.0.0",
-                                str_kv(&[("name", PhpMixed::string("foo/bar".to_string()))]),
+                                BStr::new("v1.0.0"),
+                                str_kv(&[(
+                                    BStr::new("name"),
+                                    PhpMixed::string(BString::from("foo/bar")),
+                                )]),
                             ),
                         ]),
                     )]),
@@ -537,7 +602,7 @@ fn test_get_provider_names_will_return_partial_package_names() {
     );
 
     let mut repository = ComposerRepository::new(
-        repo_config("http://example.org/packages.json"),
+        repo_config(BStr::new("http://example.org/packages.json")),
         null_io(),
         &config,
         http_downloader,
@@ -555,40 +620,51 @@ fn test_get_security_advisories_assert_repository_http_options_are_used() {
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![
             http_body(
-                "https://example.org/packages.json",
+                BStr::new("https://example.org/packages.json"),
                 json_encode(&str_kv(&[
                     (
-                        "packages",
+                        BStr::new("packages"),
                         str_kv(&[(
-                            "foo/bar",
+                            BStr::new("foo/bar"),
                             str_kv(&[
                                 (
-                                    "dev-branch",
-                                    str_kv(&[("name", PhpMixed::string("foo/bar".to_string()))]),
+                                    BStr::new("dev-branch"),
+                                    str_kv(&[(
+                                        BStr::new("name"),
+                                        PhpMixed::string(BString::from("foo/bar")),
+                                    )]),
                                 ),
                                 (
-                                    "v1.0.0",
-                                    str_kv(&[("name", PhpMixed::string("foo/bar".to_string()))]),
+                                    BStr::new("v1.0.0"),
+                                    str_kv(&[(
+                                        BStr::new("name"),
+                                        PhpMixed::string(BString::from("foo/bar")),
+                                    )]),
                                 ),
                             ]),
                         )]),
                     ),
                     (
-                        "metadata-url",
-                        PhpMixed::string("https://example.org/p2/%package%.json".to_string()),
+                        BStr::new("metadata-url"),
+                        PhpMixed::string(BString::from("https://example.org/p2/%package%.json")),
                     ),
                     (
-                        "security-advisories",
+                        BStr::new("security-advisories"),
                         str_kv(&[(
-                            "api-url",
-                            PhpMixed::string("https://example.org/security-advisories".to_string()),
+                            BStr::new("api-url"),
+                            PhpMixed::string(BString::from(
+                                "https://example.org/security-advisories",
+                            )),
                         )]),
                     ),
                 ])),
             ),
             http_body(
-                "https://example.org/security-advisories",
-                json_encode(&str_kv(&[("advisories", PhpMixed::List(vec![]))])),
+                BStr::new("https://example.org/security-advisories"),
+                json_encode(&str_kv(&[(
+                    BStr::new("advisories"),
+                    PhpMixed::List(vec![]),
+                )])),
             ),
         ],
         true,
@@ -598,20 +674,23 @@ fn test_get_security_advisories_assert_repository_http_options_are_used() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/packages.json".to_string()),
+        PhpMixed::string(BString::from("https://example.org/packages.json")),
     );
     repo_config.insert(
         "options".into(),
-        str_kv(&[("http", str_kv(&[("verify_peer", PhpMixed::Bool(false))]))]),
+        str_kv(&[(
+            BStr::new("http"),
+            str_kv(&[(BStr::new("verify_peer"), PhpMixed::Bool(false))]),
+        )]),
     );
 
     let mut repository =
         ComposerRepository::new(repo_config, null_io(), &config, http_downloader, None).unwrap();
 
     let constraint: AnyConstraint =
-        SimpleConstraint::new("=".to_string(), "1.0.0.0".to_string(), None).into();
-    let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
-    map.insert("foo/bar".to_string(), constraint);
+        SimpleConstraint::new("=", BString::from("1.0.0.0"), None).into();
+    let mut map: IndexMap<BString, AnyConstraint> = IndexMap::new();
+    map.insert("foo/bar".into(), constraint);
 
     let result = repository.get_security_advisories(map, false).unwrap();
     assert!(result.names_found.is_empty());
@@ -619,43 +698,67 @@ fn test_get_security_advisories_assert_repository_http_options_are_used() {
 }
 
 fn generate_security_advisory(
-    package_name: &str,
-    cve: Option<&str>,
-    affected_versions: &str,
-) -> (String, PhpMixed) {
+    package_name: &BStr,
+    cve: Option<&BStr>,
+    affected_versions: &BStr,
+) -> (bstr::BString, PhpMixed) {
     let advisory_id = uniqid("PKSA-", false);
     let advisory = str_kv(&[
-        ("advisoryId", PhpMixed::string(advisory_id.clone())),
-        ("packageName", PhpMixed::string(package_name.to_string())),
-        ("remoteId", PhpMixed::string("test".to_string())),
-        ("title", PhpMixed::string("Security Advisory".to_string())),
-        ("link", PhpMixed::Null),
         (
-            "cve",
+            BStr::new("advisoryId"),
+            PhpMixed::string(advisory_id.clone()),
+        ),
+        (
+            BStr::new("packageName"),
+            PhpMixed::string(bconcat!(package_name)),
+        ),
+        (
+            BStr::new("remoteId"),
+            PhpMixed::string(BString::from("test")),
+        ),
+        (
+            BStr::new("title"),
+            PhpMixed::string(BString::from("Security Advisory")),
+        ),
+        (BStr::new("link"), PhpMixed::Null),
+        (
+            BStr::new("cve"),
             match cve {
-                Some(c) => PhpMixed::string(c.to_string()),
+                Some(c) => PhpMixed::string(bconcat!(c)),
                 None => PhpMixed::Null,
             },
         ),
         (
-            "affectedVersions",
-            PhpMixed::string(affected_versions.to_string()),
-        ),
-        ("source", PhpMixed::string("Tests".to_string())),
-        (
-            "reportedAt",
-            PhpMixed::string("2024-04-31 12:37:47".to_string()),
+            BStr::new("affectedVersions"),
+            PhpMixed::string(bconcat!(affected_versions)),
         ),
         (
-            "composerRepository",
-            PhpMixed::string("Package Repository".to_string()),
+            BStr::new("source"),
+            PhpMixed::string(BString::from("Tests")),
         ),
-        ("severity", PhpMixed::string("high".to_string())),
         (
-            "sources",
+            BStr::new("reportedAt"),
+            PhpMixed::string(BString::from("2024-04-31 12:37:47")),
+        ),
+        (
+            BStr::new("composerRepository"),
+            PhpMixed::string(BString::from("Package Repository")),
+        ),
+        (
+            BStr::new("severity"),
+            PhpMixed::string(BString::from("high")),
+        ),
+        (
+            BStr::new("sources"),
             PhpMixed::List(vec![str_kv(&[
-                ("name", PhpMixed::string("Security Advisory".to_string())),
-                ("remoteId", PhpMixed::string("test".to_string())),
+                (
+                    BStr::new("name"),
+                    PhpMixed::string(BString::from("Security Advisory")),
+                ),
+                (
+                    BStr::new("remoteId"),
+                    PhpMixed::string(BString::from("test")),
+                ),
             ])]),
         ),
     ]);
@@ -670,54 +773,71 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
  {
     let (config, _home) = create_config();
 
-    let package_name = "foo/bar";
-    let (advisory1_id, advisory1) =
-        generate_security_advisory(package_name, Some("CVE-1999-1000"), ">=1.0.0,<1.1.0");
-    let (_advisory2_id, advisory2) =
-        generate_security_advisory(package_name, Some("CVE-1999-1000"), ">=2.0.0");
-    let (advisory3_id, advisory3) =
-        generate_security_advisory(package_name, Some("CVE-1999-1000"), ">=1.0.0,<1.1.0");
+    let package_name = BStr::new("foo/bar");
+    let (advisory1_id, advisory1) = generate_security_advisory(
+        package_name,
+        Some(BStr::new("CVE-1999-1000")),
+        BStr::new(">=1.0.0,<1.1.0"),
+    );
+    let (_advisory2_id, advisory2) = generate_security_advisory(
+        package_name,
+        Some(BStr::new("CVE-1999-1000")),
+        BStr::new(">=2.0.0"),
+    );
+    let (advisory3_id, advisory3) = generate_security_advisory(
+        package_name,
+        Some(BStr::new("CVE-1999-1000")),
+        BStr::new(">=1.0.0,<1.1.0"),
+    );
 
     let expected_advisory_ids = [advisory1_id, advisory3_id];
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![
             http_body(
-                "https://example.org/packages.json",
+                BStr::new("https://example.org/packages.json"),
                 json_encode(&str_kv(&[
                     (
-                        "packages",
+                        BStr::new("packages"),
                         str_kv(&[(
                             package_name,
                             str_kv(&[
                                 (
-                                    "dev-branch",
-                                    str_kv(&[("name", PhpMixed::string(package_name.to_string()))]),
+                                    BStr::new("dev-branch"),
+                                    str_kv(&[(
+                                        BStr::new("name"),
+                                        PhpMixed::string(bconcat!(package_name)),
+                                    )]),
                                 ),
                                 (
-                                    "v1.0.0",
-                                    str_kv(&[("name", PhpMixed::string(package_name.to_string()))]),
+                                    BStr::new("v1.0.0"),
+                                    str_kv(&[(
+                                        BStr::new("name"),
+                                        PhpMixed::string(bconcat!(package_name)),
+                                    )]),
                                 ),
                             ]),
                         )]),
                     ),
                     (
-                        "metadata-url",
-                        PhpMixed::string("https://example.org/p2/%package%.json".to_string()),
+                        BStr::new("metadata-url"),
+                        PhpMixed::string(BString::from("https://example.org/p2/%package%.json")),
                     ),
                     (
-                        "security-advisories",
+                        BStr::new("security-advisories"),
                         str_kv(&[(
-                            "api-url",
-                            PhpMixed::string("https://example.org/security-advisories".to_string()),
+                            BStr::new("api-url"),
+                            PhpMixed::string(BString::from(
+                                "https://example.org/security-advisories",
+                            )),
                         )]),
                     ),
                 ])),
             ),
             http_body(
-                "https://example.org/security-advisories",
+                BStr::new("https://example.org/security-advisories"),
                 json_encode(&str_kv(&[(
-                    "advisories",
+                    BStr::new("advisories"),
                     str_kv(&[(
                         package_name,
                         PhpMixed::List(vec![advisory1, advisory2, advisory3]),
@@ -732,24 +852,27 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/packages.json".to_string()),
+        PhpMixed::string(BString::from("https://example.org/packages.json")),
     );
     repo_config.insert(
         "options".into(),
-        str_kv(&[("http", str_kv(&[("verify_peer", PhpMixed::Bool(false))]))]),
+        str_kv(&[(
+            BStr::new("http"),
+            str_kv(&[(BStr::new("verify_peer"), PhpMixed::Bool(false))]),
+        )]),
     );
 
     let mut repository =
         ComposerRepository::new(repo_config, null_io(), &config, http_downloader, None).unwrap();
 
     let constraint: AnyConstraint =
-        SimpleConstraint::new("=".to_string(), "1.0.0.0".to_string(), None).into();
-    let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
-    map.insert(package_name.to_string(), constraint);
+        SimpleConstraint::new("=", BString::from("1.0.0.0"), None).into();
+    let mut map: IndexMap<BString, AnyConstraint> = IndexMap::new();
+    map.insert(package_name.into(), constraint);
 
     let result = repository.get_security_advisories(map, false).unwrap();
 
-    let actual = result.advisories.get(package_name).unwrap();
+    let actual = result.advisories.get(bstr::B(package_name)).unwrap();
     assert_eq!(expected_advisory_ids.len(), actual.len());
     for (i, expected_id) in expected_advisory_ids.iter().enumerate() {
         assert_eq!(expected_id, actual[i].advisory_id());

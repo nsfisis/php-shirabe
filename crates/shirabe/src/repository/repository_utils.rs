@@ -4,6 +4,7 @@ use crate::package::Link;
 use crate::repository::{
     CompositeRepository, FilterRepository, InstalledRepository, RepositoryInterfaceHandle,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 
 pub struct RepositoryUtils;
@@ -15,7 +16,7 @@ impl RepositoryUtils {
         include_require_dev: bool,
         mut bucket: Vec<crate::package::BasePackageHandle>,
     ) -> Vec<crate::package::BasePackageHandle> {
-        let mut requires: IndexMap<String, Link> = (*requirer.get_requires()).clone();
+        let mut requires: IndexMap<BString, Link> = (*requirer.get_requires()).clone();
         if include_require_dev {
             requires.extend(
                 requirer

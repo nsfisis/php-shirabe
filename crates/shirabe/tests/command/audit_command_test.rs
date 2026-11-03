@@ -4,8 +4,10 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 #[test]
@@ -24,7 +26,7 @@ fn test_successful_response_code_when_no_packages_are_required() {
     assert_eq!(0, app_tester.get_status_code());
     assert_eq!(
         "No packages - skipping audit.",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     drop(tear_down);
@@ -48,7 +50,7 @@ fn test_error_auditing_lock_file_when_it_is_missing() {
         )
         .expect_err("expected UnexpectedValueException");
     assert!(
-        err.to_string().contains(
+        error_message(&err).contains_str(
             "Valid composer.json and composer.lock files are required to run this command with --locked"
         ),
         "unexpected error: {err}"
@@ -77,12 +79,9 @@ fn test_audit_package_with_no_security_vulnerabilities() {
         .unwrap();
 
     assert!(
-        app_tester
-            .get_display()
-            .trim()
-            .contains("No security vulnerability advisories found."),
+        trim(app_tester.get_display()).contains_str("No security vulnerability advisories found."),
         "unexpected display: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
 
     drop(tear_down);
@@ -108,12 +107,9 @@ fn test_audit_package_with_no_dev_option_passed() {
         .unwrap();
 
     assert!(
-        app_tester
-            .get_display()
-            .trim()
-            .contains("No packages - skipping audit."),
+        trim(app_tester.get_display()).contains_str("No packages - skipping audit."),
         "unexpected display: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
 
     drop(tear_down);

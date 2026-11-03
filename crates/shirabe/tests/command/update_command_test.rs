@@ -4,12 +4,14 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
+use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::Link;
+use shirabe_php_shim::{bconcat, error_message, trim, utf8_text};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
-fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
         .map(|(k, v)| (ParameterName::of(k), v))
@@ -18,9 +20,11 @@ fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
 
 /// Minimal port of PHPUnit's `assertStringMatchesFormat` covering the placeholders these fixtures
 /// use: `%d` (integer), `%f` (float), `%s` (non-newline run), `%a` (any run incl. newlines).
-fn assert_string_matches_format(expected: &str, actual: &str) {
+#[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
+fn assert_string_matches_format(expected: &BStr, actual: impl AsRef<[u8]>) {
+    let actual = actual.as_ref();
     let mut pattern = String::from("(?s)^");
-    let mut chars = expected.chars().peekable();
+    let mut chars = utf8_text(expected).unwrap().chars().peekable();
     while let Some(c) = chars.next() {
         if c == '%'
             && let Some(&next) = chars.peek()
@@ -49,13 +53,15 @@ fn assert_string_matches_format(expected: &str, actual: &str) {
                 _ => {}
             }
         }
-        pattern.push_str(&regex::escape(&c.to_string()));
+        pattern.push_str(&regex::escape(c.encode_utf8(&mut [0; 4])));
     }
     pattern.push('$');
-    let re = regex::Regex::new(&pattern).unwrap();
+    let re = regex::bytes::Regex::new(&pattern).unwrap();
     assert!(
         re.is_match(actual),
-        "string did not match format.\n--- expected format ---\n{expected}\n--- actual ---\n{actual}"
+        "string did not match format.\n--- expected format ---\n{expected}\n--- actual ---\n{}",
+        actual.as_bstr().display_lossy(),
+        expected = expected.display_lossy()
     );
 }
 
@@ -73,18 +79,18 @@ fn root_dep_and_transitive_dep() -> serde_json::Value {
 
 /// ref: UpdateCommandTest::provideUpdates
 fn provide_updates() -> Vec<(
-    &'static str,
+    &'static BStr,
     serde_json::Value,
-    Vec<(&'static str, InputValue)>,
-    &'static str,
+    Vec<(&'static BStr, InputValue)>,
+    &'static BStr,
     bool,
 )> {
     vec![
         (
-            "simple update",
+            BStr::new("simple update"),
             root_dep_and_transitive_dep(),
             vec![],
-            "Loading composer repositories with package information
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
   - Locking dep/pkg (1.0.2)
@@ -92,14 +98,14 @@ Lock file operations: 2 installs, 0 updates, 0 removals
 Installing dependencies from lock file (including require-dev)
 Package operations: 2 installs, 0 updates, 0 removals
   - Installing dep/pkg (1.0.2)
-  - Installing root/req (1.0.0)",
+  - Installing root/req (1.0.0)"),
             false,
         ),
         (
-            "simple update with very verbose output",
+            BStr::new("simple update with very verbose output"),
             root_dep_and_transitive_dep(),
-            vec![("-vv", InputValue::from(true))],
-            "Loading composer repositories with package information
+            vec![(BStr::new("-vv"), InputValue::from(true))],
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Dependency resolution completed in %f seconds
 Analyzed %d packages to resolve dependencies
@@ -112,49 +118,49 @@ Installing dependencies from lock file (including require-dev)
 Package operations: 2 installs, 0 updates, 0 removals
 Installs: dep/pkg:1.0.2, root/req:1.0.0
   - Installing dep/pkg (1.0.2)
-  - Installing root/req (1.0.0)",
+  - Installing root/req (1.0.0)"),
             false,
         ),
         (
-            "update with temporary constraint + --no-install",
+            BStr::new("update with temporary constraint + --no-install"),
             root_dep_and_transitive_dep(),
             vec![
-                ("--with", InputValue::Array(vec!["dep/pkg:1.0.0".to_string()])),
-                ("--no-install", InputValue::from(true)),
+                (BStr::new("--with"), InputValue::Array(vec!["dep/pkg:1.0.0".into()])),
+                (BStr::new("--no-install"), InputValue::from(true)),
             ],
-            "Loading composer repositories with package information
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
   - Locking dep/pkg (1.0.0)
-  - Locking root/req (1.0.0)",
+  - Locking root/req (1.0.0)"),
             false,
         ),
         (
-            "update with temporary constraint failing resolution",
+            BStr::new("update with temporary constraint failing resolution"),
             root_dep_and_transitive_dep(),
-            vec![("--with", InputValue::Array(vec!["dep/pkg:^2".to_string()]))],
-            "Loading composer repositories with package information
+            vec![(BStr::new("--with"), InputValue::Array(vec!["dep/pkg:^2".into()]))],
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Your requirements could not be resolved to an installable set of packages.
 
   Problem 1
     - Root composer.json requires root/req 1.* -> satisfiable by root/req[1.0.0].
-    - root/req 1.0.0 requires dep/pkg ^1 -> found dep/pkg[1.0.0, 1.0.1, 1.0.2] but it conflicts with your temporary update constraint (dep/pkg:^2).",
+    - root/req 1.0.0 requires dep/pkg ^1 -> found dep/pkg[1.0.0, 1.0.1, 1.0.2] but it conflicts with your temporary update constraint (dep/pkg:^2)."),
             false,
         ),
         (
-            "update with temporary constraint failing resolution on root package",
+            BStr::new("update with temporary constraint failing resolution on root package"),
             root_dep_and_transitive_dep(),
-            vec![("--with", InputValue::Array(vec!["root/req:^2".to_string()]))],
-            "The temporary constraint \"^2\" for \"root/req\" must be a subset of the constraint in your composer.json (1.*)
-Run `shirabe require root/req` or `shirabe require root/req:^2` instead to replace the constraint",
+            vec![(BStr::new("--with"), InputValue::Array(vec!["root/req:^2".into()]))],
+            BStr::new("The temporary constraint \"^2\" for \"root/req\" must be a subset of the constraint in your composer.json (1.*)
+Run `shirabe require root/req` or `shirabe require root/req:^2` instead to replace the constraint"),
             false,
         ),
         (
-            "update & bump",
+            BStr::new("update & bump"),
             root_dep_and_transitive_dep(),
-            vec![("--bump-after-update", InputValue::from(true))],
-            "Loading composer repositories with package information
+            vec![(BStr::new("--bump-after-update"), InputValue::from(true))],
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
   - Locking dep/pkg (1.0.2)
@@ -167,28 +173,28 @@ Bumping dependencies
 <warning>Warning: Bumping dependency constraints is not recommended for libraries as it will narrow down your dependencies and may cause problems for your users.</warning>
 <warning>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</warning>
 <warning>Alternatively you can use --bump-after-update=dev to only bump dependencies within \"require-dev\".</warning>
-No requirements to update in ./composer.json.",
+No requirements to update in ./composer.json."),
             true,
         ),
         (
-            "update & bump with lock",
+            BStr::new("update & bump with lock"),
             root_dep_and_transitive_dep(),
             vec![
-                ("--bump-after-update", InputValue::from(true)),
-                ("--lock", InputValue::from(true)),
+                (BStr::new("--bump-after-update"), InputValue::from(true)),
+                (BStr::new("--lock"), InputValue::from(true)),
             ],
-            "Loading composer repositories with package information
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Nothing to modify in lock file
 Installing dependencies from lock file (including require-dev)
-Nothing to install, update or remove",
+Nothing to install, update or remove"),
             true,
         ),
         (
-            "update & bump dev only",
+            BStr::new("update & bump dev only"),
             root_dep_and_transitive_dep(),
-            vec![("--bump-after-update", InputValue::from("dev"))],
-            "Loading composer repositories with package information
+            vec![(BStr::new("--bump-after-update"), InputValue::from("dev"))],
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
   - Locking dep/pkg (1.0.2)
@@ -198,36 +204,36 @@ Package operations: 2 installs, 0 updates, 0 removals
   - Installing dep/pkg (1.0.2)
   - Installing root/req (1.0.0)
 Bumping dependencies
-No requirements to update in ./composer.json.",
+No requirements to update in ./composer.json."),
             true,
         ),
         (
-            "update & dump with failing update",
+            BStr::new("update & dump with failing update"),
             root_dep_and_transitive_dep(),
             vec![
-                ("--with", InputValue::Array(vec!["dep/pkg:^2".to_string()])),
-                ("--bump-after-update", InputValue::from(true)),
+                (BStr::new("--with"), InputValue::Array(vec!["dep/pkg:^2".into()])),
+                (BStr::new("--bump-after-update"), InputValue::from(true)),
             ],
-            "Loading composer repositories with package information
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Your requirements could not be resolved to an installable set of packages.
 
   Problem 1
     - Root composer.json requires root/req 1.* -> satisfiable by root/req[1.0.0].
-    - root/req 1.0.0 requires dep/pkg ^1 -> found dep/pkg[1.0.0, 1.0.1, 1.0.2] but it conflicts with your temporary update constraint (dep/pkg:^2).",
+    - root/req 1.0.0 requires dep/pkg ^1 -> found dep/pkg[1.0.0, 1.0.1, 1.0.2] but it conflicts with your temporary update constraint (dep/pkg:^2)."),
             false,
         ),
         (
-            "update with replaced name filter fails to resolve",
+            BStr::new("update with replaced name filter fails to resolve"),
             root_dep_and_transitive_dep(),
-            vec![("--with", InputValue::Array(vec!["replaced/pkg:^2".to_string()]))],
-            "Loading composer repositories with package information
+            vec![(BStr::new("--with"), InputValue::Array(vec!["replaced/pkg:^2".into()]))],
+            BStr::new("Loading composer repositories with package information
 Updating dependencies
 Your requirements could not be resolved to an installable set of packages.
 
   Problem 1
     - Root composer.json requires root/req 1.* -> satisfiable by root/req[1.0.0].
-    - root/req 1.0.0 requires dep/pkg ^1 -> found dep/pkg[1.0.0, 1.0.1, 1.0.2] but it conflicts with your temporary update constraint (replaced/pkg:^2).",
+    - root/req 1.0.0 requires dep/pkg ^1 -> found dep/pkg[1.0.0, 1.0.1, 1.0.2] but it conflicts with your temporary update constraint (replaced/pkg:^2)."),
             false,
         ),
     ]
@@ -245,14 +251,14 @@ fn test_update() {
 
         let mut app_tester = get_application_tester();
         let mut args = vec![
-            ("command", InputValue::from("update")),
-            ("--dry-run", InputValue::from(true)),
-            ("--no-audit", InputValue::from(true)),
+            (BStr::new("command"), InputValue::from("update")),
+            (BStr::new("--dry-run"), InputValue::from(true)),
+            (BStr::new("--no-audit"), InputValue::from(true)),
         ];
         args.extend(command);
         app_tester.run(input(args), RunOptions::default()).unwrap();
 
-        assert_string_matches_format(expected.trim(), app_tester.get_display().trim());
+        assert_string_matches_format(trim(expected).as_bstr(), trim(app_tester.get_display()));
         let _ = label;
     }
 }
@@ -286,14 +292,14 @@ fn test_update_with_patch_only() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("update")),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-install", InputValue::from(true)),
-                ("--patch-only", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("update")),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-install"), InputValue::from(true)),
+                (BStr::new("--patch-only"), InputValue::from(true)),
                 (
-                    "--with",
-                    InputValue::Array(vec!["root/req:^1.1".to_string()]),
+                    BStr::new("--with"),
+                    InputValue::Array(vec!["root/req:^1.1".into()]),
                 ),
             ]),
             RunOptions::default(),
@@ -301,13 +307,13 @@ fn test_update_with_patch_only() {
         .unwrap();
 
     assert_string_matches_format(
-        "Loading composer repositories with package information
+        BStr::new("Loading composer repositories with package information
 Updating dependencies
 Your requirements could not be resolved to an installable set of packages.
 
   Problem 1
-    - Root composer.json requires root/req 1.*, found root/req[1.0.0, 1.0.1, 1.1.0] but it conflicts with your temporary update constraint (root/req:[[>= 1.1.0.0-dev < 2.0.0.0-dev] [>= 1.0.0.0-dev < 1.1.0.0-dev]]).",
-        app_tester.get_display().trim(),
+    - Root composer.json requires root/req 1.*, found root/req[1.0.0, 1.0.1, 1.1.0] but it conflicts with your temporary update constraint (root/req:[[>= 1.1.0.0-dev < 2.0.0.0-dev] [>= 1.0.0.0-dev < 1.1.0.0-dev]])."),
+        trim(app_tester.get_display()),
     );
 
     let mut app_tester = get_application_tester();
@@ -317,18 +323,18 @@ Your requirements could not be resolved to an installable set of packages.
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("update")),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-install", InputValue::from(true)),
-                ("--patch-only", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("update")),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-install"), InputValue::from(true)),
+                (BStr::new("--patch-only"), InputValue::from(true)),
                 (
-                    "--with",
-                    InputValue::Array(vec!["root/req:^1.0.1".to_string()]),
+                    BStr::new("--with"),
+                    InputValue::Array(vec!["root/req:^1.0.1".into()]),
                 ),
                 (
-                    "packages",
-                    InputValue::Array(vec!["root/req".to_string(), "root/req2".to_string()]),
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into(), "root/req2".into()]),
                 ),
             ]),
             RunOptions::default(),
@@ -336,12 +342,14 @@ Your requirements could not be resolved to an installable set of packages.
         .unwrap();
 
     assert_string_matches_format(
-        "Loading composer repositories with package information
+        BStr::new(
+            "Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 0 installs, 2 updates, 0 removals
   - Upgrading root/req (1.0.0 => 1.0.1)
   - Upgrading root/req2 (1.0.0 => 1.0.1)",
-        app_tester.get_display().trim(),
+        ),
+        trim(app_tester.get_display()),
     );
 }
 
@@ -358,19 +366,18 @@ fn test_interactive_mode_throws_if_no_package_to_update() {
     create_composer_lock(&[get_package("root/req", "1.0.0")], &[]);
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["".to_string()]);
+    app_tester.set_inputs(vec![BString::from("")]);
     let err = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("update")),
-                ("--interactive", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("update")),
+                (BStr::new("--interactive"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .expect_err("expected an exception when there is no package to update");
     assert!(
-        err.to_string()
-            .contains("Could not find any package with new versions available"),
+        error_message(&err).contains_str("Could not find any package with new versions available"),
         "got: {err}"
     );
 }
@@ -389,43 +396,49 @@ fn test_interactive_mode_throws_if_no_package_entered() {
     create_composer_lock(&[get_package("root/req", "1.0.0")], &[]);
 
     let mut app_tester = get_application_tester();
-    app_tester.set_inputs(vec!["".to_string()]);
+    app_tester.set_inputs(vec![BString::from("")]);
     let err = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("update")),
-                ("--interactive", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("update")),
+                (BStr::new("--interactive"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .expect_err("expected an exception when no package name is entered");
     assert!(
-        err.to_string()
-            .contains(r#"No package named "" is installed."#),
+        error_message(&err).contains_str(r#"No package named "" is installed."#),
         "got: {err}"
     );
 }
 
 /// ref: UpdateCommandTest::provideInteractiveUpdates
-fn provide_interactive_updates() -> Vec<(Vec<(&'static str, &'static str)>, &'static str)> {
+fn provide_interactive_updates() -> Vec<(Vec<(&'static BStr, &'static BStr)>, &'static BStr)> {
     vec![
         (
-            vec![("dep/pkg", "1.0.1")],
-            "Lock file operations: 1 install, 1 update, 0 removals
+            vec![(BStr::new("dep/pkg"), BStr::new("1.0.1"))],
+            BStr::new(
+                "Lock file operations: 1 install, 1 update, 0 removals
   - Locking another-dep/pkg (1.0.2)
   - Upgrading dep/pkg (1.0.1 => 1.0.2)
 Installing dependencies from lock file (including require-dev)
 Package operations: 1 install, 1 update, 0 removals
   - Upgrading dep/pkg (1.0.1 => 1.0.2)
   - Installing another-dep/pkg (1.0.2)",
+            ),
         ),
         (
-            vec![("dep/pkg", "1.0.1"), ("another-dep/pkg", "1.0.2")],
-            "Lock file operations: 0 installs, 1 update, 0 removals
+            vec![
+                (BStr::new("dep/pkg"), BStr::new("1.0.1")),
+                (BStr::new("another-dep/pkg"), BStr::new("1.0.2")),
+            ],
+            BStr::new(
+                "Lock file operations: 0 installs, 1 update, 0 removals
   - Upgrading dep/pkg (1.0.1 => 1.0.2)
 Installing dependencies from lock file (including require-dev)
 Package operations: 0 installs, 1 update, 0 removals
   - Upgrading dep/pkg (1.0.1 => 1.0.2)",
+            ),
         ),
     ]
 }
@@ -454,45 +467,42 @@ fn test_interactive_tmp() {
 
         let mut requires = indexmap::IndexMap::new();
         requires.insert(
-            "dep/pkg".to_string(),
+            BString::from("dep/pkg"),
             Link::new(
-                "root/req".to_string(),
-                "dep/pkg".to_string(),
+                BString::from("root/req"),
+                BString::from("dep/pkg"),
                 AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-                Some(Link::TYPE_REQUIRE.to_string()),
-                "^1".to_string(),
+                Some(Link::TYPE_REQUIRE.to_owned()),
+                BString::from("^1"),
             ),
         );
         requires.insert(
-            "another-dep/pkg".to_string(),
+            BString::from("another-dep/pkg"),
             Link::new(
-                "root/req".to_string(),
-                "another-dep/pkg".to_string(),
+                BString::from("root/req"),
+                BString::from("another-dep/pkg"),
                 AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-                Some(Link::TYPE_REQUIRE.to_string()),
-                "^1".to_string(),
+                Some(Link::TYPE_REQUIRE.to_owned()),
+                BString::from("^1"),
             ),
         );
-        root_package.__set_requires(requires);
+        root_package.__set_requires(requires.into_iter().collect::<indexmap::IndexMap<_, _>>());
 
         create_composer_lock(&packages, &[]);
         create_installed_json(&packages, &[], true);
 
         let mut app_tester = get_application_tester();
-        let mut inputs: Vec<String> = package_names
-            .iter()
-            .map(|(pkg, _)| pkg.to_string())
-            .collect();
-        inputs.push("".to_string());
-        inputs.push("yes".to_string());
+        let mut inputs: Vec<BString> = package_names.iter().map(|(pkg, _)| bconcat!(pkg)).collect();
+        inputs.push(BString::from(""));
+        inputs.push(BString::from("yes"));
         app_tester.set_inputs(inputs);
         app_tester
             .run(
                 input(vec![
-                    ("command", InputValue::from("update")),
-                    ("--interactive", InputValue::from(true)),
-                    ("--no-audit", InputValue::from(true)),
-                    ("--dry-run", InputValue::from(true)),
+                    (BStr::new("command"), InputValue::from("update")),
+                    (BStr::new("--interactive"), InputValue::from(true)),
+                    (BStr::new("--no-audit"), InputValue::from(true)),
+                    (BStr::new("--dry-run"), InputValue::from(true)),
                 ]),
                 RunOptions {
                     interactive: Some(true),
@@ -502,9 +512,10 @@ fn test_interactive_tmp() {
             .unwrap();
 
         assert!(
-            app_tester.get_display().trim().ends_with(expected.trim()),
+            trim(app_tester.get_display()).ends_with_str(trim(expected)),
             "expected display to end with:\n{expected}\n--- got ---\n{}",
-            app_tester.get_display()
+            app_tester.get_display().display_lossy(),
+            expected = expected.display_lossy()
         );
     }
 }
@@ -547,22 +558,24 @@ fn test_no_security_blocking_allows_insecure_packages() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("update")),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-install", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("update")),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-install"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .unwrap();
     let display = app_tester.get_display();
     assert!(
-        display.contains("Locking vulnerable/pkg (1.0.0)"),
-        "got: {display}"
+        display.contains_str("Locking vulnerable/pkg (1.0.0)"),
+        "got: {}",
+        display.display_lossy()
     );
     assert!(
-        !display.contains("Locking vulnerable/pkg (1.1.0)"),
-        "got: {display}"
+        !display.contains_str("Locking vulnerable/pkg (1.1.0)"),
+        "got: {}",
+        display.display_lossy()
     );
 
     // Test 2: With --no-security-blocking, the vulnerable version 1.1.0 should be allowed
@@ -570,23 +583,25 @@ fn test_no_security_blocking_allows_insecure_packages() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("update")),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-install", InputValue::from(true)),
-                ("--no-security-blocking", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("update")),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-install"), InputValue::from(true)),
+                (BStr::new("--no-security-blocking"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .unwrap();
     let display = app_tester.get_display();
     assert!(
-        display.contains("Locking vulnerable/pkg (1.1.0)"),
-        "got: {display}"
+        display.contains_str("Locking vulnerable/pkg (1.1.0)"),
+        "got: {}",
+        display.display_lossy()
     );
     assert!(
-        !display.contains("Locking vulnerable/pkg (1.0.0)"),
-        "got: {display}"
+        !display.contains_str("Locking vulnerable/pkg (1.0.0)"),
+        "got: {}",
+        display.display_lossy()
     );
 }
 
@@ -607,23 +622,25 @@ fn test_bump_after_update_without_lockfile() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("update")),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--bump-after-update", InputValue::from("dev")),
+                (BStr::new("command"), InputValue::from("update")),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--bump-after-update"), InputValue::from("dev")),
             ]),
             RunOptions::default(),
         )
         .unwrap();
 
     assert_string_matches_format(
-        "Loading composer repositories with package information
+        BStr::new(
+            "Loading composer repositories with package information
 Updating dependencies
 Package operations: 1 install, 0 updates, 0 removals
   - Installing root/a (1.1.0)
 Bumping dependencies
 ./composer.json would be updated with:
  - require-dev.root/a: ^1.1.0",
-        app_tester.get_display().trim(),
+        ),
+        trim(app_tester.get_display()),
     );
 }

@@ -18,10 +18,10 @@ impl InputOption {
     pub const VALUE_NEGATABLE: i64 = 16;
 
     pub fn new(
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
-        description: &str,
+        description: impl AsRef<[u8]>,
         default: Option<InputValue>,
     ) -> anyhow::Result<Self> {
         Self::new6(
@@ -36,15 +36,15 @@ impl InputOption {
 
     /// PHP's constructor with the sixth parameter, `$suggestedValues`.
     pub fn new6(
-        name: &str,
-        shortcut: Option<&str>,
+        name: impl AsRef<[u8]>,
+        shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
-        description: &str,
+        description: impl AsRef<[u8]>,
         default: Option<InputValue>,
         suggested_values: SuggestedValues,
     ) -> anyhow::Result<Self> {
         let default = default.unwrap_or(InputValue::Null);
-        let inner = BaseInputOption::new(name, shortcut, mode, description.to_string(), default)?;
+        let inner = BaseInputOption::new(name, shortcut, mode, description, default)?;
         // PHP throws LogicException here; suggested values on a valueless option cannot happen
         // at runtime unless a configure() is wrong, so this is a programming error.
         assert!(
@@ -70,8 +70,8 @@ impl InputOption {
         self.suggested_values.complete(this, input, suggestions)
     }
 
-    pub(crate) fn get_name(&self) -> String {
-        self.inner.get_name().to_string()
+    pub(crate) fn get_name(&self) -> bstr::BString {
+        self.inner.get_name().to_owned()
     }
 
     /// Unwraps to the underlying Symfony `InputOption` (used when forwarding a Composer-typed

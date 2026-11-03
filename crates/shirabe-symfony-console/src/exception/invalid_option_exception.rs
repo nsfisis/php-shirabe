@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Exception/InvalidOptionException.php
 
 use super::exception_interface::ExceptionInterface;
+use bstr::BString;
 use shirabe_php_shim::InvalidArgumentException;
 
 #[derive(Debug)]
@@ -8,7 +9,7 @@ pub struct InvalidOptionException(pub InvalidArgumentException);
 
 impl InvalidOptionException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self(InvalidArgumentException::new(message))
     }
 }

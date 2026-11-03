@@ -3,7 +3,7 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -12,7 +12,7 @@ use shirabe::repository::vcs::HgDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException};
+use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -25,10 +25,7 @@ fn set_up() -> SetUp {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config_section.insert(
-        "home".into(),
-        PhpMixed::string(home.path().to_str().unwrap().to_string()),
-    );
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 
@@ -56,13 +53,13 @@ impl Drop for TearDown {
     }
 }
 
-fn supports_data_provider() -> Vec<&'static str> {
+fn supports_data_provider() -> Vec<&'static BStr> {
     vec![
-        "ssh://bitbucket.org/user/repo",
-        "ssh://hg@bitbucket.org/user/repo",
-        "ssh://user@bitbucket.org/user/repo",
-        "https://bitbucket.org/user/repo",
-        "https://user@bitbucket.org/user/repo",
+        BStr::new("ssh://bitbucket.org/user/repo"),
+        BStr::new("ssh://hg@bitbucket.org/user/repo"),
+        BStr::new("ssh://user@bitbucket.org/user/repo"),
+        BStr::new("https://bitbucket.org/user/repo"),
+        BStr::new("https://user@bitbucket.org/user/repo"),
     ]
 }
 
@@ -73,7 +70,7 @@ fn test_supports() {
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
 
-        assert!(HgDriver::supports(io, config, repository_url, false).unwrap());
+        assert!(HgDriver::supports(io, config, bstr::BStr::new(repository_url), false).unwrap());
     }
 }
 
@@ -104,16 +101,25 @@ fn test_get_branches_filter_invalid_branch_names() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let mut driver = HgDriver::new(repo_config, io, config, http_downloader, process);
 
     let branches = driver.get_branches().unwrap();
-    let mut expected: IndexMap<String, String> = IndexMap::new();
-    expected.insert("help".to_string(), "dbf6c8acb641".to_string());
-    expected.insert("default".to_string(), "dbf6c8acb640".to_string());
-    assert_eq!(expected, branches);
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
+    expected.insert(BString::from("help"), BString::from("dbf6c8acb641"));
+    expected.insert(BString::from("default"), BString::from("dbf6c8acb640"));
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_bstr()),
+                bstr::BString::from(v.as_bstr())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        branches
+    );
 }
 
 #[test]
@@ -134,14 +140,21 @@ fn test_file_get_content_invalid_identifier() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
 
-    assert_eq!(None, driver.get_file_content("file.txt", "h").unwrap());
+    assert_eq!(
+        None,
+        driver
+            .get_file_content(bstr::BStr::new("file.txt"), bstr::BStr::new("h"))
+            .unwrap()
+    );
 
-    let err = driver.get_file_content("file.txt", "-h").unwrap_err();
+    let err = driver
+        .get_file_content(bstr::BStr::new("file.txt"), bstr::BStr::new("-h"))
+        .unwrap_err();
     assert!(err.is_instanceof::<RuntimeException>());
 }
 
@@ -163,11 +176,13 @@ fn test_get_change_date_invalid_identifier() {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".into(),
-        PhpMixed::string("https://example.org/acme.git".to_string()),
+        PhpMixed::string(BString::from("https://example.org/acme.git")),
     );
 
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
 
-    let err = driver.get_change_date("-r foo").unwrap_err();
+    let err = driver
+        .get_change_date(bstr::BStr::new("-r foo"))
+        .unwrap_err();
     assert!(err.is_instanceof::<RuntimeException>());
 }

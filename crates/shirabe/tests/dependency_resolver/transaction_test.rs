@@ -1,27 +1,28 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/TransactionTest.php
 
 use crate::test_case::{get_alias_package, get_package, get_version_constraint};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::dependency_resolver::transaction::Transaction;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat};
 
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
 fn mk_link(
-    source: &str,
-    target: &str,
+    source: &BStr,
+    target: &BStr,
     constraint: shirabe_semver::constraint::AnyConstraint,
-    r#type: &str,
+    r#type: &bstr::BStr,
 ) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bconcat!(source),
+        bconcat!(target),
         constraint,
-        Some(r#type.to_string()),
+        Some(r#type.to_owned()),
         pretty,
     )
 }
@@ -30,7 +31,7 @@ fn mk_link(
 #[derive(Debug)]
 enum OperationEntry {
     Job {
-        job: String,
+        job: BString,
         package: PackageInterfaceHandle,
     },
     Update {
@@ -70,7 +71,7 @@ fn check_transaction_operations(transaction: &Transaction, expected: Vec<Operati
             });
         } else {
             result.push(OperationEntry::Job {
-                job: operation.get_operation_type().to_string(),
+                job: operation.get_operation_type().to_owned(),
                 package: operation.get_target_package(),
             });
         }
@@ -130,38 +131,43 @@ fn test_transaction_generation_and_sorting() {
     plugin
         .as_complete_package()
         .unwrap()
-        .__set_type("composer-installer".to_string());
+        .__set_type(BString::from("composer-installer"));
     for plugin_package in [&plugin2, &dl_modifying_plugin, &dl_modifying_plugin2] {
         plugin_package
             .as_complete_package()
             .unwrap()
-            .__set_type("composer-plugin".to_string());
+            .__set_type(BString::from("composer-plugin"));
     }
 
-    plugin2
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
-            "x/plugin2-dep".to_string(),
+    plugin2.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
+            BString::from("x/plugin2-dep"),
             mk_link(
-                "x/plugin2",
-                "x/plugin2-dep",
+                BStr::new("x/plugin2"),
+                BStr::new("x/plugin2-dep"),
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     dl_modifying_plugin2
         .as_complete_package()
         .unwrap()
-        .__set_requires(IndexMap::from([(
-            "x/downloads-modifying2-dep".to_string(),
-            mk_link(
-                "x/downloads-modifying2",
-                "x/downloads-modifying2-dep",
-                get_version_constraint("=", "1.0.0"),
-                Link::TYPE_REQUIRE,
-            ),
-        )]));
+        .__set_requires(
+            IndexMap::from([(
+                BString::from("x/downloads-modifying2-dep"),
+                mk_link(
+                    BStr::new("x/downloads-modifying2"),
+                    BStr::new("x/downloads-modifying2-dep"),
+                    get_version_constraint("=", "1.0.0"),
+                    Link::TYPE_REQUIRE,
+                ),
+            )])
+            .into_iter()
+            .collect::<indexmap::IndexMap<_, _>>(),
+        );
     dl_modifying_plugin
         .as_complete_package()
         .unwrap()
@@ -177,81 +183,83 @@ fn test_transaction_generation_and_sorting() {
             PhpMixed::Bool(true),
         )]));
 
-    package_d
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+    package_d.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
-                "f/f".to_string(),
+                BString::from("f/f"),
                 mk_link(
-                    "d/d",
-                    "f/f",
+                    BStr::new("d/d"),
+                    BStr::new("f/f"),
                     get_version_constraint(">", "0.2"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
             (
-                "g/provider".to_string(),
+                BString::from("g/provider"),
                 mk_link(
-                    "d/d",
-                    "g/provider",
+                    BStr::new("d/d"),
+                    BStr::new("g/provider"),
                     get_version_constraint(">", "0.2"),
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
-    package_g
-        .as_complete_package()
-        .unwrap()
-        .__set_provides(IndexMap::from([(
-            "g/provider".to_string(),
+        ])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_g.as_complete_package().unwrap().__set_provides(
+        IndexMap::from([(
+            BString::from("g/provider"),
             mk_link(
-                "g/g",
-                "g/provider",
+                BStr::new("g/g"),
+                BStr::new("g/provider"),
                 get_version_constraint("==", "1.0.0"),
                 Link::TYPE_PROVIDE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let expected_operations = vec![
         OperationEntry::Job {
-            job: "uninstall".to_string(),
+            job: BString::from("uninstall"),
             package: package_c,
         },
         OperationEntry::Job {
-            job: "uninstall".to_string(),
+            job: BString::from("uninstall"),
             package: package_e,
         },
         OperationEntry::Job {
-            job: "markAliasUninstalled".to_string(),
+            job: BString::from("markAliasUninstalled"),
             package: package_e_alias,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: dl_modifying_plugin,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: dl_modifying_plugin2_dep,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: dl_modifying_plugin2,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: plugin,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: plugin2_dep,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: plugin2,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: package_a0_first,
         },
         OperationEntry::Update {
@@ -259,23 +267,23 @@ fn test_transaction_generation_and_sorting() {
             to: package_b_new,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: package_g,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: package_f,
         },
         OperationEntry::Job {
-            job: "markAliasInstalled".to_string(),
+            job: BString::from("markAliasInstalled"),
             package: package_f_alias2,
         },
         OperationEntry::Job {
-            job: "markAliasInstalled".to_string(),
+            job: BString::from("markAliasInstalled"),
             package: package_f_alias1,
         },
         OperationEntry::Job {
-            job: "install".to_string(),
+            job: BString::from("install"),
             package: package_d,
         },
     ];

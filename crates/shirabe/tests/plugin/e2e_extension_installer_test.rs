@@ -9,8 +9,9 @@
 //! everything from local repositories.
 
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::getenv;
+use shirabe_php_shim::{bconcat, getenv, os_str_from_bytes, path_to_bytes};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -48,21 +49,16 @@ pub(crate) fn copy_dir(from: &Path, to: &Path) {
 }
 
 /// Every file under `dir` as relative path => contents.
-fn snapshot_tree(dir: &Path) -> IndexMap<String, Vec<u8>> {
+fn snapshot_tree(dir: &Path) -> IndexMap<BString, Vec<u8>> {
     let mut files = IndexMap::new();
-    fn walk(root: &Path, dir: &Path, files: &mut IndexMap<String, Vec<u8>>) {
+    fn walk(root: &Path, dir: &Path, files: &mut IndexMap<BString, Vec<u8>>) {
         for entry in std::fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_dir() {
                 walk(root, &entry.path(), files);
             } else {
-                let relative = entry
-                    .path()
-                    .strip_prefix(root)
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string();
+                let path = entry.path();
+                let relative = BString::from(path_to_bytes(path.strip_prefix(root).unwrap()));
                 files.insert(relative, std::fs::read(entry.path()).unwrap());
             }
         }
@@ -75,14 +71,14 @@ struct InstallRun {
     exit_code: i32,
     /// The plugin's own IO lines, order preserved (progress rendering differs between the two
     /// implementations and is not compared).
-    plugin_output: Vec<String>,
-    artifacts: IndexMap<String, Vec<u8>>,
+    plugin_output: Vec<BString>,
+    artifacts: IndexMap<BString, Vec<u8>>,
 }
 
-fn run_install(work: &Path, program: &str, args: &[&str]) -> InstallRun {
+fn run_install(work: &Path, program: &BStr, args: &[&std::ffi::OsStr]) -> InstallRun {
     let project = work.join("project");
     copy_dir(&fixture_dir(), work);
-    let output = std::process::Command::new(program)
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(args)
         .arg("install")
         .current_dir(&project)
@@ -93,20 +89,20 @@ fn run_install(work: &Path, program: &str, args: &[&str]) -> InstallRun {
         .unwrap();
     let mut artifacts = snapshot_tree(&project.join("vendor"));
     artifacts.insert(
-        "composer.lock".to_string(),
+        "composer.lock".into(),
         std::fs::read(project.join("composer.lock")).unwrap_or_default(),
     );
     // Directory walk order is filesystem-dependent; a canonical order keys the comparison.
     artifacts.sort_keys();
-    let text = format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+    let text = bconcat!(&output.stdout, &output.stderr);
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the test splits a child process's output into lines, which no PHP code does"
+    )]
     let plugin_output = text
         .lines()
-        .filter(|line| line.starts_with("phpstan/extension-installer:") || line.starts_with("> "))
-        .map(str::to_string)
+        .filter(|line| line.starts_with(b"phpstan/extension-installer:") || line.starts_with(b"> "))
+        .map(BString::from)
         .collect();
     // The next run reuses the same path so absolute paths embedded in the artifacts
     // (GeneratedConfig.php's install_path) compare byte for byte.
@@ -136,9 +132,8 @@ fn test_extension_installer_install_matches_upstream_composer() {
     let _worker = lock_php_worker();
 
     let work = TempDir::new().unwrap();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
-    let upstream = run_install(work.path(), "php", &[&composer_bin]);
-    let shirabe = run_install(work.path(), env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream = run_install(work.path(), BStr::new("php"), &[composer_bin.as_os_str()]);
+    let shirabe = run_install(work.path(), BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(0, upstream.exit_code, "upstream Composer must succeed");
     assert_eq!(upstream.exit_code, shirabe.exit_code);
@@ -152,13 +147,15 @@ fn test_extension_installer_install_matches_upstream_composer() {
         upstream.plugin_output
     );
 
-    let upstream_files: Vec<&String> = upstream.artifacts.keys().collect();
-    let shirabe_files: Vec<&String> = shirabe.artifacts.keys().collect();
+    let upstream_files: Vec<&BString> = upstream.artifacts.keys().collect();
+    let shirabe_files: Vec<&BString> = shirabe.artifacts.keys().collect();
     assert_eq!(upstream_files, shirabe_files);
     for (path, contents) in &upstream.artifacts {
         assert_eq!(
-            contents, &shirabe.artifacts[path],
-            "artifact `{path}` differs between upstream Composer and Shirabe"
+            contents,
+            &shirabe.artifacts[path],
+            "artifact `{}` differs between upstream Composer and Shirabe",
+            path.display_lossy()
         );
     }
 }

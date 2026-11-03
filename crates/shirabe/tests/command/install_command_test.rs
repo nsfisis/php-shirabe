@@ -4,10 +4,12 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
+use bstr::{BStr, BString};
 use serial_test::serial;
+use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
-fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
         .map(|(k, v)| (ParameterName::of(k), v))
@@ -16,46 +18,54 @@ fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
 
 /// ref: InstallCommandTest::errorCaseProvider
 fn error_cases() -> Vec<(
-    &'static str,
+    &'static BStr,
     serde_json::Value,
-    Vec<(&'static str, InputValue)>,
-    &'static str,
+    Vec<(&'static BStr, InputValue)>,
+    &'static BStr,
 )> {
     vec![
         (
-            "it writes an error when the dev flag is passed",
+            BStr::new("it writes an error when the dev flag is passed"),
             serde_json::json!({ "repositories": [] }),
-            vec![("--dev", InputValue::from(true))],
-            r#"<warning>You are using the deprecated option "--dev". It has no effect and will break in Composer 3.</warning>
+            vec![(BStr::new("--dev"), InputValue::from(true))],
+            BStr::new(
+                r#"<warning>You are using the deprecated option "--dev". It has no effect and will break in Composer 3.</warning>
 Installing dependencies from lock file (including require-dev)
 Verifying lock file contents can be installed on current platform.
 Nothing to install, update or remove
 Generating autoload files"#,
+            ),
         ),
         (
-            "it writes an error when no-suggest flag passed",
+            BStr::new("it writes an error when no-suggest flag passed"),
             serde_json::json!({ "repositories": [] }),
-            vec![("--no-suggest", InputValue::from(true))],
-            r#"<warning>You are using the deprecated option "--no-suggest". It has no effect and will break in Composer 3.</warning>
+            vec![(BStr::new("--no-suggest"), InputValue::from(true))],
+            BStr::new(
+                r#"<warning>You are using the deprecated option "--no-suggest". It has no effect and will break in Composer 3.</warning>
 Installing dependencies from lock file (including require-dev)
 Verifying lock file contents can be installed on current platform.
 Nothing to install, update or remove
 Generating autoload files"#,
+            ),
         ),
         (
-            "it writes an error when packages passed",
+            BStr::new("it writes an error when packages passed"),
             serde_json::json!({ "repositories": [] }),
             vec![(
-                "packages",
-                InputValue::Array(vec!["vendor/package".to_string()]),
+                BStr::new("packages"),
+                InputValue::Array(vec!["vendor/package".into()]),
             )],
-            r#"Invalid argument vendor/package. Use "shirabe require vendor/package" instead to add packages to your composer.json."#,
+            BStr::new(
+                r#"Invalid argument vendor/package. Use "shirabe require vendor/package" instead to add packages to your composer.json."#,
+            ),
         ),
         (
-            "it writes an error when no-install flag is passed",
+            BStr::new("it writes an error when no-install flag is passed"),
             serde_json::json!({ "repositories": [] }),
-            vec![("--no-install", InputValue::from(true))],
-            r#"Invalid option "--no-install". Use "shirabe update --no-install" instead if you are trying to update the composer.lock file."#,
+            vec![(BStr::new("--no-install"), InputValue::from(true))],
+            BStr::new(
+                r#"Invalid option "--no-install". Use "shirabe update --no-install" instead if you are trying to update the composer.lock file."#,
+            ),
         ),
     ]
 }
@@ -73,14 +83,15 @@ fn test_install_command_errors() {
         create_installed_json(&packages, &dev_packages, true);
 
         let mut app_tester = get_application_tester();
-        let mut args = vec![("command", InputValue::from("install"))];
+        let mut args = vec![(BStr::new("command"), InputValue::from("install"))];
         args.extend(command);
         let _ = app_tester.run(input(args), RunOptions::default());
 
         assert_eq!(
-            expected.trim(),
-            app_tester.get_display().trim(),
-            "case: {label}"
+            trim(expected),
+            trim(app_tester.get_display()),
+            "case: {label}",
+            label = label.display_lossy()
         );
     }
 }
@@ -98,8 +109,8 @@ fn test_install_from_empty_vendor() {
     let another_package = get_package("root/another", "1.0.0");
     // Set as a metapackage so that we can do the whole post-remove update & install process without
     // Composer trying to download them (DownloadManager::getDownloaderForPackage).
-    root_req_package.__set_type("metapackage".to_string());
-    another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(BString::from("metapackage"));
+    another_package.__set_type(BString::from("metapackage"));
 
     create_composer_lock(&[root_req_package], &[another_package]);
 
@@ -107,8 +118,8 @@ fn test_install_from_empty_vendor() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("install")),
-                ("--no-progress", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("install")),
+                (BStr::new("--no-progress"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -121,7 +132,7 @@ Package operations: 2 installs, 0 updates, 0 removals
   - Installing root/another (1.0.0)
   - Installing root/req (1.0.0)
 Generating autoload files",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -138,8 +149,8 @@ fn test_install_from_empty_vendor_no_dev() {
     let another_package = get_package("root/another", "1.0.0");
     // Set as a metapackage so that we can do the whole post-remove update & install process without
     // Composer trying to download them (DownloadManager::getDownloaderForPackage).
-    root_req_package.__set_type("metapackage".to_string());
-    another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(BString::from("metapackage"));
+    another_package.__set_type(BString::from("metapackage"));
 
     create_composer_lock(&[root_req_package], &[another_package]);
 
@@ -147,9 +158,9 @@ fn test_install_from_empty_vendor_no_dev() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("install")),
-                ("--no-progress", InputValue::from(true)),
-                ("--no-dev", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("install")),
+                (BStr::new("--no-progress"), InputValue::from(true)),
+                (BStr::new("--no-dev"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -161,7 +172,7 @@ Verifying lock file contents can be installed on current platform.
 Package operations: 1 install, 0 updates, 0 removals
   - Installing root/req (1.0.0)
 Generating autoload files",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }
 
@@ -180,8 +191,8 @@ fn test_install_new_packages_with_existing_partial_vendor() {
     let another_package = get_package("root/another", "1.0.0");
     // Set as a metapackage so that we can do the whole post-remove update & install process without
     // Composer trying to download them (DownloadManager::getDownloaderForPackage).
-    root_req_package.__set_type("metapackage".to_string());
-    another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(BString::from("metapackage"));
+    another_package.__set_type(BString::from("metapackage"));
 
     create_composer_lock(&[root_req_package.clone(), another_package], &[]);
     create_installed_json(&[root_req_package], &[], true);
@@ -190,8 +201,8 @@ fn test_install_new_packages_with_existing_partial_vendor() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("install")),
-                ("--no-progress", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("install")),
+                (BStr::new("--no-progress"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -203,6 +214,6 @@ Verifying lock file contents can be installed on current platform.
 Package operations: 1 install, 0 updates, 0 removals
   - Installing root/another (1.0.0)
 Generating autoload files",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 }

@@ -4,47 +4,47 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
 use crate::util::Platform;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, impl_php_class, is_string, php_regex,
-    preg_replace2,
+    InvalidArgumentException, LogicException, PhpMixed, bconcat, impl_php_class, is_string,
+    php_regex, preg_replace2,
 };
-use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::input::InputInterfaceByName;
+use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
 
 #[derive(Debug)]
 pub struct ScriptAliasCommand {
     base_command_data: BaseCommandData,
 
-    script: String,
-    description: String,
-    aliases: Vec<String>,
+    script: BString,
+    description: BString,
+    aliases: Vec<BString>,
 }
 
 impl_php_class!(ScriptAliasCommand, r"Composer\Command\ScriptAliasCommand");
 
 impl ScriptAliasCommand {
     pub fn new(
-        script: String,
-        description: Option<String>,
-        aliases: Vec<String>,
+        script: &BStr,
+        description: Option<BString>,
+        aliases: Vec<BString>,
     ) -> anyhow::Result<Self> {
-        let description = description
-            .unwrap_or_else(|| format!("Runs the {} script as defined in composer.json", script));
+        let description = description.unwrap_or_else(|| {
+            bconcat!("Runs the ", script, " script as defined in composer.json")
+        });
 
         for alias in &aliases {
             if !is_string(&PhpMixed::string(alias.clone())) {
-                return Err(InvalidArgumentException::new(
-                    r#""scripts-aliases" element array values should contain only strings"#
-                        .to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    r#""scripts-aliases" element array values should contain only strings"#,
+                ))
                 .into());
             }
         }
 
         let command = Self {
             base_command_data: BaseCommandData::new(None),
-            script,
+            script: script.into(),
             description,
             aliases,
         };
@@ -59,10 +59,8 @@ impl ScriptAliasCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ScriptAliasCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        let name = self.script.clone();
-        self.set_name(&name)?;
-        let description = self.description.clone();
-        self.set_description(&description);
+        self.set_name(self.script.as_bstr())?;
+        self.set_description(self.description.as_bstr());
         self.set_aliases(self.aliases.clone())?;
         self.set_definition(&[
             InputOption::new(
@@ -95,7 +93,8 @@ impl Command for ScriptAliasCommand {
         self.set_help(
             "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
             <info>shirabe run-script post-update-cmd</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run",
+            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run"
+                .into(),
         );
         Ok(())
     }
@@ -115,9 +114,9 @@ impl Command for ScriptAliasCommand {
         // TODO(symfony): InputInterface has_to_string/get_class_name not modeled in Rust
         // TODO remove for Symfony 6+ as it is then in the interface
         if false {
-            return Err(LogicException::new(
-                "Expected an Input instance that is stringable".to_string(),
-            )
+            return Err(LogicException::new(BString::from(
+                "Expected an Input instance that is stringable",
+            ))
             .into());
         }
 
@@ -131,7 +130,7 @@ impl Command for ScriptAliasCommand {
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
         // TODO(symfony): InputInterface lacks to_string; use a placeholder until it is modeled.
-        let input_as_string = String::new();
+        let input_as_string = BString::default();
         let _ = input;
         let script_alias_input =
             preg_replace2(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1, None);
@@ -141,15 +140,15 @@ impl Command for ScriptAliasCommand {
             PhpMixed::string(script_alias_input),
         );
 
-        let args_value: Vec<String> = args
-            .get("args")
+        let args_value: Vec<bstr::BString> = args
+            .get(bstr::B("args"))
             .and_then(|v| v.as_array())
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
         dispatcher
             .borrow_mut()
-            .dispatch_script(&self.script, dev_mode, args_value, flags)
+            .dispatch_script(self.script.as_ref(), dev_mode, args_value, flags)
     }
 
     fn initialize(

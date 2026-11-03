@@ -3,11 +3,12 @@
 use crate::config::Config;
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use crate::question::StrictConfirmationQuestion;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
-    PhpMixed, array_search, in_array_strict, is_array, is_string, memory_get_usage, microtime,
-    preg_replace, str_repeat, strip_tags, strlen,
+    PhpMixed, array_search, bconcat, canonical_int_key, display_to_bytes, error_message,
+    in_array_strict, is_array, is_string, mb_check_encoding, mb_convert_encoding, memory_get_usage,
+    microtime, preg_replace, str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
     ProgressBar, QuestionHelper, QuestionHelperInterface, Table,
@@ -21,7 +22,8 @@ use shirabe_symfony_console::question::{ChoiceQuestion, Question, QuestionInterf
 /// The Input/Output helper.
 #[derive(Debug)]
 pub struct ConsoleIO {
-    authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+    authentications:
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 
     pub(crate) input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     pub(crate) output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -32,8 +34,8 @@ pub struct ConsoleIO {
     /// directly instead of a `HelperSet`.
     question_helper: std::cell::RefCell<QuestionHelper>,
 
-    last_message: std::cell::RefCell<String>,
-    last_message_err: std::cell::RefCell<String>,
+    last_message: std::cell::RefCell<BString>,
+    last_message_err: std::cell::RefCell<BString>,
 
     start_time: Option<f64>,
     verbosity_map: IndexMap<i64, i64>,
@@ -59,8 +61,8 @@ impl ConsoleIO {
             input,
             output,
             question_helper: std::cell::RefCell::new(question_helper),
-            last_message: std::cell::RefCell::new(String::new()),
-            last_message_err: std::cell::RefCell::new(String::new()),
+            last_message: std::cell::RefCell::new(BString::default()),
+            last_message_err: std::cell::RefCell::new(BString::default()),
             start_time: None,
             verbosity_map,
         }
@@ -70,7 +72,7 @@ impl ConsoleIO {
         self.start_time = Some(start_time);
     }
 
-    fn do_write(&self, messages: &str, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
+    fn do_write(&self, messages: &BStr, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
         let mut sf_verbosity = *self.verbosity_map.get(&verbosity).unwrap_or(&0);
         if sf_verbosity > self.output.borrow().get_verbosity() {
             return;
@@ -83,9 +85,12 @@ impl ConsoleIO {
         let messages = if let Some(start_time) = self.start_time {
             let memory_usage = (memory_get_usage() as f64) / 1024.0 / 1024.0;
             let time_spent = microtime() - start_time;
-            format!("[{:.1}MiB/{:.2}s] {}", memory_usage, time_spent, messages)
+            bconcat!(
+                display_to_bytes(format_args!("[{:.1}MiB/{:.2}s] ", memory_usage, time_spent)),
+                messages
+            )
         } else {
-            messages.to_string()
+            BString::from(messages)
         };
 
         let error_output = if stderr {
@@ -114,7 +119,7 @@ impl ConsoleIO {
 
     fn do_overwrite(
         &self,
-        messages: &str,
+        messages: &BStr,
         newline: bool,
         size: Option<i64>,
         stderr: bool,
@@ -128,11 +133,11 @@ impl ConsoleIO {
             } else {
                 self.last_message.borrow().clone()
             };
-            strlen(&strip_tags(&last))
+            strlen(strip_tags(&last))
         });
         // ...let's fill its length with backspaces
         self.do_write(
-            &str_repeat("\x08", size as usize),
+            str_repeat("\x08", size as usize).as_bstr(),
             false,
             stderr,
             verbosity,
@@ -145,11 +150,11 @@ impl ConsoleIO {
         // In cmd.exe on Win8.1 (possibly 10?), the line can not be cleared, so we need to
         // track the length of previous output and fill it with spaces to make sure the line is cleared.
         // See https://github.com/composer/composer/pull/5836 for more details
-        let fill = size - strlen(&strip_tags(messages));
+        let fill = size - strlen(strip_tags(messages));
         if fill > 0 {
             // whitespace whatever has left
             self.do_write(
-                &str_repeat(" ", fill as usize),
+                str_repeat(" ", fill as usize).as_bstr(),
                 false,
                 stderr,
                 verbosity,
@@ -157,7 +162,7 @@ impl ConsoleIO {
             );
             // move the cursor back
             self.do_write(
-                &str_repeat("\x08", fill as usize),
+                str_repeat("\x08", fill as usize).as_bstr(),
                 false,
                 stderr,
                 verbosity,
@@ -166,13 +171,13 @@ impl ConsoleIO {
         }
 
         if newline {
-            self.do_write("", true, stderr, verbosity, false);
+            self.do_write("".into(), true, stderr, verbosity, false);
         }
 
         if stderr {
-            *self.last_message_err.borrow_mut() = messages.to_string();
+            *self.last_message_err.borrow_mut() = BString::from(messages);
         } else {
-            *self.last_message.borrow_mut() = messages.to_string();
+            *self.last_message.borrow_mut() = BString::from(messages);
         }
     }
 
@@ -205,7 +210,7 @@ impl ConsoleIO {
     /// All other control chars (except NULL bytes) as well as ANSI escape sequences are removed.
     ///
     /// Invalid unicode sequences are turned into question marks.
-    pub fn sanitize(messages: &str, allow_newlines: bool) -> String {
+    pub fn sanitize(messages: impl AsRef<[u8]>, allow_newlines: bool) -> BString {
         // Match ANSI escape sequences:
         // - CSI (Control Sequence Introducer): ESC [ params intermediate final
         // - OSC (Operating System Command): ESC ] ... ESC \ or BEL
@@ -218,26 +223,31 @@ impl ConsoleIO {
         // pair is preserved while a lone CR is removed.
         let (pattern, replacement) = if allow_newlines {
             (
-                format!(
-                    r#"@{}|[\x01-\x09\x0B\x0C\x0E-\x1A]|(\r\n)|\r@u"#,
-                    escape_pattern
+                bconcat!(
+                    r#"@"#,
+                    escape_pattern,
+                    r#"|[\x01-\x09\x0B\x0C\x0E-\x1A]|(\r\n)|\r@u"#
                 ),
                 "$1",
             )
         } else {
-            (format!("{{{}|[\\x01-\\x1A]}}u", escape_pattern), "")
+            (bconcat!("{", escape_pattern, "|[\\x01-\\x1A]}u"), "")
         };
-        let messages = Self::ensure_valid_utf8(messages);
+        let messages = Self::ensure_valid_utf8(messages.as_ref());
 
         preg_replace(&pattern, replacement, &messages)
     }
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'
-    // TODO(bytes): PHP sanitizes invalid byte sequences here, but `&str` is always valid UTF-8
-    // so this is a no-op for now. The codebase does not yet strictly distinguish `BString` from
-    // `String`; once it does, this should take `&BStr` and lossily convert it to `String`.
-    fn ensure_valid_utf8(string: &str) -> String {
-        string.to_string()
+    fn ensure_valid_utf8(string: &[u8]) -> BString {
+        // Quick check: if string is already valid UTF-8, return as-is
+        if mb_check_encoding(string, "UTF-8") {
+            return BString::from(string);
+        }
+
+        // Use mb_convert_encoding to replace invalid sequences with '?'
+        // This makes it visible when data quality issues occur
+        mb_convert_encoding(string, "UTF-8", "UTF-8")
     }
 
     /// Delegates to `QuestionHelper::ask`.
@@ -278,39 +288,51 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.output.borrow().is_decorated()
     }
 
-    fn write3(&self, message: &str, newline: bool, verbosity: i64) {
+    fn write_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         let message = Self::sanitize(message, true);
 
-        self.do_write(&message, newline, false, verbosity, false);
+        self.do_write(message.as_bstr(), newline, false, verbosity, false);
     }
 
-    fn write_error3(&self, message: &str, newline: bool, verbosity: i64) {
+    fn write_error_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         let message = Self::sanitize(message, true);
 
-        self.do_write(&message, newline, true, verbosity, false);
+        self.do_write(message.as_bstr(), newline, true, verbosity, false);
     }
 
-    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64) {
+    fn write_raw_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         self.do_write(message, newline, false, verbosity, true);
     }
 
-    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64) {
+    fn write_error_raw_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         self.do_write(message, newline, true, verbosity, true);
     }
 
-    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+    fn overwrite_bytes(
+        &self,
+        message: &bstr::BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
         self.do_overwrite(message, newline, size, false, verbosity);
     }
 
-    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+    fn overwrite_error_bytes(
+        &self,
+        message: &bstr::BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
         self.do_overwrite(message, newline, size, true, verbosity);
     }
 
-    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(&question, true);
+    fn ask_bytes(&self, question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        let sanitized_question = Self::sanitize(question, true);
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
-                &default.as_string().unwrap_or_default().to_str_lossy(),
+                default.as_string().unwrap_or_default(),
                 true,
             )))
         } else {
@@ -321,30 +343,30 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.ask_question(&question)
     }
 
-    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
-        let sanitized = Self::sanitize(&question, true);
+    fn ask_confirmation_bytes(&self, question: &bstr::BStr, default: bool) -> anyhow::Result<bool> {
+        let sanitized = Self::sanitize(question, true);
         let question = StrictConfirmationQuestion::new(
             sanitized,
             default,
-            "/^y(?:es)?$/i".to_string(),
-            "/^no?$/i".to_string(),
+            BString::from("/^y(?:es)?$/i"),
+            BString::from("/^no?$/i"),
         );
 
         let result = self.ask_question(&question)?;
         Ok(result.as_bool().unwrap_or(false))
     }
 
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(&question, true);
+        let sanitized_question = Self::sanitize(question, true);
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
-                &default.as_string().unwrap_or_default().to_str_lossy(),
+                default.as_string().unwrap_or_default(),
                 true,
             )))
         } else {
@@ -363,19 +385,20 @@ impl IOInterfaceImmutable for ConsoleIO {
             >,
         > = Box::new(move |answer: Option<PhpMixed>| {
             validator(answer.unwrap_or(PhpMixed::Null)).map_err(|e| {
-                shirabe_symfony_console::exception::InvalidArgumentException::new(e.to_string())
+                shirabe_symfony_console::exception::InvalidArgumentException::new(error_message(&e))
             })
         });
         question.set_validator(Some(adapted));
-        question
-            .set_max_attempts(attempts)
-            .map_err(|e| anyhow::anyhow!(e.0.get_message().to_string()))?;
+        question.set_max_attempts(attempts)?;
 
         self.ask_question(&question)
     }
 
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
-        let sanitized_question = Self::sanitize(&question, true);
+    fn ask_and_hide_answer_bytes(
+        &self,
+        question: &bstr::BStr,
+    ) -> anyhow::Result<Option<bstr::BString>> {
+        let sanitized_question = Self::sanitize(question, true);
         let mut question = Question::new(sanitized_question, Some(PhpMixed::Null));
         // setHidden only throws when an autocompleter is set, which is not the case here.
         question
@@ -383,32 +406,29 @@ impl IOInterfaceImmutable for ConsoleIO {
             .expect("a freshly constructed question has no autocompleter");
 
         let result = self.ask_question(&question)?;
-        Ok(result.as_string().map(|s| s.to_string()))
+        Ok(result.as_string().map(BString::from))
     }
 
-    fn select(
+    fn select_bytes(
         &self,
-        question: String,
+        question: &bstr::BStr,
         choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
-        error_message: String,
+        error_message: &bstr::BStr,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(&question, true);
+        let sanitized_question = Self::sanitize(question, true);
         // ChoiceQuestion::new expects an IndexMap<BString, PhpMixed>; project the
         // sanitized choice list/map into the keyed form, preserving keys.
         let sanitize_choice = |choice: &PhpMixed| {
-            PhpMixed::string(Self::sanitize(
-                &choice.as_string().unwrap_or_default().to_str_lossy(),
-                true,
-            ))
+            PhpMixed::string(Self::sanitize(choice.as_string().unwrap_or_default(), true))
         };
         let sanitized_choices: IndexMap<BString, PhpMixed> = match &choices {
             PhpMixed::List(l) => l
                 .iter()
                 .enumerate()
-                .map(|(i, choice)| (i.to_string().into(), sanitize_choice(choice)))
+                .map(|(i, choice)| (bconcat!(i), sanitize_choice(choice)))
                 .collect(),
             PhpMixed::Array(a) => a
                 .iter()
@@ -418,7 +438,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         };
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
-                &default.as_string().unwrap_or_default().to_str_lossy(),
+                default.as_string().unwrap_or_default(),
                 true,
             )))
         } else {
@@ -448,34 +468,27 @@ impl IOInterfaceImmutable for ConsoleIO {
             PhpMixed::List(_) => vec![],
             _ => vec![],
         };
-        let is_assoc = !choice_keys.is_empty()
-            && choice_keys
-                .iter()
-                .any(|k| !k.to_str().is_ok_and(|k| k.parse::<i64>().is_ok()));
+        let is_assoc =
+            !choice_keys.is_empty() && choice_keys.iter().any(|k| canonical_int_key(k).is_none());
         if is_assoc {
             return Ok(result);
         }
 
         if !is_array(&result) {
-            let result_str = result.as_string().unwrap_or_default().to_string();
-            let haystack: IndexMap<String, String> = match &choices {
+            let haystack: IndexMap<BString, BString> = match &choices {
                 PhpMixed::List(l) => l
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, v)| v.as_string().map(|s| (i.to_string(), s.to_string())))
+                    .filter_map(|(i, v)| v.as_string().map(|s| (bconcat!(i), BString::from(s))))
                     .collect(),
                 PhpMixed::Array(a) => a
                     .iter()
-                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-                    .filter_map(|(k, v)| {
-                        v.as_string()
-                            .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
-                    })
+                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), BString::from(s))))
                     .collect(),
                 _ => IndexMap::new(),
             };
             return Ok(PhpMixed::string(
-                array_search(&result_str, &haystack).unwrap_or_default(),
+                array_search(result.as_string().unwrap_or_default(), &haystack).unwrap_or_default(),
             ));
         }
 
@@ -485,7 +498,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             PhpMixed::List(l) => l
                 .iter()
                 .enumerate()
-                .map(|(i, v)| (i.to_string().into(), v.clone()))
+                .map(|(i, v)| (bconcat!(i), v.clone()))
                 .collect(),
             PhpMixed::Array(a) => a.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             _ => vec![],
@@ -501,27 +514,32 @@ impl IOInterfaceImmutable for ConsoleIO {
         ))
     }
 
-    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {
+    fn get_authentications(
+        &self,
+    ) -> IndexMap<bstr::BString, IndexMap<bstr::BString, Option<bstr::BString>>> {
         <Self as BaseIO>::get_authentications(self)
     }
 
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
         <Self as BaseIO>::has_authentication(self, repository_name)
     }
 
-    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>> {
+    fn get_authentication(
+        &self,
+        repository_name: &bstr::BStr,
+    ) -> IndexMap<bstr::BString, Option<bstr::BString>> {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
+    fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::error(self, message, context);
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+    fn warning_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::warning(self, message, context);
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+    fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
 }
@@ -529,9 +547,9 @@ impl IOInterfaceImmutable for ConsoleIO {
 impl IOInterfaceMutable for ConsoleIO {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: bstr::BString,
+        username: bstr::BString,
+        password: Option<bstr::BString>,
     ) {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
@@ -558,13 +576,17 @@ impl IOInterface for ConsoleIO {
 impl BaseIO for ConsoleIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
+    {
         &self.authentications
     }
 
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &mut indexmap::IndexMap<
+        bstr::BString,
+        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    > {
         &mut self.authentications
     }
 }

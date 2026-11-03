@@ -1,13 +1,14 @@
 //! ref: composer/vendor/symfony/console/Exception/RuntimeException.php
 
 use super::exception_interface::ExceptionInterface;
+use bstr::BString;
 
 #[derive(Debug)]
 pub struct RuntimeException(pub shirabe_php_shim::RuntimeException);
 
 impl RuntimeException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self(shirabe_php_shim::RuntimeException::new(message))
     }
 }

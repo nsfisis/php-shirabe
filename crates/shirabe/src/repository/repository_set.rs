@@ -15,6 +15,7 @@ use crate::repository::{
     CompositeRepository, FindPackageConstraint, InstalledRepository, LockArrayRepositoryHandle,
     PlatformRepository, RepositoryInterfaceHandle,
 };
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{Catch as _, LogicException, RuntimeException, ksort, strtolower};
 use shirabe_semver::constraint::{
@@ -23,35 +24,35 @@ use shirabe_semver::constraint::{
 
 #[derive(Debug, Clone)]
 pub struct RootAliasEntry {
-    pub alias: String,
-    pub alias_normalized: String,
+    pub alias: BString,
+    pub alias_normalized: BString,
 }
 
 #[derive(Debug, Clone)]
 pub struct RootAliasInput {
-    pub package: String,
-    pub version: String,
-    pub alias: String,
-    pub alias_normalized: String,
+    pub package: BString,
+    pub version: BString,
+    pub alias: BString,
+    pub alias_normalized: BString,
 }
 
 #[derive(Debug)]
 pub struct RepositorySet {
     /// Packages are returned even though their stability does not match the required stability
     /// PHP: ALLOW_UNACCEPTABLE_STABILITIES = 1
-    root_aliases: IndexMap<String, IndexMap<String, RootAliasEntry>>,
+    root_aliases: IndexMap<BString, IndexMap<BString, RootAliasEntry>>,
 
-    root_references: IndexMap<String, String>,
+    root_references: IndexMap<BString, BString>,
 
     repositories: Vec<RepositoryInterfaceHandle>,
 
-    acceptable_stabilities: IndexMap<String, i64>,
+    acceptable_stabilities: IndexMap<BString, i64>,
 
-    stability_flags: IndexMap<String, i64>,
+    stability_flags: IndexMap<BString, i64>,
 
-    root_requires: IndexMap<String, AnyConstraint>,
+    root_requires: IndexMap<BString, AnyConstraint>,
 
-    temporary_constraints: IndexMap<String, AnyConstraint>,
+    temporary_constraints: IndexMap<BString, AnyConstraint>,
 
     locked: bool,
     allow_installed_repositories: bool,
@@ -67,26 +68,27 @@ impl RepositorySet {
     /// passing minimumStability is all you need to worry about. The rest is for advanced pool creation including
     /// aliases, pinned references and other special cases.
     pub fn new(
-        minimum_stability: &str,
-        stability_flags: IndexMap<String, i64>,
+        minimum_stability: impl AsRef<[u8]>,
+        stability_flags: IndexMap<BString, i64>,
         root_aliases: Vec<RootAliasInput>,
-        root_references: IndexMap<String, String>,
-        mut root_requires: IndexMap<String, AnyConstraint>,
-        temporary_constraints: IndexMap<String, AnyConstraint>,
+        root_references: IndexMap<BString, BString>,
+        mut root_requires: IndexMap<BString, AnyConstraint>,
+        temporary_constraints: IndexMap<BString, AnyConstraint>,
     ) -> Self {
         let root_aliases = Self::get_root_aliases_per_package(root_aliases);
 
-        let mut acceptable_stabilities: IndexMap<String, i64> = IndexMap::new();
+        let mut acceptable_stabilities: IndexMap<BString, i64> = IndexMap::new();
         // PHP: foreach (BasePackage::STABILITIES as $stability => $value)
         let stabilities = crate::package::STABILITIES.clone();
-        let min_value = *stabilities.get(minimum_stability).unwrap_or(&0);
+        let min_value =
+            crate::package::base_package::stability_priority(minimum_stability).unwrap_or(0);
         for (stability, value) in stabilities.iter() {
             if *value <= min_value {
-                acceptable_stabilities.insert(stability.to_string(), *value);
+                acceptable_stabilities.insert(bstr::BString::from(*stability), *value);
             }
         }
         // PHP: foreach ($rootRequires as $name => $constraint) { if (...) unset(...); }
-        let names: Vec<String> = root_requires.keys().cloned().collect();
+        let names: Vec<BString> = root_requires.keys().cloned().collect();
         for name in names {
             if PlatformRepository::is_platform_package(&name) {
                 root_requires.shift_remove(&name);
@@ -110,11 +112,11 @@ impl RepositorySet {
         self.allow_installed_repositories = allow;
     }
 
-    pub fn get_root_requires(&self) -> &IndexMap<String, AnyConstraint> {
+    pub fn get_root_requires(&self) -> &IndexMap<BString, AnyConstraint> {
         &self.root_requires
     }
 
-    pub fn get_temporary_constraints(&self) -> &IndexMap<String, AnyConstraint> {
+    pub fn get_temporary_constraints(&self) -> &IndexMap<BString, AnyConstraint> {
         &self.temporary_constraints
     }
 
@@ -124,7 +126,7 @@ impl RepositorySet {
     /// repository the search for that package ends, and following repos will not be consulted.
     pub fn add_repository(&mut self, repo: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         if self.locked {
-            return Err(RuntimeException::new("Pool has already been created from this repository set, it cannot be modified anymore.".to_string())
+            return Err(RuntimeException::new(BString::from("Pool has already been created from this repository set, it cannot be modified anymore."))
             .into());
         }
 
@@ -150,7 +152,7 @@ impl RepositorySet {
     /// Returned in the order of repositories, matching priority
     pub fn find_packages(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: Option<AnyConstraint>,
         flags: i64,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
@@ -169,13 +171,13 @@ impl RepositorySet {
             }
         } else {
             'outer: for repository in &self.repositories {
-                let mut name_map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-                name_map.insert(name.to_string(), constraint.clone());
+                let mut name_map: IndexMap<BString, Option<AnyConstraint>> = IndexMap::new();
+                name_map.insert(bstr::BString::from(name), constraint.clone());
                 let acceptable = if ignore_stability {
                     // PHP: BasePackage::STABILITIES
                     crate::package::STABILITIES
                         .iter()
-                        .map(|(k, v)| (k.to_string(), *v))
+                        .map(|(k, v)| (BString::from(*k), *v))
                         .collect()
                 } else {
                     self.acceptable_stabilities.clone()
@@ -216,7 +218,10 @@ impl RepositorySet {
 
         let mut result: Vec<BasePackageHandle> = vec![];
         for candidate in candidates {
-            if self.is_package_acceptable(&candidate.get_names(true), &candidate.get_stability()) {
+            if self.is_package_acceptable(
+                &candidate.get_names(true),
+                candidate.get_stability().as_bstr(),
+            ) {
                 result.push(candidate);
             }
         }
@@ -226,16 +231,16 @@ impl RepositorySet {
 
     pub fn get_security_advisories(
         &self,
-        package_names: Vec<String>,
+        package_names: Vec<BString>,
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
     ) -> anyhow::Result<SecurityAdvisoriesResult> {
-        let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
+        let mut map: IndexMap<BString, AnyConstraint> = IndexMap::new();
         for name in &package_names {
             map.insert(name.clone(), MatchAllConstraint::new(None).into());
         }
 
-        let mut unreachable_repos: Vec<String> = vec![];
+        let mut unreachable_repos: Vec<BString> = vec![];
         let advisories = self.get_security_advisories_for_constraints(
             map,
             allow_partial_advisories,
@@ -256,7 +261,7 @@ impl RepositorySet {
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
     ) -> anyhow::Result<SecurityAdvisoriesResult> {
-        let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
+        let mut map: IndexMap<BString, AnyConstraint> = IndexMap::new();
         for package in packages {
             // ignore root alias versions as they are not actual package versions and should not matter when it comes to vulnerabilities
             if let Some(alias) = package.as_alias()
@@ -264,7 +269,7 @@ impl RepositorySet {
             {
                 continue;
             }
-            let name = package.get_name().to_string();
+            let name = BString::from(&package.get_name()[..]);
             if map.contains_key(&name) {
                 let existing = map.shift_remove(&name).unwrap();
                 map.insert(
@@ -272,8 +277,8 @@ impl RepositorySet {
                     MultiConstraint::new(
                         vec![
                             AnyConstraint::Simple(SimpleConstraint::new(
-                                "=".to_string(),
-                                package.get_version().to_string(),
+                                "=",
+                                BString::from(&package.get_version()[..]),
                                 None,
                             )),
                             existing,
@@ -286,13 +291,13 @@ impl RepositorySet {
             } else {
                 map.insert(
                     name,
-                    SimpleConstraint::new("=".to_string(), package.get_version().to_string(), None)
+                    SimpleConstraint::new("=", BString::from(&package.get_version()[..]), None)
                         .into(),
                 );
             }
         }
 
-        let mut unreachable_repos: Vec<String> = vec![];
+        let mut unreachable_repos: Vec<BString> = vec![];
         let advisories = self.get_security_advisories_for_constraints(
             map,
             allow_partial_advisories,
@@ -308,12 +313,12 @@ impl RepositorySet {
 
     fn get_security_advisories_for_constraints(
         &self,
-        package_constraint_map: IndexMap<String, AnyConstraint>,
+        package_constraint_map: IndexMap<BString, AnyConstraint>,
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
-        unreachable_repos: &mut Vec<String>,
-    ) -> anyhow::Result<IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>> {
-        let mut repo_advisories: Vec<IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>> =
+        unreachable_repos: &mut Vec<BString>,
+    ) -> anyhow::Result<IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>> {
+        let mut repo_advisories: Vec<IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>> =
             vec![];
         for repository in &self.repositories {
             let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
@@ -347,13 +352,13 @@ impl RepositorySet {
                         .catch::<TransportException>()
                         .unwrap()
                         .get_message()
-                        .to_string();
+                        .to_owned();
                     unreachable_repos.push(message);
                 }
             }
         }
 
-        let mut advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+        let mut advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
             IndexMap::new();
         for repo in repo_advisories {
             for (name, list) in repo {
@@ -367,11 +372,11 @@ impl RepositorySet {
 
     pub fn get_providers(
         &self,
-        package_name: &str,
-    ) -> anyhow::Result<IndexMap<String, crate::repository::ProviderInfo>> {
-        let mut providers: IndexMap<String, crate::repository::ProviderInfo> = IndexMap::new();
+        package_name: &BStr,
+    ) -> anyhow::Result<IndexMap<BString, crate::repository::ProviderInfo>> {
+        let mut providers: IndexMap<BString, crate::repository::ProviderInfo> = IndexMap::new();
         for repository in &self.repositories {
-            let repo_providers = repository.get_providers(package_name.to_string())?;
+            let repo_providers = repository.get_providers(bstr::BString::from(package_name))?;
             if !repo_providers.is_empty() {
                 providers.extend(repo_providers);
             }
@@ -381,7 +386,7 @@ impl RepositorySet {
     }
 
     /// Check for each given package name whether it would be accepted by this RepositorySet in the given $stability
-    pub fn is_package_acceptable(&self, names: &[String], stability: &str) -> bool {
+    pub fn is_package_acceptable(&self, names: &[BString], stability: &BStr) -> bool {
         StabilityFilter::is_package_acceptable(
             &self.acceptable_stabilities,
             &self.stability_flags,
@@ -398,8 +403,8 @@ impl RepositorySet {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
         pool_optimizer: Option<PoolOptimizer>,
-        ignored_types: Vec<String>,
-        allowed_types: Option<Vec<String>>,
+        ignored_types: Vec<BString>,
+        allowed_types: Option<Vec<BString>>,
         security_advisory_pool_filter: Option<SecurityAdvisoryPoolFilter>,
     ) -> anyhow::Result<Pool> {
         let root_aliases = self
@@ -410,9 +415,9 @@ impl RepositorySet {
                     .iter()
                     .map(|(version, entry)| {
                         let mut fields = IndexMap::new();
-                        fields.insert("alias".to_string(), entry.alias.clone());
+                        fields.insert(BString::from("alias"), entry.alias.clone());
                         fields.insert(
-                            "alias_normalized".to_string(),
+                            BString::from("alias_normalized"),
                             entry.alias_normalized.clone(),
                         );
                         (version.clone(), fields)
@@ -442,9 +447,9 @@ impl RepositorySet {
                     || repo_ref.as_any().is::<InstalledRepository>()
             };
             if is_installed && !self.allow_installed_repositories {
-                return Err(LogicException::new(
-                    "The pool can not accept packages from an installed repository".to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "The pool can not accept packages from an installed repository",
+                ))
                 .into());
             }
         }
@@ -463,9 +468,9 @@ impl RepositorySet {
                     || repo_ref.as_any().is::<InstalledRepository>()
             };
             if is_installed && !self.allow_installed_repositories {
-                return Err(LogicException::new(
-                    "The pool can not accept packages from an installed repository".to_string(),
-                )
+                return Err(LogicException::new(BString::from(
+                    "The pool can not accept packages from an installed repository",
+                ))
                 .into());
             }
         }
@@ -521,29 +526,29 @@ impl RepositorySet {
 
     pub fn create_pool_for_package(
         &mut self,
-        package_name: &str,
+        package_name: &BStr,
         locked_repo: Option<LockArrayRepositoryHandle>,
     ) -> anyhow::Result<Pool> {
         // TODO unify this with above in some simpler version without "request"?
-        self.create_pool_for_packages(vec![package_name.to_string()], locked_repo)
+        self.create_pool_for_packages(vec![bstr::BString::from(package_name)], locked_repo)
     }
 
     pub fn create_pool_for_packages(
         &mut self,
-        package_names: Vec<String>,
+        package_names: Vec<BString>,
         locked_repo: Option<LockArrayRepositoryHandle>,
     ) -> anyhow::Result<Pool> {
         let mut request = Request::new(locked_repo);
 
-        let mut allowed_packages: Vec<String> = vec![];
+        let mut allowed_packages: Vec<BString> = vec![];
         for package_name in &package_names {
             if PlatformRepository::is_platform_package(package_name) {
-                return Err(LogicException::new("createPoolForPackage(s) can not be used for platform packages, as they are never loaded by the PoolBuilder which expects them to be fixed. Use createPoolWithAllPackages or pass in a proper request with the platform packages you need fixed in it.".to_string())
+                return Err(LogicException::new(BString::from("createPoolForPackage(s) can not be used for platform packages, as they are never loaded by the PoolBuilder which expects them to be fixed. Use createPoolWithAllPackages or pass in a proper request with the platform packages you need fixed in it."))
                 .into());
             }
 
-            request.require_name(package_name, None)?;
-            allowed_packages.push(strtolower(package_name));
+            request.require_name(bstr::BStr::new(package_name), None)?;
+            allowed_packages.push(BString::from(&strtolower(package_name)[..]));
         }
 
         if !allowed_packages.is_empty() {
@@ -563,8 +568,8 @@ impl RepositorySet {
 
     fn get_root_aliases_per_package(
         aliases: Vec<RootAliasInput>,
-    ) -> IndexMap<String, IndexMap<String, RootAliasEntry>> {
-        let mut normalized_aliases: IndexMap<String, IndexMap<String, RootAliasEntry>> =
+    ) -> IndexMap<BString, IndexMap<BString, RootAliasEntry>> {
+        let mut normalized_aliases: IndexMap<BString, IndexMap<BString, RootAliasEntry>> =
             IndexMap::new();
 
         for alias in aliases {
@@ -587,7 +592,7 @@ impl RepositorySet {
 pub trait RepositorySetInterface: std::fmt::Debug {
     fn find_packages(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: Option<AnyConstraint>,
         flags: i64,
     ) -> anyhow::Result<Vec<BasePackageHandle>>;
@@ -596,7 +601,7 @@ pub trait RepositorySetInterface: std::fmt::Debug {
 impl RepositorySetInterface for RepositorySet {
     fn find_packages(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: Option<AnyConstraint>,
         flags: i64,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
@@ -606,6 +611,6 @@ impl RepositorySetInterface for RepositorySet {
 
 #[derive(Debug)]
 pub struct SecurityAdvisoriesResult {
-    pub advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-    pub unreachable_repos: Vec<String>,
+    pub advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+    pub unreachable_repos: Vec<BString>,
 }

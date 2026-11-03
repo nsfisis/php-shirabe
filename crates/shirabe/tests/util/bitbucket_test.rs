@@ -4,7 +4,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
 use crate::io_mock::{Expectation, IOMock, get_io_mock};
 use crate::process_executor_mock::get_process_executor_mock;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, io_interface};
@@ -13,42 +13,52 @@ use shirabe::util::http_downloader::{
     HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
 };
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::{PhpMixed, time};
+use shirabe_php_shim::{PhpMixed, bconcat, php_str, time};
 
-const USERNAME: &str = "username";
-const PASSWORD: &str = "password";
-const CONSUMER_KEY: &str = "consumer_key";
-const CONSUMER_SECRET: &str = "consumer_secret";
-const MESSAGE: &str = "mymessage";
-const ORIGIN: &str = "bitbucket.org";
-const TOKEN: &str = "bitbuckettoken";
+const USERNAME: &BStr = php_str(b"username");
+const PASSWORD: &BStr = php_str(b"password");
+const CONSUMER_KEY: &BStr = php_str(b"consumer_key");
+const CONSUMER_SECRET: &BStr = php_str(b"consumer_secret");
+const MESSAGE: &BStr = php_str(b"mymessage");
+const ORIGIN: &BStr = php_str(b"bitbucket.org");
+const TOKEN: &BStr = php_str(b"bitbuckettoken");
 
 // Mirrors the PHPUnit mock of ConfigSourceInterface used throughout BitbucketTest.
 // Methods left without an expectation panic if called.
-mockall::mock! {
-    #[derive(Debug)]
-    pub ConfigSource {}
-    impl ConfigSourceInterface for ConfigSource {
-        fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()>;
-        fn insert_repository(&mut self, name: &str, config: PhpMixed, reference_name: &str, offset: i64) -> anyhow::Result<()>;
-        fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()>;
-        fn remove_repository(&mut self, name: &str) -> anyhow::Result<()>;
-        fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
-        fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()>;
-        fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
-        fn remove_property(&mut self, name: &str) -> anyhow::Result<()>;
-        fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()>;
-        fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()>;
-        fn get_name(&self) -> String;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_config_source {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub ConfigSource {}
+        impl ConfigSourceInterface for ConfigSource {
+            fn add_repository(&mut self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+            fn insert_repository(&mut self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
+            fn set_repository_url(&mut self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_repository(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_config_setting(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_config_setting(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_property(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn get_name(&self) -> bstr::BString;
+        }
     }
 }
+use mock_config_source::MockConfigSource;
 
 // A bare auth config source placeholder: getAuthConfigSource() is consulted (e.g. while
 // printing instructions), but no add/removeConfigSetting expectations are asserted.
 fn placeholder_auth_config_source() -> Box<MockConfigSource> {
     let mut mock = MockConfigSource::new();
     mock.expect_get_name()
-        .returning(|| "auth-config-source".to_string());
+        .returning(|| "auth-config-source".into());
     mock.expect_add_config_setting().returning(|_, _| Ok(()));
     mock.expect_remove_config_setting().returning(|_| Ok(()));
     Box::new(mock)
@@ -103,10 +113,10 @@ fn set_up_with_config_and_http(
 // The OAuth2 token request as built by Bitbucket::request_access_token.
 fn access_token_request_options() -> IndexMap<BString, PhpMixed> {
     let mut http = IndexMap::new();
-    http.insert("method".into(), PhpMixed::string("POST".to_string()));
+    http.insert("method".into(), PhpMixed::string(BString::from("POST")));
     http.insert(
         "content".into(),
-        PhpMixed::string("grant_type=client_credentials".to_string()),
+        PhpMixed::string(BString::from("grant_type=client_credentials")),
     );
     let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
     options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
@@ -114,10 +124,11 @@ fn access_token_request_options() -> IndexMap<BString, PhpMixed> {
     options
 }
 
-fn access_token_body() -> String {
-    format!(
-        "{{\"access_token\": \"{}\", \"scopes\": \"repository\", \"expires_in\": 3600, \"refresh_token\": \"refreshtoken\", \"token_type\": \"bearer\"}}",
-        TOKEN
+fn access_token_body() -> BString {
+    bconcat!(
+        "{\"access_token\": \"",
+        TOKEN,
+        "\", \"scopes\": \"repository\", \"expires_in\": 3600, \"refresh_token\": \"refreshtoken\", \"token_type\": \"bearer\"}"
     )
 }
 
@@ -132,8 +143,8 @@ fn set_expectations_for_storing_access_token(
     let mut config_source = MockConfigSource::new();
     config_source
         .expect_get_name()
-        .returning(|| "config-source".to_string());
-    let removed_key = format!("bitbucket-oauth.{}", ORIGIN);
+        .returning(|| "config-source".into());
+    let removed_key = bconcat!("bitbucket-oauth.", ORIGIN);
     config_source
         .expect_remove_config_setting()
         .times(1)
@@ -146,8 +157,8 @@ fn set_expectations_for_storing_access_token(
     let mut auth_config_source = MockConfigSource::new();
     auth_config_source
         .expect_get_name()
-        .returning(|| "auth-config-source".to_string());
-    let added_key = format!("bitbucket-oauth.{}", ORIGIN);
+        .returning(|| "auth-config-source".into());
+    let added_key = bconcat!("bitbucket-oauth.", ORIGIN);
     let expected_value = expected_stored_token(time);
     auth_config_source
         .expect_add_config_setting()
@@ -155,7 +166,7 @@ fn set_expectations_for_storing_access_token(
         .withf(move |name, value| name == added_key && *value == expected_value)
         .returning(|_, _| Ok(()));
     if remove_basic_auth {
-        let basic_key = format!("http-basic.{}", ORIGIN);
+        let basic_key = bconcat!("http-basic.", ORIGIN);
         auth_config_source
             .expect_remove_config_setting()
             .times(1)
@@ -171,13 +182,13 @@ fn expected_stored_token(time: i64) -> PhpMixed {
     let mut consumer = IndexMap::new();
     consumer.insert(
         "consumer-key".into(),
-        PhpMixed::string(CONSUMER_KEY.to_string()),
+        PhpMixed::string(bconcat!(CONSUMER_KEY)),
     );
     consumer.insert(
         "consumer-secret".into(),
-        PhpMixed::string(CONSUMER_SECRET.to_string()),
+        PhpMixed::string(bconcat!(CONSUMER_SECRET)),
     );
-    consumer.insert("access-token".into(), PhpMixed::string(TOKEN.to_string()));
+    consumer.insert("access-token".into(), PhpMixed::string(bconcat!(TOKEN)));
     consumer.insert("access-token-expiration".into(), PhpMixed::Int(time + 3600));
     PhpMixed::Array(consumer)
 }
@@ -201,7 +212,7 @@ fn test_request_access_token_with_valid_oauth_consumer() {
             vec![Expectation::auth(
                 ORIGIN,
                 CONSUMER_KEY,
-                Some(CONSUMER_SECRET.to_string()),
+                Some(bconcat!(CONSUMER_SECRET)),
             )],
             false,
         )
@@ -211,7 +222,11 @@ fn test_request_access_token_with_valid_oauth_consumer() {
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, CONSUMER_KEY, CONSUMER_SECRET)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(CONSUMER_KEY),
+                bstr::BStr::new(CONSUMER_SECRET),
+            )
             .unwrap(),
         TOKEN
     );
@@ -221,15 +236,15 @@ fn test_request_access_token_with_valid_oauth_consumer() {
 fn test_request_access_token_with_valid_oauth_consumer_and_valid_stored_access_token() {
     let time = time();
     let mut stored = IndexMap::new();
-    stored.insert("access-token".into(), PhpMixed::string(TOKEN.to_string()));
+    stored.insert("access-token".into(), PhpMixed::string(bconcat!(TOKEN)));
     stored.insert("access-token-expiration".into(), PhpMixed::Int(time + 1800));
     stored.insert(
         "consumer-key".into(),
-        PhpMixed::string(CONSUMER_KEY.to_string()),
+        PhpMixed::string(bconcat!(CONSUMER_KEY)),
     );
     stored.insert(
         "consumer-secret".into(),
-        PhpMixed::string(CONSUMER_SECRET.to_string()),
+        PhpMixed::string(bconcat!(CONSUMER_SECRET)),
     );
     let mut oauth = IndexMap::new();
     oauth.insert(ORIGIN.into(), PhpMixed::Array(stored));
@@ -242,7 +257,11 @@ fn test_request_access_token_with_valid_oauth_consumer_and_valid_stored_access_t
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, CONSUMER_KEY, CONSUMER_SECRET)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(CONSUMER_KEY),
+                bstr::BStr::new(CONSUMER_SECRET),
+            )
             .unwrap(),
         TOKEN
     );
@@ -257,16 +276,16 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
     let mut stored = IndexMap::new();
     stored.insert(
         "access-token".into(),
-        PhpMixed::string("randomExpiredToken".to_string()),
+        PhpMixed::string(BString::from("randomExpiredToken")),
     );
     stored.insert("access-token-expiration".into(), PhpMixed::Int(time - 400));
     stored.insert(
         "consumer-key".into(),
-        PhpMixed::string(CONSUMER_KEY.to_string()),
+        PhpMixed::string(bconcat!(CONSUMER_KEY)),
     );
     stored.insert(
         "consumer-secret".into(),
-        PhpMixed::string(CONSUMER_SECRET.to_string()),
+        PhpMixed::string(bconcat!(CONSUMER_SECRET)),
     );
     let mut oauth = IndexMap::new();
     oauth.insert(ORIGIN.into(), PhpMixed::Array(stored));
@@ -291,7 +310,7 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
             vec![Expectation::auth(
                 ORIGIN,
                 CONSUMER_KEY,
-                Some(CONSUMER_SECRET.to_string()),
+                Some(bconcat!(CONSUMER_SECRET)),
             )],
             false,
         )
@@ -301,7 +320,11 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, CONSUMER_KEY, CONSUMER_SECRET)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(CONSUMER_KEY),
+                bstr::BStr::new(CONSUMER_SECRET),
+            )
             .unwrap(),
         TOKEN
     );
@@ -327,7 +350,7 @@ fn test_request_access_token_with_username_and_password() {
         .borrow_mut()
         .expects(
             vec![
-                Expectation::auth(ORIGIN, USERNAME, Some(PASSWORD.to_string())),
+                Expectation::auth(ORIGIN, USERNAME, Some(bconcat!(PASSWORD))),
                 Expectation::text("Invalid OAuth consumer provided."),
                 Expectation::text("This can have three reasons:"),
                 Expectation::text(
@@ -346,7 +369,11 @@ fn test_request_access_token_with_username_and_password() {
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, USERNAME, PASSWORD)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(USERNAME),
+                bstr::BStr::new(PASSWORD),
+            )
             .unwrap(),
         ""
     );
@@ -370,7 +397,7 @@ fn test_request_access_token_with_username_and_password_with_unauthorized_respon
         .borrow_mut()
         .expects(
             vec![
-                Expectation::auth(ORIGIN, USERNAME, Some(PASSWORD.to_string())),
+                Expectation::auth(ORIGIN, USERNAME, Some(bconcat!(PASSWORD))),
                 Expectation::text("Invalid OAuth consumer provided."),
                 Expectation::text(
                     "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
@@ -382,7 +409,11 @@ fn test_request_access_token_with_username_and_password_with_unauthorized_respon
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, USERNAME, PASSWORD)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(USERNAME),
+                bstr::BStr::new(PASSWORD),
+            )
             .unwrap(),
         ""
     );
@@ -407,13 +438,17 @@ fn test_request_access_token_with_username_and_password_with_not_found_response(
             vec![Expectation::auth(
                 ORIGIN,
                 USERNAME,
-                Some(PASSWORD.to_string()),
+                Some(bconcat!(PASSWORD)),
             )],
             false,
         )
         .unwrap();
 
-    let result = f.bitbucket.request_token(ORIGIN, USERNAME, PASSWORD);
+    let result = f.bitbucket.request_token(
+        bstr::BStr::new(ORIGIN),
+        bstr::BStr::new(USERNAME),
+        bstr::BStr::new(PASSWORD),
+    );
     assert!(
         result.is_err(),
         "expected a TransportException to propagate"
@@ -422,10 +457,11 @@ fn test_request_access_token_with_username_and_password_with_not_found_response(
 
 #[test]
 fn test_username_password_authentication_flow() {
-    let url = format!("https://{}/site/oauth2/access_token", ORIGIN);
-    let body = format!(
-        "{{\"access_token\": \"{}\", \"scopes\": \"repository\", \"expires_in\": 3600, \"refresh_token\": \"refresh_token\", \"token_type\": \"bearer\"}}",
-        TOKEN
+    let url = bconcat!("https://", ORIGIN, "/site/oauth2/access_token");
+    let body = bconcat!(
+        "{\"access_token\": \"",
+        TOKEN,
+        "\", \"scopes\": \"repository\", \"expires_in\": 3600, \"refresh_token\": \"refresh_token\", \"token_type\": \"bearer\"}"
     );
     // PHP matches the URL with `$this->anything()` for options, so match any options.
     let config = ConfigStubBuilder::new().build_shared();
@@ -447,7 +483,7 @@ fn test_username_password_authentication_flow() {
 
     assert!(
         f.bitbucket
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
 }
@@ -468,7 +504,7 @@ fn test_authorize_oauth_interactively_with_empty_username() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
 }
@@ -495,14 +531,14 @@ fn test_authorize_oauth_interactively_with_empty_password() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
 }
 
 #[test]
 fn test_authorize_oauth_interactively_with_request_access_token_failure() {
-    let url = format!("https://{}/site/oauth2/access_token", ORIGIN);
+    let url = bconcat!("https://", ORIGIN, "/site/oauth2/access_token");
     let config = ConfigStubBuilder::new().build_shared();
     // A 400 status makes the mocked HttpDownloader raise a TransportException(400).
     let mut f = set_up_with_config_and_http(config, vec![expect_full(url, None, 400, "", vec![])]);
@@ -524,7 +560,7 @@ fn test_authorize_oauth_interactively_with_request_access_token_failure() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
 }
@@ -542,7 +578,7 @@ fn test_authorize_oauth_with_wrong_origin_url() {
     let mut f = set_up_with_config_and_http(config, vec![]);
     assert!(
         !f.bitbucket
-            .authorize_oauth(&format!("non-{}", ORIGIN))
+            .authorize_oauth(bstr::BStr::new(&bconcat!("non-", ORIGIN)))
             .unwrap()
     );
 }
@@ -567,7 +603,7 @@ fn test_authorize_oauth_without_available_git_config_token() {
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
 
-    assert!(!bitbucket.authorize_oauth(ORIGIN).unwrap());
+    assert!(!bitbucket.authorize_oauth(bstr::BStr::new(ORIGIN)).unwrap());
 }
 
 #[test]
@@ -584,5 +620,5 @@ fn test_authorize_oauth_with_available_git_config_token() {
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
 
-    assert!(bitbucket.authorize_oauth(ORIGIN).unwrap());
+    assert!(bitbucket.authorize_oauth(bstr::BStr::new(ORIGIN)).unwrap());
 }

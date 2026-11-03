@@ -4,15 +4,17 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, init_temp_composer,
 };
+use bstr::{BStr, ByteSlice};
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: CheckPlatformReqsCommandTest::testPlatformReqsAreSatisfied (data provider rolled into one body).
 fn run_platform_reqs_are_satisfied_case(
     composer_json: serde_json::Value,
-    command: &[(&str, InputValue)],
-    expected: &str,
+    command: &[(&BStr, InputValue)],
+    expected: &BStr,
     lock: bool,
 ) {
     let tear_down = init_temp_composer(Some(&composer_json), None, None, false);
@@ -40,8 +42,13 @@ fn run_platform_reqs_are_satisfied_case(
     let status_code = app_tester.run(input, RunOptions::default()).unwrap();
 
     // assertCommandIsSuccessful
-    assert_eq!(0, status_code, "{}", app_tester.get_display());
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(
+        0,
+        status_code,
+        "{}",
+        app_tester.get_display().display_lossy()
+    );
+    assert_eq!(trim(expected), trim(app_tester.get_display()));
 
     drop(tear_down);
 }
@@ -55,9 +62,11 @@ fn test_platform_reqs_are_satisfied() {
             "require": { "ext-foobar": "^2.0" },
             "require-dev": { "ext-barbaz": "~4.0" },
         }),
-        &[("--no-dev", InputValue::from(true))],
-        "Checking non-dev platform requirements for packages in the vendor dir
+        &[(BStr::new("--no-dev"), InputValue::from(true))],
+        BStr::new(
+            "Checking non-dev platform requirements for packages in the vendor dir
 ext-foobar 2.3.4   success",
+        ),
         true,
     );
 
@@ -67,8 +76,10 @@ ext-foobar 2.3.4   success",
             "require": { "ext-foobar": "^2.3" },
             "require-dev": { "ext-barbaz": "~2.0" },
         }),
-        &[("--lock", InputValue::from(true))],
-        "Checking platform requirements using the lock file\next-barbaz 2.3.4.5   success \next-foobar 2.3.4     success",
+        &[(BStr::new("--lock"), InputValue::from(true))],
+        BStr::new(
+            "Checking platform requirements using the lock file\next-barbaz 2.3.4.5   success \next-foobar 2.3.4     success",
+        ),
         true,
     );
 }
@@ -89,8 +100,7 @@ fn test_exception_thrown_if_no_lockfile_found() {
         )
         .expect_err("expected LogicException for missing lockfile");
     assert!(
-        err.to_string()
-            .contains("No lockfile found. Unable to read locked packages"),
+        error_message(&err).contains_str("No lockfile found. Unable to read locked packages"),
         "got: {}",
         err
     );
@@ -157,7 +167,7 @@ fn test_failed_platform_requirement() {
     }
 ]"#;
 
-    assert_eq!(expected.trim(), app_tester.get_display().trim());
+    assert_eq!(trim(expected), trim(app_tester.get_display()));
 
     drop(tear_down);
 }

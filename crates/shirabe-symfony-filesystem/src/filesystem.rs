@@ -1,12 +1,15 @@
 //! ref: composer/vendor/symfony/filesystem/Filesystem.php
 
 use crate::exception::IOException;
+use bstr::BString;
 use shirabe_php_shim::{
-    Catch as _, FilesystemIterator, PHP_MAXPATHLEN, base64_encode, chmod, copy, dirname,
-    file_exists, filemtime, fileperms, filesize, filesystem_iterator, is_dir, is_file, is_link,
-    mkdir, parse_url, random_bytes, readlink, realpath, rename, rmdir, rtrim, stream_is_local,
-    stripos, strrev, strtr, symlink, touch2, umask, unlink,
+    Catch as _, FilesystemIterator, PHP_MAXPATHLEN, base64_encode, bconcat, chmod, copy, dirname,
+    display_to_bytes, file_exists, filemtime, fileperms, filesize, filesystem_iterator, is_dir,
+    is_file, is_link, mkdir, parse_url, path_from_bytes, path_to_bytes, random_bytes, readlink,
+    realpath, rename, rmdir, rtrim2, stream_is_local, stripos, strpos, strrev, strtr, symlink,
+    touch2, umask, unlink,
 };
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Filesystem;
@@ -17,34 +20,39 @@ impl Default for Filesystem {
     }
 }
 
+fn path_buf(path: impl AsRef<[u8]>) -> PathBuf {
+    path_from_bytes(&path).to_path_buf()
+}
+
 impl Filesystem {
     pub fn new() -> Self {
         Filesystem
     }
 
-    fn copy(&self, origin_file: &str, target_file: &str) -> anyhow::Result<()> {
+    fn copy(&self, origin_file: &Path, target_file: &Path) -> anyhow::Result<()> {
         // PHP: stream_is_local($originFile) || 0 === stripos($originFile, 'file://')
-        let origin_is_local =
-            stream_is_local(origin_file) || stripos(origin_file, "file://") == Some(0);
+        let origin_is_local = stream_is_local(path_to_bytes(origin_file))
+            || stripos(path_to_bytes(origin_file), "file://") == Some(0);
 
         if origin_is_local && !is_file(origin_file) {
             return Err(IOException::new(
-                format!(
-                    "Failed to copy \"{}\" because file does not exist.",
-                    origin_file
+                bconcat!(
+                    "Failed to copy \"",
+                    origin_file,
+                    "\" because file does not exist."
                 ),
                 0,
                 None,
-                Some(origin_file.to_string()),
+                Some(origin_file.to_path_buf()),
             )
             .into());
         }
 
-        self.mkdir(&dirname(target_file), 0o777)?;
+        self.mkdir(&path_buf(dirname(path_to_bytes(target_file))), 0o777)?;
 
         let mut do_copy = true;
         // PHP: !$overwriteNewerFiles && !parse_url($originFile, PHP_URL_HOST) && is_file($targetFile)
-        let origin_host = parse_url(origin_file).and_then(|url| url.host);
+        let origin_host = parse_url(path_to_bytes(origin_file)).and_then(|url| url.host);
         if origin_host.is_none() && is_file(target_file) {
             do_copy = filemtime(origin_file).unwrap_or(0) > filemtime(target_file).unwrap_or(0);
         }
@@ -62,10 +70,16 @@ impl Filesystem {
 
             if copy(origin_file, target_file).is_err() {
                 return Err(IOException::new(
-                    format!("Failed to copy \"{}\" to \"{}\".", origin_file, target_file),
+                    bconcat!(
+                        "Failed to copy \"",
+                        origin_file,
+                        "\" to \"",
+                        target_file,
+                        "\"."
+                    ),
                     0,
                     None,
-                    Some(origin_file.to_string()),
+                    Some(origin_file.to_path_buf()),
                 )
                 .into());
             }
@@ -73,10 +87,16 @@ impl Filesystem {
 
             if !is_file(target_file) {
                 return Err(IOException::new(
-                    format!("Failed to copy \"{}\" to \"{}\".", origin_file, target_file),
+                    bconcat!(
+                        "Failed to copy \"",
+                        origin_file,
+                        "\" to \"",
+                        target_file,
+                        "\"."
+                    ),
                     0,
                     None,
-                    Some(origin_file.to_string()),
+                    Some(origin_file.to_path_buf()),
                 )
                 .into());
             }
@@ -94,16 +114,20 @@ impl Filesystem {
                 let bytes_origin = filesize(origin_file);
                 if bytes_copied != bytes_origin {
                     return Err(IOException::new(
-                        format!(
-                            "Failed to copy the whole content of \"{}\" to \"{}\" ({} of {} bytes copied).",
+                        bconcat!(
+                            "Failed to copy the whole content of \"",
                             origin_file,
+                            "\" to \"",
                             target_file,
+                            "\" (",
                             bytes_copied.unwrap_or(0),
-                            bytes_origin.unwrap_or(0)
+                            " of ",
+                            bytes_origin.unwrap_or(0),
+                            " bytes copied)."
                         ),
                         0,
                         None,
-                        Some(origin_file.to_string()),
+                        Some(origin_file.to_path_buf()),
                     )
                     .into());
                 }
@@ -113,35 +137,36 @@ impl Filesystem {
         Ok(())
     }
 
-    fn mkdir(&self, dir: &str, mode: u32) -> anyhow::Result<()> {
+    fn mkdir(&self, dir: &Path, mode: u32) -> anyhow::Result<()> {
         if is_dir(dir) {
             return Ok(());
         }
 
         if mkdir(dir, mode, true).is_err() && !is_dir(dir) {
             return Err(IOException::new(
-                format!("Failed to create \"{}\".", dir),
+                bconcat!("Failed to create \"", dir, "\"."),
                 0,
                 None,
-                Some(dir.to_string()),
+                Some(dir.to_path_buf()),
             )
             .into());
         }
         Ok(())
     }
 
-    fn exists(&self, file: &str) -> anyhow::Result<bool> {
+    fn exists(&self, file: &Path) -> anyhow::Result<bool> {
         let max_path_length = PHP_MAXPATHLEN - 2;
 
-        if file.len() as i64 > max_path_length {
+        if path_to_bytes(file).len() as i64 > max_path_length {
             return Err(IOException::new(
-                format!(
-                    "Could not check if file exist because path length exceeds {} characters.",
-                    max_path_length
+                bconcat!(
+                    "Could not check if file exist because path length exceeds ",
+                    max_path_length,
+                    " characters."
                 ),
                 0,
                 None,
-                Some(file.to_string()),
+                Some(file.to_path_buf()),
             )
             .into());
         }
@@ -149,11 +174,11 @@ impl Filesystem {
         Ok(file_exists(file))
     }
 
-    fn remove(&self, file: &str) -> anyhow::Result<()> {
-        Self::do_remove(vec![file.to_string()], false)
+    fn remove(&self, file: &Path) -> anyhow::Result<()> {
+        Self::do_remove(vec![file.to_path_buf()], false)
     }
 
-    fn do_remove(files: Vec<String>, is_recursive: bool) -> anyhow::Result<()> {
+    fn do_remove(files: Vec<PathBuf>, is_recursive: bool) -> anyhow::Result<()> {
         // PHP reverses the list so that directory contents are removed before the directory itself.
         let mut files = files;
         files.reverse();
@@ -163,7 +188,7 @@ impl Filesystem {
                 let removed = unlink(&file).is_ok() || !cfg!(windows) || rmdir(&file).is_ok();
                 if !removed && file_exists(&file) {
                     return Err(IOException::new(
-                        format!("Failed to remove symlink \"{}\".", file),
+                        bconcat!("Failed to remove symlink \"", file, "\"."),
                         0,
                         None,
                         None,
@@ -176,11 +201,11 @@ impl Filesystem {
                 // if the final rmdir fails, so a failure leaves the path where the caller left it.
                 let mut orig_file = None;
                 if !is_recursive {
-                    let tmp_name = format!(
-                        "{}/.!{}",
-                        dirname(&realpath(&file).unwrap_or_default()),
-                        strrev(&strtr(&base64_encode(random_bytes(2)), "/=", "-!"))
-                    );
+                    let tmp_name = path_buf(bconcat!(
+                        dirname(path_to_bytes(&realpath(&file).unwrap_or_default())),
+                        "/.!",
+                        strrev(strtr(base64_encode(random_bytes(2)), "/=", "-!"))
+                    ));
 
                     if file_exists(&tmp_name)
                         && let Err(error) = Self::do_remove(vec![tmp_name.clone()], true)
@@ -199,16 +224,6 @@ impl Filesystem {
                     &file,
                     FilesystemIterator::CURRENT_AS_PATHNAME | FilesystemIterator::SKIP_DOTS,
                 )?;
-                // TODO(bytes): do_remove takes the paths as Strings.
-                let entries = entries
-                    .into_iter()
-                    .map(|entry| {
-                        entry
-                            .into_os_string()
-                            .into_string()
-                            .unwrap_or_else(|entry| panic!("path is not valid UTF-8: {entry:?}"))
-                    })
-                    .collect();
                 Self::do_remove(entries, true)?;
 
                 if let Err(last_error) = rmdir(&file)
@@ -219,7 +234,12 @@ impl Filesystem {
                         let _ = rename(&file, &orig_file);
                     }
                     return Err(IOException::new(
-                        format!("Failed to remove directory \"{}\": {}", file, last_error),
+                        bconcat!(
+                            "Failed to remove directory \"",
+                            file,
+                            "\": ",
+                            display_to_bytes(last_error)
+                        ),
                         0,
                         None,
                         None,
@@ -227,10 +247,10 @@ impl Filesystem {
                     .into());
                 }
             } else if let Err(last_error) = unlink(&file) {
-                let last_error = last_error.to_string();
-                if last_error.contains("Permission denied") || file_exists(&file) {
+                let last_error = display_to_bytes(last_error);
+                if strpos(&last_error, "Permission denied").is_some() || file_exists(&file) {
                     return Err(IOException::new(
-                        format!("Failed to remove file \"{}\": {}", file, last_error),
+                        bconcat!("Failed to remove file \"", file, "\": ", last_error),
                         0,
                         None,
                         None,
@@ -242,21 +262,24 @@ impl Filesystem {
         Ok(())
     }
 
-    pub fn symlink(&self, origin_dir: &str, target_dir: &str) -> anyhow::Result<()> {
-        let mut origin_dir = origin_dir.to_string();
-        let mut target_dir = target_dir.to_string();
+    pub fn symlink(
+        &self,
+        origin_dir: impl AsRef<Path>,
+        target_dir: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let mut origin_dir = origin_dir.as_ref().to_path_buf();
+        let mut target_dir = target_dir.as_ref().to_path_buf();
 
         if cfg!(windows) {
-            origin_dir = strtr(&origin_dir, "/", "\\");
-            target_dir = strtr(&target_dir, "/", "\\");
+            origin_dir = path_buf(strtr(path_to_bytes(&origin_dir), "/", "\\"));
+            target_dir = path_buf(strtr(path_to_bytes(&target_dir), "/", "\\"));
         }
 
-        self.mkdir(&dirname(&target_dir), 0o777)?;
+        self.mkdir(&path_buf(dirname(path_to_bytes(&target_dir))), 0o777)?;
 
         if is_link(&target_dir) {
             // PHP compares the raw strings, so `Path`'s component-wise equality is not used.
-            if readlink(&target_dir)
-                .is_some_and(|link| link.as_os_str() == std::ffi::OsStr::new(&origin_dir))
+            if readlink(&target_dir).is_some_and(|link| link.as_os_str() == origin_dir.as_os_str())
             {
                 return Ok(());
             }
@@ -265,13 +288,17 @@ impl Filesystem {
 
         if let Err(last_error) = symlink(&origin_dir, &target_dir) {
             return Err(IOException::new(
-                format!(
-                    "Failed to create \"symbolic\" link from \"{}\" to \"{}\": {}",
-                    origin_dir, target_dir, last_error
+                bconcat!(
+                    "Failed to create \"symbolic\" link from \"",
+                    origin_dir,
+                    "\" to \"",
+                    target_dir,
+                    "\": ",
+                    display_to_bytes(last_error)
                 ),
                 0,
                 None,
-                Some(target_dir.clone()),
+                Some(target_dir.to_path_buf()),
             )
             .into());
         }
@@ -280,37 +307,39 @@ impl Filesystem {
 
     pub fn mirror(
         &self,
-        origin_dir: &str,
-        target_dir: &str,
-        iterator: Vec<String>,
+        origin_dir: impl AsRef<Path>,
+        target_dir: impl AsRef<Path>,
+        iterator: Vec<PathBuf>,
     ) -> anyhow::Result<()> {
-        let target_dir = rtrim(target_dir, Some("/\\"));
-        let origin_dir = rtrim(origin_dir, Some("/\\"));
+        let target_dir = rtrim2(path_to_bytes(target_dir.as_ref()), "/\\");
+        let origin_dir = rtrim2(path_to_bytes(origin_dir.as_ref()), "/\\");
         let origin_dir_len = origin_dir.len();
 
-        if !self.exists(&origin_dir)? {
+        if !self.exists(path_from_bytes(&origin_dir))? {
             return Err(IOException::new(
-                format!(
-                    "The origin directory specified \"{}\" was not found.",
-                    origin_dir
+                bconcat!(
+                    "The origin directory specified \"",
+                    origin_dir,
+                    "\" was not found."
                 ),
                 0,
                 None,
-                Some(origin_dir.clone()),
+                Some(path_from_bytes(&origin_dir).to_path_buf()),
             )
             .into());
         }
 
-        self.mkdir(&target_dir, 0o777)?;
+        self.mkdir(path_from_bytes(&target_dir), 0o777)?;
 
-        let mut files_created_while_mirroring: indexmap::IndexMap<String, bool> =
+        let mut files_created_while_mirroring: indexmap::IndexMap<BString, bool> =
             indexmap::IndexMap::new();
 
         for pathname in iterator {
+            let pathname_bytes = path_to_bytes(&pathname);
             // SplFileInfo::getRealPath(), which returns false for a path that cannot be resolved.
-            let real_path = realpath(&pathname);
-            if pathname == target_dir
-                || real_path.as_deref() == Some(target_dir.as_str())
+            let real_path = realpath(&pathname).map(|p| BString::from(path_to_bytes(&p)));
+            if pathname_bytes == target_dir.as_slice()
+                || real_path.as_ref() == Some(&target_dir)
                 || real_path
                     .as_ref()
                     .is_some_and(|p| files_created_while_mirroring.contains_key(p))
@@ -318,17 +347,13 @@ impl Filesystem {
                 continue;
             }
 
-            let target = format!("{}{}", target_dir, &pathname[origin_dir_len..]);
+            let target = bconcat!(target_dir, &pathname_bytes[origin_dir_len..]);
             files_created_while_mirroring.insert(target.clone(), true);
+            let target = path_buf(target);
 
             if is_link(&pathname) {
                 // PHP coerces the false getLinkTarget() returns on failure to the empty string.
-                // TODO(bytes): symlink() takes the link target as a &str.
-                let link_target = readlink(&pathname)
-                    .unwrap_or_default()
-                    .into_os_string()
-                    .into_string()
-                    .unwrap_or_else(|link| panic!("link target is not valid UTF-8: {link:?}"));
+                let link_target = readlink(&pathname).unwrap_or_default();
                 self.symlink(&link_target, &target)?;
             } else if is_dir(&pathname) {
                 self.mkdir(&target, 0o777)?;
@@ -336,10 +361,10 @@ impl Filesystem {
                 self.copy(&pathname, &target)?;
             } else {
                 return Err(IOException::new(
-                    format!("Unable to guess \"{}\" file type.", pathname),
+                    bconcat!("Unable to guess \"", pathname, "\" file type."),
                     0,
                     None,
-                    Some(pathname),
+                    Some(pathname.to_path_buf()),
                 )
                 .into());
             }

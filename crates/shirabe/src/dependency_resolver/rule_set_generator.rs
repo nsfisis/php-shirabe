@@ -9,8 +9,9 @@ use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterInterface,
 };
 use crate::package::PackageInterfaceHandle;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::LogicException;
+use shirabe_php_shim::{LogicException, bconcat};
 use std::collections::VecDeque;
 
 #[derive(Debug)]
@@ -19,7 +20,7 @@ pub struct RuleSetGenerator {
     pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     rules: RuleSet,
     added_map: IndexMap<i64, PackageInterfaceHandle>,
-    added_packages_by_names: IndexMap<String, Vec<PackageInterfaceHandle>>,
+    added_packages_by_names: IndexMap<BString, Vec<PackageInterfaceHandle>>,
 }
 
 impl RuleSetGenerator {
@@ -150,7 +151,7 @@ impl RuleSetGenerator {
             if !is_alias {
                 for name in package.get_names(false) {
                     self.added_packages_by_names
-                        .entry(name)
+                        .entry(BString::from(&name[..]))
                         .or_default()
                         .push(package.clone());
                 }
@@ -185,7 +186,7 @@ impl RuleSetGenerator {
 
             for link in package.get_requires().values() {
                 let mut constraint = link.get_constraint().clone();
-                if platform_requirement_filter.is_ignored(link.get_target()) {
+                if platform_requirement_filter.is_ignored(link.get_target().as_bstr()) {
                     continue;
                 } else if let Some(ignore_list_filter) = platform_requirement_filter
                     .as_any()
@@ -193,14 +194,14 @@ impl RuleSetGenerator {
                 ) {
                     let fallback = constraint.clone();
                     constraint = ignore_list_filter
-                        .filter_constraint(link.get_target(), constraint, true)
+                        .filter_constraint(link.get_target().as_bstr(), constraint, true)
                         .unwrap_or(fallback);
                 }
 
                 let possible_requires: Vec<PackageInterfaceHandle> = self
                     .pool
                     .borrow_mut()
-                    .what_provides(link.get_target(), Some(&constraint))
+                    .what_provides(bstr::BStr::new(link.get_target()), Some(&constraint))
                     .into_iter()
                     .collect();
 
@@ -233,7 +234,7 @@ impl RuleSetGenerator {
                 }
 
                 let mut constraint = link.get_constraint().clone();
-                if platform_requirement_filter.is_ignored(link.get_target()) {
+                if platform_requirement_filter.is_ignored(link.get_target().as_bstr()) {
                     continue;
                 } else if let Some(ignore_list_filter) = platform_requirement_filter
                     .as_any()
@@ -241,14 +242,14 @@ impl RuleSetGenerator {
                 ) {
                     let fallback = constraint.clone();
                     constraint = ignore_list_filter
-                        .filter_constraint(link.get_target(), constraint, false)
+                        .filter_constraint(link.get_target().as_bstr(), constraint, false)
                         .unwrap_or(fallback);
                 }
 
                 let conflicts: Vec<PackageInterfaceHandle> = self
                     .pool
                     .borrow_mut()
-                    .what_provides(link.get_target(), Some(&constraint))
+                    .what_provides(bstr::BStr::new(link.get_target()), Some(&constraint))
                     .into_iter()
                     .collect();
 
@@ -271,7 +272,7 @@ impl RuleSetGenerator {
             }
         }
 
-        let names_packages: Vec<(String, Vec<PackageInterfaceHandle>)> = self
+        let names_packages: Vec<(BString, Vec<PackageInterfaceHandle>)> = self
             .added_packages_by_names
             .iter()
             .map(|(k, v)| (k.clone(), v.to_vec()))
@@ -307,9 +308,10 @@ impl RuleSetGenerator {
                 }
 
                 // otherwise, looks like a bug
-                return Err(LogicException::new(format!(
-                    "Fixed package {} was not added to solver pool.",
-                    package.get_pretty_string()
+                return Err(LogicException::new(bconcat!(
+                    "Fixed package ",
+                    package.get_pretty_string(),
+                    " was not added to solver pool."
                 ))
                 .into());
             }
@@ -328,7 +330,7 @@ impl RuleSetGenerator {
 
         for (package_name, constraint) in request.get_requires().iter() {
             let mut constraint = constraint.clone();
-            if platform_requirement_filter.is_ignored(package_name) {
+            if platform_requirement_filter.is_ignored(package_name.as_bstr()) {
                 continue;
             } else if let Some(ignore_list_filter) = platform_requirement_filter
                 .as_any()
@@ -336,14 +338,14 @@ impl RuleSetGenerator {
             ) {
                 let fallback = constraint.clone();
                 constraint = ignore_list_filter
-                    .filter_constraint(package_name, constraint, true)
+                    .filter_constraint(package_name.as_bstr(), constraint, true)
                     .unwrap_or(fallback);
             }
 
             let packages: Vec<PackageInterfaceHandle> = self
                 .pool
                 .borrow_mut()
-                .what_provides(package_name, Some(&constraint))
+                .what_provides(package_name.as_bstr(), Some(&constraint))
                 .into_iter()
                 .collect();
             if !packages.is_empty() {

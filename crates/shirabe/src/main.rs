@@ -1,6 +1,6 @@
 //! ref: composer/bin/composer
 
-use shirabe_php_shim::{PHP_ENV, PHP_SERVER, getenv};
+use shirabe_php_shim::{PHP_ENV, PHP_SERVER, getenv, path_to_bytes, utf8_text};
 use std::io::IsTerminal as _;
 
 /// Initialize a tracing subscriber from the environment variable `$SHIRABE_TRACING`.
@@ -8,18 +8,15 @@ fn init_tracing() {
     let Some(directives) = getenv("SHIRABE_TRACING") else {
         return;
     };
-    let directives = match directives.into_string() {
-        Ok(directives) => directives,
-        Err(directives) => {
-            eprintln!("SHIRABE_TRACING: invalid filter directives {directives:?}: not valid UTF-8");
-            return;
-        }
+    let Some(directives) = utf8_text(directives.as_encoded_bytes()) else {
+        eprintln!("SHIRABE_TRACING: invalid filter directives {directives:?}: not valid UTF-8");
+        return;
     };
     if directives.is_empty() {
         return;
     }
 
-    let env_filter = match tracing_subscriber::EnvFilter::builder().parse(&directives) {
+    let env_filter = match tracing_subscriber::EnvFilter::builder().parse(directives) {
         Ok(env_filter) => env_filter,
         Err(e) => {
             eprintln!("SHIRABE_TRACING: invalid filter directives {directives:?}: {e}");
@@ -58,7 +55,11 @@ fn main() {
 
     init_tracing();
 
-    let result = runtime.block_on(shirabe::run(std::env::args().collect()));
+    let result = runtime.block_on(shirabe::run(
+        std::env::args_os()
+            .map(|arg| bstr::BString::from(path_to_bytes(&arg)))
+            .collect(),
+    ));
     let exit_code = match result {
         Ok(exit_code) => exit_code,
         Err(e) => {

@@ -2,6 +2,7 @@
 
 use crate::exception::{InvalidArgumentException, RuntimeException};
 use crate::process::Process;
+use shirabe_php_shim::bconcat;
 
 #[derive(Debug)]
 pub struct ProcessFailedException {
@@ -13,27 +14,31 @@ impl ProcessFailedException {
     pub fn new(process: &mut Process) -> anyhow::Result<Self> {
         if process.is_successful() {
             return Err(InvalidArgumentException::new(
-                "Expected a failed process, but the given process was successful.".to_string(),
+                "Expected a failed process, but the given process was successful.",
             )
             .into());
         }
 
-        let mut error = format!(
-            "The command \"{}\" failed.\n\nExit Code: {}({})\n\nWorking directory: {}",
+        let mut error = bconcat!(
+            "The command \"",
             process.get_command_line(),
+            "\" failed.\n\nExit Code: ",
             process
                 .get_exit_code()
-                .map(|c| c.to_string())
+                .map(|c| bconcat!(c))
                 .unwrap_or_default(),
+            "(",
             process.get_exit_code_text().unwrap_or_default(),
+            ")\n\nWorking directory: ",
             process.get_working_directory().unwrap_or_default(),
         );
 
-        error += &format!(
-            "\n\nOutput:\n================\n{}\n\nError Output:\n================\n{}",
+        error.extend_from_slice(&bconcat!(
+            "\n\nOutput:\n================\n",
             process.get_output()?,
+            "\n\nError Output:\n================\n",
             process.get_error_output()?,
-        );
+        ));
 
         Ok(Self {
             inner: RuntimeException::new(error),

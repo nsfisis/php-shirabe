@@ -3,6 +3,8 @@
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
+use bstr::BStr;
+use shirabe_php_shim::{bconcat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct UpdateOperation {
@@ -26,7 +28,7 @@ impl UpdateOperation {
         self.target_package.clone()
     }
 
-    pub fn show(&self, lock: bool) -> String {
+    pub fn show(&self, lock: bool) -> bstr::BString {
         Self::format(
             self.initial_package.clone(),
             self.target_package.clone(),
@@ -38,7 +40,7 @@ impl UpdateOperation {
         initial_package: PackageInterfaceHandle,
         target_package: PackageInterfaceHandle,
         lock: bool,
-    ) -> String {
+    ) -> bstr::BString {
         let mut from_version = initial_package
             .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev);
         let mut to_version = target_package
@@ -61,8 +63,8 @@ impl UpdateOperation {
         }
 
         let action_name = if VersionParser::is_upgrade(
-            &initial_package.get_version(),
-            &target_package.get_version(),
+            initial_package.get_version(),
+            target_package.get_version(),
         )
         .unwrap_or(false)
         {
@@ -71,22 +73,25 @@ impl UpdateOperation {
             "Downgrading"
         };
 
-        format!(
-            "{} <info>{}</info> (<comment>{}</comment> => <comment>{}</comment>)",
+        bconcat!(
             action_name,
+            " <info>",
             initial_package.get_pretty_name(),
+            "</info> (<comment>",
             from_version,
+            "</comment> => <comment>",
             to_version,
+            "</comment>)"
         )
     }
 }
 
 impl SolverOperation for UpdateOperation {
-    const TYPE: &'static str = "update";
+    const TYPE: &'static BStr = php_str(b"update");
 }
 
 impl std::fmt::Display for UpdateOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false))
+        write!(f, "{}", self.show(false).display_lossy())
     }
 }

@@ -1,36 +1,39 @@
 //! ref: composer/src/Composer/Util/ProcessExecutor.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::signal::SignalSubscription;
 use crate::util::{GitHub, Platform};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
-    array_map, escapeshellarg, explode, implode, in_array_strict, is_dir, is_numeric, php_regex,
-    preg_is_match, preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split,
-    rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
+    array_map, bconcat, display_to_bytes, escapeshellarg, explode, implode, in_array_strict,
+    intval, is_dir, is_numeric, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match,
+    preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim2,
+    str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
-use shirabe_symfony_process::exception::{
-    ProcessSignaledException, RuntimeException as SymfonyProcessRuntimeException,
+use shirabe_symfony_process::{
+    ExecutableFinder, Process, ProcessMock,
+    exception::{ProcessSignaledException, RuntimeException as SymfonyProcessRuntimeException},
 };
-use shirabe_symfony_process::{ExecutableFinder, Process, ProcessMock};
+use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
-static EXECUTABLES: LazyLock<Mutex<IndexMap<String, String>>> =
+static EXECUTABLES: LazyLock<Mutex<IndexMap<BString, BString>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 static TIMEOUT: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(300));
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandLine {
-    Shell(String),
-    Args(Vec<String>),
+    Shell(BString),
+    Args(Vec<BString>),
 }
 
 #[derive(Debug)]
 pub struct ProcessExecutor {
     capture_output: std::cell::Cell<bool>,
-    error_output: std::cell::RefCell<String>,
+    error_output: std::cell::RefCell<BString>,
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     max_jobs: std::cell::Cell<i64>,
     /// PHP throttles async jobs through the $jobs queue and $maxJobs; here concurrent
@@ -52,15 +55,15 @@ pub struct ProcessExecutorMockState {
     pub expectations: Option<Vec<MockExpectation>>,
     pub strict: bool,
     pub default_handler: MockHandler,
-    pub log: Vec<String>,
+    pub log: Vec<BString>,
 }
 
 /// A single expected command (`array{cmd, return, stdout, stderr, callback}` in PHP).
 pub struct MockExpectation {
     pub cmd: CommandLine,
     pub r#return: i64,
-    pub stdout: String,
-    pub stderr: String,
+    pub stdout: BString,
+    pub stderr: BString,
     /// Optional `callable` fired when the expectation is consumed. Rare in Composer's suite.
     pub callback: Option<Box<dyn FnMut()>>,
 }
@@ -84,8 +87,8 @@ impl MockExpectation {
         Self {
             cmd,
             r#return: 0,
-            stdout: String::new(),
-            stderr: String::new(),
+            stdout: BString::default(),
+            stderr: BString::default(),
             callback: None,
         }
     }
@@ -96,8 +99,8 @@ impl MockExpectation {
 #[derive(Debug, Clone, Default)]
 pub struct MockHandler {
     pub r#return: i64,
-    pub stdout: String,
-    pub stderr: String,
+    pub stdout: BString,
+    pub stderr: BString,
 }
 
 /// Output target marking the "no `$output` argument" case of `ProcessExecutor::execute`, where the
@@ -108,22 +111,67 @@ pub struct ProcessForwardOutput;
 impl ProcessExecutor {
     pub const FORWARD_OUTPUT: ProcessForwardOutput = ProcessForwardOutput;
 
-    const BUILTIN_CMD_COMMANDS: [&'static str; 47] = [
-        "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del", "dir",
-        "echo", "endlocal", "erase", "exit", "for", "ftype", "goto", "help", "if", "label", "md",
-        "mkdir", "mklink", "move", "path", "pause", "popd", "prompt", "pushd", "rd", "rem", "ren",
-        "rename", "rmdir", "set", "setlocal", "shift", "start", "time", "title", "type", "ver",
-        "vol", // unused slots to make 47 above explicit
-        "", "", "",
+    const BUILTIN_CMD_COMMANDS: [&'static BStr; 47] = [
+        php_str(b"assoc"),
+        php_str(b"break"),
+        php_str(b"call"),
+        php_str(b"cd"),
+        php_str(b"chdir"),
+        php_str(b"cls"),
+        php_str(b"color"),
+        php_str(b"copy"),
+        php_str(b"date"),
+        php_str(b"del"),
+        php_str(b"dir"),
+        php_str(b"echo"),
+        php_str(b"endlocal"),
+        php_str(b"erase"),
+        php_str(b"exit"),
+        php_str(b"for"),
+        php_str(b"ftype"),
+        php_str(b"goto"),
+        php_str(b"help"),
+        php_str(b"if"),
+        php_str(b"label"),
+        php_str(b"md"),
+        php_str(b"mkdir"),
+        php_str(b"mklink"),
+        php_str(b"move"),
+        php_str(b"path"),
+        php_str(b"pause"),
+        php_str(b"popd"),
+        php_str(b"prompt"),
+        php_str(b"pushd"),
+        php_str(b"rd"),
+        php_str(b"rem"),
+        php_str(b"ren"),
+        php_str(b"rename"),
+        php_str(b"rmdir"),
+        php_str(b"set"),
+        php_str(b"setlocal"),
+        php_str(b"shift"),
+        php_str(b"start"),
+        php_str(b"time"),
+        php_str(b"title"),
+        php_str(b"type"),
+        php_str(b"ver"),
+        php_str(b"vol"), // unused slots to make 47 above explicit
+        php_str(b""),
+        php_str(b""),
+        php_str(b""),
     ];
 
-    const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static str]] =
-        &[&["show"], &["log"], &["branch"], &["remote", "set-url"]];
+    const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static BStr]] = &[
+        &[php_str(b"show")],
+        &[php_str(b"log")],
+        &[php_str(b"branch")],
+        &[php_str(b"remote"), php_str(b"set-url")],
+    ];
 
     pub fn new(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) -> Self {
         let this = Self {
             capture_output: std::cell::Cell::new(false),
-            error_output: std::cell::RefCell::new(String::new()),
+            error_output: std::cell::RefCell::new(BString::default()),
             io,
             max_jobs: std::cell::Cell::new(10),
             semaphore: std::cell::RefCell::new(std::rc::Rc::new(tokio::sync::Semaphore::new(10))),
@@ -135,7 +183,12 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline
-    pub fn execute<'o, C, O>(&self, command: C, output: O, cwd: Option<&str>) -> anyhow::Result<i64>
+    pub fn execute<'o, C, O>(
+        &self,
+        command: C,
+        output: O,
+        cwd: Option<&Path>,
+    ) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
         O: IntoExecOutput<'o>,
@@ -145,7 +198,7 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline in TTY mode
-    pub fn execute_tty<C>(&self, command: C, cwd: Option<&str>) -> anyhow::Result<i64>
+    pub fn execute_tty<C>(&self, command: C, cwd: Option<&Path>) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
     {
@@ -160,8 +213,8 @@ impl ProcessExecutor {
     fn run_process<'o, O>(
         &self,
         command: CommandLine,
-        cwd: Option<&str>,
-        env: Option<IndexMap<String, String>>,
+        cwd: Option<&Path>,
+        env: Option<IndexMap<BString, BString>>,
         tty: bool,
         output: O,
     ) -> anyhow::Result<Option<i64>>
@@ -176,25 +229,19 @@ impl ProcessExecutor {
                 if Platform::is_windows()
                     && let Some(m) = preg_match(php_regex!(r"{^([^:/\\]++) }"), &command)
                 {
-                    let m1 = m.get(1).unwrap_or_default().to_string();
-                    command = String::from_utf8(
-                        substr_replace(
-                            &command,
-                            Self::escape(&Self::get_executable(&m1)),
-                            0,
-                            Some(strlen(&m1)),
-                        )
-                        .into(),
-                    )
-                    .expect(
-                        "the replaced range is a regex match, so it ends on character boundaries",
+                    let m1 = BString::from(m.get(1).unwrap_or_default());
+                    command = substr_replace(
+                        &command,
+                        Self::escape(Self::get_executable(&m1)),
+                        0,
+                        Some(strlen(&m1)),
                     );
                 }
 
                 Process::from_shell_commandline(
                     &command,
                     cwd,
-                    env,
+                    None,
                     PhpMixed::Null,
                     Some(Self::get_timeout() as f64),
                 )?
@@ -208,13 +255,20 @@ impl ProcessExecutor {
 
                 Process::new(
                     command,
-                    cwd.map(String::from),
-                    env,
+                    cwd.map(Path::to_path_buf),
+                    None,
                     PhpMixed::Null,
                     Some(Self::get_timeout() as f64),
                 )?
             }
         };
+        if let Some(env) = env {
+            process.set_env(
+                env.into_iter()
+                    .map(|(name, value)| (name, PhpMixed::string(value)))
+                    .collect(),
+            );
+        }
 
         if !Platform::is_windows() && tty {
             // PHP: try { $process->setTty(true); } catch (RuntimeException $e) { /* ignore */ }
@@ -236,7 +290,7 @@ impl ProcessExecutor {
                 Err(mut output) => {
                     let capture_output = self.capture_output.get();
                     let mut io = self.io.clone();
-                    let callback = move |r#type: &str, buffer: &str| {
+                    let callback = move |r#type: &BStr, buffer: &BStr| {
                         Self::output_handler(capture_output, &mut io, r#type, buffer);
                         Ok(false)
                     };
@@ -254,9 +308,10 @@ impl ProcessExecutor {
             && let Some(io) = &self.io
         {
             io.write_error3(
-                &format!(
-                    "Received {}, aborting when child process is done",
-                    signals.last_signal().as_str()
+                bconcat!(
+                    "Received ",
+                    signals.last_signal().as_str(),
+                    ", aborting when child process is done"
                 ),
                 true,
                 io_interface::DEBUG,
@@ -285,7 +340,7 @@ impl ProcessExecutor {
     fn do_execute<'o, O>(
         &self,
         command: CommandLine,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
         tty: bool,
         output: O,
     ) -> anyhow::Result<i64>
@@ -299,31 +354,34 @@ impl ProcessExecutor {
         self.output_command_run(&command, cwd, false);
 
         self.capture_output.set(output.capture_output());
-        *self.error_output.borrow_mut() = String::new();
+        *self.error_output.borrow_mut() = BString::default();
 
-        let mut env: Option<IndexMap<String, String>> = None;
+        let mut env: Option<IndexMap<BString, BString>> = None;
 
         let requires_git_dir_env = self.requires_git_dir_env(&command);
         if let Some(cwd) = cwd
             && requires_git_dir_env
         {
-            let is_bare_repository = !is_dir(format!("{}/.git", rtrim(cwd, Some("/"))));
+            let is_bare_repository = !is_dir(path_from_bytes(&bconcat!(
+                rtrim2(path_to_bytes(cwd), "/"),
+                "/.git"
+            )));
             if is_bare_repository {
-                let mut config_value = String::new();
-                let mut git_env: IndexMap<String, String> = IndexMap::new();
-                git_env.insert("GIT_DIR".to_string(), cwd.to_string());
+                let mut config_value = BString::default();
+                let mut git_env: IndexMap<BString, BString> = IndexMap::new();
+                git_env.insert("GIT_DIR".into(), path_to_bytes(cwd).into());
                 self.run_process(
                     CommandLine::Args(vec![
-                        "git".to_string(),
-                        "config".to_string(),
-                        "safe.bareRepository".to_string(),
+                        "git".into(),
+                        "config".into(),
+                        "safe.bareRepository".into(),
                     ]),
                     Some(cwd),
                     Some(git_env.clone()),
                     tty,
                     &mut config_value,
                 )?;
-                let trimmed = trim(&config_value, None);
+                let trimmed = trim(&config_value);
                 if trimmed == "explicit" {
                     env = Some(git_env);
                 }
@@ -346,8 +404,8 @@ impl ProcessExecutor {
     fn mock_match(
         &self,
         command: &CommandLine,
-        cwd: Option<&str>,
-    ) -> anyhow::Result<(String, String, i64)> {
+        cwd: Option<&Path>,
+    ) -> anyhow::Result<(BString, BString, i64)> {
         let command_string = match command {
             CommandLine::Args(args) => implode(" ", args),
             CommandLine::Shell(command) => command.clone(),
@@ -379,22 +437,31 @@ impl ProcessExecutor {
                 .expectations
                 .as_ref()
                 .filter(|exps| !exps.is_empty())
-                .map(|exps| format!("Expected {:?} at this point.", exps[0].cmd))
-                .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
-            let received = mock.log[..mock.log.len().saturating_sub(1)].join(PHP_EOL);
+                .map(|exps| {
+                    bconcat!(
+                        "Expected ",
+                        display_to_bytes(format_args!("{:?}", exps[0].cmd)),
+                        " at this point."
+                    )
+                })
+                .unwrap_or_else(|| BString::from("Expected no more calls at this point."));
+            let received = implode(PHP_EOL, &mock.log[..mock.log.len().saturating_sub(1)]);
             // PHPUnit's `AssertionFailedError` (thrown by `ProcessExecutorMock::doExecute` on a
             // strict-mode mismatch) extends `\RuntimeException`, so PHP call sites that
             // `catch (\RuntimeException $e)` around a mock-driven git/hg/svn call (e.g.
             // `GitDriver::supports`) treat a mismatch as an ordinary recoverable failure. Using
             // the same `RuntimeException` type here keeps `catch::<RuntimeException>()` checks
             // working the same way against a mismatch.
-            return Err(RuntimeException::new(format!(
-                "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
-                command,
-                cwd.unwrap_or(""),
+            return Err(RuntimeException::new(bconcat!(
+                "Received unexpected command ",
+                display_to_bytes(format_args!("{:?}", command)),
+                " in \"",
+                cwd.unwrap_or(Path::new("")),
+                "\"",
                 PHP_EOL,
                 expected,
                 PHP_EOL,
+                "Received calls:",
                 PHP_EOL,
                 received
             ))
@@ -415,7 +482,7 @@ impl ProcessExecutor {
     fn mock_do_execute<'o, O>(
         &self,
         command: CommandLine,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
         output: O,
     ) -> anyhow::Result<i64>
     where
@@ -423,7 +490,7 @@ impl ProcessExecutor {
     {
         let capture_output = output.capture_output();
         self.capture_output.set(capture_output);
-        *self.error_output.borrow_mut() = String::new();
+        *self.error_output.borrow_mut() = BString::default();
 
         let (stdout, stderr, r#return) = self.mock_match(&command, cwd)?;
 
@@ -431,19 +498,19 @@ impl ProcessExecutor {
         match output.to_callback() {
             Ok(mut callback) => {
                 if !stdout.is_empty() {
-                    callback(Process::OUT, &stdout)?;
+                    callback(Process::OUT, stdout.as_bstr())?;
                 }
                 if !stderr.is_empty() {
-                    callback(Process::ERR, &stderr)?;
+                    callback(Process::ERR, stderr.as_bstr())?;
                 }
             }
             Err(mut out) => {
                 let mut io = self.io.clone();
                 if !stdout.is_empty() {
-                    Self::output_handler(capture_output, &mut io, Process::OUT, &stdout);
+                    Self::output_handler(capture_output, &mut io, Process::OUT, stdout.as_bstr());
                 }
                 if !stderr.is_empty() {
-                    Self::output_handler(capture_output, &mut io, Process::ERR, &stderr);
+                    Self::output_handler(capture_output, &mut io, Process::ERR, stderr.as_bstr());
                 }
                 if capture_output {
                     out.write_back(stdout.clone());
@@ -485,7 +552,7 @@ impl ProcessExecutor {
         };
 
         if !expectations.is_empty() {
-            let remaining: Vec<String> = expectations
+            let remaining: Vec<BString> = expectations
                 .iter()
                 .map(|expect| match &expect.cmd {
                     CommandLine::Args(args) => implode(" ", args),
@@ -495,12 +562,12 @@ impl ProcessExecutor {
             panic!(
                 "There are still {} expected process calls which have not been consumed:{}{}{}{}Received calls:{}{}",
                 expectations.len(),
-                PHP_EOL,
-                remaining.join(PHP_EOL),
-                PHP_EOL,
-                PHP_EOL,
-                PHP_EOL,
-                mock.log.join(PHP_EOL)
+                PHP_EOL.display_lossy(),
+                implode(PHP_EOL, &remaining).display_lossy(),
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
+                PHP_EOL.display_lossy(),
+                implode(PHP_EOL, &mock.log).display_lossy()
             );
         }
     }
@@ -519,7 +586,7 @@ impl ProcessExecutor {
     pub fn execute_async<C>(
         &self,
         command: C,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Process>>>>
     where
         C: IntoExecCommand,
@@ -533,7 +600,7 @@ impl ProcessExecutor {
     pub(crate) fn execute_async_job<C>(
         &self,
         command: C,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
         started: Option<std::rc::Rc<std::cell::Cell<bool>>>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Process>>>>
     where
@@ -562,11 +629,11 @@ impl ProcessExecutor {
         let allow_async = self.allow_async.get();
         let semaphore = self.semaphore.borrow().clone();
         let io = self.io.clone();
-        let cwd = cwd.map(ToOwned::to_owned);
+        let cwd = cwd.map(Path::to_path_buf);
 
         Box::pin(async move {
             if !allow_async {
-                return Err(LogicException::new("You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string())
+                return Err(LogicException::new(BString::from("You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes"))
                 .into());
             }
 
@@ -619,15 +686,16 @@ impl ProcessExecutor {
     fn output_handler(
         capture_output: bool,
         io: &mut Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-        r#type: &str,
-        buffer: &str,
+        r#type: &BStr,
+        buffer: &BStr,
     ) {
         if capture_output {
             return;
         }
 
         if io.is_none() {
-            print!("{}", buffer);
+            use std::io::Write as _;
+            let _ = std::io::stdout().write_all(buffer);
 
             return;
         }
@@ -656,14 +724,7 @@ impl ProcessExecutor {
             None => PhpMixed::Null,
         };
         if is_numeric(&max_jobs_env_mixed) {
-            self.max_jobs.set(
-                max_jobs_env
-                    .as_deref()
-                    .unwrap_or("0")
-                    .parse()
-                    .unwrap_or(0)
-                    .clamp(1, 50),
-            );
+            self.max_jobs.set(intval(&max_jobs_env_mixed).clamp(1, 50));
         } else {
             self.max_jobs.set(10);
         }
@@ -675,8 +736,8 @@ impl ProcessExecutor {
         self.allow_async.set(true);
     }
 
-    pub fn split_lines(&self, output: &str) -> Vec<String> {
-        let output = trim(output, None);
+    pub fn split_lines(&self, output: impl AsRef<[u8]>) -> Vec<BString> {
+        let output = trim(output);
 
         if output.is_empty() {
             vec![]
@@ -686,7 +747,7 @@ impl ProcessExecutor {
     }
 
     /// Get any error output from the last command
-    pub fn get_error_output(&self) -> String {
+    pub fn get_error_output(&self) -> BString {
         self.error_output.borrow().clone()
     }
 
@@ -699,18 +760,18 @@ impl ProcessExecutor {
     }
 
     /// Escapes a string to be used as a shell argument.
-    pub fn escape(argument: &str) -> String {
-        Self::escape_argument(argument)
+    pub fn escape(argument: impl AsRef<[u8]>) -> BString {
+        Self::escape_argument(argument.as_ref())
     }
 
-    fn output_command_run(&self, command: &CommandLine, cwd: Option<&str>, r#async: bool) {
+    fn output_command_run(&self, command: &CommandLine, cwd: Option<&Path>, r#async: bool) {
         Self::output_command_run_with(&self.io, command, cwd, r#async);
     }
 
     fn output_command_run_with(
         io: &Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         command: &CommandLine,
-        cwd: Option<&str>,
+        cwd: Option<&Path>,
         r#async: bool,
     ) {
         if io.is_none() || !io.as_ref().unwrap().is_debug() {
@@ -723,19 +784,19 @@ impl ProcessExecutor {
         };
         let safe_command = preg_replace_callback(
             php_regex!(r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i"),
-            |m: &PregMatches| -> anyhow::Result<String> {
+            |m: &PregMatches| -> anyhow::Result<BString> {
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
                 if preg_is_match(
                     GitHub::GITHUB_TOKEN_REGEX,
                     m.name("user").unwrap_or_default(),
                 ) {
-                    return Ok("://***:***@".to_string());
+                    return Ok("://***:***@".into());
                 }
                 if preg_is_match(r"{^[a-f0-9]{12,}$}", m.name("user").unwrap_or_default()) {
-                    return Ok("://***:***@".to_string());
+                    return Ok("://***:***@".into());
                 }
 
-                Ok(format!("://{}:***@", m.name("user").unwrap_or_default()))
+                Ok(bconcat!("://", m.name("user").unwrap_or_default(), ":***@"))
             },
             &command_string,
         )
@@ -745,42 +806,46 @@ impl ProcessExecutor {
             "--password '***' ",
             &safe_command,
         );
-        io.as_ref().unwrap().write_error(&format!(
-            "Executing{} command ({}): {}",
+        io.as_ref().unwrap().write_error(bconcat!(
+            "Executing",
             if r#async { " async" } else { "" },
-            cwd.unwrap_or("CWD"),
+            " command (",
+            cwd.map_or(BString::from("CWD"), |cwd| BString::from(path_to_bytes(
+                cwd
+            ))),
+            "): ",
             safe_command
         ));
     }
 
     /// Escapes a string to be used as a shell argument for Symfony Process.
-    fn escape_argument(argument: &str) -> String {
-        let mut argument = argument.to_string();
+    fn escape_argument(argument: &[u8]) -> BString {
+        let mut argument = BString::from(argument);
         if argument.is_empty() {
             return escapeshellarg(&argument);
         }
 
         if !Platform::is_windows() {
-            return format!("'{}'", str_replace("'", "'\\''", &argument));
+            return bconcat!("'", str_replace("'", "'\\''", &argument), "'");
         }
 
         // New lines break cmd.exe command parsing
         // and special chars like the fullwidth quote can be used to break out
         // of parameter encoding via "Best Fit" encoding conversion
-        let mut translation: IndexMap<String, String> = IndexMap::new();
-        translation.insert("\n".to_string(), " ".to_string());
-        translation.insert("\u{ff02}".to_string(), "\"".to_string());
-        translation.insert("\u{02ba}".to_string(), "\"".to_string());
-        translation.insert("\u{301d}".to_string(), "\"".to_string());
-        translation.insert("\u{301e}".to_string(), "\"".to_string());
-        translation.insert("\u{030e}".to_string(), "\"".to_string());
-        translation.insert("\u{ff1a}".to_string(), ":".to_string());
-        translation.insert("\u{0589}".to_string(), ":".to_string());
-        translation.insert("\u{2236}".to_string(), ":".to_string());
-        translation.insert("\u{ff0f}".to_string(), "/".to_string());
-        translation.insert("\u{2044}".to_string(), "/".to_string());
-        translation.insert("\u{2215}".to_string(), "/".to_string());
-        translation.insert("\u{00b4}".to_string(), "/".to_string());
+        let mut translation: IndexMap<&BStr, &BStr> = IndexMap::new();
+        translation.insert(BStr::new("\n"), BStr::new(" "));
+        translation.insert(BStr::new("\u{ff02}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{02ba}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{301d}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{301e}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{030e}"), BStr::new("\""));
+        translation.insert(BStr::new("\u{ff1a}"), BStr::new(":"));
+        translation.insert(BStr::new("\u{0589}"), BStr::new(":"));
+        translation.insert(BStr::new("\u{2236}"), BStr::new(":"));
+        translation.insert(BStr::new("\u{ff0f}"), BStr::new("/"));
+        translation.insert(BStr::new("\u{2044}"), BStr::new("/"));
+        translation.insert(BStr::new("\u{2215}"), BStr::new("/"));
+        translation.insert(BStr::new("\u{00b4}"), BStr::new("/"));
         argument = strtr_array(&argument, &translation);
 
         // In addition to whitespace, commas need quoting to preserve paths
@@ -801,7 +866,7 @@ impl ProcessExecutor {
         }
 
         if quote {
-            argument = format!("\"{}\"", preg_replace(r"/(\\*)$/", "$1$1", &argument));
+            argument = bconcat!("\"", preg_replace(r"/(\\*)$/", "$1$1", &argument), "\"");
         }
 
         if meta {
@@ -813,11 +878,11 @@ impl ProcessExecutor {
     }
 
     pub fn requires_git_dir_env(&self, command: &CommandLine) -> bool {
-        let cmd: Vec<String> = match command {
+        let cmd: Vec<BString> = match command {
             CommandLine::Shell(command) => explode(" ", command),
             CommandLine::Args(args) => args.clone(),
         };
-        if cmd.first().map(|s| s.as_str()) != Some("git") {
+        if cmd.first().is_none_or(|s| s != "git") {
             return false;
         }
 
@@ -827,8 +892,8 @@ impl ProcessExecutor {
         // at index 0 so the intersection can never start where the pattern does; this answers
         // true, which is what the patterns were written for.
         for git_cmd in Self::GIT_CMDS_NEED_GIT_DIR.iter() {
-            let cmd_strs: Vec<String> = cmd.clone();
-            let git_cmd_strs: Vec<String> = git_cmd.iter().map(|s| s.to_string()).collect();
+            let cmd_strs: Vec<BString> = cmd.clone();
+            let git_cmd_strs: Vec<BString> = git_cmd.iter().map(|&s| s.into()).collect();
             if array_intersect(&cmd_strs, &git_cmd_strs) == git_cmd_strs {
                 return true;
             }
@@ -838,29 +903,27 @@ impl ProcessExecutor {
     }
 
     /// Resolves executable paths on Windows
-    fn get_executable(name: &str) -> String {
+    fn get_executable(name: &[u8]) -> BString {
         if in_array_strict(
             strtolower(name),
             &Self::BUILTIN_CMD_COMMANDS
                 .iter()
-                .map(|s| PhpMixed::string(s.to_string()))
+                .map(|s| PhpMixed::string(*s))
                 .collect::<Vec<_>>(),
         ) {
-            return name.to_string();
+            return name.into();
         }
 
+        let name = BString::from(name);
         let mut executables = EXECUTABLES.lock().unwrap();
-        if !executables.contains_key(name) {
-            let path = ExecutableFinder::new().find(name, Some(name), &[]);
+        if !executables.contains_key(&name) {
+            let path = ExecutableFinder::new().find(&name, None, &[]);
             if let Some(p) = path {
-                executables.insert(name.to_string(), p);
+                executables.insert(name.clone(), p);
             }
         }
 
-        executables
-            .get(name)
-            .cloned()
-            .unwrap_or_else(|| name.to_string())
+        executables.get(&name).cloned().unwrap_or(name)
     }
 }
 
@@ -881,55 +944,58 @@ impl IntoExecCommand for &CommandLine {
     }
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl IntoExecCommand for &str {
     fn into_exec_command(self) -> CommandLine {
-        CommandLine::Shell(self.to_string())
+        CommandLine::Shell(self.into())
     }
 }
 
-impl IntoExecCommand for String {
+impl IntoExecCommand for BString {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Shell(self)
     }
 }
 
-impl IntoExecCommand for &String {
+impl IntoExecCommand for &BString {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Shell(self.clone())
     }
 }
 
-impl IntoExecCommand for Vec<String> {
+impl IntoExecCommand for Vec<BString> {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Args(self)
     }
 }
 
-impl IntoExecCommand for &Vec<String> {
+impl IntoExecCommand for &Vec<BString> {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Args(self.clone())
     }
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl<const N: usize> IntoExecCommand for &[&str; N] {
     fn into_exec_command(self) -> CommandLine {
-        CommandLine::Args(self.iter().map(|s| s.to_string()).collect())
+        CommandLine::Args(self.iter().map(|&s| s.into()).collect())
     }
 }
 
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 impl IntoExecCommand for &[&str] {
     fn into_exec_command(self) -> CommandLine {
-        CommandLine::Args(self.iter().map(|s| s.to_string()).collect())
+        CommandLine::Args(self.iter().map(|&s| s.into()).collect())
     }
 }
 
-impl IntoExecCommand for &[String] {
+impl IntoExecCommand for &[BString] {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Args(self.to_vec())
     }
 }
 
-impl<const N: usize> IntoExecCommand for &[String; N] {
+impl<const N: usize> IntoExecCommand for &[BString; N] {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Args(self.to_vec())
     }
@@ -944,8 +1010,8 @@ impl<const N: usize> IntoExecCommand for &[String; N] {
 /// | `execute($cmd)` | forward child output to STDOUT/STDERR (or the IO) | [`ProcessForwardOutput`] | `false` |
 /// | `execute($cmd, $out)` | assign captured output back to `$out` | `&mut String` / `&mut PhpMixed` | `true` |
 /// | `execute($cmd, $out)` where `$out` is unused | capture (suppress output) but discard it | `()` | `true` |
-/// | `execute($cmd, $out)` from a plugin | capture, recording whether it was assigned | `&mut Option<String>` | `true` |
-/// | `execute($cmd, $cb)` | drive the child through the callback | `Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>` | `false` |
+/// | `execute($cmd, $out)` from a plugin | capture, recording whether it was assigned | `&mut Option<BString>` | `true` |
+/// | `execute($cmd, $cb)` | drive the child through the callback | `Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>` | `false` |
 ///
 /// `capture_output` maps to PHP's `$this->captureOutput` (`func_num_args() > 3` in `doExecute`): when
 /// `true`, `outputHandler` swallows the child output instead of echoing it, and the full output is
@@ -964,12 +1030,12 @@ pub trait IntoExecOutput<'a>: Sized {
     /// so the captured output can still be written back).
     fn to_callback(
         self,
-    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self>;
+    ) -> anyhow::Result<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>, Self>;
 
     /// Assigns the captured output back to the by-reference target, mirroring PHP's
     /// `$output = $process->getOutput()`. Only meaningful when [`capture_output`](Self::capture_output)
     /// is `true`; a no-op for the forwarding and discarding variants.
-    fn write_back(&mut self, value: String);
+    fn write_back(&mut self, value: BString);
 }
 
 /// `execute($cmd, $out)` where the caller never reads `$out` (e.g. `HomeCommand::openBrowser`):
@@ -981,11 +1047,11 @@ impl<'a> IntoExecOutput<'a> for () {
 
     fn to_callback(
         self,
-    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
+    ) -> anyhow::Result<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
-    fn write_back(&mut self, _value: String) {}
+    fn write_back(&mut self, _value: BString) {}
 }
 
 /// `execute($cmd)` with no output argument: the child's output is forwarded to STDOUT/STDERR
@@ -997,11 +1063,11 @@ impl<'a> IntoExecOutput<'a> for ProcessForwardOutput {
 
     fn to_callback(
         self,
-    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
+    ) -> anyhow::Result<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
-    fn write_back(&mut self, _value: String) {}
+    fn write_back(&mut self, _value: BString) {}
 }
 
 /// `execute($cmd, $out)` where `$out` holds a `mixed`/string value: output is captured and assigned
@@ -1013,29 +1079,28 @@ impl<'a> IntoExecOutput<'a> for &'a mut PhpMixed {
 
     fn to_callback(
         self,
-    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
+    ) -> anyhow::Result<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
-    fn write_back(&mut self, value: String) {
+    fn write_back(&mut self, value: BString) {
         **self = PhpMixed::string(value);
     }
 }
 
-/// `execute($cmd, $out)` where `$out` is consumed as a string: output is captured and assigned back
-/// directly.
-impl<'a> IntoExecOutput<'a> for &'a mut String {
+/// `execute($cmd, $out)` where `$out` is consumed as a string of bytes.
+impl<'a> IntoExecOutput<'a> for &'a mut BString {
     fn capture_output(&self) -> bool {
         true
     }
 
     fn to_callback(
         self,
-    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
+    ) -> anyhow::Result<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
-    fn write_back(&mut self, value: String) {
+    fn write_back(&mut self, value: BString) {
         **self = value;
     }
 }
@@ -1043,18 +1108,18 @@ impl<'a> IntoExecOutput<'a> for &'a mut String {
 /// `execute($cmd, $out)` reached over the plugin RPC boundary, where the caller has to know whether
 /// the output was assigned at all rather than just what it is: PHP leaves `$output` untouched when
 /// the child is signaled, and `None` reproduces that by sending no value back across the boundary.
-impl<'a> IntoExecOutput<'a> for &'a mut Option<String> {
+impl<'a> IntoExecOutput<'a> for &'a mut Option<BString> {
     fn capture_output(&self) -> bool {
         true
     }
 
     fn to_callback(
         self,
-    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
+    ) -> anyhow::Result<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
-    fn write_back(&mut self, value: String) {
+    fn write_back(&mut self, value: BString) {
         **self = Some(value);
     }
 }
@@ -1062,18 +1127,18 @@ impl<'a> IntoExecOutput<'a> for &'a mut Option<String> {
 /// `execute($cmd, $cb)` where `$cb` is callable: the callback is passed straight to `Process::run`
 /// as the output handler, so the caller drives the child's output itself (e.g. `Svn`'s streaming
 /// handler). The `bool` return mirrors Symfony's ignored callback return value.
-impl<'a> IntoExecOutput<'a> for Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>> {
+impl<'a> IntoExecOutput<'a> for Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>> {
     fn capture_output(&self) -> bool {
         false
     }
 
     fn to_callback(
         self,
-    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
+    ) -> anyhow::Result<Box<dyn FnMut(&BStr, &BStr) -> anyhow::Result<bool>>, Self> {
         Ok(self)
     }
 
-    fn write_back(&mut self, _value: String) {}
+    fn write_back(&mut self, _value: BString) {}
 }
 
 /// Helper: accept either `i64` or `PhpMixed` for `set_timeout`.

@@ -7,6 +7,9 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString};
+use shirabe_php_shim::os_str_from_bytes;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -16,18 +19,18 @@ fn fixture_dir() -> PathBuf {
 
 struct Run {
     exit_codes: Vec<i32>,
-    trace: String,
+    trace: BString,
 }
 
 /// Runs `install` twice in a fresh copy of the fixture and returns both exit codes with the
 /// plugin's trace.
-fn install_twice(program: &str, prefix_args: &[&str]) -> Run {
+fn install_twice(program: &BStr, prefix_args: &[&OsStr]) -> Run {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
     let exit_codes = (0..2)
         .map(|_| {
-            let output = std::process::Command::new(program)
+            let output = std::process::Command::new(os_str_from_bytes(&program))
                 .args(prefix_args)
                 .arg("install")
                 .current_dir(&project)
@@ -43,7 +46,7 @@ fn install_twice(program: &str, prefix_args: &[&str]) -> Run {
         .collect();
     Run {
         exit_codes,
-        trace: std::fs::read_to_string(project.join("locker-trace.txt")).unwrap_or_default(),
+        trace: BString::from(std::fs::read(project.join("locker-trace.txt")).unwrap_or_default()),
     }
 }
 
@@ -56,10 +59,9 @@ fn test_plugin_read_locker_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
 
-    let upstream = install_twice("php", &[composer_bin.as_str()]);
-    let shirabe = install_twice(env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream = install_twice(BStr::new("php"), &[composer_bin.as_os_str()]);
+    let shirabe = install_twice(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     assert_eq!(
         vec![0, 0],

@@ -2,7 +2,7 @@
 
 use super::rule::ReasonData;
 use crate::dependency_resolver::{Rule, RuleBase};
-use shirabe_php_shim::{RuntimeException, hash_raw};
+use shirabe_php_shim::{RuntimeException, bconcat, hash_raw, implode};
 
 #[derive(Debug)]
 pub struct GenericRule {
@@ -30,16 +30,18 @@ impl GenericRule {
     }
 
     pub fn get_hash(&self) -> anyhow::Result<i64> {
-        let joined = self
-            .literals
-            .iter()
-            .map(|l| l.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
+        let joined = implode(
+            ",",
+            &self
+                .literals
+                .iter()
+                .map(|l| bconcat!(l))
+                .collect::<Vec<_>>(),
+        );
         let binary = hash_raw("xxh3", &joined);
         match binary.get(..4) {
             Some(chunk) => Ok(i32::from_ne_bytes(chunk.try_into().unwrap()) as i64),
-            None => Err(RuntimeException::new(format!("Failed unpacking: {}", joined)).into()),
+            None => Err(RuntimeException::new(bconcat!("Failed unpacking: ", joined)).into()),
         }
     }
 

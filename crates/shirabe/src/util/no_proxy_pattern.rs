@@ -1,24 +1,25 @@
 //! ref: composer/src/Composer/Util/NoProxyPattern.php
 
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, array_key_exists, explode, filter_var_int_with_range, filter_var_ip,
-    inet_pton, ltrim, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
-    substr_count,
+    RuntimeException, bconcat, explode, filter_var_int_with_range, filter_var_ip, inet_pton,
+    ltrim2, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
+    substr_count, utf8_text,
 };
 
 /// Tests URLs against NO_PROXY patterns
 #[derive(Debug)]
 pub struct NoProxyPattern {
-    host_names: Vec<String>,
+    host_names: Vec<BString>,
     rules: IndexMap<i64, Option<UrlData>>,
     noproxy: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct UrlData {
-    pub host: String,
-    pub name: String,
+    pub host: BString,
+    pub name: BString,
     pub port: i64,
     pub ipdata: Option<IpData>,
 }
@@ -31,8 +32,8 @@ pub struct IpData {
 }
 
 impl NoProxyPattern {
-    pub fn new(pattern: &str) -> Self {
-        let host_names: Vec<String> = preg_split(php_regex!(r"{[\s,]+}"), pattern)
+    pub fn new(pattern: impl AsRef<[u8]>) -> Self {
+        let host_names: Vec<BString> = preg_split(php_regex!(r"{[\s,]+}"), pattern.as_ref())
             .into_iter()
             .filter(|host_name| !host_name.is_empty())
             .collect();
@@ -45,19 +46,19 @@ impl NoProxyPattern {
     }
 
     /// Returns true if a URL matches the NO_PROXY pattern
-    pub fn test(&mut self, url: &str) -> anyhow::Result<bool> {
+    pub fn test(&mut self, url: impl AsRef<[u8]>) -> anyhow::Result<bool> {
         if self.noproxy {
             return Ok(true);
         }
 
-        let url_data = match self.get_url_data(url)? {
+        let url_data = match self.get_url_data(url.as_ref())? {
             Some(d) => d,
             None => return Ok(false),
         };
 
         let host_names = self.host_names.clone();
         for (index, host_name) in host_names.iter().enumerate() {
-            if self.r#match(index as i64, host_name, &url_data)? {
+            if self.r#match(index as i64, host_name.as_bstr(), &url_data)? {
                 return Ok(true);
             }
         }
@@ -66,7 +67,7 @@ impl NoProxyPattern {
     }
 
     /// Returns false is the url cannot be parsed, otherwise a data object
-    fn get_url_data(&self, url: &str) -> anyhow::Result<Option<UrlData>> {
+    fn get_url_data(&self, url: &[u8]) -> anyhow::Result<Option<UrlData>> {
         let parsed = parse_url(url);
         let Some(host_str) = parsed
             .as_ref()
@@ -79,35 +80,35 @@ impl NoProxyPattern {
         let mut port = parsed.as_ref().and_then(|parsed| parsed.port);
 
         if port.is_none_or(|port| port == 0) {
-            match parsed.as_ref().and_then(|parsed| parsed.scheme.as_deref()) {
-                Some("http") => port = Some(80),
-                Some("https") => port = Some(443),
+            match parsed
+                .as_ref()
+                .and_then(|parsed| parsed.scheme.as_ref())
+                .map(|scheme| scheme.as_slice())
+            {
+                Some(b"http") => port = Some(80),
+                Some(b"https") => port = Some(443),
                 _ => {}
             }
         }
 
         let port_int = port.unwrap_or(0);
-        let host_name = format!(
-            "{}{}",
-            host_str,
-            if port_int != 0 {
-                format!(":{}", port_int)
-            } else {
-                String::new()
-            },
-        );
-        let (host, port, err) = self.split_host_port(&host_name)?;
+        let host_name = if port_int != 0 {
+            bconcat!(host_str, ":", port_int)
+        } else {
+            host_str
+        };
+        let (host, port, err) = self.split_host_port(host_name.as_bstr())?;
 
         let mut ipdata: Option<IpData> = None;
-        if err || !self.ip_check_data(&host, &mut ipdata, false)? {
+        if err || !self.ip_check_data(host.as_bstr(), &mut ipdata, false)? {
             return Ok(None);
         }
 
-        Ok(Some(self.make_data(&host, port, ipdata)))
+        Ok(Some(self.make_data(host.as_bstr(), port, ipdata)))
     }
 
     /// Returns true if the url is matched by a rule
-    fn r#match(&mut self, index: i64, host_name: &str, url: &UrlData) -> anyhow::Result<bool> {
+    fn r#match(&mut self, index: i64, host_name: &BStr, url: &UrlData) -> anyhow::Result<bool> {
         let rule = match self.get_rule(index, host_name)? {
             Some(r) => r,
             None => {
@@ -148,23 +149,23 @@ impl NoProxyPattern {
         let mask = network.netmask.as_deref().unwrap_or_default();
         let ip = target.ip.as_slice();
         if net.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse network IP {}",
-                String::from_utf8_lossy(net)
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse network IP ",
+                net.as_bstr()
             ))
             .into());
         }
         if mask.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse netmask {}",
-                String::from_utf8_lossy(mask)
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse netmask ",
+                mask.as_bstr()
             ))
             .into());
         }
         if ip.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse target IP {}",
-                String::from_utf8_lossy(ip)
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse target IP ",
+                ip.as_bstr()
             ))
             .into());
         }
@@ -182,14 +183,8 @@ impl NoProxyPattern {
     }
 
     /// Finds or creates rule data for a hostname
-    fn get_rule(&mut self, index: i64, host_name: &str) -> anyhow::Result<Option<UrlData>> {
-        if array_key_exists(&index.to_string(), &{
-            let mut m: IndexMap<String, ()> = IndexMap::new();
-            for k in self.rules.keys() {
-                m.insert(k.to_string(), ());
-            }
-            m
-        }) {
+    fn get_rule(&mut self, index: i64, host_name: &BStr) -> anyhow::Result<Option<UrlData>> {
+        if self.rules.contains_key(&index) {
             return Ok(self.rules.get(&index).and_then(|v| v.clone()));
         }
 
@@ -197,12 +192,12 @@ impl NoProxyPattern {
         let (host, port, err) = self.split_host_port(host_name)?;
 
         let mut ipdata: Option<IpData> = None;
-        if err || !self.ip_check_data(&host, &mut ipdata, true)? {
+        if err || !self.ip_check_data(host.as_bstr(), &mut ipdata, true)? {
             return Ok(None);
         }
 
         self.rules
-            .insert(index, Some(self.make_data(&host, port, ipdata)));
+            .insert(index, Some(self.make_data(host.as_bstr(), port, ipdata)));
 
         Ok(self.rules.get(&index).and_then(|v| v.clone()))
     }
@@ -210,7 +205,7 @@ impl NoProxyPattern {
     /// Creates an object containing IP data if the host is an IP address
     fn ip_check_data(
         &self,
-        host: &str,
+        host: &BStr,
         ipdata: &mut Option<IpData>,
         allow_prefix: bool,
     ) -> anyhow::Result<bool> {
@@ -219,7 +214,7 @@ impl NoProxyPattern {
         let mut prefix: Option<i64> = None;
         let mut modified = false;
 
-        let mut host = host.to_string();
+        let mut host = BString::from(host);
 
         // Check for a CIDR prefix-length
         if strpos(&host, "/").is_some() {
@@ -227,10 +222,14 @@ impl NoProxyPattern {
             host = parts.first().cloned().unwrap_or_default();
             let prefix_str = parts.get(1).cloned().unwrap_or_default();
 
-            if !allow_prefix || !self.validate_int(&prefix_str, 0, 128) {
+            if !allow_prefix || !self.validate_int(prefix_str.as_bstr(), 0, 128) {
                 return Ok(false);
             }
-            prefix = Some(prefix_str.parse().unwrap_or(0));
+            prefix = Some(
+                utf8_text(&prefix_str)
+                    .and_then(|prefix| prefix.parse().ok())
+                    .unwrap_or(0),
+            );
             modified = true;
         }
 
@@ -239,7 +238,7 @@ impl NoProxyPattern {
             return Ok(!modified);
         }
 
-        let (mut ip, size) = self.ip_get_addr(&host);
+        let (mut ip, size) = self.ip_get_addr(host.as_bstr());
 
         if let Some(prefix) = prefix {
             // Check for a valid prefix
@@ -261,7 +260,7 @@ impl NoProxyPattern {
     ///
     /// IPv4 addresses are always mapped to IPv6, which simplifies handling
     /// and comparison.
-    fn ip_get_addr(&self, host: &str) -> (Vec<u8>, i64) {
+    fn ip_get_addr(&self, host: &BStr) -> (Vec<u8>, i64) {
         let ip = inet_pton(host).unwrap_or_default();
         let size = ip.len() as i64;
         let mapped = self.ip_map_to_6(&ip, size);
@@ -301,16 +300,16 @@ impl NoProxyPattern {
 
         // Get the network from the address and mask
         if netmask.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse netmask {}",
-                String::from_utf8_lossy(&netmask)
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse netmask ",
+                netmask.as_bstr()
             ))
             .into());
         }
         if range_ip.is_empty() {
-            return Err(RuntimeException::new(format!(
-                "Could not parse range IP {}",
-                String::from_utf8_lossy(range_ip)
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse range IP ",
+                range_ip.as_bstr()
             ))
             .into());
         }
@@ -338,10 +337,10 @@ impl NoProxyPattern {
     }
 
     /// Creates a rule data object
-    fn make_data(&self, host: &str, port: i64, ipdata: Option<IpData>) -> UrlData {
+    fn make_data(&self, host: &BStr, port: i64, ipdata: Option<IpData>) -> UrlData {
         UrlData {
-            host: host.to_string(),
-            name: format!(".{}", ltrim(host, Some("."))),
+            host: host.into(),
+            name: bconcat!(".", ltrim2(host, ".")),
             port,
             ipdata,
         }
@@ -357,17 +356,17 @@ impl NoProxyPattern {
     }
 
     /// Splits the hostname into host and port components
-    fn split_host_port(&self, host_name: &str) -> anyhow::Result<(String, i64, bool)> {
+    fn split_host_port(&self, host_name: &BStr) -> anyhow::Result<(BString, i64, bool)> {
         // host, port, err
-        let error = (String::new(), 0_i64, true);
+        let error = (BString::default(), 0_i64, true);
         let mut port: i64 = 0;
-        let mut ip6 = String::new();
+        let mut ip6 = BString::default();
 
-        let mut host_name = host_name.to_string();
+        let mut host_name = BString::from(host_name);
 
         // Check for square-bracket notation
         // PHP: if ($hostName[0] === '[')
-        if host_name.starts_with('[') {
+        if host_name.starts_with(b"[") {
             let index = strpos(&host_name, "]");
 
             // The smallest ip6 address is ::
@@ -390,20 +389,22 @@ impl NoProxyPattern {
             let port_str = substr(&host_name, (index as i64) + 1, None);
             host_name = substr(&host_name, 0, Some(index as i64));
 
-            if !self.validate_int(&port_str, 1, 65535) {
+            if !self.validate_int(port_str.as_bstr(), 1, 65535) {
                 return Ok(error);
             }
 
-            port = port_str.parse().unwrap_or(0);
+            port = utf8_text(&port_str)
+                .and_then(|port| port.parse().ok())
+                .unwrap_or(0);
         }
 
-        let host = format!("{}{}", ip6, host_name);
+        let host = bconcat!(ip6, host_name);
 
         Ok((host, port, false))
     }
 
     /// Wrapper around filter_var FILTER_VALIDATE_INT
-    fn validate_int(&self, int: &str, min: i64, max: i64) -> bool {
+    fn validate_int(&self, int: &BStr, min: i64, max: i64) -> bool {
         filter_var_int_with_range(int, min, max)
     }
 }

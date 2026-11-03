@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/ComposerTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::composer::Composer;
 use shirabe::config::Config;
@@ -48,9 +49,9 @@ fn installation_manager(
 fn test_set_get_package() {
     let mut composer = Composer::new();
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-        "foo".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0.0".to_string(),
+        BString::from("foo"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0.0"),
     )
     .into();
     composer.set_package(package.clone());
@@ -62,7 +63,7 @@ fn test_set_get_package() {
 fn test_set_get_locker() {
     let mut composer = Composer::new();
     let io = null_io();
-    let json_file = JsonFile::new("composer.lock".to_string(), None, None).unwrap();
+    let json_file = JsonFile::new("composer.lock", None, None).unwrap();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));

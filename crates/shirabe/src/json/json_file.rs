@@ -1,24 +1,27 @@
 //! ref: composer/src/Composer/Json/JsonFile.php
 
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::JsonValidationException;
 use crate::util::{Filesystem, HttpDownloader};
+use bstr::{BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
-    JSON_UNESCAPED_UNICODE, PhpMixed, PregMatches, RuntimeException, UnexpectedValueException,
-    dirname, file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc,
-    json_decode_obj, json_encode_ex, mkdir, php_regex, preg_is_match, preg_match,
-    preg_replace_callback, preg_replace2, realpath, str_repeat, strlen, strpos, usleep,
+    JSON_UNESCAPED_UNICODE, PhpJson, PhpMixed, RuntimeException, UnexpectedValueException, bconcat,
+    dirname, display_to_bytes, error_message, file_exists, file_get_contents, file_put_contents,
+    is_dir, is_file, json_decode_assoc, json_decode_obj, json_encode_ex, ltrim2, mkdir,
+    path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace2,
+    rawurldecode, realpath, sprintf, str_replace, strpos, usleep, utf8_text,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct JsonEncodeOptions {
     pub unescaped_slashes: bool,
     pub pretty_print: bool,
     pub unescaped_unicode: bool,
-    pub indent: String,
+    pub indent: BString,
 }
 
 impl Default for JsonEncodeOptions {
@@ -27,7 +30,7 @@ impl Default for JsonEncodeOptions {
             unescaped_slashes: true,
             pretty_print: true,
             unescaped_unicode: true,
-            indent: JsonFile::INDENT_DEFAULT.to_string(),
+            indent: BString::from(JsonFile::INDENT_DEFAULT),
         }
     }
 }
@@ -38,7 +41,7 @@ impl JsonEncodeOptions {
             unescaped_slashes: false,
             pretty_print: false,
             unescaped_unicode: false,
-            indent: JsonFile::INDENT_DEFAULT.to_string(),
+            indent: BString::from(JsonFile::INDENT_DEFAULT),
         }
     }
 
@@ -60,10 +63,10 @@ impl JsonEncodeOptions {
 /// Reads/writes json files.
 #[derive(Debug)]
 pub struct JsonFile {
-    path: String,
+    path: PathBuf,
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    indent: std::cell::RefCell<String>,
+    indent: std::cell::RefCell<BString>,
 }
 
 impl JsonFile {
@@ -72,41 +75,45 @@ impl JsonFile {
     pub const AUTH_SCHEMA: i64 = 3;
     pub const LOCK_SCHEMA: i64 = 4;
 
-    pub const INDENT_DEFAULT: &'static str = "    ";
+    pub const INDENT_DEFAULT: &'static BStr = php_str(b"    ");
 
     /// PHP points these at Composer's res/ directory; here the schemas are embedded in the
     /// binary and SchemaRetriever resolves these URIs back to the constants below. The res/
     /// path segment matters: composer-lock-schema.json reaches the composer schema through the
     /// relative reference "./composer-schema.json", which must resolve to COMPOSER_SCHEMA_PATH.
-    pub const COMPOSER_SCHEMA_PATH: &'static str = "shirabe:///res/composer-schema.json";
-    pub const LOCK_SCHEMA_PATH: &'static str = "shirabe:///res/composer-lock-schema.json";
+    pub const COMPOSER_SCHEMA_PATH: &'static BStr = php_str(b"shirabe:///res/composer-schema.json");
+    pub const LOCK_SCHEMA_PATH: &'static BStr =
+        php_str(b"shirabe:///res/composer-lock-schema.json");
 
-    pub const COMPOSER_SCHEMA_JSON: &'static str =
-        include_str!("../../../../composer/res/composer-schema.json");
-    const LOCK_SCHEMA_JSON: &'static str =
-        include_str!("../../../../composer/res/composer-lock-schema.json");
+    pub const COMPOSER_SCHEMA_JSON: &'static [u8] =
+        include_bytes!("../../../../composer/res/composer-schema.json");
+    const LOCK_SCHEMA_JSON: &'static [u8] =
+        include_bytes!("../../../../composer/res/composer-lock-schema.json");
 
     /// Initializes json file reader/parser.
     pub fn new(
-        path: String,
+        path: impl AsRef<Path>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Self> {
-        if http_downloader.is_none() && preg_is_match(php_regex!(r"{^https?://}i"), &path) {
-            return Err(InvalidArgumentException::new(
-                "http urls require a HttpDownloader instance to be passed".to_string(),
-            )
+        let path = path.as_ref().to_path_buf();
+        if http_downloader.is_none()
+            && preg_is_match(php_regex!(r"{^https?://}i"), path_to_bytes(&path))
+        {
+            return Err(InvalidArgumentException::new(BString::from(
+                "http urls require a HttpDownloader instance to be passed",
+            ))
             .into());
         }
         Ok(Self {
             path,
             http_downloader,
             io,
-            indent: std::cell::RefCell::new(Self::INDENT_DEFAULT.to_string()),
+            indent: std::cell::RefCell::new(BString::from(Self::INDENT_DEFAULT)),
         })
     }
 
-    pub fn get_path(&self) -> &str {
+    pub fn get_path(&self) -> &Path {
         &self.path
     }
 
@@ -121,28 +128,29 @@ impl JsonFile {
             if let Some(http_downloader) = &self.http_downloader {
                 Ok(http_downloader
                     .borrow_mut()
-                    .get(&self.path, indexmap::IndexMap::new())?
+                    .get(path_to_bytes(&self.path), indexmap::IndexMap::new())?
                     .get_body()
-                    .map(|s| s.as_bytes().to_vec()))
+                    .map(<[u8]>::to_vec))
             } else {
                 if !Filesystem::is_readable(&self.path) {
-                    return Err(RuntimeException::new(format!(
-                        "The file \"{}\" is not readable.",
-                        self.path
+                    return Err(RuntimeException::new(bconcat!(
+                        "The file \"",
+                        self.path,
+                        "\" is not readable."
                     ))
                     .into());
                 }
                 if let Some(io) = &self.io
                     && io.is_debug()
                 {
-                    let mut realpath_info = String::new();
+                    let mut realpath_info = BString::default();
                     if let Some(realpath) = realpath(&self.path)
-                        && realpath != self.path
+                        && realpath.as_os_str() != self.path.as_os_str()
                     {
-                        realpath_info = format!(" ({})", realpath);
+                        realpath_info = bconcat!(" (", realpath, ")");
                     }
                     io.write_error3(
-                        &format!("Reading {}{}", self.path, realpath_info),
+                        bconcat!("Reading ", self.path, realpath_info),
                         true,
                         io_interface::NORMAL,
                     );
@@ -153,7 +161,7 @@ impl JsonFile {
             Ok(j) => j,
             Err(e) => {
                 if let Some(te) = e.catch::<TransportException>() {
-                    let message = te.get_message().to_string();
+                    let message = te.get_message().to_owned();
                     return Err(RuntimeException::with_code_and_previous(
                         message,
                         0,
@@ -165,9 +173,11 @@ impl JsonFile {
                 if e.is_instanceof::<Error>() {
                     return Err(e);
                 }
-                return Err(RuntimeException::new(format!(
-                    "Could not read {}\n\n{}",
-                    self.path, e
+                return Err(RuntimeException::new(bconcat!(
+                    "Could not read ",
+                    self.path,
+                    "\n\n",
+                    error_message(&e)
                 ))
                 .into());
             }
@@ -176,14 +186,13 @@ impl JsonFile {
         let json = match json {
             Some(j) => j,
             None => {
-                return Err(RuntimeException::new(format!("Could not read {}", self.path)).into());
+                return Err(RuntimeException::new(bconcat!("Could not read ", self.path)).into());
             }
         };
 
-        // The indent is a run of spaces and tabs at a line start, which a lossy decode leaves intact.
-        *self.indent.borrow_mut() = Self::detect_indenting(Some(&String::from_utf8_lossy(&json)));
+        *self.indent.borrow_mut() = Self::detect_indenting(Some(&json));
 
-        Self::parse_json(Some(&json), Some(&self.path))
+        Self::parse_json(Some(&json), Some(path_to_bytes(&self.path).as_bstr()))
     }
 
     pub fn write(&self, hash: PhpMixed) -> anyhow::Result<()> {
@@ -200,7 +209,7 @@ impl JsonFile {
             ..options
         };
 
-        if self.path == "php://memory" {
+        if self.path.as_os_str() == "php://memory" {
             file_put_contents(
                 &self.path,
                 Self::encode_with_options(&hash, options)?.as_bytes(),
@@ -209,19 +218,19 @@ impl JsonFile {
             return Ok(());
         }
 
-        let dir = dirname(&self.path);
-        if !is_dir(&dir) {
-            if file_exists(&dir) {
-                return Err(UnexpectedValueException::new(format!(
-                    "{} exists and is not a directory.",
-                    realpath(&dir).unwrap_or_default(),
+        let dir = dirname(path_to_bytes(&self.path));
+        if !is_dir(path_from_bytes(&dir)) {
+            if file_exists(path_from_bytes(&dir)) {
+                return Err(UnexpectedValueException::new(bconcat!(
+                    realpath(path_from_bytes(&dir)).unwrap_or_default(),
+                    " exists and is not a directory."
                 ))
                 .into());
             }
-            if mkdir(&dir, 0o777, true).is_err() {
-                return Err(UnexpectedValueException::new(format!(
-                    "{} does not exist and could not be created.",
-                    dir
+            if mkdir(path_from_bytes(&dir), 0o777, true).is_err() {
+                return Err(UnexpectedValueException::new(bconcat!(
+                    dir,
+                    " does not exist and could not be created."
                 ))
                 .into());
             }
@@ -233,11 +242,11 @@ impl JsonFile {
             let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 self.file_put_contents_if_modified(
                     &self.path,
-                    &format!(
-                        "{}{}",
+                    bconcat!(
                         Self::encode_with_options(&hash, options.clone())?,
-                        if options.pretty_print { "\n" } else { "" },
-                    ),
+                        if options.pretty_print { "\n" } else { "" }
+                    )
+                    .as_bstr(),
                 )?;
                 Ok(())
             })();
@@ -260,8 +269,8 @@ impl JsonFile {
     /// Modify file properties only if content modified
     fn file_put_contents_if_modified(
         &self,
-        path: &str,
-        content: &str,
+        path: &Path,
+        content: &BStr,
     ) -> anyhow::Result<Option<i64>> {
         let current_content = file_get_contents(path).ok();
         if current_content.is_none() || current_content.as_deref() != Some(content.as_bytes()) {
@@ -272,11 +281,12 @@ impl JsonFile {
     }
 
     /// Validates the schema of the current json file according to composer-schema.json rules
-    pub fn validate_schema(&self, schema: i64, schema_file: Option<&str>) -> anyhow::Result<bool> {
+    pub fn validate_schema(&self, schema: i64, schema_file: Option<&BStr>) -> anyhow::Result<bool> {
         if !Filesystem::is_readable(&self.path) {
-            return Err(RuntimeException::new(format!(
-                "The file \"{}\" is not readable.",
-                self.path
+            return Err(RuntimeException::new(bconcat!(
+                "The file \"",
+                self.path,
+                "\" is not readable."
             ))
             .into());
         }
@@ -284,36 +294,42 @@ impl JsonFile {
         let data = json_decode_obj(&content)?;
 
         if matches!(data, PhpMixed::Null) && content != b"null" {
-            Self::validate_syntax(&content, Some(&self.path))?;
+            Self::validate_syntax(&content, Some(path_to_bytes(&self.path).as_bstr()))?;
         }
 
-        Self::validate_json_schema(&self.path, &data, schema, schema_file)
+        Self::validate_json_schema(
+            path_to_bytes(&self.path).as_bstr(),
+            &data,
+            schema,
+            schema_file,
+        )
     }
 
     /// Validates the schema of the current json file according to composer-schema.json rules
     pub fn validate_json_schema(
-        source: &str,
+        source: &BStr,
         data: &PhpMixed,
         schema: i64,
-        schema_file: Option<&str>,
+        schema_file: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         let mut is_composer_schema_file = false;
-        let mut schema_file = match schema_file {
-            Some(f) => f.to_string(),
+        let mut schema_file: BString = match schema_file {
+            Some(f) => f.to_owned(),
             None => {
                 if schema == Self::LOCK_SCHEMA {
-                    Self::LOCK_SCHEMA_PATH.to_string()
+                    Self::LOCK_SCHEMA_PATH.into()
                 } else {
                     is_composer_schema_file = true;
-                    Self::COMPOSER_SCHEMA_PATH.to_string()
+                    Self::COMPOSER_SCHEMA_PATH.into()
                 }
             }
         };
 
         // Prepend with file:// only when not using a special schema already (e.g. in the phar)
         if strpos(&schema_file, "://").is_none() {
-            schema_file = format!("file://{}", schema_file);
+            schema_file = bconcat!("file://", schema_file);
         }
+        schema_file = encode_file_schema_reference(schema_file.as_bstr());
 
         // PHP: $schemaData = (object) ['$ref' => $schemaFile, '$schema' => "https://json-schema.org/draft-04/schema#"];
         // A string-keyed `PhpMixed::Array` serializes as a JSON object, matching the (object) cast.
@@ -322,7 +338,7 @@ impl JsonFile {
             m.insert("$ref".into(), PhpMixed::string(schema_file.clone()));
             m.insert(
                 "$schema".into(),
-                PhpMixed::string("https://json-schema.org/draft-04/schema#".to_string()),
+                PhpMixed::string(BString::from("https://json-schema.org/draft-04/schema#")),
             );
             PhpMixed::Array(m)
         };
@@ -334,8 +350,8 @@ impl JsonFile {
                 map.insert(
                     "required".into(),
                     PhpMixed::List(vec![
-                        PhpMixed::string("name".to_string()),
-                        PhpMixed::string("description".to_string()),
+                        PhpMixed::string(BString::from("name")),
+                        PhpMixed::string(BString::from("description")),
                     ]),
                 );
             }
@@ -343,31 +359,28 @@ impl JsonFile {
             let mut m = indexmap::IndexMap::new();
             m.insert(
                 "$ref".into(),
-                PhpMixed::string(format!("{}#/properties/config", schema_file)),
+                PhpMixed::string(bconcat!(schema_file, "#/properties/config")),
             );
             m.insert(
                 "$schema".into(),
-                PhpMixed::string("https://json-schema.org/draft-04/schema#".to_string()),
+                PhpMixed::string(BString::from("https://json-schema.org/draft-04/schema#")),
             );
             schema_data = PhpMixed::Array(m);
         }
 
         // convert assoc arrays to objects
-        let schema_value = serde_json::to_value(&schema_data)?;
-        let data_value = serde_json::to_value(data)?;
+        let schema_value = serde_json::to_value(PhpJson::new(&schema_data))?;
+        let data_value = serde_json::to_value(PhpJson::new(data))?;
         let validator = jsonschema::options()
             .with_retriever(SchemaRetriever)
             .build(&schema_value)
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
+            .map_err(|e| RuntimeException::new(display_to_bytes(&e)))?;
 
-        let errors: Vec<String> = validator
+        let errors: Vec<BString> = validator
             .iter_errors(&data_value)
             .map(|error| {
-                let mut property = error
-                    .instance_path()
-                    .as_str()
-                    .trim_start_matches('/')
-                    .replace('/', ".");
+                let mut property =
+                    str_replace("/", ".", ltrim2(error.instance_path().as_str(), "/"));
                 // A missing required property is reported against its parent object, so the
                 // instance path is the parent (empty at the root). Composer points the error at
                 // the missing property itself, so append its name to match the `PROPERTY : MESSAGE`
@@ -377,22 +390,22 @@ impl JsonFile {
                     && let Some(name) = missing.as_str()
                 {
                     if property.is_empty() {
-                        property = name.to_string();
+                        property = BString::from(name);
                     } else {
-                        property = format!("{}.{}", property, name);
+                        property = bconcat!(property, ".", name);
                     }
                 }
                 if property.is_empty() {
-                    error.to_string()
+                    display_to_bytes(&error)
                 } else {
-                    format!("{} : {}", property, error)
+                    bconcat!(property, " : ", display_to_bytes(&error))
                 }
             })
             .collect();
 
         if !errors.is_empty() {
             return Err(JsonValidationException::new(
-                format!("\"{}\" does not match the expected JSON schema", source),
+                bconcat!("\"", source, "\" does not match the expected JSON schema"),
                 errors,
             )
             .into());
@@ -401,29 +414,33 @@ impl JsonFile {
         Ok(true)
     }
 
-    pub fn encode<T: serde::Serialize + ?Sized>(data: &T) -> anyhow::Result<String> {
+    pub fn encode<T: serde::Serialize + ?Sized>(data: &T) -> anyhow::Result<BString> {
         Self::encode_with_options(data, JsonEncodeOptions::default())
     }
 
     pub fn encode_with_options<T: serde::Serialize + ?Sized>(
         data: &T,
         options: JsonEncodeOptions,
-    ) -> anyhow::Result<String> {
-        let json = json_encode_ex(data, options.to_flags())
-            .map_err(|err| RuntimeException::new(format!("JSON encoding failed: {}", err)))?;
+    ) -> anyhow::Result<BString> {
+        let json = json_encode_ex(data, options.to_flags()).map_err(|err| {
+            RuntimeException::new(bconcat!("JSON encoding failed: ", error_message(&err)))
+        })?;
 
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
             let indent_owned = options.indent;
-            return Ok(preg_replace_callback(
-                php_regex!(r"#^ {4,}#m"),
-                move |m: &PregMatches| -> anyhow::Result<String> {
-                    let whole = m.get(0).unwrap_or("");
-                    Ok(str_repeat(&indent_owned, (strlen(whole) / 4) as usize))
-                },
-                &json,
-            )
-            .expect("the replacement callback cannot fail"));
+            // preg_replace_callback('#^ {4,}#m', ...)
+            let mut indented = BString::default();
+            for line in json.split_inclusive(|b| *b == b'\n') {
+                let spaces = line.iter().take_while(|b| **b == b' ').count();
+                if spaces >= 4 {
+                    indented.push_str(indent_owned.repeat(spaces / 4));
+                    indented.push_str(&line[spaces..]);
+                } else {
+                    indented.push_str(line);
+                }
+            }
+            return Ok(indented);
         }
 
         Ok(json)
@@ -432,7 +449,7 @@ impl JsonFile {
     /// Parses json string and returns hash.
     pub fn parse_json(
         json: Option<impl AsRef<[u8]>>,
-        file: Option<&str>,
+        file: Option<&BStr>,
     ) -> anyhow::Result<PhpMixed> {
         let json = match &json {
             None => return Ok(PhpMixed::Null),
@@ -446,12 +463,9 @@ impl JsonFile {
         // `'null' !== $content` check.
         if matches!(data, PhpMixed::Null) && json != b"null" {
             // attempt resolving simple conflicts in lock files so that one can run `composer update --lock` and get a valid lock file
-            // TODO(bytes): preg_replace2 matches over a &str, so input that is not UTF-8 skips
-            // this; PHP still resolves a conflict whose marker lines hold the only invalid bytes.
             if let Some(file) = file
-                && file.ends_with(".lock")
-                && let Ok(json) = std::str::from_utf8(json)
-                && json.contains("\"content-hash\"")
+                && file.ends_with(b".lock")
+                && json.contains_str("\"content-hash\"")
             {
                 let mut count: usize = 0;
                 let replaced = preg_replace2(
@@ -478,18 +492,26 @@ impl JsonFile {
     }
 
     /// Validates the syntax of a JSON string
-    fn validate_syntax(json: &[u8], file: Option<&str>) -> anyhow::Result<bool> {
+    fn validate_syntax(json: &[u8], file: Option<&BStr>) -> anyhow::Result<bool> {
         // PHP's linter checks the syntax byte-wise and leaves the encoding to the json_decode()
         // that ran before. A lossy decode keeps the syntax and the line numbers intact, so it
         // stands in for the former, and the UTF-8 check below for the latter.
-        let lossy = String::from_utf8_lossy(json);
+        let mut lossy = Vec::with_capacity(json.len());
+        for chunk in json.utf8_chunks() {
+            lossy.extend_from_slice(chunk.valid().as_bytes());
+            if !chunk.invalid().is_empty() {
+                lossy.extend_from_slice("\u{FFFD}".as_bytes());
+            }
+        }
         // TODO(php-semantics): make json_decode() returns an error object with details.
-        let error = match serde_json::from_str::<serde_json::Value>(&lossy) {
+        let error = match serde_json::from_slice::<serde_json::Value>(&lossy) {
             Ok(_) => {
-                if std::str::from_utf8(json).is_err() {
+                if utf8_text(json).is_none() {
                     return Err(UnexpectedValueException::new(match file {
-                        None => "The input is not UTF-8, could not parse as JSON".to_string(),
-                        Some(file) => format!("\"{file}\" is not UTF-8, could not parse as JSON"),
+                        None => BString::from("The input is not UTF-8, could not parse as JSON"),
+                        Some(file) => {
+                            bconcat!("\"", file, "\" is not UTF-8, could not parse as JSON")
+                        }
                     })
                     .into());
                 }
@@ -505,30 +527,58 @@ impl JsonFile {
         };
         Err(match file {
             None => ParsingException::new(
-                format!("The input does not contain valid JSON\n{error}"),
+                bconcat!(
+                    "The input does not contain valid JSON\n",
+                    display_to_bytes(&error)
+                ),
                 details,
             ),
             Some(file) => ParsingException::new(
-                format!("\"{file}\" does not contain valid JSON\n{error}"),
+                bconcat!(
+                    "\"",
+                    file,
+                    "\" does not contain valid JSON\n",
+                    display_to_bytes(&error)
+                ),
                 details,
             ),
         }
         .into())
     }
 
-    pub fn detect_indenting(json: Option<&str>) -> String {
-        if let Some(m) = preg_match(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or("")) {
-            return m.get(1).unwrap_or_default().to_string();
+    pub fn detect_indenting(json: Option<&[u8]>) -> BString {
+        if let Some(m) = preg_match(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or_default()) {
+            return BString::from(m.get(1).unwrap_or_default());
         }
 
-        Self::INDENT_DEFAULT.to_string()
+        BString::from(Self::INDENT_DEFAULT)
     }
+}
+
+/// jsonschema holds a schema reference as a text URI, while PHP reads a `file://` reference as the
+/// path it spells, whatever its bytes. The path is carried percent-encoded, and `SchemaRetriever`
+/// decodes it. `#` still starts a fragment, as it does in `JsonSchema\Uri\UriResolver`.
+fn encode_file_schema_reference(reference: &BStr) -> BString {
+    let Some(path) = reference.strip_prefix(b"file://") else {
+        return reference.to_owned();
+    };
+    let mut encoded = BString::from("file://");
+    for &byte in path {
+        if byte.is_ascii_alphanumeric() || b"-._~/:#".contains(&byte) {
+            encoded.push(byte);
+        } else {
+            encoded.extend_from_slice(&sprintf("%%%02X", &[PhpMixed::Int(i64::from(byte))]));
+        }
+    }
+    encoded
 }
 
 #[derive(Debug)]
 struct SchemaRetriever;
 
 impl jsonschema::Retrieve for SchemaRetriever {
+    #[expect(clippy::disallowed_types, reason = "imposed by jsonschema::Retrieve")]
+    #[expect(clippy::disallowed_macros, reason = "the error goes through core::fmt")]
     fn retrieve(
         &self,
         uri: &jsonschema::Uri<String>,
@@ -540,10 +590,11 @@ impl jsonschema::Retrieve for SchemaRetriever {
                     "/res/composer-lock-schema.json" => JsonFile::LOCK_SCHEMA_JSON,
                     path => return Err(format!("Unknown embedded resource {path}").into()),
                 };
-                Ok(serde_json::from_str(contents)?)
+                Ok(serde_json::from_slice(contents)?)
             }
             "file" => {
-                let file = std::fs::File::open(uri.path().as_str())?;
+                let path = rawurldecode(uri.path().as_str());
+                let file = std::fs::File::open(path_from_bytes(&path))?;
                 Ok(serde_json::from_reader(std::io::BufReader::new(file))?)
             }
             scheme => Err(format!("Unknown scheme {scheme}").into()),
@@ -555,20 +606,54 @@ impl jsonschema::Retrieve for SchemaRetriever {
 mod tests {
     use super::*;
 
+    #[test]
+    fn schema_path_is_read_whatever_its_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in [&b"sch\xE9ma 100%25.json"[..], &b"caf\xC3\xA9?.json"[..]] {
+            let schema_path = dir.path().join(path_from_bytes(name));
+            std::fs::write(
+                &schema_path,
+                r#"{"type": "object", "properties": {"a": {"type": "string"}}}"#,
+            )
+            .unwrap();
+            let schema_file = BString::from(path_to_bytes(&schema_path));
+
+            let validate = |value: PhpMixed| {
+                let mut data = indexmap::IndexMap::new();
+                data.insert(BString::from("a"), value);
+                JsonFile::validate_json_schema(
+                    BStr::new("x.json"),
+                    &PhpMixed::Object(data),
+                    JsonFile::LAX_SCHEMA,
+                    Some(schema_file.as_bstr()),
+                )
+            };
+
+            assert!(validate(PhpMixed::string("text")).unwrap());
+            assert!(
+                validate(PhpMixed::Int(1))
+                    .unwrap_err()
+                    .is_instanceof::<JsonValidationException>()
+            );
+        }
+    }
+
     // Expected values are the output of PHP 8.5.9 running Composer's JsonFile::parseJson().
     #[test]
     fn input_that_is_not_utf8_is_rejected_as_php_rejects_it() {
-        let err = JsonFile::parse_json(Some(b"{\"a\": \"\xff\"}"), Some("x.json")).unwrap_err();
+        let err = JsonFile::parse_json(Some(b"{\"a\": \"\xff\"}"), Some(bstr::BStr::new("x.json")))
+            .unwrap_err();
         assert!(err.is_instanceof::<UnexpectedValueException>());
         assert_eq!(
-            err.to_string(),
+            error_message(&err),
             "\"x.json\" is not UTF-8, could not parse as JSON"
         );
 
-        let err = JsonFile::parse_json(Some(b"{\"a\": 1\xff}"), Some("x.json")).unwrap_err();
+        let err = JsonFile::parse_json(Some(b"{\"a\": 1\xff}"), Some(bstr::BStr::new("x.json")))
+            .unwrap_err();
         assert!(err.is_instanceof::<ParsingException>());
 
-        let err = JsonFile::parse_json(Some(b"\xff"), Some("x.json")).unwrap_err();
+        let err = JsonFile::parse_json(Some(b"\xff"), Some(bstr::BStr::new("x.json"))).unwrap_err();
         assert!(err.is_instanceof::<ParsingException>());
     }
 }

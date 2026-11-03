@@ -1,15 +1,20 @@
 //! ref: composer/tests/Composer/Test/Autoload/ClassLoaderTest.php
 
+use bstr::BStr;
 use shirabe::autoload::class_loader::ClassLoader;
+use shirabe_php_shim::bconcat;
 
 // ref: ClassLoaderTest::getLoadClassTests
-fn get_find_file_tests() -> Vec<(&'static str, &'static str)> {
+fn get_find_file_tests() -> Vec<(&'static BStr, &'static BStr)> {
     vec![
-        ("Namespaced\\Foo", "Namespaced/Foo.php"),
-        ("Pearlike_Foo", "Pearlike/Foo.php"),
         (
-            "ShinyVendor\\ShinyPackage\\SubNamespace\\Foo",
-            "SubNamespace/Foo.php",
+            BStr::new("Namespaced\\Foo"),
+            BStr::new("Namespaced/Foo.php"),
+        ),
+        (BStr::new("Pearlike_Foo"), BStr::new("Pearlike/Foo.php")),
+        (
+            BStr::new("ShinyVendor\\ShinyPackage\\SubNamespace\\Foo"),
+            BStr::new("SubNamespace/Foo.php"),
         ),
     ]
 }
@@ -22,12 +27,12 @@ fn get_find_file_tests() -> Vec<(&'static str, &'static str)> {
 // ref: ClassLoaderTest::testLoadClass
 #[test]
 fn test_find_file() {
-    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../composer/tests/Composer/Test/Autoload/Fixtures")
-        .canonicalize()
-        .unwrap()
-        .display()
-        .to_string();
+    let fixtures = bconcat!(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../composer/tests/Composer/Test/Autoload/Fixtures")
+            .canonicalize()
+            .unwrap()
+    );
 
     for (class, file) in get_find_file_tests() {
         let mut loader = ClassLoader::new(None);
@@ -38,9 +43,9 @@ fn test_find_file() {
             .unwrap();
         assert_eq!(
             loader.find_file(class),
-            Some(format!("{}/{}", fixtures, file)),
+            Some(bconcat!(fixtures, "/", file)),
             "->findFile() finds '{}'",
-            class
+            class.display_lossy()
         );
     }
 }

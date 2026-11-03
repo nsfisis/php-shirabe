@@ -2,13 +2,14 @@
 
 use super::exception_interface::ExceptionInterface;
 use super::runtime_exception::RuntimeException;
+use bstr::BString;
 
 #[derive(Debug)]
 pub struct MissingInputException(pub RuntimeException);
 
 impl MissingInputException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self(RuntimeException::new(message))
     }
 }

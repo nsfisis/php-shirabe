@@ -7,17 +7,19 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, ProcessExecutor};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
-    array_shift, explode, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr,
-    trim,
+    array_shift, bconcat, error_message, explode, implode, path_from_bytes, path_to_bytes,
+    rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
 };
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct VcsDownloaderBase {
@@ -25,7 +27,7 @@ pub struct VcsDownloaderBase {
     pub config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    pub has_cleaned_changes: std::cell::RefCell<IndexMap<String, bool>>,
+    pub has_cleaned_changes: std::cell::RefCell<IndexMap<BString, bool>>,
 }
 
 impl VcsDownloaderBase {
@@ -49,7 +51,11 @@ impl VcsDownloaderBase {
         }
     }
 
-    pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
+    pub fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
             self.config.clone(),
@@ -75,14 +81,14 @@ pub trait VcsDownloader:
     fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>>;
     fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
     fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>>;
-    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>>;
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<BString, bool>>;
 
     /// Downloads data needed to run an install/update later
     async fn do_download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
@@ -90,8 +96,8 @@ pub trait VcsDownloader:
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Updates specific package in specific folder from initial to target version.
@@ -99,36 +105,37 @@ pub trait VcsDownloader:
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Fetches the commit logs between two commits
     fn get_commit_logs(
         &self,
-        from_reference: &str,
-        to_reference: &str,
-        path: &str,
-    ) -> anyhow::Result<String>;
+        from_reference: &bstr::BStr,
+        to_reference: &bstr::BStr,
+        path: &Path,
+    ) -> anyhow::Result<bstr::BString>;
 
     /// Checks if VCS metadata repository has been initialized
     /// repository example: .git|.svn|.hg
-    fn has_metadata_repository(&self, path: &str) -> bool;
+    fn has_metadata_repository(&self, path: &Path) -> bool;
 
-    fn get_installation_source(&self) -> String {
-        "source".to_string()
+    fn get_installation_source(&self) -> BString {
+        BString::from("source")
     }
 
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} is missing reference information",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
                 package.get_pretty_name(),
+                " is missing reference information"
             ))
             .into());
         }
@@ -137,7 +144,7 @@ pub trait VcsDownloader:
 
         while let Some(url) = array_shift(&mut urls) {
             let attempt: anyhow::Result<Option<PhpMixed>> = self
-                .do_download(package.clone(), path, &url, prev_package.clone())
+                .do_download(package.clone(), path, url.as_bstr(), prev_package.clone())
                 .await;
             match attempt {
                 Ok(promise) => return Ok(promise),
@@ -151,12 +158,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!(
-                                "Failed: [{}] {}",
+                            bconcat!(
+                                "Failed: [",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
-                                e
+                                "] ",
+                                error_message(&e)
                             ),
                             true,
                             io_interface::NORMAL,
@@ -180,9 +188,9 @@ pub trait VcsDownloader:
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if r#type == "update" {
@@ -202,9 +210,9 @@ pub trait VcsDownloader:
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         _package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if r#type == "update"
@@ -213,14 +221,14 @@ pub trait VcsDownloader:
                 .map(|p| {
                     self.has_cleaned_changes()
                         .borrow()
-                        .contains_key(&p.get_unique_name())
+                        .contains_key(p.get_unique_name().as_bstr())
                 })
                 .unwrap_or(false)
         {
             self.reapply_changes(path)?;
             self.has_cleaned_changes()
                 .borrow_mut()
-                .shift_remove(&prev_package.unwrap().get_unique_name());
+                .shift_remove(prev_package.unwrap().get_unique_name().as_bstr());
         }
 
         Ok(None)
@@ -229,18 +237,23 @@ pub trait VcsDownloader:
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} is missing reference information",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
                 package.get_pretty_name(),
+                " is missing reference information"
             ))
             .into());
         }
 
         self.io().write_error3(
-            &format!("  - {}: ", InstallOperation::format(package.clone(), false)),
+            bconcat!(
+                "  - ",
+                InstallOperation::format(package.clone(), false),
+                ": "
+            ),
             false,
             io_interface::NORMAL,
         );
@@ -248,7 +261,7 @@ pub trait VcsDownloader:
         let mut urls = self.prepare_urls(package.get_source_urls());
         while let Some(url) = array_shift(&mut urls) {
             let attempt: anyhow::Result<Option<PhpMixed>> =
-                self.do_install(package.clone(), path, &url).await;
+                self.do_install(package.clone(), path, url.as_bstr()).await;
             match attempt {
                 Ok(_) => break,
                 Err(e) => {
@@ -261,12 +274,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!(
-                                "Failed: [{}] {}",
+                            bconcat!(
+                                "Failed: [",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
-                                e
+                                "] ",
+                                error_message(&e)
                             ),
                             true,
                             io_interface::NORMAL,
@@ -292,20 +306,22 @@ pub trait VcsDownloader:
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(format!(
-                "Package {} is missing reference information",
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package ",
                 target.get_pretty_name(),
+                " is missing reference information"
             ))
             .into());
         }
 
         self.io().write_error3(
-            &format!(
-                "  - {}: ",
+            bconcat!(
+                "  - ",
                 UpdateOperation::format(initial.clone(), target.clone(), false),
+                ": "
             ),
             false,
             io_interface::NORMAL,
@@ -316,7 +332,7 @@ pub trait VcsDownloader:
         let mut exception: Option<anyhow::Error> = None;
         while let Some(url) = array_shift(&mut urls) {
             let attempt: anyhow::Result<Option<PhpMixed>> = self
-                .do_update(initial.clone(), target.clone(), path, &url)
+                .do_update(initial.clone(), target.clone(), path, url.as_bstr())
                 .await;
             match attempt {
                 Ok(_) => {
@@ -333,12 +349,13 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!(
-                                "Failed: [{}] {}",
+                            bconcat!(
+                                "Failed: [",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
-                                e
+                                "] ",
+                                error_message(&e)
                             ),
                             true,
                             io_interface::NORMAL,
@@ -361,16 +378,17 @@ pub trait VcsDownloader:
             let initial_ref = initial.get_source_reference().unwrap_or_default();
             let target_ref = target.get_source_reference().unwrap_or_default();
             let mut message = "Pulling in changes:";
-            let mut logs = self.get_commit_logs(&initial_ref, &target_ref, path)?;
+            let mut logs =
+                self.get_commit_logs(initial_ref.as_bstr(), target_ref.as_bstr(), path)?;
 
-            if trim(&logs, None).is_empty() {
+            if trim(&logs).is_empty() {
                 message = "Rolling back changes:";
-                logs = self.get_commit_logs(&target_ref, &initial_ref, path)?;
+                logs = self.get_commit_logs(target_ref.as_bstr(), initial_ref.as_bstr(), path)?;
             }
 
-            if !trim(&logs, None).is_empty() {
-                let prefixed: Vec<String> = array_map(
-                    |line: &String| format!("      {}", line),
+            if !trim(&logs).is_empty() {
+                let prefixed: Vec<BString> = array_map(
+                    |line: &BString| bconcat!("      ", line),
                     &explode("\n", &logs),
                 );
                 logs = implode("\n", &prefixed);
@@ -379,7 +397,7 @@ pub trait VcsDownloader:
                 logs = str_replace("<", "\\<", &logs);
 
                 self.io()
-                    .write_error3(&format!("    {}", message), true, io_interface::NORMAL);
+                    .write_error3(bconcat!("    ", message), true, io_interface::NORMAL);
                 self.io().write_error3(&logs, true, io_interface::NORMAL);
             }
         }
@@ -396,19 +414,20 @@ pub trait VcsDownloader:
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io().write_error3(
-            &format!("  - {}", UninstallOperation::format(package, false)),
+            bconcat!("  - ", UninstallOperation::format(package, false)),
             true,
             io_interface::NORMAL,
         );
 
         let result = Filesystem::remove_directory_async_via(self.filesystem(), path).await?;
         if !result {
-            return Err(RuntimeException::new(format!(
-                "Could not completely delete {}, aborting.",
-                path
+            return Err(RuntimeException::new(bconcat!(
+                "Could not completely delete ",
+                path,
+                ", aborting."
             ))
             .into());
         }
@@ -416,7 +435,11 @@ pub trait VcsDownloader:
         Ok(None)
     }
 
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(
             self.config().clone(),
@@ -439,14 +462,15 @@ pub trait VcsDownloader:
     async fn clean_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
         if self.get_local_changes(package, path).await?.is_some() {
-            return Err(RuntimeException::new(format!(
-                "Source directory {} has uncommitted changes.",
-                path
+            return Err(RuntimeException::new(bconcat!(
+                "Source directory ",
+                path,
+                " has uncommitted changes."
             ))
             .into());
         }
@@ -455,11 +479,11 @@ pub trait VcsDownloader:
     }
 
     /// Reapply previously stashed changes if applicable, only called after an update (regardless if successful or not)
-    fn reapply_changes(&self, _path: &str) -> anyhow::Result<()> {
+    fn reapply_changes(&self, _path: &Path) -> anyhow::Result<()> {
         Ok(())
     }
 
-    fn prepare_urls(&self, mut urls: Vec<String>) -> Vec<String> {
+    fn prepare_urls(&self, mut urls: Vec<BString>) -> Vec<BString> {
         for url_entry in &mut urls {
             let mut url = url_entry.clone();
             if Filesystem::is_local_path(&url) {
@@ -477,10 +501,12 @@ pub trait VcsDownloader:
                     url = rawurldecode(&url);
                 }
 
-                *url_entry = realpath(&url).unwrap_or_default();
+                *url_entry = realpath(path_from_bytes(&url))
+                    .map(|p| BString::from(path_to_bytes(&p)))
+                    .unwrap_or_default();
 
                 if is_file_protocol {
-                    *url_entry = format!("{}{}", file_protocol, url_entry);
+                    *url_entry = bconcat!(file_protocol, &*url_entry);
                 }
             }
         }

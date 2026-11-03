@@ -1,22 +1,23 @@
 use crate::main::snprintf::php_gcvt;
+use bstr::BString;
 
 /// php-src: Zend/zend_smart_str.c `smart_str_append_double` (PHP 8.5.8), folding in the `%H`
 /// NAN/INF handling from main/snprintf.c `format_converter` that the original reaches through
 /// `snprintf(buf, sizeof(buf), "%.*H", precision, num)`.
-pub fn smart_str_append_double(dest: &mut String, num: f64, precision: i32, zero_fraction: bool) {
+pub fn smart_str_append_double(dest: &mut BString, num: f64, precision: i32, zero_fraction: bool) {
     if num.is_nan() {
-        dest.push_str("NAN");
+        dest.extend_from_slice(b"NAN");
         return;
     }
     if num.is_infinite() {
-        dest.push_str(if num > 0.0 { "INF" } else { "-INF" });
+        dest.extend_from_slice(if num > 0.0 { b"INF" } else { b"-INF" });
         return;
     }
-    let buf = php_gcvt(num, precision, '.', 'E');
-    let had_period = buf.contains('.');
-    dest.push_str(&buf);
+    let buf = php_gcvt(num, precision, b'.', b'E');
+    let had_period = buf.contains(&b'.');
+    dest.extend_from_slice(&buf);
     if zero_fraction && !had_period {
-        dest.push_str(".0");
+        dest.extend_from_slice(b".0");
     }
 }
 
@@ -24,8 +25,8 @@ pub fn smart_str_append_double(dest: &mut String, num: f64, precision: i32, zero
 mod tests {
     use super::*;
 
-    fn serialize_repr(num: f64) -> String {
-        let mut out = String::new();
+    fn serialize_repr(num: f64) -> BString {
+        let mut out = BString::default();
         smart_str_append_double(&mut out, num, -1, false);
         out
     }
@@ -62,11 +63,11 @@ mod tests {
 
     #[test]
     fn zero_fraction_appends_dot_zero_to_integral_values() {
-        let mut out = String::new();
+        let mut out = BString::default();
         smart_str_append_double(&mut out, 2.0, -1, true);
         assert_eq!(out, "2.0");
 
-        let mut out = String::new();
+        let mut out = BString::default();
         smart_str_append_double(&mut out, 1e17, -1, true);
         assert_eq!(out, "1.0E+17");
     }

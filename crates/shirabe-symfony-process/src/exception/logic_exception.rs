@@ -1,5 +1,7 @@
 //! ref: composer/vendor/symfony/process/Exception/LogicException.php
 
+use bstr::BString;
+
 #[derive(Debug)]
 pub struct LogicException {
     inner: shirabe_php_shim::LogicException,
@@ -7,7 +9,7 @@ pub struct LogicException {
 
 impl LogicException {
     #[track_caller]
-    pub fn new(message: String) -> Self {
+    pub fn new(message: impl Into<BString>) -> Self {
         Self {
             inner: shirabe_php_shim::LogicException::new(message),
         }

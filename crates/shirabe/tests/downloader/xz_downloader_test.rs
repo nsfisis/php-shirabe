@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Downloader/XzDownloaderTest.php
 
 use crate::async_runtime::run;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::DownloaderInterface;
@@ -12,14 +12,14 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, error_message, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
-fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
+fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
+    CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(version)).into()
 }
 
 /// ref: setUp markTestSkipped on Windows / 32bit, expressed as a compile-time
@@ -69,8 +69,8 @@ fn test_error_messages() {
     let _tear_down = TearDown::new(test_dir.path().to_path_buf());
     let test_dir = test_dir.path().to_path_buf();
 
-    let package = get_package("dummy/pkg", "1.0.0");
-    let dist_url = format!("file://{}", file!());
+    let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
+    let dist_url = bconcat!("file://", file!());
     package.set_dist_url(Some(dist_url));
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -78,7 +78,7 @@ fn test_error_messages() {
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".into(),
-        PhpMixed::string(test_dir.to_str().unwrap().to_string()),
+        PhpMixed::string(path_to_bytes(&test_dir)),
     );
     let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(config_options, false)));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
@@ -102,21 +102,22 @@ fn test_error_messages() {
     );
 
     let install_path = test_dir.join("install-path");
-    let install_path = install_path.to_str().unwrap().to_string();
+    let install_path = install_path.to_path_buf();
 
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
-            .download3(package.clone(), &install_path, None)
+            .download3(package.clone(), std::path::Path::new(&install_path), None)
             .await
             .map(|_| ())
     });
     run(loop_.wait(vec![promise], None)).unwrap();
-    let result = run(downloader.install2(package, &install_path));
+    let result = run(downloader.install2(package, std::path::Path::new(&install_path)));
 
     // Download of invalid tarball should throw an exception.
     let e = result.expect_err("Download of invalid tarball should throw an exception");
     let re =
-        regex::Regex::new("(?i)(File format not recognized|Unrecognized archive format)").unwrap();
-    assert!(re.is_match(&e.to_string()));
+        regex::bytes::Regex::new("(?i)(File format not recognized|Unrecognized archive format)")
+            .unwrap();
+    assert!(re.is_match(&error_message(&e)));
 }

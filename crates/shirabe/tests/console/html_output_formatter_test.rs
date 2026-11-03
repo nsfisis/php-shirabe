@@ -6,12 +6,13 @@ use shirabe_symfony_console::formatter::{OutputFormatterStyle, OutputFormatterSt
 
 #[test]
 fn test_formatting() {
-    let mut styles: IndexMap<String, Box<dyn OutputFormatterStyleInterface>> = IndexMap::new();
+    let mut styles: IndexMap<bstr::BString, Box<dyn OutputFormatterStyleInterface>> =
+        IndexMap::new();
     styles.insert(
-        "warning".to_string(),
+        "warning".into(),
         Box::new(OutputFormatterStyle::new(
-            Some("black"),
-            Some("yellow"),
+            Some("black".into()),
+            Some("yellow".into()),
             vec![],
         )),
     );
@@ -21,11 +22,12 @@ fn test_formatting() {
     assert_eq!(
         Some(
             "text <span style=\"color:green;\">green</span> <span style=\"color:yellow;\">yellow</span> <span style=\"color:black;background-color:yellow;\">black w/ yellow bg</span>"
-                .to_string()
+                .into()
         ),
         formatter
             .format(Some(
                 "text <info>green</info> <comment>yellow</comment> <warning>black w/ yellow bg</warning>"
+                    .into()
             ))
             .unwrap()
     );

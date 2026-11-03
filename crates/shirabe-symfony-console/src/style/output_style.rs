@@ -63,11 +63,11 @@ impl OutputStyle {
 }
 
 impl OutputInterface for OutputStyle {
-    fn write(&self, messages: &[String], newline: bool, options: i64) {
+    fn write(&self, messages: &[bstr::BString], newline: bool, options: i64) {
         self.output.borrow().write(messages, newline, options);
     }
 
-    fn writeln(&self, messages: &[String], options: i64) {
+    fn writeln(&self, messages: &[bstr::BString], options: i64) {
         self.output.borrow().writeln(messages, options);
     }
 

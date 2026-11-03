@@ -4,8 +4,10 @@ use crate::test_case::{
     RunOptions, TearDown, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, init_temp_composer,
 };
+use bstr::{BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::{bconcat, error_message, trim, utf8_text};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: LicensesCommandTest::setUp
@@ -30,16 +32,16 @@ fn set_up() -> TearDown {
     );
 
     let first = get_complete_package("first/pkg", "2.3.4");
-    first.set_license(vec!["MIT".to_string()]);
+    first.set_license(vec![BString::from("MIT")]);
 
     let second = get_complete_package("second/pkg", "3.4.0");
-    second.set_license(vec!["LGPL-2.0-only".to_string()]);
-    second.set_homepage("https://example.org".to_string());
+    second.set_license(vec![BString::from("LGPL-2.0-only")]);
+    second.set_homepage(BString::from("https://example.org"));
 
     let third = get_complete_package("third/pkg", "1.5.4");
 
     let dev = get_complete_package("dev/pkg", "2.3.4.5");
-    dev.set_license(vec!["MIT".to_string()]);
+    dev.set_license(vec![BString::from("MIT")]);
 
     let packages: Vec<PackageInterfaceHandle> = vec![first.into(), second.into(), third.into()];
     let dev_packages: Vec<PackageInterfaceHandle> = vec![dev.into()];
@@ -52,25 +54,25 @@ fn set_up() -> TearDown {
 
 /// Asserts each non-blank line of `display` matches the regex built from `expected[i]`
 /// (`implode("\s+", expected[i])` in PHP).
-fn assert_lines(display: &str, expected: &[Vec<&str>]) {
+fn assert_lines(display: &[u8], expected: &[Vec<impl AsRef<[u8]>>]) {
     let mut i = 0usize;
-    for line in display.split('\n') {
-        if line.trim().is_empty() {
+    for line in display.split_str("\n") {
+        if trim(line).is_empty() {
             i += 1;
             continue;
         }
         assert!(i < expected.len(), "Got more output lines than expected");
         let pattern = expected[i]
             .iter()
-            .map(|s| regex::escape(s))
+            .map(|s| regex::escape(utf8_text(s.as_ref()).unwrap()))
             .collect::<Vec<_>>()
             .join(r"\s+");
-        let re = regex::Regex::new(&pattern).unwrap();
+        let re = regex::bytes::Regex::new(&pattern).unwrap();
         assert!(
             re.is_match(line),
             "line {} {:?} did not match {:?}",
             i,
-            line,
+            line.as_bstr(),
             pattern
         );
         i += 1;
@@ -169,7 +171,7 @@ fn test_format_json() {
         },
     });
 
-    let actual: serde_json::Value = serde_json::from_str(&app_tester.get_display()).unwrap();
+    let actual: serde_json::Value = serde_json::from_slice(&app_tester.get_display()).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -201,15 +203,19 @@ fn test_format_summary() {
     ];
 
     let display = app_tester.get_display();
-    let lines: Vec<&str> = display.split('\n').collect();
+    let lines: Vec<&[u8]> = display.split_str("\n").collect();
     for (i, (key, value)) in expected.iter().enumerate() {
-        let pattern = format!(r"{}\s+{}", regex::escape(key), regex::escape(value));
-        let re = regex::Regex::new(&pattern).unwrap();
+        let pattern = bconcat!(
+            BString::from(regex::escape(utf8_text(key).unwrap())),
+            r"\s+",
+            BString::from(regex::escape(utf8_text(value).unwrap()))
+        );
+        let re = regex::bytes::Regex::new(utf8_text(&pattern).unwrap()).unwrap();
         assert!(
             re.is_match(lines[i]),
             "line {} {:?} did not match {:?}",
             i,
-            lines[i],
+            lines[i].as_bstr(),
             pattern
         );
     }
@@ -317,8 +323,8 @@ fn test_locked_without_lock_file() {
     );
     let err = result.expect_err("expected an UnexpectedValueException");
     assert!(
-        err.to_string()
-            .contains("Valid composer.json and composer.lock files are required to run this command with --locked"),
+        error_message(&err)
+            .contains_str("Valid composer.json and composer.lock files are required to run this command with --locked"),
         "unexpected error: {}",
         err
     );

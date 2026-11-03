@@ -6,7 +6,7 @@
 //! constraint decides how many versions survive that filter, which is what the lazy expansion is
 //! meant to exploit.
 
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -19,39 +19,36 @@ use shirabe::repository::composer_repository::ComposerRepository;
 use shirabe::util::http_downloader::{
     HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
 };
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_to_bytes, php_str, str_replace};
 use shirabe_semver::constraint::AnyConstraint;
 use tempfile::TempDir;
 
 #[path = "packagist_fixture.rs"]
 mod packagist_fixture;
 
-const PACKAGES: &[&str] = &["symfony/console", "laravel/framework"];
+const PACKAGES: &[&BStr] = &[php_str(b"symfony/console"), php_str(b"laravel/framework")];
 
 /// Constraints spanning the acceptance rates a repository sees, from one no version satisfies to
 /// one that takes every version there is. Each case is labelled with how many packages survived,
 /// since that rate is what decides whether deferring the copy pays off.
-const CONSTRAINTS: &[(&str, &str)] = &[
-    ("none", "^99.0"),
-    ("major7", "^7.0"),
-    ("major6-up", ">=6.0"),
-    ("major4-up", ">=4.0"),
-    ("major2-up", ">=2.0"),
-    ("any", "*"),
+const CONSTRAINTS: &[(&BStr, &BStr)] = &[
+    (php_str(b"none"), php_str(b"^99.0")),
+    (php_str(b"major7"), php_str(b"^7.0")),
+    (php_str(b"major6-up"), php_str(b">=6.0")),
+    (php_str(b"major4-up"), php_str(b">=4.0")),
+    (php_str(b"major2-up"), php_str(b">=2.0")),
+    (php_str(b"any"), php_str(b"*")),
 ];
 
-const REPOSITORY_URL: &str = "https://example.org/packages.json";
-const METADATA_URL: &str = "https://example.org/p2/%package%.json";
+const REPOSITORY_URL: &BStr = php_str(b"https://example.org/packages.json");
+const METADATA_URL: &BStr = php_str(b"https://example.org/p2/%package%.json");
 
 /// A root file with nothing but a metadata-url, which is what puts the repository on the lazy
 /// provider path `load_async_packages` serves.
-fn root_file() -> String {
+fn root_file() -> BString {
     let mut root: IndexMap<BString, PhpMixed> = IndexMap::new();
     root.insert("packages".into(), PhpMixed::Array(IndexMap::new()));
-    root.insert(
-        "metadata-url".into(),
-        PhpMixed::string(METADATA_URL.to_string()),
-    );
+    root.insert("metadata-url".into(), PhpMixed::string(METADATA_URL));
     JsonFile::encode(&PhpMixed::Array(root)).expect("failed to encode the root file")
 }
 
@@ -59,10 +56,7 @@ fn root_file() -> String {
 fn config(home: &TempDir) -> Config {
     let mut config = Config::new(true, None);
     let mut settings: IndexMap<BString, PhpMixed> = IndexMap::new();
-    settings.insert(
-        "home".into(),
-        PhpMixed::string(home.path().display().to_string()),
-    );
+    settings.insert("home".into(), PhpMixed::string(path_to_bytes(home.path())));
     settings.insert("cache-read-only".into(), PhpMixed::Bool(true));
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     top.insert("config".into(), PhpMixed::Array(settings));
@@ -72,21 +66,26 @@ fn config(home: &TempDir) -> Config {
 
 /// A repository answering exactly two requests, in the order `load_packages` makes them: the root
 /// file, then the package's metadata.
-fn repository(package: &str, root: &str, metadata: &str, config: &Config) -> ComposerRepository {
+fn repository(
+    package: &BStr,
+    root: &bstr::BStr,
+    metadata: &BStr,
+    config: &Config,
+) -> ComposerRepository {
     let expectations = vec![
         HttpDownloaderMockExpectation {
-            url: REPOSITORY_URL.to_string(),
+            url: REPOSITORY_URL.into(),
             options: None,
             status: 200,
-            body: root.to_string(),
-            headers: vec![String::new()],
+            body: root.into(),
+            headers: vec![bstr::BString::default()],
         },
         HttpDownloaderMockExpectation {
-            url: METADATA_URL.replace("%package%", package),
+            url: str_replace("%package%", package, METADATA_URL),
             options: None,
             status: 200,
-            body: metadata.to_string(),
-            headers: vec![String::new()],
+            body: metadata.into(),
+            headers: vec![bstr::BString::default()],
         },
     ];
 
@@ -103,7 +102,7 @@ fn repository(package: &str, root: &str, metadata: &str, config: &Config) -> Com
     );
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(REPOSITORY_URL.to_string()));
+    repo_config.insert("url".into(), PhpMixed::string(REPOSITORY_URL));
 
     ComposerRepository::new(repo_config, io, config, http_downloader, None)
         .expect("failed to build the repository")
@@ -111,12 +110,12 @@ fn repository(package: &str, root: &str, metadata: &str, config: &Config) -> Com
 
 fn load(
     repository: &mut ComposerRepository,
-    package: &str,
+    package: &BStr,
     constraint: &AnyConstraint,
-    acceptable_stabilities: &IndexMap<String, i64>,
+    acceptable_stabilities: &IndexMap<bstr::BString, i64>,
 ) -> usize {
-    let mut package_name_map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-    package_name_map.insert(package.to_string(), Some(constraint.clone()));
+    let mut package_name_map: IndexMap<bstr::BString, Option<AnyConstraint>> = IndexMap::new();
+    package_name_map.insert(package.into(), Some(constraint.clone()));
     repository
         .load_packages(
             package_name_map,
@@ -130,11 +129,11 @@ fn load(
 }
 
 /// How many versions the p2 file carries, for the `<loaded>of<total>` labels.
-fn version_count(package: &str, metadata: &str) -> usize {
+fn version_count(package: &BStr, metadata: &BStr) -> usize {
     JsonFile::parse_json(Some(metadata), None)
         .expect("invalid fixture JSON")
         .as_array()
-        .and_then(|response| response.get("packages"))
+        .and_then(|response| response.get(bstr::B("packages")))
         .and_then(|v| v.as_array())
         .and_then(|packages| packages.get(package))
         .and_then(|v| v.as_list())
@@ -148,26 +147,34 @@ fn bench_load_packages(c: &mut Criterion) {
     let root = root_file();
     let version_parser = VersionParser::new();
 
-    let mut acceptable_stabilities: IndexMap<String, i64> = IndexMap::new();
-    acceptable_stabilities.insert("stable".to_string(), STABILITY_STABLE);
+    let mut acceptable_stabilities: IndexMap<bstr::BString, i64> = IndexMap::new();
+    acceptable_stabilities.insert("stable".into(), STABILITY_STABLE);
 
     for package in PACKAGES {
         let metadata = packagist_fixture::fetch(package);
-        let total = version_count(package, &metadata);
-        let mut group = c.benchmark_group(format!("load_packages/{package}"));
+        let total = version_count(package, metadata.as_bstr());
+        #[expect(
+            clippy::disallowed_macros,
+            reason = "criterion names a benchmark with text"
+        )]
+        let mut group = c.benchmark_group(format!("load_packages/{}", package.display_lossy()));
 
         for (label, constraint) in CONSTRAINTS {
             let constraint: AnyConstraint = version_parser
                 .parse_constraints(constraint)
                 .expect("failed to parse the constraint");
 
-            let mut probe = repository(package, &root, &metadata, &config);
+            let mut probe = repository(package, root.as_ref(), metadata.as_bstr(), &config);
             let loaded = load(&mut probe, package, &constraint, &acceptable_stabilities);
-            let parameter = format!("{label}/{loaded}of{total}");
+            #[expect(
+                clippy::disallowed_macros,
+                reason = "criterion names a benchmark with text"
+            )]
+            let parameter = format!("{}/{loaded}of{total}", label.display_lossy());
 
             group.bench_function(BenchmarkId::from_parameter(parameter), |b| {
                 b.iter_batched(
-                    || repository(package, &root, &metadata, &config),
+                    || repository(package, root.as_ref(), metadata.as_bstr(), &config),
                     |mut repository| {
                         load(
                             &mut repository,

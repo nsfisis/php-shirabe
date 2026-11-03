@@ -22,15 +22,16 @@
 
 use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
 use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreAuth, Url};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, implode, in_array_loose, in_array_strict, json_decode_assoc, parse_url,
-    php_regex, preg_is_match, preg_quote, preg_replace, rename, stripos, strlen, strpos, substr,
-    unlink_silent,
+    PHP_EOL, PhpMixed, bconcat, display_to_bytes, implode, in_array_loose, in_array_strict,
+    json_decode_assoc, parse_url, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_quote, preg_replace, rename, stripos, strlen, strpos, strtolower, substr, trim,
+    unlink_silent, utf8_text,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -54,7 +55,7 @@ static TIMEOUT_WARNING: AtomicBool = AtomicBool::new(false);
 /// resolve/reject callbacks (and this crate's former restart_job/resolve_job/reject_job side
 /// effects): `download()`'s loop matches on this instead.
 enum Decision {
-    Retry { url: String, delay_ms: Option<u64> },
+    Retry { url: BString, delay_ms: Option<u64> },
     Done(Response),
     Failed(anyhow::Error),
 }
@@ -130,10 +131,10 @@ impl NativeHttpDownloader {
     /// mirroring what the PHP promise resolver + `tick()` loop used to do together.
     pub async fn download(
         &self,
-        origin: &str,
-        url: &str,
+        origin: &BStr,
+        url: &BStr,
         mut options: IndexMap<BString, PhpMixed>,
-        copy_to: Option<&str>,
+        copy_to: Option<&std::path::Path>,
     ) -> anyhow::Result<Result<Response, anyhow::Error>> {
         let mut attributes: IndexMap<BString, PhpMixed> = {
             let mut m = IndexMap::new();
@@ -159,14 +160,14 @@ impl NativeHttpDownloader {
             .get(B("ipResolve"))
             .map(|v| v.is_null())
             .unwrap_or(true)
-            && Platform::get_env("COMPOSER_IPRESOLVE").as_deref() == Some("4")
+            && Platform::get_env("COMPOSER_IPRESOLVE").is_some_and(|v| v == "4")
         {
             attributes.insert("ipResolve".into(), PhpMixed::Int(4));
         } else if attributes
             .get(B("ipResolve"))
             .map(|v| v.is_null())
             .unwrap_or(true)
-            && Platform::get_env("COMPOSER_IPRESOLVE").as_deref() == Some("6")
+            && Platform::get_env("COMPOSER_IPRESOLVE").is_some_and(|v| v == "6")
         {
             attributes.insert("ipResolve".into(), PhpMixed::Int(6));
         }
@@ -188,7 +189,7 @@ impl NativeHttpDownloader {
         // send_once(), so the auth/stream-context merge happens once per attempt inside the loop.
 
         let header_strings = Self::header_list(&options);
-        let if_modified = if stripos(&implode(",", &header_strings), "if-modified-since:").is_some()
+        let if_modified = if stripos(implode(",", &header_strings), "if-modified-since:").is_some()
         {
             " if modified"
         } else {
@@ -199,46 +200,39 @@ impl NativeHttpDownloader {
         let using_proxy = ProxyManager::get_instance()
             .as_ref()
             .map(|pm| pm.get_proxy_for_request(url))
-            .transpose()
-            .map_err(|e| anyhow::anyhow!(e.get_message().to_string()))?
-            .and_then(|p| p.get_status(Some(" using proxy (%s)")).ok())
+            .transpose()?
+            .and_then(|p| p.get_status(Some(BStr::new(" using proxy (%s)"))).ok())
             .unwrap_or_default();
         // `attributes.redirects == 0 && attributes.retries == 0` in PHP is always true here since
         // this runs exactly once, before the retry loop below has a chance to advance either.
         self.io.write_error3(
-            &format!(
-                "Downloading {}{}{}",
-                Url::sanitize(url.to_string()),
-                using_proxy,
-                if_modified
-            ),
+            bconcat!("Downloading ", Url::sanitize(url), using_proxy, if_modified),
             true,
             crate::io::DEBUG,
         );
 
-        let mut current_url = url.to_string();
-        let mut current_origin = origin.to_string();
+        let mut current_url = url.to_owned();
+        let mut current_origin = origin.to_owned();
         loop {
             // PHP merges auth options + stream-context options at curl_setopt time. We need the
             // resulting header/method/content/timeout/ssl/max_file_size, so do it here per send.
             let send_options = self.auth_helper.borrow_mut().add_authentication_options(
                 options.clone(),
-                &current_origin,
-                &current_url,
+                current_origin.as_bstr(),
+                current_url.as_bstr(),
             )?;
             let send_options =
-                crate::util::StreamContextFactory::init_options(&current_url, send_options, true)
-                    .map_err(|e| anyhow::anyhow!(e.get_message().to_string()))?;
+                crate::util::StreamContextFactory::init_options(&current_url, send_options, true)?;
 
             let send_result = self
-                .send_once(&current_url, &send_options, copy_to, &attributes)
+                .send_once(current_url.as_bstr(), &send_options, copy_to, &attributes)
                 .await;
 
             match self
                 .decide(
                     send_result,
-                    &current_url,
-                    &current_origin,
+                    current_url.as_bstr(),
+                    current_origin.as_bstr(),
                     copy_to,
                     &options,
                     &mut attributes,
@@ -269,9 +263,9 @@ impl NativeHttpDownloader {
     async fn decide(
         &self,
         send_result: Result<RawResponse, TransportError>,
-        url: &str,
-        origin: &str,
-        filename: Option<&str>,
+        url: &BStr,
+        origin: &BStr,
+        filename: Option<&std::path::Path>,
         options: &IndexMap<BString, PhpMixed>,
         attributes: &mut IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Decision> {
@@ -306,25 +300,27 @@ impl NativeHttpDownloader {
                         attributes.insert("ipResolve".into(), PhpMixed::Int(4));
                     }
                     self.io.write_error3(
-                        &format!(
-                            "Retrying ({}) {} due to connection error",
+                        bconcat!(
+                            "Retrying (",
                             retries + 1,
-                            Url::sanitize(url.to_string())
+                            ") ",
+                            Url::sanitize(url),
+                            " due to connection error"
                         ),
                         true,
                         crate::io::DEBUG,
                     );
                     if let Some(filename) = filename {
-                        unlink_silent(format!("{}~", filename));
+                        unlink_silent(Self::temp_file(filename));
                     }
                     return Ok(Decision::Retry {
-                        url: url.to_string(),
+                        url: url.to_owned(),
                         delay_ms: Self::retry_delay_ms(retries + 1),
                     });
                 }
 
                 if let Some(filename) = filename {
-                    unlink_silent(format!("{}~", filename));
+                    unlink_silent(Self::temp_file(filename));
                 }
                 // The message carries the raw "Maximum allowed download size reached..." text
                 // rather than the generic curl-error wrapper used below.
@@ -335,9 +331,10 @@ impl NativeHttpDownloader {
                 }
                 return Ok(Decision::Failed(
                     TransportException::new(
-                        format!(
-                            "curl error while downloading {}: {}",
-                            Url::sanitize(url.to_string()),
+                        bconcat!(
+                            "curl error while downloading ",
+                            Url::sanitize(url),
+                            ": ",
                             transport_err.message
                         ),
                         0,
@@ -351,15 +348,17 @@ impl NativeHttpDownloader {
         let native_response = response.into_native_http_response(url);
 
         self.io.write_error3(
-            &format!("[{}] {}", status_code, Url::sanitize(url.to_string())),
+            bconcat!("[", status_code, "] ", Url::sanitize(url)),
             true,
             crate::io::DEBUG,
         );
 
         // Output JSON warnings (PHP HttpDownloader::outputWarnings) for >= 300 JSON bodies.
         if native_response.inner.get_status_code() >= 300
-            && native_response.inner.get_header("content-type").as_deref()
-                == Some("application/json")
+            && native_response
+                .inner
+                .get_header(BStr::new("content-type"))
+                .is_some_and(|content_type| content_type == "application/json")
             && let Some(body) = native_response.inner.get_body()
         {
             let decoded = json_decode_assoc(body)?;
@@ -382,7 +381,7 @@ impl NativeHttpDownloader {
                     "storeAuth".into(),
                     match prompt.store_auth {
                         StoreAuth::Bool(b) => PhpMixed::Bool(b),
-                        StoreAuth::Prompt => PhpMixed::string("prompt".to_string()),
+                        StoreAuth::Prompt => PhpMixed::string(BString::from("prompt")),
                     },
                 );
                 let retries = attributes
@@ -391,10 +390,10 @@ impl NativeHttpDownloader {
                     .unwrap_or(0);
                 attributes.insert("retries".into(), PhpMixed::Int(retries + 1));
                 if let Some(filename) = filename {
-                    unlink_silent(format!("{}~", filename));
+                    unlink_silent(Self::temp_file(filename));
                 }
                 return Ok(Decision::Retry {
-                    url: url.to_string(),
+                    url: url.to_owned(),
                     delay_ms: None,
                 });
             }
@@ -415,7 +414,7 @@ impl NativeHttpDownloader {
                 Ok(location) if !location.is_empty() => {
                     attributes.insert("redirects".into(), PhpMixed::Int(redirects + 1));
                     if let Some(filename) = filename {
-                        unlink_silent(format!("{}~", filename));
+                        unlink_silent(Self::temp_file(filename));
                     }
                     return Ok(Decision::Retry {
                         url: location,
@@ -425,7 +424,7 @@ impl NativeHttpDownloader {
                 Ok(_) => {}
                 Err(e) => {
                     if let Some(filename) = filename {
-                        unlink_silent(format!("{}~", filename));
+                        unlink_silent(Self::temp_file(filename));
                     }
                     return Ok(Decision::Failed((*e).into()));
                 }
@@ -443,10 +442,12 @@ impl NativeHttpDownloader {
                 && retries < self.max_retries
             {
                 self.io.write_error3(
-                    &format!(
-                        "Retrying ({}) {} due to status code {}",
+                    bconcat!(
+                        "Retrying (",
                         retries + 1,
-                        Url::sanitize(url.to_string()),
+                        ") ",
+                        Url::sanitize(url),
+                        " due to status code ",
                         status_code
                     ),
                     true,
@@ -454,10 +455,10 @@ impl NativeHttpDownloader {
                 );
                 attributes.insert("retries".into(), PhpMixed::Int(retries + 1));
                 if let Some(filename) = filename {
-                    unlink_silent(format!("{}~", filename));
+                    unlink_silent(Self::temp_file(filename));
                 }
                 return Ok(Decision::Retry {
-                    url: url.to_string(),
+                    url: url.to_owned(),
                     delay_ms: Self::retry_delay_ms(retries + 1),
                 });
             }
@@ -471,7 +472,7 @@ impl NativeHttpDownloader {
             let mut e = self.fail_response(url, filename, &native_response, &status_msg);
             e.set_headers(native_response.inner.get_headers().clone());
             e.set_status_code(Some(native_response.inner.get_status_code()));
-            e.set_response(native_response.inner.get_body().map(|s| s.to_string()));
+            e.set_response(native_response.inner.get_body().map(<[u8]>::to_vec));
             return Ok(Decision::Failed((*e).into()));
         }
 
@@ -488,7 +489,7 @@ impl NativeHttpDownloader {
 
         // Atomic rename of the `~` temp file to its final name (file mode).
         if let Some(filename) = filename {
-            let _ = rename(format!("{}~", filename), filename);
+            let _ = rename(Self::temp_file(filename), filename);
         }
 
         Ok(Decision::Done(native_response.inner))
@@ -498,17 +499,16 @@ impl NativeHttpDownloader {
     /// the body to the `~` temp file when in file mode. Replaces PHP's curl_setopt block + curl I/O.
     async fn send_once(
         &self,
-        url: &str,
+        url: &BStr,
         options: &IndexMap<BString, PhpMixed>,
-        filename: Option<&str>,
+        filename: Option<&std::path::Path>,
         attributes: &IndexMap<BString, PhpMixed>,
     ) -> Result<RawResponse, TransportError> {
         let http = options.get(B("http")).and_then(|v| v.as_array());
         let method = http
             .and_then(|h| h.get(B("method")))
             .and_then(|v| v.as_string())
-            .unwrap_or("GET".into())
-            .to_string();
+            .unwrap_or("GET".into());
         let body = http
             .and_then(|h| h.get(B("content")))
             .and_then(|v| v.as_string())
@@ -530,18 +530,28 @@ impl NativeHttpDownloader {
         // TODO(http): CURLOPT_IPRESOLVE (force IPv4/IPv6) has no direct reqwest API.
         let _ = attributes;
 
-        let reqwest_method =
-            reqwest::Method::from_bytes(method.as_bytes()).unwrap_or(reqwest::Method::GET);
+        let reqwest_method = reqwest::Method::from_bytes(method).unwrap_or(reqwest::Method::GET);
 
+        // TODO(http): reqwest parses the URL as text, so a URL that is not valid UTF-8 fails here
+        // as a transport error, where curl would send its bytes.
+        let Some(url) = utf8_text(url) else {
+            return Err(TransportError {
+                message: display_to_bytes(format_args!("URL is not valid UTF-8: {:?}", url)),
+                retryable: false,
+                is_connect: false,
+                was_timeout: false,
+                is_max_file_size: false,
+            });
+        };
         let mut builder = self.client.request(reqwest_method, url);
         for header in &headers {
-            if let Some((name, value)) = header.split_once(':') {
+            if let Some((name, value)) = header.split_once_str(":") {
                 // Skip the Connection header reqwest manages itself.
-                let name = name.trim();
-                if name.eq_ignore_ascii_case("connection") {
+                let name = trim(name);
+                if name.eq_ignore_ascii_case(b"connection") {
                     continue;
                 }
-                builder = builder.header(name, value.trim());
+                builder = builder.header(name.as_slice(), trim(value).as_slice());
             }
         }
         builder = builder.timeout(std::time::Duration::from_secs(timeout_secs as u64));
@@ -550,7 +560,7 @@ impl NativeHttpDownloader {
         }
 
         let resp = builder.send().await.map_err(|e| TransportError {
-            message: e.to_string(),
+            message: display_to_bytes(&e),
             retryable: e.is_timeout() || e.is_connect() || e.is_request(),
             is_connect: e.is_connect(),
             was_timeout: e.is_timeout(),
@@ -558,8 +568,8 @@ impl NativeHttpDownloader {
         })?;
 
         let status = resp.status().as_u16() as i64;
-        let status_line = format!(
-            "HTTP/{} {}",
+        let status_line = bconcat!(
+            "HTTP/",
             match resp.version() {
                 reqwest::Version::HTTP_09 => "0.9",
                 reqwest::Version::HTTP_10 => "1.0",
@@ -568,12 +578,13 @@ impl NativeHttpDownloader {
                 reqwest::Version::HTTP_3 => "3",
                 _ => "1.1",
             },
-            resp.status()
+            " ",
+            display_to_bytes(resp.status())
         );
         // Header lines start with the status line so Response::get_status_message can find it.
-        let mut headers_out: Vec<String> = vec![status_line];
+        let mut headers_out: Vec<BString> = vec![status_line];
         for (k, v) in resp.headers().iter() {
-            headers_out.push(format!("{}: {}", k, v.to_str().unwrap_or("")));
+            headers_out.push(bconcat!(k.as_str(), ": ", v.as_bytes()));
         }
 
         let body = Self::read_body_with_limit(resp, max_file_size, filename)
@@ -598,8 +609,8 @@ impl NativeHttpDownloader {
     async fn read_body_with_limit(
         mut resp: reqwest::Response,
         max_file_size: Option<u64>,
-        filename: Option<&str>,
-    ) -> Result<Body, (String, bool)> {
+        filename: Option<&std::path::Path>,
+    ) -> Result<Body, (BString, bool)> {
         use tokio::io::AsyncWriteExt as _;
 
         let mut written: u64 = 0;
@@ -609,9 +620,9 @@ impl NativeHttpDownloader {
         }
         let mut sink = match filename {
             Some(f) => Sink::File(
-                tokio::fs::File::create(format!("{}~", f))
+                tokio::fs::File::create(Self::temp_file(f))
                     .await
-                    .map_err(|e| (e.to_string(), false))?,
+                    .map_err(|e| (display_to_bytes(&e), false))?,
             ),
             None => Sink::Memory(Vec::new()),
         };
@@ -620,16 +631,19 @@ impl NativeHttpDownloader {
             let chunk = match resp.chunk().await {
                 Ok(Some(chunk)) => chunk,
                 Ok(None) => break,
-                Err(e) => return Err((e.to_string(), false)),
+                Err(e) => return Err((display_to_bytes(&e), false)),
             };
             written += chunk.len() as u64;
             if let Some(max) = max_file_size
                 && written > max
             {
                 return Err((
-                    format!(
-                        "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
-                        written, max
+                    bconcat!(
+                        "Maximum allowed download size reached. Downloaded ",
+                        written,
+                        " of allowed ",
+                        max,
+                        " bytes"
                     ),
                     true,
                 ));
@@ -638,7 +652,7 @@ impl NativeHttpDownloader {
                 Sink::File(f) => f
                     .write_all(&chunk)
                     .await
-                    .map_err(|e| (e.to_string(), false))?,
+                    .map_err(|e| (display_to_bytes(&e), false))?,
                 Sink::Memory(buf) => buf.extend_from_slice(&chunk),
             }
         }
@@ -648,7 +662,7 @@ impl NativeHttpDownloader {
                 // tokio's File returns from write_all once the blocking write is queued, so the
                 // tail of the body can still be in flight after the loop above. flush waits for it
                 // and reports its error; without it the caller renames and copies a short file.
-                f.flush().await.map_err(|e| (e.to_string(), false))?;
+                f.flush().await.map_err(|e| (display_to_bytes(&e), false))?;
                 Body::File
             }
             Sink::Memory(buf) => Body::Memory(buf),
@@ -657,52 +671,53 @@ impl NativeHttpDownloader {
 
     fn handle_redirect(
         &self,
-        url: &str,
+        url: &BStr,
         attributes: &IndexMap<BString, PhpMixed>,
         response: &NativeHttpResponse,
-    ) -> anyhow::Result<Result<String, Box<TransportException>>> {
-        let mut target_url = String::new();
-        if let Some(location_header) = response.inner.get_header("location")
+    ) -> anyhow::Result<Result<BString, Box<TransportException>>> {
+        let mut target_url = BString::default();
+        if let Some(location_header) = response.inner.get_header(BStr::new("location"))
             && !location_header.is_empty()
         {
             let location_parsed = parse_url(&location_header);
             if location_parsed
                 .as_ref()
-                .and_then(|parsed| parsed.scheme.as_deref())
+                .and_then(|parsed| parsed.scheme.as_ref())
                 .is_some_and(|scheme| !scheme.is_empty() && scheme != "0")
             {
                 // Absolute URL; e.g. https://example.com/composer
                 target_url = location_header;
             } else if location_parsed
                 .as_ref()
-                .and_then(|parsed| parsed.host.as_deref())
+                .and_then(|parsed| parsed.host.as_ref())
                 .is_some_and(|host| !host.is_empty() && host != "0")
             {
                 // Scheme relative; e.g. //example.com/foo
-                target_url = format!(
-                    "{}:{}",
+                target_url = bconcat!(
                     parse_url(url)
                         .and_then(|parsed| parsed.scheme)
                         .unwrap_or_default(),
+                    ":",
                     location_header
                 );
-            } else if location_header.starts_with('/') {
+            } else if location_header.starts_with(b"/") {
                 // Absolute path; e.g. /foo
                 let url_host = parse_url(url).and_then(|parsed| parsed.host);
-                let url_host_str = url_host.as_deref().unwrap_or("");
+                let url_host_str = url_host.unwrap_or_default();
                 target_url = preg_replace(
-                    format!(
-                        r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",
-                        preg_quote(url_host_str, None)
+                    bconcat!(
+                        r"{^(.+(?://|@)",
+                        preg_quote(url_host_str, None),
+                        r"(?::\d+)?)(?:[/\?].*)?$}"
                     ),
-                    &format!("\\1{}", location_header),
+                    bconcat!("\\1", location_header),
                     url,
                 );
             } else {
                 // Relative path; e.g. foo
                 target_url = preg_replace(
                     php_regex!(r"{^(.+/)[^/?]*(?:\?.*)?$}"),
-                    &format!("\\1{}", location_header),
+                    bconcat!("\\1", location_header),
                     url,
                 );
             }
@@ -710,14 +725,15 @@ impl NativeHttpDownloader {
 
         if !target_url.is_empty() {
             self.io.write_error3(
-                &format!(
-                    "Following redirect ({}) {}",
+                bconcat!(
+                    "Following redirect (",
                     attributes
                         .get(B("redirects"))
                         .and_then(|v| v.as_int())
                         .unwrap_or(0)
                         + 1,
-                    Url::sanitize(target_url.clone()),
+                    ") ",
+                    Url::sanitize(target_url.clone())
                 ),
                 true,
                 crate::io::DEBUG,
@@ -727,10 +743,12 @@ impl NativeHttpDownloader {
         }
 
         Ok(Err(Box::new(TransportException::new(
-            format!(
-                "The \"{}\" file could not be downloaded, got redirect without Location ({})",
+            bconcat!(
+                "The \"",
                 url,
-                response.inner.get_status_message().unwrap_or_default()
+                "\" file could not be downloaded, got redirect without Location (",
+                response.inner.get_status_message().unwrap_or_default(),
+                ")"
             ),
             0,
         ))))
@@ -738,9 +756,9 @@ impl NativeHttpDownloader {
 
     fn is_authenticated_retry_needed(
         &self,
-        url: &str,
-        origin: &str,
-        filename: Option<&str>,
+        url: &BStr,
+        origin: &BStr,
+        filename: Option<&std::path::Path>,
         attributes: &IndexMap<BString, PhpMixed>,
         response: &NativeHttpResponse,
     ) -> anyhow::Result<Result<PromptAuthResult, Box<TransportException>>> {
@@ -759,15 +777,14 @@ impl NativeHttpDownloader {
         ) && retry_auth_failure
         {
             let status_message = response.inner.get_status_message();
-            let body = response.inner.get_body().map(|s| s.to_string());
             let result = self.auth_helper.borrow_mut().prompt_auth_if_needed(
                 url,
                 origin,
                 response.inner.get_status_code(),
-                status_message.as_deref(),
+                status_message.as_ref().map(|message| message.as_bstr()),
                 response.inner.get_headers().clone(),
                 retries,
-                body.as_deref(),
+                response.inner.get_body().map(BStr::new),
             )?;
 
             if result.retry {
@@ -775,24 +792,26 @@ impl NativeHttpDownloader {
             }
         }
 
-        let location_header = response.inner.get_header("location");
-        let mut needs_auth_retry: Option<&'static str> = None;
+        let location_header = response.inner.get_header(BStr::new("location"));
+        let mut needs_auth_retry: Option<&'static BStr> = None;
 
         // check for bitbucket login page asking to authenticate
         if origin == "bitbucket.org"
             && !self.auth_helper.borrow().is_public_bit_bucket_download(url)
             && substr(url, -4, None) == ".zip"
             && (location_header.is_none()
-                || substr(location_header.as_deref().unwrap_or(""), -4, None) != ".zip")
+                || substr(location_header.as_ref().unwrap(), -4, None) != ".zip")
             && preg_is_match(
                 php_regex!(r"{^text/html\b}i"),
-                &response
+                response
                     .inner
-                    .get_header("content-type")
+                    .get_header(BStr::new("content-type"))
                     .unwrap_or_default(),
             )
         {
-            needs_auth_retry = Some("Bitbucket requires authentication and it was not provided");
+            needs_auth_retry = Some(BStr::new(
+                "Bitbucket requires authentication and it was not provided",
+            ));
         }
 
         // check for gitlab 404 when downloading archives
@@ -802,10 +821,12 @@ impl NativeHttpDownloader {
             _ => Vec::new(),
         };
         if response.inner.get_status_code() == 404
-            && in_array_strict(origin.to_string(), &gitlab_domains_list)
+            && in_array_strict(PhpMixed::string(origin), &gitlab_domains_list)
             && strpos(url, "archive.zip").is_some()
         {
-            needs_auth_retry = Some("GitLab requires authentication and it was not provided");
+            needs_auth_retry = Some(BStr::new(
+                "GitLab requires authentication and it was not provided",
+            ));
         }
 
         if let Some(msg) = needs_auth_retry {
@@ -824,7 +845,12 @@ impl NativeHttpDownloader {
                 }
             }
 
-            return Ok(Err(self.fail_response(url, filename, response, msg)));
+            return Ok(Err(self.fail_response(
+                url,
+                filename,
+                response,
+                msg.as_bytes(),
+            )));
         }
 
         Ok(Ok(PromptAuthResult {
@@ -848,28 +874,29 @@ impl NativeHttpDownloader {
 
     fn fail_response(
         &self,
-        url: &str,
-        filename: Option<&str>,
+        url: &BStr,
+        filename: Option<&std::path::Path>,
         response: &NativeHttpResponse,
-        error_message: &str,
+        error_message: &[u8],
     ) -> Box<TransportException> {
         if let Some(filename) = filename {
-            unlink_silent(format!("{}~", filename));
+            unlink_silent(Self::temp_file(filename));
         }
 
-        let mut details = String::new();
+        let mut details = BString::default();
         if matches!(
-            response
-                .inner
-                .get_header("content-type")
-                .unwrap_or_default()
-                .to_lowercase()
-                .as_str(),
-            "application/json" | "application/json; charset=utf-8"
+            strtolower(
+                response
+                    .inner
+                    .get_header(BStr::new("content-type"))
+                    .unwrap_or_default()
+            )
+            .as_slice(),
+            b"application/json" | b"application/json; charset=utf-8"
         ) {
-            let body = response.inner.get_body().unwrap_or("");
-            details = format!(
-                ":{}{}{}",
+            let body = response.inner.get_body().unwrap_or_default();
+            details = bconcat!(
+                ":",
                 PHP_EOL,
                 substr(body, 0, Some(200)),
                 if strlen(body) > 200 { "..." } else { "" }
@@ -877,9 +904,13 @@ impl NativeHttpDownloader {
         }
 
         Box::new(TransportException::new(
-            format!(
-                "The \"{}\" file could not be downloaded ({}){}",
-                url, error_message, details
+            bconcat!(
+                "The \"",
+                url,
+                "\" file could not be downloaded (",
+                error_message.as_bstr(),
+                ")",
+                details
             ),
             response.inner.get_status_code(),
         ))
@@ -897,8 +928,13 @@ impl NativeHttpDownloader {
         }
     }
 
-    /// Extracts `options['http']['header']` as a `Vec<String>`.
-    fn header_list(options: &IndexMap<BString, PhpMixed>) -> Vec<String> {
+    /// The `~` file a download is written to before it is renamed to `filename`.
+    fn temp_file(filename: &std::path::Path) -> std::path::PathBuf {
+        path_from_bytes(&bconcat!(path_to_bytes(filename), "~")).to_owned()
+    }
+
+    /// Extracts `options['http']['header']` as a `Vec<BString>`.
+    fn header_list(options: &IndexMap<BString, PhpMixed>) -> Vec<BString> {
         options
             .get(B("http"))
             .and_then(|v| v.as_array())
@@ -906,7 +942,7 @@ impl NativeHttpDownloader {
             .and_then(|v| match v {
                 PhpMixed::List(l) => Some(
                     l.iter()
-                        .filter_map(|x| x.as_string().map(|s| s.to_string()))
+                        .filter_map(|x| x.as_string().map(BStr::to_owned))
                         .collect(),
                 ),
                 _ => None,
@@ -917,7 +953,7 @@ impl NativeHttpDownloader {
 
 /// A transport-layer failure approximating the curl errno branches PHP inspected.
 struct TransportError {
-    message: String,
+    message: BString,
     retryable: bool,
     is_connect: bool,
     was_timeout: bool,
@@ -928,7 +964,7 @@ struct TransportError {
 /// Raw send result before conversion to `NativeHttpResponse`.
 struct RawResponse {
     status: i64,
-    headers: Vec<String>,
+    headers: Vec<BString>,
     body: Body,
 }
 
@@ -940,16 +976,16 @@ enum Body {
 }
 
 impl RawResponse {
-    fn into_native_http_response(self, url: &str) -> NativeHttpResponse {
+    fn into_native_http_response(self, url: &BStr) -> NativeHttpResponse {
         let body = match self.body {
-            Body::Memory(b) => Some(String::from_utf8_lossy(&b).into_owned()),
+            Body::Memory(b) => Some(b),
             // File mode: PHP stores `$filename.'~'` as the contents string; the actual bytes live
             // on disk. We do not have the filename here, so leave the body empty — the caller's
             // rename/read handling does not consult the body for successful file downloads.
             Body::File => None,
         };
         NativeHttpResponse::new(
-            url.to_string(),
+            url.to_owned(),
             Some(self.status),
             self.headers,
             body,

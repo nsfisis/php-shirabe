@@ -3,8 +3,8 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::question::choice_question::ChoiceQuestion;
 use crate::question::confirmation_question::ConfirmationQuestion;
-use bstr::ByteSlice;
-use shirabe_php_shim::PhpMixed;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{PhpMixed, canonical_int_key};
 
 /// Polymorphic boundary for the Symfony Console Question hierarchy.
 ///
@@ -14,7 +14,7 @@ use shirabe_php_shim::PhpMixed;
 /// a `Question` and run `instanceof` checks are expressed here as a trait whose
 /// `as_choice`/`as_confirmation` downcasts stand in for `instanceof`.
 pub trait QuestionInterface: std::fmt::Debug {
-    fn get_question(&self) -> &str;
+    fn get_question(&self) -> &BStr;
 
     fn get_default(&self) -> PhpMixed;
 
@@ -26,7 +26,7 @@ pub trait QuestionInterface: std::fmt::Debug {
 
     fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>>;
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>>;
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>;
 
     fn get_validator(
         &self,
@@ -51,11 +51,11 @@ pub trait QuestionInterface: std::fmt::Debug {
 
 /// Represents a Question.
 pub struct Question {
-    question: String,
+    question: BString,
     attempts: Option<i64>,
     hidden: bool,
     hidden_fallback: bool,
-    autocompleter_callback: Option<Box<dyn Fn(&str) -> Option<Vec<PhpMixed>>>>,
+    autocompleter_callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>>,
     validator: Option<Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>>,
     default: Option<PhpMixed>,
     normalizer: Option<Box<dyn Fn(PhpMixed) -> PhpMixed>>,
@@ -80,9 +80,9 @@ impl std::fmt::Debug for Question {
 impl Question {
     /// `$question` The question to ask to the user.
     /// `$default` The default answer to return if the user enters nothing.
-    pub fn new(question: String, default: Option<PhpMixed>) -> Self {
+    pub fn new(question: impl Into<BString>, default: Option<PhpMixed>) -> Self {
         Self {
-            question,
+            question: question.into(),
             attempts: None,
             hidden: false,
             hidden_fallback: true,
@@ -96,8 +96,8 @@ impl Question {
     }
 
     /// Returns the question.
-    pub fn get_question(&self) -> &str {
-        &self.question
+    pub fn get_question(&self) -> &BStr {
+        self.question.as_bstr()
     }
 
     /// Returns the default answer.
@@ -128,7 +128,7 @@ impl Question {
     pub fn set_hidden(&mut self, hidden: bool) -> Result<&mut Self, LogicException> {
         if self.autocompleter_callback.is_some() {
             return Err(LogicException::new(
-                "A hidden question cannot use the autocompleter.".to_string(),
+                "A hidden question cannot use the autocompleter.",
             ));
         }
 
@@ -154,7 +154,7 @@ impl Question {
         let callback = self.get_autocompleter_callback();
 
         match callback {
-            Some(callback) => callback(""),
+            Some(callback) => callback(BStr::new("")),
             None => None,
         }
     }
@@ -166,7 +166,7 @@ impl Question {
         &mut self,
         values: Option<PhpMixed>,
     ) -> Result<&mut Self, LogicException> {
-        let callback: Option<Box<dyn Fn(&str) -> Option<Vec<PhpMixed>>>> = match values {
+        let callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>> = match values {
             // PHP: `if (\is_array($values))`. Both PhpMixed::List and ::Array model PHP arrays.
             Some(values) if matches!(values, PhpMixed::List(_) | PhpMixed::Array(_)) => {
                 let values = if Self::is_assoc(&values) {
@@ -188,7 +188,7 @@ impl Question {
                     }
                 };
 
-                Some(Box::new(move |_input: &str| Some(values.clone())))
+                Some(Box::new(move |_input: &BStr| Some(values.clone())))
             }
             // PHP: `elseif ($values instanceof \Traversable)`. In PHP this caches the
             // iterator result; here non-array iterables are not modeled, so treat any
@@ -202,7 +202,7 @@ impl Question {
                     PhpMixed::Array(array) => array.into_values().collect(),
                     _ => Vec::new(),
                 };
-                Some(Box::new(move |_input: &str| Some(cached.clone())))
+                Some(Box::new(move |_input: &BStr| Some(cached.clone())))
             }
             None => None,
         };
@@ -211,7 +211,7 @@ impl Question {
     }
 
     /// Gets the callback function used for the autocompleter.
-    pub fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    pub fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
         self.autocompleter_callback.as_deref()
     }
 
@@ -221,11 +221,11 @@ impl Question {
     /// corresponding suggestions.
     pub fn set_autocompleter_callback(
         &mut self,
-        callback: Option<Box<dyn Fn(&str) -> Option<Vec<PhpMixed>>>>,
+        callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>>,
     ) -> Result<&mut Self, LogicException> {
         if self.hidden && callback.is_some() {
             return Err(LogicException::new(
-                "A hidden question cannot use the autocompleter.".to_string(),
+                "A hidden question cannot use the autocompleter.",
             ));
         }
 
@@ -266,7 +266,7 @@ impl Question {
             && attempts < 1
         {
             return Err(InvalidArgumentException::new(
-                "Maximum number of attempts must be a positive value.".to_string(),
+                "Maximum number of attempts must be a positive value.",
             ));
         }
 
@@ -302,13 +302,9 @@ impl Question {
     // A `List` has only sequential int keys, so it is never associative. An `Array` is
     // associative only when at least one key is a genuine string key; PHP normalizes
     // canonical-integer string keys (e.g. "0", "12") back to int keys, so those do not count.
-    // The same heuristic (a key is "string" iff it does not parse as an i64) is used by
-    // ConsoleIO::select when computing `$isAssoc` over the choice map.
     pub(crate) fn is_assoc(array: &PhpMixed) -> bool {
         match array {
-            PhpMixed::Array(map) => map
-                .keys()
-                .any(|key| !key.to_str().is_ok_and(|key| key.parse::<i64>().is_ok())),
+            PhpMixed::Array(map) => map.keys().any(|key| canonical_int_key(key).is_none()),
             _ => false,
         }
     }
@@ -325,7 +321,7 @@ impl Question {
 }
 
 impl QuestionInterface for Question {
-    fn get_question(&self) -> &str {
+    fn get_question(&self) -> &BStr {
         self.get_question()
     }
 
@@ -349,7 +345,7 @@ impl QuestionInterface for Question {
         self.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&str) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
         self.get_autocompleter_callback()
     }
 

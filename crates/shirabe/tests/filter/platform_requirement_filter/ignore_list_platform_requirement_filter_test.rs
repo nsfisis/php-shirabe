@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Filter/PlatformRequirementFilter/IgnoreListPlatformRequirementFilterTest.php
 
+use bstr::BStr;
 use shirabe::filter::platform_requirement_filter::{
     IgnoreListPlatformRequirementFilter, PlatformRequirementFilterInterface,
 };
@@ -8,42 +9,73 @@ use shirabe::filter::platform_requirement_filter::{
 fn test_is_ignored() {
     for (req_list, req, expect_ignored) in data_is_ignored() {
         let platform_requirement_filter = IgnoreListPlatformRequirementFilter::new(
-            req_list.iter().map(|s| s.to_string()).collect(),
+            req_list.iter().map(|s| (*s).into()).collect(),
         )
         .unwrap();
 
-        assert_eq!(expect_ignored, platform_requirement_filter.is_ignored(req));
+        assert_eq!(
+            expect_ignored,
+            platform_requirement_filter.is_ignored(bstr::BStr::new(req))
+        );
     }
 }
 
-fn data_is_ignored() -> Vec<(Vec<&'static str>, &'static str, bool)> {
+fn data_is_ignored() -> Vec<(Vec<&'static BStr>, &'static BStr, bool)> {
     vec![
         // 'ext-json is ignored if listed'
-        (vec!["ext-json", "monolog/monolog"], "ext-json", true),
+        (
+            vec![BStr::new("ext-json"), BStr::new("monolog/monolog")],
+            BStr::new("ext-json"),
+            true,
+        ),
         // 'php is not ignored if not listed'
-        (vec!["ext-json", "monolog/monolog"], "php", false),
+        (
+            vec![BStr::new("ext-json"), BStr::new("monolog/monolog")],
+            BStr::new("php"),
+            false,
+        ),
         // 'monolog/monolog is not ignored even if listed'
         (
-            vec!["ext-json", "monolog/monolog"],
-            "monolog/monolog",
+            vec![BStr::new("ext-json"), BStr::new("monolog/monolog")],
+            BStr::new("monolog/monolog"),
             false,
         ),
         // 'ext-json is ignored if ext-* is listed'
-        (vec!["ext-*"], "ext-json", true),
+        (vec![BStr::new("ext-*")], BStr::new("ext-json"), true),
         // 'php is ignored if php* is listed'
-        (vec!["ext-*", "php*"], "php", true),
+        (
+            vec![BStr::new("ext-*"), BStr::new("php*")],
+            BStr::new("php"),
+            true,
+        ),
         // 'ext-json is ignored if * is listed'
-        (vec!["foo", "*"], "ext-json", true),
+        (
+            vec![BStr::new("foo"), BStr::new("*")],
+            BStr::new("ext-json"),
+            true,
+        ),
         // 'php is ignored if * is listed'
-        (vec!["*", "foo"], "php", true),
+        (
+            vec![BStr::new("*"), BStr::new("foo")],
+            BStr::new("php"),
+            true,
+        ),
         // 'monolog/monolog is not ignored even if * or monolog/* are listed'
-        (vec!["*", "monolog/*"], "monolog/monolog", false),
+        (
+            vec![BStr::new("*"), BStr::new("monolog/*")],
+            BStr::new("monolog/monolog"),
+            false,
+        ),
         // 'empty list entry does not ignore'
-        (vec![""], "ext-foo", false),
+        (vec![BStr::new("")], BStr::new("ext-foo"), false),
         // 'empty array does not ignore'
-        (vec![], "ext-foo", false),
+        (vec![], BStr::new("ext-foo"), false),
         // 'list entries are not completing each other'
-        (vec!["ext-", "foo"], "ext-foo", false),
+        (
+            vec![BStr::new("ext-"), BStr::new("foo")],
+            BStr::new("ext-foo"),
+            false,
+        ),
     ]
 }
 
@@ -51,42 +83,78 @@ fn data_is_ignored() -> Vec<(Vec<&'static str>, &'static str, bool)> {
 fn test_is_upper_bound_ignored() {
     for (req_list, req, expect_ignored) in data_is_upper_bound_ignored() {
         let platform_requirement_filter = IgnoreListPlatformRequirementFilter::new(
-            req_list.iter().map(|s| s.to_string()).collect(),
+            req_list.iter().map(|s| (*s).into()).collect(),
         )
         .unwrap();
 
         assert_eq!(
             expect_ignored,
-            platform_requirement_filter.is_upper_bound_ignored(req)
+            platform_requirement_filter.is_upper_bound_ignored(bstr::BStr::new(req))
         );
     }
 }
 
-fn data_is_upper_bound_ignored() -> Vec<(Vec<&'static str>, &'static str, bool)> {
+fn data_is_upper_bound_ignored() -> Vec<(Vec<&'static BStr>, &'static BStr, bool)> {
     vec![
         // 'ext-json is ignored if listed and fully ignored'
-        (vec!["ext-json", "monolog/monolog"], "ext-json", true),
+        (
+            vec![BStr::new("ext-json"), BStr::new("monolog/monolog")],
+            BStr::new("ext-json"),
+            true,
+        ),
         // 'ext-json is ignored if listed and upper bound ignored'
-        (vec!["ext-json+", "monolog/monolog"], "ext-json", true),
+        (
+            vec![BStr::new("ext-json+"), BStr::new("monolog/monolog")],
+            BStr::new("ext-json"),
+            true,
+        ),
         // 'php is not ignored if not listed'
-        (vec!["ext-json+", "monolog/monolog"], "php", false),
+        (
+            vec![BStr::new("ext-json+"), BStr::new("monolog/monolog")],
+            BStr::new("php"),
+            false,
+        ),
         // 'monolog/monolog is not ignored even if listed'
-        (vec!["monolog/monolog"], "monolog/monolog", false),
+        (
+            vec![BStr::new("monolog/monolog")],
+            BStr::new("monolog/monolog"),
+            false,
+        ),
         // 'ext-json is ignored if ext-* is listed'
-        (vec!["ext-*+"], "ext-json", true),
+        (vec![BStr::new("ext-*+")], BStr::new("ext-json"), true),
         // 'php is ignored if php* is listed'
-        (vec!["ext-*+", "php*+"], "php", true),
+        (
+            vec![BStr::new("ext-*+"), BStr::new("php*+")],
+            BStr::new("php"),
+            true,
+        ),
         // 'ext-json is ignored if * is listed'
-        (vec!["foo", "*+"], "ext-json", true),
+        (
+            vec![BStr::new("foo"), BStr::new("*+")],
+            BStr::new("ext-json"),
+            true,
+        ),
         // 'php is ignored if * is listed'
-        (vec!["*+", "foo"], "php", true),
+        (
+            vec![BStr::new("*+"), BStr::new("foo")],
+            BStr::new("php"),
+            true,
+        ),
         // 'monolog/monolog is not ignored even if * or monolog/* are listed'
-        (vec!["*+", "monolog/*+"], "monolog/monolog", false),
+        (
+            vec![BStr::new("*+"), BStr::new("monolog/*+")],
+            BStr::new("monolog/monolog"),
+            false,
+        ),
         // 'empty list entry does not ignore'
-        (vec![""], "ext-foo", false),
+        (vec![BStr::new("")], BStr::new("ext-foo"), false),
         // 'empty array does not ignore'
-        (vec![], "ext-foo", false),
+        (vec![], BStr::new("ext-foo"), false),
         // 'list entries are not completing each other'
-        (vec!["ext-", "foo"], "ext-foo", false),
+        (
+            vec![BStr::new("ext-"), BStr::new("foo")],
+            BStr::new("ext-foo"),
+            false,
+        ),
     ]
 }

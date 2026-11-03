@@ -2,80 +2,75 @@
 
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
 use crate::package::version::VersionParser;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, date_create, php_regex, preg_replace};
+use shirabe_php_shim::{PhpMixed, date_create, json_bytes, php_regex, preg_replace};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 fn serialize_constraint<S: serde::Serializer>(
     c: &AnyConstraint,
     serializer: S,
 ) -> anyhow::Result<S::Ok, S::Error> {
-    serializer.serialize_str(&c.get_pretty_string())
+    json_bytes::str(&c.get_pretty_string(), serializer)
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialSecurityAdvisory {
-    pub advisory_id: String,
-    pub package_name: String,
+    #[serde(serialize_with = "shirabe_php_shim::json_bytes::str")]
+    pub advisory_id: BString,
+    #[serde(serialize_with = "shirabe_php_shim::json_bytes::str")]
+    pub package_name: BString,
     #[serde(serialize_with = "serialize_constraint")]
     pub affected_versions: AnyConstraint,
 }
 
 impl PartialSecurityAdvisory {
     pub fn create(
-        package_name: &str,
+        package_name: &BStr,
         data: &IndexMap<BString, PhpMixed>,
         parser: &VersionParser,
     ) -> anyhow::Result<AnySecurityAdvisory> {
         let affected_versions_str = data[B("affectedVersions")].as_string().unwrap_or_default();
 
-        let constraint: AnyConstraint =
-            match parser.parse_constraints(&affected_versions_str.to_str_lossy()) {
-                Ok(c) => c,
-                Err(_) => {
-                    let affected_version = preg_replace(
+        let constraint: AnyConstraint = match parser.parse_constraints(affected_versions_str) {
+            Ok(c) => c,
+            Err(_) => {
+                let affected_version = BString::from(
+                    &preg_replace(
                         php_regex!(r"{(^[>=<^~]*[\d.]+).*}"),
                         "$1",
-                        &affected_versions_str.to_str_lossy(),
-                    );
-                    match parser.parse_constraints(&affected_version) {
-                        Ok(c) => c,
-                        Err(_) => SimpleConstraint::new(
-                            "==".to_string(),
-                            "0.0.0-invalid-version".to_string(),
-                            None,
-                        )
-                        .into(),
+                        affected_versions_str,
+                    )[..],
+                );
+                match parser.parse_constraints(&affected_version) {
+                    Ok(c) => c,
+                    Err(_) => {
+                        SimpleConstraint::new("==", BString::from("0.0.0-invalid-version"), None)
+                            .into()
                     }
                 }
-            };
+            }
+        };
 
         let has_full_data = data.contains_key(B("title"))
             && data.contains_key(B("sources"))
             && data.contains_key(B("reportedAt"));
 
         if has_full_data {
-            let reported_at: DateTime<Utc> = date_create(
-                &data[B("reportedAt")]
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_str_lossy(),
-            )
-            .unwrap_or_default();
-            let sources: Vec<IndexMap<String, String>> = data[B("sources")]
+            let reported_at: DateTime<Utc> =
+                date_create(data[B("reportedAt")].as_string().unwrap_or_default())
+                    .unwrap_or_default();
+            let sources: Vec<IndexMap<BString, BString>> = data[B("sources")]
                 .as_list()
                 .map(|list| {
                     list.iter()
                         .filter_map(|item| item.as_array())
                         .map(|arr| {
                             arr.iter()
-                                // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                                 .filter_map(|(k, v)| {
-                                    v.as_string()
-                                        .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                                    v.as_string().map(|s| (k.clone(), BString::from(s)))
                                 })
                                 .collect()
                         })
@@ -83,41 +78,35 @@ impl PartialSecurityAdvisory {
                 })
                 .unwrap_or_default();
             let advisory = SecurityAdvisory::new(
-                package_name.to_string(),
-                data[B("advisoryId")]
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
+                bstr::BString::from(package_name),
+                BString::from(data[B("advisoryId")].as_string().unwrap_or_default()),
                 constraint,
-                data[B("title")].as_string().unwrap_or_default().to_string(),
+                BString::from(data[B("title")].as_string().unwrap_or_default()),
                 sources,
                 reported_at,
                 data.get(B("cve"))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string()),
+                    .map(BString::from),
                 data.get(B("link"))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string()),
+                    .map(BString::from),
                 data.get(B("severity"))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string()),
+                    .map(BString::from),
             );
             return Ok(AnySecurityAdvisory::Full(advisory));
         }
 
         Ok(AnySecurityAdvisory::Partial(Self {
-            advisory_id: data[B("advisoryId")]
-                .as_string()
-                .unwrap_or_default()
-                .to_string(),
-            package_name: package_name.to_string(),
+            advisory_id: BString::from(data[B("advisoryId")].as_string().unwrap_or_default()),
+            package_name: bstr::BString::from(package_name),
             affected_versions: constraint,
         }))
     }
 
     pub fn new(
-        package_name: String,
-        advisory_id: String,
+        package_name: BString,
+        advisory_id: BString,
         affected_versions: AnyConstraint,
     ) -> Self {
         Self {

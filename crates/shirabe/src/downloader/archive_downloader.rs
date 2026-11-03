@@ -2,37 +2,39 @@
 
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::downloader::{DownloaderInterface, FileDownloader};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
+    Catch as _, PhpMixed, RuntimeException, bconcat, bin2hex, file_exists, is_dir, path_from_bytes,
+    path_to_bytes, random_bytes, realpath,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
 
 pub trait ArchiveDownloader {
     fn inner(&self) -> &FileDownloader;
-    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>>;
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<BString, bool>>;
 
     async fn extract(
         &self,
         package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &Path,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed()
             .borrow_mut()
-            .shift_remove(&package.get_name());
+            .shift_remove(package.get_name().as_bstr());
         self.inner()
             .prepare(r#type, package, path, prev_package)
             .await
@@ -40,9 +42,9 @@ pub trait ArchiveDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed()
@@ -56,12 +58,12 @@ pub trait ArchiveDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.inner().io.borrow().write_error(&format!(
-                "  - {}{}",
+            self.inner().io.borrow().write_error(bconcat!(
+                "  - ",
                 InstallOperation::format(package.clone(), false),
                 self.get_install_operation_appendix(package.clone(), path)
             ));
@@ -74,22 +76,28 @@ pub trait ArchiveDownloader {
             .get("vendor-dir")
             .as_string()
             .unwrap_or_default()
-            .to_string();
+            .to_owned();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
-        if !self
-            .inner()
-            .filesystem
-            .borrow()
-            .normalize_path(&vendor_dir)
-            .contains(&self.inner().filesystem.borrow().normalize_path(&format!(
-                "{}{}",
-                path,
-                std::path::MAIN_SEPARATOR
-            )))
-        {
+        if !path_to_bytes(
+            &self
+                .inner()
+                .filesystem
+                .borrow()
+                .normalize_path(path_from_bytes(&vendor_dir)),
+        )
+        .contains_str(path_to_bytes(
+            &self
+                .inner()
+                .filesystem
+                .borrow()
+                .normalize_path(path_from_bytes(&bconcat!(
+                    path,
+                    std::path::MAIN_SEPARATOR_STR
+                ))),
+        )) {
             self.inner()
                 .filesystem
                 .borrow_mut()
@@ -97,7 +105,11 @@ pub trait ArchiveDownloader {
         }
 
         let temporary_dir = loop {
-            let candidate = format!("{}/composer/{}", vendor_dir, bin2hex(&random_bytes(4)));
+            let candidate = PathBuf::from(path_from_bytes(&bconcat!(
+                vendor_dir,
+                "/composer/",
+                bin2hex(random_bytes(4))
+            )));
             if !is_dir(&candidate) {
                 break candidate;
             }
@@ -107,7 +119,10 @@ pub trait ArchiveDownloader {
             .add_cleanup_path(package.clone(), &temporary_dir);
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
-        if !is_dir(path) || realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
+        if !is_dir(path)
+            || realpath(path).as_deref().map(Path::as_os_str)
+                != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
+        {
             self.inner().add_cleanup_path(package.clone(), path);
         }
 
@@ -162,7 +177,7 @@ pub trait ArchiveDownloader {
                     let extracted_dir: PathBuf = if single_dir_at_top_level {
                         content_dir.first().unwrap().clone()
                     } else {
-                        PathBuf::from(&temporary_dir)
+                        temporary_dir.clone()
                     };
                     self.inner()
                         .filesystem
@@ -170,17 +185,12 @@ pub trait ArchiveDownloader {
                         .rename(&extracted_dir, path)?;
                 } else {
                     // only one dir in the archive, extract its contents out of it
-                    let mut from = PathBuf::from(&temporary_dir);
+                    let mut from = temporary_dir.clone();
                     if single_dir_at_top_level {
                         from = content_dir.first().unwrap().clone();
                     }
 
-                    rename_recursively(
-                        &self.inner().filesystem,
-                        package.clone(),
-                        &from,
-                        Path::new(path),
-                    )?;
+                    rename_recursively(&self.inner().filesystem, package.clone(), &from, path)?;
                 }
 
                 Filesystem::remove_directory_async_via(&self.inner().filesystem, &temporary_dir)
@@ -197,17 +207,17 @@ pub trait ArchiveDownloader {
     fn get_install_operation_appendix(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &str,
-    ) -> &str {
-        ": Extracting archive"
+        _path: &Path,
+    ) -> &BStr {
+        BStr::new(": Extracting archive")
     }
 }
 
 fn install_cleanup(
     inner: &FileDownloader,
     package: PackageInterfaceHandle,
-    path: &str,
-    temporary_dir: &str,
+    path: &Path,
+    temporary_dir: &Path,
 ) -> anyhow::Result<()> {
     // remove cache if the file was corrupted
     inner.clear_last_cache_write(package.clone());
@@ -217,7 +227,10 @@ fn install_cleanup(
         .filesystem
         .borrow_mut()
         .remove_directory(temporary_dir)?;
-    if is_dir(path) && realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
+    if is_dir(path)
+        && realpath(path).as_deref().map(Path::as_os_str)
+            != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
+    {
         inner.filesystem.borrow_mut().remove_directory(path)?;
     }
     inner.remove_cleanup_path(package.clone(), temporary_dir);
@@ -235,7 +248,7 @@ fn get_folder_content(dir: impl AsRef<Path>) -> Vec<PathBuf> {
     finder
         .ignore_vcs(false)
         .ignore_dot_files(false)
-        .not_name(".DS_Store")
+        .not_name(BStr::new(".DS_Store"))
         .depth(0)
         .r#in(dir.as_ref());
 
@@ -263,10 +276,12 @@ fn rename_recursively(
         );
         if is_dir(&target) {
             if !is_dir(file) {
-                return Err(RuntimeException::new(format!(
-                    "Installing {} would lead to overwriting the {} directory with a file from the package, invalid operation.",
-                    package,
-                    target.display()
+                return Err(RuntimeException::new(bconcat!(
+                    "Installing ",
+                    package.to_php_string(),
+                    " would lead to overwriting the ",
+                    target,
+                    " directory with a file from the package, invalid operation."
                 ))
                 .into());
             }

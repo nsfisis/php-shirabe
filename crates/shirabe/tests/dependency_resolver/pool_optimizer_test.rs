@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php
 
-use bstr::{B, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
 use shirabe::dependency_resolver::pool::Pool;
@@ -13,7 +13,8 @@ use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::handle::LockArrayRepositoryHandle;
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe_php_shim::{
-    PhpMixed, file_get_contents, php_regex, preg_is_match, preg_split_delim_capture,
+    PhpMixed, bconcat, file_get_contents, path_to_bytes, php_regex, preg_is_match,
+    preg_split_delim_capture, str_replace,
 };
 use std::path::PathBuf;
 
@@ -38,18 +39,18 @@ fn load_packages(packages_data: &[PhpMixed]) -> Vec<BasePackageHandle> {
     packages
 }
 
-fn reduce_packages_info_for_comparison(packages: &[BasePackageHandle]) -> Vec<String> {
-    let mut packages_info: Vec<String> = Vec::new();
+fn reduce_packages_info_for_comparison(packages: &[BasePackageHandle]) -> Vec<BString> {
+    let mut packages_info: Vec<BString> = Vec::new();
 
     for package in packages {
         let suffix = if let Some(alias) = package.as_alias() {
-            format!(" (alias of {})", alias.get_alias_of().get_version())
+            bconcat!(" (alias of ", alias.get_alias_of().get_version(), ")")
         } else {
-            String::new()
+            BString::default()
         };
-        packages_info.push(format!(
-            "{}@{}{}",
+        packages_info.push(bconcat!(
             package.get_name(),
+            "@",
             package.get_version(),
             suffix
         ));
@@ -60,42 +61,49 @@ fn reduce_packages_info_for_comparison(packages: &[BasePackageHandle]) -> Vec<St
     packages_info
 }
 
-fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
-    // TODO(bytes)
-    let contents = String::from_utf8_lossy(&file_get_contents(file).unwrap()).into_owned();
+fn read_test_file(
+    file: &std::path::Path,
+    fixtures_dir: &std::path::Path,
+) -> IndexMap<BString, BString> {
+    let contents = file_get_contents(file).unwrap();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
-    let section_info: Vec<&str> = vec!["TEST", "REQUEST", "POOL-BEFORE", "POOL-AFTER"];
+    let section_info: Vec<&BStr> = vec![
+        BStr::new("TEST"),
+        BStr::new("REQUEST"),
+        BStr::new("POOL-BEFORE"),
+        BStr::new("POOL-AFTER"),
+    ];
 
-    let mut section: Option<String> = None;
-    let mut data: IndexMap<String, String> = IndexMap::new();
+    let mut section: Option<BString> = None;
+    let mut data: IndexMap<BString, BString> = IndexMap::new();
     for token in tokens {
         if section.is_none() && token.is_empty() {
             continue;
         }
 
         if section.is_none() {
-            if !section_info.contains(&token.as_str()) {
+            if !section_info.iter().any(|name| *name == token) {
                 panic!(
                     "The test file \"{}\" must not contain a section named \"{}\".",
-                    file.replace(&format!("{}/", fixtures_dir), ""),
-                    token
+                    str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file))
+                        .display_lossy(),
+                    token.display_lossy()
                 );
             }
             section = Some(token);
             continue;
         }
 
-        let section_data = token;
-        data.insert(section.take().unwrap(), section_data);
+        data.insert(section.take().unwrap(), token);
     }
 
     for required_section in &section_info {
-        if !data.contains_key(*required_section) {
+        if !data.contains_key(B(required_section)) {
             panic!(
                 "The test file \"{}\" must have a section named \"{}\".",
-                file.replace(&format!("{}/", fixtures_dir), ""),
-                required_section
+                str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file)).display_lossy(),
+                required_section.display_lossy()
             );
         }
     }
@@ -116,60 +124,52 @@ fn collect_test_files(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
 }
 
 fn provide_integration_tests() -> IndexMap<
-    String,
+    BString,
     (
         PhpMixed,
         Vec<BasePackageHandle>,
         Vec<BasePackageHandle>,
-        String,
+        BString,
     ),
 > {
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/DependencyResolver/Fixtures/pooloptimizer");
     let fixtures_dir = std::fs::canonicalize(&fixtures_dir).unwrap();
-    let fixtures_dir_str = fixtures_dir.to_str().unwrap().to_string();
 
     let mut files: Vec<PathBuf> = Vec::new();
     collect_test_files(&fixtures_dir, &mut files);
 
     let mut tests: IndexMap<
-        String,
+        BString,
         (
             PhpMixed,
             Vec<BasePackageHandle>,
             Vec<BasePackageHandle>,
-            String,
+            BString,
         ),
     > = IndexMap::new();
     for file in files {
-        let file = file.to_str().unwrap().to_string();
-
-        if !preg_is_match(php_regex!(r"/\.test$/"), &file) {
+        if !preg_is_match(php_regex!(r"/\.test$/"), path_to_bytes(&file)) {
             continue;
         }
 
-        let test_data = read_test_file(&file, &fixtures_dir_str);
-        let message = test_data["TEST"].clone();
-        let request_data = JsonFile::parse_json(Some(&test_data["REQUEST"]), None).unwrap();
+        let test_data = read_test_file(&file, &fixtures_dir);
+        let message = test_data[B("TEST")].clone();
+        let request_data = JsonFile::parse_json(Some(&test_data[B("REQUEST")]), None).unwrap();
         let packages_before = load_packages(
-            JsonFile::parse_json(Some(&test_data["POOL-BEFORE"]), None)
+            JsonFile::parse_json(Some(&test_data[B("POOL-BEFORE")]), None)
                 .unwrap()
                 .as_list()
                 .unwrap(),
         );
         let expected_packages = load_packages(
-            JsonFile::parse_json(Some(&test_data["POOL-AFTER"]), None)
+            JsonFile::parse_json(Some(&test_data[B("POOL-AFTER")]), None)
                 .unwrap()
                 .as_list()
                 .unwrap(),
         );
 
-        let basename = std::path::Path::new(&file)
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let basename = BString::from(path_to_bytes(file.file_name().unwrap()));
         tests.insert(
             basename,
             (request_data, packages_before, expected_packages, message),
@@ -183,7 +183,7 @@ fn run_test_pool_optimizer(
     request_data: &PhpMixed,
     packages_before: Vec<BasePackageHandle>,
     expected_packages: &[BasePackageHandle],
-    message: &str,
+    message: &[u8],
 ) {
     let request_data = request_data.as_array().unwrap();
 
@@ -206,10 +206,10 @@ fn run_test_pool_optimizer(
     for (package, constraint) in request_data[B("require")].as_array().unwrap() {
         request
             .require_name(
-                &package.to_str_lossy(),
+                package.as_bstr(),
                 Some(
                     parser
-                        .parse_constraints(&constraint.as_string().unwrap().to_str_lossy())
+                        .parse_constraints(constraint.as_string().unwrap())
                         .unwrap(),
                 ),
             )
@@ -245,7 +245,7 @@ fn run_test_pool_optimizer(
         reduce_packages_info_for_comparison(expected_packages),
         reduce_packages_info_for_comparison(pool.get_packages()),
         "{}",
-        message
+        message.as_bstr().display_lossy()
     );
 }
 

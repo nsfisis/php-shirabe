@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Util/PackageSorter.php
 
 use crate::package::{Link, PackageInterfaceHandle};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{CmpOp, strnatcasecmp, version_compare};
 
@@ -20,7 +21,7 @@ impl PackageSorter {
             if candidate.is_default_branch() {
                 return Some(candidate);
             }
-            if version_compare(&highest.get_version(), &candidate.get_version(), CmpOp::Lt) {
+            if version_compare(highest.get_version(), candidate.get_version(), CmpOp::Lt) {
                 highest = candidate;
             }
         }
@@ -37,12 +38,12 @@ impl PackageSorter {
 
     pub fn sort_packages(
         packages: Vec<PackageInterfaceHandle>,
-        weights: IndexMap<String, i64>,
+        weights: IndexMap<BString, i64>,
     ) -> Vec<PackageInterfaceHandle> {
-        let mut usage_list: IndexMap<String, Vec<String>> = IndexMap::new();
+        let mut usage_list: IndexMap<BString, Vec<BString>> = IndexMap::new();
 
         for package in &packages {
-            let mut links: IndexMap<String, Link> = (*package.get_requires()).clone();
+            let mut links: IndexMap<BString, Link> = (*package.get_requires()).clone();
             if let Some(root_package) = package.as_root() {
                 links.extend(
                     root_package
@@ -52,9 +53,8 @@ impl PackageSorter {
                 );
             }
             for link in links.values() {
-                let target = link.get_target().to_string();
                 usage_list
-                    .entry(target)
+                    .entry(BString::from(link.get_target()))
                     .or_default()
                     .push(package.get_name());
             }
@@ -67,10 +67,10 @@ impl PackageSorter {
             weights: &weights,
         };
 
-        let mut weighted_packages: Vec<(String, i64, usize)> = Vec::new();
+        let mut weighted_packages: Vec<(BString, i64, usize)> = Vec::new();
         for (index, package) in packages.iter().enumerate() {
-            let name = package.get_name().to_string();
-            let weight = helper.compute(&name);
+            let name = package.get_name();
+            let weight = helper.compute(name.as_ref());
             weighted_packages.push((name, weight, index));
         }
 
@@ -92,30 +92,30 @@ impl PackageSorter {
 }
 
 struct ComputeImportanceHelper<'a> {
-    computing: IndexMap<String, bool>,
-    computed: IndexMap<String, i64>,
-    usage_list: &'a IndexMap<String, Vec<String>>,
-    weights: &'a IndexMap<String, i64>,
+    computing: IndexMap<BString, bool>,
+    computed: IndexMap<BString, i64>,
+    usage_list: &'a IndexMap<BString, Vec<BString>>,
+    weights: &'a IndexMap<BString, i64>,
 }
 
 impl ComputeImportanceHelper<'_> {
-    fn compute(&mut self, name: &str) -> i64 {
+    fn compute(&mut self, name: &BStr) -> i64 {
         if let Some(&w) = self.computed.get(name) {
             return w;
         }
         if self.computing.contains_key(name) {
             return 0;
         }
-        self.computing.insert(name.to_string(), true);
+        self.computing.insert(BString::from(name), true);
         let mut weight = *self.weights.get(name).unwrap_or(&0);
         if let Some(users) = self.usage_list.get(name) {
             let users = users.clone();
             for user in &users {
-                weight -= 1 - self.compute(user);
+                weight -= 1 - self.compute(user.as_ref());
             }
         }
         self.computing.shift_remove(name);
-        self.computed.insert(name.to_string(), weight);
+        self.computed.insert(BString::from(name), weight);
         weight
     }
 }

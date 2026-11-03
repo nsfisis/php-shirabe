@@ -3,8 +3,9 @@
 use crate::dependency_resolver::{PolicyInterface, Pool, Request};
 use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
+use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, implode, ksort};
+use shirabe_php_shim::{CmpOp, bconcat, implode, ksort};
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
 
@@ -13,17 +14,17 @@ use shirabe_semver::{CompilingMatcher, Intervals};
 pub struct PoolOptimizer {
     policy: std::rc::Rc<dyn PolicyInterface>,
     irremovable_packages: IndexMap<i64, bool>,
-    require_constraints_per_package: IndexMap<String, IndexMap<String, AnyConstraint>>,
-    conflict_constraints_per_package: IndexMap<String, IndexMap<String, AnyConstraint>>,
+    require_constraints_per_package: IndexMap<BString, IndexMap<BString, AnyConstraint>>,
+    conflict_constraints_per_package: IndexMap<BString, IndexMap<BString, AnyConstraint>>,
     packages_to_remove: IndexMap<i64, bool>,
     aliases_per_package: IndexMap<i64, Vec<BasePackageHandle>>,
-    removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
+    removed_versions_by_package: IndexMap<BString, IndexMap<BString, BString>>,
 }
 
 #[derive(Debug, Clone)]
 struct IdenticalDefinitionPointers {
-    group_hash: String,
-    dependency_hash: String,
+    group_hash: BString,
+    dependency_hash: BString,
 }
 
 impl PoolOptimizer {
@@ -66,27 +67,23 @@ impl PoolOptimizer {
 
     #[tracing::instrument(skip_all)]
     fn prepare(&mut self, request: &Request, pool: &Pool) {
-        let mut irremovable_package_constraint_groups: IndexMap<String, Vec<AnyConstraint>> =
+        let mut irremovable_package_constraint_groups: IndexMap<BString, Vec<AnyConstraint>> =
             IndexMap::new();
 
         // Mark fixed or locked packages as irremovable
         for (_, package) in request.get_fixed_or_locked_packages() {
             irremovable_package_constraint_groups
-                .entry(package.get_name())
+                .entry(BString::from(&package.get_name()[..]))
                 .or_default()
                 .push(
-                    SimpleConstraint::new(
-                        "==".to_string(),
-                        package.get_version().to_string(),
-                        None,
-                    )
-                    .into(),
+                    SimpleConstraint::new("==", BString::from(&package.get_version()[..]), None)
+                        .into(),
                 );
         }
 
         // Extract requested package requirements
         for (require, constraint) in request.get_requires().iter() {
-            self.extract_require_constraints_per_package(require, constraint.clone());
+            self.extract_require_constraints_per_package(require.as_bstr(), constraint.clone());
         }
 
         // First pass over all packages to extract information and mark package constraints irremovable
@@ -116,7 +113,7 @@ impl PoolOptimizer {
             }
         }
 
-        let mut irremovable_package_constraints: IndexMap<String, AnyConstraint> = IndexMap::new();
+        let mut irremovable_package_constraints: IndexMap<BString, AnyConstraint> = IndexMap::new();
         for (package_name, constraints) in irremovable_package_constraint_groups {
             irremovable_package_constraints.insert(
                 package_name,
@@ -138,7 +135,7 @@ impl PoolOptimizer {
             let constraint = irremovable_package_constraints
                 .get(&package.get_name())
                 .unwrap();
-            if CompilingMatcher::r#match(constraint, CmpOp::Eq, &package.get_version()) {
+            if CompilingMatcher::r#match(constraint, CmpOp::Eq, package.get_version()) {
                 self.mark_package_irremovable(package.clone());
             }
         }
@@ -166,17 +163,17 @@ impl PoolOptimizer {
     #[tracing::instrument(skip_all)]
     fn apply_removals_to_pool(&self, pool: &Pool) -> Pool {
         let mut packages: Vec<BasePackageHandle> = vec![];
-        let mut removed_versions: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
+        let mut removed_versions: IndexMap<BString, IndexMap<BString, BString>> = IndexMap::new();
         for package in pool.get_packages() {
             if !self.packages_to_remove.contains_key(&package.id()) {
                 packages.push(package.clone());
             } else {
                 removed_versions
-                    .entry(package.get_name())
+                    .entry(BString::from(&package.get_name()[..]))
                     .or_default()
                     .insert(
-                        package.get_version().to_string(),
-                        package.get_pretty_version().to_string(),
+                        BString::from(&package.get_version()[..]),
+                        BString::from(&package.get_pretty_version()[..]),
                     );
             }
         }
@@ -194,12 +191,12 @@ impl PoolOptimizer {
     #[tracing::instrument(skip_all)]
     fn optimize_by_identical_dependencies(&mut self, _request: &Request, pool: &Pool) {
         let mut identical_definitions_per_package: IndexMap<
-            String,
-            IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
+            BString,
+            IndexMap<BString, IndexMap<BString, Vec<BasePackageHandle>>>,
         > = IndexMap::new();
         let mut package_identical_definition_lookup: IndexMap<
             i64,
-            IndexMap<String, IdenticalDefinitionPointers>,
+            IndexMap<BString, IdenticalDefinitionPointers>,
         > = IndexMap::new();
 
         for package in pool.get_packages() {
@@ -225,17 +222,15 @@ impl PoolOptimizer {
                 let empty_constraints = IndexMap::new();
                 let require_constraints = require_constraints.unwrap_or(&empty_constraints);
                 for (_, require_constraint) in require_constraints.iter() {
-                    let mut group_hash_parts: Vec<String> = vec![];
+                    let mut group_hash_parts: Vec<BString> = vec![];
 
                     if CompilingMatcher::r#match(
                         require_constraint,
                         CmpOp::Eq,
-                        &package.get_version(),
+                        package.get_version(),
                     ) {
-                        group_hash_parts.push(format!(
-                            "require:{}",
-                            require_constraint.get_pretty_string()
-                        ));
+                        group_hash_parts
+                            .push(bconcat!("require:", require_constraint.get_pretty_string()));
                     }
 
                     if !package.get_replaces().is_empty() {
@@ -243,11 +238,11 @@ impl PoolOptimizer {
                             if CompilingMatcher::r#match(
                                 link.get_constraint(),
                                 CmpOp::Eq,
-                                &package.get_version(),
+                                package.get_version(),
                             ) {
                                 // Use the same hash part as the regular require hash because that's what the replacement does
-                                group_hash_parts.push(format!(
-                                    "require:{}",
+                                group_hash_parts.push(bconcat!(
+                                    "require:",
                                     link.get_constraint().get_pretty_string()
                                 ));
                             }
@@ -261,10 +256,10 @@ impl PoolOptimizer {
                             if CompilingMatcher::r#match(
                                 conflict_constraint,
                                 CmpOp::Eq,
-                                &package.get_version(),
+                                package.get_version(),
                             ) {
-                                group_hash_parts.push(format!(
-                                    "conflict:{}",
+                                group_hash_parts.push(bconcat!(
+                                    "conflict:",
                                     conflict_constraint.get_pretty_string()
                                 ));
                             }
@@ -275,9 +270,9 @@ impl PoolOptimizer {
                         continue;
                     }
 
-                    let group_hash = implode("", &group_hash_parts);
+                    let group_hash = BString::from(&implode("", &group_hash_parts)[..]);
                     identical_definitions_per_package
-                        .entry(package_name.clone())
+                        .entry(BString::from(&package_name.clone()[..]))
                         .or_default()
                         .entry(group_hash.clone())
                         .or_default()
@@ -288,7 +283,7 @@ impl PoolOptimizer {
                         .entry(package.id())
                         .or_default()
                         .insert(
-                            package_name.clone(),
+                            BString::from(&package_name.clone()[..]),
                             IdenticalDefinitionPointers {
                                 group_hash,
                                 dependency_hash: dependency_hash.clone(),
@@ -336,24 +331,24 @@ impl PoolOptimizer {
         }
     }
 
-    fn calculate_dependency_hash(&self, package: BasePackageHandle) -> String {
-        let mut hash = String::new();
+    fn calculate_dependency_hash(&self, package: BasePackageHandle) -> BString {
+        let mut hash = BString::default();
 
-        let hash_relevant_links: Vec<(&str, Vec<crate::package::Link>)> = vec![
+        let hash_relevant_links: Vec<(&BStr, Vec<crate::package::Link>)> = vec![
             (
-                "requires",
+                BStr::new("requires"),
                 package.get_requires().values().cloned().collect(),
             ),
             (
-                "conflicts",
+                BStr::new("conflicts"),
                 package.get_conflicts().values().cloned().collect(),
             ),
             (
-                "replaces",
+                BStr::new("replaces"),
                 package.get_replaces().values().cloned().collect(),
             ),
             (
-                "provides",
+                BStr::new("provides"),
                 package.get_provides().values().cloned().collect(),
             ),
         ];
@@ -364,9 +359,9 @@ impl PoolOptimizer {
             }
 
             // start new hash section
-            hash.push_str(&format!("{}:", key));
+            hash.push_str(bconcat!(key, ":"));
 
-            let mut subhash: IndexMap<String, String> = IndexMap::new();
+            let mut subhash: IndexMap<BString, BString> = IndexMap::new();
 
             for link in links {
                 // To get the best dependency hash matches we should use Intervals::compactConstraint() here.
@@ -374,8 +369,8 @@ impl PoolOptimizer {
                 // much in the best variant possible. In other words, we'd be wasting time here and it would actually hurt
                 // performance more than the additional few packages that could be filtered out would benefit the process.
                 subhash.insert(
-                    link.get_target().to_string(),
-                    link.get_constraint().to_string(),
+                    BString::from(link.get_target()),
+                    BString::from(&link.get_constraint().to_php_string()[..]),
                 );
             }
 
@@ -383,7 +378,7 @@ impl PoolOptimizer {
             ksort(&mut subhash);
 
             for (target, constraint) in subhash {
-                hash.push_str(&format!("{}@{}", target, constraint));
+                hash.push_str(&bconcat!(target, "@", constraint));
             }
         }
 
@@ -404,12 +399,12 @@ impl PoolOptimizer {
         &mut self,
         package: BasePackageHandle,
         identical_definitions_per_package: &IndexMap<
-            String,
-            IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
+            BString,
+            IndexMap<BString, IndexMap<BString, Vec<BasePackageHandle>>>,
         >,
         package_identical_definition_lookup: &IndexMap<
             i64,
-            IndexMap<String, IdenticalDefinitionPointers>,
+            IndexMap<BString, IdenticalDefinitionPointers>,
         >,
     ) {
         // Already marked to keep
@@ -452,18 +447,18 @@ impl PoolOptimizer {
                             pkg.clone()
                         };
                         self.removed_versions_by_package
-                            .entry(package.ptr_id().to_string())
+                            .entry(bconcat!(package.ptr_id()))
                             .or_default()
                             .insert(
-                                pkg.get_version().to_string(),
-                                pkg.get_pretty_version().to_string(),
+                                BString::from(&pkg.get_version()[..]),
+                                BString::from(&pkg.get_pretty_version()[..]),
                             );
                     }
                 }
             }
         }
 
-        let alias_info: Vec<(i64, Vec<String>)> = self
+        let alias_info: Vec<(i64, Vec<BString>)> = self
             .aliases_per_package
             .get(&package.id())
             .map(|aliases| {
@@ -499,11 +494,11 @@ impl PoolOptimizer {
                                 pkg.clone()
                             };
                             self.removed_versions_by_package
-                                .entry(format!("alias-{}", alias_id))
+                                .entry(bconcat!("alias-", alias_id))
                                 .or_default()
                                 .insert(
-                                    pkg.get_version().to_string(),
-                                    pkg.get_pretty_version().to_string(),
+                                    BString::from(&pkg.get_version()[..]),
+                                    BString::from(&pkg.get_pretty_version()[..]),
                                 );
                         }
                     }
@@ -521,7 +516,8 @@ impl PoolOptimizer {
             return;
         }
 
-        let mut package_index: IndexMap<String, IndexMap<i64, BasePackageHandle>> = IndexMap::new();
+        let mut package_index: IndexMap<BString, IndexMap<i64, BasePackageHandle>> =
+            IndexMap::new();
 
         for package in pool.get_packages() {
             let id = package.id();
@@ -542,7 +538,7 @@ impl PoolOptimizer {
             }
 
             package_index
-                .entry(package.get_name())
+                .entry(BString::from(&package.get_name()[..]))
                 .or_default()
                 .insert(package.id(), package.clone());
         }
@@ -599,14 +595,14 @@ impl PoolOptimizer {
     /// only keep either one which can cause trouble (e.g. when using --prefer-lowest).
     fn extract_require_constraints_per_package(
         &mut self,
-        package: &str,
+        package: &BStr,
         constraint: AnyConstraint,
     ) {
         for expanded in self.expand_disjunctive_multi_constraints(constraint) {
             self.require_constraints_per_package
-                .entry(package.to_string())
+                .entry(BString::from(package))
                 .or_default()
-                .insert(expanded.to_string(), expanded);
+                .insert(BString::from(&expanded.to_php_string()[..]), expanded);
         }
     }
 
@@ -615,14 +611,14 @@ impl PoolOptimizer {
     /// only keep either one which can cause trouble (e.g. when using --prefer-lowest).
     fn extract_conflict_constraints_per_package(
         &mut self,
-        package: &str,
+        package: &BStr,
         constraint: AnyConstraint,
     ) {
         for expanded in self.expand_disjunctive_multi_constraints(constraint) {
             self.conflict_constraints_per_package
-                .entry(package.to_string())
+                .entry(BString::from(package))
                 .or_default()
-                .insert(expanded.to_string(), expanded);
+                .insert(BString::from(&expanded.to_php_string()[..]), expanded);
         }
     }
 

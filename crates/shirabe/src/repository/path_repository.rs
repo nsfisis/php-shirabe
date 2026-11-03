@@ -12,12 +12,12 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Url};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, dirname, file_exists,
-    file_get_contents, glob_with_flags, hash, is_dir, php_regex, preg_is_match, realpath,
-    serialize,
+    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bconcat, defined, dirname,
+    file_exists, file_get_contents, glob_with_flags, hash, is_dir, path_from_bytes, path_to_bytes,
+    php_regex, preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
 };
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ pub struct PathRepository {
     inner: ArrayRepository,
     loader: ArrayLoader,
     version_guesser: std::cell::RefCell<VersionGuesser>,
-    url: String,
+    url: BString,
     repo_config: IndexMap<BString, PhpMixed>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     options: IndexMap<BString, PhpMixed>,
@@ -47,18 +47,18 @@ impl PathRepository {
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<Self> {
         if !repo_config.contains_key(B("url")) {
-            return Err(RuntimeException::new(
-                "You must specify the `url` configuration for the path repository".to_string(),
-            )
+            return Err(RuntimeException::new(BString::from(
+                "You must specify the `url` configuration for the path repository",
+            ))
             .into());
         }
 
-        let url_str = repo_config
-            .get(B("url"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
-        let url = Platform::expand_path(&url_str);
+        let url = Platform::expand_path(
+            repo_config
+                .get(B("url"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        );
         let process = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
                 io.clone(),
@@ -79,7 +79,7 @@ impl PathRepository {
             .collect::<IndexMap<BString, PhpMixed>>();
         if !options.contains_key(B("relative")) {
             let filesystem = Filesystem::new(None);
-            let is_relative = !filesystem.is_absolute_path(&url);
+            let is_relative = !filesystem.is_absolute_path(path_from_bytes(&url));
             options.insert("relative".into(), PhpMixed::Bool(is_relative));
         }
 
@@ -94,16 +94,16 @@ impl PathRepository {
         })
     }
 
-    pub fn get_repo_name(&self) -> String {
-        format!(
-            "path repo ({})",
+    pub fn get_repo_name(&self) -> BString {
+        bconcat!(
+            "path repo (",
             Url::sanitize(
                 self.repo_config
                     .get(B("url"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
-                    .to_string()
-            )
+            ),
+            ")"
         )
     }
 
@@ -153,49 +153,54 @@ impl PathRepository {
             if preg_is_match(php_regex!(r"{[*{}]}"), &self.url) {
                 let mut url = self.url.clone();
                 while preg_is_match(php_regex!(r"{[*{}]}"), &url) {
-                    url = dirname(&url);
+                    url = BString::from(&dirname(&url)[..]);
                 }
                 // the parent directory before any wildcard exists, so we assume it is correctly configured but simply empty
-                if is_dir(&url) {
+                if is_dir(path_from_bytes(&url)) {
                     return Ok(());
                 }
             }
 
-            return Err(RuntimeException::new(format!(
-                "The `url` supplied for the path ({}) repository does not exist",
-                self.url
+            return Err(RuntimeException::new(bconcat!(
+                "The `url` supplied for the path (",
+                self.url,
+                ") repository does not exist"
             ))
             .into());
         }
 
         for url in url_matches {
-            let path = format!("{}/", realpath(&url).unwrap_or_default());
-            let composer_file_path = format!("{}composer.json", path);
+            let path = bconcat!(realpath(path_from_bytes(&url)).unwrap_or_default(), "/");
+            let composer_file_path =
+                path_from_bytes(&bconcat!(path, "composer.json")).to_path_buf();
 
             if !file_exists(&composer_file_path) {
                 continue;
             }
 
             let json = file_get_contents(&composer_file_path).unwrap_or_default();
-            let parsed = JsonFile::parse_json(Some(&json), Some(&composer_file_path))?;
+            let parsed = JsonFile::parse_json(
+                Some(&json),
+                Some(bstr::BStr::new(path_to_bytes(&composer_file_path))),
+            )?;
             let mut package: IndexMap<BString, PhpMixed> = match parsed {
                 PhpMixed::Array(m) => m.into_iter().collect(),
                 _ => IndexMap::new(),
             };
             let dist = {
                 let mut dist: IndexMap<BString, PhpMixed> = IndexMap::new();
-                dist.insert("type".into(), PhpMixed::string("path".to_string()));
+                dist.insert("type".into(), PhpMixed::string(BString::from("path")));
                 dist.insert("url".into(), PhpMixed::string(url.clone()));
                 dist
             };
             package.insert("dist".into(), PhpMixed::Array(dist));
 
-            let reference = self
-                .options
-                .get(B("reference"))
-                .and_then(|v| v.as_string())
-                .unwrap_or("auto".into())
-                .to_string();
+            let reference = BString::from(
+                self.options
+                    .get(B("reference"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("auto".into()),
+            );
             if reference == "none" {
                 if let Some(PhpMixed::Array(dist)) = package.get_mut(B("dist")) {
                     dist.insert("reference".into(), PhpMixed::Null);
@@ -209,7 +214,7 @@ impl PathRepository {
                 );
                 let ref_hash = hash(
                     "sha1",
-                    [json.as_slice(), serialize(&options_mixed).as_bytes()].concat(),
+                    [json.as_slice(), serialize(&options_mixed).as_slice()].concat(),
                 );
                 if let Some(PhpMixed::Array(dist)) = package.get_mut(B("dist")) {
                     dist.insert("reference".into(), PhpMixed::string(ref_hash));
@@ -232,14 +237,14 @@ impl PathRepository {
             if let Some(name) = package
                 .get(B("name"))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string())
+                .map(BString::from)
                 && let Some(version) = self
                     .options
                     .get(B("versions"))
                     .and_then(|v| v.as_array())
                     .and_then(|a| a.get(B(&name)))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string())
+                    .map(BString::from)
             {
                 package.insert("version".into(), PhpMixed::string(version));
             }
@@ -255,7 +260,7 @@ impl PathRepository {
                 let code1 = self
                     .process
                     .borrow_mut()
-                    .execute(&cmd, &mut ref1, Some(path.as_str()))
+                    .execute(&cmd, &mut ref1, Some(path_from_bytes(&path)))
                     .unwrap_or(1);
                 let code2 = self
                     .process
@@ -274,27 +279,24 @@ impl PathRepository {
 
             let mut output = PhpMixed::Null;
             let command = GitUtil::build_rev_list_command(&self.process, {
-                let mut args = vec![
-                    "-n1".to_string(),
-                    "--format=%H".to_string(),
-                    "HEAD".to_string(),
-                ];
+                let mut args: Vec<BString> =
+                    vec!["-n1".into(), "--format=%H".into(), "HEAD".into()];
                 args.extend(GitUtil::get_no_show_signature_flags(&self.process)?);
                 args
             })?;
             if reference == "auto"
-                && is_dir(format!("{}/.git", path.trim_end_matches('/')))
+                && is_dir(path_from_bytes(&bconcat!(rtrim2(&path, "/"), "/.git")))
                 && self
                     .process
                     .borrow_mut()
-                    .execute(command, &mut output, Some(path.as_str()))
+                    .execute(command, &mut output, Some(path_from_bytes(&path)))
                     .unwrap_or(1)
                     == 0
             {
-                let output_str = output.as_string().unwrap_or_default().to_string();
-                let ref_val = GitUtil::parse_rev_list_output(&output_str, &self.process)?
-                    .trim()
-                    .to_string();
+                let ref_val = trim(GitUtil::parse_rev_list_output(
+                    output.as_string().unwrap_or_default(),
+                    &self.process,
+                )?);
                 if let Some(PhpMixed::Array(dist)) = package.get_mut(B("dist")) {
                     dist.insert("reference".into(), PhpMixed::string(ref_val));
                 }
@@ -304,7 +306,7 @@ impl PathRepository {
                 let version_data = self
                     .version_guesser
                     .borrow_mut()
-                    .guess_version(&package, &path)?;
+                    .guess_version(&package, path_from_bytes(&path))?;
                 if let Some(version_data) = version_data {
                     if let Some(pretty_version) = version_data
                         .pretty_version
@@ -327,17 +329,23 @@ impl PathRepository {
 
                         package.insert("version".into(), PhpMixed::string(pretty_version));
                     } else {
-                        package.insert("version".into(), PhpMixed::string("dev-main".to_string()));
+                        package.insert(
+                            "version".into(),
+                            PhpMixed::string(BString::from("dev-main")),
+                        );
                     }
                 } else {
-                    package.insert("version".into(), PhpMixed::string("dev-main".to_string()));
+                    package.insert(
+                        "version".into(),
+                        PhpMixed::string(BString::from("dev-main")),
+                    );
                 }
             }
 
             self.inner
                 .add_package(self.loader.load(package.clone(), None).map_err(|e| {
                     RuntimeException::with_code_and_previous(
-                        format!("Failed loading the package in {}", composer_file_path),
+                        bconcat!("Failed loading the package in ", composer_file_path),
                         0,
                         Some(std::sync::Arc::new(e)),
                     )
@@ -347,14 +355,14 @@ impl PathRepository {
         Ok(())
     }
 
-    fn get_url_matches(&self) -> anyhow::Result<Vec<String>> {
+    fn get_url_matches(&self) -> anyhow::Result<Vec<BString>> {
         let mut flags = GLOB_MARK | GLOB_ONLYDIR;
 
         if defined("GLOB_BRACE") {
             flags |= GLOB_BRACE;
-        } else if self.url.contains('{') || self.url.contains('}') {
-            return Err(RuntimeException::new(format!(
-                "The operating system does not support GLOB_BRACE which is required for the url {}",
+        } else if self.url.contains(&b'{') || self.url.contains(&b'}') {
+            return Err(RuntimeException::new(bconcat!(
+                "The operating system does not support GLOB_BRACE which is required for the url ",
                 self.url
             ))
             .into());
@@ -364,9 +372,9 @@ impl PathRepository {
         Ok(glob_with_flags(&self.url, flags)
             .into_iter()
             .map(|val| {
-                val.replace(std::path::MAIN_SEPARATOR, "/")
-                    .trim_end_matches('/')
-                    .to_string()
+                BString::from(
+                    &rtrim2(str_replace(std::path::MAIN_SEPARATOR_STR, "/", &val), "/")[..],
+                )
             })
             .collect())
     }
@@ -388,7 +396,7 @@ impl RepositoryInterface for PathRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -397,7 +405,7 @@ impl RepositoryInterface for PathRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -411,10 +419,10 @@ impl RepositoryInterface for PathRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         self.ensure_initialized()?;
         self.inner.load_packages(
@@ -427,9 +435,9 @@ impl RepositoryInterface for PathRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.ensure_initialized()?;
         self.inner.search(query, mode, r#type)
@@ -437,13 +445,13 @@ impl RepositoryInterface for PathRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         Ok(PathRepository::get_repo_name(self))
     }
 

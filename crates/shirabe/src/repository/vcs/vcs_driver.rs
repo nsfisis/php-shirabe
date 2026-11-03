@@ -8,23 +8,24 @@ use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::VcsDriverInterface;
 use crate::util::http::Response;
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, DATE_RFC3339, PhpMixed, extension_loaded, php_regex, preg_is_match,
+    Catch as _, DATE_RFC3339, PhpMixed, bconcat, display_to_bytes, extension_loaded, php_regex,
+    preg_is_match,
 };
 
 #[derive(Debug)]
 pub struct VcsDriverBase {
-    pub url: String,
-    pub origin_url: String,
+    pub url: BString,
+    pub origin_url: BString,
     pub repo_config: IndexMap<BString, PhpMixed>,
     pub io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    pub info_cache: IndexMap<String, Option<IndexMap<BString, PhpMixed>>>,
+    pub info_cache: IndexMap<BString, Option<IndexMap<BString, PhpMixed>>>,
     pub cache: Option<Cache>,
 }
 
@@ -36,11 +37,12 @@ impl VcsDriverBase {
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
-        let url = repo_config
-            .get(B("url"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        let url = BString::from(
+            repo_config
+                .get(B("url"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        );
         let origin_url = url.clone();
         Self {
             url,
@@ -55,20 +57,20 @@ impl VcsDriverBase {
         }
     }
 
-    pub fn should_cache(&self, identifier: &str) -> bool {
+    pub fn should_cache(&self, identifier: &BStr) -> bool {
         self.cache.is_some() && preg_is_match(php_regex!("{^[a-f0-9]{40}$}iD"), identifier)
     }
 
-    pub fn get_scheme(&self) -> &str {
+    pub fn get_scheme(&self) -> &BStr {
         if extension_loaded("openssl") {
-            return "https";
+            return BStr::new("https");
         }
-        "http"
+        BStr::new("http")
     }
 
     pub fn get_contents(
         &self,
-        url: &str,
+        url: &BStr,
     ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
         let options_mixed = self
             .repo_config
@@ -95,8 +97,8 @@ impl VcsDriverBase {
     // they cannot dispatch back into a base method that calls `get_file_content`
     // / `get_change_date` hooks; the caller threads those calls in itself.
     pub fn finish_base_composer_information(
-        identifier: &str,
-        composer_file_content: Option<String>,
+        identifier: &BStr,
+        composer_file_content: Option<BString>,
         change_date: impl FnOnce() -> anyhow::Result<Option<DateTime<FixedOffset>>>,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         let content = match composer_file_content {
@@ -107,7 +109,7 @@ impl VcsDriverBase {
 
         let parsed = JsonFile::parse_json(
             Some(&content),
-            Some(&format!("{}:composer.json", identifier)),
+            Some(bconcat!(identifier, ":composer.json").as_ref()),
         )?;
 
         let array = match parsed {
@@ -125,7 +127,7 @@ impl VcsDriverBase {
         {
             composer.insert(
                 "time".into(),
-                PhpMixed::string(d.format(DATE_RFC3339).to_string()),
+                PhpMixed::string(display_to_bytes(d.format(DATE_RFC3339))),
             );
         }
 
@@ -139,7 +141,7 @@ impl VcsDriverBase {
     // cache), or `None` when the caller must fetch it.
     pub fn read_cached_composer(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<Option<IndexMap<BString, PhpMixed>>>> {
         if self.info_cache.contains_key(identifier) {
             return Ok(Some(
@@ -152,7 +154,7 @@ impl VcsDriverBase {
             let parsed = JsonFile::parse_json(Some(&res), None)?;
             let composer: Option<IndexMap<BString, PhpMixed>> = parsed.as_array().cloned();
             self.info_cache
-                .insert(identifier.to_string(), composer.clone());
+                .insert(bstr::BString::from(identifier), composer.clone());
             return Ok(Some(composer));
         }
         Ok(None)
@@ -160,7 +162,7 @@ impl VcsDriverBase {
 
     pub fn write_cached_composer(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
         composer: Option<IndexMap<BString, PhpMixed>>,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if self.should_cache(identifier) {
@@ -176,16 +178,17 @@ impl VcsDriverBase {
             )?;
             self.cache.as_mut().map(|c| c.write(identifier, &encoded));
         }
-        self.info_cache.insert(identifier.to_string(), composer);
+        self.info_cache
+            .insert(bstr::BString::from(identifier), composer);
         Ok(self.info_cache.get(identifier).and_then(|v| v.clone()))
     }
 }
 
 pub trait VcsDriver: VcsDriverInterface {
-    fn url(&self) -> &str;
-    fn url_mut(&mut self) -> &mut String;
-    fn origin_url(&self) -> &str;
-    fn origin_url_mut(&mut self) -> &mut String;
+    fn url(&self) -> &BStr;
+    fn url_mut(&mut self) -> &mut BString;
+    fn origin_url(&self) -> &BStr;
+    fn origin_url_mut(&mut self) -> &mut BString;
     fn repo_config(&self) -> &IndexMap<BString, PhpMixed>;
     fn repo_config_mut(&mut self) -> &mut IndexMap<BString, PhpMixed>;
     fn io(&self) -> &dyn IOInterface;
@@ -195,18 +198,18 @@ pub trait VcsDriver: VcsDriverInterface {
     fn process(&self) -> &ProcessExecutor;
     fn process_mut(&mut self) -> &mut ProcessExecutor;
     fn http_downloader(&self) -> &std::rc::Rc<std::cell::RefCell<HttpDownloader>>;
-    fn info_cache(&self) -> &IndexMap<String, Option<IndexMap<BString, PhpMixed>>>;
-    fn info_cache_mut(&mut self) -> &mut IndexMap<String, Option<IndexMap<BString, PhpMixed>>>;
+    fn info_cache(&self) -> &IndexMap<BString, Option<IndexMap<BString, PhpMixed>>>;
+    fn info_cache_mut(&mut self) -> &mut IndexMap<BString, Option<IndexMap<BString, PhpMixed>>>;
     fn cache(&self) -> Option<&Cache>;
     fn cache_mut(&mut self) -> Option<&mut Cache>;
 
-    fn should_cache(&self, identifier: &str) -> bool {
+    fn should_cache(&self, identifier: &BStr) -> bool {
         self.cache().is_some() && preg_is_match(php_regex!("{^[a-f0-9]{40}$}iD"), identifier)
     }
 
     fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if !self.info_cache().contains_key(identifier) {
             if self.should_cache(identifier)
@@ -218,7 +221,7 @@ pub trait VcsDriver: VcsDriverInterface {
                     _ => None,
                 };
                 self.info_cache_mut()
-                    .insert(identifier.to_string(), parsed_map);
+                    .insert(bstr::BString::from(identifier), parsed_map);
                 return Ok(self.info_cache().get(identifier).and_then(|v| v.clone()));
             }
 
@@ -244,7 +247,7 @@ pub trait VcsDriver: VcsDriverInterface {
             }
 
             self.info_cache_mut()
-                .insert(identifier.to_string(), composer);
+                .insert(bstr::BString::from(identifier), composer);
         }
 
         Ok(self.info_cache().get(identifier).and_then(|v| v.clone()))
@@ -252,9 +255,10 @@ pub trait VcsDriver: VcsDriverInterface {
 
     fn get_base_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
-        let composer_file_content = self.get_file_content("composer.json", identifier)?;
+        let composer_file_content =
+            self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
 
         let composer_file_content = match composer_file_content {
             None => return Ok(None),
@@ -264,7 +268,7 @@ pub trait VcsDriver: VcsDriverInterface {
 
         let composer = JsonFile::parse_json(
             Some(&composer_file_content),
-            Some(&format!("{}:composer.json", identifier)),
+            Some(bconcat!(identifier, ":composer.json").as_ref()),
         )?;
 
         let mut composer: IndexMap<BString, PhpMixed> = match composer {
@@ -280,28 +284,31 @@ pub trait VcsDriver: VcsDriverInterface {
         {
             composer.insert(
                 "time".into(),
-                PhpMixed::string(change_date.format(DATE_RFC3339).to_string()),
+                PhpMixed::string(display_to_bytes(change_date.format(DATE_RFC3339))),
             );
         }
 
         Ok(Some(composer))
     }
 
-    fn has_composer_file(&mut self, identifier: &str) -> bool {
+    fn has_composer_file(&mut self, identifier: &BStr) -> bool {
         matches!(
             VcsDriver::get_composer_information(self, identifier),
             Ok(Some(_))
         )
     }
 
-    fn get_scheme(&self) -> &str {
+    fn get_scheme(&self) -> &BStr {
         if extension_loaded("openssl") {
-            return "https";
+            return BStr::new("https");
         }
-        "http"
+        BStr::new("http")
     }
 
-    fn get_contents(&self, url: &str) -> anyhow::Result<Result<Response, Box<TransportException>>> {
+    fn get_contents(
+        &self,
+        url: &BStr,
+    ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
         let options_mixed = self
             .repo_config()
             .get(B("options"))

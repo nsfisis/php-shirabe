@@ -9,6 +9,9 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::{lock_php_worker, php_runtime_available};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::os_str_from_bytes;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -24,13 +27,13 @@ fn fixture_fetched() -> bool {
 
 struct CommandRun {
     exit_code: i32,
-    stdout: String,
+    stdout: BString,
 }
 
-fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) -> CommandRun {
-    let output = std::process::Command::new(program)
+fn run_command(work: &Path, program: &BStr, prefix_args: &[&OsStr], args: &[&BStr]) -> CommandRun {
+    let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
-        .args(args)
+        .args(args.iter().map(os_str_from_bytes))
         .current_dir(work.join("project"))
         .env("COMPOSER_HOME", work.join("home"))
         .env("COMPOSER_CACHE_DIR", work.join("cache"))
@@ -41,22 +44,32 @@ fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) 
         .unwrap();
     CommandRun {
         exit_code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stdout: BString::from(output.stdout),
     }
 }
 
-fn prepared_project(program: &str, prefix: &[&str]) -> TempDir {
+fn prepared_project(program: &BStr, prefix: &[&OsStr]) -> TempDir {
     let work = TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
-    let install = run_command(work.path(), program, prefix, &["install"]);
-    assert_eq!(0, install.exit_code, "{program}: install must succeed");
+    let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
+    assert_eq!(
+        0,
+        install.exit_code,
+        "{program}: install must succeed",
+        program = program.display_lossy()
+    );
     work
 }
 
-fn normalize_lines(stdout: &str) -> Vec<&str> {
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the test splits a child process's output into lines, which no PHP code does"
+)]
+fn normalize_lines(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
-        .filter(|line| line.contains("normalize"))
+        .filter(|line| line.contains_str("normalize"))
+        .map(ByteSlice::as_bstr)
         .collect()
 }
 
@@ -76,23 +89,21 @@ fn test_normalize_listing_matches_upstream_composer() {
         return;
     }
     let _worker = lock_php_worker();
-
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
-    let upstream_prefix = [composer_bin.as_str()];
-    let u_work = prepared_project("php", &upstream_prefix);
-    let s_work = prepared_project(env!("CARGO_BIN_EXE_shirabe"), &[]);
+    let upstream_prefix = [composer_bin.as_os_str()];
+    let u_work = prepared_project(BStr::new("php"), &upstream_prefix);
+    let s_work = prepared_project(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
     let u_list = run_command(
         u_work.path(),
-        "php",
+        BStr::new("php"),
         &upstream_prefix,
-        &["list", "--no-ansi"],
+        &[BStr::new("list"), BStr::new("--no-ansi")],
     );
     let s_list = run_command(
         s_work.path(),
-        env!("CARGO_BIN_EXE_shirabe"),
+        BStr::new(env!("CARGO_BIN_EXE_shirabe")),
         &[],
-        &["list", "--no-ansi"],
+        &[BStr::new("list"), BStr::new("--no-ansi")],
     );
     assert_eq!(0, u_list.exit_code);
     assert_eq!(u_list.exit_code, s_list.exit_code);
@@ -107,15 +118,23 @@ fn test_normalize_listing_matches_upstream_composer() {
 
     let u_help = run_command(
         u_work.path(),
-        "php",
+        BStr::new("php"),
         &upstream_prefix,
-        &["help", "normalize", "--no-ansi"],
+        &[
+            BStr::new("help"),
+            BStr::new("normalize"),
+            BStr::new("--no-ansi"),
+        ],
     );
     let s_help = run_command(
         s_work.path(),
-        env!("CARGO_BIN_EXE_shirabe"),
+        BStr::new(env!("CARGO_BIN_EXE_shirabe")),
         &[],
-        &["help", "normalize", "--no-ansi"],
+        &[
+            BStr::new("help"),
+            BStr::new("normalize"),
+            BStr::new("--no-ansi"),
+        ],
     );
     assert_eq!(0, u_help.exit_code);
     assert_eq!(u_help.exit_code, s_help.exit_code);
@@ -142,15 +161,22 @@ fn test_normalize_execution_matches_upstream_composer() {
         return;
     }
     let _worker = lock_php_worker();
+    let upstream_prefix = [composer_bin.as_os_str()];
+    let u_work = prepared_project(BStr::new("php"), &upstream_prefix);
+    let s_work = prepared_project(BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 
-    let composer_bin = composer_bin.to_str().unwrap().to_string();
-    let upstream_prefix = [composer_bin.as_str()];
-    let u_work = prepared_project("php", &upstream_prefix);
-    let s_work = prepared_project(env!("CARGO_BIN_EXE_shirabe"), &[]);
-
-    let dry = ["normalize", "--dry-run", "--no-ansi"];
-    let u_dry = run_command(u_work.path(), "php", &upstream_prefix, &dry);
-    let s_dry = run_command(s_work.path(), env!("CARGO_BIN_EXE_shirabe"), &[], &dry);
+    let dry = [
+        BStr::new("normalize"),
+        BStr::new("--dry-run"),
+        BStr::new("--no-ansi"),
+    ];
+    let u_dry = run_command(u_work.path(), BStr::new("php"), &upstream_prefix, &dry);
+    let s_dry = run_command(
+        s_work.path(),
+        BStr::new(env!("CARGO_BIN_EXE_shirabe")),
+        &[],
+        &dry,
+    );
     assert_eq!(1, u_dry.exit_code, "upstream dry-run must report a diff");
     assert_eq!(u_dry.exit_code, s_dry.exit_code);
     assert_eq!(
@@ -158,9 +184,18 @@ fn test_normalize_execution_matches_upstream_composer() {
         "normalize --dry-run output differs"
     );
 
-    let real = ["normalize", "--no-update-lock", "--no-ansi"];
-    let u_run = run_command(u_work.path(), "php", &upstream_prefix, &real);
-    let s_run = run_command(s_work.path(), env!("CARGO_BIN_EXE_shirabe"), &[], &real);
+    let real = [
+        BStr::new("normalize"),
+        BStr::new("--no-update-lock"),
+        BStr::new("--no-ansi"),
+    ];
+    let u_run = run_command(u_work.path(), BStr::new("php"), &upstream_prefix, &real);
+    let s_run = run_command(
+        s_work.path(),
+        BStr::new(env!("CARGO_BIN_EXE_shirabe")),
+        &[],
+        &real,
+    );
     assert_eq!(0, u_run.exit_code, "upstream normalize must succeed");
     assert_eq!(u_run.exit_code, s_run.exit_code);
     assert_eq!(

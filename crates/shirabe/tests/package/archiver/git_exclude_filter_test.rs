@@ -1,30 +1,31 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/GitExcludeFilterTest.php
 
+use bstr::BStr;
 use shirabe::package::archiver::git_exclude_filter::GitExcludeFilter;
 
 #[test]
 fn test_pattern_escape() {
     for (ignore, expected) in provide_patterns() {
-        let filter = GitExcludeFilter::new("/".to_string());
+        let filter = GitExcludeFilter::new("/");
 
         assert_eq!(expected, filter.parse_git_attributes_line(ignore));
     }
 }
 
-fn provide_patterns() -> Vec<(&'static str, Option<(String, bool, bool)>)> {
+fn provide_patterns() -> Vec<(&'static BStr, Option<(bstr::BString, bool, bool)>)> {
     vec![
         (
-            "app/config/parameters.yml export-ignore",
+            BStr::new("app/config/parameters.yml export-ignore"),
             Some((
-                r"{app/config/parameters\.yml(?:$|/)}".to_string(),
+                bstr::BString::from(r"{app/config/parameters\.yml(?:$|/)}"),
                 false,
                 false,
             )),
         ),
         (
-            "app/config/parameters.yml -export-ignore",
+            BStr::new("app/config/parameters.yml -export-ignore"),
             Some((
-                r"{app/config/parameters\.yml(?:$|/)}".to_string(),
+                bstr::BString::from(r"{app/config/parameters\.yml(?:$|/)}"),
                 true,
                 false,
             )),

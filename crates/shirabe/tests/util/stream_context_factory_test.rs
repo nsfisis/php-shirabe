@@ -8,37 +8,30 @@
 // execution), every test here is also tagged `#[serial_test::serial]` to avoid racing other
 // serial-tagged tests in this binary that touch the same global state (see
 // util/http/proxy_manager_test.rs and http_downloader_test.rs).
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::util::http::proxy_manager::ProxyManager;
 use shirabe::util::platform::Platform;
 use shirabe::util::stream_context_factory::StreamContextFactory;
 use shirabe_php_shim::{
-    PhpMixed, base64_encode, extension_loaded, implode, stream_context_get_options, stripos,
+    PhpMixed, base64_encode, bconcat, extension_loaded, implode, stream_context_get_options,
+    stripos,
 };
 
-fn s(value: &str) -> PhpMixed {
-    PhpMixed::string(value.to_string())
+fn s(value: &BStr) -> PhpMixed {
+    PhpMixed::string(bconcat!(value))
 }
 
-fn arr(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {
-    PhpMixed::Array(
-        entries
-            .into_iter()
-            .map(|(k, v)| (k.to_string().into(), v))
-            .collect(),
-    )
+fn arr(entries: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
+    PhpMixed::Array(entries.into_iter().map(|(k, v)| (bconcat!(k), v)).collect())
 }
 
 fn list(items: Vec<PhpMixed>) -> PhpMixed {
     PhpMixed::List(items)
 }
 
-fn map(entries: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
-    entries
-        .into_iter()
-        .map(|(k, v)| (k.to_string().into(), v))
-        .collect()
+fn map(entries: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+    entries.into_iter().map(|(k, v)| (bconcat!(k), v)).collect()
 }
 
 // `PhpMixed`'s `PartialEq` models PHP's `===` (order-sensitive for associative arrays). These
@@ -131,8 +124,11 @@ fn test_http_proxy() {
     Platform::put_env("HTTP_PROXY", "http://proxyserver/");
 
     let default_options = map(vec![(
-        "http",
-        arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+        BStr::new("http"),
+        arr(vec![
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
+        ]),
     )]);
     let context =
         StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
@@ -140,23 +136,27 @@ fn test_http_proxy() {
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
-        "http",
+        BStr::new("http"),
         arr(vec![
-            ("proxy", s("tcp://proxyserver.net:3128")),
-            ("request_fulluri", PhpMixed::Bool(true)),
-            ("method", s("GET")),
             (
-                "header",
+                BStr::new("proxy"),
+                s(BStr::new("tcp://proxyserver.net:3128")),
+            ),
+            (BStr::new("request_fulluri"), PhpMixed::Bool(true)),
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (
+                BStr::new("header"),
                 list(vec![
-                    s("User-Agent: foo"),
-                    s(&format!(
-                        "Proxy-Authorization: Basic {}",
+                    s(BStr::new("User-Agent: foo")),
+                    s(bconcat!(
+                        "Proxy-Authorization: Basic ",
                         base64_encode("username:p@ssword")
-                    )),
+                    )
+                    .as_bstr()),
                 ]),
             ),
-            ("max_redirects", PhpMixed::Int(20)),
-            ("follow_location", PhpMixed::Int(1)),
+            (BStr::new("max_redirects"), PhpMixed::Int(20)),
+            (BStr::new("follow_location"), PhpMixed::Int(1)),
         ]),
     )]);
     assert_options_eq(&expected, &options);
@@ -174,8 +174,11 @@ fn test_http_proxy_with_no_proxy() {
     Platform::put_env("no_proxy", "foo,example.org");
 
     let default_options = map(vec![(
-        "http",
-        arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+        BStr::new("http"),
+        arr(vec![
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
+        ]),
     )]);
     let context =
         StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
@@ -183,12 +186,15 @@ fn test_http_proxy_with_no_proxy() {
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
-        "http",
+        BStr::new("http"),
         arr(vec![
-            ("method", s("GET")),
-            ("max_redirects", PhpMixed::Int(20)),
-            ("follow_location", PhpMixed::Int(1)),
-            ("header", list(vec![s("User-Agent: foo")])),
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (BStr::new("max_redirects"), PhpMixed::Int(20)),
+            (BStr::new("follow_location"), PhpMixed::Int(1)),
+            (
+                BStr::new("header"),
+                list(vec![s(BStr::new("User-Agent: foo"))]),
+            ),
         ]),
     )]);
     assert_options_eq(&expected, &options);
@@ -206,8 +212,11 @@ fn test_http_proxy_with_no_proxy_wildcard() {
     Platform::put_env("no_proxy", "*");
 
     let default_options = map(vec![(
-        "http",
-        arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+        BStr::new("http"),
+        arr(vec![
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
+        ]),
     )]);
     let context =
         StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
@@ -215,12 +224,15 @@ fn test_http_proxy_with_no_proxy_wildcard() {
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
-        "http",
+        BStr::new("http"),
         arr(vec![
-            ("method", s("GET")),
-            ("max_redirects", PhpMixed::Int(20)),
-            ("follow_location", PhpMixed::Int(1)),
-            ("header", list(vec![s("User-Agent: foo")])),
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (BStr::new("max_redirects"), PhpMixed::Int(20)),
+            (BStr::new("follow_location"), PhpMixed::Int(1)),
+            (
+                BStr::new("header"),
+                list(vec![s(BStr::new("User-Agent: foo"))]),
+            ),
         ]),
     )]);
     assert_options_eq(&expected, &options);
@@ -238,11 +250,17 @@ fn test_options_are_preserved() {
     );
 
     let default_options = map(vec![(
-        "http",
+        BStr::new("http"),
         arr(vec![
-            ("method", s("GET")),
-            ("header", list(vec![s("User-Agent: foo"), s("X-Foo: bar")])),
-            ("request_fulluri", PhpMixed::Bool(false)),
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (
+                BStr::new("header"),
+                list(vec![
+                    s(BStr::new("User-Agent: foo")),
+                    s(BStr::new("X-Foo: bar")),
+                ]),
+            ),
+            (BStr::new("request_fulluri"), PhpMixed::Bool(false)),
         ]),
     )]);
     let context =
@@ -251,24 +269,28 @@ fn test_options_are_preserved() {
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
-        "http",
+        BStr::new("http"),
         arr(vec![
-            ("proxy", s("tcp://proxyserver.net:3128")),
-            ("request_fulluri", PhpMixed::Bool(false)),
-            ("method", s("GET")),
             (
-                "header",
+                BStr::new("proxy"),
+                s(BStr::new("tcp://proxyserver.net:3128")),
+            ),
+            (BStr::new("request_fulluri"), PhpMixed::Bool(false)),
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (
+                BStr::new("header"),
                 list(vec![
-                    s("User-Agent: foo"),
-                    s("X-Foo: bar"),
-                    s(&format!(
-                        "Proxy-Authorization: Basic {}",
+                    s(BStr::new("User-Agent: foo")),
+                    s(BStr::new("X-Foo: bar")),
+                    s(bconcat!(
+                        "Proxy-Authorization: Basic ",
                         base64_encode("username:password")
-                    )),
+                    )
+                    .as_bstr()),
                 ]),
             ),
-            ("max_redirects", PhpMixed::Int(20)),
-            ("follow_location", PhpMixed::Int(1)),
+            (BStr::new("max_redirects"), PhpMixed::Int(20)),
+            (BStr::new("follow_location"), PhpMixed::Int(1)),
         ]),
     )]);
     assert_options_eq(&expected, &options);
@@ -283,8 +305,11 @@ fn test_http_proxy_without_port() {
     Platform::put_env("https_proxy", "http://username:password@proxyserver.net");
 
     let default_options = map(vec![(
-        "http",
-        arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+        BStr::new("http"),
+        arr(vec![
+            (BStr::new("method"), s(BStr::new("GET"))),
+            (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
+        ]),
     )]);
     let context =
         StreamContextFactory::get_context("https://example.org", default_options, IndexMap::new())
@@ -292,22 +317,23 @@ fn test_http_proxy_without_port() {
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
-        "http",
+        BStr::new("http"),
         arr(vec![
-            ("proxy", s("tcp://proxyserver.net:80")),
-            ("method", s("GET")),
+            (BStr::new("proxy"), s(BStr::new("tcp://proxyserver.net:80"))),
+            (BStr::new("method"), s(BStr::new("GET"))),
             (
-                "header",
+                BStr::new("header"),
                 list(vec![
-                    s("User-Agent: foo"),
-                    s(&format!(
-                        "Proxy-Authorization: Basic {}",
+                    s(BStr::new("User-Agent: foo")),
+                    s(bconcat!(
+                        "Proxy-Authorization: Basic ",
                         base64_encode("username:password")
-                    )),
+                    )
+                    .as_bstr()),
                 ]),
             ),
-            ("max_redirects", PhpMixed::Int(20)),
-            ("follow_location", PhpMixed::Int(1)),
+            (BStr::new("max_redirects"), PhpMixed::Int(20)),
+            (BStr::new("follow_location"), PhpMixed::Int(1)),
         ]),
     )]);
     assert_options_eq(&expected, &options);
@@ -331,8 +357,11 @@ fn test_https_proxy_override() {
     let result = StreamContextFactory::get_context(
         "https://example.org",
         map(vec![(
-            "http",
-            arr(vec![("method", s("GET")), ("header", s("User-Agent: foo"))]),
+            BStr::new("http"),
+            arr(vec![
+                (BStr::new("method"), s(BStr::new("GET"))),
+                (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
+            ]),
         )]),
         IndexMap::new(),
     );
@@ -344,8 +373,11 @@ fn test_https_proxy_override() {
 fn test_ssl_proxy() {
     let _tear_down = TearDown;
     for (expected, proxy) in [
-        ("ssl://proxyserver:443", "https://proxyserver/"),
-        ("ssl://proxyserver:8443", "https://proxyserver:8443"),
+        (BStr::new("ssl://proxyserver:443"), "https://proxyserver/"),
+        (
+            BStr::new("ssl://proxyserver:8443"),
+            "https://proxyserver:8443",
+        ),
     ] {
         set_up();
         Platform::put_env("http_proxy", proxy);
@@ -353,20 +385,26 @@ fn test_ssl_proxy() {
         if extension_loaded("openssl") {
             let context = StreamContextFactory::get_context(
                 "http://example.org",
-                map(vec![("http", arr(vec![("header", s("User-Agent: foo"))]))]),
+                map(vec![(
+                    BStr::new("http"),
+                    arr(vec![(BStr::new("header"), s(BStr::new("User-Agent: foo")))]),
+                )]),
                 IndexMap::new(),
             )
             .unwrap();
             let options = stream_context_get_options(&context);
 
             let expected_options = map(vec![(
-                "http",
+                BStr::new("http"),
                 arr(vec![
-                    ("proxy", s(expected)),
-                    ("request_fulluri", PhpMixed::Bool(true)),
-                    ("max_redirects", PhpMixed::Int(20)),
-                    ("follow_location", PhpMixed::Int(1)),
-                    ("header", list(vec![s("User-Agent: foo")])),
+                    (BStr::new("proxy"), s(expected)),
+                    (BStr::new("request_fulluri"), PhpMixed::Bool(true)),
+                    (BStr::new("max_redirects"), PhpMixed::Int(20)),
+                    (BStr::new("follow_location"), PhpMixed::Int(1)),
+                    (
+                        BStr::new("header"),
+                        list(vec![s(BStr::new("User-Agent: foo"))]),
+                    ),
                 ]),
             )]);
             assert_options_eq(&expected_options, &options);
@@ -391,19 +429,19 @@ fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() 
     let _tear_down = TearDown;
     set_up();
     let options = map(vec![(
-        "http",
+        BStr::new("http"),
         arr(vec![(
-            "header",
-            s(
+            BStr::new("header"),
+            s(BStr::new(
                 "User-agent: foo\r\nX-Foo: bar\r\nContent-Type: application/json\r\nAuthorization: Basic aW52YWxpZA==",
-            ),
+            )),
         )]),
     )]);
     let expected_header = [
-        s("User-agent: foo"),
-        s("X-Foo: bar"),
-        s("Authorization: Basic aW52YWxpZA=="),
-        s("Content-Type: application/json"),
+        s(BStr::new("User-agent: foo")),
+        s(BStr::new("X-Foo: bar")),
+        s(BStr::new("Authorization: Basic aW52YWxpZA==")),
+        s(BStr::new("Content-Type: application/json")),
     ];
     let context =
         StreamContextFactory::get_context("http://example.org", options, IndexMap::new()).unwrap();
@@ -431,14 +469,14 @@ fn test_init_options_does_include_proxy_auth_headers() {
     let options: IndexMap<BString, PhpMixed> = IndexMap::new();
     let options =
         StreamContextFactory::init_options("https://example.org", options, false).unwrap();
-    let header_list: Vec<String> = options
+    let header_list: Vec<BString> = options
         .get(B("http"))
         .and_then(|v| v.as_array())
         .and_then(|a| a.get(B("header")))
         .and_then(|v| v.as_list())
         .unwrap()
         .iter()
-        .filter_map(|item| item.as_string().map(|s| s.to_string()))
+        .filter_map(|item| item.as_string().map(BString::from))
         .collect();
     let headers = implode(" ", &header_list);
 
@@ -458,14 +496,14 @@ fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
 
     let options: IndexMap<BString, PhpMixed> = IndexMap::new();
     let options = StreamContextFactory::init_options("https://example.org", options, true).unwrap();
-    let header_list: Vec<String> = options
+    let header_list: Vec<BString> = options
         .get(B("http"))
         .and_then(|v| v.as_array())
         .and_then(|a| a.get(B("header")))
         .and_then(|v| v.as_list())
         .unwrap()
         .iter()
-        .filter_map(|item| item.as_string().map(|s| s.to_string()))
+        .filter_map(|item| item.as_string().map(BString::from))
         .collect();
     let headers = implode(" ", &header_list);
 

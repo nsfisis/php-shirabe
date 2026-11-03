@@ -1,17 +1,19 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ArchivableFilesFinderTest.php
 
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::archiver::ArchivableFilesFinder;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{
-    PhpMixed, ZipArchive, dirname, file_put_contents, preg_quote, preg_replace,
+    PhpMixed, ZipArchive, bconcat, dirname, file_put_contents, path_from_bytes, path_to_bytes,
+    preg_quote, preg_replace,
 };
 use shirabe_symfony_process::Process;
 use tempfile::TempDir;
 
 struct SetUp {
     _sources_dir: TempDir,
-    sources: String,
+    sources: std::path::PathBuf,
     fs: Filesystem,
 }
 
@@ -19,7 +21,7 @@ fn set_up() -> SetUp {
     let mut fs = Filesystem::new(None);
 
     let sources_dir = TempDir::new().unwrap();
-    let sources = fs.normalize_path(sources_dir.path().canonicalize().unwrap().to_str().unwrap());
+    let sources = fs.normalize_path(sources_dir.path().canonicalize().unwrap());
 
     let file_tree = [
         ".foo",
@@ -70,27 +72,31 @@ fn set_up() -> SetUp {
 
     for relative_path in file_tree {
         let path = std::path::Path::new(&sources).join(relative_path);
-        fs.ensure_directory_exists(&dirname(path.to_str().unwrap()))
+        fs.ensure_directory_exists(path_from_bytes(&dirname(path_to_bytes(&path))))
             .unwrap();
-        file_put_contents(path.to_str().unwrap(), b"");
+        file_put_contents(&path, b"");
     }
 
     SetUp {
         _sources_dir: sources_dir,
-        sources,
+        sources: sources.clone(),
         fs,
     }
 }
 
-fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<String> {
-    let mut files: Vec<String> = vec![];
+fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<BString> {
+    let mut files: Vec<BString> = vec![];
     for file in finder {
         if !file.is_dir() {
             let real_path = file.canonicalize().unwrap();
             files.push(preg_replace(
-                format!("#^{}#", preg_quote(&set_up.sources, Some('#'))),
+                bconcat!(
+                    "#^",
+                    preg_quote(path_to_bytes(&set_up.sources), Some(b'#')),
+                    "#"
+                ),
                 "",
-                &set_up.fs.normalize_path(real_path.to_str().unwrap()),
+                path_to_bytes(&set_up.fs.normalize_path(&real_path)),
             ));
         }
     }
@@ -100,10 +106,17 @@ fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<St
     files
 }
 
-fn assert_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder, expected_files: &[&str]) {
+fn assert_archivable_files(
+    set_up: &SetUp,
+    finder: ArchivableFilesFinder,
+    expected_files: &[impl AsRef<[u8]>],
+) {
     let actual_files = get_archivable_files(set_up, finder);
 
-    let expected_files: Vec<String> = expected_files.iter().map(|s| s.to_string()).collect();
+    let expected_files: Vec<BString> = expected_files
+        .iter()
+        .map(|s| BString::from(s.as_ref()))
+        .collect();
     assert_eq!(expected_files, actual_files);
 }
 
@@ -111,13 +124,13 @@ fn assert_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder, expect
 fn test_manual_excludes() {
     let set_up = set_up();
 
-    let excludes = vec![
-        "prefixB.foo".to_string(),
-        "!/prefixB.foo".to_string(),
-        "/prefixA.foo".to_string(),
-        "prefixC.*".to_string(),
-        "!*/*/*/prefixC.foo".to_string(),
-        ".*".to_string(),
+    let excludes: Vec<BString> = vec![
+        "prefixB.foo".into(),
+        "!/prefixB.foo".into(),
+        "/prefixA.foo".into(),
+        "prefixC.*".into(),
+        "!*/*/*/prefixC.foo".into(),
+        ".*".into(),
     ];
 
     let finder = ArchivableFilesFinder::new(&set_up.sources, excludes, false).unwrap();
@@ -172,10 +185,10 @@ fn test_manual_excludes() {
 /// leaf files; `ZipArchive` entry enumeration (skipping directory entries) is the faithful
 /// equivalent. Each entry is rebuilt into the `phar://.../archive.zip/archive/...` virtual path
 /// PHP would stringify, then the `archive` prefix is stripped.
-fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
+fn get_archived_files(set_up: &SetUp, command: &BStr) -> Vec<BString> {
     let mut process = Process::from_shell_commandline(
         command,
-        Some(&set_up.sources),
+        Some(std::path::Path::new(&set_up.sources)),
         None,
         PhpMixed::Bool(false),
         Some(60.0),
@@ -187,21 +200,22 @@ fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
     let mut archive = ZipArchive::new();
     archive.open(&zip_path, 0).unwrap();
 
-    let prefix = format!(
-        "#^phar://{}/archive\\.zip/archive#",
-        preg_quote(&set_up.sources, Some('#'))
+    let prefix = bconcat!(
+        "#^phar://",
+        preg_quote(path_to_bytes(&set_up.sources), Some(b'#')),
+        "/archive\\.zip/archive#"
     );
-    let mut files: Vec<String> = vec![];
+    let mut files: Vec<BString> = vec![];
     for index in 0..archive.count() {
         let name = archive.get_name_index(index);
-        if name.ends_with('/') {
+        if name.ends_with(b"/") {
             continue;
         }
-        let virtual_path = format!("phar://{}/archive.zip/{}", set_up.sources, name);
+        let virtual_path = bconcat!("phar://", &set_up.sources, "/archive.zip/", &name);
         files.push(preg_replace(
             &prefix,
             "",
-            &set_up.fs.normalize_path(&virtual_path),
+            path_to_bytes(&set_up.fs.normalize_path(path_from_bytes(&virtual_path))),
         ));
     }
 
@@ -233,10 +247,7 @@ fn test_git_excludes() {
     let set_up = set_up();
 
     file_put_contents(
-        std::path::Path::new(&set_up.sources)
-            .join(".gitattributes")
-            .to_str()
-            .unwrap(),
+        std::path::Path::new(&set_up.sources).join(".gitattributes"),
         [
             "",
             "# gitattributes rules with comments and blank lines",
@@ -273,7 +284,8 @@ fn test_git_excludes() {
 
     let expected = get_archived_files(
         &set_up,
-        "git init && \
+        BStr::new(
+            "git init && \
          git config user.email \"you@example.com\" && \
          git config user.name \"Your Name\" && \
          git config commit.gpgsign false && \
@@ -282,8 +294,8 @@ fn test_git_excludes() {
          git add . && \
          git commit -m \"init\" && \
          git archive --format=zip --prefix=archive/ -o archive.zip HEAD",
+        ),
     );
-    let expected: Vec<&str> = expected.iter().map(String::as_str).collect();
     assert_archivable_files(&set_up, finder, &expected);
 }
 
@@ -291,7 +303,7 @@ fn test_git_excludes() {
 fn test_skip_excludes() {
     let set_up = set_up();
 
-    let excludes = vec!["prefixB.foo".to_string()];
+    let excludes: Vec<BString> = vec!["prefixB.foo".into()];
 
     let finder = ArchivableFilesFinder::new(&set_up.sources, excludes, true).unwrap();
 

@@ -1,9 +1,10 @@
 //! ref: composer/tests/Composer/Test/Command/SelfUpdateCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe_php_shim::{PHP_BINARY, PhpMixed};
+use shirabe_php_shim::{PHP_BINARY, PhpMixed, bconcat, error_message};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use shirabe_symfony_process::Process;
 
@@ -16,7 +17,7 @@ fn set_up() -> crate::test_case::TearDown {
 
 /// ref: SelfUpdateCommandTest::setUp, including the `composer-test.phar` copy. Returns the tear-down
 /// guard and `$this->phar`.
-fn set_up_with_phar() -> (crate::test_case::TearDown, String) {
+fn set_up_with_phar() -> (crate::test_case::TearDown, BString) {
     let tear_down = set_up();
     let phar = tear_down.working_dir().join("composer.phar");
     std::fs::copy(
@@ -26,15 +27,15 @@ fn set_up_with_phar() -> (crate::test_case::TearDown, String) {
     )
     .unwrap();
 
-    (tear_down, phar.display().to_string())
+    (tear_down, bconcat!(phar))
 }
 
 /// ref: SelfUpdateCommandTest::channelOptions
-fn channel_options() -> Vec<(&'static str, &'static str)> {
+fn channel_options() -> Vec<(&'static BStr, &'static BStr)> {
     vec![
-        ("--stable", "stable channel"),
-        ("--preview", "preview channel"),
-        ("--snapshot", "snapshot channel"),
+        (BStr::new("--stable"), BStr::new("stable channel")),
+        (BStr::new("--preview"), BStr::new("preview channel")),
+        (BStr::new("--snapshot"), BStr::new("snapshot channel")),
     ]
 }
 
@@ -52,7 +53,7 @@ fn test_successful_update() {
     }
 
     let mut app_tester = Process::new(
-        vec![PHP_BINARY.to_string(), phar, "self-update".to_string()],
+        vec![PHP_BINARY.to_owned(), phar, BString::from("self-update")],
         None,
         None,
         PhpMixed::Null,
@@ -60,13 +61,18 @@ fn test_successful_update() {
     )
     .unwrap();
     let status = app_tester.run(None, IndexMap::new()).unwrap();
-    assert_eq!(0, status, "{}", app_tester.get_error_output().unwrap());
+    assert_eq!(
+        0,
+        status,
+        "{}",
+        app_tester.get_error_output().unwrap().display_lossy()
+    );
 
     assert!(
         app_tester
             .get_output()
             .unwrap()
-            .contains("Upgrading to version")
+            .contains_str("Upgrading to version")
     );
 }
 
@@ -78,10 +84,10 @@ fn test_update_to_specific_version() {
 
     let mut app_tester = Process::new(
         vec![
-            PHP_BINARY.to_string(),
+            PHP_BINARY.to_owned(),
             phar,
-            "self-update".to_string(),
-            "2.4.0".to_string(),
+            BString::from("self-update"),
+            BString::from("2.4.0"),
         ],
         None,
         None,
@@ -90,13 +96,18 @@ fn test_update_to_specific_version() {
     )
     .unwrap();
     let status = app_tester.run(None, IndexMap::new()).unwrap();
-    assert_eq!(0, status, "{}", app_tester.get_error_output().unwrap());
+    assert_eq!(
+        0,
+        status,
+        "{}",
+        app_tester.get_error_output().unwrap().display_lossy()
+    );
 
     assert!(
         app_tester
             .get_output()
             .unwrap()
-            .contains("Upgrading to version 2.4.0")
+            .contains_str("Upgrading to version 2.4.0")
     );
 }
 
@@ -120,8 +131,7 @@ fn test_update_with_invalid_option_throws_exception() {
         .expect_err("expected InvalidArgumentException for the unknown argument");
 
     assert!(
-        err.to_string()
-            .contains("The \"invalid-option\" argument does not exist."),
+        error_message(&err).contains_str("The \"invalid-option\" argument does not exist."),
         "expected error about unknown argument, got: {:?}",
         err,
     );
@@ -135,7 +145,7 @@ fn test_update_to_different_channel() {
         let (_tear_down, phar) = set_up_with_phar();
 
         if shirabe::composer::VERSION != concat!("@package_version", "@")
-            && ["--stable", "--preview"].contains(&option)
+            && [BStr::new("--stable"), BStr::new("--preview")].contains(&option)
         {
             eprintln!(
                 "skipping: On releases this test can fail to upgrade as we are already on latest version"
@@ -145,10 +155,10 @@ fn test_update_to_different_channel() {
 
         let mut app_tester = Process::new(
             vec![
-                PHP_BINARY.to_string(),
+                PHP_BINARY.to_owned(),
                 phar,
-                "self-update".to_string(),
-                option.to_string(),
+                BString::from("self-update"),
+                bconcat!(option),
             ],
             None,
             None,
@@ -157,10 +167,15 @@ fn test_update_to_different_channel() {
         )
         .unwrap();
         let status = app_tester.run(None, IndexMap::new()).unwrap();
-        assert_eq!(0, status, "{}", app_tester.get_error_output().unwrap());
+        assert_eq!(
+            0,
+            status,
+            "{}",
+            app_tester.get_error_output().unwrap().display_lossy()
+        );
 
         let output = app_tester.get_output().unwrap();
-        assert!(output.contains("Upgrading to version"));
-        assert!(output.contains(expected_output));
+        assert!(output.contains_str("Upgrading to version"));
+        assert!(output.contains_str(expected_output));
     }
 }

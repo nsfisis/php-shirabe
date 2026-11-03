@@ -2,7 +2,10 @@
 
 use crate::package::archiver::{BaseExcludeFilter, ComposerExcludeFilter, GitExcludeFilter};
 use crate::util::Filesystem;
-use shirabe_php_shim::{RuntimeException, preg_quote, preg_replace, realpath};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{
+    RuntimeException, bconcat, path_to_bytes, preg_quote, preg_replace, realpath,
+};
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
 
@@ -20,18 +23,24 @@ impl std::fmt::Debug for ArchivableFilesFinder {
 }
 
 impl ArchivableFilesFinder {
-    pub fn new(sources: &str, excludes: Vec<String>, ignore_filters: bool) -> anyhow::Result<Self> {
+    pub fn new(
+        sources: impl AsRef<Path>,
+        excludes: Vec<BString>,
+        ignore_filters: bool,
+    ) -> anyhow::Result<Self> {
+        let sources = sources.as_ref();
         let fs = Filesystem::new(None);
 
         let sources_real_path = realpath(sources);
         if sources_real_path.is_none() {
-            return Err(RuntimeException::new(format!(
-                "Could not realpath() the source directory \"{}\"",
-                sources
+            return Err(RuntimeException::new(bconcat!(
+                "Could not realpath() the source directory \"",
+                sources,
+                "\""
             ))
             .into());
         }
-        let sources = fs.normalize_path(&sources_real_path.unwrap());
+        let sources = fs.normalize_path(sources_real_path.unwrap());
 
         let filters: Vec<Box<dyn BaseExcludeFilter>> = if ignore_filters {
             vec![]
@@ -49,24 +58,25 @@ impl ArchivableFilesFinder {
             let Ok(realpath) = file.canonicalize() else {
                 return false;
             };
-            if file.is_symlink() && !realpath.starts_with(&sources_clone) {
+            if file.is_symlink()
+                && !path_to_bytes(&realpath).starts_with(path_to_bytes(&sources_clone))
+            {
                 return false;
             }
 
-            // TODO(bytes): normalize_path and preg_replace work on Strings.
-            let realpath = realpath
-                .into_os_string()
-                .into_string()
-                .unwrap_or_else(|realpath| panic!("path is not valid UTF-8: {realpath:?}"));
             let relative_path = preg_replace(
-                format!("#^{}#", preg_quote(&sources_clone, Some('#'))),
+                bconcat!(
+                    "#^",
+                    preg_quote(path_to_bytes(&sources_clone), Some(b'#')),
+                    "#"
+                ),
                 "",
-                &fs.normalize_path(&realpath),
+                path_to_bytes(&fs.normalize_path(&realpath)),
             );
 
             let mut exclude = false;
             for f in &filters {
-                exclude = f.filter(&relative_path, exclude);
+                exclude = f.filter(BStr::new(&relative_path), exclude);
             }
 
             !exclude

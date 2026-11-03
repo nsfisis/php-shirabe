@@ -3,58 +3,68 @@
 use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
 use crate::io_mock::{Expectation, IOMock, get_io_mock};
+use bstr::BStr;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::GitHub;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, bconcat, php_str};
 
-const PASSWORD: &str = "password";
-const MESSAGE: &str = "mymessage";
-const ORIGIN: &str = "github.com";
+const PASSWORD: &BStr = php_str(b"password");
+const MESSAGE: &BStr = php_str(b"mymessage");
+const ORIGIN: &BStr = php_str(b"github.com");
 
 // Mirrors GitHubTest's JsonConfigSource mocks. Methods left without an expectation
 // panic if called.
-mockall::mock! {
-    #[derive(Debug)]
-    pub ConfigSource {}
-    impl ConfigSourceInterface for ConfigSource {
-        fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()>;
-        fn insert_repository(&mut self, name: &str, config: PhpMixed, reference_name: &str, offset: i64) -> anyhow::Result<()>;
-        fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()>;
-        fn remove_repository(&mut self, name: &str) -> anyhow::Result<()>;
-        fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
-        fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()>;
-        fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
-        fn remove_property(&mut self, name: &str) -> anyhow::Result<()>;
-        fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()>;
-        fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()>;
-        fn get_name(&self) -> String;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_config_source {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub ConfigSource {}
+        impl ConfigSourceInterface for ConfigSource {
+            fn add_repository(&mut self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+            fn insert_repository(&mut self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
+            fn set_repository_url(&mut self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_repository(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_config_setting(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_config_setting(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_property(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn get_name(&self) -> bstr::BString;
+        }
     }
 }
+use mock_config_source::MockConfigSource;
 
 // getAuthJsonMock: getName atLeastOnce -> "auth.json".
 fn get_auth_json_mock() -> Box<MockConfigSource> {
     let mut mock = MockConfigSource::new();
     mock.expect_get_name()
         .times(1..)
-        .returning(|| "auth.json".to_string());
+        .returning(|| "auth.json".into());
     mock.expect_add_config_setting().returning(|_, _| Ok(()));
     mock.expect_remove_config_setting().returning(|_| Ok(()));
     Box::new(mock)
 }
 
 // getConfJsonMock: removeConfigSetting atLeastOnce with('github-oauth.<origin>').
-fn get_conf_json_mock(origin: &str) -> Box<MockConfigSource> {
+fn get_conf_json_mock(origin: &BStr) -> Box<MockConfigSource> {
     let mut mock = MockConfigSource::new();
-    let expected = format!("github-oauth.{}", origin);
+    let expected = bconcat!("github-oauth.", origin);
     mock.expect_remove_config_setting()
         .times(1..)
         .withf(move |name| name == expected)
         .returning(|_| Ok(()));
     mock.expect_add_config_setting().returning(|_, _| Ok(()));
-    mock.expect_get_name()
-        .returning(|| "config.json".to_string());
+    mock.expect_get_name().returning(|| "config.json".into());
     Box::new(mock)
 }
 
@@ -92,7 +102,7 @@ fn test_username_password_authentication_flow() {
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![expect_full(
-            format!("https://api.{}/", ORIGIN),
+            bconcat!("https://api.", ORIGIN, "/"),
             None,
             200,
             "{}",
@@ -114,7 +124,7 @@ fn test_username_password_authentication_flow() {
 
     assert!(
         github
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(bstr::BStr::new(MESSAGE)))
             .unwrap()
     );
     // removeConfigSetting('github-oauth.<origin>') verified on the conf source mock drop.
@@ -130,7 +140,7 @@ fn test_username_password_failure() {
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![expect_full(
-            format!("https://api.{}/", ORIGIN),
+            bconcat!("https://api.", ORIGIN, "/"),
             None,
             401,
             "",
@@ -147,5 +157,9 @@ fn test_username_password_failure() {
 
     let mut github = build_github(&io_mock, config, http_downloader);
 
-    assert!(!github.authorize_oauth_interactively(ORIGIN, None).unwrap());
+    assert!(
+        !github
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), None)
+            .unwrap()
+    );
 }

@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/IO/IOInterface.php
 
 use crate::config::Config;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -26,82 +27,40 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
 
     fn is_decorated(&self) -> bool;
 
-    fn write(&self, message: &str) {
-        self.write3(message, true, NORMAL)
-    }
-    fn write2(&self, message: &str, newline: bool) {
-        self.write3(message, newline, NORMAL)
-    }
-    fn write_no_newline(&self, message: &str) {
-        self.write3(message, false, NORMAL)
-    }
-    fn write3(&self, message: &str, newline: bool, verbosity: i64);
+    fn write_bytes(&self, message: &BStr, newline: bool, verbosity: i64);
 
-    fn write_error(&self, message: &str) {
-        self.write_error3(message, true, NORMAL)
-    }
-    fn write_error2(&self, message: &str, newline: bool) {
-        self.write_error3(message, newline, NORMAL)
-    }
-    fn write_error_no_newline(&self, message: &str) {
-        self.write_error3(message, false, NORMAL)
-    }
-    fn write_error3(&self, message: &str, newline: bool, verbosity: i64);
+    fn write_error_bytes(&self, message: &BStr, newline: bool, verbosity: i64);
 
-    fn write_raw(&self, message: &str) {
-        self.write_raw3(message, true, NORMAL)
-    }
-    fn write_raw2(&self, message: &str, newline: bool) {
-        self.write_raw3(message, newline, NORMAL)
-    }
-    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64);
+    fn write_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64);
 
-    fn write_error_raw(&self, message: &str) {
-        self.write_error_raw3(message, true, NORMAL)
-    }
-    fn write_error_raw2(&self, message: &str, newline: bool) {
-        self.write_error_raw3(message, newline, NORMAL)
-    }
-    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64);
+    fn write_error_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64);
 
-    fn overwrite(&self, message: &str) {
-        self.overwrite4(message, true, None, NORMAL)
-    }
-    fn overwrite2(&self, message: &str, newline: bool) {
-        self.overwrite4(message, newline, None, NORMAL)
-    }
-    fn overwrite3(&self, message: &str, newline: bool, size: Option<i64>) {
-        self.overwrite4(message, newline, size, NORMAL)
-    }
-    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
+    fn overwrite_bytes(&self, message: &BStr, newline: bool, size: Option<i64>, verbosity: i64);
 
-    fn overwrite_error(&self, message: &str) {
-        self.overwrite_error4(message, true, None, NORMAL)
-    }
-    fn overwrite_error2(&self, message: &str, newline: bool) {
-        self.overwrite_error4(message, newline, None, NORMAL)
-    }
-    fn overwrite_error3(&self, message: &str, newline: bool, size: Option<i64>) {
-        self.overwrite_error4(message, newline, size, NORMAL)
-    }
-    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
+    fn overwrite_error_bytes(
+        &self,
+        message: &BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    );
 
     /// PHP: `@throws \RuntimeException If there is no data to read in the input stream`.
     /// `QuestionHelper::ask` exceptions (validator errors, `MissingInputException`) propagate
     /// to the caller, hence the `anyhow::Result` return type.
-    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed>;
+    fn ask_bytes(&self, question: &BStr, default: PhpMixed) -> anyhow::Result<PhpMixed>;
 
-    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool>;
+    fn ask_confirmation_bytes(&self, question: &BStr, default: bool) -> anyhow::Result<bool>;
 
-    fn ask_and_validate(
+    fn ask_and_validate_bytes(
         &self,
-        question: String,
+        question: &BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed>;
 
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>>;
+    fn ask_and_hide_answer_bytes(&self, question: &BStr) -> anyhow::Result<Option<BString>>;
 
     /// PHP `array $choices` may be a list (`PhpMixed::List`) or an associative
     /// array (`PhpMixed::Array`); list choices resolve to their index, while
@@ -110,38 +69,169 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     /// PHP: `@throws \InvalidArgumentException` — the `ChoiceQuestion` validator error
     /// propagates to the caller once `$attempts` is exhausted, hence the `anyhow::Result`
     /// return type.
-    fn select(
+    fn select_bytes(
         &self,
-        question: String,
+        question: &BStr,
         choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
-        error_message: String,
+        error_message: &BStr,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed>;
 
-    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>>;
+    fn get_authentications(&self) -> IndexMap<BString, IndexMap<BString, Option<BString>>>;
 
-    fn has_authentication(&self, repository_name: &str) -> bool;
+    fn has_authentication(&self, repository_name: &BStr) -> bool;
 
-    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>>;
+    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<BString, Option<BString>>;
 
     // From PHP `LoggerInterface` (which `IOInterface` extends). Only the
     // variants Composer actually calls through an IO are kept.
-    fn error(&self, message: &str, context: &[(&str, &str)]);
+    fn error_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]);
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]);
+    fn warning_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]);
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]);
+    fn debug_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]);
 }
+
+// The overloads of the PHP methods taking a string (`write()`, `writeError()`, `ask()`,
+// `select()`, `error()`, ...), which accept any byte string. They are generic, so they live outside
+// the `dyn IOInterface` vtable.
+pub trait IOInterfaceWrite: IOInterfaceImmutable {
+    fn write(&self, message: impl AsRef<[u8]>) {
+        self.write_bytes(BStr::new(message.as_ref()), true, NORMAL)
+    }
+    fn write2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.write_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    }
+    fn write3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
+        self.write_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    }
+    fn write_no_newline(&self, message: impl AsRef<[u8]>) {
+        self.write_bytes(BStr::new(message.as_ref()), false, NORMAL)
+    }
+    fn write_error(&self, message: impl AsRef<[u8]>) {
+        self.write_error_bytes(BStr::new(message.as_ref()), true, NORMAL)
+    }
+    fn write_error2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.write_error_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    }
+    fn write_error3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
+        self.write_error_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    }
+    fn write_error_no_newline(&self, message: impl AsRef<[u8]>) {
+        self.write_error_bytes(BStr::new(message.as_ref()), false, NORMAL)
+    }
+    fn write_raw(&self, message: impl AsRef<[u8]>) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), true, NORMAL)
+    }
+    fn write_raw2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    }
+    fn write_raw3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    }
+    fn write_error_raw(&self, message: impl AsRef<[u8]>) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), true, NORMAL)
+    }
+    fn write_error_raw2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    }
+    fn write_error_raw3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    }
+    fn overwrite(&self, message: impl AsRef<[u8]>) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), true, None, NORMAL)
+    }
+    fn overwrite2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), newline, None, NORMAL)
+    }
+    fn overwrite3(&self, message: impl AsRef<[u8]>, newline: bool, size: Option<i64>) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), newline, size, NORMAL)
+    }
+    fn overwrite4(
+        &self,
+        message: impl AsRef<[u8]>,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), newline, size, verbosity)
+    }
+    fn overwrite_error(&self, message: impl AsRef<[u8]>) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), true, None, NORMAL)
+    }
+    fn overwrite_error2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, None, NORMAL)
+    }
+    fn overwrite_error3(&self, message: impl AsRef<[u8]>, newline: bool, size: Option<i64>) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, size, NORMAL)
+    }
+    fn overwrite_error4(
+        &self,
+        message: impl AsRef<[u8]>,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, size, verbosity)
+    }
+    fn ask(&self, question: impl AsRef<[u8]>, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        self.ask_bytes(BStr::new(question.as_ref()), default)
+    }
+    fn ask_confirmation(&self, question: impl AsRef<[u8]>, default: bool) -> anyhow::Result<bool> {
+        self.ask_confirmation_bytes(BStr::new(question.as_ref()), default)
+    }
+    fn ask_and_validate(
+        &self,
+        question: impl AsRef<[u8]>,
+        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        attempts: Option<i64>,
+        default: PhpMixed,
+    ) -> anyhow::Result<PhpMixed> {
+        self.ask_and_validate_bytes(BStr::new(question.as_ref()), validator, attempts, default)
+    }
+    fn ask_and_hide_answer(&self, question: impl AsRef<[u8]>) -> anyhow::Result<Option<BString>> {
+        self.ask_and_hide_answer_bytes(BStr::new(question.as_ref()))
+    }
+    fn select(
+        &self,
+        question: impl AsRef<[u8]>,
+        choices: PhpMixed,
+        default: PhpMixed,
+        attempts: PhpMixed,
+        error_message: impl AsRef<[u8]>,
+        multiselect: bool,
+    ) -> anyhow::Result<PhpMixed> {
+        self.select_bytes(
+            BStr::new(question.as_ref()),
+            choices,
+            default,
+            attempts,
+            BStr::new(error_message.as_ref()),
+            multiselect,
+        )
+    }
+    fn error(&self, message: impl AsRef<[u8]>, context: &[(&BStr, &BStr)]) {
+        self.error_bytes(BStr::new(message.as_ref()), context)
+    }
+    fn warning(&self, message: impl AsRef<[u8]>, context: &[(&BStr, &BStr)]) {
+        self.warning_bytes(BStr::new(message.as_ref()), context)
+    }
+    fn debug(&self, message: impl AsRef<[u8]>, context: &[(&BStr, &BStr)]) {
+        self.debug_bytes(BStr::new(message.as_ref()), context)
+    }
+}
+
+impl<T: IOInterfaceImmutable + ?Sized> IOInterfaceWrite for T {}
 
 // The `&mut self` part of PHP `IOInterface`.
 pub trait IOInterfaceMutable {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: BString,
+        username: BString,
+        password: Option<BString>,
     );
 
     fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()>;
@@ -183,128 +273,72 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         self.borrow().is_decorated()
     }
 
-    fn write(&self, message: &str) {
-        self.borrow().write(message)
+    fn write_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
+        self.borrow().write_bytes(message, newline, verbosity)
     }
 
-    fn write2(&self, message: &str, newline: bool) {
-        self.borrow().write2(message, newline)
+    fn write_error_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
+        self.borrow().write_error_bytes(message, newline, verbosity)
     }
 
-    fn write_no_newline(&self, message: &str) {
-        self.borrow().write_no_newline(message)
+    fn write_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
+        self.borrow().write_raw_bytes(message, newline, verbosity)
     }
 
-    fn write3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.borrow().write3(message, newline, verbosity)
-    }
-
-    fn write_error(&self, message: &str) {
-        self.borrow().write_error(message)
-    }
-
-    fn write_error2(&self, message: &str, newline: bool) {
-        self.borrow().write_error2(message, newline)
-    }
-
-    fn write_error_no_newline(&self, message: &str) {
-        self.borrow().write_error_no_newline(message)
-    }
-
-    fn write_error3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.borrow().write_error3(message, newline, verbosity)
-    }
-
-    fn write_raw(&self, message: &str) {
-        self.borrow().write_raw(message)
-    }
-
-    fn write_raw2(&self, message: &str, newline: bool) {
-        self.borrow().write_raw2(message, newline)
-    }
-
-    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.borrow().write_raw3(message, newline, verbosity)
-    }
-
-    fn write_error_raw(&self, message: &str) {
-        self.borrow().write_error_raw(message)
-    }
-
-    fn write_error_raw2(&self, message: &str, newline: bool) {
-        self.borrow().write_error_raw2(message, newline)
-    }
-
-    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.borrow().write_error_raw3(message, newline, verbosity)
-    }
-
-    fn overwrite(&self, message: &str) {
-        self.borrow().overwrite(message)
-    }
-
-    fn overwrite2(&self, message: &str, newline: bool) {
-        self.borrow().overwrite2(message, newline)
-    }
-
-    fn overwrite3(&self, message: &str, newline: bool, size: Option<i64>) {
-        self.borrow().overwrite3(message, newline, size)
-    }
-
-    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.borrow().overwrite4(message, newline, size, verbosity)
-    }
-
-    fn overwrite_error(&self, message: &str) {
-        self.borrow().overwrite_error(message)
-    }
-
-    fn overwrite_error2(&self, message: &str, newline: bool) {
-        self.borrow().overwrite_error2(message, newline)
-    }
-
-    fn overwrite_error3(&self, message: &str, newline: bool, size: Option<i64>) {
-        self.borrow().overwrite_error3(message, newline, size)
-    }
-
-    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+    fn write_error_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
         self.borrow()
-            .overwrite_error4(message, newline, size, verbosity)
+            .write_error_raw_bytes(message, newline, verbosity)
     }
 
-    fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        self.borrow().ask(question, default)
+    fn overwrite_bytes(&self, message: &BStr, newline: bool, size: Option<i64>, verbosity: i64) {
+        self.borrow()
+            .overwrite_bytes(message, newline, size, verbosity)
     }
 
-    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
-        self.borrow().ask_confirmation(question, default)
-    }
-
-    fn ask_and_validate(
+    fn overwrite_error_bytes(
         &self,
-        question: String,
+        message: &BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.borrow()
+            .overwrite_error_bytes(message, newline, size, verbosity)
+    }
+
+    fn ask_bytes(&self, question: &BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+        self.borrow().ask_bytes(question, default)
+    }
+
+    fn ask_confirmation_bytes(&self, question: &BStr, default: bool) -> anyhow::Result<bool> {
+        self.borrow().ask_confirmation_bytes(question, default)
+    }
+
+    fn ask_and_validate_bytes(
+        &self,
+        question: &BStr,
         validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
         self.borrow()
-            .ask_and_validate(question, validator, attempts, default)
+            .ask_and_validate_bytes(question, validator, attempts, default)
     }
 
-    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
-        self.borrow().ask_and_hide_answer(question)
+    fn ask_and_hide_answer_bytes(&self, question: &BStr) -> anyhow::Result<Option<BString>> {
+        self.borrow().ask_and_hide_answer_bytes(question)
     }
 
-    fn select(
+    fn select_bytes(
         &self,
-        question: String,
+        question: &BStr,
         choices: PhpMixed,
         default: PhpMixed,
         attempts: PhpMixed,
-        error_message: String,
+        error_message: &BStr,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
-        self.borrow().select(
+        self.borrow().select_bytes(
             question,
             choices,
             default,
@@ -314,27 +348,27 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         )
     }
 
-    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {
+    fn get_authentications(&self) -> IndexMap<BString, IndexMap<BString, Option<BString>>> {
         self.borrow().get_authentications()
     }
 
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &BStr) -> bool {
         self.borrow().has_authentication(repository_name)
     }
 
-    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>> {
+    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<BString, Option<BString>> {
         self.borrow().get_authentication(repository_name)
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
-        self.borrow().error(message, context)
+    fn error_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
+        self.borrow().error_bytes(message, context)
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
-        self.borrow().warning(message, context)
+    fn warning_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
+        self.borrow().warning_bytes(message, context)
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
-        self.borrow().debug(message, context)
+    fn debug_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
+        self.borrow().debug_bytes(message, context)
     }
 }

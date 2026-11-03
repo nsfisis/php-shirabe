@@ -5,6 +5,7 @@
 use crate::value::{self, PluginValue};
 use bstr::BString;
 use indexmap::IndexMap;
+use shirabe_php_shim::{bconcat, utf8_text};
 use std::io::{Read as _, Write as _};
 use std::os::unix::net::UnixStream;
 
@@ -27,20 +28,20 @@ pub const TAG_EPOCH_BUMP: u8 = 0x09;
 pub enum Frame {
     CallFunction {
         corr_id: u64,
-        function_name: String,
+        function_name: BString,
         args: Vec<PluginValue>,
         out_param_positions: Vec<u32>,
     },
     CallStaticMethod {
         corr_id: u64,
-        pclass: String,
-        method_name: String,
+        pclass: BString,
+        method_name: BString,
         args: Vec<PluginValue>,
         out_param_positions: Vec<u32>,
     },
     NewObject {
         corr_id: u64,
-        pclass: String,
+        pclass: BString,
         ctor_args: Vec<PluginValue>,
     },
     CallPhpMethod {
@@ -53,7 +54,7 @@ pub enum Frame {
     CallRustMethod {
         corr_id: u64,
         rhandle: u64,
-        method_name: String,
+        method_name: BString,
         args: Vec<PluginValue>,
         out_param_positions: Vec<u32>,
     },
@@ -64,16 +65,16 @@ pub enum Frame {
     },
     Throw {
         corr_id: u64,
-        exception_class: String,
-        message: String,
+        exception_class: BString,
+        message: BString,
         code: i64,
         /// The state the exception carries beyond `message` and `code`, keyed by the property
         /// names its class declares. Empty for an exception that carries none.
-        properties: IndexMap<String, PluginValue>,
-        file: String,
+        properties: IndexMap<BString, PluginValue>,
+        file: BString,
         line: i64,
         /// The superclasses of `exception_class`, nearest first.
-        parents: Vec<String>,
+        parents: Vec<BString>,
     },
     ReleaseRustHandle {
         rhandle: u64,
@@ -180,7 +181,7 @@ impl Frame {
                 PluginValue::Array(
                     out_params
                         .iter()
-                        .map(|(pos, v)| (pos.to_string().into(), v.clone()))
+                        .map(|(pos, v)| (bconcat!(pos), v.clone()))
                         .collect(),
                 ),
             ],
@@ -197,12 +198,7 @@ impl Frame {
                 PluginValue::string(exception_class.clone()),
                 PluginValue::string(message.clone()),
                 PluginValue::Int(*code),
-                PluginValue::Array(
-                    properties
-                        .iter()
-                        .map(|(name, v)| (name.as_str().into(), v.clone()))
-                        .collect(),
-                ),
+                PluginValue::Array(properties.clone()),
                 PluginValue::string(file.clone()),
                 PluginValue::Int(*line),
                 PluginValue::List(parents.iter().cloned().map(PluginValue::string).collect()),
@@ -237,6 +233,10 @@ pub fn write_frame(stream: &mut UnixStream, frame: &Frame) -> std::io::Result<()
     stream.flush()
 }
 
+#[expect(
+    clippy::disallowed_macros,
+    reason = "std::io::Error takes text, and the message holds no PHP string"
+)]
 pub fn read_frame(stream: &mut UnixStream) -> std::io::Result<Frame> {
     let mut header = [0u8; 8];
     stream.read_exact(&mut header)?;
@@ -278,20 +278,20 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
     match tag {
         TAG_CALL_FUNCTION => Frame::CallFunction {
             corr_id,
-            function_name: expect_string(next()),
+            function_name: expect_bytes(next()),
             args: expect_list(next()),
             out_param_positions: expect_positions(next()),
         },
         TAG_CALL_STATIC_METHOD => Frame::CallStaticMethod {
             corr_id,
-            pclass: expect_string(next()),
-            method_name: expect_string(next()),
+            pclass: expect_bytes(next()),
+            method_name: expect_bytes(next()),
             args: expect_list(next()),
             out_param_positions: expect_positions(next()),
         },
         TAG_NEW_OBJECT => Frame::NewObject {
             corr_id,
-            pclass: expect_string(next()),
+            pclass: expect_bytes(next()),
             ctor_args: expect_list(next()),
         },
         TAG_CALL_PHP_METHOD => Frame::CallPhpMethod {
@@ -304,7 +304,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         TAG_CALL_RUST_METHOD => Frame::CallRustMethod {
             corr_id,
             rhandle: expect_id(next()),
-            method_name: expect_string(next()),
+            method_name: expect_bytes(next()),
             args: expect_list(next()),
             out_param_positions: expect_positions(next()),
         },
@@ -315,8 +315,8 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         },
         TAG_THROW => Frame::Throw {
             corr_id,
-            exception_class: expect_string(next()),
-            message: expect_string(next()),
+            exception_class: expect_bytes(next()),
+            message: expect_bytes(next()),
             code: match next() {
                 PluginValue::Int(code) => code,
                 other => {
@@ -324,9 +324,8 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
                 }
             },
             properties: expect_properties(next()),
-            // TODO(bytes): a PHP path is bytes, not necessarily UTF-8.
             file: match next() {
-                PluginValue::String(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+                PluginValue::String(bytes) => bytes,
                 other => {
                     panic!("PHP RPC: protocol violation — Throw file is not a string: {other:?}")
                 }
@@ -337,7 +336,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
                     panic!("PHP RPC: protocol violation — Throw line is not an int: {other:?}")
                 }
             },
-            parents: expect_list(next()).into_iter().map(expect_string).collect(),
+            parents: expect_list(next()).into_iter().map(expect_bytes).collect(),
         },
         TAG_RELEASE_RUST_HANDLE => Frame::ReleaseRustHandle {
             rhandle: expect_id(next()),
@@ -350,14 +349,6 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             epoch: expect_id(next()),
         },
         _ => panic!("PHP RPC: protocol violation — unknown frame tag {tag:#04x}"),
-    }
-}
-
-fn expect_string(value: PluginValue) -> String {
-    match value {
-        PluginValue::String(bytes) => String::from_utf8(bytes.into())
-            .unwrap_or_else(|e| panic!("PHP RPC: protocol violation — non-UTF-8 name field: {e}")),
-        other => panic!("PHP RPC: protocol violation — expected a string field: {other:?}"),
     }
 }
 
@@ -397,21 +388,10 @@ fn expect_positions(value: PluginValue) -> Vec<u32> {
         .collect()
 }
 
-fn expect_properties(value: PluginValue) -> IndexMap<String, PluginValue> {
+fn expect_properties(value: PluginValue) -> IndexMap<BString, PluginValue> {
     match value {
         PluginValue::List(items) if items.is_empty() => IndexMap::new(),
-        PluginValue::Array(map) => map
-            .into_iter()
-            .map(|(key, item)| {
-                let name = String::from_utf8(key.into()).unwrap_or_else(|error| {
-                    panic!(
-                        "PHP RPC: protocol violation — exception property name is not UTF-8: {:?}",
-                        String::from_utf8_lossy(error.as_bytes())
-                    )
-                });
-                (name, item)
-            })
-            .collect(),
+        PluginValue::Array(map) => map,
         other => {
             panic!("PHP RPC: protocol violation — exception properties is not an array: {other:?}")
         }
@@ -429,13 +409,11 @@ fn expect_out_params(value: PluginValue) -> IndexMap<u32, PluginValue> {
         PluginValue::Array(map) => map
             .into_iter()
             .map(|(key, item)| {
-                let position = std::str::from_utf8(&key)
-                    .ok()
+                let position = utf8_text(&key)
                     .and_then(|s| s.parse().ok())
                     .unwrap_or_else(|| {
                         panic!(
-                            "PHP RPC: protocol violation — out param key is not a position: {:?}",
-                            String::from_utf8_lossy(&key)
+                            "PHP RPC: protocol violation — out param key is not a position: {key:?}"
                         )
                     });
                 (position, item)
@@ -459,7 +437,7 @@ mod tests {
     fn frame_roundtrip_call_function() {
         let frame = roundtrip(Frame::CallFunction {
             corr_id: 7,
-            function_name: "defined".to_string(),
+            function_name: "defined".into(),
             args: vec![PluginValue::string("PHP_VERSION")],
             out_param_positions: vec![],
         });
@@ -480,21 +458,43 @@ mod tests {
     }
 
     #[test]
+    fn frame_roundtrip_non_utf8_names() {
+        let frame = roundtrip(Frame::CallStaticMethod {
+            corr_id: 3,
+            pclass: b"Caf\xe9".into(),
+            method_name: b"m\xff".into(),
+            args: vec![],
+            out_param_positions: vec![],
+        });
+        match frame {
+            Frame::CallStaticMethod {
+                pclass,
+                method_name,
+                ..
+            } => {
+                assert_eq!(pclass, b"Caf\xe9".as_slice());
+                assert_eq!(method_name, b"m\xff".as_slice());
+            }
+            other => panic!("unexpected frame: {other:?}"),
+        }
+    }
+
+    #[test]
     fn frame_roundtrip_throw_with_properties() {
         let frame = roundtrip(Frame::Throw {
             corr_id: 11,
-            exception_class: "Composer\\Downloader\\TransportException".to_string(),
-            message: "The \"https://example.org\" file could not be downloaded".to_string(),
+            exception_class: "Composer\\Downloader\\TransportException".into(),
+            message: "The \"https://example.org\" file could not be downloaded".into(),
             code: 401,
             properties: [
-                ("statusCode".to_string(), PluginValue::Int(401)),
-                ("response".to_string(), PluginValue::Null),
+                ("statusCode".into(), PluginValue::Int(401)),
+                ("response".into(), PluginValue::Null),
             ]
             .into_iter()
             .collect(),
-            file: "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".to_string(),
+            file: "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".into(),
             line: 42,
-            parents: vec!["RuntimeException".to_string(), "Exception".to_string()],
+            parents: vec!["RuntimeException".into(), "Exception".into()],
         });
         match frame {
             Frame::Throw {
@@ -520,8 +520,14 @@ mod tests {
                     "The \"https://example.org\" file could not be downloaded"
                 );
                 assert_eq!(code, 401);
-                assert_eq!(properties.get("statusCode"), Some(&PluginValue::Int(401)));
-                assert_eq!(properties.get("response"), Some(&PluginValue::Null));
+                assert_eq!(
+                    properties.get(bstr::B("statusCode")),
+                    Some(&PluginValue::Int(401))
+                );
+                assert_eq!(
+                    properties.get(bstr::B("response")),
+                    Some(&PluginValue::Null)
+                );
             }
             other => panic!("unexpected frame: {other:?}"),
         }
@@ -563,6 +569,10 @@ mod tests {
         }
     }
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "an anyhow error raised by the port, read through core::fmt"
+    )]
     #[test]
     fn read_frame_rejects_oversized_length() {
         let (mut a, mut b) = UnixStream::pair().unwrap();

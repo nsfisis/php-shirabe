@@ -3,304 +3,370 @@
 // These exercise Filesystem path helpers and on-disk operations (sizes, copy, symlinks and
 // junctions over a temp tree). The on-disk tests build their temp tree with tempfile::TempDir in
 // place of TestCase::getUniqueTmpDirectory, which is not ported.
+use bstr::{BStr, ByteSlice};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{file_exists, file_put_contents, is_dir, mkdir, symlink, touch};
+use shirabe_php_shim::{
+    error_message, file_exists, file_put_contents, is_dir, mkdir, path_from_bytes, path_to_bytes,
+    symlink, touch,
+};
 
 // PHP's setUp/tearDown build workingDir/testFile under TestCase::getUniqueTmpDirectory; the
 // on-disk tests below instead create their own tempfile::TempDir inline, so no shared fixture
 // helper is needed.
 
 /// providePathCouplesAsCode: (a, b, directory, expected, static, prefer_relative)
-fn provide_path_couples_as_code()
--> Vec<(&'static str, &'static str, bool, &'static str, bool, bool)> {
+fn provide_path_couples_as_code() -> Vec<(
+    &'static BStr,
+    &'static BStr,
+    bool,
+    &'static BStr,
+    bool,
+    bool,
+)> {
     vec![
-        ("/foo/bar", "/foo/bar", false, "__FILE__", false, false),
         (
-            "/foo/bar",
-            "/foo/baz",
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/bar"),
             false,
-            "__DIR__.'/baz'",
+            BStr::new("__FILE__"),
             false,
             false,
         ),
         (
-            "/foo/bin/run",
-            "/foo/vendor/acme/bin/run",
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/baz"),
             false,
-            "dirname(__DIR__).'/vendor/acme/bin/run'",
-            false,
-            false,
-        ),
-        (
-            "/foo/bin/run",
-            "/bar/bin/run",
-            false,
-            "'/bar/bin/run'",
+            BStr::new("__DIR__.'/baz'"),
             false,
             false,
         ),
         (
-            "c:/bin/run",
-            "c:/vendor/acme/bin/run",
+            BStr::new("/foo/bin/run"),
+            BStr::new("/foo/vendor/acme/bin/run"),
             false,
-            "dirname(__DIR__).'/vendor/acme/bin/run'",
-            false,
-            false,
-        ),
-        (
-            "c:\\bin\\run",
-            "c:/vendor/acme/bin/run",
-            false,
-            "dirname(__DIR__).'/vendor/acme/bin/run'",
+            BStr::new("dirname(__DIR__).'/vendor/acme/bin/run'"),
             false,
             false,
         ),
         (
-            "c:/bin/run",
-            "D:/vendor/acme/bin/run",
+            BStr::new("/foo/bin/run"),
+            BStr::new("/bar/bin/run"),
             false,
-            "'D:/vendor/acme/bin/run'",
+            BStr::new("'/bar/bin/run'"),
             false,
             false,
         ),
         (
-            "c:\\bin\\run",
-            "d:/vendor/acme/bin/run",
+            BStr::new("c:/bin/run"),
+            BStr::new("c:/vendor/acme/bin/run"),
             false,
-            "'D:/vendor/acme/bin/run'",
+            BStr::new("dirname(__DIR__).'/vendor/acme/bin/run'"),
             false,
             false,
         ),
-        ("/foo/bar", "/foo/bar", true, "__DIR__", false, false),
-        ("/foo/bar/", "/foo/bar", true, "__DIR__", false, false),
         (
-            "/foo",
-            "/baz",
+            BStr::new("c:\\bin\\run"),
+            BStr::new("c:/vendor/acme/bin/run"),
+            false,
+            BStr::new("dirname(__DIR__).'/vendor/acme/bin/run'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("c:/bin/run"),
+            BStr::new("D:/vendor/acme/bin/run"),
+            false,
+            BStr::new("'D:/vendor/acme/bin/run'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("c:\\bin\\run"),
+            BStr::new("d:/vendor/acme/bin/run"),
+            false,
+            BStr::new("'D:/vendor/acme/bin/run'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/bar"),
             true,
-            "dirname(__DIR__).'/baz'",
+            BStr::new("__DIR__"),
             false,
             false,
         ),
         (
-            "/foo/bar",
-            "/foo/baz",
+            BStr::new("/foo/bar/"),
+            BStr::new("/foo/bar"),
             true,
-            "dirname(__DIR__).'/baz'",
+            BStr::new("__DIR__"),
             false,
             false,
         ),
         (
-            "/foo/bin/run",
-            "/foo/vendor/acme/bin/run",
+            BStr::new("/foo"),
+            BStr::new("/baz"),
             true,
-            "dirname(dirname(__DIR__)).'/vendor/acme/bin/run'",
+            BStr::new("dirname(__DIR__).'/baz'"),
             false,
             false,
         ),
         (
-            "/foo/bin/run",
-            "/bar/bin/run",
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/baz"),
             true,
-            "'/bar/bin/run'",
+            BStr::new("dirname(__DIR__).'/baz'"),
             false,
             false,
         ),
         (
-            "/app/vendor/foo/bar",
-            "/lib",
+            BStr::new("/foo/bin/run"),
+            BStr::new("/foo/vendor/acme/bin/run"),
             true,
-            "dirname(dirname(dirname(dirname(__DIR__)))).'/lib'",
-            false,
-            true,
-        ),
-        ("/bin/run", "/bin/run", true, "__DIR__", false, false),
-        ("c:/bin/run", "C:\\bin/run", true, "__DIR__", false, false),
-        (
-            "c:/bin/run",
-            "c:/vendor/acme/bin/run",
-            true,
-            "dirname(dirname(__DIR__)).'/vendor/acme/bin/run'",
+            BStr::new("dirname(dirname(__DIR__)).'/vendor/acme/bin/run'"),
             false,
             false,
         ),
         (
-            "c:\\bin\\run",
-            "c:/vendor/acme/bin/run",
+            BStr::new("/foo/bin/run"),
+            BStr::new("/bar/bin/run"),
             true,
-            "dirname(dirname(__DIR__)).'/vendor/acme/bin/run'",
+            BStr::new("'/bar/bin/run'"),
             false,
             false,
         ),
         (
-            "c:/bin/run",
-            "d:/vendor/acme/bin/run",
+            BStr::new("/app/vendor/foo/bar"),
+            BStr::new("/lib"),
             true,
-            "'D:/vendor/acme/bin/run'",
+            BStr::new("dirname(dirname(dirname(dirname(__DIR__)))).'/lib'"),
+            false,
+            true,
+        ),
+        (
+            BStr::new("/bin/run"),
+            BStr::new("/bin/run"),
+            true,
+            BStr::new("__DIR__"),
             false,
             false,
         ),
         (
-            "c:\\bin\\run",
-            "d:/vendor/acme/bin/run",
+            BStr::new("c:/bin/run"),
+            BStr::new("C:\\bin/run"),
             true,
-            "'D:/vendor/acme/bin/run'",
+            BStr::new("__DIR__"),
             false,
             false,
         ),
         (
-            "C:/Temp/test",
-            "C:\\Temp",
+            BStr::new("c:/bin/run"),
+            BStr::new("c:/vendor/acme/bin/run"),
             true,
-            "dirname(__DIR__)",
+            BStr::new("dirname(dirname(__DIR__)).'/vendor/acme/bin/run'"),
             false,
             false,
         ),
         (
-            "C:/Temp",
-            "C:\\Temp\\test",
+            BStr::new("c:\\bin\\run"),
+            BStr::new("c:/vendor/acme/bin/run"),
             true,
-            "__DIR__ . '/test'",
-            false,
-            false,
-        ),
-        ("/tmp/test", "/tmp", true, "dirname(__DIR__)", false, false),
-        ("/tmp", "/tmp/test", true, "__DIR__ . '/test'", false, false),
-        (
-            "C:/Temp",
-            "c:\\Temp\\test",
-            true,
-            "__DIR__ . '/test'",
-            false,
-            false,
-        ),
-        ("/tmp/test/./", "/tmp/test/", true, "__DIR__", false, false),
-        (
-            "/tmp/test/../vendor",
-            "/tmp/test",
-            true,
-            "dirname(__DIR__).'/test'",
+            BStr::new("dirname(dirname(__DIR__)).'/vendor/acme/bin/run'"),
             false,
             false,
         ),
         (
-            "/tmp/test/.././vendor",
-            "/tmp/test",
+            BStr::new("c:/bin/run"),
+            BStr::new("d:/vendor/acme/bin/run"),
             true,
-            "dirname(__DIR__).'/test'",
+            BStr::new("'D:/vendor/acme/bin/run'"),
             false,
             false,
         ),
         (
-            "C:/Temp",
-            "c:\\Temp\\..\\..\\test",
+            BStr::new("c:\\bin\\run"),
+            BStr::new("d:/vendor/acme/bin/run"),
             true,
-            "dirname(__DIR__).'/test'",
+            BStr::new("'D:/vendor/acme/bin/run'"),
             false,
             false,
         ),
         (
-            "C:/Temp/../..",
-            "d:\\Temp\\..\\..\\test",
+            BStr::new("C:/Temp/test"),
+            BStr::new("C:\\Temp"),
             true,
-            "'D:/test'",
+            BStr::new("dirname(__DIR__)"),
             false,
             false,
         ),
         (
-            "/foo/bar",
-            "/foo/bar_vendor",
+            BStr::new("C:/Temp"),
+            BStr::new("C:\\Temp\\test"),
             true,
-            "dirname(__DIR__).'/bar_vendor'",
+            BStr::new("__DIR__ . '/test'"),
             false,
             false,
         ),
         (
-            "/foo/bar_vendor",
-            "/foo/bar",
+            BStr::new("/tmp/test"),
+            BStr::new("/tmp"),
             true,
-            "dirname(__DIR__).'/bar'",
+            BStr::new("dirname(__DIR__)"),
             false,
             false,
         ),
         (
-            "/foo/bar_vendor",
-            "/foo/bar/src",
+            BStr::new("/tmp"),
+            BStr::new("/tmp/test"),
             true,
-            "dirname(__DIR__).'/bar/src'",
+            BStr::new("__DIR__ . '/test'"),
             false,
             false,
         ),
         (
-            "/foo/bar_vendor/src2",
-            "/foo/bar/src/lib",
+            BStr::new("C:/Temp"),
+            BStr::new("c:\\Temp\\test"),
             true,
-            "dirname(dirname(__DIR__)).'/bar/src/lib'",
+            BStr::new("__DIR__ . '/test'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test/./"),
+            BStr::new("/tmp/test/"),
+            true,
+            BStr::new("__DIR__"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test/../vendor"),
+            BStr::new("/tmp/test"),
+            true,
+            BStr::new("dirname(__DIR__).'/test'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test/.././vendor"),
+            BStr::new("/tmp/test"),
+            true,
+            BStr::new("dirname(__DIR__).'/test'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp"),
+            BStr::new("c:\\Temp\\..\\..\\test"),
+            true,
+            BStr::new("dirname(__DIR__).'/test'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp/../.."),
+            BStr::new("d:\\Temp\\..\\..\\test"),
+            true,
+            BStr::new("'D:/test'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/bar_vendor"),
+            true,
+            BStr::new("dirname(__DIR__).'/bar_vendor'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor"),
+            BStr::new("/foo/bar"),
+            true,
+            BStr::new("dirname(__DIR__).'/bar'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor"),
+            BStr::new("/foo/bar/src"),
+            true,
+            BStr::new("dirname(__DIR__).'/bar/src'"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor/src2"),
+            BStr::new("/foo/bar/src/lib"),
+            true,
+            BStr::new("dirname(dirname(__DIR__)).'/bar/src/lib'"),
             false,
             false,
         ),
         // static use case
         (
-            "/tmp/test/../vendor",
-            "/tmp/test",
+            BStr::new("/tmp/test/../vendor"),
+            BStr::new("/tmp/test"),
             true,
-            "__DIR__ . '/..'.'/test'",
-            true,
-            false,
-        ),
-        (
-            "/tmp/test/.././vendor",
-            "/tmp/test",
-            true,
-            "__DIR__ . '/..'.'/test'",
+            BStr::new("__DIR__ . '/..'.'/test'"),
             true,
             false,
         ),
         (
-            "C:/Temp",
-            "c:\\Temp\\..\\..\\test",
+            BStr::new("/tmp/test/.././vendor"),
+            BStr::new("/tmp/test"),
             true,
-            "__DIR__ . '/..'.'/test'",
-            true,
-            false,
-        ),
-        (
-            "C:/Temp/../..",
-            "d:\\Temp\\..\\..\\test",
-            true,
-            "'D:/test'",
+            BStr::new("__DIR__ . '/..'.'/test'"),
             true,
             false,
         ),
         (
-            "/foo/bar",
-            "/foo/bar_vendor",
+            BStr::new("C:/Temp"),
+            BStr::new("c:\\Temp\\..\\..\\test"),
             true,
-            "__DIR__ . '/..'.'/bar_vendor'",
-            true,
-            false,
-        ),
-        (
-            "/foo/bar_vendor",
-            "/foo/bar",
-            true,
-            "__DIR__ . '/..'.'/bar'",
+            BStr::new("__DIR__ . '/..'.'/test'"),
             true,
             false,
         ),
         (
-            "/foo/bar_vendor",
-            "/foo/bar/src",
+            BStr::new("C:/Temp/../.."),
+            BStr::new("d:\\Temp\\..\\..\\test"),
             true,
-            "__DIR__ . '/..'.'/bar/src'",
+            BStr::new("'D:/test'"),
             true,
             false,
         ),
         (
-            "/foo/bar_vendor/src2",
-            "/foo/bar/src/lib",
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/bar_vendor"),
             true,
-            "__DIR__ . '/../..'.'/bar/src/lib'",
+            BStr::new("__DIR__ . '/..'.'/bar_vendor'"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor"),
+            BStr::new("/foo/bar"),
+            true,
+            BStr::new("__DIR__ . '/..'.'/bar'"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor"),
+            BStr::new("/foo/bar/src"),
+            true,
+            BStr::new("__DIR__ . '/..'.'/bar/src'"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor/src2"),
+            BStr::new("/foo/bar/src/lib"),
+            true,
+            BStr::new("__DIR__ . '/../..'.'/bar/src/lib'"),
             true,
             false,
         ),
@@ -314,107 +380,287 @@ fn test_find_shortest_path_code() {
     {
         assert_eq!(
             expected,
-            fs.find_shortest_path_code(a, b, directory, static_code, prefer_relative)
-                .unwrap()
+            fs.find_shortest_path_code(
+                path_from_bytes(a),
+                path_from_bytes(b),
+                directory,
+                static_code,
+                prefer_relative
+            )
+            .unwrap()
         );
     }
 }
 
 /// providePathCouples: (a, b, expected, directory, prefer_relative)
-fn provide_path_couples() -> Vec<(&'static str, &'static str, &'static str, bool, bool)> {
+fn provide_path_couples() -> Vec<(&'static BStr, &'static BStr, &'static BStr, bool, bool)> {
     vec![
-        ("/foo/bar", "/foo/bar", "./bar", false, false),
-        ("/foo/bar", "/foo/baz", "./baz", false, false),
-        ("/foo/bar/", "/foo/baz", "./baz", false, false),
-        ("/foo/bar", "/foo/bar", "./", true, false),
-        ("/foo/bar", "/foo/baz", "../baz", true, false),
-        ("/foo/bar/", "/foo/baz", "../baz", true, false),
-        ("C:/foo/bar/", "c:/foo/baz", "../baz", true, false),
         (
-            "/foo/bin/run",
-            "/foo/vendor/acme/bin/run",
-            "../vendor/acme/bin/run",
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/bar"),
+            BStr::new("./bar"),
             false,
             false,
         ),
-        ("/foo/bin/run", "/bar/bin/run", "/bar/bin/run", false, false),
-        ("/foo/bin/run", "/bar/bin/run", "/bar/bin/run", true, false),
         (
-            "c:/foo/bin/run",
-            "d:/bar/bin/run",
-            "D:/bar/bin/run",
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/baz"),
+            BStr::new("./baz"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar/"),
+            BStr::new("/foo/baz"),
+            BStr::new("./baz"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/bar"),
+            BStr::new("./"),
             true,
             false,
         ),
         (
-            "c:/bin/run",
-            "c:/vendor/acme/bin/run",
-            "../vendor/acme/bin/run",
-            false,
-            false,
-        ),
-        (
-            "c:\\bin\\run",
-            "c:/vendor/acme/bin/run",
-            "../vendor/acme/bin/run",
-            false,
-            false,
-        ),
-        (
-            "c:/bin/run",
-            "d:/vendor/acme/bin/run",
-            "D:/vendor/acme/bin/run",
-            false,
-            false,
-        ),
-        (
-            "c:\\bin\\run",
-            "d:/vendor/acme/bin/run",
-            "D:/vendor/acme/bin/run",
-            false,
-            false,
-        ),
-        ("C:/Temp/test", "C:\\Temp", "./", false, false),
-        ("/tmp/test", "/tmp", "./", false, false),
-        ("C:/Temp/test/sub", "C:\\Temp", "../", false, false),
-        ("/tmp/test/sub", "/tmp", "../", false, false),
-        ("/tmp/test/sub", "/tmp", "../../", true, false),
-        ("c:/tmp/test/sub", "c:/tmp", "../../", true, false),
-        ("/tmp", "/tmp/test", "test", false, false),
-        ("C:/Temp", "C:\\Temp\\test", "test", false, false),
-        ("C:/Temp", "c:\\Temp\\test", "test", false, false),
-        ("/tmp/test/./", "/tmp/test", "./", true, false),
-        ("/tmp/test/../vendor", "/tmp/test", "../test", true, false),
-        ("/tmp/test/.././vendor", "/tmp/test", "../test", true, false),
-        ("C:/Temp", "c:\\Temp\\..\\..\\test", "../test", true, false),
-        (
-            "C:/Temp/../..",
-            "c:\\Temp\\..\\..\\test",
-            "./test",
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/baz"),
+            BStr::new("../baz"),
             true,
             false,
         ),
         (
-            "C:/Temp/../..",
-            "D:\\Temp\\..\\..\\test",
-            "D:/test",
+            BStr::new("/foo/bar/"),
+            BStr::new("/foo/baz"),
+            BStr::new("../baz"),
             true,
             false,
         ),
-        ("/app/vendor/foo/bar", "/lib", "../../../../lib", true, true),
-        ("/tmp", "/tmp/../../test", "../test", true, false),
-        ("/tmp", "/test", "../test", true, false),
-        ("/foo/bar", "/foo/bar_vendor", "../bar_vendor", true, false),
-        ("/foo/bar_vendor", "/foo/bar", "../bar", true, false),
-        ("/foo/bar_vendor", "/foo/bar/src", "../bar/src", true, false),
         (
-            "/foo/bar_vendor/src2",
-            "/foo/bar/src/lib",
-            "../../bar/src/lib",
+            BStr::new("C:/foo/bar/"),
+            BStr::new("c:/foo/baz"),
+            BStr::new("../baz"),
             true,
             false,
         ),
-        ("C:/", "C:/foo/bar/", "foo/bar", true, false),
+        (
+            BStr::new("/foo/bin/run"),
+            BStr::new("/foo/vendor/acme/bin/run"),
+            BStr::new("../vendor/acme/bin/run"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bin/run"),
+            BStr::new("/bar/bin/run"),
+            BStr::new("/bar/bin/run"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/foo/bin/run"),
+            BStr::new("/bar/bin/run"),
+            BStr::new("/bar/bin/run"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("c:/foo/bin/run"),
+            BStr::new("d:/bar/bin/run"),
+            BStr::new("D:/bar/bin/run"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("c:/bin/run"),
+            BStr::new("c:/vendor/acme/bin/run"),
+            BStr::new("../vendor/acme/bin/run"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("c:\\bin\\run"),
+            BStr::new("c:/vendor/acme/bin/run"),
+            BStr::new("../vendor/acme/bin/run"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("c:/bin/run"),
+            BStr::new("d:/vendor/acme/bin/run"),
+            BStr::new("D:/vendor/acme/bin/run"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("c:\\bin\\run"),
+            BStr::new("d:/vendor/acme/bin/run"),
+            BStr::new("D:/vendor/acme/bin/run"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp/test"),
+            BStr::new("C:\\Temp"),
+            BStr::new("./"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test"),
+            BStr::new("/tmp"),
+            BStr::new("./"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp/test/sub"),
+            BStr::new("C:\\Temp"),
+            BStr::new("../"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test/sub"),
+            BStr::new("/tmp"),
+            BStr::new("../"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test/sub"),
+            BStr::new("/tmp"),
+            BStr::new("../../"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("c:/tmp/test/sub"),
+            BStr::new("c:/tmp"),
+            BStr::new("../../"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/tmp"),
+            BStr::new("/tmp/test"),
+            BStr::new("test"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp"),
+            BStr::new("C:\\Temp\\test"),
+            BStr::new("test"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp"),
+            BStr::new("c:\\Temp\\test"),
+            BStr::new("test"),
+            false,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test/./"),
+            BStr::new("/tmp/test"),
+            BStr::new("./"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test/../vendor"),
+            BStr::new("/tmp/test"),
+            BStr::new("../test"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/tmp/test/.././vendor"),
+            BStr::new("/tmp/test"),
+            BStr::new("../test"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp"),
+            BStr::new("c:\\Temp\\..\\..\\test"),
+            BStr::new("../test"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp/../.."),
+            BStr::new("c:\\Temp\\..\\..\\test"),
+            BStr::new("./test"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("C:/Temp/../.."),
+            BStr::new("D:\\Temp\\..\\..\\test"),
+            BStr::new("D:/test"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/app/vendor/foo/bar"),
+            BStr::new("/lib"),
+            BStr::new("../../../../lib"),
+            true,
+            true,
+        ),
+        (
+            BStr::new("/tmp"),
+            BStr::new("/tmp/../../test"),
+            BStr::new("../test"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/tmp"),
+            BStr::new("/test"),
+            BStr::new("../test"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar"),
+            BStr::new("/foo/bar_vendor"),
+            BStr::new("../bar_vendor"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor"),
+            BStr::new("/foo/bar"),
+            BStr::new("../bar"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor"),
+            BStr::new("/foo/bar/src"),
+            BStr::new("../bar/src"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("/foo/bar_vendor/src2"),
+            BStr::new("/foo/bar/src/lib"),
+            BStr::new("../../bar/src/lib"),
+            true,
+            false,
+        ),
+        (
+            BStr::new("C:/"),
+            BStr::new("C:/foo/bar/"),
+            BStr::new("foo/bar"),
+            true,
+            false,
+        ),
     ]
 }
 
@@ -423,9 +669,16 @@ fn test_find_shortest_path() {
     let fs = Filesystem::new(None);
     for (a, b, expected, directory, prefer_relative) in provide_path_couples() {
         assert_eq!(
-            expected,
-            fs.find_shortest_path(a, b, directory, prefer_relative)
+            bstr::BStr::new(expected),
+            bstr::BStr::new(path_to_bytes(
+                &fs.find_shortest_path(
+                    path_from_bytes(a),
+                    path_from_bytes(b),
+                    directory,
+                    prefer_relative
+                )
                 .unwrap()
+            ))
         );
     }
 }
@@ -436,19 +689,10 @@ fn test_remove_directory_php() {
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(working_dir.join("level1/level2"), 0o777, true);
-    file_put_contents(
-        working_dir
-            .join("level1/level2/hello.txt")
-            .to_str()
-            .unwrap(),
-        b"hello world",
-    );
+    file_put_contents(working_dir.join("level1/level2/hello.txt"), b"hello world");
 
     let mut fs = Filesystem::new(None);
-    assert!(
-        fs.remove_directory_php(working_dir.to_str().unwrap())
-            .unwrap()
-    );
+    assert!(fs.remove_directory_php(&working_dir).unwrap());
     assert!(!file_exists(working_dir.join("level1/level2/hello.txt")));
 }
 
@@ -457,7 +701,7 @@ fn test_file_size() {
     let unique_tmp = tempfile::TempDir::new().unwrap();
     let test_file = unique_tmp.path().join("composer_test_file");
 
-    file_put_contents(test_file.to_str().unwrap(), b"Hello");
+    file_put_contents(&test_file, b"Hello");
 
     let fs = Filesystem::new(None);
     assert!(fs.size(&test_file).unwrap() >= 5);
@@ -469,36 +713,45 @@ fn test_directory_size() {
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(&working_dir, 0o777, true);
-    file_put_contents(working_dir.join("file1.txt").to_str().unwrap(), b"Hello");
-    file_put_contents(working_dir.join("file2.txt").to_str().unwrap(), b"World");
+    file_put_contents(working_dir.join("file1.txt"), b"Hello");
+    file_put_contents(working_dir.join("file2.txt"), b"World");
 
     let fs = Filesystem::new(None);
     assert!(fs.size(&working_dir).unwrap() >= 10);
 }
 
 /// provideNormalizedPaths: (expected, actual)
-fn provide_normalized_paths() -> Vec<(&'static str, &'static str)> {
+fn provide_normalized_paths() -> Vec<(&'static BStr, &'static BStr)> {
     vec![
-        ("../foo", "../foo"),
-        ("C:/foo/bar", "c:/foo//bar"),
-        ("C:/foo/bar", "C:/foo/./bar"),
-        ("C:/foo/bar", "C://foo//bar"),
-        ("C:/foo/bar", "C:///foo//bar"),
-        ("C:/bar", "C:/foo/../bar"),
-        ("/bar", "/foo/../bar/"),
-        ("phar://C:/Foo", "phar://c:/Foo/Bar/.."),
-        ("phar://C:/Foo", "phar://c:///Foo/Bar/.."),
-        ("phar://C:/", "phar://c:/Foo/Bar/../../../.."),
-        ("/", "/Foo/Bar/../../../.."),
-        ("/", "/"),
-        ("/", "//"),
-        ("/", "///"),
-        ("/Foo", "///Foo"),
-        ("C:/", "c:\\"),
-        ("../src", "Foo/Bar/../../../src"),
-        ("C:../b", "c:.\\..\\a\\..\\b"),
-        ("phar://C:../Foo", "phar://c:../Foo"),
-        ("//foo/bar", "\\\\foo\\bar"),
+        (BStr::new("../foo"), BStr::new("../foo")),
+        (BStr::new("C:/foo/bar"), BStr::new("c:/foo//bar")),
+        (BStr::new("C:/foo/bar"), BStr::new("C:/foo/./bar")),
+        (BStr::new("C:/foo/bar"), BStr::new("C://foo//bar")),
+        (BStr::new("C:/foo/bar"), BStr::new("C:///foo//bar")),
+        (BStr::new("C:/bar"), BStr::new("C:/foo/../bar")),
+        (BStr::new("/bar"), BStr::new("/foo/../bar/")),
+        (
+            BStr::new("phar://C:/Foo"),
+            BStr::new("phar://c:/Foo/Bar/.."),
+        ),
+        (
+            BStr::new("phar://C:/Foo"),
+            BStr::new("phar://c:///Foo/Bar/.."),
+        ),
+        (
+            BStr::new("phar://C:/"),
+            BStr::new("phar://c:/Foo/Bar/../../../.."),
+        ),
+        (BStr::new("/"), BStr::new("/Foo/Bar/../../../..")),
+        (BStr::new("/"), BStr::new("/")),
+        (BStr::new("/"), BStr::new("//")),
+        (BStr::new("/"), BStr::new("///")),
+        (BStr::new("/Foo"), BStr::new("///Foo")),
+        (BStr::new("C:/"), BStr::new("c:\\")),
+        (BStr::new("../src"), BStr::new("Foo/Bar/../../../src")),
+        (BStr::new("C:../b"), BStr::new("c:.\\..\\a\\..\\b")),
+        (BStr::new("phar://C:../Foo"), BStr::new("phar://c:../Foo")),
+        (BStr::new("//foo/bar"), BStr::new("\\\\foo\\bar")),
     ]
 }
 
@@ -506,7 +759,10 @@ fn provide_normalized_paths() -> Vec<(&'static str, &'static str)> {
 fn test_normalize_path() {
     let fs = Filesystem::new(None);
     for (expected, actual) in provide_normalized_paths() {
-        assert_eq!(expected, fs.normalize_path(actual));
+        assert_eq!(
+            bstr::BStr::new(expected),
+            bstr::BStr::new(path_to_bytes(&fs.normalize_path(path_from_bytes(actual))))
+        );
     }
 }
 
@@ -579,18 +835,13 @@ fn test_junctions() {
     // Non-Windows systems do not support this and will return false on all tests, and an exception
     // on creation.
     if !Platform::is_windows() {
-        assert!(!fs.is_junction(working_dir.to_str().unwrap()));
-        assert!(!fs.remove_junction(working_dir.to_str().unwrap()).unwrap());
+        assert!(!fs.is_junction(&working_dir));
+        assert!(!fs.remove_junction(&working_dir).unwrap());
 
         let target = working_dir.join("real/../real/nesting");
         let junction = working_dir.join("junction");
-        let err = fs
-            .junction(target.to_str().unwrap(), junction.to_str().unwrap())
-            .unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("not available on non-Windows platform")
-        );
+        let err = fs.junction(&target, &junction).unwrap_err();
+        assert!(error_message(&err).contains_str("not available on non-Windows platform"));
         return;
     }
 
@@ -598,30 +849,29 @@ fn test_junctions() {
     let junction = working_dir.join("junction");
 
     // Create and detect junction
-    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
+    fs.junction(&target, &junction).unwrap();
     assert!(
-        fs.is_junction(junction.to_str().unwrap()),
+        fs.is_junction(&junction),
         "{}: is a junction",
         junction.display()
     );
     assert!(
-        !fs.is_junction(target.to_str().unwrap()),
+        !fs.is_junction(&target),
         "{}: is not a junction",
         target.display()
     );
     assert!(
-        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        fs.is_junction(target.join("../../junction")),
         "{}/../../junction: is a junction",
         target.display()
     );
     assert!(
-        !fs.is_junction(junction.join("../real").to_str().unwrap()),
+        !fs.is_junction(junction.join("../real")),
         "{}/../real: is not a junction",
         junction.display()
     );
     assert!(
-        fs.is_junction(junction.join("../junction").to_str().unwrap()),
+        fs.is_junction(junction.join("../junction")),
         "{}/../junction: is a junction",
         junction.display()
     );
@@ -629,7 +879,7 @@ fn test_junctions() {
     // Remove junction
     assert!(is_dir(&junction), "{} is a directory", junction.display());
     assert!(
-        fs.remove_junction(junction.to_str().unwrap()).unwrap(),
+        fs.remove_junction(&junction).unwrap(),
         "{} has been removed",
         junction.display()
     );
@@ -658,43 +908,39 @@ fn test_override_junctions() {
     let junction = working_dir.join("junction");
 
     // Override non-broken junction
-    fs.junction(old_target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
-    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
+    fs.junction(&old_target, &junction).unwrap();
+    fs.junction(&target, &junction).unwrap();
 
     assert!(
-        fs.is_junction(junction.to_str().unwrap()),
+        fs.is_junction(&junction),
         "{}: is a junction",
         junction.display()
     );
     assert!(
-        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        fs.is_junction(target.join("../../junction")),
         "{}/../../junction: is a junction",
         target.display()
     );
 
     // Remove junction
     assert!(
-        fs.remove_junction(junction.to_str().unwrap()).unwrap(),
+        fs.remove_junction(&junction).unwrap(),
         "{} has been removed",
         junction.display()
     );
 
     // Override broken junction
-    fs.junction(old_target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
+    fs.junction(&old_target, &junction).unwrap();
     fs.remove_directory(&old_target).unwrap();
-    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
-        .unwrap();
+    fs.junction(&target, &junction).unwrap();
 
     assert!(
-        fs.is_junction(junction.to_str().unwrap()),
+        fs.is_junction(&junction),
         "{}: is a junction",
         junction.display()
     );
     assert!(
-        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        fs.is_junction(target.join("../../junction")),
         "{}/../../junction: is a junction",
         target.display()
     );
@@ -709,24 +955,15 @@ fn test_copy() {
 
     mkdir(working_dir.join("foo/bar"), 0o777, true);
     mkdir(working_dir.join("foo/baz"), 0o777, true);
-    file_put_contents(working_dir.join("foo/foo.file").to_str().unwrap(), b"foo");
-    file_put_contents(
-        working_dir.join("foo/bar/foobar.file").to_str().unwrap(),
-        b"foobar",
-    );
-    file_put_contents(
-        working_dir.join("foo/baz/foobaz.file").to_str().unwrap(),
-        b"foobaz",
-    );
-    file_put_contents(test_file.to_str().unwrap(), b"testfile");
+    file_put_contents(working_dir.join("foo/foo.file"), b"foo");
+    file_put_contents(working_dir.join("foo/bar/foobar.file"), b"foobar");
+    file_put_contents(working_dir.join("foo/baz/foobaz.file"), b"foobaz");
+    file_put_contents(&test_file, b"testfile");
 
     let mut fs = Filesystem::new(None);
 
     let result1 = fs
-        .copy(
-            working_dir.join("foo").to_str().unwrap(),
-            working_dir.join("foop").to_str().unwrap(),
-        )
+        .copy(working_dir.join("foo"), working_dir.join("foop"))
         .unwrap();
     assert!(result1, "Copying directory failed.");
     assert!(
@@ -761,10 +998,7 @@ fn test_copy() {
     );
 
     let result2 = fs
-        .copy(
-            test_file.to_str().unwrap(),
-            working_dir.join("testfile.file").to_str().unwrap(),
-        )
+        .copy(&test_file, working_dir.join("testfile.file"))
         .unwrap();
     assert!(result2);
     assert!(file_exists(working_dir.join("testfile.file")));
@@ -779,35 +1013,23 @@ fn test_copy_then_remove() {
 
     mkdir(working_dir.join("foo/bar"), 0o777, true);
     mkdir(working_dir.join("foo/baz"), 0o777, true);
-    file_put_contents(working_dir.join("foo/foo.file").to_str().unwrap(), b"foo");
-    file_put_contents(
-        working_dir.join("foo/bar/foobar.file").to_str().unwrap(),
-        b"foobar",
-    );
-    file_put_contents(
-        working_dir.join("foo/baz/foobaz.file").to_str().unwrap(),
-        b"foobaz",
-    );
-    file_put_contents(test_file.to_str().unwrap(), b"testfile");
+    file_put_contents(working_dir.join("foo/foo.file"), b"foo");
+    file_put_contents(working_dir.join("foo/bar/foobar.file"), b"foobar");
+    file_put_contents(working_dir.join("foo/baz/foobaz.file"), b"foobaz");
+    file_put_contents(&test_file, b"testfile");
 
     let mut fs = Filesystem::new(None);
 
-    fs.copy_then_remove(
-        test_file.to_str().unwrap(),
-        working_dir.join("testfile.file").to_str().unwrap(),
-    )
-    .unwrap();
+    fs.copy_then_remove(&test_file, working_dir.join("testfile.file"))
+        .unwrap();
     assert!(
         !file_exists(&test_file),
         "Still a file: {}",
         test_file.display()
     );
 
-    fs.copy_then_remove(
-        working_dir.join("foo").to_str().unwrap(),
-        working_dir.join("foop").to_str().unwrap(),
-    )
-    .unwrap();
+    fs.copy_then_remove(working_dir.join("foo"), working_dir.join("foop"))
+        .unwrap();
     assert!(
         !file_exists(working_dir.join("foo/baz/foobaz.file")),
         "Still a file: {}/foo/baz/foobaz.file",

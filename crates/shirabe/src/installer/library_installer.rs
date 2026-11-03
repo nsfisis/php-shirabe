@@ -9,19 +9,22 @@ use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
-    preg_replace, realpath, rmdir, rtrim, strpos,
+    InvalidArgumentException, LogicException, PhpMixed, bconcat, dirname, is_dir, is_link,
+    path_from_bytes, path_to_bytes, preg_quote, preg_replace, realpath, rmdir, rtrim2, str_replace,
+    strpos,
 };
+use std::path::PathBuf;
 
 /// Package installation manager.
 #[derive(Debug)]
 pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
-    vendor_dir: std::cell::RefCell<String>,
+    vendor_dir: std::cell::RefCell<PathBuf>,
     download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    r#type: Option<String>,
+    r#type: Option<BString>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>,
 }
@@ -31,7 +34,7 @@ impl LibraryInstaller {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         composer: PartialComposerWeakHandle,
-        r#type: Option<String>,
+        r#type: Option<BString>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         binary_installer: Option<std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>>,
     ) -> Self {
@@ -47,31 +50,35 @@ impl LibraryInstaller {
 
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
-        let vendor_dir = rtrim(
-            &composer_ref
+        let vendor_dir = PathBuf::from(path_from_bytes(&rtrim2(
+            composer_ref
                 .get_config()
                 .borrow_mut()
-                .get_str("vendor-dir")
+                .get("vendor-dir")
+                .as_string()
                 .unwrap_or_default(),
-            Some("/"),
-        );
+            "/",
+        )));
         let binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>> =
             match binary_installer {
                 Some(binary_installer) => binary_installer,
                 None => {
-                    let bin_dir = rtrim(
-                        &composer_ref
+                    let bin_dir = PathBuf::from(path_from_bytes(&rtrim2(
+                        composer_ref
                             .get_config()
                             .borrow_mut()
-                            .get_str("bin-dir")
+                            .get("bin-dir")
+                            .as_string()
                             .unwrap_or_default(),
-                        Some("/"),
-                    );
+                        "/",
+                    )));
                     let bin_compat = composer_ref
                         .get_config()
                         .borrow_mut()
-                        .get_str("bin-compat")
-                        .unwrap_or_default();
+                        .get("bin-compat")
+                        .as_string()
+                        .unwrap_or_default()
+                        .to_owned();
                     std::rc::Rc::new(std::cell::RefCell::new(BinaryInstaller::new(
                         io.clone(),
                         bin_dir,
@@ -114,22 +121,22 @@ impl LibraryInstaller {
     ///
     /// It is used for BC as getInstallPath tends to be overridden by
     /// installer plugins but not getPackageBasePath
-    fn get_package_base_path(&self, package: PackageInterfaceHandle) -> String {
+    fn get_package_base_path(&self, package: PackageInterfaceHandle) -> PathBuf {
         let install_path = self.get_install_path(package.clone()).unwrap();
         let target_dir = package.get_target_dir();
 
         if let Some(target_dir) = target_dir
             && !target_dir.is_empty()
         {
-            let replaced = preg_replace(
-                format!(
-                    "{{/*{}/?$}}",
-                    preg_quote(&target_dir, None).replace('/', "/+")
+            return PathBuf::from(path_from_bytes(&preg_replace(
+                bconcat!(
+                    "{/*",
+                    str_replace("/", "/+", preg_quote(&target_dir, None)),
+                    "/?$}"
                 ),
                 "",
-                &install_path,
-            );
-            return replaced;
+                path_to_bytes(&install_path),
+            )));
         }
 
         install_path
@@ -154,11 +161,13 @@ impl LibraryInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let initial_download_path = self.get_install_path(initial.clone()).unwrap();
         let target_download_path = self.get_install_path(target.clone()).unwrap();
-        if target_download_path != initial_download_path {
+        if target_download_path.as_os_str() != initial_download_path.as_os_str() {
             // if the target and initial dirs intersect, we force a remove + install
             // to avoid the rename wiping the target dir as part of the initial dir cleanup
-            if strpos(&initial_download_path, &target_download_path) == Some(0)
-                || strpos(&target_download_path, &initial_download_path) == Some(0)
+            let initial_bytes = path_to_bytes(&initial_download_path);
+            let target_bytes = path_to_bytes(&target_download_path);
+            if strpos(initial_bytes, target_bytes) == Some(0)
+                || strpos(target_bytes, initial_bytes) == Some(0)
             {
                 // PHP: return $this->removeCode($initial)->then(fn () => $this->installCode($target));
                 let _ = self.remove_code(initial).await?;
@@ -191,8 +200,8 @@ impl LibraryInstaller {
     fn initialize_vendor_dir(&self) {
         self.filesystem
             .borrow_mut()
-            .ensure_directory_exists(&self.vendor_dir.borrow());
-        let realpath = realpath(self.vendor_dir.borrow().as_str()).unwrap_or_default();
+            .ensure_directory_exists(&*self.vendor_dir.borrow());
+        let realpath = realpath(&*self.vendor_dir.borrow()).unwrap_or_default();
         *self.vendor_dir.borrow_mut() = realpath;
     }
 
@@ -203,11 +212,8 @@ impl LibraryInstaller {
         assert!(
             self.download_manager.is_some(),
             "{}",
-            LogicException::new(format!(
-                    "{} should be initialized with a fully loaded Composer instance to be able to install/... packages",
-                    "LibraryInstaller",
-                ))
-            .get_message()
+            LogicException::new(bconcat!("LibraryInstaller", " should be initialized with a fully loaded Composer instance to be able to install/... packages"))
+            .get_message().display_lossy()
         );
 
         self.download_manager.as_ref().unwrap()
@@ -216,9 +222,9 @@ impl LibraryInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for LibraryInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &BStr) -> anyhow::Result<bool> {
         Ok(match &self.r#type {
-            Some(t) => package_type == t,
+            Some(t) => package_type == t.as_bstr(),
             None => true,
         })
     }
@@ -269,7 +275,7 @@ impl InstallerInterface for LibraryInstaller {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -284,7 +290,7 @@ impl InstallerInterface for LibraryInstaller {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -337,9 +343,9 @@ impl InstallerInterface for LibraryInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                initial
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                initial.to_php_string()
             ))
             .into());
         }
@@ -370,9 +376,9 @@ impl InstallerInterface for LibraryInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(format!(
-                "Package is not installed: {}",
-                package
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Package is not installed: ",
+                package.to_php_string()
             ))
             .into());
         }
@@ -385,42 +391,45 @@ impl InstallerInterface for LibraryInstaller {
             .remove_binaries(package.clone());
         repo.borrow_mut().remove_package(package.clone());
 
-        if strpos(&package.get_name(), "/").is_some_and(|pos| pos != 0) {
-            let package_vendor_dir = dirname(&download_path);
-            if is_dir(&package_vendor_dir)
-                && self.filesystem.borrow().is_dir_empty(&package_vendor_dir)
+        if strpos(package.get_name(), "/").is_some_and(|pos| pos != 0) {
+            let package_vendor_dir = dirname(path_to_bytes(&download_path));
+            if is_dir(path_from_bytes(&package_vendor_dir))
+                && self
+                    .filesystem
+                    .borrow()
+                    .is_dir_empty(path_from_bytes(&package_vendor_dir))
             {
-                let _ = rmdir(&package_vendor_dir);
+                let _ = rmdir(path_from_bytes(&package_vendor_dir));
             }
         }
 
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
         self.initialize_vendor_dir();
 
         let vendor_dir = self.vendor_dir.borrow();
-        let base_path = format!(
-            "{}{}",
-            if !vendor_dir.is_empty() {
-                format!("{}/", vendor_dir)
+        let base_path = bconcat!(
+            if !vendor_dir.as_os_str().is_empty() {
+                bconcat!(vendor_dir.as_path(), "/")
             } else {
-                String::new()
+                BString::default()
             },
             package.get_pretty_name(),
         );
         let target_dir = package.get_target_dir();
 
-        Some(if let Some(target_dir) = target_dir {
+        let install_path = if let Some(target_dir) = target_dir {
             if !target_dir.is_empty() {
-                format!("{}/{}", base_path, target_dir)
+                bconcat!(base_path, "/", target_dir)
             } else {
                 base_path
             }
         } else {
             base_path
-        })
+        };
+        Some(PathBuf::from(path_from_bytes(&install_path)))
     }
 
     fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {

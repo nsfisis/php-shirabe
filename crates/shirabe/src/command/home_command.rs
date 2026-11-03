@@ -3,13 +3,14 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::package::CompletePackageInterfaceHandle;
 use crate::repository::{RepositoryFactory, RootPackageRepository};
 use crate::util::{Platform, ProcessExecutor};
-use shirabe_php_shim::{filter_var_url, impl_php_class};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{bconcat, filter_var_url, impl_php_class};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -43,11 +44,11 @@ impl HomeCommand {
         show_only: bool,
     ) -> bool {
         let support = package.get_support();
-        let mut url: Option<String> = support
-            .get("source")
+        let mut url: Option<BString> = support
+            .get(bstr::B("source"))
             .cloned()
             .or_else(|| package.get_source_url());
-        if url.as_deref().is_none_or(|s| s.is_empty()) || show_homepage {
+        if url.as_ref().is_none_or(|s| s.is_empty()) || show_homepage {
             url = package.get_homepage();
         }
 
@@ -62,18 +63,28 @@ impl HomeCommand {
         }
 
         if show_only {
-            self.get_io().write(&format!("<info>{}</info>", url));
+            self.get_io().write(bconcat!("<info>", url, "</info>"));
         } else {
-            self.open_browser(&url);
+            self.open_browser(BStr::new(&url));
         }
 
         true
     }
 
-    fn open_browser(&self, url: &str) {
+    fn open_browser(&self, url: &BStr) {
         let process = ProcessExecutor::new(Some(self.get_io().clone()));
+        let url_arg = BString::from(url);
         if Platform::is_windows() {
-            let _ = process.execute(&["start", "\"web\"", "explorer", url], (), None);
+            let _ = process.execute(
+                &[
+                    BString::from("start"),
+                    BString::from("\"web\""),
+                    BString::from("explorer"),
+                    url_arg,
+                ],
+                (),
+                None,
+            );
             return;
         }
 
@@ -83,12 +94,12 @@ impl HomeCommand {
         let osx = process.execute(&["which", "open"], (), None).unwrap_or(1);
 
         if linux == 0 {
-            let _ = process.execute(&["xdg-open", url], (), None);
+            let _ = process.execute(&[BString::from("xdg-open"), url_arg], (), None);
         } else if osx == 0 {
-            let _ = process.execute(&["open", url], (), None);
+            let _ = process.execute(&[BString::from("open"), url_arg], (), None);
         } else {
-            self.get_io().write_error(&format!(
-                "No suitable browser opening command found, open yourself: {}",
+            self.get_io().write_error(bconcat!(
+                "No suitable browser opening command found, open yourself: ",
                 url
             ));
         }
@@ -124,9 +135,11 @@ impl HomeCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for HomeCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("browse")?;
-        self.set_aliases(vec!["home".to_string()])?;
-        self.set_description("Opens the package's repository URL or homepage in your browser");
+        self.set_name("browse".into())?;
+        self.set_aliases(vec!["home".into()])?;
+        self.set_description(
+            "Opens the package's repository URL or homepage in your browser".into(),
+        );
         self.set_definition(&[
             InputArgument::new5(
                 "packages",
@@ -139,7 +152,7 @@ impl Command for HomeCommand {
             .into(),
             InputOption::new(
                 "homepage",
-                Some("H"),
+                Some("H".into()),
                 Some(InputOption::VALUE_NONE),
                 "Open the homepage instead of the repository URL.",
                 None,
@@ -148,7 +161,7 @@ impl Command for HomeCommand {
             .into(),
             InputOption::new(
                 "show",
-                Some("s"),
+                Some("s".into()),
                 Some(InputOption::VALUE_NONE),
                 "Only show the homepage or repository URL.",
                 None,
@@ -161,7 +174,8 @@ impl Command for HomeCommand {
             homepage in your default browser.\n\n\
             To open the homepage by default, use -H or --homepage.\n\
             To show instead of open the repository or homepage URL, use -s or --show.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#browse-home",
+            Read more at https://getcomposer.org/doc/03-cli.md#browse-home"
+                .into(),
         );
         Ok(())
     }
@@ -175,11 +189,11 @@ impl Command for HomeCommand {
         let io = self.get_io().clone();
         let mut return_code: i64 = 0;
 
-        let packages: Vec<String> = input
+        let packages: Vec<bstr::BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
         let packages = if packages.is_empty() {
@@ -207,7 +221,7 @@ impl Command for HomeCommand {
             let mut package_exists = false;
 
             'repos: for repo in &repos {
-                for package in repo.find_packages(package_name, None)? {
+                for package in repo.find_packages(bstr::BStr::new(package_name), None)? {
                     package_exists = true;
                     if let Some(complete_pkg) = package.as_complete()
                         && self.handle_package(complete_pkg, show_homepage, show_only)
@@ -220,9 +234,10 @@ impl Command for HomeCommand {
 
             if !package_exists {
                 return_code = 1;
-                io.write_error(&format!(
-                    "<warning>Package {} not found</warning>",
-                    package_name
+                io.write_error(bconcat!(
+                    "<warning>Package ",
+                    package_name,
+                    " not found</warning>"
                 ));
             }
 
@@ -233,7 +248,13 @@ impl Command for HomeCommand {
                 } else {
                     "Invalid or missing repository URL"
                 };
-                io.write_error(&format!("<warning>{} for {}</warning>", msg, package_name));
+                io.write_error(bconcat!(
+                    "<warning>",
+                    msg,
+                    " for ",
+                    package_name,
+                    "</warning>"
+                ));
             }
         }
 

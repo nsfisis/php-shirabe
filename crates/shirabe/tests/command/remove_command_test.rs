@@ -4,11 +4,13 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::{error_message, path_from_bytes, trim};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -17,7 +19,7 @@ const SUCCESS: i32 = 0;
 const FAILURE: i32 = 1;
 const INVALID: i32 = 2;
 
-fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
         .map(|(k, v)| (ParameterName::of(k), v))
@@ -25,10 +27,10 @@ fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
 }
 
 /// Read a JSON file in the CWD and decode it to a `serde_json::Value`.
-fn read_json_file(path: &str) -> serde_json::Value {
-    let json = JsonFile::new(path.to_string(), None, None).unwrap();
+fn read_json_file(path: &BStr) -> serde_json::Value {
+    let json = JsonFile::new(path_from_bytes(&path), None, None).unwrap();
     let read = json.read().unwrap();
-    serde_json::from_str(&JsonFile::encode(&read).unwrap()).unwrap()
+    serde_json::from_slice(&JsonFile::encode(&read).unwrap()).unwrap()
 }
 
 /// Mirrors PHPUnit's assertEmpty for a decoded JSON document (empty object/array/null).
@@ -47,13 +49,12 @@ fn test_exception_running_with_no_remove_packages() {
     let mut app_tester = get_application_tester();
     let err = app_tester
         .run(
-            input(vec![("command", InputValue::from("remove"))]),
+            input(vec![(BStr::new("command"), InputValue::from("remove"))]),
             RunOptions::default(),
         )
         .expect_err("expected InvalidArgumentException for missing packages argument");
     assert!(
-        err.to_string()
-            .contains(r#"Not enough arguments (missing: "packages")."#),
+        error_message(&err).contains_str(r#"Not enough arguments (missing: "packages")."#),
         "got: {}",
         err
     );
@@ -68,15 +69,16 @@ fn test_exception_when_running_unused_without_lock_file() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("--unused", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (BStr::new("--unused"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .expect_err("expected UnexpectedValueException when --unused without lock file");
     assert!(
-        err.to_string()
-            .contains("A valid composer.lock file is required to run this command with --unused"),
+        error_message(&err).contains_str(
+            "A valid composer.lock file is required to run this command with --unused"
+        ),
         "got: {}",
         err
     );
@@ -94,10 +96,10 @@ fn test_warning_when_removing_non_existent_package() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
+                (BStr::new("command"), InputValue::from("remove")),
                 (
-                    "packages",
-                    InputValue::Array(vec!["vendor1/package1".to_string()]),
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["vendor1/package1".into()]),
                 ),
             ]),
             RunOptions::default(),
@@ -105,11 +107,10 @@ fn test_warning_when_removing_non_existent_package() {
         .unwrap();
     assert_eq!(SUCCESS, status_code);
     assert!(
-        app_tester.get_display().trim().starts_with(
-            "<warning>vendor1/package1 is not required in your composer.json and has not been removed</warning>"
+        trim(app_tester.get_display()).starts_with_str("<warning>vendor1/package1 is not required in your composer.json and has not been removed</warning>"
         ),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
 
     drop(tear_down);
@@ -131,11 +132,14 @@ fn test_warning_when_removing_package_from_wrong_type() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
-                ("--dev", InputValue::from(true)),
-                ("--no-update", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into()]),
+                ),
+                (BStr::new("--dev"), InputValue::from(true)),
+                (BStr::new("--no-update"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -144,11 +148,11 @@ fn test_warning_when_removing_package_from_wrong_type() {
     assert_eq!(
         "<warning>root/req could not be found in require-dev but it is present in require</warning>
 ./composer.json has been updated",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert_eq!(
         serde_json::json!({ "require": { "root/req": "1.*" } }),
-        read_json_file("./composer.json")
+        read_json_file(BStr::new("./composer.json"))
     );
 
     drop(tear_down);
@@ -170,11 +174,17 @@ fn test_warning_when_removing_package_with_deprecated_dependencies_flag() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
-                ("--update-with-dependencies", InputValue::from(true)),
-                ("--no-update", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into()]),
+                ),
+                (
+                    BStr::new("--update-with-dependencies"),
+                    InputValue::from(true),
+                ),
+                (BStr::new("--no-update"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -183,12 +193,12 @@ fn test_warning_when_removing_package_with_deprecated_dependencies_flag() {
     assert_eq!(
         "<warning>You are using the deprecated option \"update-with-dependencies\". This is now default behaviour. The --no-update-with-dependencies option can be used to remove a package without its dependencies.</warning>
 ./composer.json has been updated",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert!(
-        is_empty_json(&read_json_file("./composer.json")),
+        is_empty_json(&read_json_file(BStr::new("./composer.json"))),
         "expected composer.json to be empty, got: {}",
-        read_json_file("./composer.json")
+        read_json_file(BStr::new("./composer.json"))
     );
 
     drop(tear_down);
@@ -218,16 +228,16 @@ fn test_message_output_when_no_unused_packages_to_remove() {
     let required_package = get_package("root/req", "1.0.0");
     let mut requires = IndexMap::new();
     requires.insert(
-        "nested/req".to_string(),
+        BString::from("nested/req"),
         Link::new(
-            "root/req".to_string(),
-            "nested/req".to_string(),
+            BString::from("root/req"),
+            BString::from("nested/req"),
             AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-            Some(Link::TYPE_REQUIRE.to_string()),
-            "^1".to_string(),
+            Some(Link::TYPE_REQUIRE.to_owned()),
+            BString::from("^1"),
         ),
     );
-    required_package.__set_requires(requires);
+    required_package.__set_requires(requires.into_iter().collect::<indexmap::IndexMap<_, _>>());
     let nested_package = get_package("nested/req", "1.1.0");
 
     let packages: Vec<PackageInterfaceHandle> = vec![required_package, nested_package];
@@ -238,10 +248,10 @@ fn test_message_output_when_no_unused_packages_to_remove() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("--unused", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (BStr::new("--unused"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -249,7 +259,7 @@ fn test_message_output_when_no_unused_packages_to_remove() {
     assert_eq!(SUCCESS, status_code);
     assert_eq!(
         "No unused packages to remove",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
 
     drop(tear_down);
@@ -286,35 +296,34 @@ fn test_remove_unused_package() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("--unused", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (BStr::new("--unused"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .unwrap();
     assert_eq!(SUCCESS, status_code);
     assert!(
-        app_tester.get_display().starts_with(
-            "<warning>not/req is not required in your composer.json and has not been removed</warning>"
+        app_tester.get_display().starts_with_str("<warning>not/req is not required in your composer.json and has not been removed</warning>"
         ),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
     assert!(
         app_tester
             .get_display()
-            .contains("Running shirabe update not/req"),
+            .contains_str("Running shirabe update not/req"),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
     assert!(
         app_tester
             .get_display()
-            .contains("- Removing not/req (1.0.0)"),
+            .contains_str("- Removing not/req (1.0.0)"),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
 
     drop(tear_down);
@@ -344,8 +353,8 @@ fn test_remove_package_by_name() {
     let root_another_package = get_package("root/another", "1.0.0");
     // Set as a metapackage so that we can do the whole post-remove update & install process without
     // Composer trying to download them (DownloadManager::getDownloaderForPackage).
-    root_req_package.__set_type("metapackage".to_string());
-    root_another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(BString::from("metapackage"));
+    root_another_package.__set_type(BString::from("metapackage"));
 
     let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
@@ -355,49 +364,52 @@ fn test_remove_package_by_name() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into()]),
+                ),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .unwrap();
     assert_eq!(SUCCESS, status_code);
     let display = app_tester.get_display();
-    let trimmed = display.trim();
+    let trimmed = trim(&display);
     assert!(
-        trimmed.starts_with("./composer.json has been updated"),
+        trimmed.starts_with_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Running shirabe update root/req"),
+        trimmed.contains_str("Running shirabe update root/req"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        trimmed.contains_str("Lock file operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("- Removing root/req (1.0.0)"),
+        trimmed.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Package operations: 0 installs, 0 updates, 1 removal"),
+        trimmed.contains_str("Package operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert_eq!(
         serde_json::json!({ "root/another": "1.*" }),
-        read_json_file("./composer.json")["require"]
+        read_json_file(BStr::new("./composer.json"))["require"]
     );
     assert_eq!(
         serde_json::json!([{"name": "root/another", "version": "1.0.0", "type": "metapackage"}]),
-        read_json_file("./composer.lock")["packages"]
+        read_json_file(BStr::new("./composer.lock"))["packages"]
     );
 
     drop(tear_down);
@@ -425,8 +437,8 @@ fn test_remove_package_by_name_with_dry_run() {
     );
     let root_req_package = get_package("root/req", "1.0.0");
     let root_another_package = get_package("root/another", "1.0.0");
-    root_req_package.__set_type("metapackage".to_string());
-    root_another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(BString::from("metapackage"));
+    root_another_package.__set_type(BString::from("metapackage"));
 
     let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
@@ -436,53 +448,56 @@ fn test_remove_package_by_name_with_dry_run() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into()]),
+                ),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
         .unwrap();
     assert_eq!(SUCCESS, status_code);
     let display = app_tester.get_display();
-    let trimmed = display.trim();
+    let trimmed = trim(&display);
     assert!(
-        trimmed.contains("./composer.json has been updated"),
+        trimmed.contains_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Running shirabe update root/req"),
+        trimmed.contains_str("Running shirabe update root/req"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        trimmed.contains_str("Lock file operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("- Removing root/req (1.0.0)"),
+        trimmed.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        trimmed.contains("Package operations: 0 installs, 0 updates, 1 removal"),
+        trimmed.contains_str("Package operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert_eq!(
         serde_json::json!({ "root/req": "1.*", "root/another": "1.*" }),
-        read_json_file("./composer.json")["require"]
+        read_json_file(BStr::new("./composer.json"))["require"]
     );
     assert_eq!(
         serde_json::json!([
             {"name": "root/another", "version": "1.0.0", "type": "metapackage"},
             {"name": "root/req", "version": "1.0.0", "type": "metapackage"},
         ]),
-        read_json_file("./composer.lock")["packages"]
+        read_json_file(BStr::new("./composer.lock"))["packages"]
     );
 
     drop(tear_down);
@@ -511,8 +526,8 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     );
     let root_req_package = get_package("root/req", "1.0.0");
     let root_another_package = get_package("root/another", "1.0.0");
-    root_req_package.__set_type("metapackage".to_string());
-    root_another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(BString::from("metapackage"));
+    root_another_package.__set_type(BString::from("metapackage"));
 
     let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
@@ -522,10 +537,13 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into()]),
+                ),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -533,12 +551,12 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     assert_eq!(SUCCESS, status_code);
     assert_eq!(
         serde_json::json!({ "root/another": "1.*" }),
-        read_json_file("./composer.json")["require"]
+        read_json_file(BStr::new("./composer.json"))["require"]
     );
     assert!(
-        is_empty_json(&read_json_file("./composer.json")["config"]),
+        is_empty_json(&read_json_file(BStr::new("./composer.json"))["config"]),
         "expected config to be empty, got: {}",
-        read_json_file("./composer.json")["config"]
+        read_json_file(BStr::new("./composer.json"))["config"]
     );
 
     drop(tear_down);
@@ -567,17 +585,20 @@ fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
     );
     let root_req_package = get_package("root/req", "1.0.0");
     let root_another_package = get_package("root/another", "1.0.0");
-    root_req_package.__set_type("metapackage".to_string());
-    root_another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(BString::from("metapackage"));
+    root_another_package.__set_type(BString::from("metapackage"));
 
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into()]),
+                ),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -585,11 +606,11 @@ fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
     assert_eq!(SUCCESS, status_code);
     assert_eq!(
         serde_json::json!({ "root/another": "1.*" }),
-        read_json_file("./composer.json")["require"]
+        read_json_file(BStr::new("./composer.json"))["require"]
     );
     assert_eq!(
         serde_json::json!({ "allow-plugins": { "root/another": true } }),
-        read_json_file("./composer.json")["config"]
+        read_json_file(BStr::new("./composer.json"))["config"]
     );
 
     drop(tear_down);
@@ -629,11 +650,14 @@ fn test_remove_packages_by_vendor() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/*".to_string()])),
-                ("--no-install", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/*".into()]),
+                ),
+                (BStr::new("--no-install"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -641,35 +665,37 @@ fn test_remove_packages_by_vendor() {
     assert_eq!(SUCCESS, status_code);
     let display = app_tester.get_display();
     assert!(
-        display
-            .trim()
-            .starts_with("./composer.json has been updated"),
+        trim(&display).starts_with_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("Running shirabe update root/*"),
+        display.contains_str("Running shirabe update root/*"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("- Removing root/another (1.0.0)"),
+        display.contains_str("- Removing root/another (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("- Removing root/req (1.0.0)"),
+        display.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
-    assert!(display.contains("Writing lock file"), "got: {}", display);
+    assert!(
+        display.contains_str("Writing lock file"),
+        "got: {}",
+        display.display_lossy()
+    );
     assert_eq!(
         serde_json::json!({ "another/req": "1.*" }),
-        read_json_file("./composer.json")["require"]
+        read_json_file(BStr::new("./composer.json"))["require"]
     );
     assert_eq!(
         serde_json::json!([{"name": "another/req", "version": "1.0.0", "type": "library"}]),
-        read_json_file("./composer.lock")["packages"]
+        read_json_file(BStr::new("./composer.lock"))["packages"]
     );
 
     drop(tear_down);
@@ -709,12 +735,15 @@ fn test_remove_packages_by_vendor_with_dry_run() {
     app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/*".to_string()])),
-                ("--dry-run", InputValue::from(true)),
-                ("--no-install", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/*".into()]),
+                ),
+                (BStr::new("--dry-run"), InputValue::from(true)),
+                (BStr::new("--no-install"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -728,16 +757,16 @@ Updating dependencies
 Lock file operations: 0 installs, 0 updates, 2 removals
   - Removing root/another (1.0.0)
   - Removing root/req (1.0.0)",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert!(
-        !app_tester.get_display().contains("Writing lock file"),
+        !app_tester.get_display().contains_str("Writing lock file"),
         "got: {}",
-        app_tester.get_display()
+        app_tester.get_display().display_lossy()
     );
     assert_eq!(
         serde_json::json!({ "root/req": "1.*", "root/another": "1.*", "another/req": "1.*" }),
-        read_json_file("./composer.json")["require"]
+        read_json_file(BStr::new("./composer.json"))["require"]
     );
     assert_eq!(
         serde_json::json!([
@@ -745,7 +774,7 @@ Lock file operations: 0 installs, 0 updates, 2 removals
             {"name": "root/another", "version": "1.0.0", "type": "library"},
             {"name": "root/req", "version": "1.0.0", "type": "library"},
         ]),
-        read_json_file("./composer.lock")["packages"]
+        read_json_file(BStr::new("./composer.lock"))["packages"]
     );
 
     drop(tear_down);
@@ -767,11 +796,14 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/*".to_string()])),
-                ("--dev", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
-                ("--no-update", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/*".into()]),
+                ),
+                (BStr::new("--dev"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
+                (BStr::new("--no-update"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -781,13 +813,13 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
         "<warning>root/req could not be found in require-dev but it is present in require</warning>
 <warning>root/another could not be found in require-dev but it is present in require</warning>
 ./composer.json has been updated",
-        app_tester.get_display().trim()
+        trim(app_tester.get_display())
     );
     assert_eq!(
         serde_json::json!({
             "require": { "root/req": "1.*", "root/another": "1.*", "another/req": "1.*" }
         }),
-        read_json_file("./composer.json")
+        read_json_file(BStr::new("./composer.json"))
     );
 
     drop(tear_down);
@@ -813,11 +845,14 @@ fn test_package_still_present_error_when_no_install_flag_used() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
-                ("--no-install", InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into()]),
+                ),
+                (BStr::new("--no-install"), InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -825,37 +860,41 @@ fn test_package_still_present_error_when_no_install_flag_used() {
     assert_eq!(INVALID, status_code);
     let display = app_tester.get_display();
     assert!(
-        display.contains("./composer.json has been updated"),
+        display.contains_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        display.contains_str("Lock file operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("- Removing root/req (1.0.0)"),
+        display.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
+        display.display_lossy()
     );
-    assert!(display.contains("Writing lock file"), "got: {}", display);
     assert!(
-        display.contains(
+        display.contains_str("Writing lock file"),
+        "got: {}",
+        display.display_lossy()
+    );
+    assert!(
+        display.contains_str(
             "Removal failed, root/req is still present, it may be required by another package. See `shirabe why root/req`"
         ),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        is_empty_json(&read_json_file("./composer.json")),
+        is_empty_json(&read_json_file(BStr::new("./composer.json"))),
         "expected composer.json to be empty, got: {}",
-        read_json_file("./composer.json")
+        read_json_file(BStr::new("./composer.json"))
     );
     assert!(
-        is_empty_json(&read_json_file("./composer.lock")["packages"]),
+        is_empty_json(&read_json_file(BStr::new("./composer.lock"))["packages"]),
         "expected composer.lock packages to be empty, got: {}",
-        read_json_file("./composer.lock")["packages"]
+        read_json_file(BStr::new("./composer.lock"))["packages"]
     );
     assert_eq!(
         serde_json::json!([{
@@ -865,7 +904,7 @@ fn test_package_still_present_error_when_no_install_flag_used() {
             "type": "library",
             "install-path": "../root/req"
         }]),
-        read_json_file("./vendor/composer/installed.json")["packages"]
+        read_json_file(BStr::new("./vendor/composer/installed.json"))["packages"]
     );
 
     drop(tear_down);
@@ -874,8 +913,8 @@ fn test_package_still_present_error_when_no_install_flag_used() {
 /// ref: RemoveCommandTest::testUpdateInheritedDependenciesFlagIsPassedToPostRemoveInstaller
 /// (data provider provideInheritedDependenciesUpdateFlag).
 fn run_update_inherited_dependencies_flag_case(
-    install_flag_name: &str,
-    expected_composer_update_command: &str,
+    install_flag_name: &BStr,
+    expected_composer_update_command: &BStr,
 ) {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -894,7 +933,7 @@ fn run_update_inherited_dependencies_flag_case(
         true,
     );
     let root_req_package = get_package("root/req", "1.0.0");
-    root_req_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(BString::from("metapackage"));
 
     create_installed_json(std::slice::from_ref(&root_req_package), &[], true);
     create_composer_lock(std::slice::from_ref(&root_req_package), &[]);
@@ -903,11 +942,14 @@ fn run_update_inherited_dependencies_flag_case(
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                (BStr::new("command"), InputValue::from("remove")),
+                (
+                    BStr::new("packages"),
+                    InputValue::Array(vec!["root/req".into()]),
+                ),
                 (install_flag_name, InputValue::from(true)),
-                ("--no-audit", InputValue::from(true)),
-                ("--no-interaction", InputValue::from(true)),
+                (BStr::new("--no-audit"), InputValue::from(true)),
+                (BStr::new("--no-interaction"), InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -915,35 +957,39 @@ fn run_update_inherited_dependencies_flag_case(
     assert_eq!(SUCCESS, status_code);
     let display = app_tester.get_display();
     assert!(
-        display.contains("./composer.json has been updated"),
+        display.contains_str("./composer.json has been updated"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains(expected_composer_update_command),
+        display.contains_str(expected_composer_update_command),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("Package operations: 0 installs, 0 updates, 1 removal"),
+        display.contains_str("Package operations: 0 installs, 0 updates, 1 removal"),
         "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        display.contains("- Removing root/req (1.0.0)"),
+        display.contains_str("- Removing root/req (1.0.0)"),
         "got: {}",
-        display
-    );
-    assert!(display.contains("Writing lock file"), "got: {}", display);
-    assert!(
-        display.contains("Lock file operations: 0 installs, 0 updates, 1 removal"),
-        "got: {}",
-        display
+        display.display_lossy()
     );
     assert!(
-        is_empty_json(&read_json_file("./composer.lock")["packages"]),
+        display.contains_str("Writing lock file"),
+        "got: {}",
+        display.display_lossy()
+    );
+    assert!(
+        display.contains_str("Lock file operations: 0 installs, 0 updates, 1 removal"),
+        "got: {}",
+        display.display_lossy()
+    );
+    assert!(
+        is_empty_json(&read_json_file(BStr::new("./composer.lock"))["packages"]),
         "expected composer.lock packages to be empty, got: {}",
-        read_json_file("./composer.lock")["packages"]
+        read_json_file(BStr::new("./composer.lock"))["packages"]
     );
 
     drop(tear_down);
@@ -954,17 +1000,17 @@ fn run_update_inherited_dependencies_flag_case(
 fn test_update_inherited_dependencies_flag_is_passed_to_post_remove_installer() {
     // 'update with all dependencies'
     run_update_inherited_dependencies_flag_case(
-        "--update-with-all-dependencies",
-        "Running shirabe update root/req --with-all-dependencies",
+        BStr::new("--update-with-all-dependencies"),
+        BStr::new("Running shirabe update root/req --with-all-dependencies"),
     );
     // 'with all dependencies'
     run_update_inherited_dependencies_flag_case(
-        "--with-all-dependencies",
-        "Running shirabe update root/req --with-all-dependencies",
+        BStr::new("--with-all-dependencies"),
+        BStr::new("Running shirabe update root/req --with-all-dependencies"),
     );
     // 'no update with dependencies'
     run_update_inherited_dependencies_flag_case(
-        "--no-update-with-dependencies",
-        "Running shirabe update root/req --with-dependencies",
+        BStr::new("--no-update-with-dependencies"),
+        BStr::new("Running shirabe update root/req --with-dependencies"),
     );
 }

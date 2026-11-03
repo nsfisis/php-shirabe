@@ -5,13 +5,16 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, ProcessExecutor};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, impl_php_class, php_regex, preg_is_match, preg_split, realpath,
+    PhpMixed, RuntimeException, bconcat, impl_php_class, implode, path_from_bytes, php_regex,
+    preg_is_match, preg_split, realpath, trim,
 };
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct FossilDownloader {
@@ -34,20 +37,21 @@ impl FossilDownloader {
 
     fn execute(
         &self,
-        command: Vec<String>,
-        cwd: Option<String>,
-        output: &mut String,
+        command: Vec<BString>,
+        cwd: Option<&Path>,
+        output: &mut BString,
     ) -> anyhow::Result<()> {
         if self
             .inner
             .process
             .borrow_mut()
-            .execute(&command, output, cwd.as_deref())?
+            .execute(&command, output, cwd)?
             != 0
         {
-            return Err(RuntimeException::new(format!(
-                "Failed to execute {}\n\n{}",
-                command.join(" "),
+            return Err(RuntimeException::new(bconcat!(
+                "Failed to execute ",
+                implode(" ", &command),
+                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -73,15 +77,15 @@ impl VcsDownloader for FossilDownloader {
         &self.inner.filesystem
     }
 
-    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.inner.has_cleaned_changes
     }
 
     async fn do_download(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &str,
-        _url: &str,
+        _path: &Path,
+        _url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -90,8 +94,8 @@ impl VcsDownloader for FossilDownloader {
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             url,
@@ -99,21 +103,21 @@ impl VcsDownloader for FossilDownloader {
             &indexmap::IndexMap::new(),
         )?;
 
-        let repo_file = format!("{}.fossil", path);
-        let real_path = realpath(path);
+        let repo_file = bconcat!(path, ".fossil");
+        let real_path: Option<PathBuf> = realpath(path);
 
-        self.inner.io.write_error(&format!(
-            "Cloning {}",
+        self.inner.io.write_error(bconcat!(
+            "Cloning ",
             package.get_source_reference().unwrap_or_default()
         ));
 
-        let mut output = String::new();
+        let mut output = BString::default();
         self.execute(
             vec![
-                "fossil".to_string(),
-                "clone".to_string(),
-                "--".to_string(),
-                url.to_string(),
+                "fossil".into(),
+                "clone".into(),
+                "--".into(),
+                url.into(),
                 repo_file.clone(),
             ],
             None,
@@ -121,23 +125,23 @@ impl VcsDownloader for FossilDownloader {
         )?;
         self.execute(
             vec![
-                "fossil".to_string(),
-                "open".to_string(),
-                "--nested".to_string(),
-                "--".to_string(),
+                "fossil".into(),
+                "open".into(),
+                "--nested".into(),
+                "--".into(),
                 repo_file,
             ],
-            real_path.clone(),
+            real_path.as_deref(),
             &mut output,
         )?;
         self.execute(
             vec![
-                "fossil".to_string(),
-                "update".to_string(),
-                "--".to_string(),
+                "fossil".into(),
+                "update".into(),
+                "--".into(),
                 package.get_source_reference().unwrap_or_default(),
             ],
-            real_path,
+            real_path.as_deref(),
             &mut output,
         )?;
 
@@ -148,8 +152,8 @@ impl VcsDownloader for FossilDownloader {
         &self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
+        path: &Path,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             url,
@@ -157,33 +161,35 @@ impl VcsDownloader for FossilDownloader {
             &indexmap::IndexMap::new(),
         )?;
 
-        self.inner.io.write_error(&format!(
-            " Updating to {}",
+        self.inner.io.write_error(bconcat!(
+            " Updating to ",
             target.get_source_reference().unwrap_or_default()
         ));
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException::new(format!(
-                "The .fslckout file is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                path
-            )).into());
+            return Err(RuntimeException::new(bconcat!(
+                "The .fslckout file is missing from ",
+                path,
+                ", see https://getcomposer.org/commit-deps for more information"
+            ))
+            .into());
         }
 
-        let real_path = realpath(path);
-        let mut output = String::new();
+        let real_path: Option<PathBuf> = realpath(path);
+        let mut output = BString::default();
         self.execute(
-            vec!["fossil".to_string(), "pull".to_string()],
-            real_path.clone(),
+            vec!["fossil".into(), "pull".into()],
+            real_path.as_deref(),
             &mut output,
         )?;
         self.execute(
             vec![
-                "fossil".to_string(),
-                "up".to_string(),
-                "--".to_string(),
+                "fossil".into(),
+                "up".into(),
+                "--".into(),
                 target.get_source_reference().unwrap_or_default(),
             ],
-            real_path,
+            real_path.as_deref(),
             &mut output,
         )?;
 
@@ -192,33 +198,33 @@ impl VcsDownloader for FossilDownloader {
 
     fn get_commit_logs(
         &self,
-        _from_reference: &str,
-        to_reference: &str,
-        path: &str,
-    ) -> anyhow::Result<String> {
-        let mut output = String::new();
+        _from_reference: &bstr::BStr,
+        to_reference: &bstr::BStr,
+        path: &Path,
+    ) -> anyhow::Result<bstr::BString> {
+        let mut output = BString::default();
         self.execute(
             vec![
-                "fossil".to_string(),
-                "timeline".to_string(),
-                "-t".to_string(),
-                "ci".to_string(),
-                "-W".to_string(),
-                "0".to_string(),
-                "-n".to_string(),
-                "0".to_string(),
-                "before".to_string(),
-                to_reference.to_string(),
+                "fossil".into(),
+                "timeline".into(),
+                "-t".into(),
+                "ci".into(),
+                "-W".into(),
+                "0".into(),
+                "-n".into(),
+                "0".into(),
+                "before".into(),
+                to_reference.to_owned(),
             ],
-            realpath(path),
+            realpath(path).as_deref(),
             &mut output,
         )?;
 
-        let mut log = String::new();
-        let match_pattern = format!("/\\d\\d:\\d\\d:\\d\\d\\s+\\[{}\\]/", to_reference);
+        let mut log = BString::default();
+        let match_pattern = bconcat!("/\\d\\d:\\d\\d:\\d\\d\\s+\\[", to_reference, "\\]/");
 
-        let trimmed = output.trim().to_string();
-        let lines: Vec<String> = if trimmed.is_empty() {
+        let trimmed = trim(&output);
+        let lines: Vec<BString> = if trimmed.is_empty() {
             vec![]
         } else {
             preg_split(php_regex!(r"{\r?\n}"), &trimmed)
@@ -228,15 +234,15 @@ impl VcsDownloader for FossilDownloader {
             if preg_is_match(&match_pattern, &line) {
                 break;
             }
-            log.push_str(&line);
+            log.extend_from_slice(&line);
         }
 
         Ok(log)
     }
 
-    fn has_metadata_repository(&self, path: &str) -> bool {
-        std::path::Path::new(&format!("{}/.fslckout", path)).is_file()
-            || std::path::Path::new(&format!("{}/_FOSSIL_", path)).is_file()
+    fn has_metadata_repository(&self, path: &Path) -> bool {
+        path_from_bytes(&bconcat!(path, "/.fslckout")).is_file()
+            || path_from_bytes(&bconcat!(path, "/_FOSSIL_")).is_file()
     }
 }
 
@@ -245,20 +251,20 @@ impl ChangeReportInterface for FossilDownloader {
     async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         if !self.has_metadata_repository(path) {
             return Ok(None);
         }
 
-        let mut output = String::new();
+        let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
-            &["fossil".to_string(), "changes".to_string()],
+            &["fossil", "changes"],
             &mut output,
             realpath(path).as_deref(),
         )?;
 
-        let output = output.trim().to_string();
+        let output = trim(&output);
 
         Ok(if !output.is_empty() {
             Some(output)
@@ -269,8 +275,12 @@ impl ChangeReportInterface for FossilDownloader {
 }
 
 impl VcsCapableDownloaderInterface for FossilDownloader {
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
-        self.inner.get_vcs_reference(package, &path)
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
+        self.inner.get_vcs_reference(package, path)
     }
 }
 
@@ -286,14 +296,14 @@ impl DownloaderInterface for FossilDownloader {
         Some(self)
     }
 
-    fn get_installation_source(&self) -> String {
+    fn get_installation_source(&self) -> BString {
         <Self as VcsDownloader>::get_installation_source(self)
     }
 
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -302,9 +312,9 @@ impl DownloaderInterface for FossilDownloader {
 
     async fn prepare(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -313,7 +323,7 @@ impl DownloaderInterface for FossilDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
@@ -323,7 +333,7 @@ impl DownloaderInterface for FossilDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
@@ -331,7 +341,7 @@ impl DownloaderInterface for FossilDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
@@ -339,9 +349,9 @@ impl DownloaderInterface for FossilDownloader {
 
     async fn cleanup(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await

@@ -24,11 +24,11 @@ pub enum OriginatingEvent {
 
 impl Event {
     pub fn new(
-        name: String,
+        name: impl Into<BString>,
         composer: ComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
-        args: Vec<String>,
+        args: Vec<BString>,
         flags: IndexMap<BString, PhpMixed>,
     ) -> Self {
         Self {
@@ -83,11 +83,11 @@ impl EventInterface for Event {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<bstr::BString> {
         self.inner.get_arguments()
     }
 
@@ -113,14 +113,14 @@ impl EventInterface for OriginatingEvent {
         self
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &bstr::BStr {
         match self {
             OriginatingEvent::Base(e) => e.get_name(),
             OriginatingEvent::Script(e) => e.get_name(),
         }
     }
 
-    fn get_arguments(&self) -> &Vec<String> {
+    fn get_arguments(&self) -> &Vec<bstr::BString> {
         match self {
             OriginatingEvent::Base(e) => e.get_arguments(),
             OriginatingEvent::Script(e) => e.get_arguments(),

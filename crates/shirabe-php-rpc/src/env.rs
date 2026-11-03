@@ -10,6 +10,7 @@
 //! environment is not reflected back into the Rust-side storages.
 
 use crate::PluginValue;
+use bstr::BStr;
 use shirabe_php_shim::{EnvStorageKind, env_mutations_since};
 use std::os::unix::ffi::OsStrExt as _;
 
@@ -17,12 +18,12 @@ use std::os::unix::ffi::OsStrExt as _;
 static SYNCED: std::sync::Mutex<usize> = std::sync::Mutex::new(0);
 
 /// The name `__shirabe_sync_env` reads each mutation's target storage under.
-fn storage_name(storage: EnvStorageKind) -> &'static str {
-    match storage {
+fn storage_name(storage: EnvStorageKind) -> &'static BStr {
+    BStr::new(match storage {
         EnvStorageKind::Process => "process",
         EnvStorageKind::Env => "_ENV",
         EnvStorageKind::Server => "_SERVER",
-    }
+    })
 }
 
 /// Replays the environment mutations recorded since the last flush into the worker.
@@ -51,7 +52,7 @@ pub(crate) fn flush() -> anyhow::Result<()> {
         .collect();
     let outcome = crate::call_function("__shirabe_sync_env", vec![PluginValue::List(mutations)])?;
     // The worker only writes the three storages; nothing it does there can throw.
-    outcome.unwrap_or_else(|throw| panic!("PHP RPC: __shirabe_sync_env threw: {}", throw.message));
+    outcome.unwrap_or_else(|throw| panic!("PHP RPC: __shirabe_sync_env threw: {throw}"));
     *synced = cursor;
     Ok(())
 }

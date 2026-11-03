@@ -11,10 +11,10 @@ pub trait PipesInterface: std::fmt::Debug {
     fn get_descriptors(&mut self) -> Vec<Descriptor>;
 
     /// Returns an array of filenames indexed by their related stream in case these pipes use temporary files.
-    fn get_files(&self) -> IndexMap<i64, String>;
+    fn get_files(&self) -> IndexMap<i64, bstr::BString>;
 
     /// Reads data in file handles and pipes.
-    fn read_and_write(&mut self, blocking: bool, close: bool) -> IndexMap<i64, String>;
+    fn read_and_write(&mut self, blocking: bool, close: bool) -> IndexMap<i64, bstr::BString>;
 
     /// Returns if the current state has open file handles or pipes.
     fn are_open(&self) -> bool;

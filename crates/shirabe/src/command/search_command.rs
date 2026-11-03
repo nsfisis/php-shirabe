@@ -3,18 +3,20 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::repository_interface::{self, AbandonedInfo, RepositoryInterface};
 use crate::repository::{CompositeRepository, PlatformRepository, RepositoryInterfaceHandle};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, impl_php_class, implode, in_array_loose, preg_quote, substr,
+    InvalidArgumentException, PhpMixed, STR_PAD_RIGHT, bconcat, impl_php_class, implode,
+    in_array_loose, preg_quote, str_pad, str_repeat, substr,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -45,12 +47,12 @@ impl SearchCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SearchCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("search")?;
-        self.set_description("Searches for packages");
+        self.set_name("search".into())?;
+        self.set_description("Searches for packages".into());
         self.set_definition(&[
             InputOption::new(
                 "only-name",
-                Some("N"),
+                Some("N".into()),
                 Some(InputOption::VALUE_NONE),
                 "Search only in package names",
                 None,
@@ -59,7 +61,7 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new(
                 "only-vendor",
-                Some("O"),
+                Some("O".into()),
                 Some(InputOption::VALUE_NONE),
                 "Search only for vendor / organization names, returns only \"vendor\" as result",
                 None,
@@ -68,7 +70,7 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new(
                 "type",
-                Some("t"),
+                Some("t".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Search for a specific package type",
                 None,
@@ -77,11 +79,11 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new6(
                 "format",
-                Some("f"),
+                Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
-                Some(InputValue::String("text".to_string())),
-                SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
+                Some(InputValue::from("text")),
+                SuggestedValues::List(vec![BString::from("json"), BString::from("text")]),
             )
             .unwrap()
             .into(),
@@ -97,7 +99,8 @@ impl Command for SearchCommand {
         self.set_help(
             "The search command searches for packages by its name\n\
             <info>shirabe search symfony composer</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#search",
+            Read more at https://getcomposer.org/doc/03-cli.md#search"
+                .into(),
         );
         Ok(())
     }
@@ -114,18 +117,19 @@ impl Command for SearchCommand {
             .borrow()
             .get_option("format")?
             .as_string()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "text".to_string());
+            .map(BString::from)
+            .unwrap_or_else(|| BString::from("text"));
         if !in_array_loose(
             format.clone(),
             &[
-                PhpMixed::string("text".to_string()),
-                PhpMixed::string("json".to_string()),
+                PhpMixed::string(BString::from("text")),
+                PhpMixed::string(BString::from("json")),
             ],
         ) {
-            io.write_error(&format!(
-                "Unsupported format \"{}\". See help for supported formats.",
-                format
+            io.write_error(bconcat!(
+                "Unsupported format \"",
+                format,
+                "\". See help for supported formats."
             ));
             return Ok(1);
         }
@@ -157,12 +161,12 @@ impl Command for SearchCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "search", input.clone(), output);
-        let command_event_name = command_event.get_name().to_string();
+        let command_event_name = command_event.get_name().to_owned();
         let dispatcher = composer_ref.get_event_dispatcher().clone();
         drop(composer_ref);
         dispatcher
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
+            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
         let mut mode: i64 = repository_interface::SEARCH_FULLTEXT;
         if input
@@ -177,9 +181,9 @@ impl Command for SearchCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(InvalidArgumentException::new(
-                    "--only-name and --only-vendor cannot be used together".to_string(),
-                )
+                return Err(InvalidArgumentException::new(BString::from(
+                    "--only-name and --only-vendor cannot be used together",
+                ))
                 .into());
             }
             mode = repository_interface::SEARCH_NAME;
@@ -196,12 +200,12 @@ impl Command for SearchCommand {
             .borrow()
             .get_option("type")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(BString::from);
 
         let tokens_arg = input.borrow().get_argument("tokens")?;
-        let token_strings: Vec<String> = tokens_arg
+        let token_strings: Vec<bstr::BString> = tokens_arg
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         let mut query = implode(" ", &token_strings);
         if mode != repository_interface::SEARCH_FULLTEXT {
@@ -226,28 +230,28 @@ impl Command for SearchCommand {
                 };
                 let remaining = width - name_length - warning.len() as i64 - 2;
                 let description = if description.len() as i64 > remaining {
-                    format!("{}...", substr(&description, 0, Some(remaining - 3)))
+                    bconcat!(substr(&description, 0, Some(remaining - 3)), "...")
                 } else {
                     description
                 };
 
                 let link = result.url.as_deref();
                 if let Some(link) = link {
-                    io.write(&format!(
-                        "<href={}>{}</>{}{}{}",
+                    io.write(bconcat!(
+                        "<href=",
                         OutputFormatter::escape(link)?,
+                        ">",
                         result.name,
-                        " ".repeat(name_length as usize - result.name.len()),
+                        "</>",
+                        str_repeat(" ", name_length as usize - result.name.len()),
                         warning,
                         description
                     ));
                 } else {
-                    io.write(&format!(
-                        "{:<width$}{}{}",
-                        result.name,
+                    io.write(bconcat!(
+                        str_pad(&result.name, name_length as usize, " ", STR_PAD_RIGHT),
                         warning,
-                        description,
-                        width = name_length as usize
+                        description
                     ));
                 }
             }

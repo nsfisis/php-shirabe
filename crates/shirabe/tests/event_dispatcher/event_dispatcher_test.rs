@@ -5,7 +5,7 @@ use crate::php_worker::{
     load_composer_php_runtime, php_eval, php_runtime_available, php_single_quote,
 };
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::autoload::{AutoloadGenerator, AutoloadGeneratorInterface, ClassLoader};
@@ -28,7 +28,9 @@ use shirabe::script::{Event as ScriptEvent, ScriptEvents};
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, RuntimeException, getenv};
+use shirabe_php_shim::{
+    Catch as _, PHP_EOL, PhpMixed, RuntimeException, bconcat, error_message, getenv, path_to_bytes,
+};
 use shirabe_symfony_console::output::output_interface;
 
 fn tear_down() {
@@ -56,9 +58,9 @@ fn create_composer_instance() -> ComposerHandle {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     composer.borrow_mut().set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-        "foo".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0.0".to_string(),
+        BString::from("foo"),
+        BString::from("1.0.0.0"),
+        BString::from("1.0.0"),
     )
     .into();
     composer.borrow_mut().set_package(package);
@@ -115,8 +117,8 @@ fn load_php_listener_class() {
             composer_test_dir().join("TestCase.php"),
             composer_test_dir().join("EventDispatcher/EventDispatcherTest.php"),
         ] {
-            let path = file.to_str().expect("the fixture paths are UTF-8");
-            php_eval(&format!("require {};", php_single_quote(path)));
+            let path = path_to_bytes(&file);
+            php_eval(bconcat!("require ", php_single_quote(path), ";"));
         }
     });
 }
@@ -143,7 +145,7 @@ fn ensure_php_binary() -> bool {
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join("php");
         if candidate.is_file() {
-            Platform::put_env("PHP_BINARY", candidate.to_str().unwrap());
+            Platform::put_env("PHP_BINARY", path_to_bytes(&candidate));
             return true;
         }
     }
@@ -152,7 +154,12 @@ fn ensure_php_binary() -> bool {
 
 fn buffer_io_verbose() -> std::rc::Rc<std::cell::RefCell<BufferIO>> {
     std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), output_interface::VERBOSITY_VERBOSE, None).unwrap(),
+        BufferIO::new(
+            BString::default(),
+            output_interface::VERBOSITY_VERBOSE,
+            None,
+        )
+        .unwrap(),
     ))
 }
 
@@ -174,15 +181,15 @@ fn dispatcher_with_listeners(
 fn dispatcher_stub_for_listeners_test(
     composer: &ComposerHandle,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    listeners: Vec<&str>,
+    listeners: Vec<&BStr>,
 ) -> EventDispatcher {
     let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, None);
     dispatcher.__set_get_listeners_override(listeners_const(listeners));
     dispatcher
 }
 
-fn listeners_const(listeners: Vec<&str>) -> Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> {
-    let listeners: Vec<String> = listeners.into_iter().map(|s| s.to_string()).collect();
+fn listeners_const(listeners: Vec<&BStr>) -> Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> {
+    let listeners: Vec<bstr::BString> = listeners.into_iter().map(|s| s.into()).collect();
     Box::new(move |_event| listeners.iter().cloned().map(Callable::String).collect())
 }
 
@@ -203,7 +210,7 @@ fn test_dispatcher_can_execute_single_command_line_script() {
             &composer,
             null_io(),
             process,
-            listeners_const(vec![command]),
+            listeners_const(vec![BStr::new(command)]),
         );
 
         dispatcher
@@ -236,31 +243,41 @@ fn test_dispatcher_can_execute_composer_script_groups() {
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
-        Box::new(|event| match event.get_name() {
-            "root" => vec![Callable::String("@group".to_string())],
-            "group" => vec![
-                Callable::String("echo -n foo".to_string()),
-                Callable::String("@subgroup".to_string()),
-                Callable::String("echo -n bar".to_string()),
+        Box::new(|event| match &**event.get_name() {
+            b"root" => vec![Callable::String("@group".into())],
+            b"group" => vec![
+                Callable::String("echo -n foo".into()),
+                Callable::String("@subgroup".into()),
+                Callable::String("echo -n bar".into()),
             ],
-            "subgroup" => vec![Callable::String("echo -n baz".to_string())],
+            b"subgroup" => vec![Callable::String("echo -n baz".into())],
             _ => vec![],
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
 
     let mut event = ScriptEvent::new(
-        "root".to_string(),
+        BString::from("root"),
         composer.downgrade(),
         io_dyn,
         false,
         vec![],
         IndexMap::new(),
     );
-    dispatcher.dispatch(Some("root"), Some(&mut event)).unwrap();
+    dispatcher
+        .dispatch(Some("root".into()), Some(&mut event))
+        .unwrap();
 
-    let expected = format!(
-        "> root: @group{eol}> group: echo -n foo{eol}> group: @subgroup{eol}> subgroup: echo -n baz{eol}> group: echo -n bar{eol}",
-        eol = PHP_EOL
+    let expected = bconcat!(
+        "> root: @group",
+        PHP_EOL,
+        "> group: echo -n foo",
+        PHP_EOL,
+        "> group: @subgroup",
+        PHP_EOL,
+        "> subgroup: echo -n baz",
+        PHP_EOL,
+        "> group: echo -n bar",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -274,8 +291,8 @@ fn test_recursion_in_scripts_names() {
         return;
     }
     let (process, _process_guard) = get_process_executor_mock(
-        vec![cmd(format!(
-            "echo Hello {}",
+        vec![cmd(bconcat!(
+            "echo Hello ",
             ProcessExecutor::escape("World")
         ))],
         true,
@@ -287,15 +304,15 @@ fn test_recursion_in_scripts_names() {
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
-        Box::new(|event| match event.get_name() {
-            "hello" => vec![Callable::String("echo Hello".to_string())],
-            "helloWorld" => vec![Callable::String("@hello World".to_string())],
+        Box::new(|event| match &**event.get_name() {
+            b"hello" => vec![Callable::String("echo Hello".into())],
+            b"helloWorld" => vec![Callable::String("@hello World".into())],
             _ => vec![],
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
 
     let mut event = ScriptEvent::new(
-        "helloWorld".to_string(),
+        BString::from("helloWorld"),
         composer.downgrade(),
         io_dyn,
         false,
@@ -303,13 +320,15 @@ fn test_recursion_in_scripts_names() {
         IndexMap::new(),
     );
     dispatcher
-        .dispatch(Some("helloWorld"), Some(&mut event))
+        .dispatch(Some("helloWorld".into()), Some(&mut event))
         .unwrap();
 
-    let expected = format!(
-        "> helloWorld: @hello World{eol}> hello: echo Hello {world}{eol}",
-        eol = PHP_EOL,
-        world = ProcessExecutor::escape("World"),
+    let expected = bconcat!(
+        "> helloWorld: @hello World",
+        PHP_EOL,
+        "> hello: echo Hello ",
+        ProcessExecutor::escape("World"),
+        PHP_EOL,
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -325,22 +344,22 @@ fn test_dispatcher_detect_infinite_recursion() {
     let io = null_io();
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
-        Box::new(|event| match event.get_name() {
-            "root" => vec![Callable::String("@recurse".to_string())],
-            "recurse" => vec![Callable::String("@root".to_string())],
+        Box::new(|event| match &**event.get_name() {
+            b"root" => vec![Callable::String("@recurse".into())],
+            b"recurse" => vec![Callable::String("@root".into())],
             _ => vec![],
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io.clone(), process, callback);
 
     let mut event = ScriptEvent::new(
-        "root".to_string(),
+        BString::from("root"),
         composer.downgrade(),
         io,
         false,
         vec![],
         IndexMap::new(),
     );
-    let result = dispatcher.dispatch(Some("root"), Some(&mut event));
+    let result = dispatcher.dispatch(Some("root".into()), Some(&mut event));
     let err = result.expect_err("infinite recursion must raise a RuntimeException");
     assert!(
         err.is_instanceof::<RuntimeException>(),
@@ -381,9 +400,17 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
     Platform::put_env("COMPOSER_SKIP_SCRIPTS", "scriptName");
 
     let composer = create_composer_instance();
-    let mut scripts: IndexMap<String, Vec<String>> = IndexMap::new();
-    scripts.insert("scriptName".to_string(), vec!["scriptName".to_string()]);
-    composer.borrow().get_package().set_scripts(scripts);
+    let mut scripts: IndexMap<BString, Vec<BString>> = IndexMap::new();
+    scripts.insert(
+        BString::from("scriptName"),
+        vec![BString::from("scriptName")],
+    );
+    composer.borrow().get_package().set_scripts(
+        scripts
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().collect::<Vec<_>>()))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
@@ -391,7 +418,7 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
         EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
 
     let mut event = ScriptEvent::new(
-        "scriptName".to_string(),
+        BString::from("scriptName"),
         composer.downgrade(),
         null_io(),
         false,
@@ -420,7 +447,9 @@ fn test_listener_exceptions_are_caught() {
     let mut dispatcher = dispatcher_stub_for_listeners_test(
         &composer,
         io_dyn,
-        vec!["Composer\\Test\\EventDispatcher\\EventDispatcherTest::call"],
+        vec![BStr::new(
+            "Composer\\Test\\EventDispatcher\\EventDispatcherTest::call",
+        )],
     );
 
     io_mock
@@ -449,97 +478,127 @@ fn test_listener_exceptions_are_caught() {
 
 // PHP mocks `Composer\Autoload\AutoloadGenerator` with onlyMethods(['buildPackageMap',
 // 'parseAutoloads', 'createLoader', 'setDevMode']).
-mockall::mock! {
-    #[derive(Debug)]
-    pub AutoloadGenerator {}
-    impl AutoloadGeneratorInterface for AutoloadGenerator {
-        fn set_dev_mode(&self, dev_mode: bool);
-        fn set_class_map_authoritative(&self, class_map_authoritative: bool);
-        fn set_apcu(&self, apcu: bool, apcu_prefix: Option<String>);
-        fn set_run_scripts(&self, run_scripts: bool);
-        fn set_dry_run(&self, dry_run: bool);
-        fn set_platform_requirement_filter(
-            &self,
-            platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
-        );
-        fn dump(
-            &self,
-            config: &Config,
-            local_repo: shirabe::repository::RepositoryInterfaceHandle,
-            root_package: RootPackageInterfaceHandle,
-            installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-            target_dir: &str,
-            scan_psr_packages: bool,
-            suffix: Option<String>,
-            locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
-            strict_ambiguous: bool,
-        ) -> anyhow::Result<ClassMap>;
-        fn build_package_map(
-            &self,
-            installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-            root_package: RootPackageInterfaceHandle,
-            packages: Vec<PackageInterfaceHandle>,
-        ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>>;
-        fn parse_autoloads(
-            &self,
-            package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
-            root_package: RootPackageInterfaceHandle,
-            filtered_dev_packages: PhpMixed,
-        ) -> IndexMap<BString, PhpMixed>;
-        fn create_loader<'a>(
-            &self,
-            autoloads: &IndexMap<BString, PhpMixed>,
-            vendor_dir: Option<String>,
-        ) -> anyhow::Result<ClassLoader>;
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_autoload_generator {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub AutoloadGenerator {}
+        impl AutoloadGeneratorInterface for AutoloadGenerator {
+            fn set_dev_mode(&self, dev_mode: bool);
+            fn set_class_map_authoritative(&self, class_map_authoritative: bool);
+            fn set_apcu(&self, apcu: bool, apcu_prefix: Option<bstr::BString>);
+            fn set_run_scripts(&self, run_scripts: bool);
+            fn set_dry_run(&self, dry_run: bool);
+            fn set_platform_requirement_filter(
+                &self,
+                platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
+            );
+            fn dump(
+                &self,
+                config: &Config,
+                local_repo: shirabe::repository::RepositoryInterfaceHandle,
+                root_package: RootPackageInterfaceHandle,
+                installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+                target_dir: &bstr::BStr,
+                scan_psr_packages: bool,
+                suffix: Option<bstr::BString>,
+                locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+                strict_ambiguous: bool,
+            ) -> anyhow::Result<ClassMap>;
+            fn build_package_map(
+                &self,
+                installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+                root_package: RootPackageInterfaceHandle,
+                packages: Vec<PackageInterfaceHandle>,
+            ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>>;
+            fn parse_autoloads(
+                &self,
+                package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
+                root_package: RootPackageInterfaceHandle,
+                filtered_dev_packages: PhpMixed,
+            ) -> IndexMap<BString, PhpMixed>;
+            fn create_loader<'a>(
+                &self,
+                autoloads: &IndexMap<BString, PhpMixed>,
+                vendor_dir: Option<bstr::BString>,
+            ) -> anyhow::Result<ClassLoader>;
+        }
     }
 }
+use mock_autoload_generator::MockAutoloadGenerator;
 
 // PHP mocks `Composer\Repository\RepositoryManager` with onlyMethods(['getLocalRepository']).
-mockall::mock! {
-    #[derive(Debug)]
-    pub RepositoryManager {}
-    impl RepositoryManagerInterface for RepositoryManager {
-        fn get_local_repository(&self) -> RepositoryInterfaceHandle;
-        fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
-        fn create_repository<'a>(
-            &self,
-            r#type: &str,
-            config: IndexMap<BString, PhpMixed>,
-            name: Option<&'a str>,
-        ) -> anyhow::Result<RepositoryInterfaceHandle>;
-        fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
-        fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_repository_manager {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub RepositoryManager {}
+        impl RepositoryManagerInterface for RepositoryManager {
+            fn get_local_repository(&self) -> RepositoryInterfaceHandle;
+            fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+            fn create_repository<'a>(
+                &self,
+                r#type: &BStr,
+                config: IndexMap<BString, PhpMixed>,
+                name: Option<&'a bstr::BStr>,
+            ) -> anyhow::Result<RepositoryInterfaceHandle>;
+            fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
+            fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+        }
     }
 }
+use mock_repository_manager::MockRepositoryManager;
 
 // PHP mocks `Composer\Installer\InstallationManager` with disableOriginalConstructor().
-mockall::mock! {
-    #[derive(Debug)]
-    pub InstallationManager {}
-    #[async_trait::async_trait(?Send)]
-    impl InstallationManagerInterface for InstallationManager {
-        fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
-        fn remove_installer(&self, installer: &dyn InstallerInterface);
-        fn disable_plugins(&mut self);
-        fn is_package_installed(
-            &mut self,
-            repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
-            package: PackageInterfaceHandle,
-        ) -> anyhow::Result<bool>;
-        fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
-        async fn execute(
-            &self,
-            repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
-            operations: Vec<std::rc::Rc<AnyOperation>>,
-            dev_mode: bool,
-            run_scripts: bool,
-            download_only: bool,
-        ) -> anyhow::Result<()>;
-        fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
-        fn set_output_progress(&mut self, output_progress: bool);
-        async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    reason = "the code mockall generates"
+)]
+mod mock_installation_manager {
+    use super::*;
+
+    mockall::mock! {
+        #[derive(Debug)]
+        pub InstallationManager {}
+        #[async_trait::async_trait(?Send)]
+        impl InstallationManagerInterface for InstallationManager {
+            fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
+            fn remove_installer(&self, installer: &dyn InstallerInterface);
+            fn disable_plugins(&mut self);
+            fn is_package_installed(
+                &mut self,
+                repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
+                package: PackageInterfaceHandle,
+            ) -> anyhow::Result<bool>;
+            fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
+            async fn execute(
+                &self,
+                repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
+                operations: Vec<std::rc::Rc<AnyOperation>>,
+                dev_mode: bool,
+                run_scripts: bool,
+                download_only: bool,
+            ) -> anyhow::Result<()>;
+            fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf>;
+            fn set_output_progress(&mut self, output_progress: bool);
+            async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+        }
     }
 }
+use mock_installation_manager::MockInstallationManager;
 
 /// ref: EventDispatcherTest::testDispatcherPassDevModeToAutoloadGeneratorForScriptEvents
 #[test]
@@ -583,17 +642,22 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
 
         let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-            "foo".to_string(),
-            "1.0.0.0".to_string(),
-            "1.0.0".to_string(),
+            BString::from("foo"),
+            BString::from("1.0.0.0"),
+            BString::from("1.0.0"),
         )
         .into();
-        let mut scripts: IndexMap<String, Vec<String>> = IndexMap::new();
+        let mut scripts: IndexMap<BString, Vec<BString>> = IndexMap::new();
         scripts.insert(
-            "scriptName".to_string(),
-            vec!["ClassName::testMethod".to_string()],
+            BString::from("scriptName"),
+            vec![BString::from("ClassName::testMethod")],
         );
-        package.set_scripts(scripts);
+        package.set_scripts(
+            scripts
+                .into_iter()
+                .map(|(k, v)| (k, v.into_iter().collect::<Vec<_>>()))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        );
         composer.borrow_mut().set_package(package);
 
         let mut repository_manager = MockRepositoryManager::new();
@@ -617,7 +681,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
 
         let mut event = ScriptEvent::new(
-            "scriptName".to_string(),
+            BString::from("scriptName"),
             composer.downgrade(),
             null_io(),
             dev_mode,
@@ -626,7 +690,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
         );
 
         dispatcher
-            .dispatch(Some("scriptName"), Some(&mut event))
+            .dispatch(Some("scriptName".into()), Some(&mut event))
             .unwrap();
     }
 }
@@ -658,38 +722,51 @@ fn test_dispatcher_remove_listener() {
         };
     let listener = Callable::PhpMethod(this.clone(), "someMethod".into());
     let listener2 = Callable::PhpMethod(this.clone(), "someMethod2".into());
-    let listener3 = Callable::String(
-        "Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod".to_string(),
-    );
+    let listener3 = Callable::String(BString::from(
+        "Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+    ));
 
-    dispatcher.add_listener("ev1", listener.clone(), 0);
-    dispatcher.add_listener("ev1", listener.clone(), 1);
-    dispatcher.add_listener("ev1", listener2, 1);
-    dispatcher.add_listener("ev1", listener3.clone(), 0);
-    dispatcher.add_listener("ev2", listener3, 0);
-    dispatcher.add_listener("ev2", listener, 0);
-    dispatcher.dispatch(Some("ev1"), None).unwrap();
-    dispatcher.dispatch(Some("ev2"), None).unwrap();
+    dispatcher.add_listener("ev1".into(), listener.clone(), 0);
+    dispatcher.add_listener("ev1".into(), listener.clone(), 1);
+    dispatcher.add_listener("ev1".into(), listener2, 1);
+    dispatcher.add_listener("ev1".into(), listener3.clone(), 0);
+    dispatcher.add_listener("ev2".into(), listener3, 0);
+    dispatcher.add_listener("ev2".into(), listener, 0);
+    dispatcher.dispatch(Some("ev1".into()), None).unwrap();
+    dispatcher.dispatch(Some("ev2".into()), None).unwrap();
 
-    let mut expected = format!(
-        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{eol}\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod2{eol}\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{eol}\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{eol}",
-        eol = PHP_EOL
+    let mut expected = bconcat!(
+        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
+        PHP_EOL,
+        "\
+         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod2",
+        PHP_EOL,
+        "\
+         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
+        PHP_EOL,
+        "\
+         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL,
+        "\
+         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL,
+        "\
+         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 
     dispatcher.remove_listener(&this);
-    dispatcher.dispatch(Some("ev1"), None).unwrap();
-    dispatcher.dispatch(Some("ev2"), None).unwrap();
+    dispatcher.dispatch(Some("ev1".into()), None).unwrap();
+    dispatcher.dispatch(Some("ev2".into()), None).unwrap();
 
-    expected += &format!(
-        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}",
-        eol = PHP_EOL
+    expected = bconcat!(
+        expected,
+        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL,
+        "\
+         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -718,9 +795,9 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
         io_dyn,
         process,
         listeners_const(vec![
-            "echo -n foo",
-            "Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
-            "echo -n bar",
+            BStr::new("echo -n foo"),
+            BStr::new("Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod"),
+            BStr::new("echo -n bar"),
         ]),
     );
 
@@ -733,9 +810,13 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
         )
         .unwrap();
 
-    let expected = format!(
-        "> post-install-cmd: echo -n foo{eol}> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{eol}> post-install-cmd: echo -n bar{eol}",
-        eol = PHP_EOL
+    let expected = bconcat!(
+        "> post-install-cmd: echo -n foo",
+        PHP_EOL,
+        "> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
+        PHP_EOL,
+        "> post-install-cmd: echo -n bar",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -761,8 +842,8 @@ fn test_dispatcher_can_put_env() {
         io_dyn,
         process,
         listeners_const(vec![
-            "@putenv ABC=123",
-            "Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv",
+            BStr::new("@putenv ABC=123"),
+            BStr::new("Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv"),
         ]),
     );
 
@@ -775,9 +856,11 @@ fn test_dispatcher_can_put_env() {
         )
         .unwrap();
 
-    let expected = format!(
-        "> post-install-cmd: @putenv ABC=123{eol}> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv{eol}",
-        eol = PHP_EOL
+    let expected = bconcat!(
+        "> post-install-cmd: @putenv ABC=123",
+        PHP_EOL,
+        "> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -798,7 +881,7 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     std::env::set_current_dir(&php_test_dir).unwrap();
     Platform::put_env(
         "COMPOSER_BIN_DIR",
-        php_test_dir.join("vendor/bin").to_str().unwrap(),
+        path_to_bytes(&php_test_dir.join("vendor/bin")),
     );
 
     let (process, _process_guard) =
@@ -813,8 +896,12 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
         io_dyn,
         process,
         listeners_const(vec![
-            "Composer\\Test\\EventDispatcher\\EventDispatcherTest::createsVendorBinFolderChecksEnvDoesNotContainsBin",
-            "Composer\\Test\\EventDispatcher\\EventDispatcherTest::createsVendorBinFolderChecksEnvContainsBin",
+            BStr::new(
+                "Composer\\Test\\EventDispatcher\\EventDispatcherTest::createsVendorBinFolderChecksEnvDoesNotContainsBin",
+            ),
+            BStr::new(
+                "Composer\\Test\\EventDispatcher\\EventDispatcherTest::createsVendorBinFolderChecksEnvContainsBin",
+            ),
         ]),
     );
 
@@ -856,18 +943,19 @@ fn test_dispatcher_support_for_additional_args() {
         .__get_php_exec_command()
         .unwrap();
 
-    let args = format!(
-        "{} {} {}",
+    let args = bconcat!(
         ProcessExecutor::escape("ARG"),
+        " ",
         ProcessExecutor::escape("ARG2"),
+        " ",
         ProcessExecutor::escape("--arg"),
     );
 
     let (process, _process_guard) = get_process_executor_mock(
         vec![
             cmd("echo -n foo"),
-            cmd(format!("{} foo.php {} then the rest", php_cmd, args)),
-            cmd(format!("echo -n bar {}", args)),
+            cmd(bconcat!(php_cmd, " foo.php ", args, " then the rest")),
+            cmd(bconcat!("echo -n bar ", args)),
         ],
         true,
         MockHandler::default(),
@@ -878,9 +966,9 @@ fn test_dispatcher_support_for_additional_args() {
         io_dyn,
         process,
         listeners_const(vec![
-            "echo -n foo @no_additional_args",
-            "@php foo.php @additional_args then the rest",
-            "echo -n bar",
+            BStr::new("echo -n foo @no_additional_args"),
+            BStr::new("@php foo.php @additional_args then the rest"),
+            BStr::new("echo -n bar"),
         ]),
     );
 
@@ -888,15 +976,21 @@ fn test_dispatcher_support_for_additional_args() {
         .dispatch_script(
             ScriptEvents::POST_INSTALL_CMD,
             false,
-            vec!["ARG".to_string(), "ARG2".to_string(), "--arg".to_string()],
+            vec!["ARG".into(), "ARG2".into(), "--arg".into()],
             IndexMap::new(),
         )
         .unwrap();
 
-    let expected = format!(
-        "> post-install-cmd: echo -n foo{eol}> post-install-cmd: @php foo.php {args} then the rest{eol}> post-install-cmd: echo -n bar {args}{eol}",
-        eol = PHP_EOL,
-        args = args,
+    let expected = bconcat!(
+        "> post-install-cmd: echo -n foo",
+        PHP_EOL,
+        "> post-install-cmd: @php foo.php ",
+        args,
+        " then the rest",
+        PHP_EOL,
+        "> post-install-cmd: echo -n bar ",
+        args,
+        PHP_EOL,
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -917,7 +1011,7 @@ fn test_dispatcher_outputs_command() {
         &composer,
         io_dyn,
         process,
-        listeners_const(vec!["echo foo"]),
+        listeners_const(vec![BStr::new("echo foo")]),
     );
 
     dispatcher
@@ -930,18 +1024,18 @@ fn test_dispatcher_outputs_command() {
         .unwrap();
 
     // ref: $io->expects($this->once())->method('writeError')->with('> echo foo')
-    let write_error_messages: Vec<String> = io
+    let write_error_messages: Vec<bstr::BString> = io
         .borrow()
         .write_error_calls()
         .into_iter()
         .map(|(message, _newline)| message)
         .collect();
-    assert_eq!(write_error_messages, vec!["> echo foo".to_string()]);
+    assert_eq!(write_error_messages, vec![BString::from("> echo foo")]);
 
     // ref: $io->expects($this->once())->method('writeRaw')->with('foo'.PHP_EOL, false)
     assert_eq!(
         io.borrow().write_raw_calls(),
-        vec![(format!("foo{PHP_EOL}"), false)]
+        vec![(bconcat!("foo", PHP_EOL), false)]
     );
 }
 
@@ -953,11 +1047,11 @@ fn test_dispatcher_outputs_error_on_failed_command() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
     let composer = create_composer_instance();
     let io = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(String::new(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
     ));
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
-    let code = "exit 1";
+    let code = BStr::new("exit 1");
     let mut dispatcher =
         dispatcher_with_listeners(&composer, io_dyn, process, listeners_const(vec![code]));
 
@@ -969,11 +1063,13 @@ fn test_dispatcher_outputs_error_on_failed_command() {
     );
 
     let e = result.expect_err("expected ScriptExecutionException");
-    assert!(e.to_string().contains("Error Output: "), "got: {e}");
+    assert!(error_message(&e).contains_str("Error Output: "), "got: {e}");
 
-    let expected = format!(
-        "> exit 1{eol}Script exit 1 handling the post-install-cmd event returned with error code 1{eol}",
-        eol = PHP_EOL
+    let expected = bconcat!(
+        "> exit 1",
+        PHP_EOL,
+        "Script exit 1 handling the post-install-cmd event returned with error code 1",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -991,8 +1087,8 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
 
     let (process, _process_guard) = get_process_executor_mock(
         vec![
-            cmd(format!("{} install --no-dev", binary)),
-            cmd(format!("{} update", binary)),
+            cmd(bconcat!(binary, " install --no-dev")),
+            cmd(bconcat!(binary, " update")),
         ],
         true,
         MockHandler::default(),
@@ -1006,7 +1102,10 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
         &composer,
         io_dyn,
         process,
-        listeners_const(vec!["@composer install --no-dev", "composer update"]),
+        listeners_const(vec![
+            BStr::new("@composer install --no-dev"),
+            BStr::new("composer update"),
+        ]),
     );
 
     dispatcher
@@ -1018,9 +1117,42 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
         )
         .unwrap();
 
-    let expected = format!(
-        "> post-install-cmd: @composer install --no-dev{eol}> post-install-cmd: composer update{eol}",
-        eol = PHP_EOL,
+    let expected = bconcat!(
+        "> post-install-cmd: @composer install --no-dev",
+        PHP_EOL,
+        "> post-install-cmd: composer update",
+        PHP_EOL
     );
     assert_eq!(expected, io.borrow().get_output());
+}
+
+#[test]
+#[serial]
+fn test_listeners_are_keyed_by_the_bytes_of_the_event_name() {
+    let _tear_down = TearDown;
+    let composer = create_composer_instance();
+    let io = buffer_io_verbose();
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, None);
+    let called = std::rc::Rc::new(std::cell::Cell::new(0));
+    let called_by_listener = called.clone();
+    dispatcher.add_listener(
+        bstr::B(b"event\xE9").into(),
+        Callable::Closure(std::rc::Rc::new(move |_event: &dyn EventInterface| {
+            called_by_listener.set(called_by_listener.get() + 1);
+            PhpMixed::Null
+        })),
+        0,
+    );
+
+    dispatcher
+        .dispatch(Some(bstr::B(b"event\xE9").into()), None)
+        .unwrap();
+    assert_eq!(1, called.get());
+
+    // U+FFFD is what a lossy conversion of the name above would produce.
+    dispatcher
+        .dispatch(Some("event\u{FFFD}".into()), None)
+        .unwrap();
+    assert_eq!(1, called.get());
 }

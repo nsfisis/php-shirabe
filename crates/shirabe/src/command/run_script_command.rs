@@ -3,23 +3,25 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::script::{Event as ScriptEvent, ScriptEvents};
 use crate::util::{Platform, ProcessExecutor};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class,
+    str_replace, strtoupper, utf8_text,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::{CommandNotFoundException, NamespaceNotFoundException};
-use shirabe_symfony_console::input::{InputInterface, InputValue};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct RunScriptCommand {
     base_command_data: BaseCommandData,
 
-    script_events: Vec<&'static str>,
+    script_events: Vec<&'static BStr>,
 }
 
 impl_php_class!(RunScriptCommand, r"Composer\Command\RunScriptCommand");
@@ -70,18 +72,18 @@ impl RunScriptCommand {
             .iter()
             .map(|(name, desc)| {
                 PhpMixed::List(vec![
-                    PhpMixed::string(format!("  {}", name)),
+                    PhpMixed::string(bconcat!("  ", name)),
                     PhpMixed::string(desc.clone()),
                 ])
             })
             .collect();
 
-        self.render_table(table, output);
+        self.render_table(table, output)?;
 
         Ok(0)
     }
 
-    fn get_scripts(&self) -> anyhow::Result<Vec<(String, String)>> {
+    fn get_scripts(&self) -> anyhow::Result<Vec<(BString, BString)>> {
         let composer = self.require_composer(None, None)?;
         let scripts = crate::composer::composer_full(&composer)
             .get_package()
@@ -91,11 +93,11 @@ impl RunScriptCommand {
             return Ok(vec![]);
         }
 
-        let mut result: Vec<(String, String)> = vec![];
+        let mut result: Vec<(BString, BString)> = vec![];
         for (name, _script) in scripts {
-            let mut description = String::new();
+            let mut description = BString::default();
             if let Some(application) = self.get_application() {
-                match application.borrow_mut().find(&name) {
+                match application.borrow_mut().find(name.as_ref()) {
                     Ok(cmd) => description = cmd.borrow().get_description(),
                     Err(e)
                         if e.is_instanceof::<CommandNotFoundException>()
@@ -113,9 +115,9 @@ impl RunScriptCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RunScriptCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("run-script")?;
-        self.set_aliases(vec!["run".to_string()])?;
-        self.set_description("Runs the scripts defined in composer.json");
+        self.set_name("run-script".into())?;
+        self.set_aliases(vec!["run".into()])?;
+        self.set_description("Runs the scripts defined in composer.json".into());
         self.set_definition(&[
             // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
             // extra ones the caller passes).
@@ -178,7 +180,7 @@ impl Command for RunScriptCommand {
             .into(),
             InputOption::new(
                 "list",
-                Some("l"),
+                Some("l".into()),
                 Some(InputOption::VALUE_NONE),
                 "List scripts.",
                 None,
@@ -189,7 +191,8 @@ impl Command for RunScriptCommand {
         self.set_help(
             "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
             <info>shirabe run-script post-update-cmd</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run",
+            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run"
+                .into(),
         );
         Ok(())
     }
@@ -217,16 +220,16 @@ impl Command for RunScriptCommand {
 
             let mut options = indexmap::IndexMap::new();
             for script in &scripts {
-                options.insert(script.0.as_str().into(), PhpMixed::string(script.1.clone()));
+                options.insert(script.0.clone(), PhpMixed::string(script.1.clone()));
             }
 
             let io = self.get_io();
             let script = io.select(
-                "Script to run: ".into(),
+                "Script to run: ",
                 PhpMixed::Array(options),
-                PhpMixed::string(String::new()),
+                PhpMixed::string(BString::default()),
                 PhpMixed::Int(1),
-                "Invalid script name \"%s\"".to_string(),
+                "Invalid script name \"%s\"",
                 false,
             )?;
 
@@ -254,20 +257,21 @@ impl Command for RunScriptCommand {
 
         let script = match input.borrow().get_argument("script")?.as_string() {
             None => {
-                return Err(RuntimeException::new(
-                    "Missing required argument \"script\"".to_string(),
-                )
+                return Err(RuntimeException::new(BString::from(
+                    "Missing required argument \"script\"",
+                ))
                 .into());
             }
-            Some(s) => s.to_string(),
+            Some(s) => s.to_owned(),
         };
 
-        if !self.script_events.contains(&script.as_str()) {
-            let const_name = script.to_uppercase().replace('-', "_");
+        if !self.script_events.iter().any(|event| script == *event) {
+            let const_name = str_replace("-", "_", strtoupper(&script));
             if ScriptEvents::is_defined(&const_name) {
-                return Err(InvalidArgumentException::new(format!(
-                    "Script \"{}\" cannot be run with this command",
-                    script
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Script \"",
+                    script,
+                    "\" cannot be run with this command"
                 ))
                 .into());
             }
@@ -297,30 +301,31 @@ impl Command for RunScriptCommand {
         );
         let has_listeners = dispatcher.borrow_mut().has_event_listeners(&event);
         if !has_listeners {
-            return Err(InvalidArgumentException::new(format!(
-                "Script \"{}\" is not defined in this package",
-                script
+            return Err(InvalidArgumentException::new(bconcat!(
+                "Script \"",
+                script,
+                "\" is not defined in this package"
             ))
             .into());
         }
 
-        let args: Vec<String> = input
+        let args: Vec<bstr::BString> = input
             .borrow()
             .get_argument("args")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
         if let Some(timeout_val) = input.borrow().get_option("timeout")?.as_string() {
-            let timeout_str = timeout_val.to_string();
-            if !timeout_str.chars().all(|c| c.is_ascii_digit()) {
-                return Err(RuntimeException::new(
-                    "Timeout value must be numeric and positive if defined, or 0 for forever"
-                        .to_string(),
-                )
+            if !timeout_val.iter().all(u8::is_ascii_digit) {
+                return Err(RuntimeException::new(BString::from(
+                    "Timeout value must be numeric and positive if defined, or 0 for forever",
+                ))
                 .into());
             }
-            let timeout: i64 = timeout_str.parse().unwrap_or(0);
+            let timeout: i64 = utf8_text(timeout_val)
+                .and_then(|text| text.parse().ok())
+                .unwrap_or(0);
             ProcessExecutor::set_timeout(timeout);
         }
 
@@ -328,7 +333,7 @@ impl Command for RunScriptCommand {
 
         dispatcher
             .borrow_mut()
-            .dispatch_script(&script, dev_mode, args, IndexMap::new())
+            .dispatch_script(script.as_ref(), dev_mode, args, IndexMap::new())
     }
 
     fn initialize(

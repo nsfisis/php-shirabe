@@ -7,9 +7,9 @@ use crate::descriptor::{
 };
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, json_encode_ex, php_regex, preg_replace, str_replace};
+use shirabe_php_shim::{PhpMixed, bconcat, json_encode_ex, php_regex, preg_replace, str_replace};
 
 /// JSON descriptor.
 #[derive(Debug, Default)]
@@ -64,7 +64,7 @@ impl JsonDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
+            Some(PhpMixed::String(s)) => Some(s.clone()),
             _ => None,
         };
         let mut description =
@@ -130,8 +130,7 @@ impl JsonDescriptor {
         };
 
         self.write(
-            &json_encode_ex(&PhpMixed::Array(data.into_iter().collect()), flags)
-                .unwrap_or_default(),
+            json_encode_ex(&PhpMixed::Array(data.into_iter().collect()), flags).unwrap_or_default(),
             false,
         );
         Ok(())
@@ -142,10 +141,7 @@ impl JsonDescriptor {
         argument: &InputArgument,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
-        data.insert(
-            "name".into(),
-            PhpMixed::string(argument.get_name().to_string()),
-        );
+        data.insert("name".into(), PhpMixed::string(argument.get_name()));
         data.insert("is_required".into(), PhpMixed::Bool(argument.is_required()));
         data.insert("is_array".into(), PhpMixed::Bool(argument.is_array()));
         data.insert(
@@ -171,28 +167,28 @@ impl JsonDescriptor {
         if negated {
             data.insert(
                 "name".into(),
-                PhpMixed::string(format!("--no-{}", option.get_name())),
+                PhpMixed::string(bconcat!("--no-", option.get_name())),
             );
-            data.insert("shortcut".into(), PhpMixed::string(String::new()));
+            data.insert("shortcut".into(), PhpMixed::string(BString::default()));
             data.insert("accept_value".into(), PhpMixed::Bool(false));
             data.insert("is_value_required".into(), PhpMixed::Bool(false));
             data.insert("is_multiple".into(), PhpMixed::Bool(false));
             data.insert(
                 "description".into(),
-                PhpMixed::string(format!("Negate the \"--{}\" option", option.get_name())),
+                PhpMixed::string(bconcat!("Negate the \"--", option.get_name(), "\" option")),
             );
             data.insert("default".into(), PhpMixed::Bool(false));
         } else {
             data.insert(
                 "name".into(),
-                PhpMixed::string(format!("--{}", option.get_name())),
+                PhpMixed::string(bconcat!("--", option.get_name())),
             );
             data.insert(
                 "shortcut".into(),
                 PhpMixed::string(if let Some(shortcut) = option.get_shortcut() {
-                    format!("-{}", str_replace("|", "|-", shortcut))
+                    bconcat!("-", str_replace("|", "|-", shortcut))
                 } else {
-                    String::new()
+                    BString::default()
                 }),
             );
             data.insert("accept_value".into(), PhpMixed::Bool(option.accept_value()));
@@ -223,7 +219,7 @@ impl JsonDescriptor {
         let mut input_arguments: IndexMap<BString, PhpMixed> = IndexMap::new();
         for (name, argument) in definition.get_arguments() {
             input_arguments.insert(
-                name.as_str().into(),
+                name.clone(),
                 PhpMixed::Array(
                     self.get_input_argument_data(argument)?
                         .into_iter()
@@ -235,7 +231,7 @@ impl JsonDescriptor {
         let mut input_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         for (name, option) in definition.get_options() {
             input_options.insert(
-                name.as_str().into(),
+                name.clone(),
                 PhpMixed::Array(
                     self.get_input_option_data(option, false)?
                         .into_iter()
@@ -244,7 +240,7 @@ impl JsonDescriptor {
             );
             if option.is_negatable() {
                 input_options.insert(
-                    format!("no-{}", name).into(),
+                    bconcat!("no-", name),
                     PhpMixed::Array(
                         self.get_input_option_data(option, true)?
                             .into_iter()

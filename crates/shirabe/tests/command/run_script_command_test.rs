@@ -1,7 +1,9 @@
 //! ref: composer/tests/Composer/Test/Command/RunScriptCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::ByteSlice;
 use serial_test::serial;
+use shirabe_php_shim::{bconcat, str_replace};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: RunScriptCommandTest::testDetectAndPassDevModeToEventAndToDispatching
@@ -60,11 +62,11 @@ fn test_can_list_scripts() {
     let output = app_tester.get_display();
 
     assert!(
-        output.contains("Runs the test script as defined in composer.json"),
+        output.contains_str("Runs the test script as defined in composer.json"),
         "The default description for the test script should be printed"
     );
     assert!(
-        output.contains("Run the codestyle fixer"),
+        output.contains_str("Run the codestyle fixer"),
         "The custom description for the fix-cs script should be printed"
     );
 
@@ -105,13 +107,13 @@ fn test_can_define_aliases() {
     assert_eq!(0, status_code, "assertCommandIsSuccessful");
 
     let output = app_tester.get_display();
-    let array: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let array: serde_json::Value = serde_json::from_slice(&output).unwrap();
     let mut actual_aliases: Vec<serde_json::Value> = array["usage"].as_array().unwrap().clone();
     actual_aliases.remove(0);
 
     let expected: Vec<serde_json::Value> = expected_aliases
         .iter()
-        .map(|s| serde_json::Value::String(s.to_string()))
+        .map(|s| serde_json::Value::from(*s))
         .collect();
     assert_eq!(
         expected, actual_aliases,
@@ -242,7 +244,7 @@ class MyCommand extends Command
     assert_eq!(0, status_code, "assertCommandIsSuccessful");
     let output = app_tester.get_display();
     assert!(
-        output.contains(description),
+        output.contains_str(description),
         "The contents of scripts-description for the test script should be printed"
     );
 
@@ -259,7 +261,7 @@ class MyCommand extends Command
             config produces ('./MyCommand.php') only resolves when the test runs first in the binary"]
 fn test_execution_of_symfony_command_with_configuration() {
     let cmd_name = "custom-cmd-123";
-    let cmd_alias = format!("{}-alias", cmd_name);
+    let cmd_alias = bconcat!(cmd_name, "-alias");
     let cmd_desc = "This is a Symfony command with custom configuration";
     let wrong_desc = "this should be ignored";
 
@@ -284,7 +286,10 @@ fn test_execution_of_symfony_command_with_configuration() {
 
     std::fs::write(
         "MyCommandWithDefinitions.php",
-        r#"<?php
+        str_replace(
+            "__CMD_ALIAS__",
+            &cmd_alias,
+            str_replace("__CMD_DESC__", cmd_desc, r#"<?php
 
 namespace Test;
 
@@ -309,9 +314,8 @@ class MyCommandWithDefinitions extends Command
         return Command::SUCCESS;
     }
 }
-"#
-        .replace("__CMD_DESC__", cmd_desc)
-        .replace("__CMD_ALIAS__", &cmd_alias),
+"#),
+        ),
     )
     .unwrap();
 
@@ -335,7 +339,7 @@ class MyCommandWithDefinitions extends Command
             vec![
                 (
                     ParameterName::of("command"),
-                    InputValue::from(cmd_alias.as_str()),
+                    InputValue::from(cmd_alias.as_bstr()),
                 ),
                 (ParameterName::of("req-arg"), InputValue::from("lala")),
             ],
@@ -358,11 +362,11 @@ class MyCommandWithDefinitions extends Command
     assert_eq!(0, status_code, "assertCommandIsSuccessful");
     let output = app_tester.get_display();
     assert!(
-        output.contains(cmd_desc),
+        output.contains_str(cmd_desc),
         "The custom description for the test script should be printed"
     );
     assert!(
-        !output.contains(wrong_desc),
+        !output.contains_str(wrong_desc),
         "The dummy description shouldn't show"
     );
 
