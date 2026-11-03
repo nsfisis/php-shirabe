@@ -7,11 +7,11 @@ use crate::util::{Filesystem, HttpDownloader};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
-    JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, dirname,
-    display_to_bytes, error_message, file_exists, file_get_contents, file_put_contents, is_dir,
-    is_file, json_decode_assoc, json_decode_obj, json_encode_ex, ltrim2, mkdir, path_from_bytes,
-    path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace2, rawurldecode,
-    realpath, sprintf, str_replace, strpos, usleep, utf8_text,
+    JSON_UNESCAPED_UNICODE, PhpJson, PhpMixed, RuntimeException, UnexpectedValueException, bconcat,
+    dirname, display_to_bytes, error_message, file_exists, file_get_contents, file_put_contents,
+    is_dir, is_file, json_decode_assoc, json_decode_obj, json_encode_ex, ltrim2, mkdir,
+    path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace2,
+    rawurldecode, realpath, sprintf, str_replace, strpos, usleep, utf8_text,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 use std::path::{Path, PathBuf};
@@ -369,8 +369,8 @@ impl JsonFile {
         }
 
         // convert assoc arrays to objects
-        let schema_value = serde_json::to_value(&schema_data)?;
-        let data_value = serde_json::to_value(data)?;
+        let schema_value = serde_json::to_value(PhpJson::new(&schema_data))?;
+        let data_value = serde_json::to_value(PhpJson::new(data))?;
         let validator = jsonschema::options()
             .with_retriever(SchemaRetriever)
             .build(&schema_value)

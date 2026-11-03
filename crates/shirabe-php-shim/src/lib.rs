@@ -9,6 +9,7 @@ mod filter;
 mod fs;
 mod hash;
 mod json;
+mod json_serializer;
 mod math;
 mod net;
 mod openssl;
@@ -36,6 +37,7 @@ pub use filter::*;
 pub use fs::*;
 pub use hash::*;
 pub use json::*;
+pub use json_serializer::*;
 pub use math::*;
 pub use net::*;
 pub use openssl::*;
@@ -71,34 +73,24 @@ pub enum PhpMixed {
     // things to this type.
 }
 
-/// A string as JSON holds it. PHP's `json_encode()` fails with `JSON_ERROR_UTF8` on a string that
-/// is not valid UTF-8.
-#[expect(
-    clippy::disallowed_types,
-    reason = "serde serializes a JSON string as text"
-)]
-fn json_utf8<S: serde::Serializer>(s: &[u8]) -> Result<&str, S::Error> {
-    utf8_text(s).ok_or_else(|| {
-        serde::ser::Error::custom("Malformed UTF-8 characters, possibly incorrectly encoded")
-    })
+/// A PHP string, which a serializer receives as bytes. See [`PhpJson`].
+struct ByteString<'a>(&'a [u8]);
+
+impl serde::Serialize for ByteString<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(self.0)
+    }
 }
 
-/// `#[serde(serialize_with = "...")]` adapters for PHP strings held as bytes. Each writes the
-/// bytes the way `json_encode()` does, failing on invalid UTF-8.
+/// `#[serde(serialize_with = "...")]` adapters for PHP strings held as bytes. Each passes the
+/// bytes to `serialize_bytes`; serialize the value through [`PhpJson`](crate::PhpJson)
+/// to write them as JSON strings.
 pub mod json_bytes {
-    use super::json_utf8;
+    use super::ByteString;
     use bstr::BString;
     use indexmap::IndexMap;
     use serde::ser::{SerializeMap, SerializeSeq};
     use serde::{Serialize, Serializer};
-
-    struct Str<'a>(&'a [u8]);
-
-    impl Serialize for Str<'_> {
-        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            serializer.serialize_str(json_utf8::<S>(self.0)?)
-        }
-    }
 
     struct StrMap<'a>(&'a IndexMap<BString, BString>);
 
@@ -109,7 +101,7 @@ pub mod json_bytes {
     }
 
     pub fn str<S: Serializer>(value: &BString, serializer: S) -> Result<S::Ok, S::Error> {
-        Str(value).serialize(serializer)
+        ByteString(value).serialize(serializer)
     }
 
     pub fn option_str<S: Serializer>(
@@ -117,7 +109,7 @@ pub mod json_bytes {
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         match value {
-            Some(value) => Str(value).serialize(serializer),
+            Some(value) => ByteString(value).serialize(serializer),
             None => serializer.serialize_none(),
         }
     }
@@ -125,7 +117,7 @@ pub mod json_bytes {
     pub fn str_vec<S: Serializer>(value: &[BString], serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(Some(value.len()))?;
         for item in value {
-            seq.serialize_element(&Str(item))?;
+            seq.serialize_element(&ByteString(item))?;
         }
         seq.end()
     }
@@ -136,7 +128,7 @@ pub mod json_bytes {
     ) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(Some(value.len()))?;
         for (k, v) in value {
-            map.serialize_entry(&Str(k), &Str(v))?;
+            map.serialize_entry(&ByteString(k), &ByteString(v))?;
         }
         map.end()
     }
@@ -162,7 +154,7 @@ pub mod json_bytes {
         }
         let mut map = serializer.serialize_map(Some(value.len()))?;
         for (k, v) in value {
-            map.serialize_entry(&Str(k), v)?;
+            map.serialize_entry(&ByteString(k), v)?;
         }
         map.end()
     }
@@ -177,7 +169,7 @@ pub mod json_bytes {
         }
         let mut map = serializer.serialize_map(Some(value.len()))?;
         for (k, v) in value {
-            map.serialize_entry(&Str(k), &v.as_ref().map(|v| Str(v)))?;
+            map.serialize_entry(&ByteString(k), &v.as_ref().map(|v| ByteString(v)))?;
         }
         map.end()
     }
@@ -194,7 +186,7 @@ impl serde::Serialize for PhpMixed {
             PhpMixed::Bool(b) => serializer.serialize_bool(*b),
             PhpMixed::Int(i) => serializer.serialize_i64(*i),
             PhpMixed::Float(f) => serializer.serialize_f64(*f),
-            PhpMixed::String(s) => serializer.serialize_str(json_utf8::<S>(s)?),
+            PhpMixed::String(s) => ByteString(s).serialize(serializer),
             PhpMixed::List(items) => {
                 let mut seq = serializer.serialize_seq(Some(items.len()))?;
                 for item in items {
@@ -211,14 +203,14 @@ impl serde::Serialize for PhpMixed {
                 }
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
-                    map.serialize_entry(json_utf8::<S>(k)?, v)?;
+                    map.serialize_entry(&ByteString(k), v)?;
                 }
                 map.end()
             }
             PhpMixed::Object(entries) => {
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
-                    map.serialize_entry(json_utf8::<S>(k)?, v)?;
+                    map.serialize_entry(&ByteString(k), v)?;
                 }
                 map.end()
             }

@@ -35,15 +35,17 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
     // they are absent.
     // TODO(php-semantics): other flags (e.g. JSON_HEX_*, JSON_THROW_ON_ERROR) are not handled yet; add
     // them when a call site needs them.
+    let value =
+        crate::PhpJson::with_invalid_utf8_ignore(value, flags & JSON_INVALID_UTF8_IGNORE != 0);
     let mut s = if flags & JSON_PRETTY_PRINT != 0 {
         // PHP's JSON_PRETTY_PRINT uses a 4-space indent.
         let mut buf = Vec::new();
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-        value.serialize(&mut ser)?;
+        serde::Serialize::serialize(&value, &mut ser)?;
         BString::from(buf)
     } else {
-        BString::from(serde_json::to_vec(value)?)
+        BString::from(serde_json::to_vec(&value)?)
     };
 
     if flags & JSON_UNESCAPED_SLASHES == 0 {
@@ -188,6 +190,20 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invalid_utf8_ignore_drops_only_the_invalid_bytes() {
+        let value = PhpMixed::Array(IndexMap::from([(
+            BString::from(b"pa\xfeth".to_vec()),
+            PhpMixed::String(BString::from(b"/tmp/caf\xe9".to_vec())),
+        )]));
+        assert!(json_encode_ex(&value, JSON_UNESCAPED_SLASHES).is_err());
+        assert_eq!(
+            json_encode_ex(&value, JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES).unwrap(),
+            r#"{"path":"/tmp/caf"}"#
+        );
+        assert!(json_encode_ex(&value, JSON_UNESCAPED_SLASHES).is_err());
+    }
 
     #[test]
     fn input_that_is_not_utf8_decodes_to_null() {

@@ -11,7 +11,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, bconcat, error_message, implode, path_to_bytes, php_fopen_resource,
+    PHP_EOL, PhpJson, PhpMixed, bconcat, error_message, implode, path_to_bytes, php_fopen_resource,
     php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind, rtrim,
     str_replace, stream_get_contents, trim, utf8_text,
 };
@@ -1332,7 +1332,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
 }
 
 fn php_mixed_map_to_json(map: &IndexMap<BString, PhpMixed>) -> serde_json::Value {
-    serde_json::to_value(PhpMixed::Array(map.clone())).unwrap_or(serde_json::Value::Null)
+    serde_json::to_value(PhpJson::new(&PhpMixed::Array(map.clone())))
+        .unwrap_or(serde_json::Value::Null)
 }
 
 #[test]

@@ -14,7 +14,7 @@ use crate::util::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
+    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed,
     array_replace_recursive, bconcat, empty, extension_loaded, file_get_contents, implode, intval,
     is_numeric, path_to_bytes, pcre_check_utf8_subject, php_regex, preg_is_match, preg_match,
     preg_replace, rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
@@ -766,8 +766,10 @@ impl HttpDownloader {
                     bconcat!(
                         "\" with options \"",
                         BString::from(
-                            serde_json::to_vec(&first.options.clone().map(PhpMixed::Array))
-                                .unwrap_or_default()
+                            serde_json::to_vec(&PhpJson::new(
+                                &first.options.clone().map(PhpMixed::Array),
+                            ))
+                            .unwrap_or_default()
                         )
                     )
                 } else {
@@ -784,7 +786,8 @@ impl HttpDownloader {
         panic!(
             "Received unexpected request for \"{}\" with options \"{}\"{}{}{}Received calls:{}{}",
             file_url.display_lossy(),
-            serde_json::to_string(&PhpMixed::Array(options.clone())).unwrap_or_default(),
+            serde_json::to_string(&PhpJson::new(&PhpMixed::Array(options.clone())))
+                .unwrap_or_default(),
             PHP_EOL.display_lossy(),
             next_expected.display_lossy(),
             PHP_EOL.display_lossy(),
