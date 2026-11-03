@@ -1,4 +1,5 @@
 //! Benchmarks for `ProcessExecutor::execute_async`.
+#![deny(clippy::disallowed_types, clippy::disallowed_macros)]
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use shirabe::util::process_executor::ProcessExecutor;
@@ -8,6 +9,7 @@ use shirabe::util::process_executor::ProcessExecutor;
 const MAX_JOBS: i64 = 10;
 
 /// The cheapest child that still goes through the whole spawn path.
+#[expect(clippy::disallowed_types, reason = "a string literal")]
 const COMMAND: &[&str; 1] = &["true"];
 
 /// Concurrency within a case comes from joining futures inside a single task on a current-thread
