@@ -17,6 +17,7 @@ disallowed-methods = [
     { path = "bstr::ByteSlice::to_str_lossy_into", reason = "use display_lossy() for a message; see docs/dev/strings-porting.md" },
     { path = "bstr::ByteVec::into_string", reason = "keep the bytes; see docs/dev/strings-porting.md" },
     { path = "bstr::ByteVec::into_string_lossy", reason = "use display_lossy() for a message; see docs/dev/strings-porting.md" },
+    { path = "std::string::ToString::to_string", reason = "use bconcat!(), display_to_bytes() or error_message(); see docs/dev/strings-porting.md" },
 ]
 
 # Every string is bytes unless it has a reason to be UTF-8. A site that has a reason says so:

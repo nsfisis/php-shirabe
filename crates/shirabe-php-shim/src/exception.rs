@@ -629,7 +629,7 @@ mod tests {
     impl Subclass {
         fn new(detail: i64) -> Self {
             Self {
-                inner: UnexpectedValueException::new("boom".to_string()),
+                inner: UnexpectedValueException::new("boom"),
                 detail,
             }
         }
@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn catch_reaches_no_sibling_or_subclass() {
-        let error: anyhow::Error = RuntimeException::new("boom".to_string()).into();
+        let error: anyhow::Error = RuntimeException::new("boom").into();
 
         assert!(error.catch::<Subclass>().is_none());
         assert!(error.catch::<LogicException>().is_none());
@@ -659,7 +659,7 @@ mod tests {
 
     #[test]
     fn an_error_is_not_an_exception() {
-        let error: anyhow::Error = TypeError::new("boom".to_string()).into();
+        let error: anyhow::Error = TypeError::new("boom").into();
 
         assert!(error.catch::<Error>().is_some());
         assert!(error.catch::<ThrowableFields>().is_some());
@@ -669,7 +669,7 @@ mod tests {
     #[test]
     fn an_exception_records_where_it_was_created() {
         let line = i64::from(line!()) + 1;
-        let error: anyhow::Error = UnexpectedValueException::new("boom".to_string()).into();
+        let error: anyhow::Error = UnexpectedValueException::new("boom").into();
 
         let exception = AnyThrowable::of(&error).unwrap();
         assert_eq!(file!(), exception.get_file());
@@ -678,14 +678,7 @@ mod tests {
 
     #[test]
     fn an_error_exception_takes_the_location_it_is_given() {
-        let exception = ErrorException::new(
-            "boom".to_string(),
-            0,
-            1,
-            "/path/to/file.php".to_string(),
-            42,
-            None,
-        );
+        let exception = ErrorException::new("boom", 0, 1, "/path/to/file.php", 42, None);
 
         assert_eq!("/path/to/file.php", exception.get_file());
         assert_eq!(42, exception.get_line());
@@ -693,10 +686,8 @@ mod tests {
 
     #[test]
     fn an_unported_class_is_an_instance_of_its_superclasses() {
-        let parent: AnyThrowable =
-            UnexpectedValueException::with_code("boom".to_string(), 5).into();
-        let error: anyhow::Error =
-            UnportedThrowable::new(r"Vendor\PluginException".to_string(), parent).into();
+        let parent: AnyThrowable = UnexpectedValueException::with_code("boom", 5).into();
+        let error: anyhow::Error = UnportedThrowable::new(r"Vendor\PluginException", parent).into();
 
         let exception = AnyThrowable::of(&error).unwrap();
         assert_eq!(r"Vendor\PluginException", exception.php_class_name());
@@ -710,7 +701,7 @@ mod tests {
 
     #[test]
     fn of_sees_an_exception_behind_a_context_layer() {
-        let error: anyhow::Error = RuntimeException::with_code("boom".to_string(), 3).into();
+        let error: anyhow::Error = RuntimeException::with_code("boom", 3).into();
         let error = error.context("while doing something");
 
         assert_eq!(
@@ -771,7 +762,7 @@ mod tests {
     fn the_previous_is_any_error_a_catch_can_reach() {
         let previous = std::sync::Arc::new(anyhow::Error::new(std::io::Error::other("io")));
         let error: anyhow::Error =
-            Exception::with_code_and_previous("boom".to_string(), 0, Some(previous)).into();
+            Exception::with_code_and_previous("boom", 0, Some(previous)).into();
 
         assert_eq!(
             error
@@ -784,9 +775,7 @@ mod tests {
 
     #[test]
     fn set_previous_reaches_the_superclass_holding_it() {
-        let pending = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new(
-            "first".to_string(),
-        )));
+        let pending = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new("first")));
         let mut error: anyhow::Error = Subclass::new(7).into();
 
         error
@@ -824,15 +813,18 @@ mod tests {
 
     #[test]
     fn the_previous_exception_is_the_error_source() {
-        let previous = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new(
-            "cause".to_string(),
-        )));
+        let previous = std::sync::Arc::new(anyhow::Error::from(RuntimeException::new("cause")));
         let error: anyhow::Error =
-            Exception::with_code_and_previous("boom".to_string(), 0, Some(previous)).into();
+            Exception::with_code_and_previous("boom", 0, Some(previous)).into();
 
         let source = std::error::Error::source(
             error.downcast_ref::<AnyThrowable>().unwrap() as &dyn std::error::Error
         );
-        assert_eq!(source.map(ToString::to_string), Some("cause".to_string()));
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "std::error::Error::source() exposes the cause through core::fmt"
+        )]
+        let source = source.map(ToString::to_string);
+        assert_eq!(source.as_deref(), Some("cause"));
     }
 }

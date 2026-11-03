@@ -70,8 +70,8 @@ fn append_query_pairs(pairs: &mut Vec<(BString, BString)>, key: BString, value: 
         // Null values are omitted from the query string entirely.
         PhpMixed::Null => {}
         PhpMixed::Bool(b) => pairs.push((key, BString::from(if *b { "1" } else { "0" }))),
-        PhpMixed::Int(i) => pairs.push((key, BString::from(i.to_string()))),
-        PhpMixed::Float(f) => pairs.push((key, BString::from(f.to_string()))),
+        PhpMixed::Int(i) => pairs.push((key, crate::bconcat!(i))),
+        PhpMixed::Float(f) => pairs.push((key, crate::display_to_bytes(f))),
         PhpMixed::String(s) => pairs.push((key, s.clone())),
         PhpMixed::List(items) => {
             for (i, item) in items.iter().enumerate() {

@@ -569,6 +569,10 @@ mod tests {
         }
     }
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "an anyhow error raised by the port, read through core::fmt"
+    )]
     #[test]
     fn read_frame_rejects_oversized_length() {
         let (mut a, mut b) = UnixStream::pair().unwrap();

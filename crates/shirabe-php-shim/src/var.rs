@@ -258,7 +258,7 @@ pub fn php_to_string(value: &PhpMixed) -> BString {
         PhpMixed::Null => BString::default(),
         PhpMixed::Bool(true) => "1".into(),
         PhpMixed::Bool(false) => BString::default(),
-        PhpMixed::Int(i) => i.to_string().into(),
+        PhpMixed::Int(i) => crate::bconcat!(i),
         PhpMixed::Float(f) => float_to_string(*f),
         PhpMixed::String(s) => s.clone(),
         // PHP renders any array as the literal string "Array".
@@ -344,7 +344,7 @@ pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
         PhpMixed::List(items) => items
             .into_iter()
             .enumerate()
-            .map(|(i, v)| (i.to_string().into(), v))
+            .map(|(i, v)| (crate::bconcat!(i), v))
             .collect(),
         scalar => {
             let mut m = IndexMap::new();
@@ -410,7 +410,7 @@ fn var_export_into(out: &mut BString, value: &PhpMixed, level: usize) {
     match value {
         PhpMixed::Null => out.push_str("NULL"),
         PhpMixed::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-        PhpMixed::Int(i) => out.push_str(i.to_string()),
+        PhpMixed::Int(i) => out.push_str(crate::bconcat!(i)),
         PhpMixed::Float(f) => out.extend_from_slice(&var_export_float(*f)),
         PhpMixed::String(s) => var_export_string(out, s),
         PhpMixed::List(items) => {
@@ -436,7 +436,7 @@ fn var_export_into(out: &mut BString, value: &PhpMixed, level: usize) {
             for (k, v) in entries {
                 var_export_indent(out, level + 1);
                 match canonical_int_key(k) {
-                    Some(i) => out.push_str(i.to_string()),
+                    Some(i) => out.push_str(crate::bconcat!(i)),
                     None => var_export_string(out, k),
                 }
                 out.push_str(" => ");

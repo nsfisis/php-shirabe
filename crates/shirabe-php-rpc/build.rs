@@ -6,6 +6,7 @@
 #![allow(
     clippy::disallowed_types,
     clippy::disallowed_macros,
+    clippy::disallowed_methods,
     reason = "the file generates Rust source, which rustc reads as text"
 )]
 

@@ -898,6 +898,10 @@ mod tests {
         assert_ne!(items[0], items[2]);
     }
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "an anyhow error raised by the port, read through core::fmt"
+    )]
     #[test]
     fn rejects_cyclic_object_graphs_and_php_references() {
         let err = unserialize(b"O:8:\"stdClass\":1:{s:4:\"self\";r:1;}").unwrap_err();
@@ -977,6 +981,10 @@ mod tests {
         assert_eq!(serialize(&decoded), wire);
     }
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "an anyhow error raised by the port, read through core::fmt"
+    )]
     #[test]
     fn rejects_over_deep_nesting() {
         let mut payload = Vec::new();

@@ -684,17 +684,11 @@ fn is_regex(str: &BStr) -> bool {
     let pattern = bconcat!("/^(.{3,}?)[", available_modifiers, "]*$/");
     if let Some(matches) = preg_match(&pattern, str) {
         let bytes = matches.get(1).unwrap_or_default();
-        let start = bytes
-            .first()
-            .map(|b| (*b as char).to_string())
-            .unwrap_or_default();
-        let end = bytes
-            .last()
-            .map(|b| (*b as char).to_string())
-            .unwrap_or_default();
+        let start = &bytes[..bytes.len().min(1)];
+        let end = &bytes[bytes.len().saturating_sub(1)..];
 
         if start == end {
-            return !preg_is_match(php_regex!("/[*?[:alnum:] \\\\]/"), &start);
+            return !preg_is_match(php_regex!("/[*?[:alnum:] \\\\]/"), start);
         }
 
         for (open, close) in [("{", "}"), ("(", ")"), ("[", "]"), ("<", ">")] {

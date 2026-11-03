@@ -104,10 +104,7 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
             _ => panic!("array_merge(): Argument must be of type array"),
         }
     }
-    let is_list = result
-        .keys()
-        .enumerate()
-        .all(|(i, k)| *k == i.to_string().as_bytes());
+    let is_list = result.keys().enumerate().all(|(i, k)| *k == bconcat!(i));
     if is_list {
         PhpMixed::List(result.into_values().collect())
     } else {
@@ -346,7 +343,7 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
             for (i, value) in items.iter().enumerate() {
                 match value {
                     PhpMixed::Int(n) => {
-                        result.insert(n.to_string().into(), PhpMixed::Int(i as i64));
+                        result.insert(bconcat!(n), PhpMixed::Int(i as i64));
                     }
                     PhpMixed::String(s) => {
                         result.insert(s.clone(), PhpMixed::Int(i as i64));
@@ -360,7 +357,7 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
             for (key, value) in map {
                 match value {
                     PhpMixed::Int(n) => {
-                        result.insert(n.to_string().into(), php_key_to_mixed(key));
+                        result.insert(bconcat!(n), php_key_to_mixed(key));
                     }
                     PhpMixed::String(s) => {
                         result.insert(s.clone(), php_key_to_mixed(key));
@@ -384,7 +381,7 @@ where
 pub fn array_is_list(array: &PhpMixed) -> bool {
     match array {
         PhpMixed::List(_) => true,
-        PhpMixed::Array(map) => map.keys().enumerate().all(|(i, k)| *k == i.to_string()),
+        PhpMixed::Array(map) => map.keys().enumerate().all(|(i, k)| *k == bconcat!(i)),
         _ => panic!("array_is_list(): Argument #1 ($array) must be of type array"),
     }
 }
@@ -498,7 +495,7 @@ fn merge_build(acc: Vec<(MergeKey, PhpMixed)>) -> PhpMixed {
         PhpMixed::Array(
             acc.into_iter()
                 .map(|(k, v)| match k {
-                    MergeKey::Int(n) => (n.to_string().into(), v),
+                    MergeKey::Int(n) => (bconcat!(n), v),
                     MergeKey::Str(s) => (s, v),
                 })
                 .collect(),
