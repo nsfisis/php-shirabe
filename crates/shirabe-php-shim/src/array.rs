@@ -30,26 +30,6 @@ pub fn array_search_in_vec(
     haystack.iter().position(|s| s.as_ref() == needle.as_ref())
 }
 
-pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
-    match value {
-        PhpMixed::List(items) => {
-            let (start, end) = php_slice_bounds(items.len() as i64, offset, length);
-            PhpMixed::List(items[start..end].to_vec())
-        }
-        PhpMixed::Array(map) => {
-            let (start, end) = php_slice_bounds(map.len() as i64, offset, length);
-            PhpMixed::Array(
-                map.iter()
-                    .skip(start)
-                    .take(end - start)
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect(),
-            )
-        }
-        _ => panic!("array_slice(): Argument #1 ($array) must be of type array"),
-    }
-}
-
 pub fn array_slice_strs<T: Clone>(value: &[T], offset: i64, length: Option<i64>) -> Vec<T> {
     let (start, end) = php_slice_bounds(value.len() as i64, offset, length);
     value[start..end].to_vec()

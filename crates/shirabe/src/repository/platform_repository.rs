@@ -9,14 +9,13 @@ use crate::package::{
 use crate::platform::{HhvmDetector, HhvmDetectorInterface, Version};
 use crate::plugin::plugin_interface::{self};
 use crate::repository::{ArrayRepository, RepositoryInterface};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_slice_mixed,
-    array_slice_strs, bconcat, display_to_bytes, explode, get_class, get_debug_type, implode,
-    intval, is_string, php_regex, php_str, preg_is_match, preg_match, preg_replace, str_replace,
-    strpos, strtolower, var_export,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_slice_strs, bconcat,
+    explode, get_class, get_debug_type, implode, intval, is_string, php_regex, php_str,
+    preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use std::sync::{LazyLock, Mutex};
@@ -294,8 +293,7 @@ impl PlatformRepository {
         // The AF_INET6 constant is only defined if ext-sockets is available but
         // IPv6 support might still be available.
         let has_inet6 = platform_info.has_constant("AF_INET6", None);
-        let inet_pton_check = &platform_info.inet_pton_ipv6;
-        if has_inet6 || !matches!(inet_pton_check, PhpMixed::Bool(false)) {
+        if has_inet6 || platform_info.inet_pton_ipv6.is_some() {
             let mut php_ipv6 =
                 CompletePackage::new(BString::from("php-ipv6"), version, pretty_version);
             php_ipv6.set_description(BString::from("The PHP interpreter, with IPv6 support"));
@@ -379,22 +377,14 @@ impl PlatformRepository {
                 }
 
                 b"curl" => {
-                    let curl_version = &platform_info.curl_version;
-                    let curl_version_str = curl_version
-                        .as_array()
-                        .and_then(|m| m.get(B("version")))
-                        .and_then(|v| v.as_string())
-                        .map(BString::from);
-                    if let Some(cv) = curl_version_str.as_deref() {
-                        self.add_library(
-                            &mut libraries,
-                            name.as_bstr(),
-                            Some(cv),
-                            None::<&BStr>,
-                            &[],
-                            &[],
-                        )?;
-                    }
+                    self.add_library(
+                        &mut libraries,
+                        name.as_bstr(),
+                        platform_info.curl_version.as_ref(),
+                        None::<&BStr>,
+                        &[],
+                        &[],
+                    )?;
 
                     let info = platform_info.get_extension_info(name);
 
@@ -737,31 +727,33 @@ impl PlatformRepository {
                     }
 
                     // Add a separate version for the CLDR library version
-                    if platform_info.has_class("ResourceBundle") {
-                        let resource_bundle = &platform_info.resource_bundle;
-                        if !matches!(resource_bundle, PhpMixed::Null) {
-                            let version_value =
-                                Self::resource_bundle_get(resource_bundle, BStr::new("Version"));
-                            let version_str = match version_value {
-                                PhpMixed::String(s) => Some(s.clone()),
-                                _ => None,
-                            };
-                            self.add_library(
-                                &mut libraries,
-                                bstr::BStr::new("icu-cldr"),
-                                version_str.as_deref(),
-                                Some("ICU CLDR project version"),
-                                &[],
-                                &[],
-                            )?;
-                        }
+                    if platform_info.has_class("ResourceBundle")
+                        && let Some(version) = &platform_info.resource_bundle_version
+                    {
+                        self.add_library(
+                            &mut libraries,
+                            bstr::BStr::new("icu-cldr"),
+                            Some(version),
+                            Some("ICU CLDR project version"),
+                            &[],
+                            &[],
+                        )?;
                     }
 
                     if platform_info.has_class("IntlChar") {
-                        let intl_char_versions = &platform_info.intl_char_unicode_version;
-                        let sliced = array_slice_mixed(intl_char_versions, 0, Some(3));
+                        let intl_char_versions =
+                            platform_info.intl_char_unicode_version.as_ref().expect(
+                                "the platform payload reports the version whenever IntlChar exists",
+                            );
                         let joined = BString::from(
-                            &implode(".", &Self::php_array_to_string_vec(&sliced))[..],
+                            &implode(
+                                ".",
+                                &intl_char_versions
+                                    .iter()
+                                    .take(3)
+                                    .map(|part| bconcat!(part))
+                                    .collect::<Vec<BString>>(),
+                            )[..],
                         );
                         self.add_library(
                             &mut libraries,
@@ -775,14 +767,15 @@ impl PlatformRepository {
                 }
 
                 b"imagick" => {
-                    let image_magick_version = &platform_info.imagick;
                     let image_magick_version_str =
-                        Self::imagick_get_version_string(image_magick_version);
+                        platform_info.imagick_version_string.as_ref().expect(
+                            "the platform payload reports the version whenever imagick is loaded",
+                        );
                     // 6.x: ImageMagick 6.2.9 08/24/06 Q16 http://www.imagemagick.org
                     // 7.x: ImageMagick 7.0.8-34 Q16 x86_64 2019-03-23 https://imagemagick.org
                     if let Some(matches) = preg_match(
                         php_regex!("/^ImageMagick (?<version>[\\d.]+)(?:-(?<patch>\\d+))?/"),
-                        &image_magick_version_str,
+                        image_magick_version_str,
                     ) {
                         let mut version_built =
                             BString::from(matches.name("version").unwrap_or_default());
@@ -1659,51 +1652,6 @@ impl PlatformRepository {
 
     fn is_complete_package(package: PackageInterfaceHandle) -> bool {
         package.as_complete().is_some()
-    }
-
-    /// PHP `$resourceBundle->get($key)`. A live PHP object has no `PhpMixed` counterpart, so
-    /// [`PlatformInfo`] carries the entries the caller reads instead of the object.
-    fn resource_bundle_get(value: &PhpMixed, key: &BStr) -> PhpMixed {
-        Self::php_object_field(value, key).unwrap_or(PhpMixed::Null)
-    }
-
-    /// PHP `$imagick->getVersion()['versionString']`, read the same way.
-    fn imagick_get_version_string(value: &PhpMixed) -> BString {
-        match Self::php_object_field(value, BStr::new("versionString")) {
-            Some(PhpMixed::String(version)) => version.clone(),
-            _ => BString::default(),
-        }
-    }
-
-    fn php_object_field(value: &PhpMixed, key: &BStr) -> Option<PhpMixed> {
-        match value {
-            PhpMixed::Object(fields) | PhpMixed::Array(fields) => fields.get(B(key)).cloned(),
-            _ => None,
-        }
-    }
-
-    fn php_array_to_string_vec(value: &PhpMixed) -> Vec<BString> {
-        match value {
-            PhpMixed::List(list) => list
-                .iter()
-                .map(|v| match v {
-                    PhpMixed::String(s) => s.clone(),
-                    PhpMixed::Int(i) => bconcat!(i),
-                    PhpMixed::Float(f) => display_to_bytes(f),
-                    _ => BString::from(""),
-                })
-                .collect(),
-            PhpMixed::Array(m) => m
-                .values()
-                .map(|v| match v {
-                    PhpMixed::String(s) => s.clone(),
-                    PhpMixed::Int(i) => bconcat!(i),
-                    PhpMixed::Float(f) => display_to_bytes(f),
-                    _ => BString::from(""),
-                })
-                .collect(),
-            _ => Vec::new(),
-        }
     }
 }
 

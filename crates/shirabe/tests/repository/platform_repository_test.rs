@@ -61,23 +61,41 @@ fn platform_info(
     for (callable, arguments, result) in functions {
         match (callable, arguments.as_slice()) {
             (PhpMixed::String(name), []) if name == "curl_version" => {
-                platform_info.curl_version = result.clone();
+                platform_info.curl_version = Some(entry_string(result, BStr::new("version")));
             }
             (PhpMixed::String(name), [PhpMixed::String(address)])
                 if name == "inet_pton" && address == "::" =>
             {
-                platform_info.inet_pton_ipv6 = result.clone();
+                platform_info.inet_pton_ipv6 = match result {
+                    PhpMixed::String(address) => Some(address.to_vec()),
+                    PhpMixed::Bool(false) => None,
+                    other => panic!("inet_pton() does not return {other:?}"),
+                };
             }
             (PhpMixed::List(spec), _) => match spec.as_slice() {
                 [PhpMixed::String(class), PhpMixed::String(method)]
                     if class == "ResourceBundle" && method == "create" =>
                 {
-                    platform_info.resource_bundle = result.clone();
+                    platform_info.resource_bundle_version =
+                        Some(entry_string(result, BStr::new("Version")));
                 }
                 [PhpMixed::String(class), PhpMixed::String(method)]
                     if class == "IntlChar" && method == "getUnicodeVersion" =>
                 {
-                    platform_info.intl_char_unicode_version = result.clone();
+                    platform_info.intl_char_unicode_version = match result {
+                        PhpMixed::List(parts) => Some(
+                            parts
+                                .iter()
+                                .map(|part| match part {
+                                    PhpMixed::Int(n) => *n,
+                                    other => panic!(
+                                        "IntlChar::getUnicodeVersion() does not return {other:?}"
+                                    ),
+                                })
+                                .collect(),
+                        ),
+                        other => panic!("IntlChar::getUnicodeVersion() does not return {other:?}"),
+                    };
                 }
                 other => panic!("the platform payload does not report {other:?}"),
             },
@@ -88,7 +106,8 @@ fn platform_info(
     for definition in class_definitions {
         match (definition.class, &definition.construct) {
             (class, Some((_arguments, result))) if class == "Imagick" => {
-                platform_info.imagick = result.clone()
+                platform_info.imagick_version_string =
+                    Some(entry_string(result, BStr::new("versionString")))
             }
             (class, None) => platform_info.__set_class(class),
             (class, Some(_)) => panic!(
@@ -99,6 +118,18 @@ fn platform_info(
     }
 
     platform_info
+}
+
+/// The string entry `key` of an array, or of an object modelled as its fields, that the platform
+/// payload reduces a PHP call result to.
+fn entry_string(value: &PhpMixed, key: &BStr) -> BString {
+    match value {
+        PhpMixed::Array(fields) | PhpMixed::Object(fields) => match fields.get(key) {
+            Some(PhpMixed::String(entry)) => entry.clone(),
+            other => panic!("{key:?} is not a string entry: {other:?}"),
+        },
+        other => panic!("{other:?} has no {key:?} entry"),
+    }
 }
 
 #[test]

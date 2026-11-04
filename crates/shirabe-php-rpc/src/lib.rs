@@ -221,8 +221,8 @@ const PLATFORM_CLASSES: &[&BStr] = &[php_str(b"ResourceBundle"), php_str(b"IntlC
 /// Everything `PlatformRepository` needs to know about the PHP runtime, fetched in a single round
 /// trip because it would otherwise query the same runtime once per extension and constant.
 ///
-/// The fields standing in for PHP objects (`resource_bundle`, `imagick`) carry the entries the
-/// consumer reads off them rather than the object itself.
+/// The fields standing in for PHP calls and objects carry the entries the consumer reads off their
+/// results rather than the results themselves.
 #[derive(Debug, Clone)]
 pub struct PlatformInfo {
     extensions: Vec<BString>,
@@ -231,17 +231,18 @@ pub struct PlatformInfo {
     /// Keyed as `ltrim($class.'::'.$constant, ':')`; `None` for a reported but undefined constant.
     constants: IndexMap<BString, Option<PhpMixed>>,
     classes: IndexMap<BString, bool>,
-    /// `curl_version()`, or null when the curl extension is not loaded.
-    pub curl_version: PhpMixed,
-    /// `@inet_pton('::')`.
-    pub inet_pton_ipv6: PhpMixed,
-    /// `['Version' => ResourceBundle::create('root', 'ICUDATA', false)->get('Version')]`, or null
-    /// when the class is absent or the bundle cannot be opened.
-    pub resource_bundle: PhpMixed,
-    /// `IntlChar::getUnicodeVersion()`, or null when the class is absent.
-    pub intl_char_unicode_version: PhpMixed,
-    /// `(new Imagick())->getVersion()`, or null when the extension is not loaded.
-    pub imagick: PhpMixed,
+    /// `curl_version()['version']`, or `None` when the curl extension is not loaded.
+    pub curl_version: Option<BString>,
+    /// `@inet_pton('::')`, with PHP's `false` mapped to `None`.
+    pub inet_pton_ipv6: Option<Vec<u8>>,
+    /// `ResourceBundle::create('root', 'ICUDATA', false)->get('Version')`, or `None` when the class
+    /// is absent or the bundle cannot be opened.
+    pub resource_bundle_version: Option<BString>,
+    /// `IntlChar::getUnicodeVersion()`, or `None` when the class is absent.
+    pub intl_char_unicode_version: Option<Vec<i64>>,
+    /// `(new Imagick())->getVersion()['versionString']`, or `None` when the extension is not
+    /// loaded.
+    pub imagick_version_string: Option<BString>,
 }
 
 impl Default for PlatformInfo {
@@ -260,11 +261,11 @@ impl Default for PlatformInfo {
                 .iter()
                 .map(|name| ((*name).to_owned(), false))
                 .collect(),
-            curl_version: PhpMixed::Null,
-            inet_pton_ipv6: PhpMixed::Null,
-            resource_bundle: PhpMixed::Null,
-            intl_char_unicode_version: PhpMixed::Null,
-            imagick: PhpMixed::Null,
+            curl_version: None,
+            inet_pton_ipv6: None,
+            resource_bundle_version: None,
+            intl_char_unicode_version: None,
+            imagick_version_string: None,
         }
     }
 }
@@ -429,11 +430,13 @@ pub fn get_platform_info() -> &'static PlatformInfo {
                 .iter()
                 .map(|name| ((*name).to_owned(), classes[B(name)]))
                 .collect(),
-            curl_version: payload.mixed("curl_version"),
-            inet_pton_ipv6: payload.mixed("inet_pton_ipv6"),
-            resource_bundle: payload.mixed("resource_bundle"),
-            intl_char_unicode_version: payload.mixed("intl_char_unicode_version"),
-            imagick: payload.mixed("imagick"),
+            curl_version: payload.nullable_string("curl_version"),
+            inet_pton_ipv6: payload
+                .nullable_string("inet_pton_ipv6")
+                .map(|address| address.to_vec()),
+            resource_bundle_version: payload.nullable_string("resource_bundle_version"),
+            intl_char_unicode_version: payload.nullable_int_list("intl_char_unicode_version"),
+            imagick_version_string: payload.nullable_string("imagick_version_string"),
         }
     })
 }
@@ -451,10 +454,6 @@ impl Payload<'_> {
         self.map
             .get(B(key))
             .unwrap_or_else(|| panic!("PHP RPC: {:?} payload has no {key:?} entry", self.what))
-    }
-
-    fn mixed(&self, key: impl AsRef<[u8]>) -> PhpMixed {
-        self.field(key).clone()
     }
 
     fn string(&self, key: impl AsRef<[u8]>) -> BString {
@@ -525,6 +524,29 @@ impl Payload<'_> {
                 ),
             })
             .collect()
+    }
+
+    fn nullable_int_list(&self, key: impl AsRef<[u8]>) -> Option<Vec<i64>> {
+        let key = key.as_ref().as_bstr();
+        match self.field(key) {
+            PhpMixed::Null => None,
+            PhpMixed::List(items) => Some(
+                items
+                    .iter()
+                    .map(|item| match item {
+                        PhpMixed::Int(n) => *n,
+                        other => panic!(
+                            "PHP RPC: {:?} payload entry {key:?} has a non-int element: {other:?}",
+                            self.what
+                        ),
+                    })
+                    .collect(),
+            ),
+            other => panic!(
+                "PHP RPC: {:?} payload entry {key:?} is neither a list nor null: {other:?}",
+                self.what
+            ),
+        }
     }
 
     fn string_list(&self, key: impl AsRef<[u8]>) -> Vec<BString> {

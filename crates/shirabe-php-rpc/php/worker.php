@@ -827,11 +827,13 @@ ShirabeRpcRuntime::$dispatch = [
 
         // The values below stand in for the PHP objects and calls PlatformRepository reaches
         // through Composer\Platform\Runtime::invoke()/construct(), reduced to the entries it reads.
-        $resource_bundle = null;
+        $inet_pton_ipv6 = @inet_pton('::');
+
+        $resource_bundle_version = null;
         if ($classes['ResourceBundle']) {
             $bundle = ResourceBundle::create('root', 'ICUDATA', false);
             if ($bundle !== null) {
-                $resource_bundle = ['Version' => $bundle->get('Version')];
+                $resource_bundle_version = $bundle->get('Version');
             }
         }
 
@@ -842,11 +844,11 @@ ShirabeRpcRuntime::$dispatch = [
             'constant_names' => ShirabePlatformRuntime::CONSTANTS,
             'constants' => $constants,
             'classes' => $classes,
-            'curl_version' => extension_loaded('curl') ? curl_version() : null,
-            'inet_pton_ipv6' => @inet_pton('::'),
-            'resource_bundle' => $resource_bundle,
+            'curl_version' => extension_loaded('curl') ? curl_version()['version'] : null,
+            'inet_pton_ipv6' => $inet_pton_ipv6 === false ? null : $inet_pton_ipv6,
+            'resource_bundle_version' => $resource_bundle_version,
             'intl_char_unicode_version' => $classes['IntlChar'] ? IntlChar::getUnicodeVersion() : null,
-            'imagick' => extension_loaded('imagick') ? (new Imagick())->getVersion() : null,
+            'imagick_version_string' => extension_loaded('imagick') ? (new Imagick())->getVersion()['versionString'] : null,
         ];
     },
     'diagnose' => static function ($args) use ($xdebug_active) {
