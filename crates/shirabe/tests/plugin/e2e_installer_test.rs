@@ -123,11 +123,8 @@ fn test_plugin_provided_installer_matches_upstream_composer() {
 }
 
 // Re-running `install` over an already installed project, and removing the asset package
-// afterwards, produce the same files on both sides but consult the installers in a different
-// order: upstream resolves `getInstaller('composer-plugin')` before the asset operations run,
-// Shirabe only when the autoload dump asks for the install paths. The counts differ too once a
-// `remove` re-creates the Composer instance.
-#[ignore = "InstallationManager consults getInstaller at different points than upstream; installer-trace.txt diverges in order and count (TODO(plugin))"]
+// afterwards: installer-trace.txt records every `supports` lookup, so the tree comparison also
+// pins the order and count of `getInstaller` calls.
 #[test]
 fn test_plugin_provided_installer_call_order_matches_upstream_composer() {
     if !php_runtime_available() {
