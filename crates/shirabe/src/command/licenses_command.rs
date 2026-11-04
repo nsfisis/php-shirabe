@@ -12,6 +12,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, bconcat, impl_php_class, implode,
+    json_bytes,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -19,6 +20,27 @@ use shirabe_symfony_console::helper::{Row, Table};
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_console::style::{StyleInterface, SymfonyStyle};
+
+/// Shape of the `licenses --format=json` output.
+#[derive(Debug, serde::Serialize)]
+struct LicensesJson {
+    #[serde(serialize_with = "json_bytes::str")]
+    name: BString,
+    #[serde(serialize_with = "json_bytes::str")]
+    version: BString,
+    #[serde(serialize_with = "json_bytes::str_vec")]
+    license: Vec<BString>,
+    #[serde(serialize_with = "json_bytes::keyed")]
+    dependencies: IndexMap<BString, DependencyLicenseJson>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct DependencyLicenseJson {
+    #[serde(serialize_with = "json_bytes::str")]
+    version: BString,
+    #[serde(serialize_with = "json_bytes::str_vec")]
+    license: Vec<BString>,
+}
 
 #[derive(Debug)]
 pub struct LicensesCommand {
@@ -231,46 +253,34 @@ impl Command for LicensesCommand {
                 table.render()?;
             }
             b"json" => {
-                let mut dependencies: IndexMap<BString, PhpMixed> = IndexMap::new();
-                for package in &packages {
-                    let pkg_licenses = if let Some(complete_pkg) = package.as_complete_package() {
-                        complete_pkg.get_license()
-                    } else {
-                        vec![]
-                    };
-                    let mut dep_info: IndexMap<BString, PhpMixed> = IndexMap::new();
-                    dep_info.insert(
-                        "version".into(),
-                        PhpMixed::string(package.get_full_pretty_version(
-                            true,
-                            crate::package::DisplayMode::SourceRefIfDev,
-                        )),
-                    );
-                    dep_info.insert(
-                        "license".into(),
-                        PhpMixed::List(pkg_licenses.into_iter().map(PhpMixed::string).collect()),
-                    );
-                    dependencies.insert(package.get_pretty_name(), PhpMixed::Array(dep_info));
-                }
+                let dependencies: IndexMap<BString, DependencyLicenseJson> = packages
+                    .iter()
+                    .map(|package| {
+                        let license = if let Some(complete_pkg) = package.as_complete_package() {
+                            complete_pkg.get_license()
+                        } else {
+                            vec![]
+                        };
+                        (
+                            package.get_pretty_name(),
+                            DependencyLicenseJson {
+                                version: package.get_full_pretty_version(
+                                    true,
+                                    crate::package::DisplayMode::SourceRefIfDev,
+                                ),
+                                license,
+                            },
+                        )
+                    })
+                    .collect();
 
-                let mut output_map: IndexMap<BString, PhpMixed> = IndexMap::new();
-                output_map.insert("name".into(), PhpMixed::string(root.get_pretty_name()));
-                output_map.insert(
-                    "version".into(),
-                    PhpMixed::string(root.get_full_pretty_version(
-                        true,
-                        crate::package::DisplayMode::SourceRefIfDev,
-                    )),
-                );
-                let root_licenses = root.get_license();
-                output_map.insert(
-                    "license".into(),
-                    PhpMixed::List(root_licenses.into_iter().map(PhpMixed::string).collect()),
-                );
-                output_map.insert("dependencies".into(), PhpMixed::Array(dependencies));
-                io.write(&JsonFile::encode(&PhpMixed::Array(
-                    output_map.into_iter().collect(),
-                ))?);
+                io.write(&JsonFile::encode(&LicensesJson {
+                    name: root.get_pretty_name(),
+                    version: root
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                    license: root.get_license(),
+                    dependencies,
+                })?);
             }
             b"summary" => {
                 let mut used_licenses: IndexMap<BString, i64> = IndexMap::new();

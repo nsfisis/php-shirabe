@@ -12,12 +12,36 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, STR_PAD_RIGHT, bconcat, impl_php_class, implode,
-    in_array_loose, preg_quote, str_pad, str_repeat, substr,
+    in_array_loose, json_bytes, preg_quote, str_pad, str_repeat, substr,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
+
+/// Shape of one entry of the `search --format=json` output.
+#[derive(Debug, serde::Serialize)]
+struct SearchResultJson {
+    #[serde(serialize_with = "json_bytes::str")]
+    name: BString,
+    #[serde(serialize_with = "json_bytes::option_str")]
+    description: Option<BString>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    abandoned: Option<AbandonedJson>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "json_bytes::option_str"
+    )]
+    url: Option<BString>,
+}
+
+/// PHP stores `getReplacementPackage() ?: true`.
+#[derive(Debug, serde::Serialize)]
+#[serde(untagged)]
+enum AbandonedJson {
+    Replacement(#[serde(serialize_with = "json_bytes::str")] BString),
+    Abandoned(bool),
+}
 
 #[derive(Debug)]
 pub struct SearchCommand {
@@ -260,34 +284,21 @@ impl Command for SearchCommand {
             // array. PHP's fulltext search passes through arbitrary API fields (downloads, favers,
             // repository, ...) which the typed SearchResult (name/description/abandoned/url) drops,
             // so ComposerRepository-sourced results still diverge from Composer's raw JSON output.
-            let rows: Vec<PhpMixed> = results
+            let rows: Vec<SearchResultJson> = results
                 .into_iter()
-                .map(|result| {
-                    let mut entry = IndexMap::new();
-                    entry.insert("name".into(), PhpMixed::string(result.name));
-                    entry.insert(
-                        "description".into(),
-                        result
-                            .description
-                            .map(PhpMixed::string)
-                            .unwrap_or(PhpMixed::Null),
-                    );
-                    if let Some(abandoned) = result.abandoned {
-                        entry.insert(
-                            "abandoned".into(),
-                            match abandoned {
-                                AbandonedInfo::Replacement(s) => PhpMixed::string(s),
-                                AbandonedInfo::Abandoned => PhpMixed::Bool(true),
-                            },
-                        );
-                    }
-                    if let Some(url) = result.url {
-                        entry.insert("url".into(), PhpMixed::string(url));
-                    }
-                    PhpMixed::Array(entry)
+                .map(|result| SearchResultJson {
+                    name: result.name,
+                    description: result.description,
+                    abandoned: result.abandoned.map(|abandoned| match abandoned {
+                        AbandonedInfo::Replacement(replacement) => {
+                            AbandonedJson::Replacement(replacement)
+                        }
+                        AbandonedInfo::Abandoned => AbandonedJson::Abandoned(true),
+                    }),
+                    url: result.url,
                 })
                 .collect();
-            io.write(&JsonFile::encode(&PhpMixed::List(rows))?);
+            io.write(&JsonFile::encode(&rows)?);
         }
 
         Ok(0)

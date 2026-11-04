@@ -94,6 +94,14 @@ pub mod json_bytes {
 
     struct StrMap<'a>(&'a IndexMap<BString, BString>);
 
+    struct StrVec<'a>(&'a [BString]);
+
+    impl Serialize for StrVec<'_> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            str_vec(self.0, serializer)
+        }
+    }
+
     impl Serialize for StrMap<'_> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             str_map(self.0, serializer)
@@ -155,6 +163,21 @@ pub mod json_bytes {
         let mut map = serializer.serialize_map(Some(value.len()))?;
         for (k, v) in value {
             map.serialize_entry(&ByteString(k), v)?;
+        }
+        map.end()
+    }
+
+    /// Like [`keyed`], for values that are lists of PHP strings.
+    pub fn keyed_str_vec<S: Serializer>(
+        value: &IndexMap<BString, Vec<BString>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_empty() {
+            return serializer.serialize_seq(Some(0))?.end();
+        }
+        let mut map = serializer.serialize_map(Some(value.len()))?;
+        for (k, v) in value {
+            map.serialize_entry(&ByteString(k), &StrVec(v))?;
         }
         map.end()
     }

@@ -9,12 +9,26 @@ use crate::package::base_package::{self};
 use crate::repository::{CompositeRepository, RepositoryInterface};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat, impl_php_class, implode, php_regex, preg_match};
+use shirabe_php_shim::{bconcat, impl_php_class, implode, json_bytes, php_regex, preg_match};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
+
+/// Shape of the `fund --format=json` output, keyed by vendor.
+#[derive(Debug, serde::Serialize)]
+#[serde(transparent)]
+struct FundingsJson(
+    #[serde(serialize_with = "json_bytes::keyed")] IndexMap<BString, VendorFundingsJson>,
+);
+
+/// The package names of one vendor, keyed by funding URL.
+#[derive(Debug, serde::Serialize)]
+#[serde(transparent)]
+struct VendorFundingsJson(
+    #[serde(serialize_with = "json_bytes::keyed_str_vec")] IndexMap<BString, Vec<BString>>,
+);
 
 #[derive(Debug)]
 pub struct FundCommand {
@@ -213,8 +227,13 @@ impl Command for FundCommand {
             );
             io.write("Thank you!");
         } else if format == "json" {
-            let fundings_mixed: PhpMixed = fundings.clone().into();
-            io.write(&JsonFile::encode(&fundings_mixed)?);
+            let fundings = FundingsJson(
+                fundings
+                    .into_iter()
+                    .map(|(vendor, links)| (vendor, VendorFundingsJson(links)))
+                    .collect(),
+            );
+            io.write(&JsonFile::encode(&fundings)?);
         } else {
             io.write("No funding links were found in your package dependencies. This doesn't mean they don't need your support!");
         }
