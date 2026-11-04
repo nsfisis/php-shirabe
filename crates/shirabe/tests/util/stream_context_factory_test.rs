@@ -132,6 +132,7 @@ fn test_http_proxy() {
     )]);
     let context =
         StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
+            .unwrap()
             .unwrap();
     let options = stream_context_get_options(&context);
 
@@ -182,6 +183,7 @@ fn test_http_proxy_with_no_proxy() {
     )]);
     let context =
         StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
+            .unwrap()
             .unwrap();
     let options = stream_context_get_options(&context);
 
@@ -220,6 +222,7 @@ fn test_http_proxy_with_no_proxy_wildcard() {
     )]);
     let context =
         StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
+            .unwrap()
             .unwrap();
     let options = stream_context_get_options(&context);
 
@@ -265,6 +268,7 @@ fn test_options_are_preserved() {
     )]);
     let context =
         StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
+            .unwrap()
             .unwrap();
     let options = stream_context_get_options(&context);
 
@@ -313,6 +317,7 @@ fn test_http_proxy_without_port() {
     )]);
     let context =
         StreamContextFactory::get_context("https://example.org", default_options, IndexMap::new())
+            .unwrap()
             .unwrap();
     let options = stream_context_get_options(&context);
 
@@ -365,7 +370,7 @@ fn test_https_proxy_override() {
         )]),
         IndexMap::new(),
     );
-    assert!(result.is_err());
+    assert!(result.unwrap().is_err());
 }
 
 #[test]
@@ -391,6 +396,7 @@ fn test_ssl_proxy() {
                 )]),
                 IndexMap::new(),
             )
+            .unwrap()
             .unwrap();
             let options = stream_context_get_options(&context);
 
@@ -417,6 +423,7 @@ fn test_ssl_proxy() {
                     IndexMap::new(),
                     IndexMap::new(),
                 )
+                .unwrap()
                 .is_err()
             );
         }
@@ -443,8 +450,9 @@ fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() 
         s(BStr::new("Authorization: Basic aW52YWxpZA==")),
         s(BStr::new("Content-Type: application/json")),
     ];
-    let context =
-        StreamContextFactory::get_context("http://example.org", options, IndexMap::new()).unwrap();
+    let context = StreamContextFactory::get_context("http://example.org", options, IndexMap::new())
+        .unwrap()
+        .unwrap();
     let ctxoptions = stream_context_get_options(&context);
     let ctx_header = ctxoptions
         .get(B("http"))
@@ -467,8 +475,9 @@ fn test_init_options_does_include_proxy_auth_headers() {
     );
 
     let options: IndexMap<BString, PhpMixed> = IndexMap::new();
-    let options =
-        StreamContextFactory::init_options("https://example.org", options, false).unwrap();
+    let options = StreamContextFactory::init_options("https://example.org", options, false)
+        .unwrap()
+        .unwrap();
     let header_list: Vec<BString> = options
         .get(B("http"))
         .and_then(|v| v.as_array())
@@ -495,7 +504,9 @@ fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
     );
 
     let options: IndexMap<BString, PhpMixed> = IndexMap::new();
-    let options = StreamContextFactory::init_options("https://example.org", options, true).unwrap();
+    let options = StreamContextFactory::init_options("https://example.org", options, true)
+        .unwrap()
+        .unwrap();
     let header_list: Vec<BString> = options
         .get(B("http"))
         .and_then(|v| v.as_array())

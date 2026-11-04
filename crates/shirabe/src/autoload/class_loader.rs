@@ -293,14 +293,14 @@ impl ClassLoader {
     }
 
     /// Finds the path to the file where the class is defined.
-    pub fn find_file(&mut self, class: impl AsRef<[u8]>) -> Option<BString> {
+    pub fn find_file(&mut self, class: impl AsRef<[u8]>) -> anyhow::Result<Option<BString>> {
         let class = class.as_ref().as_bstr();
         // class map lookup
         if let Some(path) = self.class_map.get(class) {
-            return Some(path.clone());
+            return Ok(Some(path.clone()));
         }
         if self.class_map_authoritative || self.missing_classes.contains_key(class) {
-            return None;
+            return Ok(None);
         }
         // PHP also consults and fills the APCu cache around the lookup below. APCu is never enabled
         // here (see set_apcu_prefix), so the prefix is always null.
@@ -308,14 +308,14 @@ impl ClassLoader {
         // TODO(php-runtime): PHP also looks for a Hack file (`.hh`) when it runs on HHVM. Only the
         // worker, which is the runtime that includes the file, can answer whether it is HHVM, and
         // asking boots it, while this lookup is what decides whether it is needed at all.
-        let file = self.find_file_with_extension(class, BStr::new(".php"));
+        let file = self.find_file_with_extension(class, BStr::new(".php"))?;
 
         if file.is_none() {
             // Remember that this class does not exist.
             self.missing_classes.insert(class.to_owned(), true);
         }
 
-        file
+        Ok(file)
     }
 
     /// Returns the currently registered loaders keyed by their corresponding vendor directories.
@@ -323,7 +323,11 @@ impl ClassLoader {
         REGISTERED_LOADERS.lock().unwrap().clone()
     }
 
-    fn find_file_with_extension(&self, class: &BStr, ext: &BStr) -> Option<BString> {
+    fn find_file_with_extension(
+        &self,
+        class: &BStr,
+        ext: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         // PSR-4 lookup
         let logical_path_psr4 = bconcat!(strtr(class, "\\", std::path::MAIN_SEPARATOR_STR), ext);
 
@@ -341,7 +345,7 @@ impl ClassLoader {
                     for dir in dirs {
                         let file = bconcat!(dir, path_end);
                         if file_exists(path_from_bytes(&file)) {
-                            return Some(file);
+                            return Ok(Some(file));
                         }
                     }
                 }
@@ -352,7 +356,7 @@ impl ClassLoader {
         for dir in &self.fallback_dirs_psr4 {
             let file = bconcat!(dir, std::path::MAIN_SEPARATOR_STR, logical_path_psr4);
             if file_exists(path_from_bytes(&file)) {
-                return Some(file);
+                return Ok(Some(file));
             }
         }
 
@@ -378,7 +382,7 @@ impl ClassLoader {
                     for dir in dirs {
                         let file = bconcat!(dir, std::path::MAIN_SEPARATOR_STR, logical_path_psr0);
                         if file_exists(path_from_bytes(&file)) {
-                            return Some(file);
+                            return Ok(Some(file));
                         }
                     }
                 }
@@ -389,18 +393,18 @@ impl ClassLoader {
         for dir in &self.fallback_dirs_psr0 {
             let file = bconcat!(dir, std::path::MAIN_SEPARATOR_STR, logical_path_psr0);
             if file_exists(path_from_bytes(&file)) {
-                return Some(file);
+                return Ok(Some(file));
             }
         }
 
         // PSR-0 include paths.
         if self.use_include_path
-            && let Some(file) = stream_resolve_include_path(&logical_path_psr0)
+            && let Some(file) = stream_resolve_include_path(&logical_path_psr0)?
         {
-            return Some(BString::from(path_to_bytes(&file)));
+            return Ok(Some(BString::from(path_to_bytes(&file))));
         }
 
-        None
+        Ok(None)
     }
 
     /// PHP `(array) $loader`. Every property is private, so keys are mangled as

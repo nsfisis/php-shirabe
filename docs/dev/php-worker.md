@@ -7,17 +7,52 @@ the worker loads, the classes that cross as materialized values, and how the con
 is split between the two worlds. Which treatment each Composer class receives is decided by
 [docs/dev/plugin-class-classification.md](./plugin-class-classification.md).
 
+## Calling into the worker
+
+The `shirabe` crate calls into the worker through `plugin::php_call::PhpCall` and nothing else: it
+names what to run (a function or entry point, a method of a P-table entity, a static method, a
+constructor) and decodes the answer as the type the caller asks for (`FromWire`). The callbacks
+the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the runtime
+service endpoint and the R table — unless the caller brings a dispatcher of its own, as script
+execution does to expose the event it dispatches. A PHP exception becomes the error of the ported
+exception it stands for (`try_run` keeps it apart for a caller that catches it), and an answer
+that does not decode is an error naming the call and the value it answered with.
+
 ## Entry points
 
 A `CallFunction` name reaches the worker's dispatch table first (see "Entry points" in
-[docs/dev/php-rpc.md](./php-rpc.md)). The table holds two composite queries, `diagnose` and
-`platform`, and the Shirabe-internal helpers.
+[docs/dev/php-rpc.md](./php-rpc.md)). The table holds two composite queries,
+`__shirabe_diagnose` and `__shirabe_platform`, the runtime queries `__shirabe_constant`,
+`__shirabe_get_all_ini_files` and `__shirabe_xdebug_active`, and the Shirabe-internal helpers.
+Every entry is named `__shirabe_<snake_case>`, including one that answers what a standard
+function would (`__shirabe_constant` answers null for an undefined constant, where `constant()`
+throws), so a name in the table never shadows a PHP function.
 
 A composite query answers everything one consumer needs about the runtime in a single round trip,
 because asking one constant and one extension at a time costs a round trip each. The Rust side
-decodes the answer into a struct cached in a `OnceLock` (`Diagnostics` for `diagnose`,
-`PlatformInfo` for `platform`) whose accessors panic on a name the worker does not report, so a
-consumer and the worker cannot drift apart unnoticed.
+sends the names to report on (the extensions, functions and ini settings for
+`__shirabe_diagnose`; the constants, classes and extension info for `__shirabe_platform`) with the
+query, so the lists exist only there, and decodes the answer into a struct cached in a `OnceLock`
+(`Diagnostics` for `__shirabe_diagnose`, `PlatformInfo` for `__shirabe_platform`) whose accessors
+panic on a name the list does not hold.
+
+The functions of `shirabe-php-rpc` that answer questions about the runtime — the two composite
+queries (`get_diagnostics`, `get_platform_info`), the PHP version and binary, and the few PHP
+functions whose answer depends on the worker (`phpversion`, `stream_resolve_include_path`, the
+loaded ini files, whether Xdebug is active) — return `anyhow::Result` like every other call into
+the worker: a worker that cannot be spawned or reached, and an exception the call throws, are
+errors the caller propagates. An answer that does not decode is a protocol violation and panics,
+since only the worker's own code or a PHP builtin with a fixed return type writes it. A cached
+answer is cached only once it has arrived, so a failed query is asked again on the next call.
+
+### Records
+
+A composite payload — the answer of a composite query, the console application handoff, a
+command definition read back, the facts of a terminated process, the result of a `scripts` Command
+class — is a PHP array whose keys are the field names of one Rust struct declared with
+`shirabe_php_rpc::wire_record!`, which derives its `ToWire` / `FromWire` from those fields. The
+worker code reading or writing such an array uses the same snake_case names. A missing key or a
+value of the wrong type is a decoding failure naming the record and the key, never a default.
 
 Notable internal helpers:
 
@@ -39,25 +74,19 @@ Notable internal helpers:
   even autoloadable there, i.e. no Composer PHP runtime and therefore no observer code.
 - `__shirabe_resolve_job` / `__shirabe_reject_job` — the settle pushes of a Rust-owned job: the
   worker resolves or rejects the `Deferred` behind the job's promise, which runs the callbacks
-  plugin code chained on it before the call returns. The rejection is the exception the fields
-  of a `Throw` frame describe.
+  plugin code chained on it before the call returns. The rejection is the exception a
+  description of the kind a `Throw` frame carries stands for.
 - `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, for a Rust method
   whose PHP signature declares `PromiseInterface` and that has the value before any job exists.
-  The worker holds the promise under an even job id and answers with its `{__job}` descriptor,
+  The worker holds the promise under an even job id and answers with its `Job` descriptor,
   which the Rust method passes on as its own answer.
 - `__shirabe_rejected_promise` — the failure half of the same: `\React\Promise\reject()` over
-  the exception the fields of a `Throw` frame describe, so a failed request reaches the caller
+  the exception such a description stands for, so a failed request reaches the caller
   as a rejection it handles rather than as a throw out of the call that started it.
 - `__shirabe_sync_env` — replays the environment writes the Rust side made after the worker was
   spawned into the storage each one names (`putenv()`, `$_ENV`, `$_SERVER`); see
   [docs/dev/env-vars-porting.md](./env-vars-porting.md). The outermost `rpc_call` of a session
   issues it whenever the journal has moved on.
-- `__shirabe_get_property` — for testing only: reads a public property of a P-table entity.
-- `__shirabe_reflection_invoke` / `__shirabe_reflection_get_property` /
-  `__shirabe_reflection_set_property` — for testing only: the `ReflectionMethod` /
-  `ReflectionProperty` access PHPUnit tests use to reach the non-public members of a P-table
-  entity.
-- `__shirabe_oracle_roundtrip` — codec oracle support for tests.
 - `__shirabe_console_application_boot` — builds the worker-side `Composer\Console\Application`
   (the `php/runtime/` definition) from the Rust handoff: the shared `$composer`/`$io` proxies,
   the initial working directory and disable-by-default flags, `\Shirabe\RustCommandStub` rows
@@ -68,25 +97,35 @@ Notable internal helpers:
 - `__shirabe_read_command_definition` — reads a command's input definition (plus help text and
   extra usages) as plain data, so the Rust side mirrors it for `help`/`list` rendering.
 
+The helpers that exist only for tests sit together at the end of the table, each commented
+`For testing:`:
+
+- `__shirabe_oracle_roundtrip` — codec oracle support.
+- `__shirabe_get_property` — reads a public property of a P-table entity.
+- `__shirabe_reflection_invoke` / `__shirabe_reflection_get_property` /
+  `__shirabe_reflection_set_property` — the `ReflectionMethod` / `ReflectionProperty` access
+  PHPUnit tests use to reach the non-public members of a P-table entity.
+
 ### Runtime service endpoint
 
 The runtime service endpoint (handle 0) answers `__shirabe_find_file`, which the worker's
 script-class autoloader uses to ask the Rust-side `ClassLoader` where a class file lives,
 `__shirabe_run_rust_command` — the reverse half of the two-world command split: a
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
-the Rust process, against the Rust-side application state — `__shirabeConstruct`, which
+the Rust process, against the Rust-side application state — `__shirabe_construct`, which
 allocates the Rust entity behind a `new SomeProxiedClass(...)` written by plugin code and
-answers with `[rhandle, epoch]`, `__shirabeCallStatic`, which takes `[class, method, args]`
+answers with its rhandle, `__shirabe_call_static`, which takes `[class, method, args]`
 and runs a static method no handle identifies a receiver for, and the job methods
-`__shirabeResolveJob` / `__shirabeRejectJob` / `__shirabeCancelJob` / `__shirabeAbortJobs`
+`__shirabe_resolve_job` / `__shirabe_reject_job` / `__shirabe_cancel_job` / `__shirabe_abort_jobs`
 ([docs/dev/plugin-async.md](./plugin-async.md)). Classes and static methods Rust cannot answer
 are an explicit error naming them.
 
 ## Materialized values
 
 The two halves of the materialized-value codec are `crates/shirabe/src/plugin/php_plugin_value.rs`
-and `Shirabe\MaterializedValue`, whose `CLASSES` constant is the closed list of classes that may
-cross as object records.
+(and, for the PHP built-in `\DateTimeInterface`, the `ToWire` / `FromWire` impls of
+`shirabe-php-rpc`) and `Shirabe\MaterializedValue`, whose `CLASSES` constant is the closed list of
+classes that may cross as object records.
 
 `Composer\Package\Link` travels this way, together with the `composer/semver` constraint it holds
 (a `Link` can be built without a pretty constraint, which no constructor call reproduces), and so
@@ -135,13 +174,15 @@ that belongs to a proxied class.
   `executeAsync()` promise resolves with: the child was spawned by the Rust side, so it answers
   from what the Rust-side `Process` reports about the terminated process instead of from a
   `proc_open()` resource.
-- `Shirabe\MaterializedThrowable` — the PHP half of the `Throw` codec: rebuilds the exception a
-  `Throw` frame (or a job rejection) describes as its own class, or as a `RuntimeException` when
-  the child does not know the class, and describes an exception raised in the child as the fields
-  of a `Throw`.
+- `Shirabe\MaterializedThrowable` — the PHP half of the exception codec: rebuilds the exception
+  a description (the payload of a `Throw` frame, a job rejection) stands for as its own class, or
+  as a `RuntimeException` when the child does not know the class, and describes an exception
+  raised in the child.
 - `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: the closed list of
-  classes `unserialize()` may revive, and the hook that hands such an instance to `serialize()`
-  in place of a handle descriptor.
+  classes `unserialize()` may revive beside the descriptor classes, and the hook that hands such
+  an instance to `serialize()` in place of a handle descriptor.
+- `Shirabe\Wire\RustHandle`, `Shirabe\Wire\PhpHandle` and `Shirabe\Wire\Job` — the descriptor
+  records (see "Values" in [docs/dev/php-rpc.md](./php-rpc.md)).
 - `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust handle (through
   `__shirabeBind`) it proxies like a generated stub, while a natively-constructed instance (real
   Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands
@@ -163,13 +204,13 @@ resolved with highest priority, so these FQCNs can never be shadowed by the real
 Stubs are interned per rhandle (`WeakReference`-based registry) so identity (`===`) holds, and
 their destructors send `ReleaseRustHandle`. Reviving a stub for an existing entity bypasses its
 constructor (`newInstanceWithoutConstructor` plus `__shirabeBind`), because the constructor
-carries the real class's own signature and belongs to plugin code building a *new* entity. `clone` on a stub calls `__shirabeClone` on the
+carries the real class's own signature and belongs to plugin code building a *new* entity. `clone` on a stub calls `__shirabe_clone` on the
 entity and rebinds the copy to the handle that answers, so the two stubs never share (and never
 double-release) one entity; entities with no clone semantics answer with an explicit error.
 
 ## The R table
 
-`R_TABLE` in `crates/shirabe/src/plugin/php_plugin_proxy.rs` holds the Rust-side entities, as
+`R_TABLE` in `crates/shirabe/src/plugin/rpc/table.rs` holds the Rust-side entities, as
 `RustEntity` with one variant per kind of entity that crosses. Interning scans the table for the
 same variant and shared-pointer address, with no separate reverse index. There is no per-plugin
 bookkeeping: an entry lives as long as a stub for it is reachable in the worker, which is also how

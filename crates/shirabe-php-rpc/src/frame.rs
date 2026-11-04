@@ -2,7 +2,9 @@
 //! everything after itself (tag + corr_id + payload) and the payload is the frame's remaining
 //! fields as a PHP-serialized list. See `docs/dev/php-rpc.md`.
 
+use crate::PhpThrow;
 use crate::value::{self, PluginValue};
+use crate::wire::{FromWire, protocol_value};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{bconcat, utf8_text};
@@ -22,7 +24,6 @@ pub const TAG_RETURN: u8 = 0x05;
 pub const TAG_THROW: u8 = 0x06;
 pub const TAG_RELEASE_RUST_HANDLE: u8 = 0x07;
 pub const TAG_RELEASE_PHP_HANDLE: u8 = 0x08;
-pub const TAG_EPOCH_BUMP: u8 = 0x09;
 
 #[derive(Debug)]
 pub enum Frame {
@@ -30,14 +31,12 @@ pub enum Frame {
         corr_id: u64,
         function_name: BString,
         args: Vec<PluginValue>,
-        out_param_positions: Vec<u32>,
     },
     CallStaticMethod {
         corr_id: u64,
         pclass: BString,
         method_name: BString,
         args: Vec<PluginValue>,
-        out_param_positions: Vec<u32>,
     },
     NewObject {
         corr_id: u64,
@@ -49,42 +48,28 @@ pub enum Frame {
         phandle: u64,
         method_name: BString,
         args: Vec<PluginValue>,
-        out_param_positions: Vec<u32>,
     },
     CallRustMethod {
         corr_id: u64,
         rhandle: u64,
         method_name: BString,
         args: Vec<PluginValue>,
-        out_param_positions: Vec<u32>,
     },
     Return {
         corr_id: u64,
         value: PluginValue,
         out_params: IndexMap<u32, PluginValue>,
     },
+    /// The payload is the exception's description (`PhpThrow::to_wire`) itself.
     Throw {
         corr_id: u64,
-        exception_class: BString,
-        message: BString,
-        code: i64,
-        /// The state the exception carries beyond `message` and `code`, keyed by the property
-        /// names its class declares. Empty for an exception that carries none.
-        properties: IndexMap<BString, PluginValue>,
-        file: BString,
-        line: i64,
-        /// The superclasses of `exception_class`, nearest first.
-        parents: Vec<BString>,
+        throw: PhpThrow,
     },
     ReleaseRustHandle {
         rhandle: u64,
     },
     ReleasePhpHandle {
         phandle: u64,
-    },
-    EpochBump {
-        rhandle: u64,
-        epoch: u64,
     },
 }
 
@@ -100,7 +85,6 @@ impl Frame {
             Frame::Throw { .. } => TAG_THROW,
             Frame::ReleaseRustHandle { .. } => TAG_RELEASE_RUST_HANDLE,
             Frame::ReleasePhpHandle { .. } => TAG_RELEASE_PHP_HANDLE,
-            Frame::EpochBump { .. } => TAG_EPOCH_BUMP,
         }
     }
 
@@ -114,9 +98,7 @@ impl Frame {
             | Frame::CallRustMethod { corr_id, .. }
             | Frame::Return { corr_id, .. }
             | Frame::Throw { corr_id, .. } => *corr_id,
-            Frame::ReleaseRustHandle { .. }
-            | Frame::ReleasePhpHandle { .. }
-            | Frame::EpochBump { .. } => 0,
+            Frame::ReleaseRustHandle { .. } | Frame::ReleasePhpHandle { .. } => 0,
         }
     }
 
@@ -125,24 +107,20 @@ impl Frame {
             Frame::CallFunction {
                 function_name,
                 args,
-                out_param_positions,
                 ..
             } => vec![
                 PluginValue::string(function_name.clone()),
                 PluginValue::List(args.clone()),
-                positions_value(out_param_positions),
             ],
             Frame::CallStaticMethod {
                 pclass,
                 method_name,
                 args,
-                out_param_positions,
                 ..
             } => vec![
                 PluginValue::string(pclass.clone()),
                 PluginValue::string(method_name.clone()),
                 PluginValue::List(args.clone()),
-                positions_value(out_param_positions),
             ],
             Frame::NewObject {
                 pclass, ctor_args, ..
@@ -154,25 +132,21 @@ impl Frame {
                 phandle,
                 method_name,
                 args,
-                out_param_positions,
                 ..
             } => vec![
                 int_value(*phandle),
                 PluginValue::String(method_name.clone()),
                 PluginValue::List(args.clone()),
-                positions_value(out_param_positions),
             ],
             Frame::CallRustMethod {
                 rhandle,
                 method_name,
                 args,
-                out_param_positions,
                 ..
             } => vec![
                 int_value(*rhandle),
                 PluginValue::string(method_name.clone()),
                 PluginValue::List(args.clone()),
-                positions_value(out_param_positions),
             ],
             Frame::Return {
                 value, out_params, ..
@@ -185,42 +159,15 @@ impl Frame {
                         .collect(),
                 ),
             ],
-            Frame::Throw {
-                exception_class,
-                message,
-                code,
-                properties,
-                file,
-                line,
-                parents,
-                ..
-            } => vec![
-                PluginValue::string(exception_class.clone()),
-                PluginValue::string(message.clone()),
-                PluginValue::Int(*code),
-                PluginValue::Array(properties.clone()),
-                PluginValue::string(file.clone()),
-                PluginValue::Int(*line),
-                PluginValue::List(parents.iter().cloned().map(PluginValue::string).collect()),
-            ],
+            Frame::Throw { throw, .. } => throw.wire_fields(),
             Frame::ReleaseRustHandle { rhandle } => vec![int_value(*rhandle)],
             Frame::ReleasePhpHandle { phandle } => vec![int_value(*phandle)],
-            Frame::EpochBump { rhandle, epoch } => vec![int_value(*rhandle), int_value(*epoch)],
         }
     }
 }
 
 fn int_value(id: u64) -> PluginValue {
     PluginValue::Int(i64::try_from(id).expect("handle id exceeds i64"))
-}
-
-fn positions_value(positions: &[u32]) -> PluginValue {
-    PluginValue::List(
-        positions
-            .iter()
-            .map(|p| PluginValue::Int(i64::from(*p)))
-            .collect(),
-    )
 }
 
 pub fn write_frame(stream: &mut UnixStream, frame: &Frame) -> std::io::Result<()> {
@@ -278,35 +225,31 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
     match tag {
         TAG_CALL_FUNCTION => Frame::CallFunction {
             corr_id,
-            function_name: expect_bytes(next()),
-            args: expect_list(next()),
-            out_param_positions: expect_positions(next()),
+            function_name: field(next()),
+            args: field(next()),
         },
         TAG_CALL_STATIC_METHOD => Frame::CallStaticMethod {
             corr_id,
-            pclass: expect_bytes(next()),
-            method_name: expect_bytes(next()),
-            args: expect_list(next()),
-            out_param_positions: expect_positions(next()),
+            pclass: field(next()),
+            method_name: field(next()),
+            args: field(next()),
         },
         TAG_NEW_OBJECT => Frame::NewObject {
             corr_id,
-            pclass: expect_bytes(next()),
-            ctor_args: expect_list(next()),
+            pclass: field(next()),
+            ctor_args: field(next()),
         },
         TAG_CALL_PHP_METHOD => Frame::CallPhpMethod {
             corr_id,
             phandle: expect_id(next()),
-            method_name: expect_bytes(next()),
-            args: expect_list(next()),
-            out_param_positions: expect_positions(next()),
+            method_name: field(next()),
+            args: field(next()),
         },
         TAG_CALL_RUST_METHOD => Frame::CallRustMethod {
             corr_id,
             rhandle: expect_id(next()),
-            method_name: expect_bytes(next()),
-            args: expect_list(next()),
-            out_param_positions: expect_positions(next()),
+            method_name: field(next()),
+            args: field(next()),
         },
         TAG_RETURN => Frame::Return {
             corr_id,
@@ -315,28 +258,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         },
         TAG_THROW => Frame::Throw {
             corr_id,
-            exception_class: expect_bytes(next()),
-            message: expect_bytes(next()),
-            code: match next() {
-                PluginValue::Int(code) => code,
-                other => {
-                    panic!("PHP RPC: protocol violation — Throw code is not an int: {other:?}")
-                }
-            },
-            properties: expect_properties(next()),
-            file: match next() {
-                PluginValue::String(bytes) => bytes,
-                other => {
-                    panic!("PHP RPC: protocol violation — Throw file is not a string: {other:?}")
-                }
-            },
-            line: match next() {
-                PluginValue::Int(line) => line,
-                other => {
-                    panic!("PHP RPC: protocol violation — Throw line is not an int: {other:?}")
-                }
-            },
-            parents: expect_list(next()).into_iter().map(expect_bytes).collect(),
+            throw: PhpThrow::from_wire_fields(fields.collect()),
         },
         TAG_RELEASE_RUST_HANDLE => Frame::ReleaseRustHandle {
             rhandle: expect_id(next()),
@@ -344,83 +266,32 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         TAG_RELEASE_PHP_HANDLE => Frame::ReleasePhpHandle {
             phandle: expect_id(next()),
         },
-        TAG_EPOCH_BUMP => Frame::EpochBump {
-            rhandle: expect_id(next()),
-            epoch: expect_id(next()),
-        },
         _ => panic!("PHP RPC: protocol violation — unknown frame tag {tag:#04x}"),
     }
 }
 
-fn expect_bytes(value: PluginValue) -> BString {
-    match value {
-        PluginValue::String(bytes) => bytes,
-        other => panic!("PHP RPC: protocol violation — expected a string field: {other:?}"),
-    }
-}
-
-fn expect_list(value: PluginValue) -> Vec<PluginValue> {
-    match value {
-        PluginValue::List(items) => items,
-        other => panic!("PHP RPC: protocol violation — expected a list field: {other:?}"),
-    }
+fn field<T: FromWire>(value: PluginValue) -> T {
+    protocol_value(&value, "a frame field")
 }
 
 fn expect_id(value: PluginValue) -> u64 {
-    match value {
-        PluginValue::Int(n) => u64::try_from(n)
-            .unwrap_or_else(|_| panic!("PHP RPC: protocol violation — negative handle id {n}")),
-        other => panic!("PHP RPC: protocol violation — expected an int id field: {other:?}"),
-    }
-}
-
-fn expect_positions(value: PluginValue) -> Vec<u32> {
-    expect_list(value)
-        .into_iter()
-        .map(|item| match item {
-            PluginValue::Int(n) => u32::try_from(n).unwrap_or_else(|_| {
-                panic!("PHP RPC: protocol violation — out param position {n} out of range")
-            }),
-            other => {
-                panic!("PHP RPC: protocol violation — out param position is not an int: {other:?}")
-            }
-        })
-        .collect()
-}
-
-fn expect_properties(value: PluginValue) -> IndexMap<BString, PluginValue> {
-    match value {
-        PluginValue::List(items) if items.is_empty() => IndexMap::new(),
-        PluginValue::Array(map) => map,
-        other => {
-            panic!("PHP RPC: protocol violation — exception properties is not an array: {other:?}")
-        }
-    }
+    let id: i64 = field(value);
+    u64::try_from(id)
+        .unwrap_or_else(|_| panic!("PHP RPC: protocol violation — negative handle id {id}"))
 }
 
 fn expect_out_params(value: PluginValue) -> IndexMap<u32, PluginValue> {
-    match value {
-        PluginValue::List(items) if items.is_empty() => IndexMap::new(),
-        PluginValue::List(items) => items
-            .into_iter()
-            .enumerate()
-            .map(|(index, item)| (index as u32, item))
-            .collect(),
-        PluginValue::Array(map) => map
-            .into_iter()
-            .map(|(key, item)| {
-                let position = utf8_text(&key)
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "PHP RPC: protocol violation — out param key is not a position: {key:?}"
-                        )
-                    });
-                (position, item)
-            })
-            .collect(),
-        other => panic!("PHP RPC: protocol violation — out_params is not an array: {other:?}"),
-    }
+    field::<IndexMap<BString, PluginValue>>(value)
+        .into_iter()
+        .map(|(key, item)| {
+            let position = utf8_text(&key)
+                .and_then(|s| s.parse().ok())
+                .unwrap_or_else(|| {
+                    panic!("PHP RPC: protocol violation — out param key is not a position: {key:?}")
+                });
+            (position, item)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -439,19 +310,16 @@ mod tests {
             corr_id: 7,
             function_name: "defined".into(),
             args: vec![PluginValue::string("PHP_VERSION")],
-            out_param_positions: vec![],
         });
         match frame {
             Frame::CallFunction {
                 corr_id,
                 function_name,
                 args,
-                out_param_positions,
             } => {
                 assert_eq!(corr_id, 7);
                 assert_eq!(function_name, "defined");
                 assert_eq!(args, vec![PluginValue::string("PHP_VERSION")]);
-                assert!(out_param_positions.is_empty());
             }
             other => panic!("unexpected frame: {other:?}"),
         }
@@ -464,7 +332,6 @@ mod tests {
             pclass: b"Caf\xe9".into(),
             method_name: b"m\xff".into(),
             args: vec![],
-            out_param_positions: vec![],
         });
         match frame {
             Frame::CallStaticMethod {
@@ -481,51 +348,45 @@ mod tests {
 
     #[test]
     fn frame_roundtrip_throw_with_properties() {
-        let frame = roundtrip(Frame::Throw {
-            corr_id: 11,
-            exception_class: "Composer\\Downloader\\TransportException".into(),
-            message: "The \"https://example.org\" file could not be downloaded".into(),
-            code: 401,
-            properties: [
-                ("statusCode".into(), PluginValue::Int(401)),
-                ("response".into(), PluginValue::Null),
-            ]
-            .into_iter()
-            .collect(),
-            file: "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".into(),
-            line: 42,
-            parents: vec!["RuntimeException".into(), "Exception".into()],
-        });
+        let mut throw = PhpThrow::new(
+            "Composer\\Downloader\\TransportException",
+            "The \"https://example.org\" file could not be downloaded",
+            401,
+        );
+        *throw.properties = [
+            ("statusCode".into(), PluginValue::Int(401)),
+            ("response".into(), PluginValue::Null),
+        ]
+        .into_iter()
+        .collect();
+        throw.file = "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".into();
+        throw.line = 42;
+        throw.parents = vec!["RuntimeException".into(), "Exception".into()];
+        let frame = roundtrip(Frame::Throw { corr_id: 11, throw });
         match frame {
-            Frame::Throw {
-                corr_id,
-                exception_class,
-                message,
-                code,
-                properties,
-                file,
-                line,
-                parents,
-            } => {
+            Frame::Throw { corr_id, throw } => {
                 assert_eq!(
-                    file,
+                    throw.file,
                     "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php"
                 );
-                assert_eq!(line, 42);
-                assert_eq!(parents, vec!["RuntimeException", "Exception"]);
+                assert_eq!(throw.line, 42);
+                assert_eq!(throw.parents, vec!["RuntimeException", "Exception"]);
                 assert_eq!(corr_id, 11);
-                assert_eq!(exception_class, "Composer\\Downloader\\TransportException");
                 assert_eq!(
-                    message,
+                    throw.exception_class,
+                    "Composer\\Downloader\\TransportException"
+                );
+                assert_eq!(
+                    throw.message,
                     "The \"https://example.org\" file could not be downloaded"
                 );
-                assert_eq!(code, 401);
+                assert_eq!(throw.code, 401);
                 assert_eq!(
-                    properties.get(bstr::B("statusCode")),
+                    throw.properties.get(bstr::B("statusCode")),
                     Some(&PluginValue::Int(401))
                 );
                 assert_eq!(
-                    properties.get(bstr::B("response")),
+                    throw.properties.get(bstr::B("response")),
                     Some(&PluginValue::Null)
                 );
             }
@@ -556,14 +417,10 @@ mod tests {
 
     #[test]
     fn frame_roundtrip_one_way_notification() {
-        let frame = roundtrip(Frame::EpochBump {
-            rhandle: 4,
-            epoch: 2,
-        });
+        let frame = roundtrip(Frame::ReleaseRustHandle { rhandle: 4 });
         match frame {
-            Frame::EpochBump { rhandle, epoch } => {
+            Frame::ReleaseRustHandle { rhandle } => {
                 assert_eq!(rhandle, 4);
-                assert_eq!(epoch, 2);
             }
             other => panic!("unexpected frame: {other:?}"),
         }

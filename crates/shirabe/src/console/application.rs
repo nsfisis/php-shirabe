@@ -22,6 +22,7 @@ use crate::io::{
     ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface,
 };
 use crate::json::JsonValidationException;
+use crate::plugin::php_call::PhpCall;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
@@ -533,7 +534,7 @@ impl Application {
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
         let mut commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![];
 
-        crate::plugin::reset_pending_plugin_command_handles();
+        crate::plugin::console_bridge::reset_pending_plugin_command_handles();
 
         let mut composer = self.get_composer(false, Some(false), None)?;
         if composer.is_none() {
@@ -557,11 +558,11 @@ impl Application {
             let mut ctor_args: IndexMap<BString, shirabe_php_rpc::PluginValue> = IndexMap::new();
             ctor_args.insert(
                 BString::from("composer"),
-                crate::plugin::composer_handle_value(&composer),
+                crate::plugin::rpc::table::composer_handle_value(&composer),
             );
             ctor_args.insert(
                 BString::from("io"),
-                crate::plugin::io_handle_value(&self.io)?,
+                crate::plugin::rpc::table::io_handle_value(&self.io)?,
             );
             let capabilities = pm.borrow().get_plugin_capabilities(
                 BStr::new("Composer\\Plugin\\Capability\\CommandProvider"),
@@ -584,7 +585,7 @@ impl Application {
             if !commands.is_empty() {
                 self.register_worker_console_commands(
                     Some(&composer),
-                    crate::plugin::take_pending_plugin_command_handles(),
+                    crate::plugin::console_bridge::take_pending_plugin_command_handles(),
                 )?;
             }
         }
@@ -610,12 +611,12 @@ impl Application {
         handles: Vec<shirabe_php_rpc::PhpObjHandle>,
     ) -> anyhow::Result<()> {
         if self.published_worker_console_context {
-            return crate::plugin::extend_console_application_commands(handles);
+            return crate::plugin::console_bridge::extend_console_application_commands(handles);
         }
         self.published_worker_console_context = true;
 
         let mut seen: Vec<*const ()> = Vec::new();
-        let mut rust_commands: Vec<crate::plugin::RustCommandMetadata> = Vec::new();
+        let mut rust_commands: Vec<crate::plugin::console_bridge::RustCommandMetadata> = Vec::new();
         for command in self.commands.values() {
             let ptr = std::rc::Rc::as_ptr(command) as *const ();
             if seen.contains(&ptr) {
@@ -626,14 +627,14 @@ impl Application {
             let Some(name) = command.get_name() else {
                 continue;
             };
-            rust_commands.push(crate::plugin::RustCommandMetadata {
+            rust_commands.push(crate::plugin::console_bridge::RustCommandMetadata {
                 name,
                 description: command.get_description(),
                 aliases: command.get_aliases(),
                 hidden: command.is_hidden(),
             });
         }
-        crate::plugin::publish_console_application_context(
+        crate::plugin::console_bridge::publish_console_application_context(
             composer,
             &self.io,
             self.get_initial_working_directory(),
@@ -1880,8 +1881,6 @@ impl ApplicationHandle {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i32> {
         let application = &self.0;
-        shirabe_php_rpc::ensure_worker()?;
-
         application.borrow_mut().disable_plugins_by_default = input
             .borrow()
             .has_parameter_option(&["--no-plugins"], false);
@@ -2188,7 +2187,7 @@ impl ApplicationHandle {
                     ", based on Composer ",
                     composer::VERSION,
                     ") with PHP ",
-                    shirabe_php_rpc::get_php_version().version,
+                    shirabe_php_rpc::get_php_version()?.version,
                     " on ",
                     php_uname("s"),
                     " / ",
@@ -2198,11 +2197,11 @@ impl ApplicationHandle {
                 io_interface::DEBUG,
             );
 
-            if shirabe_php_rpc::get_php_version().version_id < 70205 {
-                io.write_error(bconcat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP ", shirabe_php_rpc::get_php_version().version, ". Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>"));
+            if shirabe_php_rpc::get_php_version()?.version_id < 70205 {
+                io.write_error(bconcat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP ", shirabe_php_rpc::get_php_version()?.version, ". Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>"));
             }
 
-            if shirabe_php_rpc::xdebug::is_xdebug_active()
+            if shirabe_php_rpc::xdebug::is_xdebug_active()?
                 && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none()
             {
                 io.write_error("<warning>Shirabe is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
@@ -2354,7 +2353,7 @@ impl ApplicationHandle {
                                 // `Composer\Command\AboutCommand`) is imported as a command by
                                 // PHP but falls through to ScriptAliasCommand here.
                                 let is_command_class = is_string(dummy)
-                                    && crate::plugin::find_file_in_registered_loaders(dummy_str)
+                                    && crate::plugin::rpc::dispatch::find_file_in_registered_loaders(dummy_str)?
                                         .is_some()
                                     && {
                                         let cache_dir = match composer_opt {
@@ -2407,45 +2406,31 @@ impl ApplicationHandle {
                                         )?;
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
-                                        let cmd_name = crate::plugin::call_php_entity_method(
-                                            &handle,
-                                            BStr::new("getName"),
-                                            vec![],
-                                        )?;
-                                        if let shirabe_php_rpc::PluginValue::String(ref bytes) =
-                                            cmd_name
+                                        let cmd_name: Option<BString> =
+                                            PhpCall::Method(&handle, BStr::new("getName"))
+                                                .run(Vec::new())?;
+                                        if let Some(ref bytes) = cmd_name
                                             && !bytes.is_empty()
                                             && bytes != script
                                         {
                                             io.write_error(bconcat!("<warning>The script named ", script, " in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>"));
                                             // override it with the defined script name
-                                            crate::plugin::call_php_entity_method(
-                                                &handle,
-                                                BStr::new("setName"),
-                                                vec![shirabe_php_rpc::PluginValue::string(
+                                            PhpCall::Method(&handle, BStr::new("setName"))
+                                                .run::<shirabe_php_rpc::PluginValue>(vec![
+                                                shirabe_php_rpc::PluginValue::string(
                                                     script.clone(),
-                                                )],
-                                            )?;
+                                                ),
+                                            ])?;
                                         }
 
-                                        let cmd_description =
-                                            crate::plugin::call_php_entity_method(
-                                                &handle,
-                                                BStr::new("getDescription"),
-                                                vec![],
-                                            )?;
-                                        if matches!(
-                                            cmd_description,
-                                            shirabe_php_rpc::PluginValue::String(ref bytes)
-                                                if bytes.is_empty()
-                                        ) {
-                                            crate::plugin::call_php_entity_method(
-                                                &handle,
-                                                BStr::new("setDescription"),
-                                                vec![shirabe_php_rpc::PluginValue::string(
-                                                    description,
-                                                )],
-                                            )?;
+                                        let cmd_description: BString =
+                                            PhpCall::Method(&handle, BStr::new("getDescription"))
+                                                .run(Vec::new())?;
+                                        if cmd_description.is_empty() {
+                                            PhpCall::Method(&handle, BStr::new("setDescription"))
+                                                .run::<shirabe_php_rpc::PluginValue>(vec![
+                                                shirabe_php_rpc::PluginValue::string(description),
+                                            ])?;
                                         }
 
                                         let cmd =
@@ -2457,7 +2442,7 @@ impl ApplicationHandle {
                                                 .as_ref()
                                                 .and_then(|c| c.as_full())
                                                 .as_ref(),
-                                            crate::plugin::take_pending_plugin_command_handles(),
+                                            crate::plugin::console_bridge::take_pending_plugin_command_handles(),
                                         )?;
                                         std::rc::Rc::new(std::cell::RefCell::new(cmd))
                                     } else {
@@ -2497,9 +2482,9 @@ impl ApplicationHandle {
             {
                 io.write_error(bconcat!(
                     "<info>PHP</info> version <comment>",
-                    shirabe_php_rpc::get_php_version().version,
+                    shirabe_php_rpc::get_php_version()?.version,
                     "</comment> (",
-                    shirabe_php_rpc::get_php_binary(),
+                    shirabe_php_rpc::get_php_binary()?,
                     ")"
                 ));
                 io.write_error(

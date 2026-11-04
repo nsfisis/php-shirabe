@@ -5,8 +5,8 @@
 The plugin PHP worker resolves proxied Composer FQCNs to thin stub classes whose
 public methods forward to the Rust-side entity over RPC (see
 `docs/dev/php-worker.md`, "Proxy stubs, runtime classes and guards"). These stub files, committed under
-`crates/shirabe-php-rpc/php/stubs/` and embedded into the binary by the
-`STUB_FILES` list in `crates/shirabe-php-rpc/src/lib.rs`, are *generated* by
+`crates/shirabe-php-rpc/php/stubs/` and embedded into the binary (the crate's
+`build.rs` embeds whatever the directory holds), are *generated* by
 `scripts/plugin-stub-generator` — never edited by hand. Generating them from the
 Composer sources keeps every stub signature mechanically faithful to the real
 class and turns "the stub is missing something the real class has" into a
@@ -18,7 +18,7 @@ no `php/runtime/` class shadows. Without them the worker's autoloader falls
 through to the real Composer implementation, and code running there works on a
 second instance the Rust side never sees — silent breakage in place of the
 explicit error an unimplemented plugin API is supposed to raise. `build.rs`
-embeds the guards, building the list from the directory itself.
+embeds the guards the same way as the stubs.
 
 ## Running
 
@@ -67,13 +67,13 @@ installs both tools' dependencies and regenerates the report.
 
 * **Root stubs** (targets that extend no class; a target extending another
   target or a `php/runtime/` class inherits the boilerplate from it) carry the
-  proxy boilerplate: `__rhandle`/`__epoch` properties, the `__shirabeBind`
+  proxy boilerplate: the `__rhandle` property, the `__shirabeBind`
   binder the registry calls when reviving a stub for an existing entity, a
   destructor releasing the Rust handle, and the wire descriptor helper. The
   real `extends`/`implements` hierarchy is preserved and `\ShirabeRustStub` is
   appended to the interface list.
 * **Constructors** reproduce the real class's parameter list and forward to the
-  Rust side (`__shirabeConstruct` on handle 0), which allocates the entity and
+  Rust side (`__shirabe_construct` on handle 0), which allocates the entity and
   answers with its handle; a class Rust cannot build answers with an explicit
   error naming it. One is emitted for every root stub and for every subclass
   that declares a public constructor of its own, so `new SomeProxiedClass(...)`
@@ -97,10 +97,9 @@ installs both tools' dependencies and regenerates the report.
   is a `two-world` class the Rust side never hands out as an entity, so the stub
   answers with the worker-side Loop built over the proxied services
   (`docs/dev/plugin-async.md`). An entry no stub declares fails generation.
-* **By-ref parameters** are declared `&$name` on the stub as well. The call
-  carries their positions, and the answer carries the value each of them holds
-  afterwards, which the stub assigns back (see "By-ref parameters" in
-  `docs/dev/php-rpc.md`). A position the answer omits is left alone, so a
+* **By-ref parameters** are declared `&$name` on the stub as well. The answer
+  carries the value each of them holds afterwards, which the stub assigns back
+  (see "By-ref parameters" in `docs/dev/php-rpc.md`). A position the answer omits is left alone, so a
   parameter the callee never assigned to keeps the value it had.
 * **Arity** is reproduced when — and only when — the real method body calls
   `func_num_args()`, in which case the stub trims the argument list to what the
@@ -118,7 +117,7 @@ installs both tools' dependencies and regenerates the report.
   One that reads a **static property** — whose value the Rust side owns, as
   `ProcessExecutor::$timeout` does — or that reaches a class a **guard**
   shadows there — as `ProcessExecutor::escape()` reaches `Composer\Util\Platform`
-  — forwards instead, through `__shirabeCallStatic` on handle 0, carrying a
+  — forwards instead, through `__shirabe_call_static` on handle 0, carrying a
   comment that names the reason. The test covers the transitive closure of the
   non-public static helpers the method calls, since those are materialized with
   it. A forwarded static may not take by-ref parameters; that combination fails
@@ -133,7 +132,7 @@ installs both tools' dependencies and regenerates the report.
   the boilerplate on every stub, whether or not the real class declares one:
   PHP has already copied the stub by the time it runs, so the copy asks the
   Rust side for a clone of the entity and rebinds itself to the fresh handle
-  (`__shirabeClone`, answered with `[rhandle, epoch]`). The clone semantics of
+  (`__shirabe_clone`, answered with the fresh rhandle). The clone semantics of
   the real class live on the Rust side with the entity; entities that model no
   clone answer with an explicit error.
 * **Imports**: the original file's `use` statements are kept in their original
@@ -177,10 +176,9 @@ Generation fails — instead of emitting something quietly wrong — on:
 * a target whose FQCN is also provided by `php/runtime/`.
 
 `generate-stubs` (in both modes) additionally fails when a `.php` file exists
-under the stubs or guards directory that no target produces, or when `STUB_FILES` /
-`RUNTIME_FILES` in `crates/shirabe-php-rpc/src/lib.rs` does not embed every
-generated stub / runtime file. It also cross-checks the handoff property table
-for `Composer\Console\Application` (declared in `generate-stubs` itself) against
+under the stubs or guards directory that no target produces, since `build.rs`
+would embed it. It also cross-checks the handoff property table for
+`Composer\Console\Application` (declared in `generate-stubs` itself) against
 the real class: a property upstream adds without a handoff classification — or a
 table row the class no longer declares — fails generation, so the worker-side
 runtime application can never silently drop plugin-visible state after a

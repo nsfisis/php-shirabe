@@ -86,25 +86,31 @@ fn main() {
     .unwrap();
     println!("cargo::rustc-env=SHIRABE_COMPOSER_RUNTIME_BUNDLE_ID={bundle_id}");
 
-    write_guard_files(&manifest_dir.join("php/guards"), &out_dir);
+    for (dir, list) in [
+        ("php/stubs", "stub-files.rs"),
+        ("php/runtime", "runtime-files.rs"),
+        ("php/guards", "guard-files.rs"),
+    ] {
+        write_embedded_files(&manifest_dir.join(dir), &out_dir.join(list));
+    }
 }
 
-/// Writes the initializer of `GUARD_FILES`: one `include_str!` per generated guard class. The
-/// list is built here rather than spelled out in the source because there is one guard for every
-/// Rust-owned class the worker has no proxy stub for.
-fn write_guard_files(guards: &Path, out_dir: &Path) {
-    println!("cargo::rerun-if-changed={}", guards.display());
+/// Writes the initializer of one of the lists of PHP files the worker loads (`STUB_FILES`,
+/// `RUNTIME_FILES`, `GUARD_FILES`): one `include_str!` per file under `dir`, keyed by its path
+/// relative to `dir`, so the list is whatever the directory holds.
+fn write_embedded_files(dir: &Path, list: &Path) {
+    println!("cargo::rerun-if-changed={}", dir.display());
 
     let mut code = String::from("&[\n");
-    for file in find_files(guards) {
+    for file in find_files(dir) {
         code += &format!(
             "    (php_str(b{:?}), include_str!({:?}).as_bytes()),\n",
-            relative_path(guards, &file),
+            relative_path(dir, &file),
             file.display().to_string()
         );
     }
     code += "]\n";
-    std::fs::write(out_dir.join("guard-files.rs"), code).unwrap();
+    std::fs::write(list, code).unwrap();
 }
 
 /// Every file the bundle holds, in the order `Compiler::compile` adds them.

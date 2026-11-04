@@ -2,7 +2,7 @@
 //!
 //! See `docs/dev/composer-runtime-bundle.md`.
 
-use crate::{PluginValue, call_function};
+use crate::{PluginValue, call_internal_function};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
     AnyThrowable, Phar, RuntimeException, bconcat, display_to_bytes, getenv, os_str_from_bytes,
@@ -76,7 +76,7 @@ fn override_directory() -> anyhow::Result<Option<std::path::PathBuf>> {
 /// wrapper.
 fn worker_opens_bundle() -> anyhow::Result<bool> {
     let executable = std::env::current_exe()?;
-    let opened = call_function(
+    let opened = call_internal_function(
         "__shirabe_open_runtime_bundle",
         vec![
             PluginValue::string(path_to_bytes(&executable)),
@@ -221,7 +221,7 @@ mod tests {
         let autoload = extract_into(root.path())
             .unwrap()
             .join("vendor/autoload.php");
-        call_function(
+        call_internal_function(
             "__shirabe_require",
             vec![PluginValue::string(path_to_bytes(&autoload))],
         )
@@ -230,7 +230,7 @@ mod tests {
 
         // A class with no proxy stub, so that the answer is about the runtime and not about the
         // stub autoloader.
-        let exists = call_function(
+        let exists = call_internal_function(
             "class_exists",
             vec![PluginValue::string(r"Composer\Util\Filesystem")],
         )

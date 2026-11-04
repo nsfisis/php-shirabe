@@ -252,7 +252,7 @@ impl VersionSelector {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<BString> {
         if package.get_name().starts_with(b"ext-") {
-            let php = shirabe_php_rpc::get_php_version();
+            let php = shirabe_php_rpc::get_php_version()?;
             let php_version = bconcat!(php.major, ".", php.minor, ".", php.release);
             let package_version = package.get_version();
             let ext_parts = explode_with_limit(".", package_version, 4);

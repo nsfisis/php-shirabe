@@ -12,7 +12,7 @@ class LocalRepoTransaction extends Transaction
 {
     public function __construct(RepositoryInterface $lockedRepository, InstalledRepositoryInterface $localRepository)
     {
-        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$lockedRepository, $localRepository]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$lockedRepository, $localRepository]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 }

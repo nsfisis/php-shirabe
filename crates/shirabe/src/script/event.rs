@@ -74,35 +74,7 @@ impl Event {
     }
 }
 
-impl EventInterface for Event {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-
-    fn get_name(&self) -> &bstr::BStr {
-        self.inner.get_name()
-    }
-
-    fn get_arguments(&self) -> &Vec<bstr::BString> {
-        self.inner.get_arguments()
-    }
-
-    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
-        self.inner.get_flags()
-    }
-
-    fn is_propagation_stopped(&self) -> bool {
-        self.inner.is_propagation_stopped()
-    }
-
-    fn stop_propagation(&mut self) {
-        self.inner.stop_propagation();
-    }
-}
+crate::event_dispatcher::delegate_event_interface_to_inner!(Event, inner);
 
 impl EventInterface for OriginatingEvent {
     fn as_any(&self) -> &dyn std::any::Any {

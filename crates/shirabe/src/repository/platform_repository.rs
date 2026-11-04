@@ -124,10 +124,13 @@ impl PlatformRepository {
     fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
 
-        let platform_info = self
-            .platform_info
-            .get_or_insert_with(|| shirabe_php_rpc::get_platform_info().clone())
-            .clone();
+        let platform_info = match &self.platform_info {
+            Some(platform_info) => platform_info.clone(),
+            None => self
+                .platform_info
+                .insert(shirabe_php_rpc::get_platform_info()?.clone())
+                .clone(),
+        };
 
         let mut libraries: IndexMap<BString, bool> = IndexMap::new();
 

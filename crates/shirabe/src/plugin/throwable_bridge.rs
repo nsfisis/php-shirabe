@@ -12,7 +12,8 @@ use crate::plugin::PluginBlockedException;
 use crate::repository::{InvalidRepositoryException, RepositorySecurityException};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::wire::protocol_value;
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{
     AnyThrowable, BadFunctionCallException, BadMethodCallException, Catch as _, Error, Exception,
     InvalidArgumentException, LogicException, OutOfBoundsException, PhpClass as _, PhpMixed,
@@ -49,51 +50,6 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
     anyhow::Error::new(exception)
 }
 
-/// Collapses the two failure lanes of an RPC call into `anyhow`, for a caller where Composer does
-/// not catch the exception the PHP code may throw: the `Throw` becomes the fatal error it stands
-/// for.
-pub(crate) fn unwrap_php_result(
-    outcome: anyhow::Result<Result<PluginValue, PhpThrow>>,
-) -> anyhow::Result<PluginValue> {
-    match outcome? {
-        Ok(value) => Ok(value),
-        Err(throw) => Err(throw_into_error(throw)),
-    }
-}
-
-/// The `Throw` the fields of `MaterializedThrowable::describe()` stand for, when they come back
-/// as a plain value rather than as a frame.
-pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
-    let string = |position: usize| {
-        fields
-            .get(position)
-            .and_then(PhpMixed::as_string)
-            .unwrap_or_default()
-            .to_owned()
-    };
-    let int = |position: usize| fields.get(position).and_then(PhpMixed::as_int).unwrap_or(0);
-    let mut throw = PhpThrow::new(string(0), string(1), int(2));
-    if let Some(PhpMixed::Array(properties)) = fields.get(3) {
-        *throw.properties = properties
-            .iter()
-            .map(|(name, value)| (name.clone(), PluginValue::from_php_mixed(value)))
-            .collect();
-    }
-    throw.file = fields
-        .get(4)
-        .and_then(PhpMixed::as_string)
-        .map(bstr::BString::from)
-        .unwrap_or_default();
-    throw.line = int(5);
-    if let Some(PhpMixed::List(parents)) = fields.get(6) {
-        throw.parents = parents
-            .iter()
-            .filter_map(|parent| parent.as_string().map(BString::from))
-            .collect();
-    }
-    throw
-}
-
 /// The ported exception of exactly `class`, built from what `throw` carries, or `None` if the
 /// port has no type for it or cannot build one from a `Throw`.
 fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
@@ -103,11 +59,7 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
         throw
             .properties
             .get(bstr::B(name))
-            .map(|value| {
-                value
-                    .to_php_mixed()
-                    .expect("an exception property is a plain PHP value")
-            })
+            .map(|value| protocol_value::<PhpMixed>(value, "an exception property"))
             .unwrap_or(PhpMixed::Null)
     };
     let byte_strings = |name: &BStr| -> Vec<BString> {
@@ -305,7 +257,8 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
                 exception
                     .get_response_info()
                     .iter()
-                    .map(PluginValue::from_php_mixed)
+                    .cloned()
+                    .map(PhpMixed::to_wire)
                     .collect(),
             ),
         );
@@ -315,7 +268,7 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
         properties.insert("warnings".into(), byte_strings(exception.get_warnings()));
         properties.insert(
             "data".into(),
-            PluginValue::from_php_mixed(&PhpMixed::Array(exception.get_data().clone())),
+            PhpMixed::Array(exception.get_data().clone()).to_wire(),
         );
     }
     if let Some(exception) = error.catch::<JsonValidationException>() {

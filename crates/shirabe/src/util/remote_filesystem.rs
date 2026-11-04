@@ -8,13 +8,13 @@
 
 use crate::config::Config;
 use crate::io::IOInterface;
-use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, config_handle_value, io_handle_value};
+use crate::plugin::php_call::PhpCall;
+use crate::plugin::rpc::table::{config_handle_value, io_handle_value};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue};
+use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, ToWire, wire};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, display_to_bytes, path_from_bytes, path_to_bytes,
-    php_regex, php_str, preg_match, utf8_text,
+    PhpMixed, path_from_bytes, path_to_bytes, php_regex, php_str, preg_match, utf8_text,
 };
 
 const CLASS: &BStr = php_str(b"Composer\\Util\\RemoteFilesystem");
@@ -62,17 +62,16 @@ impl RemoteFilesystem {
         progress: bool,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
-        let value = self.call(
+        self.call(
             BStr::new("copy"),
             vec![
                 PluginValue::string(origin_url.as_ref()),
                 PluginValue::string(file_url.as_ref()),
                 PluginValue::string(path_to_bytes(file_name.as_ref())),
                 PluginValue::Bool(progress),
-                PluginValue::from_php_mixed(&PhpMixed::Array(options)),
+                PhpMixed::Array(options).to_wire(),
             ],
-        )?;
-        Self::get_result(value)
+        )
     }
 
     pub fn get_contents(
@@ -82,47 +81,32 @@ impl RemoteFilesystem {
         progress: bool,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
-        let value = self.call(
+        self.call(
             BStr::new("getContents"),
             vec![
                 PluginValue::string(origin_url.as_ref()),
                 PluginValue::string(file_url.as_ref()),
                 PluginValue::Bool(progress),
-                PluginValue::from_php_mixed(&PhpMixed::Array(options)),
+                PhpMixed::Array(options).to_wire(),
             ],
-        )?;
-        Self::get_result(value)
+        )
     }
 
     pub fn get_options(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        match self
-            .call(BStr::new("getOptions"), Vec::new())?
-            .to_php_mixed()?
-        {
-            PhpMixed::Array(options) => Ok(options),
-            PhpMixed::List(list) if list.is_empty() => Ok(IndexMap::new()),
-            other => Err(Self::shape_error(BStr::new("getOptions"), &other)),
-        }
+        self.call(BStr::new("getOptions"), Vec::new())
     }
 
     pub fn set_options(&self, options: IndexMap<BString, PhpMixed>) -> anyhow::Result<()> {
-        self.call(
-            BStr::new("setOptions"),
-            vec![PluginValue::from_php_mixed(&PhpMixed::Array(options))],
-        )?;
+        self.call::<PluginValue>(BStr::new("setOptions"), vec![options.to_wire()])?;
         Ok(())
     }
 
     pub fn is_tls_disabled(&self) -> anyhow::Result<bool> {
-        match self.call(BStr::new("isTlsDisabled"), Vec::new())? {
-            PluginValue::Bool(disabled) => Ok(disabled),
-            other => Err(Self::shape_error(BStr::new("isTlsDisabled"), &other)),
-        }
+        self.call(BStr::new("isTlsDisabled"), Vec::new())
     }
 
     pub fn get_last_headers(&self) -> anyhow::Result<Vec<BString>> {
-        let value = self.call(BStr::new("getLastHeaders"), Vec::new())?;
-        Self::string_list(BStr::new("getLastHeaders"), value)
+        self.call(BStr::new("getLastHeaders"), Vec::new())
     }
 
     /// Computed on this side: a static method has no instance to forward to, and the function is
@@ -142,20 +126,10 @@ impl RemoteFilesystem {
     }
 
     pub fn find_status_message(&self, headers: &[BString]) -> anyhow::Result<Option<BString>> {
-        let value = self.call(
+        self.call(
             BStr::new("findStatusMessage"),
-            vec![PluginValue::List(
-                headers
-                    .iter()
-                    .map(|h| PluginValue::string(h.clone()))
-                    .collect(),
-            )],
-        )?;
-        match value {
-            PluginValue::Null => Ok(None),
-            PluginValue::String(message) => Ok(Some(message)),
-            other => Err(Self::shape_error(BStr::new("findStatusMessage"), &other)),
-        }
+            vec![headers.to_vec().to_wire()],
+        )
     }
 
     /// The worker-side instance, built on the first call.
@@ -168,77 +142,20 @@ impl RemoteFilesystem {
         crate::event_dispatcher::EventDispatcher::ensure_composer_php_runtime(path_from_bytes(
             &cache_dir,
         ))?;
-        let value = Self::php_result(shirabe_php_rpc::new_object(
-            CLASS,
-            vec![
-                io_handle_value(&self.io)?,
-                config_handle_value(&self.config),
-                PluginValue::from_php_mixed(&PhpMixed::Array(self.options.clone())),
-                PluginValue::Bool(self.disable_tls),
-            ],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
-        let PluginValue::PhpHandle(handle) = value else {
-            return Err(Self::shape_error(BStr::new("__construct"), &value));
-        };
+        let handle: PhpObjHandle = PhpCall::New(CLASS).run(vec![
+            io_handle_value(&self.io)?,
+            config_handle_value(&self.config),
+            PhpMixed::Array(self.options.clone()).to_wire(),
+            PluginValue::Bool(self.disable_tls),
+        ])?;
 
         Ok(self.entity.get_or_init(|| handle))
     }
 
-    fn call(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<PluginValue> {
-        let entity = self.entity()?;
-        Self::php_result(shirabe_php_rpc::call_php_method(
-            entity.phandle,
-            method,
-            args,
-            Some(&mut PluginRpcDispatcher::default()),
-        ))
-    }
-
-    /// Carries an exception the PHP instance throws over as the ported class, so a caller
-    /// catching `TransportException` catches it as it would under Composer.
-    fn php_result(
-        outcome: anyhow::Result<Result<PluginValue, PhpThrow>>,
-    ) -> anyhow::Result<PluginValue> {
-        match outcome? {
-            Ok(value) => Ok(value),
-            Err(throw) => Err(crate::plugin::throwable_bridge::throw_into_error(throw)),
-        }
-    }
-
-    fn get_result(value: PluginValue) -> anyhow::Result<GetResult> {
-        match value {
-            PluginValue::Bool(true) => Ok(GetResult::True),
-            PluginValue::Bool(false) => Ok(GetResult::False),
-            PluginValue::String(content) => Ok(GetResult::Content(content.into())),
-            other => Err(Self::shape_error(BStr::new("get"), &other)),
-        }
-    }
-
-    fn string_list(method: &BStr, value: PluginValue) -> anyhow::Result<Vec<BString>> {
-        let PluginValue::List(list) = value else {
-            return match value {
-                PluginValue::Array(ref map) if map.is_empty() => Ok(Vec::new()),
-                other => Err(Self::shape_error(method, &other)),
-            };
-        };
-        list.into_iter()
-            .map(|item| match item {
-                PluginValue::String(s) => Ok(s),
-                other => Err(Self::shape_error(method, &other)),
-            })
-            .collect()
-    }
-
-    fn shape_error(method: &BStr, value: &dyn std::fmt::Debug) -> anyhow::Error {
-        RuntimeException::new(bconcat!(
-            CLASS,
-            "::",
-            method,
-            " answered with an unsupported shape over RPC: ",
-            display_to_bytes(format_args!("{value:?}"))
-        ))
-        .into()
+    /// Forwards the call to the PHP instance. An exception it throws comes back as the ported
+    /// class, so a caller catching `TransportException` catches it as it would under Composer.
+    fn call<R: FromWire>(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<R> {
+        PhpCall::Method(self.entity()?, method).run(args)
     }
 
     /// For testing only. Invokes the protected `getOptionsForUrl` of the PHP instance, mirroring
@@ -248,17 +165,13 @@ impl RemoteFilesystem {
         origin_url: impl AsRef<[u8]>,
         additional_options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        let value = self.reflection_invoke(
+        self.reflection_invoke(
             BStr::new("getOptionsForUrl"),
             vec![
                 PluginValue::string(origin_url.as_ref()),
-                PluginValue::from_php_mixed(&PhpMixed::Array(additional_options)),
+                PhpMixed::Array(additional_options).to_wire(),
             ],
-        )?;
-        match value.to_php_mixed()? {
-            PhpMixed::Array(options) => Ok(options),
-            other => Err(Self::shape_error(BStr::new("getOptionsForUrl"), &other)),
-        }
+        )
     }
 
     /// For testing only. Sets the private `fileUrl` of the PHP instance, mirroring the
@@ -278,7 +191,7 @@ impl RemoteFilesystem {
         bytes_transferred: i64,
         bytes_max: i64,
     ) -> anyhow::Result<()> {
-        self.reflection_invoke(
+        self.reflection_invoke::<PluginValue>(
             BStr::new("callbackGet"),
             vec![
                 PluginValue::Int(notification_code),
@@ -297,10 +210,7 @@ impl RemoteFilesystem {
 
     /// For testing only. Reads the private `bytesMax` of the PHP instance.
     pub fn __bytes_max(&self) -> anyhow::Result<i64> {
-        match self.reflection_get_property(BStr::new("bytesMax"))? {
-            PluginValue::Int(bytes_max) => Ok(bytes_max),
-            other => Err(Self::shape_error(BStr::new("bytesMax"), &other)),
-        }
+        self.reflection_get_property(BStr::new("bytesMax"))
     }
 
     /// For testing only. Sets the private `bytesMax` of the PHP instance.
@@ -315,51 +225,44 @@ impl RemoteFilesystem {
 
     /// For testing only. Reads the private `lastProgress` of the PHP instance.
     pub fn __last_progress(&self) -> anyhow::Result<Option<i64>> {
-        match self.reflection_get_property(BStr::new("lastProgress"))? {
-            PluginValue::Null => Ok(None),
-            PluginValue::Int(last_progress) => Ok(Some(last_progress)),
-            other => Err(Self::shape_error(BStr::new("lastProgress"), &other)),
-        }
+        self.reflection_get_property(BStr::new("lastProgress"))
     }
 
-    fn reflection_invoke(
+    fn reflection_invoke<R: FromWire>(
         &self,
         method: &BStr,
         args: Vec<PluginValue>,
-    ) -> anyhow::Result<PluginValue> {
+    ) -> anyhow::Result<R> {
         let entity = PluginValue::PhpHandle(self.entity()?.clone());
-        Self::php_result(shirabe_php_rpc::call_function_with_dispatcher(
-            "__shirabe_reflection_invoke",
-            vec![entity, PluginValue::string(method), PluginValue::List(args)],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))
+        PhpCall::Function(BStr::new("__shirabe_reflection_invoke")).run(vec![
+            entity,
+            PluginValue::string(method),
+            PluginValue::List(args),
+        ])
     }
 
-    fn reflection_get_property(&self, name: &BStr) -> anyhow::Result<PluginValue> {
+    fn reflection_get_property<R: FromWire>(&self, name: &BStr) -> anyhow::Result<R> {
         let entity = PluginValue::PhpHandle(self.entity()?.clone());
-        Self::php_result(shirabe_php_rpc::call_function_with_dispatcher(
-            "__shirabe_reflection_get_property",
-            vec![entity, PluginValue::string(name)],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))
+        PhpCall::Function(BStr::new("__shirabe_reflection_get_property"))
+            .run(vec![entity, PluginValue::string(name)])
     }
 
     fn reflection_set_property(&self, name: &BStr, value: PluginValue) -> anyhow::Result<()> {
         let entity = PluginValue::PhpHandle(self.entity()?.clone());
-        Self::php_result(shirabe_php_rpc::call_function_with_dispatcher(
-            "__shirabe_reflection_set_property",
-            vec![entity, PluginValue::string(name), value],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
+        PhpCall::Function(BStr::new("__shirabe_reflection_set_property"))
+            .run::<PluginValue>(vec![entity, PluginValue::string(name), value])?;
         Ok(())
     }
 }
 
-impl Drop for RemoteFilesystem {
-    fn drop(&mut self) {
-        if let Some(entity) = self.entity.get() {
-            // A dead worker has nothing left to release.
-            let _ = shirabe_php_rpc::release_php_handle(entity.phandle);
+/// `string|bool` as `get()` answers it: the content, or whether a copy succeeded.
+impl FromWire for GetResult {
+    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
+        match value {
+            PluginValue::Bool(true) => Ok(GetResult::True),
+            PluginValue::Bool(false) => Ok(GetResult::False),
+            PluginValue::String(content) => Ok(GetResult::Content(content.to_vec())),
+            other => Err(wire::unexpected("a string or a bool", other)),
         }
     }
 }

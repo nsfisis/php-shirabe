@@ -4,10 +4,11 @@
 //! the other side holds a promise for; only its id crosses the RPC channel. See
 //! `docs/dev/plugin-async.md`.
 
-use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::php_call::PhpCall;
 use crate::plugin::throwable_bridge::throw_into_error;
+use bstr::BStr;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, call_function_with_dispatcher};
+use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{bconcat, error_chain_message};
 
 /// The service a job is counted against: the one whose `countActiveJobs()` reports it and whose
@@ -193,13 +194,12 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
             "__shirabe_resolve_job",
             vec![PluginValue::Int(id as i64), value],
         ),
-        Err(throw) => {
-            let mut args = vec![PluginValue::Int(id as i64)];
-            args.extend(throw_fields(throw));
-            ("__shirabe_reject_job", args)
-        }
+        Err(throw) => (
+            "__shirabe_reject_job",
+            vec![PluginValue::Int(id as i64), throw.to_wire()],
+        ),
     };
-    match call_function_with_dispatcher(function, args, Some(&mut PluginRpcDispatcher::default())) {
+    match PhpCall::Function(BStr::new(function)).try_run::<PluginValue>(args) {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(throw)) => Err(throw),
         Err(error) => Err(PhpThrow::runtime(bconcat!(
@@ -209,20 +209,6 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
             error_chain_message(&error)
         ))),
     }
-}
-
-/// The fields a `Throw` frame carries, as the argument list the worker rebuilds an exception
-/// from: class, message, code, declared state, file and line.
-pub(crate) fn throw_fields(throw: PhpThrow) -> Vec<PluginValue> {
-    let properties = PluginValue::Array(*throw.properties);
-    vec![
-        PluginValue::string(throw.exception_class),
-        PluginValue::string(throw.message),
-        PluginValue::Int(throw.code),
-        properties,
-        PluginValue::string(throw.file),
-        PluginValue::Int(throw.line),
-    ]
 }
 
 /// One tick of `owner`: advance its jobs, settle the ones that finished, and report how many

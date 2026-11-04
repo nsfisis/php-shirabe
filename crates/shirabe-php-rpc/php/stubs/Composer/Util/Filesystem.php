@@ -11,17 +11,14 @@ class Filesystem implements \ShirabeRustStub
 {
     /** @var int */
     protected $__rhandle;
-    /** @var int */
-    protected $__epoch;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle, int $epoch): void
+    public function __shirabeBind(int $rhandle): void
     {
         $this->__rhandle = $rhandle;
-        $this->__epoch = $epoch;
     }
 
     public function __destruct()
@@ -29,13 +26,9 @@ class Filesystem implements \ShirabeRustStub
         \ShirabeRustObjectRegistry::release($this->__rhandle);
     }
 
-    public function __shirabeRustHandleDescriptor(): array
+    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
     {
-        return [
-            '__rhandle' => $this->__rhandle,
-            '__class' => static::class,
-            '__epoch' => $this->__epoch,
-        ];
+        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
     }
 
     public function __clone()
@@ -44,7 +37,7 @@ class Filesystem implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
@@ -70,7 +63,7 @@ class Filesystem implements \ShirabeRustStub
 
     public function __construct(?ProcessExecutor $executor = null)
     {
-        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$executor]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$executor]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
@@ -104,13 +97,13 @@ class Filesystem implements \ShirabeRustStub
     // Forwarded rather than materialized: it references Composer\Util\Platform, which a guard shadows in the worker.
     public static function isLocalPath(string $path)
     {
-        return \ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, 'isLocalPath', [$path]]);
+        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'isLocalPath', [$path]]);
     }
 
     // Forwarded rather than materialized: it references Composer\Util\Platform, which a guard shadows in the worker.
     public static function getPlatformPath(string $path)
     {
-        return \ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, 'getPlatformPath', [$path]]);
+        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getPlatformPath', [$path]]);
     }
 
     public function remove(string $file)

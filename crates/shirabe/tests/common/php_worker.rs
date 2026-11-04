@@ -5,6 +5,7 @@
 #![allow(dead_code)]
 
 use bstr::{BStr, BString};
+use shirabe::plugin::php_call::PhpCall;
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{bconcat, str_replace};
 use shirabe_symfony_process::PhpExecutableFinder;
@@ -45,7 +46,8 @@ pub fn php_call_static(
 ) -> PluginValue {
     let class = BStr::new(class.as_ref());
     let method = BStr::new(method.as_ref());
-    shirabe_php_rpc::call_static_method(class, method, args, None)
+    PhpCall::StaticMethod(class, method)
+        .try_run::<PluginValue>(args)
         .unwrap_or_else(|error| {
             panic!(
                 "{}::{} request failed: {error}",
@@ -64,7 +66,8 @@ pub fn php_call_static(
 
 /// Runs a PHP snippet in the worker and returns its `return` value.
 pub fn php_eval(code: impl AsRef<[u8]>) -> PluginValue {
-    shirabe_php_rpc::call_function("__shirabe_eval", vec![PluginValue::string(code.as_ref())])
+    PhpCall::Function(BStr::new("__shirabe_eval"))
+        .try_run(vec![PluginValue::string(code.as_ref())])
         .expect("eval request failed")
         .expect("eval threw")
 }

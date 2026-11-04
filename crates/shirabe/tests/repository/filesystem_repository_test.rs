@@ -14,7 +14,7 @@ use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, Roo
 use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_rpc::PluginValue;
+use shirabe_php_rpc::{PluginValue, ToWire};
 use shirabe_php_shim::{
     Catch as _, PhpMixed, bconcat, display_to_bytes, path_from_bytes, path_to_bytes,
 };
@@ -456,5 +456,5 @@ fn test_safely_load_installed_versions() {
         ),
     ]));
 
-    assert_eq!(PluginValue::from_php_mixed(&expected), raw_data);
+    assert_eq!(expected.clone().to_wire(), raw_data);
 }

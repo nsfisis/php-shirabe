@@ -16,9 +16,9 @@ const ALLOW: &BStr = php_str(b"COMPOSER_ALLOW_XDEBUG");
 /// that settles the question for every Xdebug that honours the setting — Xdebug 2, which has no
 /// such setting, is reported inactive while it is not. `diagnose` reports what the worker measures
 /// instead.
-pub fn is_xdebug_active() -> bool {
+pub fn is_xdebug_active() -> anyhow::Result<bool> {
     if switches_xdebug_off() {
-        return false;
+        return Ok(false);
     }
 
     crate::xdebug_active()

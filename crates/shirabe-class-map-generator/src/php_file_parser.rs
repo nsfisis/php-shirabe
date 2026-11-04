@@ -13,7 +13,7 @@ pub struct PhpFileParser;
 
 impl PhpFileParser {
     pub fn find_classes(path: &BStr) -> anyhow::Result<Vec<BString>> {
-        let extra_types = Self::get_extra_types();
+        let extra_types = Self::get_extra_types()?;
         let fs_path = path_from_bytes(path);
 
         // Use @ here instead of Silencer to actively suppress 'unhelpful' output
@@ -143,30 +143,30 @@ impl PhpFileParser {
         Ok(classes)
     }
 
-    fn get_extra_types() -> &'static BStr {
+    fn get_extra_types() -> anyhow::Result<&'static BStr> {
         static EXTRA_TYPES: OnceLock<BString> = OnceLock::new();
-        EXTRA_TYPES
-            .get_or_init(|| {
-                let mut extra_types = BString::default();
-                let mut extra_types_array: Vec<BString> = vec![];
-                // TODO(port): PHP also scans for enums on HHVM 3.3 and above
-                // (`defined('HHVM_VERSION') && version_compare(HHVM_VERSION, '3.3', '>=')`).
-                if shirabe_php_rpc::get_php_version().version_id >= 80100 {
-                    extra_types.push_str("|enum");
-                    extra_types_array = vec![BString::from("enum")];
-                }
+        if let Some(extra_types) = EXTRA_TYPES.get() {
+            return Ok(extra_types.as_bstr());
+        }
 
-                let mut type_config = vec![
-                    BString::from("class"),
-                    BString::from("interface"),
-                    BString::from("trait"),
-                ];
-                type_config.extend(extra_types_array);
-                PhpFileCleaner::set_type_config(type_config);
+        let mut extra_types = BString::default();
+        let mut extra_types_array: Vec<BString> = vec![];
+        // TODO(port): PHP also scans for enums on HHVM 3.3 and above
+        // (`defined('HHVM_VERSION') && version_compare(HHVM_VERSION, '3.3', '>=')`).
+        if shirabe_php_rpc::get_php_version()?.version_id >= 80100 {
+            extra_types.push_str("|enum");
+            extra_types_array = vec![BString::from("enum")];
+        }
 
-                extra_types
-            })
-            .as_bstr()
+        let mut type_config = vec![
+            BString::from("class"),
+            BString::from("interface"),
+            BString::from("trait"),
+        ];
+        type_config.extend(extra_types_array);
+        PhpFileCleaner::set_type_config(type_config);
+
+        Ok(EXTRA_TYPES.get_or_init(|| extra_types).as_bstr())
     }
 
     /// Cross-platform safe version of is_readable()

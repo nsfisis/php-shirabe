@@ -9,8 +9,25 @@
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::value::{serialize, unserialize};
-use shirabe_php_rpc::{PhpObject, PluginValue, call_function};
+use shirabe_php_rpc::{
+    PhpObject, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
+};
 use shirabe_symfony_process::PhpExecutableFinder;
+
+/// The snippets these tests run never call back into Rust.
+struct NoCallbacks;
+
+impl RustMethodDispatcher for NoCallbacks {
+    fn dispatch(
+        &mut self,
+        _rhandle: u64,
+        method_name: &bstr::BStr,
+        _args: Vec<PluginValue>,
+        _out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        panic!("unexpected callback `{method_name:?}`")
+    }
+}
 
 fn php_available() -> bool {
     PhpExecutableFinder::new().find(false).is_some()
@@ -21,6 +38,7 @@ fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
     let outcome = call_function(
         "__shirabe_oracle_roundtrip",
         vec![PluginValue::String(bytes.into())],
+        &mut NoCallbacks,
     )
     .expect("oracle roundtrip request failed");
     match outcome.expect("oracle roundtrip threw") {
@@ -31,9 +49,13 @@ fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
 
 /// Runs a PHP snippet and returns its `return` value.
 fn php_eval(code: impl AsRef<[u8]>) -> PluginValue {
-    call_function("__shirabe_eval", vec![PluginValue::string(code.as_ref())])
-        .expect("eval request failed")
-        .expect("eval threw")
+    call_function(
+        "__shirabe_eval",
+        vec![PluginValue::string(code.as_ref())],
+        &mut NoCallbacks,
+    )
+    .expect("eval request failed")
+    .expect("eval threw")
 }
 
 fn assert_php_agrees(value: &PluginValue) {
@@ -199,6 +221,46 @@ fn decode_direction_matches_php_for_object_records() {
         };
         let decoded = unserialize(&php_bytes)
             .unwrap_or_else(|e| panic!("failed to decode PHP output for `{snippet}`: {e:#}"));
+        assert_eq!(
+            bstr::BStr::new(&serialize(&decoded)),
+            bstr::BStr::new(&php_bytes),
+            "re-encoding diverged for `{snippet}`"
+        );
+    }
+}
+
+/// A descriptor is the record of a class the worker declares, so its bytes are whatever PHP writes
+/// for an instance of that class.
+#[test]
+fn descriptor_records_match_php_in_both_directions() {
+    if !php_available() {
+        return;
+    }
+
+    assert_php_agrees(&PluginValue::RustHandle(RustObjHandle {
+        rhandle: 3,
+        class: "Composer\\Script\\Event".into(),
+    }));
+    assert_php_agrees(&PluginValue::Job(7));
+
+    let snippets = [
+        r#"return serialize(new \Shirabe\Wire\RustHandle(3, 'Composer\Script\Event'));"#,
+        r#"return serialize(new \Shirabe\Wire\PhpHandle(1000003, 'MyPlugin', ['Composer\Plugin\PluginInterface']));"#,
+        r#"return serialize(new \Shirabe\Wire\Job(8));"#,
+    ];
+    for snippet in snippets {
+        let PluginValue::String(php_bytes) = php_eval(snippet) else {
+            panic!("snippet did not return a string: {snippet}");
+        };
+        let decoded = unserialize(&php_bytes)
+            .unwrap_or_else(|e| panic!("failed to decode PHP output for `{snippet}`: {e:#}"));
+        assert!(
+            matches!(
+                decoded,
+                PluginValue::RustHandle(_) | PluginValue::PhpHandle(_) | PluginValue::Job(_)
+            ),
+            "`{snippet}` decoded as {decoded:?}"
+        );
         assert_eq!(
             bstr::BStr::new(&serialize(&decoded)),
             bstr::BStr::new(&php_bytes),

@@ -21,17 +21,14 @@ final class Generator
     private const BOILERPLATE = <<<'PHP'
         /** @var int */
         protected $__rhandle;
-        /** @var int */
-        protected $__epoch;
 
         /**
          * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
          * the constructor, which belongs to plugin code building a new entity instead.
          */
-        public function __shirabeBind(int $rhandle, int $epoch): void
+        public function __shirabeBind(int $rhandle): void
         {
             $this->__rhandle = $rhandle;
-            $this->__epoch = $epoch;
         }
 
         public function __destruct()
@@ -39,13 +36,9 @@ final class Generator
             \ShirabeRustObjectRegistry::release($this->__rhandle);
         }
 
-        public function __shirabeRustHandleDescriptor(): array
+        public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
         {
-            return [
-                '__rhandle' => $this->__rhandle,
-                '__class' => static::class,
-                '__epoch' => $this->__epoch,
-            ];
+            return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
         }
 
         public function __clone()
@@ -54,7 +47,7 @@ final class Generator
             // entity and release it twice. The Rust side clones the entity instead, applying
             // whatever __clone semantics the real class defines, and this copy rebinds to the
             // fresh handle. Entities without clone semantics answer with an explicit error.
-            [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+            $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
             \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
         }
     PHP;
@@ -406,11 +399,11 @@ final class Generator
             $params[] = $rendered;
             $args[] = '$' . $paramName;
         }
-        $call = "\\ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, ["
+        $call = "\\ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, ["
             . implode(', ', $args) . ']])';
         return "    public function __construct(" . implode(', ', $params) . ")\n"
             . "    {\n"
-            . "        [\$this->__rhandle, \$this->__epoch] = $call;\n"
+            . "        \$this->__rhandle = $call;\n"
             . "        \\ShirabeRustObjectRegistry::adopt(\$this->__rhandle, \$this);\n"
             . "    }";
     }
@@ -616,7 +609,7 @@ final class Generator
         // self::class, not static::class: the forwarded statics stand for this class's own state,
         // and a plugin subclass redeclaring it is not modelled on the Rust side.
         $body = $this->renderForwardingBody(
-            "\\ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, '$name', %s]%s)",
+            "\\ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', %s]%s)",
             $args,
             $outPositions,
             $this->inspectsArgCount($fqcn, $name, $method),
@@ -718,7 +711,7 @@ final class Generator
             return implode("\n", $lines);
         }
 
-        $tail = ', [' . implode(', ', $outPositions) . '], $__out';
+        $tail = ', $__out';
         $call = sprintf($callTemplate, $argsExpr, $tail);
         $lines[] = '        $__out = [];';
         $lines[] = $returnType === 'void' ? "        $call;" : "        \$__result = $call;";

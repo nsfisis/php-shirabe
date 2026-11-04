@@ -5,9 +5,11 @@ mod env;
 pub mod frame;
 pub mod session;
 pub mod value;
+pub mod wire;
 pub mod xdebug;
 
-pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
+pub use value::{PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
+pub use wire::{FromWire, ToWire};
 
 use bstr::{B, BStr, BString, ByteSlice};
 use frame::Frame;
@@ -17,6 +19,7 @@ use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
+use wire::protocol_value;
 
 /// The version constants of the PHP the worker runs.
 #[derive(Debug)]
@@ -37,84 +40,133 @@ static PHP_VERSION: OnceLock<PhpVersion> = OnceLock::new();
 
 /// The PHP version the worker runs. The worker is queried once per process; subsequent calls
 /// reuse the cached constants.
-pub fn get_php_version() -> &'static PhpVersion {
-    PHP_VERSION.get_or_init(|| PhpVersion {
-        version: string_constant("PHP_VERSION"),
-        version_id: int_constant("PHP_VERSION_ID"),
-        major: int_constant("PHP_MAJOR_VERSION"),
-        minor: int_constant("PHP_MINOR_VERSION"),
-        release: int_constant("PHP_RELEASE_VERSION"),
+pub fn get_php_version() -> anyhow::Result<&'static PhpVersion> {
+    cached(&PHP_VERSION, || {
+        Ok(PhpVersion {
+            version: constant("PHP_VERSION")?,
+            version_id: constant("PHP_VERSION_ID")?,
+            major: constant("PHP_MAJOR_VERSION")?,
+            minor: constant("PHP_MINOR_VERSION")?,
+            release: constant("PHP_RELEASE_VERSION")?,
+        })
     })
 }
 
 /// PHP `\PHP_BINARY`.
-pub fn get_php_binary() -> std::path::PathBuf {
-    path_from_bytes(&string_constant("PHP_BINARY")).to_path_buf()
+pub fn get_php_binary() -> anyhow::Result<std::path::PathBuf> {
+    constant("PHP_BINARY")
 }
 
 /// PHP `constant($name)`.
-fn get_constant(name: &BStr) -> PhpMixed {
-    call("constant", name)
+fn constant<T: FromWire>(name: impl AsRef<[u8]>) -> anyhow::Result<T> {
+    query("__shirabe_constant", name.as_ref().as_bstr())
 }
 
-fn string_constant(name: impl AsRef<[u8]>) -> BString {
-    let name = name.as_ref().as_bstr();
-    match get_constant(name) {
-        PhpMixed::String(s) => s,
-        other => panic!("PHP RPC: {name:?} constant did not resolve to a string: {other:?}"),
+/// The value `cell` caches, computing it with `init` on first use. A failed `init` caches
+/// nothing, so the next call asks again.
+fn cached<T>(
+    cell: &'static OnceLock<T>,
+    init: impl FnOnce() -> anyhow::Result<T>,
+) -> anyhow::Result<&'static T> {
+    if let Some(value) = cell.get() {
+        return Ok(value);
+    }
+    let value = init()?;
+    Ok(cell.get_or_init(|| value))
+}
+
+wire_record! {
+    /// `curl_version()`, together with the `CURL_*` constants the `diagnose` command consults.
+    /// Every `Option` field is `None` when the corresponding array key or constant is absent.
+    #[derive(Debug)]
+    pub struct Curl {
+        pub version: BString,
+        pub libz_version: Option<BString>,
+        pub brotli_version: Option<BString>,
+        pub ssl_version: Option<BString>,
+        pub features: Option<i64>,
+        pub version_zstd: Option<i64>,
+        pub version_http2: Option<i64>,
+        pub has_http_version_2_0: bool,
+        pub version_http3: Option<i64>,
     }
 }
 
-fn int_constant(name: impl AsRef<[u8]>) -> i64 {
-    let name = name.as_ref().as_bstr();
-    match get_constant(name) {
-        PhpMixed::Int(n) => n,
-        other => panic!("PHP RPC: {name:?} constant did not resolve to an int: {other:?}"),
+wire_record! {
+    /// Everything the `diagnose` command needs to know about the PHP runtime, fetched in a single
+    /// round trip because the command would otherwise query the same runtime dozens of times.
+    #[derive(Debug)]
+    pub struct Diagnostics {
+        pub php_version: BString,
+        pub php_version_id: i64,
+        /// `None` when `PHP_BINARY` is undefined.
+        pub php_binary: Option<std::path::PathBuf>,
+        /// `None` when `OPENSSL_VERSION_TEXT` is undefined.
+        pub openssl_version_text: Option<BString>,
+        /// `0` when `OPENSSL_VERSION_NUMBER` is undefined.
+        pub openssl_version_number: i64,
+        pub has_hhvm_version: bool,
+        pub has_php_windows_version_build: bool,
+        /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()`.
+        pub xdebug_active: bool,
+        /// `0` when the ionCube loader is not loaded.
+        pub ioncube_loader_iversion: i64,
+        /// Empty when the ionCube loader is not loaded.
+        pub ioncube_loader_version: BString,
+        /// `phpinfo(INFO_GENERAL)` output.
+        pub phpinfo_general: BString,
+        /// `None` when the curl extension is not loaded.
+        pub curl: Option<Curl>,
+        extensions: IndexMap<BString, bool>,
+        functions: IndexMap<BString, bool>,
+        /// PHP's `false` (no such setting) is `None`.
+        ini_settings: IndexMap<BString, Option<BString>>,
     }
 }
 
-/// `curl_version()`, together with the `CURL_*` constants the `diagnose` command consults. Every
-/// `Option` field is `None` when the corresponding array key or constant is absent.
-#[derive(Debug)]
-pub struct Curl {
-    pub version: BString,
-    pub libz_version: Option<BString>,
-    pub brotli_version: Option<BString>,
-    pub ssl_version: Option<BString>,
-    pub features: Option<i64>,
-    pub version_zstd: Option<i64>,
-    pub version_http2: Option<i64>,
-    pub has_http_version_2_0: bool,
-    pub version_http3: Option<i64>,
+wire_record! {
+    /// The names the `__shirabe_diagnose` payload reports on.
+    struct DiagnoseQuery {
+        extensions: Vec<BString>,
+        functions: Vec<BString>,
+        ini_settings: Vec<BString>,
+    }
 }
 
-/// Everything the `diagnose` command needs to know about the PHP runtime, fetched in a single
-/// round trip because the command would otherwise query the same runtime dozens of times.
-#[derive(Debug)]
-pub struct Diagnostics {
-    pub php_version: BString,
-    pub php_version_id: i64,
-    /// `None` when `PHP_BINARY` is undefined.
-    pub php_binary: Option<std::path::PathBuf>,
-    /// `None` when `OPENSSL_VERSION_TEXT` is undefined.
-    pub openssl_version_text: Option<BString>,
-    /// `0` when `OPENSSL_VERSION_NUMBER` is undefined.
-    pub openssl_version_number: i64,
-    pub has_hhvm_version: bool,
-    pub has_php_windows_version_build: bool,
-    /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()`.
-    pub xdebug_active: bool,
-    /// `0` when the ionCube loader is not loaded.
-    pub ioncube_loader_iversion: i64,
-    /// Empty when the ionCube loader is not loaded.
-    pub ioncube_loader_version: BString,
-    /// `phpinfo(INFO_GENERAL)` output.
-    pub phpinfo_general: BString,
-    /// `None` when the curl extension is not loaded.
-    pub curl: Option<Curl>,
-    extensions: IndexMap<BString, bool>,
-    functions: IndexMap<BString, bool>,
-    ini_settings: IndexMap<BString, Option<BString>>,
+/// The extensions `Diagnostics::extension_loaded` can be asked about.
+const DIAGNOSE_EXTENSIONS: &[&BStr] = &[
+    php_str(b"apcu"),
+    php_str(b"curl"),
+    php_str(b"filter"),
+    php_str(b"hash"),
+    php_str(b"iconv"),
+    php_str(b"ionCube Loader"),
+    php_str(b"mbstring"),
+    php_str(b"openssl"),
+    php_str(b"Phar"),
+    php_str(b"uopz"),
+    php_str(b"zip"),
+    php_str(b"zlib"),
+];
+
+/// The functions `Diagnostics::function_exists` can be asked about.
+const DIAGNOSE_FUNCTIONS: &[&BStr] = &[
+    php_str(b"disk_free_space"),
+    php_str(b"json_decode"),
+    php_str(b"proc_open"),
+];
+
+/// The settings `Diagnostics::ini_get` can be asked about.
+const DIAGNOSE_INI_SETTINGS: &[&BStr] = &[
+    php_str(b"allow_url_fopen"),
+    php_str(b"apc.enable_cli"),
+    php_str(b"uopz.disable"),
+    php_str(b"uopz.exit"),
+    php_str(b"xdebug.profiler_enabled"),
+];
+
+fn bstr_list(names: &[&BStr]) -> Vec<BString> {
+    names.iter().map(|name| (*name).to_owned()).collect()
 }
 
 impl Diagnostics {
@@ -153,46 +205,20 @@ static DIAGNOSTICS: OnceLock<Diagnostics> = OnceLock::new();
 
 /// PHP runtime information for the `diagnose` command. The worker is queried once per process;
 /// subsequent calls reuse the cached payload.
-pub fn get_diagnostics() -> &'static Diagnostics {
-    DIAGNOSTICS.get_or_init(|| {
-        let payload = call("diagnose", "");
-        let payload = payload
-            .as_array()
-            .unwrap_or_else(|| panic!("PHP RPC: `diagnose` did not return an array: {payload:?}"));
-        let payload = &Payload {
-            what: php_str(b"diagnose"),
-            map: payload,
-        };
-
-        Diagnostics {
-            php_version: payload.string("php_version"),
-            php_version_id: payload.int("php_version_id"),
-            php_binary: payload
-                .nullable_string("php_binary")
-                .map(|path| path_from_bytes(&path).to_path_buf()),
-            openssl_version_text: payload.nullable_string("openssl_version_text"),
-            openssl_version_number: payload.int("openssl_version_number"),
-            has_hhvm_version: payload.bool("has_hhvm_version"),
-            has_php_windows_version_build: payload.bool("has_php_windows_version_build"),
-            xdebug_active: payload.bool("xdebug_active"),
-            ioncube_loader_iversion: payload.int("ioncube_loader_iversion"),
-            ioncube_loader_version: payload.string("ioncube_loader_version"),
-            phpinfo_general: payload.string("phpinfo_general"),
-            curl: curl_field(payload, "curl"),
-            extensions: payload.bool_map("extensions"),
-            functions: payload.bool_map("functions"),
-            ini_settings: payload
-                .entries("ini")
-                .map(|(name, value)| {
-                    let value = as_nullable_string(value, BStr::new("ini"), name);
-                    (name.clone(), value)
-                })
-                .collect(),
-        }
+pub fn get_diagnostics() -> anyhow::Result<&'static Diagnostics> {
+    cached(&DIAGNOSTICS, || {
+        query(
+            "__shirabe_diagnose",
+            DiagnoseQuery {
+                extensions: bstr_list(DIAGNOSE_EXTENSIONS),
+                functions: bstr_list(DIAGNOSE_FUNCTIONS),
+                ini_settings: bstr_list(DIAGNOSE_INI_SETTINGS),
+            },
+        )
     })
 }
 
-/// The constants the `platform` payload carries, in the worker's order.
+/// The constants `PlatformInfo::has_constant` can be asked about.
 const PLATFORM_CONSTANTS: &[&BStr] = &[
     php_str(b"PHP_VERSION"),
     php_str(b"PHP_DEBUG"),
@@ -215,8 +241,62 @@ const PLATFORM_CONSTANTS: &[&BStr] = &[
     php_str(b"ZLIB_VERSION"),
 ];
 
-/// The classes the `platform` payload carries the existence of.
+/// The classes `PlatformInfo::has_class` can be asked about.
 const PLATFORM_CLASSES: &[&BStr] = &[php_str(b"ResourceBundle"), php_str(b"IntlChar")];
+
+/// The extensions whose `ReflectionExtension::info()` output `PlatformInfo::get_extension_info`
+/// can be asked about, when they are loaded.
+const PLATFORM_EXTENSION_INFO: &[&BStr] = &[
+    php_str(b"amqp"),
+    php_str(b"bz2"),
+    php_str(b"curl"),
+    php_str(b"date"),
+    php_str(b"fileinfo"),
+    php_str(b"gd"),
+    php_str(b"intl"),
+    php_str(b"ldap"),
+    php_str(b"mbstring"),
+    php_str(b"memcached"),
+    php_str(b"mongodb"),
+    php_str(b"mysqlnd"),
+    php_str(b"pcre"),
+    php_str(b"pdo_mysql"),
+    php_str(b"pdo_pgsql"),
+    php_str(b"pdo_sqlite"),
+    php_str(b"pgsql"),
+    php_str(b"pq"),
+    php_str(b"sqlite3"),
+    php_str(b"ssh2"),
+    php_str(b"xsl"),
+    php_str(b"yaml"),
+    php_str(b"zlib"),
+];
+
+wire_record! {
+    /// The names the `__shirabe_platform` payload reports on.
+    struct PlatformQuery {
+        constants: Vec<BString>,
+        classes: Vec<BString>,
+        extension_info: Vec<BString>,
+    }
+}
+
+wire_record! {
+    /// The answer to the `__shirabe_platform` query, which [`PlatformInfo`] is built from.
+    struct PlatformPayload {
+        extensions: Vec<BString>,
+        extension_versions: IndexMap<BString, BString>,
+        extension_info: IndexMap<BString, BString>,
+        /// Only the defined constants.
+        constants: IndexMap<BString, PhpMixed>,
+        classes: IndexMap<BString, bool>,
+        curl_version: Option<BString>,
+        inet_pton_ipv6: Option<BString>,
+        resource_bundle_version: Option<BString>,
+        intl_char_unicode_version: Option<Vec<i64>>,
+        imagick_version_string: Option<BString>,
+    }
+}
 
 /// Everything `PlatformRepository` needs to know about the PHP runtime, fetched in a single round
 /// trip because it would otherwise query the same runtime once per extension and constant.
@@ -391,296 +471,92 @@ static PLATFORM_INFO: OnceLock<PlatformInfo> = OnceLock::new();
 
 /// PHP runtime information for `PlatformRepository`. The worker is queried once per process;
 /// subsequent calls reuse the cached payload.
-pub fn get_platform_info() -> &'static PlatformInfo {
-    PLATFORM_INFO.get_or_init(|| {
-        let payload = call("platform", "");
-        let payload = payload
-            .as_array()
-            .unwrap_or_else(|| panic!("PHP RPC: `platform` did not return an array: {payload:?}"));
-        let payload = &Payload {
-            what: php_str(b"platform"),
-            map: payload,
-        };
-
-        let constant_names = payload.string_list("constant_names");
-        assert_eq!(
-            constant_names, PLATFORM_CONSTANTS,
-            "PHP RPC: the worker reports different constants than the platform payload declares"
-        );
-        let constants = payload.map("constants");
-        let classes = payload.bool_map("classes");
-        assert_eq!(
-            classes.keys().collect::<Vec<_>>(),
-            PLATFORM_CLASSES,
-            "PHP RPC: the worker reports different classes than the platform payload declares"
-        );
-
-        PlatformInfo {
-            extensions: payload.string_list("extensions"),
-            extension_versions: payload.string_map("extension_versions"),
-            extension_info: payload.string_map("extension_info"),
+pub fn get_platform_info() -> anyhow::Result<&'static PlatformInfo> {
+    cached(&PLATFORM_INFO, || {
+        let payload: PlatformPayload = query(
+            "__shirabe_platform",
+            PlatformQuery {
+                constants: bstr_list(PLATFORM_CONSTANTS),
+                classes: bstr_list(PLATFORM_CLASSES),
+                extension_info: bstr_list(PLATFORM_EXTENSION_INFO),
+            },
+        )?;
+        Ok(PlatformInfo {
+            extensions: payload.extensions,
+            extension_versions: payload.extension_versions,
+            extension_info: payload.extension_info,
             constants: PLATFORM_CONSTANTS
                 .iter()
-                .map(|name| {
-                    let value = constants.and_then(|map| map.get(B(name))).cloned();
-                    ((*name).to_owned(), value)
-                })
+                .map(|name| ((*name).to_owned(), payload.constants.get(B(name)).cloned()))
                 .collect(),
             classes: PLATFORM_CLASSES
                 .iter()
-                .map(|name| ((*name).to_owned(), classes[B(name)]))
+                .map(|name| {
+                    let exists = *payload.classes.get(B(name)).unwrap_or_else(|| {
+                        panic!("PHP RPC: the platform payload does not report the class {name:?}")
+                    });
+                    ((*name).to_owned(), exists)
+                })
                 .collect(),
-            curl_version: payload.nullable_string("curl_version"),
-            inet_pton_ipv6: payload
-                .nullable_string("inet_pton_ipv6")
-                .map(|address| address.to_vec()),
-            resource_bundle_version: payload.nullable_string("resource_bundle_version"),
-            intl_char_unicode_version: payload.nullable_int_list("intl_char_unicode_version"),
-            imagick_version_string: payload.nullable_string("imagick_version_string"),
-        }
+            curl_version: payload.curl_version,
+            inet_pton_ipv6: payload.inet_pton_ipv6.map(Vec::from),
+            resource_bundle_version: payload.resource_bundle_version,
+            intl_char_unicode_version: payload.intl_char_unicode_version,
+            imagick_version_string: payload.imagick_version_string,
+        })
     })
 }
 
-/// One worker answer, named after the dispatch entry that produced it so a decoding failure says
-/// which payload was malformed.
-struct Payload<'a> {
-    what: &'static BStr,
-    map: &'a IndexMap<BString, PhpMixed>,
+/// Runs a query against the worker: a PHP function, or an entry point answering one consumer's
+/// questions about the runtime. A failure to reach the worker and an exception the call throws are
+/// errors; an answer that does not decode as `T` is a protocol violation, because only the
+/// worker's own code or a PHP builtin with a fixed return type writes it.
+fn query<T: FromWire>(name: impl AsRef<[u8]>, request: impl ToWire) -> anyhow::Result<T> {
+    let name = name.as_ref().as_bstr();
+    let value = call_internal_function(name, vec![request.to_wire()])??;
+    Ok(protocol_value(&value, bconcat!("the answer of ", name)))
 }
 
-impl Payload<'_> {
-    fn field(&self, key: impl AsRef<[u8]>) -> &PhpMixed {
-        let key = key.as_ref().as_bstr();
-        self.map
-            .get(B(key))
-            .unwrap_or_else(|| panic!("PHP RPC: {:?} payload has no {key:?} entry", self.what))
-    }
-
-    fn string(&self, key: impl AsRef<[u8]>) -> BString {
-        let key = key.as_ref().as_bstr();
-        match self.field(key) {
-            PhpMixed::String(s) => s.clone(),
-            other => panic!(
-                "PHP RPC: {:?} payload entry {key:?} is not a string: {other:?}",
-                self.what
-            ),
-        }
-    }
-
-    fn nullable_string(&self, key: impl AsRef<[u8]>) -> Option<BString> {
-        let key = key.as_ref().as_bstr();
-        as_nullable_string(self.field(key), self.what, key)
-    }
-
-    fn int(&self, key: impl AsRef<[u8]>) -> i64 {
-        let key = key.as_ref().as_bstr();
-        match self.field(key) {
-            PhpMixed::Int(n) => *n,
-            other => panic!(
-                "PHP RPC: {:?} payload entry {key:?} is not an int: {other:?}",
-                self.what
-            ),
-        }
-    }
-
-    fn bool(&self, key: impl AsRef<[u8]>) -> bool {
-        let key = key.as_ref().as_bstr();
-        as_bool(self.field(key), self.what, key)
-    }
-
-    /// `None` for PHP's empty array, which carries no key type and so decodes as an empty list.
-    fn map(&self, key: impl AsRef<[u8]>) -> Option<&IndexMap<BString, PhpMixed>> {
-        let key = key.as_ref().as_bstr();
-        match self.field(key) {
-            PhpMixed::Array(map) => Some(map),
-            PhpMixed::List(items) if items.is_empty() => None,
-            other => panic!(
-                "PHP RPC: {:?} payload entry {key:?} is not an array: {other:?}",
-                self.what
-            ),
-        }
-    }
-
-    fn entries(&self, key: impl AsRef<[u8]>) -> impl Iterator<Item = (&BString, &PhpMixed)> {
-        let key = key.as_ref().as_bstr();
-        self.map(key).into_iter().flatten()
-    }
-
-    fn bool_map(&self, key: impl AsRef<[u8]>) -> IndexMap<BString, bool> {
-        let key = key.as_ref().as_bstr();
-        self.entries(key)
-            .map(|(name, value)| (name.clone(), as_bool(value, self.what, name)))
-            .collect()
-    }
-
-    fn string_map(&self, key: impl AsRef<[u8]>) -> IndexMap<BString, BString> {
-        let key = key.as_ref().as_bstr();
-        self.entries(key)
-            .map(|(name, value)| match value {
-                PhpMixed::String(s) => (name.clone(), s.clone()),
-                other => panic!(
-                    "PHP RPC: {:?} payload entry {key:?}[{name:?}] is not a string: {other:?}",
-                    self.what
-                ),
-            })
-            .collect()
-    }
-
-    fn nullable_int_list(&self, key: impl AsRef<[u8]>) -> Option<Vec<i64>> {
-        let key = key.as_ref().as_bstr();
-        match self.field(key) {
-            PhpMixed::Null => None,
-            PhpMixed::List(items) => Some(
-                items
-                    .iter()
-                    .map(|item| match item {
-                        PhpMixed::Int(n) => *n,
-                        other => panic!(
-                            "PHP RPC: {:?} payload entry {key:?} has a non-int element: {other:?}",
-                            self.what
-                        ),
-                    })
-                    .collect(),
-            ),
-            other => panic!(
-                "PHP RPC: {:?} payload entry {key:?} is neither a list nor null: {other:?}",
-                self.what
-            ),
-        }
-    }
-
-    fn string_list(&self, key: impl AsRef<[u8]>) -> Vec<BString> {
-        let key = key.as_ref().as_bstr();
-        match self.field(key) {
-            PhpMixed::List(items) => items
-                .iter()
-                .map(|item| match item {
-                    PhpMixed::String(s) => s.clone(),
-                    other => panic!(
-                        "PHP RPC: {:?} payload entry {key:?} has a non-string element: {other:?}",
-                        self.what
-                    ),
-                })
-                .collect(),
-            other => panic!(
-                "PHP RPC: {:?} payload entry {key:?} is not a list: {other:?}",
-                self.what
-            ),
-        }
-    }
-}
-
-fn as_bool(value: &PhpMixed, what: &BStr, key: impl std::fmt::Debug) -> bool {
-    match value {
-        PhpMixed::Bool(b) => *b,
-        other => panic!("PHP RPC: {what:?} payload entry {key:?} is not a bool: {other:?}"),
-    }
-}
-
-fn as_nullable_string(value: &PhpMixed, what: &BStr, key: impl std::fmt::Debug) -> Option<BString> {
-    match value {
-        PhpMixed::String(s) => Some(s.clone()),
-        PhpMixed::Null => None,
-        other => {
-            panic!("PHP RPC: {what:?} payload entry {key:?} is not a string or null: {other:?}")
-        }
-    }
-}
-
-fn nullable_int_field(payload: &Payload, key: impl AsRef<[u8]>) -> Option<i64> {
-    let key = key.as_ref().as_bstr();
-    let what = payload.what;
-    match payload.field(key) {
-        PhpMixed::Int(n) => Some(*n),
-        PhpMixed::Null => None,
-        other => {
-            panic!("PHP RPC: {what:?} payload entry {key:?} is not an int or null: {other:?}")
-        }
-    }
-}
-
-fn curl_field(payload: &Payload, key: impl AsRef<[u8]>) -> Option<Curl> {
-    let key = key.as_ref().as_bstr();
-    let what = payload.what;
-    let curl = match payload.field(key) {
-        PhpMixed::Null => return None,
-        PhpMixed::Array(map) => map,
-        other => {
-            panic!("PHP RPC: {what:?} payload entry {key:?} is not an array or null: {other:?}")
-        }
-    };
-    let curl = &Payload { what, map: curl };
-
-    Some(Curl {
-        version: curl.string("version"),
-        libz_version: curl.nullable_string("libz_version"),
-        brotli_version: curl.nullable_string("brotli_version"),
-        ssl_version: curl.nullable_string("ssl_version"),
-        features: nullable_int_field(curl, "features"),
-        version_zstd: nullable_int_field(curl, "version_zstd"),
-        version_http2: nullable_int_field(curl, "version_http2"),
-        has_http_version_2_0: curl.bool("has_http_version_2_0"),
-        version_http3: nullable_int_field(curl, "version_http3"),
+/// A PHP function answering `string|false`, with `false` mapped to `None`.
+fn string_or_false(name: impl AsRef<[u8]>, arg: &BStr) -> anyhow::Result<Option<BString>> {
+    let name = name.as_ref();
+    Ok(match query(name, arg)? {
+        PhpMixed::String(s) => Some(s),
+        PhpMixed::Bool(false) => None,
+        other => panic!(
+            "PHP RPC: protocol violation — `{}` answered with {other:?}",
+            name.as_bstr().display_lossy()
+        ),
     })
 }
 
 /// PHP `phpversion($extension)`.
-pub fn phpversion(extension: impl AsRef<[u8]>) -> Option<BString> {
-    match call("phpversion", extension) {
-        PhpMixed::String(s) => Some(s),
-        PhpMixed::Bool(false) => None,
-        other => panic!("PHP RPC: `phpversion` returned an unexpected value: {other:?}"),
-    }
+pub fn phpversion(extension: impl AsRef<[u8]>) -> anyhow::Result<Option<BString>> {
+    string_or_false("phpversion", extension.as_ref().as_bstr())
 }
 
 /// PHP `stream_resolve_include_path($filename)`. It is answered by the worker because the
 /// `include_path` it searches is the worker's own, including whatever a required `autoload_real.php`
 /// put there with `set_include_path()`.
-pub fn stream_resolve_include_path(filename: impl AsRef<[u8]>) -> Option<std::path::PathBuf> {
-    let filename = filename.as_ref();
-    match call("stream_resolve_include_path", filename) {
-        PhpMixed::String(s) => Some(path_from_bytes(&s).to_path_buf()),
-        PhpMixed::Bool(false) => None,
-        other => {
-            panic!("PHP RPC: `stream_resolve_include_path` returned an unexpected value: {other:?}")
-        }
-    }
+pub fn stream_resolve_include_path(
+    filename: impl AsRef<[u8]>,
+) -> anyhow::Result<Option<std::path::PathBuf>> {
+    let resolved = string_or_false("stream_resolve_include_path", filename.as_ref().as_bstr())?;
+    Ok(resolved.map(|s| path_from_bytes(&s).to_path_buf()))
 }
 
 /// What `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` measures: `[(string)
 /// php_ini_loaded_file()]` merged with the trimmed, comma-split `php_ini_scanned_files()` list
 /// when scanning is active. The worker runs on the ini files of the machine, so these are the
 /// user's own.
-pub fn get_all_ini_files() -> Vec<std::path::PathBuf> {
-    string_list(
-        call("get_all_ini_files", ""),
-        BStr::new("get_all_ini_files"),
-    )
-    .into_iter()
-    .map(|path| path_from_bytes(&path).to_path_buf())
-    .collect()
+pub fn get_all_ini_files() -> anyhow::Result<Vec<std::path::PathBuf>> {
+    query("__shirabe_get_all_ini_files", PluginValue::Null)
 }
 
 /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()` as measured in the worker, which is
 /// the process Xdebug is loaded into.
-fn xdebug_active() -> bool {
-    match call("xdebug_active", "") {
-        PhpMixed::Bool(b) => b,
-        other => panic!("PHP RPC: `xdebug_active` did not return a bool: {other:?}"),
-    }
-}
-
-fn string_list(value: PhpMixed, name: &BStr) -> Vec<BString> {
-    match value {
-        PhpMixed::List(items) => items
-            .into_iter()
-            .map(|item| match item {
-                PhpMixed::String(s) => s,
-                other => panic!("PHP RPC: {name:?} returned a non-string element: {other:?}"),
-            })
-            .collect(),
-        other => panic!("PHP RPC: {name:?} did not return a list: {other:?}"),
-    }
+fn xdebug_active() -> anyhow::Result<bool> {
+    query("__shirabe_xdebug_active", PluginValue::Null)
 }
 
 /// A PHP exception that crossed the RPC boundary (the recoverable failure lane, as opposed to
@@ -725,6 +601,55 @@ impl PhpThrow {
     pub fn runtime(message: impl Into<BString>) -> PhpThrow {
         PhpThrow::new("RuntimeException", message, 0)
     }
+
+    /// The exception as it crosses the boundary wherever it does — as the payload of a `Throw`
+    /// frame, a job rejection, or a value an entry point answers with: `[class, message, code,
+    /// properties, file, line, parents]`. `\Shirabe\MaterializedThrowable::describe()` writes the
+    /// same list on the PHP side.
+    pub fn to_wire(&self) -> PluginValue {
+        PluginValue::List(self.wire_fields())
+    }
+
+    /// Rebuilds the exception [`PhpThrow::to_wire`] describes. Both sides write the description
+    /// in the same commit of Shirabe, so one that does not decode is a protocol violation.
+    pub fn from_wire(value: PluginValue) -> PhpThrow {
+        PhpThrow::from_wire_fields(protocol_value(&value, "an exception description"))
+    }
+
+    pub(crate) fn wire_fields(&self) -> Vec<PluginValue> {
+        vec![
+            PluginValue::string(self.exception_class.clone()),
+            PluginValue::string(self.message.clone()),
+            PluginValue::Int(self.code),
+            PluginValue::Array((*self.properties).clone()),
+            PluginValue::string(self.file.clone()),
+            PluginValue::Int(self.line),
+            PluginValue::List(
+                self.parents
+                    .iter()
+                    .cloned()
+                    .map(PluginValue::string)
+                    .collect(),
+            ),
+        ]
+    }
+
+    pub(crate) fn from_wire_fields(fields: Vec<PluginValue>) -> PhpThrow {
+        let Ok([class, message, code, properties, file, line, parents]) =
+            <[PluginValue; 7]>::try_from(fields)
+        else {
+            panic!("PHP RPC: protocol violation — an exception description has not 7 fields");
+        };
+        PhpThrow {
+            exception_class: protocol_value(&class, "the exception class"),
+            message: protocol_value(&message, "the exception message"),
+            code: protocol_value(&code, "the exception code"),
+            properties: Box::new(protocol_value(&properties, "the exception properties")),
+            file: protocol_value(&file, "the exception file"),
+            line: protocol_value(&line, "the exception line"),
+            parents: protocol_value(&parents, "the exception parents"),
+        }
+    }
 }
 
 impl std::fmt::Display for PhpThrow {
@@ -743,18 +668,16 @@ impl std::error::Error for PhpThrow {}
 /// Handles `CallRustMethod` requests arriving while a Rust-initiated call is waiting for its
 /// `Return` (the cooperative reentrancy loop). A handler may itself issue nested RPC calls.
 ///
-/// `out_param_positions` names the by-ref parameters of the called method, as the calling stub
-/// declared them. A handler that assigns to one writes the resulting value into `out_params` under
-/// the same position, and the stub copies it back into the caller's variable; leaving a position
-/// out means the method never assigned to it, which is what PHP does with an untouched by-ref
-/// parameter.
+/// A handler whose method takes by-ref parameters writes the value each one holds afterwards into
+/// `out_params` under its position, and the stub copies it back into the caller's variable;
+/// leaving a position out means the method never assigned to it, which is what PHP does with an
+/// untouched by-ref parameter.
 pub trait RustMethodDispatcher {
     fn dispatch(
         &mut self,
         rhandle: u64,
         method_name: &BStr,
         args: Vec<PluginValue>,
-        out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow>;
 }
@@ -786,26 +709,43 @@ pub fn alloc_rhandle() -> u64 {
     NEXT_RHANDLE.fetch_add(1, Ordering::Relaxed)
 }
 
-/// Calls a PHP function in the worker. The outer `Result` is the fatal lane (dead worker, broken
-/// framing); the inner one carries a PHP exception if the call threw.
+/// Answers every `CallRustMethod` with an explicit error: the dispatcher of the calls this crate
+/// makes for itself, none of which runs code that calls back.
+#[derive(Debug)]
+struct RefuseCallbacks;
+
+impl RustMethodDispatcher for RefuseCallbacks {
+    fn dispatch(
+        &mut self,
+        rhandle: u64,
+        method_name: &BStr,
+        _args: Vec<PluginValue>,
+        _out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Err(PhpThrow::runtime(bconcat!(
+            "no Rust method dispatcher is active for this call (rhandle ",
+            rhandle,
+            ", method `",
+            method_name,
+            "`)"
+        )))
+    }
+}
+
+/// Calls a PHP function in the worker, or the worker's entry point of that name. The outer
+/// `Result` is the fatal lane (dead worker, broken framing); the inner one carries a PHP
+/// exception if the call threw. `dispatcher` serves the `CallRustMethod` requests the worker
+/// makes while the call is in flight.
 pub fn call_function(
     name: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
-) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
-    call_function_with_dispatcher(name, args, None)
-}
-
-pub fn call_function_with_dispatcher(
-    name: impl AsRef<[u8]>,
-    args: Vec<PluginValue>,
-    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallFunction {
             corr_id,
             function_name: name.as_ref().into(),
             args,
-            out_param_positions: Vec::new(),
         },
         dispatcher,
     )
@@ -816,7 +756,7 @@ pub fn call_static_method(
     class: impl AsRef<[u8]>,
     method: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
-    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallStaticMethod {
@@ -824,7 +764,6 @@ pub fn call_static_method(
             pclass: class.as_ref().into(),
             method_name: method.as_ref().into(),
             args,
-            out_param_positions: Vec::new(),
         },
         dispatcher,
     )
@@ -832,11 +771,11 @@ pub fn call_static_method(
 
 /// Instantiates `new $class(...$ctor_args)` in the worker (autoloading the class if needed).
 /// On success the returned value is a `PluginValue::PhpHandle` registered in the worker's P
-/// table; the entity stays alive there until `release_php_handle`.
+/// table; the entity stays alive there while the handle does.
 pub fn new_object(
     class: impl AsRef<[u8]>,
     ctor_args: Vec<PluginValue>,
-    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::NewObject {
@@ -850,28 +789,28 @@ pub fn new_object(
 
 /// Calls `$obj->$method(...$args)` on a P-table entity in the worker.
 pub fn call_php_method(
-    phandle: u64,
+    handle: &PhpObjHandle,
     method: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
-    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallPhpMethod {
             corr_id,
-            phandle,
+            phandle: handle.phandle(),
             method_name: method.as_ref().into(),
             args,
-            out_param_positions: Vec::new(),
         },
         dispatcher,
     )
 }
 
-/// One-way notification dropping a P-table entity in the worker. Callers releasing from a
-/// destructor should ignore the error: a dead worker has nothing left to release.
-pub fn release_php_handle(phandle: u64) -> anyhow::Result<()> {
-    let _session = session::SessionGuard::enter();
-    send_frame(&Frame::ReleasePhpHandle { phandle })
+/// [`call_function`] for the calls this crate makes for itself.
+pub(crate) fn call_internal_function(
+    name: impl AsRef<[u8]>,
+    args: Vec<PluginValue>,
+) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+    call_function(name, args, &mut RefuseCallbacks)
 }
 
 /// Whether the PHP worker process has been spawned by this process. Callers that only need to
@@ -886,7 +825,7 @@ pub fn worker_is_running() -> bool {
 
 fn rpc_call(
     request: impl FnOnce(u64) -> Frame,
-    mut dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     // Held for the whole logical call session; nested calls from the same thread (issued by a
     // dispatcher handler) re-enter immediately, other threads are serialized.
@@ -899,71 +838,37 @@ fn rpc_call(
     loop {
         let incoming = recv_frame()?;
         match incoming {
-            Frame::Return { corr_id, value, .. } if corr_id == my_id => {
+            Frame::Return {
+                corr_id,
+                value,
+                out_params,
+            } if corr_id == my_id => {
+                assert!(
+                    out_params.is_empty(),
+                    "PHP RPC: protocol violation — the worker answered with out params: \
+                     {out_params:?}"
+                );
                 return Ok(Ok(value));
             }
-            Frame::Throw {
-                corr_id,
-                exception_class,
-                message,
-                code,
-                properties,
-                file,
-                line,
-                parents,
-            } if corr_id == my_id => {
-                return Ok(Err(PhpThrow {
-                    exception_class,
-                    message,
-                    code,
-                    properties: Box::new(properties),
-                    file,
-                    line,
-                    parents,
-                }));
+            Frame::Throw { corr_id, throw } if corr_id == my_id => {
+                return Ok(Err(throw));
             }
             Frame::CallRustMethod {
                 corr_id,
                 rhandle,
                 method_name,
                 args,
-                out_param_positions,
             } => {
                 let mut out_params = IndexMap::new();
-                let outcome = match dispatcher.as_deref_mut() {
-                    Some(dispatcher) => dispatcher.dispatch(
-                        rhandle,
-                        method_name.as_bstr(),
-                        args,
-                        &out_param_positions,
-                        &mut out_params,
-                    ),
-                    // Never fall back to a silent null: an unroutable callback is reported as an
-                    // explicit error on the PHP side.
-                    None => Err(PhpThrow::runtime(bconcat!(
-                        "no Rust method dispatcher is active for this call (rhandle ",
-                        rhandle,
-                        ", method `",
-                        method_name,
-                        "`)"
-                    ))),
-                };
+                let outcome =
+                    dispatcher.dispatch(rhandle, method_name.as_bstr(), args, &mut out_params);
                 let reply = match outcome {
                     Ok(value) => Frame::Return {
                         corr_id,
                         value,
                         out_params,
                     },
-                    Err(throw) => Frame::Throw {
-                        corr_id,
-                        exception_class: throw.exception_class,
-                        message: throw.message,
-                        code: throw.code,
-                        properties: *throw.properties,
-                        file: throw.file,
-                        line: throw.line,
-                        parents: throw.parents,
-                    },
+                    Err(throw) => Frame::Throw { corr_id, throw },
                 };
                 send_frame(&reply)?;
             }
@@ -978,10 +883,6 @@ fn rpc_call(
                 });
                 continue;
             }
-            Frame::EpochBump { .. } => {
-                // Rust is the sender of epoch bumps; tolerate the symmetric direction.
-                continue;
-            }
             other => panic!(
                 "PHP RPC: protocol violation — unexpected frame while waiting for corr_id \
                  {my_id}: {other:?}"
@@ -990,266 +891,24 @@ fn rpc_call(
     }
 }
 
-fn call(name: impl AsRef<[u8]>, arg: impl AsRef<[u8]>) -> PhpMixed {
-    let name = name.as_ref().as_bstr();
-    let outcome = call_function(name, vec![PluginValue::string(arg.as_ref())])
-        .unwrap_or_else(|e| panic!("PHP RPC: request {name:?} failed: {e:#}"));
-    let value = match outcome {
-        Ok(value) => value,
-        Err(throw) => panic!("PHP RPC: request {name:?} threw {throw}"),
-    };
-    value
-        .to_php_mixed()
-        .unwrap_or_else(|e| panic!("PHP RPC: request {name:?} returned an unusable value: {e:#}"))
-}
-
 const GLUE_SCRIPT: &[u8] = include_bytes!("../php/worker.php");
 
-/// Proxy stub classes made autoloadable inside the worker. Generated by
-/// `scripts/plugin-stub-generator/generate-stubs`; this list must cover its targets.list (the
-/// generator's `--check` mode verifies both the file contents and this list).
-const STUB_FILES: &[(&BStr, &[u8])] = &[
-    (
-        php_str(b"Composer/EventDispatcher/EventDispatcher.php"),
-        include_str!("../php/stubs/Composer/EventDispatcher/EventDispatcher.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Script/Event.php"),
-        include_str!("../php/stubs/Composer/Script/Event.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/PartialComposer.php"),
-        include_str!("../php/stubs/Composer/PartialComposer.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Composer.php"),
-        include_str!("../php/stubs/Composer/Composer.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Autoload/AutoloadGenerator.php"),
-        include_str!("../php/stubs/Composer/Autoload/AutoloadGenerator.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Config.php"),
-        include_str!("../php/stubs/Composer/Config.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Downloader/DownloadManager.php"),
-        include_str!("../php/stubs/Composer/Downloader/DownloadManager.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/IO/BaseIO.php"),
-        include_str!("../php/stubs/Composer/IO/BaseIO.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/IO/ConsoleIO.php"),
-        include_str!("../php/stubs/Composer/IO/ConsoleIO.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/IO/BufferIO.php"),
-        include_str!("../php/stubs/Composer/IO/BufferIO.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/IO/NullIO.php"),
-        include_str!("../php/stubs/Composer/IO/NullIO.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Package/BasePackage.php"),
-        include_str!("../php/stubs/Composer/Package/BasePackage.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Package/Package.php"),
-        include_str!("../php/stubs/Composer/Package/Package.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Package/CompletePackage.php"),
-        include_str!("../php/stubs/Composer/Package/CompletePackage.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Package/RootPackage.php"),
-        include_str!("../php/stubs/Composer/Package/RootPackage.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Package/AliasPackage.php"),
-        include_str!("../php/stubs/Composer/Package/AliasPackage.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Package/CompleteAliasPackage.php"),
-        include_str!("../php/stubs/Composer/Package/CompleteAliasPackage.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Package/RootAliasPackage.php"),
-        include_str!("../php/stubs/Composer/Package/RootAliasPackage.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Package/Locker.php"),
-        include_str!("../php/stubs/Composer/Package/Locker.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Repository/ArrayRepository.php"),
-        include_str!("../php/stubs/Composer/Repository/ArrayRepository.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Repository/WritableArrayRepository.php"),
-        include_str!("../php/stubs/Composer/Repository/WritableArrayRepository.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Repository/InstalledArrayRepository.php"),
-        include_str!("../php/stubs/Composer/Repository/InstalledArrayRepository.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Repository/LockArrayRepository.php"),
-        include_str!("../php/stubs/Composer/Repository/LockArrayRepository.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Repository/FilesystemRepository.php"),
-        include_str!("../php/stubs/Composer/Repository/FilesystemRepository.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Repository/InstalledFilesystemRepository.php"),
-        include_str!("../php/stubs/Composer/Repository/InstalledFilesystemRepository.php")
-            .as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Repository/RepositoryManager.php"),
-        include_str!("../php/stubs/Composer/Repository/RepositoryManager.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Installer/InstallationManager.php"),
-        include_str!("../php/stubs/Composer/Installer/InstallationManager.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Installer/PackageEvent.php"),
-        include_str!("../php/stubs/Composer/Installer/PackageEvent.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Installer/InstallerEvent.php"),
-        include_str!("../php/stubs/Composer/Installer/InstallerEvent.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Plugin/PreFileDownloadEvent.php"),
-        include_str!("../php/stubs/Composer/Plugin/PreFileDownloadEvent.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Plugin/PostFileDownloadEvent.php"),
-        include_str!("../php/stubs/Composer/Plugin/PostFileDownloadEvent.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Plugin/PrePoolCreateEvent.php"),
-        include_str!("../php/stubs/Composer/Plugin/PrePoolCreateEvent.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Plugin/CommandEvent.php"),
-        include_str!("../php/stubs/Composer/Plugin/CommandEvent.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/DependencyResolver/Transaction.php"),
-        include_str!("../php/stubs/Composer/DependencyResolver/Transaction.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/DependencyResolver/LocalRepoTransaction.php"),
-        include_str!("../php/stubs/Composer/DependencyResolver/LocalRepoTransaction.php")
-            .as_bytes(),
-    ),
-    (
-        php_str(b"Composer/DependencyResolver/Operation/SolverOperation.php"),
-        include_str!("../php/stubs/Composer/DependencyResolver/Operation/SolverOperation.php")
-            .as_bytes(),
-    ),
-    (
-        php_str(b"Composer/DependencyResolver/Operation/InstallOperation.php"),
-        include_str!("../php/stubs/Composer/DependencyResolver/Operation/InstallOperation.php")
-            .as_bytes(),
-    ),
-    (
-        php_str(b"Composer/DependencyResolver/Operation/UpdateOperation.php"),
-        include_str!("../php/stubs/Composer/DependencyResolver/Operation/UpdateOperation.php")
-            .as_bytes(),
-    ),
-    (
-        php_str(b"Composer/DependencyResolver/Operation/UninstallOperation.php"),
-        include_str!("../php/stubs/Composer/DependencyResolver/Operation/UninstallOperation.php")
-            .as_bytes(),
-    ),
-    (
-        php_str(b"Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php"),
-        include_str!(
-            "../php/stubs/Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php"
-        )
-        .as_bytes(),
-    ),
-    (
-        php_str(b"Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php"),
-        include_str!(
-            "../php/stubs/Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php"
-        )
-        .as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Util/Filesystem.php"),
-        include_str!("../php/stubs/Composer/Util/Filesystem.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Util/ProcessExecutor.php"),
-        include_str!("../php/stubs/Composer/Util/ProcessExecutor.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Util/HttpDownloader.php"),
-        include_str!("../php/stubs/Composer/Util/HttpDownloader.php").as_bytes(),
-    ),
-];
+/// Proxy stub classes made autoloadable inside the worker, generated by
+/// `scripts/plugin-stub-generator/generate-stubs` into `php/stubs/`. `build.rs` builds the list
+/// from the directory itself.
+const STUB_FILES: &[(&BStr, &[u8])] = include!(concat!(env!("OUT_DIR"), "/stub-files.rs"));
 
-/// Hand-written worker-side classes (two-world implementations with behavior of their own, not
-/// mechanical proxies), written into the same autoload directory as the generated stubs so the
-/// prepended stub autoloader resolves their FQCNs ahead of any real class file.
-const RUNTIME_FILES: &[(&BStr, &[u8])] = &[
-    (
-        php_str(b"Composer/Console/Application.php"),
-        include_str!("../php/runtime/Composer/Console/Application.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/EventDispatcher/Event.php"),
-        include_str!("../php/runtime/Composer/EventDispatcher/Event.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Plugin/PreCommandRunEvent.php"),
-        include_str!("../php/runtime/Composer/Plugin/PreCommandRunEvent.php").as_bytes(),
-    ),
-    (
-        php_str(b"Composer/Util/Loop.php"),
-        include_str!("../php/runtime/Composer/Util/Loop.php").as_bytes(),
-    ),
-    (
-        php_str(b"Shirabe/MaterializedThrowable.php"),
-        include_str!("../php/runtime/Shirabe/MaterializedThrowable.php").as_bytes(),
-    ),
-    (
-        php_str(b"Shirabe/MaterializedValue.php"),
-        include_str!("../php/runtime/Shirabe/MaterializedValue.php").as_bytes(),
-    ),
-    (
-        php_str(b"Shirabe/RustCommandStub.php"),
-        include_str!("../php/runtime/Shirabe/RustCommandStub.php").as_bytes(),
-    ),
-    (
-        php_str(b"Shirabe/RustProcessStub.php"),
-        include_str!("../php/runtime/Shirabe/RustProcessStub.php").as_bytes(),
-    ),
-    (
-        php_str(b"Shirabe/RustPluginStub.php"),
-        include_str!("../php/runtime/Shirabe/RustPluginStub.php").as_bytes(),
-    ),
-    (
-        php_str(b"Shirabe/RustCapablePluginStub.php"),
-        include_str!("../php/runtime/Shirabe/RustCapablePluginStub.php").as_bytes(),
-    ),
-];
+/// Hand-written worker-side classes under `php/runtime/` (two-world implementations with behavior
+/// of their own, not mechanical proxies), written into the same autoload directory as the
+/// generated stubs so the prepended stub autoloader resolves their FQCNs ahead of any real class
+/// file. `build.rs` builds the list from the directory itself.
+const RUNTIME_FILES: &[(&BStr, &[u8])] = include!(concat!(env!("OUT_DIR"), "/runtime-files.rs"));
 
 /// Guard classes made autoloadable inside the worker, behind the stubs: they shadow the real
 /// Composer class of every Rust-owned FQCN no stub proxies, so the worker cannot fall through to
 /// the real implementation and run an instance the Rust side never sees. Generated by
-/// `scripts/plugin-stub-generator/generate-stubs`; too many to spell out here, so `build.rs`
-/// builds the list from the directory itself.
+/// `scripts/plugin-stub-generator/generate-stubs` into `php/guards/`. `build.rs` builds the list
+/// from the directory itself.
 const GUARD_FILES: &[(&BStr, &[u8])] = include!(concat!(env!("OUT_DIR"), "/guard-files.rs"));
 
 struct Worker {
@@ -1341,22 +1000,22 @@ fn with_worker<T>(f: impl FnOnce(&mut Worker) -> T) -> anyhow::Result<T> {
     Ok(f(worker))
 }
 
-/// Spawns the PHP worker unless it is already running, and reports a failed spawn as an error.
-/// The scalar query API (`get_php_version` etc.) panics on any failure, so an entry point calls
-/// this before its first query to report a missing or broken PHP as an ordinary error.
-pub fn ensure_worker() -> anyhow::Result<()> {
-    with_worker(|_| ())
-}
-
 /// Writes one frame while holding the worker mutex only for the duration of the write, so the
 /// session owner (see `session`) can interleave sends and blocking reads without keeping the
-/// worker locked across a whole call.
+/// worker locked across a whole call. A `ReleasePhpHandle` for every P handle dropped since the
+/// previous write goes out first.
 fn send_frame(frame: &Frame) -> anyhow::Result<()> {
     with_worker(|worker| {
-        frame::write_frame(&mut worker.stream, frame).map_err(|e| {
-            worker.exit_if_worker_is_dead();
-            anyhow::Error::new(e).context(worker.worker_state())
-        })
+        let mut write = |frame: &Frame| {
+            frame::write_frame(&mut worker.stream, frame).map_err(|e| {
+                worker.exit_if_worker_is_dead();
+                anyhow::Error::new(e).context(worker.worker_state())
+            })
+        };
+        for phandle in value::take_released_php_handles() {
+            write(&Frame::ReleasePhpHandle { phandle })?;
+        }
+        write(frame)
     })?
 }
 
@@ -1489,7 +1148,6 @@ mod tests {
                 corr_id: 1,
                 function_name: "defined".into(),
                 args: vec![PluginValue::string("PHP_VERSION")],
-                out_param_positions: Vec::new(),
             },
         );
         frame::read_frame(&mut worker.stream).expect_err("reading from a dead worker should fail");
@@ -1518,16 +1176,12 @@ mod tests {
                 corr_id: 1,
                 function_name: "getenv".into(),
                 args: vec![PluginValue::string("XDEBUG_MODE")],
-                out_param_positions: Vec::new(),
             },
         )
         .expect("failed to ask the worker for its Xdebug mode");
         let reply = frame::read_frame(&mut worker.stream).expect("failed to read the worker reply");
         match reply {
-            Frame::Return { value, .. } => assert_eq!(
-                value.to_php_mixed().expect("unusable reply"),
-                PhpMixed::string("off")
-            ),
+            Frame::Return { value, .. } => assert_eq!(value, PluginValue::string("off")),
             other => panic!("unexpected reply: {other:?}"),
         }
 
@@ -1544,7 +1198,7 @@ mod tests {
 
         // XdebugHandler::getAllIniFiles() always yields at least one entry, which is the empty
         // string when no php.ini is loaded.
-        assert!(!get_all_ini_files().is_empty());
+        assert!(!get_all_ini_files().unwrap().is_empty());
     }
 
     #[test]
@@ -1554,10 +1208,10 @@ mod tests {
             return;
         }
 
-        let diagnostics = get_diagnostics();
-        assert_eq!(diagnostics.php_version, get_php_version().version);
+        let diagnostics = get_diagnostics().unwrap();
+        assert_eq!(diagnostics.php_version, get_php_version().unwrap().version);
         assert!(diagnostics.php_version_id >= 70205);
-        let php_binary = get_php_binary();
+        let php_binary = get_php_binary().unwrap();
         assert_eq!(
             diagnostics.php_binary.as_deref(),
             Some(php_binary.as_path())
@@ -1578,7 +1232,7 @@ mod tests {
             return;
         }
 
-        let php = get_php_version();
+        let php = get_php_version().unwrap();
         assert!(!php.version.is_empty(), "expected a PHP version");
         assert_eq!(
             php.version
@@ -1594,7 +1248,7 @@ mod tests {
             php.major * 10000 + php.minor * 100 + php.release
         );
 
-        let binary = get_php_binary();
+        let binary = get_php_binary().unwrap();
         assert!(!binary.as_os_str().is_empty(), "expected a PHP binary path");
         assert!(
             std::path::Path::new(&binary).exists(),
@@ -1610,7 +1264,7 @@ mod tests {
             return;
         }
 
-        let platform_info = get_platform_info();
+        let platform_info = get_platform_info().unwrap();
 
         let extensions = platform_info.get_extensions();
         assert!(
@@ -1619,7 +1273,7 @@ mod tests {
         );
         assert_eq!(
             platform_info.get_extension_version("Core"),
-            get_php_version().version
+            get_php_version().unwrap().version
         );
 
         assert!(platform_info.has_constant("PHP_VERSION", None));

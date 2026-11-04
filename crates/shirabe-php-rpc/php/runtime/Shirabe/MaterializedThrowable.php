@@ -1,9 +1,10 @@
 <?php
 
-// The PHP half of the Throw frame's exception codec. A failure crosses with the class it was
-// thrown as, so `catch (TransportException $e)` on either side catches what it would catch under
-// Composer, plus the state that class declares beyond message and code and the place it was
-// thrown at.
+// The PHP half of the exception codec (`PhpThrow::to_wire` / `PhpThrow::from_wire` on the Rust
+// side), used wherever an exception crosses: a Throw frame, a job rejection, or a value an entry
+// point answers with. A failure crosses with the class it was thrown as, so
+// `catch (TransportException $e)` on either side catches what it would catch under Composer, plus
+// the state that class declares beyond message and code and the place it was thrown at.
 
 namespace Shirabe;
 
@@ -21,8 +22,8 @@ final class MaterializedThrowable
     ];
 
     /**
-     * The fields of a Throw frame for an exception raised in this process: class, message,
-     * code, declared state, file, line and the superclasses, nearest first.
+     * The description of an exception raised in this process: class, message, code, declared
+     * state, file, line and the superclasses, nearest first.
      *
      * @return array{string, string, int, array<string, mixed>, string, int, list<string>}
      */
@@ -52,13 +53,16 @@ final class MaterializedThrowable
     }
 
     /**
-     * Rebuilds the exception a Throw frame describes. A class the child cannot construct keeps
-     * the RuntimeException shape, which is all the frame guarantees.
+     * Rebuilds the exception a description in the shape describe() writes stands for. The
+     * superclasses only matter to the Rust side, which has no type for every class. A class the
+     * child cannot construct keeps the RuntimeException shape, which is all the description
+     * guarantees.
      *
-     * @param array<string, mixed> $properties
+     * @param array{string, string, int, array<string, mixed>, string, int, list<string>} $description
      */
-    public static function revive(string $class, string $message, int $code, array $properties, string $file = '', int $line = 0): \Throwable
+    public static function revive(array $description): \Throwable
     {
+        [$class, $message, $code, $properties, $file, $line] = $description;
         $exception = self::instantiate($class, $message, $code);
         foreach ($properties as $name => $value) {
             // A name the class does not declare is a Shirabe bug rather than a plugin one, and

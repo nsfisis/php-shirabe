@@ -92,3 +92,38 @@ impl EventInterface for Event {
         self.propagation_stopped = true;
     }
 }
+
+macro_rules! delegate_event_interface_to_inner {
+    ($Type:ty, $field:ident) => {
+        impl crate::event_dispatcher::EventInterface for $Type {
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
+
+            fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+                self
+            }
+
+            fn get_name(&self) -> &bstr::BStr {
+                self.$field.get_name()
+            }
+
+            fn get_arguments(&self) -> &Vec<bstr::BString> {
+                self.$field.get_arguments()
+            }
+
+            fn get_flags(&self) -> &indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
+                self.$field.get_flags()
+            }
+
+            fn is_propagation_stopped(&self) -> bool {
+                self.$field.is_propagation_stopped()
+            }
+
+            fn stop_propagation(&mut self) {
+                self.$field.stop_propagation();
+            }
+        }
+    };
+}
+pub(crate) use delegate_event_interface_to_inner;

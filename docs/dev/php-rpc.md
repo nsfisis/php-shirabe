@@ -46,19 +46,18 @@ frame is a fatal channel error, not an allocation attempt.
 
 | tag | name | direction | payload fields |
 |---|---|---|---|
-| `0x00` | `CallFunction` | Rust→PHP | `function_name`, `args`, `out_param_positions` |
-| `0x01` | `CallStaticMethod` | Rust→PHP | `pclass`, `method_name`, `args`, `out_param_positions` |
+| `0x00` | `CallFunction` | Rust→PHP | `function_name`, `args` |
+| `0x01` | `CallStaticMethod` | Rust→PHP | `pclass`, `method_name`, `args` |
 | `0x02` | `NewObject` | Rust→PHP | `pclass`, `ctor_args` |
-| `0x03` | `CallPhpMethod` | Rust→PHP | `phandle`, `method_name`, `args`, `out_param_positions` |
-| `0x04` | `CallRustMethod` | PHP→Rust | `rhandle`, `method_name`, `args`, `out_param_positions` |
+| `0x03` | `CallPhpMethod` | Rust→PHP | `phandle`, `method_name`, `args` |
+| `0x04` | `CallRustMethod` | PHP→Rust | `rhandle`, `method_name`, `args` |
 | `0x05` | `Return` | both | `value`, `out_params` |
-| `0x06` | `Throw` | both | `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
+| `0x06` | `Throw` | both | the exception's description: `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
 | `0x07` | `ReleaseRustHandle` | PHP→Rust | `rhandle` |
 | `0x08` | `ReleasePhpHandle` | Rust→PHP | `phandle` |
-| `0x09` | `EpochBump` | Rust→PHP | `rhandle`, `epoch` |
 
 The Rust side allocates odd correlation ids, the PHP side even ones. `NewObject` instantiates
-a class in the worker and returns a `__phandle` descriptor for the new P-table entity;
+a class in the worker and returns a `PhpHandle` descriptor for the new P-table entity;
 `CallPhpMethod` invokes a method on such an entity; `ReleasePhpHandle` drops it.
 
 ### Values: `PluginValue` and the codec
@@ -67,14 +66,19 @@ Payloads are encoded with a Rust reimplementation of the PHP `serialize()` gramm
 (`src/value.rs`), byte-compatible with the PHP core implementation under
 `serialize_precision=-1` (the float formatting itself is ported in `shirabe-php-src`). The value
 model is `PluginValue`: PHP scalars, byte strings (`Vec<u8>` — non-UTF-8 round-trips
-losslessly), lists, ordered maps, object records, and four descriptor kinds encoded as reserved
-arrays:
+losslessly), lists, ordered maps, object records, and three descriptor kinds, each the object
+record of a class reserved for it (declared in `php/runtime/Shirabe/Wire/`):
 
-- `{__rhandle, __class, __epoch[, __snapshot]}` — entity lives on the Rust side
-- `{__phandle, __class, __implements}` — entity lives in the PHP child
-- `{__pclass}` — a PHP class name
-- `{__job}` — an asynchronous job, an entity in neither table. The Rust side allocates odd job
-  ids, the PHP side even ones. See "Jobs" below.
+- `Shirabe\Wire\RustHandle {rhandle, class}` — entity lives on the Rust side
+- `Shirabe\Wire\PhpHandle {phandle, class, implements}` — entity lives in the PHP child
+- `Shirabe\Wire\Job {id}` — an asynchronous job, an entity in neither table. The Rust side
+  allocates odd job ids, the PHP side even ones. See "Jobs" below.
+
+A descriptor is told apart from data by its class alone, so an array is always data, whatever its
+keys. Nothing but the codec writes a descriptor record: the worker's `toWire` turns every object
+into a descriptor or a materialized value, so an object of plugin code crosses as a `PhpHandle`
+even when it is an instance of a descriptor class. A descriptor record without exactly its
+declared properties is a protocol error.
 
 An immutable value has no entity to point at, so it crosses in neither table: it travels as the
 object record `serialize()` writes for it (`PluginValue::PhpObject` — the class name and the
@@ -82,14 +86,14 @@ property table, property names carrying PHP's visibility mangling), and each sid
 own value from those fields. `unserialize()` revives the PHP one without running a constructor,
 which is what makes the two directions equivalent: a value whose state a constructor cannot
 express has no faithful constructor call, and no field has to be read back out through
-reflection. The classes that may cross this way are a closed list on both sides — the PHP one is
-the `allowed_classes` list of every `unserialize()` — so a record can never name an arbitrary
-class. Which classes are on the list, and how each one maps to a Rust value, is not part of the
+reflection. The classes that may cross this way are a closed list on both sides — the PHP one, together with
+the descriptor classes, is the `allowed_classes` list of every `unserialize()` — so a record can
+never name an arbitrary class. Which classes are on the list, and how each one maps to a Rust value, is not part of the
 protocol; see "Materialized values" in [docs/dev/php-worker.md](./php-worker.md).
 
-`PluginValue::Object` is encode-only: the wire erases the array/object distinction for a
-class-less object, so the decoder only produces `List` (contiguous 0-based int keys) or `Array`
-for an `a:` record. A repeated object instance arrives as PHP's `r:` back-reference, which the
+An `a:` record decodes as `List` when its keys are exactly `0..N` and as `Array` otherwise; the
+wire has no shape for an object without a class, so such an object crosses as an array. A
+repeated object instance arrives as PHP's `r:` back-reference, which the
 decoder resolves by copying the value it names (identity means nothing to a value on this side);
 a cyclic object graph and a PHP reference (`R:`) are both rejected. The decoder is iterative
 (input nesting never becomes call-stack depth) and additionally rejects payloads nested deeper
@@ -98,6 +102,22 @@ than 512 levels.
 The codec is verified against the real PHP `serialize()`/`unserialize()` by oracle tests
 (`tests/oracle.rs`), with floats, non-UTF-8 byte strings, object records and deep nesting as
 focus areas.
+
+### Typed values: `ToWire` and `FromWire`
+
+Code on either side of a call never takes a `PluginValue` apart by hand: `ToWire` encodes a Rust
+value as the PHP value the receiving side declares, and `FromWire` decodes one, failing with the
+`PhpThrow` a PHP caller gets for a value of the wrong shape (`src/wire.rs`). The same pair serves
+the arguments and the answer of a call in either direction. A value absent where PHP reads null
+(an omitted argument, a missing property) decodes from `PluginValue::Null`. Where a malformed
+value can only be a bug in Shirabe — a frame, or a payload only Shirabe's own worker code writes
+— `wire::protocol_value` turns the failure into a panic instead.
+
+`src/wire.rs` implements the pair for the scalars, byte strings and paths, the containers
+(`Option`, `Vec`, `IndexMap`), the handles, `\DateTimeInterface` (as the `\DateTimeImmutable`
+record, rebased on UTC because the Rust side carries no timezone database) and
+`shirabe_php_shim::PhpMixed`, which is the only conversion between `PhpMixed` and `PluginValue`.
+A crate that ports a class implements the pair for its own types.
 
 ## Concurrency and reentrancy
 
@@ -109,8 +129,9 @@ A `thread_local!` worker would not: each test thread would spawn a child of its 
 mutex itself is only held per frame, not across a call.
 
 While a Rust-initiated call waits for its `Return`, incoming `CallRustMethod` frames are
-dispatched to the caller-supplied `RustMethodDispatcher` (the cooperative loop); with no
-dispatcher active they are answered with an explicit `Throw`, never a silent null. Rust handle
+dispatched to the `RustMethodDispatcher` every call takes (the cooperative loop). The calls the
+crate makes for itself, none of which runs code that calls back, answer every callback with an
+explicit `Throw`, never a silent null. Rust handle
 0 is reserved for the runtime service endpoint, which answers calls that have no receiver entity.
 
 The PHP side mirrors this: its top level is a standing serve loop, and `callRust` drives the
@@ -122,12 +143,17 @@ same dispatch while waiting for its own `Return`.
   Composer runs in, so when a read or a write finds it gone, Shirabe exits with its exit code, or
   is killed by the signal that killed it, as Composer would be by a plugin's `exit()`, a fatal
   error or a signal.
-- The outer `anyhow::Result` of `call_function`/`call_static_method` is the fatal lane: broken
-  framing, oversized frames, and an I/O failure while the worker is still running (with its
-  state attached as context).
+- The outer `anyhow::Result` of `call_function`, `call_static_method`, `new_object` and
+  `call_php_method` is the fatal lane: a worker that cannot be spawned (no PHP executable, for
+  one), broken framing, oversized frames, and an I/O failure while the worker is still running
+  (with its state attached as context).
 - The inner `Result<PluginValue, PhpThrow>` is the recoverable lane: a PHP exception crossing
   the boundary as a `Throw` frame.
-- A `Throw` names the class the exception was thrown as, `properties` carries the state that
+- An exception crosses as its description, the list a `Throw` frame carries as its payload, and
+  as nothing else wherever else it crosses (a job rejection, a value an entry point answers
+  with). `PhpThrow::to_wire` / `PhpThrow::from_wire` on the Rust side and
+  `\Shirabe\MaterializedThrowable::describe` / `revive` in the worker are its only codec.
+- A description names the class the exception was thrown as, `properties` carries the state that
   class declares beyond `message` and `code`, and `file` and `line` are where it was created.
   Rust to PHP, `\Shirabe\MaterializedThrowable` rebuilds the exception in the child —
   `new $class($message, $code)` for a class whose constructor has `\Exception`'s shape, an
@@ -142,28 +168,29 @@ same dispatch while waiting for its own `Return`.
   Rust side ports, listed in `MaterializedThrowable::PROPERTIES`.
 - A frame that decodes to something protocol-invalid is a bug in Shirabe itself (both halves
   ship in the same commit) and panics; the PHP side symmetrically dies so Rust observes EOF.
-- The legacy scalar query API (`get_php_version` etc.) keeps its historical contract: every
-  failure panics.
 - There is no timeout. A plugin that never returns hangs Shirabe exactly as it hangs Composer,
   which runs it in its own process.
 
 ## Entry points
 
 `CallFunction` first consults the worker's dispatch table of named entry points, then falls back
-to calling the named PHP function; an unknown name is an explicit error. Shirabe-internal entry
-points are prefixed `__shirabe_`. Likewise, a `CallRustMethod` on handle 0 names a method of the
-runtime service endpoint; one it does not answer is an explicit error naming it.
+to calling the named PHP function; an unknown name is an explicit error. Likewise, a
+`CallRustMethod` on handle 0 names a method of the runtime service endpoint; one it does not
+answer is an explicit error naming it. Every name Shirabe defines on either side — an entry
+point, a runtime service method, and a method an entity answers beyond its PHP class's own (such
+as `__shirabe_clone`) — is `__shirabe_<snake_case>`.
 
 The entry points themselves are not part of the protocol: each is a consumer of it, and the
 catalogue lives in [docs/dev/php-worker.md](./php-worker.md).
 
 ### By-ref parameters
 
-`out_param_positions` names the by-ref parameters of the called method, as the caller declared
-them; the answering `Return` carries `out_params`, a map from the same positions to the value
-each parameter holds afterwards, and the caller assigns those back into its own variables. A
-position the answer leaves out was never assigned to, which is what PHP does with an untouched
-by-ref parameter — so an out-param is genuinely optional rather than defaulting to null.
+The `Return` answering a `CallRustMethod` carries `out_params`, a map from the positions of the
+called method's by-ref parameters to the value each one holds afterwards, and the calling stub
+assigns those back into its own variables. A position the answer leaves out was never assigned
+to, which is what PHP does with an untouched by-ref parameter — so an out-param is genuinely
+optional rather than defaulting to null. The worker's `Return` always carries an empty
+`out_params`.
 
 ## Jobs
 
@@ -185,10 +212,21 @@ everything goes away with the worker process.
 
 `ShirabePhpObjectRegistry` holds PHP-owned entities keyed by phandle, strongly referenced until the
 Rust side sends `ReleasePhpHandle`. `ShirabeRpcRuntime::toWire` turns any object that is not a
-handle descriptor, a job or a materialized value of its own into a `__phandle` descriptor through
+proxy stub, a promise or a materialized value into a `PhpHandle` descriptor through
 `ShirabePhpObjectRegistry::descriptor` (interned by `spl_object_id`, so one entity keeps one
 handle); `ShirabeRpcRuntime::fromWire` resolves descriptors back to the live entity through
 `ShirabePhpObjectRegistry::get`.
+
+On the Rust side a P-table entry is owned by `PhpObjHandle`, the only form a phandle takes outside
+the wire layer. Its clones share one reference-counted entry, and the decoder interns by phandle:
+decoding a descriptor whose phandle is already held yields another clone of the same entry,
+however many times and through whichever value the entity crosses. The entry therefore stands for
+the P-table entry itself, so the worker needs no reference count. When the last clone drops, the
+phandle is queued, and `ReleasePhpHandle` for every queued phandle is written ahead of the next
+frame the Rust side sends. A dropped handle never writes to the socket itself, so dropping one is
+safe anywhere, including while a frame is being decoded. Until that next frame is written, the
+worker's entry is still intact: a descriptor for the same phandle decoded in the meantime takes the
+entry back over and withdraws the queued release.
 
 ## Trust model
 
@@ -200,8 +238,4 @@ so only the two processes holding its descriptors can reach it.
 
 ## Out of scope (deferred)
 
-By-ref parameters on Rust-initiated calls (`call_function`/`call_static_method`/`call_php_method`
-always send an empty `out_param_positions` and ignore the answer's `out_params`), epoch-based
-cache invalidation on the PHP side (the worker routes `EpochBump` to `__invalidateCache`, but no
-stub defines it and the Rust side never sends the frame), the `previous` of an exception crossing
-in either direction, and Windows support.
+The `previous` of an exception crossing in either direction, and Windows support.

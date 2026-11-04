@@ -9,21 +9,19 @@ use crate::event_dispatcher::{
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
-use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::php_call::PhpCall;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::plugin::throwable_bridge::{described_throw, throw_into_error, unwrap_php_result};
+use crate::plugin::rpc::dispatch::{PluginRpcDispatcher, error_throw, unavailable_method};
+use crate::plugin::throwable_bridge::throw_into_error;
 use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{
-    PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
-    call_function_with_dispatcher, call_php_method, call_static_method,
-};
+use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, ToWire};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, bconcat, display_to_bytes, error_message, explode,
@@ -366,18 +364,17 @@ impl EventDispatcher {
             } else if let Callable::PhpMethod(ref handle, ref method_name) = callable {
                 self.make_autoloader(event, &callable)?;
                 Self::ensure_script_autoloader()?;
-                let is_callable_value = unwrap_php_result(call_function_with_dispatcher(
-                    "is_callable",
-                    vec![PluginValue::List(vec![
-                        PluginValue::PhpHandle(handle.clone()),
-                        PluginValue::String(method_name.clone()),
-                    ])],
-                    Some(&mut PluginRpcDispatcher::default()),
-                ))?;
-                if !matches!(is_callable_value, PluginValue::Bool(true)) {
+                let is_callable: bool =
+                    PhpCall::Function(BStr::new("is_callable")).run(vec![PluginValue::List(
+                        vec![
+                            PluginValue::PhpHandle(handle.clone()),
+                            PluginValue::String(method_name.clone()),
+                        ],
+                    )])?;
+                if !is_callable {
                     return Err(RuntimeException::new(bconcat!(
                         "Subscriber ",
-                        handle.class,
+                        handle.class(),
                         "::",
                         method_name,
                         " for event ",
@@ -391,7 +388,7 @@ impl EventDispatcher {
                         "> ",
                         formatted_event_name_with_args,
                         ": ",
-                        handle.class,
+                        handle.class(),
                         "->",
                         method_name,
                     ),
@@ -405,7 +402,7 @@ impl EventDispatcher {
                             "no proxy stub is available yet for the event `",
                             event.get_name(),
                             "` dispatched to ",
-                            handle.class,
+                            handle.class(),
                             "::",
                             method_name
                         ))
@@ -415,26 +412,17 @@ impl EventDispatcher {
                 let mut dispatcher = PluginRpcDispatcher {
                     event: Some((event_rhandle, event)),
                 };
-                let outcome = call_php_method(
-                    handle.phandle,
-                    method_name,
+                let value: PluginValue = PhpCall::Method(handle, method_name.as_bstr()).run_with(
                     vec![PluginValue::RustHandle(RustObjHandle {
                         rhandle: event_rhandle,
                         class: bconcat!(stub_class),
-                        epoch: 0,
-                        snapshot: None,
                     })],
-                    Some(&mut dispatcher),
+                    &mut dispatcher,
                 )?;
-                r#return = match outcome {
-                    Ok(value) => {
-                        if matches!(value, PluginValue::Bool(false)) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                    Err(throw) => return Err(throw_into_error(throw)),
+                r#return = if matches!(value, PluginValue::Bool(false)) {
+                    1
+                } else {
+                    0
                 };
             } else if !is_string_callable {
                 // TODO(plugin): an ArrayCallable whose object half is a PhpMixed has no
@@ -829,9 +817,9 @@ try {
     $status = $app->run(new \Symfony\Component\Console\Input\StringInput("#,
                             php_single_quote(string_input.as_ref()),
                             r#"), $output);
-    return ['status' => $status, 'output' => $output->fetch()];
+    return ['status' => $status, 'output' => $output->fetch(), 'throw' => null, 'caught' => false];
 } catch (\Throwable $e) {
-    return ['throw' => \Shirabe\MaterializedThrowable::describe($e), 'caught' => $e instanceof \Exception, 'output' => $output->fetch()];
+    return ['status' => null, 'output' => $output->fetch(), 'throw' => \Shirabe\MaterializedThrowable::describe($e), 'caught' => $e instanceof \Exception];
 }
 "#,
                         );
@@ -840,36 +828,14 @@ try {
                             loader: self.loader.clone(),
                             event: None,
                         };
-                        let outcome = call_function_with_dispatcher(
-                            "__shirabe_eval",
-                            vec![PluginValue::string(snippet)],
-                            Some(&mut dispatcher),
-                        )?;
-                        let result = match outcome {
-                            Ok(value) => value.to_php_mixed()?,
-                            Err(throw) => return Err(throw_into_error(throw)),
-                        };
-                        let command_output = BString::from(
-                            result
-                                .as_array()
-                                .and_then(|map| map.get(B("output")))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        );
-                        if !command_output.is_empty() {
-                            self.io.write3(&command_output, false, crate::io::NORMAL);
+                        let result: ScriptCommandResult =
+                            PhpCall::Function(BStr::new("__shirabe_eval"))
+                                .run_with(vec![PluginValue::string(snippet)], &mut dispatcher)?;
+                        if !result.output.is_empty() {
+                            self.io.write3(&result.output, false, crate::io::NORMAL);
                         }
-                        if let Some(throw) = result.as_array().and_then(|map| map.get(B("throw"))) {
-                            let throw = described_throw(
-                                throw
-                                    .as_list()
-                                    .expect("the eval snippet reports exceptions as a list"),
-                            );
-                            let caught = result
-                                .as_array()
-                                .and_then(|map| map.get(B("caught")))
-                                .is_some_and(|caught| matches!(caught, PhpMixed::Bool(true)));
-                            if caught {
+                        if let Some(throw) = result.throw {
+                            if result.caught {
                                 self.io.write_error3(
                                     bconcat!(
                                         "<error>Script ",
@@ -882,14 +848,11 @@ try {
                                     crate::io::QUIET,
                                 );
                             }
-                            return Err(throw_into_error(throw));
+                            return Err(throw_into_error(PhpThrow::from_wire(throw)));
                         }
-                        r#return = match result.as_array().and_then(|map| map.get(B("status"))) {
-                            Some(PhpMixed::Int(status)) => *status,
-                            other => panic!(
-                                "the eval snippet always returns an int status, got {other:?}"
-                            ),
-                        };
+                        r#return = result
+                            .status
+                            .expect("the snippet reports a status whenever nothing was thrown");
                     }
                     Callable::String(callable_str) => {
                         let args = implode(
@@ -1185,21 +1148,13 @@ try {
             loader: self.loader.clone(),
             event: Some((rhandle, event)),
         };
-        let outcome = call_static_method(
-            class_name,
-            method_name,
+        PhpCall::StaticMethod(class_name, method_name).run_with(
             vec![PluginValue::RustHandle(RustObjHandle {
                 rhandle,
                 class: bconcat!(stub_class),
-                epoch: 0,
-                snapshot: None,
             })],
-            Some(&mut dispatcher),
-        )?;
-        match outcome {
-            Ok(value) => Ok(value.to_php_mixed()?),
-            Err(throw) => Err(throw_into_error(throw)),
-        }
+            &mut dispatcher,
+        )
     }
 
     /// The proxy stub class (same FQCN as the real event class) an event crosses the RPC
@@ -1277,7 +1232,7 @@ try {
     /// passes an object, and no `Callable` shape holds a bare object, so the parameter is
     /// narrowed to the object's cross-RPC identity (its P-table handle). Of PHP's two match
     /// conditions only `$candidate[0] === $listener` can fire for an object listener; it maps
-    /// to phandle equality on `Callable::PhpMethod`.
+    /// to handle equality on `Callable::PhpMethod`.
     pub fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle) {
         for priorities in self.listeners.values_mut() {
             for listeners in priorities.values_mut() {
@@ -1285,7 +1240,7 @@ try {
                 // cross-RPC identity, so `$candidate[0] === $listener` is undecidable for it;
                 // only `PhpMethod` candidates are compared.
                 listeners.retain(|candidate| match candidate {
-                    Callable::PhpMethod(handle, _) => handle.phandle != listener.phandle,
+                    Callable::PhpMethod(handle, _) => handle != listener,
                     _ => true,
                 });
             }
@@ -1502,7 +1457,7 @@ try {
             },
             // PHP: get_class($callable[0]).'::'.$callable[1] — the object half's runtime class.
             Callable::PhpMethod(handle, method) => {
-                bconcat!(handle.class, "::", method)
+                bconcat!(handle.class(), "::", method)
             }
             Callable::Closure(_) => BString::from("closure"),
         };
@@ -1584,10 +1539,8 @@ try {
     /// in the child can resolve classes through the Rust-side [`ClassLoader`] built by
     /// [`Self::make_autoloader`].
     pub(crate) fn ensure_script_autoloader() -> anyhow::Result<()> {
-        unwrap_php_result(call_function(
-            "__shirabe_enable_script_autoloader",
-            Vec::new(),
-        ))?;
+        PhpCall::Function(BStr::new("__shirabe_enable_script_autoloader"))
+            .run::<PluginValue>(Vec::new())?;
         Ok(())
     }
 
@@ -1595,10 +1548,8 @@ try {
     /// before a `scripts` Command class can be autoloaded and hosted.
     pub(crate) fn ensure_composer_php_runtime(cache_dir: &std::path::Path) -> anyhow::Result<()> {
         let autoload = Self::composer_php_runtime_autoload(cache_dir)?;
-        unwrap_php_result(call_function(
-            "__shirabe_require",
-            vec![PluginValue::string(autoload)],
-        ))?;
+        PhpCall::Function(BStr::new("__shirabe_require"))
+            .run::<PluginValue>(vec![PluginValue::string(autoload)])?;
         crate::repository::FilesystemRepository::load_pending_installed_versions()
     }
 
@@ -1625,21 +1576,7 @@ try {
             loader: self.loader.clone(),
             event: None,
         };
-        let value = unwrap_php_result(call_function_with_dispatcher(
-            function,
-            args,
-            Some(&mut dispatcher),
-        ))?;
-        match value {
-            PluginValue::Bool(value) => Ok(value),
-            other => Err(RuntimeException::new(bconcat!(
-                "PHP runtime query `",
-                function,
-                "` did not return a bool: ",
-                display_to_bytes(format_args!("{other:?}"))
-            ))
-            .into()),
-        }
+        PhpCall::Function(function).run_with(args, &mut dispatcher)
     }
 
     fn io_clone(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -1666,6 +1603,18 @@ try {
     }
 }
 
+shirabe_php_rpc::wire_record! {
+    /// What the snippet hosting a `scripts` Command class reports about its run: the exit status,
+    /// or the exception it ended with and whether Composer would have caught that exception.
+    #[derive(Debug)]
+    struct ScriptCommandResult {
+        status: Option<i64>,
+        output: BString,
+        throw: Option<PluginValue>,
+        caught: bool,
+    }
+}
+
 /// Serves `CallRustMethod` requests issued by the PHP worker while a script-related call is in
 /// flight: Rust handle 0 is the runtime service endpoint (autoload lookups against the
 /// Rust-side [`ClassLoader`]), every other rhandle resolves through the R table, except the
@@ -1685,7 +1634,6 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
         rhandle: u64,
         method_name: &BStr,
         args: Vec<PluginValue>,
-        _out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
         let method_name = method_name.to_owned();
@@ -1695,34 +1643,34 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                 let class = match args.first() {
                     Some(PluginValue::String(bytes)) => bytes,
                     other => {
-                        return Err(runtime_throw(display_to_bytes(format_args!(
+                        return Err(PhpThrow::runtime(display_to_bytes(format_args!(
                             "__shirabe_find_file expects a class name argument, got {other:?}"
                         ))));
                     }
                 };
-                return Ok(
-                    match self
-                        .loader
-                        .as_mut()
-                        .and_then(|loader| loader.find_file(class))
-                    {
-                        Some(file) => PluginValue::string(file),
-                        None => PluginValue::Null,
-                    },
-                );
+                let file = match self.loader.as_mut() {
+                    Some(loader) => loader
+                        .find_file(class)
+                        .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?,
+                    None => None,
+                };
+                return Ok(match file {
+                    Some(file) => PluginValue::string(file),
+                    None => PluginValue::Null,
+                });
             }
-            if method_name == "__shirabeConstruct" {
-                return crate::plugin::php_plugin_proxy::construct_entity(&args);
+            if method_name == "__shirabe_construct" {
+                return crate::plugin::rpc::dispatch::construct_entity(&args);
             }
-            if method_name == "__shirabeCallStatic" {
-                return crate::plugin::php_plugin_proxy::call_static_entity(&args);
+            if method_name == "__shirabe_call_static" {
+                return crate::plugin::rpc::dispatch::call_static_entity(&args);
             }
             if let Some(answer) =
-                crate::plugin::php_plugin_proxy::dispatch_job_service_method(method_name, &args)
+                crate::plugin::rpc::dispatch::dispatch_job_service_method(method_name, &args)
             {
                 return answer;
             }
-            return Err(runtime_throw(bconcat!(
+            return Err(PhpThrow::runtime(bconcat!(
                 "unknown runtime service method `",
                 method_name,
                 "`"
@@ -1732,7 +1680,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             Some((event_rhandle, ref mut event)) if event_rhandle == rhandle => {
                 dispatch_event_method(&mut **event, method_name, &args)
             }
-            _ => crate::plugin::php_plugin_proxy::dispatch_r_table_method(
+            _ => crate::plugin::rpc::dispatch::dispatch_r_table_method(
                 rhandle,
                 method_name,
                 &args,
@@ -1758,9 +1706,7 @@ pub(crate) fn dispatch_event_method(
                 .map(|arg| PluginValue::string(arg.clone()))
                 .collect(),
         )),
-        b"getFlags" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-            event.get_flags().clone(),
-        ))),
+        b"getFlags" => Ok(PhpMixed::Array(event.get_flags().clone()).to_wire()),
         b"isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
         b"stopPropagation" => {
             event.stop_propagation();
@@ -1774,7 +1720,7 @@ pub(crate) fn dispatch_event_method(
             (Some(event), _, _) => Ok(PluginValue::Bool(event.is_dev_mode())),
             (_, Some(event), _) => Ok(PluginValue::Bool(event.is_dev_mode())),
             (_, _, Some(event)) => Ok(PluginValue::Bool(event.is_dev_mode())),
-            _ => Err(runtime_throw(BString::from(
+            _ => Err(PhpThrow::runtime(BString::from(
                 "isDevMode is only available on script, package and installer events",
             ))),
         },
@@ -1788,16 +1734,16 @@ pub(crate) fn dispatch_event_method(
                 (_, Some(event), _) => event.get_composer().upgrade(),
                 (_, _, Some(event)) => event.get_composer().upgrade(),
                 _ => {
-                    return Err(runtime_throw(BString::from(
+                    return Err(PhpThrow::runtime(BString::from(
                         "getComposer is only available on script, package and installer events",
                     )));
                 }
             };
             let composer = composer.ok_or_else(|| {
-                runtime_throw(BString::from("the Composer instance of this event is gone"))
+                PhpThrow::runtime(BString::from("the Composer instance of this event is gone"))
             })?;
-            let rhandle = crate::plugin::php_plugin_proxy::register_composer_entity(&composer);
-            Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
+            let rhandle = crate::plugin::rpc::table::register_composer_entity(&composer);
+            Ok(crate::plugin::rpc::table::rust_handle_value(
                 rhandle,
                 BStr::new("Composer\\Composer"),
             ))
@@ -1812,23 +1758,21 @@ pub(crate) fn dispatch_event_method(
                 (_, Some(event), _) => event.get_io(),
                 (_, _, Some(event)) => event.get_io(),
                 _ => {
-                    return Err(runtime_throw(BString::from(
+                    return Err(PhpThrow::runtime(BString::from(
                         "getIO is only available on script, package and installer events",
                     )));
                 }
             };
-            let class = crate::plugin::php_plugin_proxy::io_stub_class(&io)
-                .map_err(|error| runtime_throw(error_message(&error)))?;
-            let rhandle = crate::plugin::php_plugin_proxy::register_io_entity(&io);
-            Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
-                rhandle, class,
-            ))
+            let class = crate::plugin::rpc::table::io_stub_class(&io)
+                .map_err(|error| PhpThrow::runtime(error_message(&error)))?;
+            let rhandle = crate::plugin::rpc::table::register_io_entity(&io);
+            Ok(crate::plugin::rpc::table::rust_handle_value(rhandle, class))
         }
         b"getLocalRepo" => match package_event(event) {
-            Some(event) => crate::plugin::php_plugin_proxy::repository_handle_value(
+            Some(event) => crate::plugin::rpc::table::repository_handle_value(
                 &event.get_local_repo().as_repository_handle(),
             ),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getLocalRepo is only available on package events",
             ))),
         },
@@ -1837,30 +1781,30 @@ pub(crate) fn dispatch_event_method(
                 event
                     .get_operations()
                     .iter()
-                    .map(crate::plugin::php_plugin_proxy::operation_handle_value)
+                    .map(crate::plugin::rpc::table::operation_handle_value)
                     .collect(),
             )),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getOperations is only available on package events",
             ))),
         },
         b"getOperation" => match package_event(event) {
-            Some(event) => Ok(crate::plugin::php_plugin_proxy::operation_handle_value(
+            Some(event) => Ok(crate::plugin::rpc::table::operation_handle_value(
                 event.get_operation(),
             )),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getOperation is only available on package events",
             ))),
         },
         b"getCommandName" => match event.as_any().downcast_ref::<CommandEvent>() {
             Some(event) => Ok(PluginValue::string(event.get_command_name())),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getCommandName is only available on command events",
             ))),
         },
         b"getCommand" => match event.as_any().downcast_ref::<PreCommandRunEvent>() {
             Some(event) => Ok(PluginValue::string(event.get_command())),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getCommand is only available on pre-command-run events",
             ))),
         },
@@ -1873,42 +1817,42 @@ pub(crate) fn dispatch_event_method(
                     .downcast_ref::<PreCommandRunEvent>()
                     .is_some() =>
         {
-            Err(runtime_throw(bconcat!(
+            Err(PhpThrow::runtime(bconcat!(
                 "the console ",
-                if method_name == "getInput" {
-                    "input"
-                } else {
-                    "output"
+                match method_name.as_bytes() {
+                    b"getInput" => "input",
+                    b"getOutput" => "output",
+                    _ => unreachable!(),
                 },
                 " of a command event is not available over RPC yet"
             )))
         }
         b"isExecutingOperations" => match installer_event(event) {
             Some(event) => Ok(PluginValue::Bool(event.is_executing_operations())),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "isExecutingOperations is only available on installer events",
             ))),
         },
         b"getTransaction" => match installer_event(event) {
             Some(event) => match event.get_transaction() {
-                Some(transaction) => Ok(crate::plugin::php_plugin_proxy::transaction_handle_value(
+                Some(transaction) => Ok(crate::plugin::rpc::table::transaction_handle_value(
                     transaction,
                 )),
                 None => Ok(PluginValue::Null),
             },
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getTransaction is only available on installer events",
             ))),
         },
         other => {
             if let Some(event) = event.as_any().downcast_ref::<PostFileDownloadEvent>() {
-                return crate::plugin::php_plugin_proxy::dispatch_post_file_download_event_method(
+                return crate::plugin::rpc::entities::events::dispatch_post_file_download_event_method(
                     event,
                     BStr::new(other),
                 );
             }
             if let Some(event) = event.as_any_mut().downcast_mut::<PrePoolCreateEvent>() {
-                return crate::plugin::php_plugin_proxy::dispatch_pre_pool_create_event_method(
+                return crate::plugin::rpc::entities::events::dispatch_pre_pool_create_event_method(
                     event,
                     BStr::new(other),
                     args,
@@ -1916,7 +1860,7 @@ pub(crate) fn dispatch_event_method(
             }
             match event.as_any_mut().downcast_mut::<PreFileDownloadEvent>() {
                 Some(event) => {
-                    crate::plugin::php_plugin_proxy::dispatch_pre_file_download_event_method(
+                    crate::plugin::rpc::entities::events::dispatch_pre_file_download_event_method(
                         event,
                         BStr::new(other),
                         args,
@@ -1924,11 +1868,7 @@ pub(crate) fn dispatch_event_method(
                 }
                 // TODO(plugin): the rest need full proxying of the object graph an event exposes,
                 // which does not exist yet.
-                None => Err(runtime_throw(bconcat!(
-                    "the Event method `",
-                    other,
-                    "` is not available over RPC yet"
-                ))),
+                None => Err(unavailable_method("Event", other)),
             }
         }
     }
@@ -1944,10 +1884,6 @@ fn package_event(event: &dyn EventInterface) -> Option<&PackageEvent> {
 
 fn installer_event(event: &dyn EventInterface) -> Option<&InstallerEvent> {
     event.as_any().downcast_ref::<InstallerEvent>()
-}
-
-fn runtime_throw(message: impl Into<BString>) -> PhpThrow {
-    PhpThrow::runtime(message)
 }
 
 /// Quotes a string as a PHP single-quoted literal for a generated snippet.

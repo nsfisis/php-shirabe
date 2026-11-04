@@ -9,7 +9,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
 {
     public function __construct(RootPackage $aliasOf, string $version, string $prettyVersion)
     {
-        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$aliasOf, $version, $prettyVersion]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$aliasOf, $version, $prettyVersion]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

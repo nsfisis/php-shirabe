@@ -11,7 +11,6 @@ const SHIRABE_TAG_RETURN = 0x05;
 const SHIRABE_TAG_THROW = 0x06;
 const SHIRABE_TAG_RELEASE_RUST_HANDLE = 0x07;
 const SHIRABE_TAG_RELEASE_PHP_HANDLE = 0x08;
-const SHIRABE_TAG_EPOCH_BUMP = 0x09;
 
 const SHIRABE_MAX_FRAME_LEN = 268435456; // 256 MiB, mirrored on the Rust side.
 
@@ -22,12 +21,11 @@ interface ShirabeRustStub
      * Null when this instance holds no Rust handle: a dual-mode class (see php/runtime/) that
      * was constructed natively in this process crosses the wire as a P-table entity instead.
      *
-     * @return ?array{__rhandle: int, __class: string, __epoch: int}
      */
-    public function __shirabeRustHandleDescriptor(): ?array;
+    public function __shirabeRustHandleDescriptor(): ?\Shirabe\Wire\RustHandle;
 
     /** Binds this stub to an existing Rust entity, in place of running its constructor. */
-    public function __shirabeBind(int $rhandle, int $epoch): void;
+    public function __shirabeBind(int $rhandle): void;
 }
 
 /**
@@ -53,7 +51,7 @@ final class ShirabeRustObjectRegistry
     /** @var array<int, WeakReference> */
     private static array $internTable = [];
 
-    public static function stubFor(int $rhandle, string $class, int $epoch): object
+    public static function stubFor(int $rhandle, string $class): object
     {
         if (isset(self::$internTable[$rhandle])) {
             $existing = self::$internTable[$rhandle]->get();
@@ -71,7 +69,7 @@ final class ShirabeRustObjectRegistry
         // The stub's constructor belongs to plugin code building a *new* entity; an entity that
         // already exists is bound directly, so proxying never runs it.
         $stub = (new ReflectionClass($class))->newInstanceWithoutConstructor();
-        $stub->__shirabeBind($rhandle, $epoch);
+        $stub->__shirabeBind($rhandle);
         self::$internTable[$rhandle] = WeakReference::create($stub);
         return $stub;
     }
@@ -84,16 +82,6 @@ final class ShirabeRustObjectRegistry
     public static function adopt(int $rhandle, object $stub): void
     {
         self::$internTable[$rhandle] = WeakReference::create($stub);
-    }
-
-    /** Invoked when an EpochBump frame arrives. No-op if the stub already died. */
-    public static function bumpEpoch(int $rhandle, int $epoch): void
-    {
-        $ref = self::$internTable[$rhandle] ?? null;
-        $stub = $ref !== null ? $ref->get() : null;
-        if ($stub !== null && method_exists($stub, '__invalidateCache')) {
-            $stub->__invalidateCache($epoch);
-        }
     }
 
     /** Invoked from stub destructors. */
@@ -146,14 +134,13 @@ final class ShirabePhpObjectRegistry
         }
     }
 
-    /** @return array{__phandle: int, __class: string, __implements: list<string>} */
-    public static function descriptor(object $obj): array
+    public static function descriptor(object $obj): \Shirabe\Wire\PhpHandle
     {
-        return [
-            '__phandle' => self::register($obj),
-            '__class' => get_class($obj),
-            '__implements' => array_values(class_implements($obj)),
-        ];
+        return new \Shirabe\Wire\PhpHandle(
+            self::register($obj),
+            get_class($obj),
+            array_values(class_implements($obj))
+        );
     }
 }
 
@@ -187,6 +174,8 @@ final class ShirabeJobRegistry
      * @var array<int, \React\Promise\PromiseInterface>
      */
     private static array $parked = [];
+    /** @var array<int, int> spl_object_id => job id of a parked promise */
+    private static array $parkedIdsByObjectId = [];
     private static int $nextId = 2;
 
     private static function requireReact(): void
@@ -204,7 +193,7 @@ final class ShirabeJobRegistry
         if ($id % 2 === 0) {
             if (isset(self::$parked[$id])) {
                 $promise = self::$parked[$id];
-                unset(self::$parked[$id]);
+                unset(self::$parked[$id], self::$parkedIdsByObjectId[spl_object_id($promise)]);
                 return $promise;
             }
             if (!isset(self::$promises[$id])) {
@@ -219,10 +208,9 @@ final class ShirabeJobRegistry
                 // with the exception a started job is cancelled with, and with null for one that
                 // had not started, which Composer aborts without rejecting.
                 unset(self::$deferreds[$id]);
-                $thrown = ShirabeRpcRuntime::callRust(0, '__shirabeCancelJob', [$id]);
+                $thrown = ShirabeRpcRuntime::callRust(0, '__shirabe_cancel_job', [$id]);
                 if ($thrown !== null) {
-                    [$class, $message, $code, $properties, $file, $line] = $thrown;
-                    throw \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line);
+                    throw \Shirabe\MaterializedThrowable::revive($thrown);
                 }
             });
         }
@@ -251,31 +239,32 @@ final class ShirabeJobRegistry
     }
 
     /**
-     * The descriptor of a settled promise the Rust side asked for. It names no job: the Rust
+     * Parks a settled promise the Rust side asked for. Its descriptor names no job: the Rust
      * side passes it on as the answer of the call it is serving, and the promise is handed out
      * when that answer arrives.
-     *
-     * @return array{__job: int}
      */
-    public static function park(\React\Promise\PromiseInterface $promise): array
+    public static function park(\React\Promise\PromiseInterface $promise): \React\Promise\PromiseInterface
     {
         $id = self::$nextId;
         self::$nextId += 2;
         self::$parked[$id] = $promise;
-        return ['__job' => $id];
+        self::$parkedIdsByObjectId[spl_object_id($promise)] = $id;
+        return $promise;
     }
 
     /**
-     * The descriptor of a promise leaving for the Rust side. The recorder attached here reports
-     * the outcome when the promise settles, which is right away for one that already has.
-     *
-     * @return array{__job: int}
+     * The descriptor of a promise leaving for the Rust side: the id it is parked under, or a
+     * PHP-owned job. The recorder attached to a job reports the outcome when the promise
+     * settles, which is right away for one that already has.
      */
-    public static function descriptor(\React\Promise\PromiseInterface $promise): array
+    public static function descriptor(\React\Promise\PromiseInterface $promise): \Shirabe\Wire\Job
     {
         $objectId = spl_object_id($promise);
+        if (isset(self::$parkedIdsByObjectId[$objectId])) {
+            return new \Shirabe\Wire\Job(self::$parkedIdsByObjectId[$objectId]);
+        }
         if (isset(self::$idsByObjectId[$objectId])) {
-            return ['__job' => self::$idsByObjectId[$objectId]];
+            return new \Shirabe\Wire\Job(self::$idsByObjectId[$objectId]);
         }
         $id = self::$nextId;
         self::$nextId += 2;
@@ -287,7 +276,7 @@ final class ShirabeJobRegistry
         $promise->then(
             static function ($value) use ($id, $forget): void {
                 $forget();
-                ShirabeRpcRuntime::callRust(0, '__shirabeResolveJob', [$id, $value]);
+                ShirabeRpcRuntime::callRust(0, '__shirabe_resolve_job', [$id, $value]);
             },
             static function ($reason) use ($id, $forget): void {
                 $forget();
@@ -296,12 +285,12 @@ final class ShirabeJobRegistry
                 }
                 ShirabeRpcRuntime::callRust(
                     0,
-                    '__shirabeRejectJob',
-                    array_merge([$id], \Shirabe\MaterializedThrowable::describe($reason))
+                    '__shirabe_reject_job',
+                    [$id, \Shirabe\MaterializedThrowable::describe($reason)]
                 );
             }
         );
-        return ['__job' => $id];
+        return new \Shirabe\Wire\Job($id);
     }
 }
 
@@ -334,7 +323,7 @@ final class ShirabeRpcRuntime
     public static function loopFor(object $composer, int $rhandle): \Composer\Util\Loop
     {
         if (!isset(self::$loops[$rhandle])) {
-            [$httpDownloader, $processExecutor] = self::callRust($rhandle, '__shirabeLoopServices', []);
+            [$httpDownloader, $processExecutor] = self::callRust($rhandle, '__shirabe_loop_services', []);
             $loop = new \Composer\Util\Loop($httpDownloader, $processExecutor);
             $loop->__shirabeBindToExecution();
             self::$loops[$rhandle] = [$composer, $loop];
@@ -404,8 +393,11 @@ final class ShirabeRpcRuntime
     }
 
     /**
-     * Converts a value about to be serialized onto the wire: proxy stubs become handle
-     * descriptor arrays; plain scalars and arrays pass through.
+     * Converts a value about to be serialized onto the wire: a proxy stub, a promise and any
+     * other object without a materialized value become descriptors; scalars and arrays pass
+     * through. Every object crosses as a descriptor or a materialized value, so a descriptor
+     * record on the wire never stands for an object of plugin code, even one of a descriptor
+     * class.
      */
     public static function toWire($value)
     {
@@ -438,55 +430,51 @@ final class ShirabeRpcRuntime
     }
 
     /**
-     * Converts a decoded wire value: handle descriptor arrays become live objects. A
-     * materialized value arrives as a real instance already, revived by unserialize().
-     *
-     * TODO(type-model): a descriptor travels in-band as a plain array, so its exact key set is
-     * the only thing separating it from plugin data of the same shape. Every check below except
-     * __pclass matches on the reserved key alone, so an array a plugin built with a __rhandle or
-     * __phandle key of its own is read as a handle rather than kept as data. The Rust half
-     * (`decode_handle` in `src/value.rs`) matches the whole key set, and diverges the other way.
-     * __pclass and __job are single-key descriptors and match on that.
+     * Converts a decoded wire value: descriptors become live objects. A materialized value
+     * arrives as a real instance already, revived by unserialize().
      */
     public static function fromWire($value)
     {
-        if (!is_array($value)) {
-            return $value;
+        if ($value instanceof \Shirabe\Wire\RustHandle) {
+            return ShirabeRustObjectRegistry::stubFor($value->rhandle, $value->class);
         }
-        if (isset($value['__rhandle'])) {
-            return ShirabeRustObjectRegistry::stubFor(
-                $value['__rhandle'],
-                $value['__class'],
-                $value['__epoch']
-            );
+        if ($value instanceof \Shirabe\Wire\PhpHandle) {
+            return ShirabePhpObjectRegistry::get($value->phandle);
         }
-        if (isset($value['__phandle'])) {
-            return ShirabePhpObjectRegistry::get((int) $value['__phandle']);
+        if ($value instanceof \Shirabe\Wire\Job) {
+            return ShirabeJobRegistry::promiseFor($value->id);
         }
-        if (isset($value['__pclass']) && count($value) === 1) {
-            return $value['__pclass'];
+        if (is_array($value)) {
+            return array_map([self::class, 'fromWire'], $value);
         }
-        if (isset($value['__job']) && count($value) === 1) {
-            return ShirabeJobRegistry::promiseFor((int) $value['__job']);
-        }
-        return array_map([self::class, 'fromWire'], $value);
+        return $value;
+    }
+
+    /**
+     * Decodes a frame payload. The descriptor records and the materialized values are the only
+     * classes a payload may name.
+     */
+    public static function unserializePayload(string $payload)
+    {
+        return unserialize($payload, ['allowed_classes' => array_merge(
+            [\Shirabe\Wire\RustHandle::class, \Shirabe\Wire\PhpHandle::class, \Shirabe\Wire\Job::class],
+            \Shirabe\MaterializedValue::CLASSES
+        )]);
     }
 
     /**
      * Sends a CallRustMethod request and drives the cooperative loop until its Return.
      *
-     * `$outParamPositions` names the by-ref parameters of the called method; the Rust side
-     * answers with the value each of them holds afterwards, and the caller (a generated stub)
-     * assigns those back to its own by-ref parameters.
+     * For a method with by-ref parameters, the Rust side answers with the value each of them
+     * holds afterwards, keyed by position, and the caller (a generated stub) assigns those back
+     * to its own by-ref parameters.
      *
-     * @param list<int>  $outParamPositions
      * @param array<int, mixed>|null $outParams
      */
     public static function callRust(
         int $rhandle,
         string $method,
         array $args,
-        array $outParamPositions = [],
         ?array &$outParams = null
     ) {
         $corrId = self::$nextCorrId;
@@ -494,7 +482,7 @@ final class ShirabeRpcRuntime
         self::writeFrame(
             SHIRABE_TAG_CALL_RUST_METHOD,
             $corrId,
-            serialize([$rhandle, $method, self::toWire($args), $outParamPositions])
+            serialize([$rhandle, $method, self::toWire($args)])
         );
         while (true) {
             $frame = self::readFrame();
@@ -506,7 +494,7 @@ final class ShirabeRpcRuntime
                 if ($inId !== $corrId) {
                     self::fail("protocol violation: response for unexpected corr_id {$inId}");
                 }
-                $fields = unserialize($payload, ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES]);
+                $fields = self::unserializePayload($payload);
                 if (!is_array($fields)) {
                     self::fail('protocol violation: unparseable response payload');
                 }
@@ -514,15 +502,7 @@ final class ShirabeRpcRuntime
                     $outParams = self::fromWire($fields[1] ?? []);
                     return self::fromWire($fields[0]);
                 }
-                [$class, $message, $code, $properties, $file, $line] = $fields;
-                throw \Shirabe\MaterializedThrowable::revive(
-                    $class,
-                    $message,
-                    (int) $code,
-                    self::fromWire($properties),
-                    $file,
-                    (int) $line
-                );
+                throw \Shirabe\MaterializedThrowable::revive(self::fromWire($fields));
             }
             self::dispatchRequest($tag, $inId, $payload);
         }
@@ -539,7 +519,7 @@ final class ShirabeRpcRuntime
 
     public static function dispatchRequest(int $tag, int $corrId, string $payload): void
     {
-        $fields = unserialize($payload, ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES]);
+        $fields = self::unserializePayload($payload);
         if (!is_array($fields)) {
             self::fail('protocol violation: unparseable frame payload');
         }
@@ -594,10 +574,6 @@ final class ShirabeRpcRuntime
                 [$phandle] = $fields;
                 ShirabePhpObjectRegistry::release((int) $phandle);
                 break;
-            case SHIRABE_TAG_EPOCH_BUMP:
-                [$rhandle, $epoch] = $fields;
-                ShirabeRustObjectRegistry::bumpEpoch((int) $rhandle, (int) $epoch);
-                break;
             default:
                 self::fail("protocol violation: unexpected frame tag {$tag}");
         }
@@ -614,9 +590,11 @@ final class ShirabeRpcRuntime
                 serialize([self::toWire($result), []])
             );
         } catch (Throwable $e) {
-            $fields = \Shirabe\MaterializedThrowable::describe($e);
-            $fields[3] = self::toWire($fields[3]);
-            self::writeFrame(SHIRABE_TAG_THROW, $corrId, serialize($fields));
+            self::writeFrame(
+                SHIRABE_TAG_THROW,
+                $corrId,
+                serialize(self::toWire(\Shirabe\MaterializedThrowable::describe($e)))
+            );
         }
     }
 
@@ -679,65 +657,12 @@ ShirabeRpcRuntime::$stubAutoloader = static function (string $class): void {
 spl_autoload_register(ShirabeRpcRuntime::$stubAutoloader, true, true);
 
 /**
- * Port of Composer\Platform\Runtime, whose runtime queries feed the `platform` payload. Its
- * parseHtmlExtensionInfo() has no counterpart here: the worker is always the CLI SAPI, so
- * getExtensionInfo() never takes the branch that reformats phpinfo()'s HTML output.
+ * Port of Composer\Platform\Runtime, whose runtime queries feed the `__shirabe_platform`
+ * payload. Its parseHtmlExtensionInfo() has no counterpart here: the worker is always the CLI
+ * SAPI, so getExtensionInfo() never takes the branch that reformats phpinfo()'s HTML output.
  */
 final class ShirabePlatformRuntime
 {
-    /** The constants the `platform` payload reports, named ltrim($class.'::'.$constant, ':'). */
-    public const CONSTANTS = [
-        'PHP_VERSION',
-        'PHP_DEBUG',
-        'PHP_ZTS',
-        'PHP_INT_SIZE',
-        'AF_INET6',
-        'GD_VERSION',
-        'GMP_VERSION',
-        'ICONV_VERSION',
-        'INTL_ICU_VERSION',
-        'LIBXML_DOTTED_VERSION',
-        'MB_ONIGURUMA_VERSION',
-        'OPENSSL_VERSION_TEXT',
-        'PCRE_VERSION',
-        'PGSQL_LIBPQ_VERSION',
-        'RD_KAFKA_VERSION',
-        'SODIUM_LIBRARY_VERSION',
-        'LIBXSLT_DOTTED_VERSION',
-        'ZipArchive::LIBZIP_VERSION',
-        'ZLIB_VERSION',
-    ];
-
-    /** The extensions whose info() output the `platform` payload reports when they are loaded. */
-    public const EXTENSION_INFO = [
-        'amqp',
-        'bz2',
-        'curl',
-        'date',
-        'fileinfo',
-        'gd',
-        'intl',
-        'ldap',
-        'mbstring',
-        'memcached',
-        'mongodb',
-        'mysqlnd',
-        'pcre',
-        'pdo_mysql',
-        'pdo_pgsql',
-        'pdo_sqlite',
-        'pgsql',
-        'pq',
-        'sqlite3',
-        'ssh2',
-        'xsl',
-        'yaml',
-        'zlib',
-    ];
-
-    /** The classes the `platform` payload reports the existence of. */
-    public const CLASSES = ['ResourceBundle', 'IntlChar'];
-
     public static function getExtensionInfo(string $extension): string
     {
         $reflector = new ReflectionExtension($extension);
@@ -749,8 +674,8 @@ final class ShirabePlatformRuntime
     }
 }
 
-// Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the `xdebug_active`
-// query and the diagnose payload both report.
+// Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the
+// `__shirabe_xdebug_active` query and the `__shirabe_diagnose` payload both report.
 $xdebug_active = static function (): bool {
     if (!extension_loaded('xdebug')) {
         return false;
@@ -784,9 +709,9 @@ $xdebug_active = static function (): bool {
 };
 
 ShirabeRpcRuntime::$dispatch = [
-    'constant' => static fn($args) => defined($args[0]) ? constant($args[0]) : null,
-    'xdebug_active' => static fn($args) => $xdebug_active(),
-    'get_all_ini_files' => static function ($args) {
+    '__shirabe_constant' => static fn($args) => defined($args[0]) ? constant($args[0]) : null,
+    '__shirabe_xdebug_active' => static fn($args) => $xdebug_active(),
+    '__shirabe_get_all_ini_files' => static function ($args) {
         $paths = [(string) php_ini_loaded_file()];
         $scanned = php_ini_scanned_files();
         if ($scanned !== false) {
@@ -794,7 +719,10 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return $paths;
     },
-    'platform' => static function ($args) {
+    // The names reported on arrive with the query: constants as ltrim($class.'::'.$constant, ':'),
+    // classes, and the extensions whose info() output is reported when they are loaded.
+    '__shirabe_platform' => static function ($args) {
+        $query = $args[0];
         $extensions = get_loaded_extensions();
 
         $extension_versions = [];
@@ -804,24 +732,22 @@ ShirabeRpcRuntime::$dispatch = [
         }
 
         $extension_info = [];
-        foreach (ShirabePlatformRuntime::EXTENSION_INFO as $extension) {
+        foreach ($query['extension_info'] as $extension) {
             if (in_array($extension, $extensions, true)) {
                 $extension_info[$extension] = ShirabePlatformRuntime::getExtensionInfo($extension);
             }
         }
 
-        // Only the defined constants carry a value; `constant_names` tells the Rust side which
-        // names were looked up, so a name it reads but this list omits is an error rather than a
-        // silently undefined constant.
+        // Only the defined constants carry a value.
         $constants = [];
-        foreach (ShirabePlatformRuntime::CONSTANTS as $constant) {
+        foreach ($query['constants'] as $constant) {
             if (defined($constant)) {
                 $constants[$constant] = constant($constant);
             }
         }
 
         $classes = [];
-        foreach (ShirabePlatformRuntime::CLASSES as $class) {
+        foreach ($query['classes'] as $class) {
             $classes[$class] = class_exists($class, false);
         }
 
@@ -830,7 +756,7 @@ ShirabeRpcRuntime::$dispatch = [
         $inet_pton_ipv6 = @inet_pton('::');
 
         $resource_bundle_version = null;
-        if ($classes['ResourceBundle']) {
+        if (class_exists('ResourceBundle', false)) {
             $bundle = ResourceBundle::create('root', 'ICUDATA', false);
             if ($bundle !== null) {
                 $resource_bundle_version = $bundle->get('Version');
@@ -841,50 +767,32 @@ ShirabeRpcRuntime::$dispatch = [
             'extensions' => $extensions,
             'extension_versions' => $extension_versions,
             'extension_info' => $extension_info,
-            'constant_names' => ShirabePlatformRuntime::CONSTANTS,
             'constants' => $constants,
             'classes' => $classes,
             'curl_version' => extension_loaded('curl') ? curl_version()['version'] : null,
             'inet_pton_ipv6' => $inet_pton_ipv6 === false ? null : $inet_pton_ipv6,
             'resource_bundle_version' => $resource_bundle_version,
-            'intl_char_unicode_version' => $classes['IntlChar'] ? IntlChar::getUnicodeVersion() : null,
+            'intl_char_unicode_version' => class_exists('IntlChar', false) ? IntlChar::getUnicodeVersion() : null,
             'imagick_version_string' => extension_loaded('imagick') ? (new Imagick())->getVersion()['versionString'] : null,
         ];
     },
-    'diagnose' => static function ($args) use ($xdebug_active) {
+    // The extensions, functions and ini settings reported on arrive with the query.
+    '__shirabe_diagnose' => static function ($args) use ($xdebug_active) {
+        $query = $args[0];
         $extensions = [];
-        foreach ([
-            'apcu',
-            'curl',
-            'filter',
-            'hash',
-            'iconv',
-            'ionCube Loader',
-            'mbstring',
-            'openssl',
-            'Phar',
-            'uopz',
-            'zip',
-            'zlib',
-        ] as $extension) {
+        foreach ($query['extensions'] as $extension) {
             $extensions[$extension] = extension_loaded($extension);
         }
 
         $functions = [];
-        foreach (['disk_free_space', 'json_decode', 'proc_open'] as $function) {
+        foreach ($query['functions'] as $function) {
             $functions[$function] = function_exists($function);
         }
 
-        $ini = [];
-        foreach ([
-            'allow_url_fopen',
-            'apc.enable_cli',
-            'uopz.disable',
-            'uopz.exit',
-            'xdebug.profiler_enabled',
-        ] as $setting) {
+        $ini_settings = [];
+        foreach ($query['ini_settings'] as $setting) {
             $value = ini_get($setting);
-            $ini[$setting] = $value === false ? null : $value;
+            $ini_settings[$setting] = $value === false ? null : $value;
         }
 
         // curl_version() only exists while the extension is loaded; DiagnoseCommand reads these
@@ -924,15 +832,10 @@ ShirabeRpcRuntime::$dispatch = [
             'curl' => $curl,
             'extensions' => $extensions,
             'functions' => $functions,
-            'ini' => $ini,
+            'ini_settings' => $ini_settings,
         ];
     },
-    // Shirabe-internal helpers, not PHP builtins:
     '__shirabe_eval' => static fn($args) => eval($args[0]),
-    // Round-trips raw serialize() bytes through the PHP core codec, for the codec oracle tests.
-    '__shirabe_oracle_roundtrip' => static fn($args) => serialize(
-        unserialize($args[0], ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES])
-    ),
     '__shirabe_require' => static function ($args) {
         require_once $args[0];
         // The required file may have registered further prepending autoloaders (a Composer
@@ -1037,10 +940,8 @@ ShirabeRpcRuntime::$dispatch = [
                 'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
             );
         }
-        [$class, $message, $code, $properties, $file, $line] = $args;
-
         return ShirabeJobRegistry::park(\React\Promise\reject(
-            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line)
+            \Shirabe\MaterializedThrowable::revive($args[0])
         ));
     },
     // The settle pushes of a Rust-owned job, sent from inside the tick that saw it finish. The
@@ -1050,11 +951,8 @@ ShirabeRpcRuntime::$dispatch = [
         return null;
     },
     '__shirabe_reject_job' => static function ($args) {
-        [$id, $class, $message, $code, $properties, $file, $line] = $args;
-        ShirabeJobRegistry::reject(
-            (int) $id,
-            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line)
-        );
+        [$id, $description] = $args;
+        ShirabeJobRegistry::reject((int) $id, \Shirabe\MaterializedThrowable::revive($description));
         return null;
     },
     // Replays environment writes the Rust side made after this process was spawned, which only
@@ -1091,36 +989,6 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return true;
     },
-    // For testing only: reads a public property of a P-table entity (PHPUnit asserts like
-    // `$plugins[0]->version` have no method to call).
-    '__shirabe_get_property' => static function ($args) {
-        $obj = ShirabeRpcRuntime::fromWire($args[0]);
-        if (!is_object($obj)) {
-            throw new RuntimeException('__shirabe_get_property expects a handle argument');
-        }
-        return $obj->{$args[1]};
-    },
-    // For testing only: the ReflectionMethod / ReflectionProperty access PHPUnit tests use to
-    // reach the non-public members of a P-table entity.
-    '__shirabe_reflection_invoke' => static function ($args) {
-        [$obj, $method, $methodArgs] = $args;
-        $reflMethod = new ReflectionMethod($obj, $method);
-        (\PHP_VERSION_ID < 80100) and $reflMethod->setAccessible(true);
-        return $reflMethod->invokeArgs($obj, $methodArgs);
-    },
-    '__shirabe_reflection_get_property' => static function ($args) {
-        [$obj, $name] = $args;
-        $reflProp = new ReflectionProperty($obj, $name);
-        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
-        return $reflProp->getValue($obj);
-    },
-    '__shirabe_reflection_set_property' => static function ($args) {
-        [$obj, $name, $value] = $args;
-        $reflProp = new ReflectionProperty($obj, $name);
-        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
-        $reflProp->setValue($obj, $value);
-        return null;
-    },
     // Builds the worker-side Composer\Console\Application (the runtime/ definition, not the
     // real class) from the Rust handoff; the caller keeps the returned handle and runs
     // plugin-provided commands through __shirabe_run_console_application.
@@ -1151,7 +1019,7 @@ ShirabeRpcRuntime::$dispatch = [
             $arguments[] = [
                 'name' => $argument->getName(),
                 'required' => $argument->isRequired(),
-                'isArray' => $argument->isArray(),
+                'is_array' => $argument->isArray(),
                 'description' => $argument->getDescription(),
                 'default' => $argument->getDefault(),
             ];
@@ -1161,10 +1029,10 @@ ShirabeRpcRuntime::$dispatch = [
             $options[] = [
                 'name' => $option->getName(),
                 'shortcut' => $option->getShortcut(),
-                'acceptValue' => $option->acceptValue(),
-                'isValueRequired' => $option->isValueRequired(),
-                'isArray' => $option->isArray(),
-                'isNegatable' => $option->isNegatable(),
+                'accept_value' => $option->acceptValue(),
+                'is_value_required' => $option->isValueRequired(),
+                'is_array' => $option->isArray(),
+                'is_negatable' => $option->isNegatable(),
                 'description' => $option->getDescription(),
                 'default' => $option->getDefault(),
             ];
@@ -1175,6 +1043,42 @@ ShirabeRpcRuntime::$dispatch = [
             'help' => $command->getHelp(),
             'usages' => $command->getUsages(),
         ];
+    },
+    // For testing: round-trips raw serialize() bytes through the PHP core codec, for the codec
+    // oracle tests.
+    '__shirabe_oracle_roundtrip' => static fn($args) => serialize(
+        ShirabeRpcRuntime::unserializePayload($args[0])
+    ),
+    // For testing: reads a public property of a P-table entity (PHPUnit asserts like
+    // `$plugins[0]->version` have no method to call).
+    '__shirabe_get_property' => static function ($args) {
+        $obj = ShirabeRpcRuntime::fromWire($args[0]);
+        if (!is_object($obj)) {
+            throw new RuntimeException('__shirabe_get_property expects a handle argument');
+        }
+        return $obj->{$args[1]};
+    },
+    // For testing: invokes a non-public method of a P-table entity through ReflectionMethod.
+    '__shirabe_reflection_invoke' => static function ($args) {
+        [$obj, $method, $methodArgs] = $args;
+        $reflMethod = new ReflectionMethod($obj, $method);
+        (\PHP_VERSION_ID < 80100) and $reflMethod->setAccessible(true);
+        return $reflMethod->invokeArgs($obj, $methodArgs);
+    },
+    // For testing: reads a non-public property of a P-table entity through ReflectionProperty.
+    '__shirabe_reflection_get_property' => static function ($args) {
+        [$obj, $name] = $args;
+        $reflProp = new ReflectionProperty($obj, $name);
+        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+        return $reflProp->getValue($obj);
+    },
+    // For testing: writes a non-public property of a P-table entity through ReflectionProperty.
+    '__shirabe_reflection_set_property' => static function ($args) {
+        [$obj, $name, $value] = $args;
+        $reflProp = new ReflectionProperty($obj, $name);
+        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+        $reflProp->setValue($obj, $value);
+        return null;
     },
 ];
 
