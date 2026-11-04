@@ -575,7 +575,7 @@ Plugin classes are autoloaded from the Rust side. The loaders
 worker's autoloader asks them for a file through the runtime service
 endpoint (`__shirabe_find_file`); the files-autoload entries and the
 `_composer_tmp` class-rename path run in the worker. One gap remains: the
-Rust `spl_autoload_register` is a no-op and `ClassLoader::register` keeps
+Rust side has no autoload stack of its own, and `ClassLoader::register` keeps
 one loader per vendor directory (matching upstream's `$registeredLoaders`)
 where PHP's autoload stack keeps every registered loader, so a second
 plugin loader registered under the same vendor directory evicts the first,

@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::stream_resolve_include_path;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, bconcat, file_exists, path_from_bytes, path_to_bytes,
-    spl_autoload_register, spl_autoload_unregister, strlen, strpos, strrpos, strtr, substr,
+    strlen, strpos, strrpos, strtr, substr,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -261,12 +261,8 @@ impl ClassLoader {
 
     /// Registers this instance as an autoloader.
     pub fn register(&self, prepend: bool) {
-        spl_autoload_register(
-            // PHP: array($this, 'loadClass')
-            Box::new(|_class: &BStr| -> PhpMixed { PhpMixed::Null }),
-            true,
-            prepend,
-        );
+        // PHP also registers loadClass on the spl autoload stack. Here classes are loaded by the PHP
+        // worker, whose autoloader looks files up in the registered loaders.
 
         if self.vendor_dir.is_none() {
             return;
@@ -291,8 +287,6 @@ impl ClassLoader {
 
     /// Unregisters this instance as an autoloader.
     pub fn unregister(&self) {
-        spl_autoload_unregister(Box::new(|_class: &BStr| -> PhpMixed { PhpMixed::Null }));
-
         if let Some(vendor_dir) = &self.vendor_dir {
             REGISTERED_LOADERS.lock().unwrap().shift_remove(vendor_dir);
         }

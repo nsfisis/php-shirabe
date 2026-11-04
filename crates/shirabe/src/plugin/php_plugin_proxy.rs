@@ -318,8 +318,8 @@ pub(crate) fn io_stub_class(
 ///
 /// TODO(plugin): `ClassLoader::register` keeps one loader per vendor-dir (matching upstream's
 /// `$registeredLoaders`), but the real spl stack keeps every registered loader; because the
-/// `spl_autoload_register` shim is a no-op, registering a second plugin loader under the same
-/// vendor-dir evicts the first one here, and a class of the earlier plugin that was never
+/// registered loaders are the only autoload stack here, registering a second plugin loader under
+/// the same vendor-dir evicts the first one, and a class of the earlier plugin that was never
 /// loaded can become unresolvable (PHP would still find it).
 pub(crate) fn find_file_in_registered_loaders(class: impl AsRef<[u8]>) -> Option<BString> {
     let class = class.as_ref();

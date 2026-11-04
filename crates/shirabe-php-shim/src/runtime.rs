@@ -180,24 +180,6 @@ pub fn debug_backtrace() -> Vec<BacktraceFrame> {
     todo!()
 }
 
-pub fn spl_autoload_register(
-    callback: Box<dyn Fn(&BStr) -> PhpMixed + Send + Sync>,
-    throw: bool,
-    prepend: bool,
-) -> bool {
-    let _ = (callback, throw, prepend);
-    // TODO(php-runtime): class autoloading has no analogue in compiled Rust (classes are not loaded by
-    // name at runtime), so the callback is dropped. Returns success so callers that register an
-    // autoloader during startup can proceed; this is not a faithful implementation.
-    true
-}
-
-pub fn spl_autoload_unregister(callback: Box<dyn Fn(&BStr) -> PhpMixed + Send + Sync>) -> bool {
-    let _ = callback;
-    // TODO(php-runtime): see spl_autoload_register; nothing is registered, so this is a no-op stub.
-    true
-}
-
 static ERROR_REPORTING_LEVEL: std::sync::atomic::AtomicI64 =
     std::sync::atomic::AtomicI64::new(E_ALL);
 
@@ -207,14 +189,6 @@ pub fn error_reporting(level: Option<i64>) -> i64 {
         ERROR_REPORTING_LEVEL.store(level, std::sync::atomic::Ordering::Relaxed);
     }
     old
-}
-
-pub fn spl_autoload_functions() -> Vec<PhpMixed> {
-    // In compiled Rust there is no runtime class-autoload registry, so no autoload functions are
-    // ever registered. Callers (e.g. EventDispatcher::do_dispatch, which diffs the registry before
-    // and after running listeners to re-order plugin-prepended autoloaders) therefore always
-    // observe an empty list. See spl_autoload_register/unregister, which remain unimplemented.
-    Vec::new()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

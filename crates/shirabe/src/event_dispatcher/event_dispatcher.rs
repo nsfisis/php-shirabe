@@ -27,11 +27,10 @@ use shirabe_php_rpc::{
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, bconcat, display_to_bytes, error_message, explode,
-    explode_with_limit, file_exists, get_class, hash, implode, ini_get, is_array, is_callable,
-    is_dir, is_object, is_string, krsort, os_str_from_bytes, path_from_bytes, path_to_bytes,
-    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback,
-    realpath, spl_autoload_functions, spl_autoload_register, spl_autoload_unregister,
-    spl_object_hash, str_replace, strlen, strpos, strtoupper, substr, trim2,
+    explode_with_limit, file_exists, get_class, hash, implode, ini_get, is_callable, is_dir,
+    is_object, krsort, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, strlen,
+    strpos, strtoupper, substr, trim2,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -316,43 +315,14 @@ impl EventDispatcher {
 
         self.push_event(&*event)?;
 
-        let autoloaders_before = spl_autoload_functions();
-
         let result = self.do_dispatch_body(event, listeners);
 
         // finally block
         self.pop_event();
 
-        let mut known_identifiers: IndexMap<BString, IndexMap<BString, PhpMixed>> = IndexMap::new();
-        for (key, cb) in autoloaders_before.iter().enumerate() {
-            let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
-            entry.insert("key".into(), PhpMixed::Int(key as i64));
-            entry.insert("callback".into(), cb.clone());
-            known_identifiers.insert(Self::get_callback_identifier(cb), entry);
-        }
-        for cb in spl_autoload_functions() {
-            // once we get to the first known autoloader, we can leave any appended autoloader without problems
-            if let Some(entry) = known_identifiers.get(&Self::get_callback_identifier(&cb))
-                && entry
-                    .get(B("key"))
-                    .and_then(|v| v.as_int())
-                    .map(|k| k == 0)
-                    .unwrap_or(false)
-            {
-                break;
-            }
-
-            // other newly appeared prepended autoloaders should be appended instead to ensure Composer loads its classes first
-            // PHP: spl_autoload_unregister($cb); spl_autoload_register($cb, true, $prepend);
-            // TODO(plugin): ClassLoader detection via instanceof — currently treat all callbacks uniformly
-            // TODO(php-runtime): `cb` is a PhpMixed holding a callable; spl_autoload_register/unregister
-            // (php-shims that stay todo!()) need a typed Box<dyn Fn(&str) -> PhpMixed> callback.
-            // Bridging requires the callable model to expose the underlying closure from PhpMixed.
-            let _ = &cb;
-            let _ = spl_autoload_unregister;
-            let _ = spl_autoload_register;
-        }
-
+        // PHP re-appends the autoloaders a listener prepended so that Composer loads its classes
+        // first. Autoloaders only exist in the PHP worker, which re-prepends its own stub
+        // autoloader after loading plugin code for the same reason.
         result
     }
 
@@ -1512,42 +1482,6 @@ try {
                 Platform::put_env(path_env, path_to_bytes(&path_value));
             }
         }
-    }
-
-    fn get_callback_identifier(cb: &PhpMixed) -> BString {
-        if let PhpMixed::String(s) = cb {
-            return bconcat!("fn:", s);
-        }
-        if is_object(cb) {
-            return bconcat!("obj:", spl_object_hash(cb));
-        }
-        if is_array(cb)
-            && let PhpMixed::Array(map) = cb
-        {
-            let entries: Vec<&PhpMixed> = map.values().collect();
-            if entries.len() >= 2 {
-                let first = entries[0];
-                let second = entries[1];
-                let prefix = if is_string(first) {
-                    if let PhpMixed::String(s) = first {
-                        s.clone()
-                    } else {
-                        BString::from("?")
-                    }
-                } else {
-                    bconcat!(get_class(first), "#", spl_object_hash(first))
-                };
-                let suffix = if let PhpMixed::String(s) = second {
-                    s.clone()
-                } else {
-                    BString::from("?")
-                };
-                return bconcat!("array:", prefix, "::", suffix);
-            }
-        }
-
-        // not great but also do not want to break everything here
-        BString::from("unsupported")
     }
 
     fn make_autoloader(
