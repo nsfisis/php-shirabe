@@ -380,7 +380,7 @@ impl Problem {
                     pool,
                     package_name,
                     shirabe_php_rpc::get_php_version()?.version.as_ref(),
-                );
+                )?;
 
                 let msg = bconcat!(
                     "- Root composer.json requires ",
@@ -462,7 +462,7 @@ impl Problem {
                     pool,
                     package_name,
                     effective_version.as_ref(),
-                );
+                )?;
                 if version.is_none() {
                     let providers_str_opt =
                         Self::get_providers_list(repository_set, package_name, 5)?;
@@ -1192,7 +1192,7 @@ impl Problem {
         pool: &mut Pool,
         package_name: &BStr,
         version: &BStr,
-    ) -> Option<BString> {
+    ) -> anyhow::Result<Option<BString>> {
         let available = pool.what_provides(package_name, None);
 
         if !available.is_empty() {
@@ -1217,13 +1217,13 @@ impl Problem {
                 let replaces: Vec<Link> = selected.get_replaces().values().cloned().collect();
                 for link in provides.iter().chain(replaces.iter()) {
                     if link.get_target() == package_name {
-                        return Some(bconcat!(
-                            link.get_pretty_constraint(),
+                        return Ok(Some(bconcat!(
+                            link.get_pretty_constraint()?,
                             " ",
                             substr(link.get_description(), 0, Some(-1)),
                             "d by ",
                             selected.get_pretty_string()
-                        ));
+                        )));
                     }
                 }
             }
@@ -1240,11 +1240,11 @@ impl Problem {
                     .unwrap_or_default();
                 version = bconcat!(version, "; ", str_replace("Package ", "", &description));
             }
-            return Some(version);
+            return Ok(Some(version));
         }
 
         let _ = version;
-        None
+        Ok(None)
     }
 
     fn condense_version_list(

@@ -395,7 +395,7 @@ impl Rule {
                     conflict_target = bconcat!(
                         package1.get_pretty_name(),
                         " ",
-                        link.get_pretty_constraint()
+                        link.get_pretty_constraint()?
                     );
                 }
 
@@ -407,14 +407,14 @@ impl Rule {
                     for provide in package1.get_provides().values() {
                         if provide.get_target() == link.get_target() {
                             provide_type = Some(BStr::new("provides"));
-                            provided = Some(BString::from(provide.get_pretty_constraint()));
+                            provided = Some(BString::from(provide.get_pretty_constraint()?));
                             break;
                         }
                     }
                     for replace in package1.get_replaces().values() {
                         if replace.get_target() == link.get_target() {
                             provide_type = Some(BStr::new("replaces"));
-                            provided = Some(BString::from(replace.get_pretty_constraint()));
+                            provided = Some(BString::from(replace.get_pretty_constraint()?));
                             break;
                         }
                     }
@@ -422,7 +422,7 @@ impl Rule {
                         conflict_target = bconcat!(
                             link.get_target(),
                             " ",
-                            link.get_pretty_constraint(),
+                            link.get_pretty_constraint()?,
                             " (",
                             package1.get_pretty_string(),
                             " ",

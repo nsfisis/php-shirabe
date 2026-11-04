@@ -24,7 +24,7 @@ fn root_package() -> RootPackageHandle {
 #[test]
 fn test_required_information() {
     let dumper = set_up();
-    let config = dumper.dump(complete_package().into());
+    let config = dumper.dump(complete_package().into()).unwrap();
 
     let mut expected: IndexMap<BString, PhpMixed> = IndexMap::new();
     expected.insert("name".into(), PhpMixed::string(BString::from("dummy/pkg")));
@@ -44,7 +44,7 @@ fn test_root_package() {
     let package = root_package();
     package.set_minimum_stability(BString::from("dev"));
 
-    let config = dumper.dump(package.into());
+    let config = dumper.dump(package.into()).unwrap();
 
     assert_eq!(
         Some(&PhpMixed::string(BString::from("dev"))),
@@ -58,7 +58,7 @@ fn test_dump_abandoned() {
     let package = complete_package();
     package.set_abandoned(PhpMixed::Bool(true));
 
-    let config = dumper.dump(package.into());
+    let config = dumper.dump(package.into()).unwrap();
 
     assert_eq!(Some(&PhpMixed::Bool(true)), config.get(B("abandoned")));
 }
@@ -69,7 +69,7 @@ fn test_dump_abandoned_replacement() {
     let package = complete_package();
     package.set_abandoned(PhpMixed::string(BString::from("foo/bar")));
 
-    let config = dumper.dump(package.into());
+    let config = dumper.dump(package.into()).unwrap();
 
     assert_eq!(
         Some(&PhpMixed::string(BString::from("foo/bar"))),

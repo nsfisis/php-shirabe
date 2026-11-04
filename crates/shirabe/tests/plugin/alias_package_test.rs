@@ -42,7 +42,8 @@ fn test_alias_packages_cross_the_plugin_boundary() {
         aliased.clone(),
         BString::from("2.0.0.0"),
         BString::from("2.0.0"),
-    );
+    )
+    .unwrap();
     set_up
         .repository
         .borrow_mut()
@@ -58,7 +59,8 @@ fn test_alias_packages_cross_the_plugin_boundary() {
         real_root.clone(),
         BString::from("1.1.0.0"),
         BString::from("1.1.0"),
-    );
+    )
+    .unwrap();
     set_up.composer.borrow_mut().set_package(root_alias.into());
 
     let installer = new_installer(&set_up);

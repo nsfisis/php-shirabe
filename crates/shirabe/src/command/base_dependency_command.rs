@@ -320,7 +320,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 " ",
                 description
             ));
-            self.print_tree(&results, BStr::new(""), 1);
+            self.print_tree(&results, BStr::new(""), 1)?;
         } else {
             self.print_table(output, results)?;
         }
@@ -400,7 +400,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     name_with_link,
                     version,
                     BString::from(link.get_description()),
-                    bconcat!(link.get_target(), " (", link.get_pretty_constraint(), ")"),
+                    bconcat!(link.get_target(), " (", link.get_pretty_constraint()?, ")"),
                 ]);
                 if let Some(children_vec) = children {
                     queue.extend(children_vec);
@@ -436,7 +436,12 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
     }
 
-    fn print_tree(&self, results: &[DependentsEntry], prefix: &BStr, level: i64) {
+    fn print_tree(
+        &self,
+        results: &[DependentsEntry],
+        prefix: &BStr,
+        level: i64,
+    ) -> anyhow::Result<()> {
         let count = results.len() as i64;
         let mut idx: i64 = 0;
         let colors = self.colors();
@@ -483,7 +488,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 "</",
                 prev_color,
                 "> ",
-                link.get_pretty_constraint()
+                link.get_pretty_constraint()?
             );
             let circular_warn = if children.is_none() {
                 "(circular dependency aborted here)"
@@ -504,9 +509,11 @@ pub trait BaseDependencyCommand: BaseCommand {
                     children_vec,
                     bconcat!(prefix, if is_last { "   " } else { "│  " }).as_bstr(),
                     level + 1,
-                );
+                )?;
             }
         }
+
+        Ok(())
     }
 
     fn write_tree_line(&self, line: &BStr) {

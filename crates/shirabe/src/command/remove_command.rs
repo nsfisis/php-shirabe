@@ -518,8 +518,9 @@ impl Command for RemoveCommand {
                     }
                 }
             }
-            root_package.set_requires(links.shift_remove(B("require")).unwrap_or_default());
-            root_package.set_dev_requires(links.shift_remove(B("require-dev")).unwrap_or_default());
+            root_package.set_requires(links.shift_remove(B("require")).unwrap_or_default())?;
+            root_package
+                .set_dev_requires(links.shift_remove(B("require-dev")).unwrap_or_default())?;
         }
 
         let mut command_event = crate::plugin::CommandEvent::new(

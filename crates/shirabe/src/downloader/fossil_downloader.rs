@@ -279,7 +279,7 @@ impl VcsCapableDownloaderInterface for FossilDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-    ) -> Option<bstr::BString> {
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.get_vcs_reference(package, path)
     }
 }

@@ -1412,7 +1412,7 @@ fn test_specific_package_and_tree_with_one_package_requirement() {
             BString::from("vendor/required-package"),
             get_version_constraint("=", "1.0.0"),
             Some(Link::TYPE_REQUIRE.to_owned()),
-            BString::from("1.0.0"),
+            Some(BString::from("1.0.0")),
         ),
     );
     pkg.__set_requires(requires.into_iter().collect::<indexmap::IndexMap<_, _>>());
@@ -1438,7 +1438,7 @@ fn test_specific_package_and_tree_with_platform_requirement() {
             BString::from("php"),
             get_version_constraint("=", "8.2.0"),
             Some(Link::TYPE_REQUIRE.to_owned()),
-            BString::from("8.2.0"),
+            Some(BString::from("8.2.0")),
         ),
     );
     pkg.__set_requires(requires.into_iter().collect::<indexmap::IndexMap<_, _>>());
@@ -1556,7 +1556,7 @@ fn package_with_every_link_type() -> PackageInterfaceHandle {
                     bconcat!(target),
                     get_version_constraint(operator, version),
                     Some(r#type.to_owned()),
-                    bconcat!(pretty),
+                    Some(bconcat!(pretty)),
                 ),
             )])
         };

@@ -70,7 +70,9 @@ pub fn get_alias_package(
 ) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version.as_ref(), None).unwrap();
     let complete = CompletePackageHandle::from_rc_unchecked(package.as_rc().clone());
-    CompleteAliasPackageHandle::new(complete, norm_version, BString::from(version.as_ref())).into()
+    CompleteAliasPackageHandle::new(complete, norm_version, BString::from(version.as_ref()))
+        .unwrap()
+        .into()
 }
 
 /// ref: TestCase::getVersionConstraint

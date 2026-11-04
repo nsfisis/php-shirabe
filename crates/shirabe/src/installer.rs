@@ -721,9 +721,9 @@ impl Installer {
         shirabe_semver::CompilingMatcher::clear();
 
         // write lock
-        let platform_reqs = self.extract_platform_requirements(&self.package.get_requires());
+        let platform_reqs = self.extract_platform_requirements(&self.package.get_requires())?;
         let platform_dev_reqs =
-            self.extract_platform_requirements(&self.package.get_dev_requires());
+            self.extract_platform_requirements(&self.package.get_dev_requires())?;
 
         let mut installs_updates: Vec<std::rc::Rc<AnyOperation>> = vec![];
         let mut uninstalls: Vec<std::rc::Rc<AnyOperation>> = vec![];
@@ -919,7 +919,7 @@ impl Installer {
         let dumper = ArrayDumper::new();
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
             let loaded = loader.load(
-                dumper.dump(pkg.clone()),
+                dumper.dump(pkg.clone())?,
                 Some(BString::from("Composer\\Package\\CompletePackage")),
             )?;
             result_repo.add_package(loaded)?;
@@ -1397,8 +1397,8 @@ impl Installer {
         }
 
         self.fixed_root_package = RootPackageInterfaceHandle::dup(&self.package);
-        self.fixed_root_package.set_requires(IndexMap::new());
-        self.fixed_root_package.set_dev_requires(IndexMap::new());
+        self.fixed_root_package.set_requires(IndexMap::new())?;
+        self.fixed_root_package.set_dev_requires(IndexMap::new())?;
 
         stability_flags.insert(
             bstr::BString::from(&self.package.get_name()[..]),
@@ -1616,18 +1616,18 @@ impl Installer {
     fn extract_platform_requirements(
         &self,
         links: &IndexMap<BString, Link>,
-    ) -> IndexMap<BString, BString> {
+    ) -> anyhow::Result<IndexMap<BString, BString>> {
         let mut platform_reqs: IndexMap<BString, BString> = IndexMap::new();
         for (_key, link) in links {
             if PlatformRepository::is_platform_package(link.get_target()) {
                 platform_reqs.insert(
                     bstr::BString::from(link.get_target()),
-                    bstr::BString::from(link.get_pretty_constraint()),
+                    bstr::BString::from(link.get_pretty_constraint()?),
                 );
             }
         }
 
-        platform_reqs
+        Ok(platform_reqs)
     }
 
     /// Replace local repositories with InstalledArrayRepository instances
@@ -1658,12 +1658,12 @@ impl Installer {
                         let complete = aliased.as_complete_package().expect(
                             "CompleteAliasPackage requires aliasOf to be a real CompletePackage",
                         );
-                        CompleteAliasPackageHandle::new(complete, version, pretty_version).into()
+                        CompleteAliasPackageHandle::new(complete, version, pretty_version)?.into()
                     } else {
                         let real = aliased
                             .as_package()
                             .expect("AliasPackage requires aliasOf to be a real Package");
-                        AliasPackageHandle::new(real, version, pretty_version).into()
+                        AliasPackageHandle::new(real, version, pretty_version)?.into()
                     };
                 packages.insert(key, new_alias_package);
             }

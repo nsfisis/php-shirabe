@@ -57,7 +57,7 @@ impl PathDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-    ) -> Option<bstr::BString> {
+    ) -> anyhow::Result<Option<bstr::BString>> {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
@@ -68,13 +68,13 @@ impl PathDownloader {
         );
         let dumper = ArrayDumper::new();
 
-        let package_config = dumper.dump(package);
+        let package_config = dumper.dump(package)?;
         let package_version = guesser.guess_version(&package_config, &path);
         if let Ok(Some(version)) = package_version {
-            return version.commit;
+            return Ok(version.commit);
         }
 
-        None
+        Ok(None)
     }
 
     fn get_install_operation_appendix(
@@ -178,7 +178,7 @@ impl VcsCapableDownloaderInterface for PathDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-    ) -> Option<bstr::BString> {
+    ) -> anyhow::Result<Option<bstr::BString>> {
         PathDownloader::get_vcs_reference(self, package, path)
     }
 }

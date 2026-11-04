@@ -132,7 +132,7 @@ fn test_pretty_string() {
             BString::from("foo"),
             empty_constraint.into(),
             None,
-            BString::from("*"),
+            Some(BString::from("*")),
         )),
     ));
 

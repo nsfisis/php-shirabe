@@ -267,10 +267,11 @@ pub(crate) fn link_to_wire(link: &Link) -> PluginValue {
     object.set_protected("target", PluginValue::string(link.get_target()));
     object.set_protected("constraint", constraint_to_wire(link.get_constraint()));
     object.set_protected("description", PluginValue::string(link.get_description()));
-    object.set_protected(
-        "prettyConstraint",
-        PluginValue::string(link.get_pretty_constraint()),
-    );
+    let pretty_constraint = match link.get_pretty_constraint_for_serialization() {
+        Some(pretty) => PluginValue::string(pretty),
+        None => PluginValue::Null,
+    };
+    object.set_protected("prettyConstraint", pretty_constraint);
     PluginValue::PhpObject(object)
 }
 
@@ -295,9 +296,6 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
             .protected("constraint")
             .ok_or_else(|| PhpThrow::runtime("a Link expects a constraint"))?,
     )?;
-    // TODO(plugin): PHP's Link leaves $prettyConstraint nullable and throws from
-    // getPrettyConstraint() when it was never given, but this port stores a string, so a link
-    // a plugin built without one comes back carrying the empty string instead.
     let pretty_constraint: Option<BString> = property(
         "a Link pretty constraint",
         object.protected("prettyConstraint"),
@@ -307,7 +305,7 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
         property("a Link target", object.protected("target"))?,
         constraint,
         property("a Link description", object.protected("description"))?,
-        pretty_constraint.unwrap_or_default(),
+        pretty_constraint,
     ))
 }
 
@@ -336,7 +334,7 @@ mod tests {
             BString::from("c/d"),
             simple(BStr::new(">="), BStr::new("1.0.0"), None),
             Some(BString::from("requires")),
-            BString::from("^1.0"),
+            Some(BString::from("^1.0")),
         );
         assert_eq!(
             BStr::new(&serialize(&link_to_wire(&link))),
@@ -354,6 +352,35 @@ mod tests {
                     s:19:\"\0*\0prettyConstraint\";s:4:\"^1.0\";}"
             ),
         );
+    }
+
+    /// The expected bytes are what PHP writes for
+    /// `new Link('a/b', 'c/d', new MatchAllConstraint())`: a link built without a pretty
+    /// constraint crosses with a null one, so `getPrettyConstraint()` throws in the plugin too.
+    #[test]
+    fn a_link_without_a_pretty_constraint_is_written_with_null() {
+        let link = Link::new(
+            BString::from("a/b"),
+            BString::from("c/d"),
+            AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
+            None,
+            None,
+        );
+        assert_eq!(
+            BStr::new(&serialize(&link_to_wire(&link))),
+            BStr::new(
+                b"O:21:\"Composer\\Package\\Link\":5:{\
+                    s:9:\"\0*\0source\";s:3:\"a/b\";\
+                    s:9:\"\0*\0target\";s:3:\"c/d\";\
+                    s:13:\"\0*\0constraint\";O:45:\"Composer\\Semver\\Constraint\\MatchAllConstraint\":1:{\
+                        s:15:\"\0*\0prettyString\";N;}\
+                    s:14:\"\0*\0description\";s:10:\"relates to\";\
+                    s:19:\"\0*\0prettyConstraint\";N;}"
+            ),
+        );
+        let decoded = link_from_wire(&link_to_wire(&link)).expect("decode failed");
+        assert_eq!(None, decoded.get_pretty_constraint_for_serialization());
+        assert!(decoded.get_pretty_constraint().is_err());
     }
 
     /// The expected bytes are what PHP writes for
@@ -428,7 +455,7 @@ mod tests {
                 BString::from("Vendor/Dep"),
                 constraint,
                 Some(Link::TYPE_DEV_REQUIRE.to_owned()),
-                BString::from("^1.0"),
+                Some(BString::from("^1.0")),
             );
             let decoded = link_from_wire(&link_to_wire(&link)).expect("decode failed");
             assert_eq!(link.to_php_string(), decoded.to_php_string());

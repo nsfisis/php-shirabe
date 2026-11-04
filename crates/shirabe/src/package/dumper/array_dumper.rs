@@ -27,7 +27,10 @@ impl ArrayDumper {
         Self
     }
 
-    pub fn dump(&self, package: PackageInterfaceHandle) -> IndexMap<BString, PhpMixed> {
+    pub fn dump(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
         data.insert("name".into(), PhpMixed::string(package.get_pretty_name()));
         data.insert(
@@ -97,7 +100,7 @@ impl ArrayDumper {
             for link in links.values() {
                 link_map.insert(
                     BString::from(link.get_target()),
-                    PhpMixed::string(link.get_pretty_constraint()),
+                    PhpMixed::string(link.get_pretty_constraint()?),
                 );
             }
             link_map.sort_keys();
@@ -332,6 +335,6 @@ impl ArrayDumper {
             );
         }
 
-        data
+        Ok(data)
     }
 }

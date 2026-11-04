@@ -537,13 +537,13 @@ impl ArrayLoader {
                     RootPackageHandle::from_root_package(root),
                     alias_normalized,
                     pretty_alias,
-                )
+                )?
                 .into(),
                 CompleteOrRootPackage::Complete(complete) => CompleteAliasPackageHandle::new(
                     CompletePackageHandle::from_complete_package(complete),
                     alias_normalized,
                     pretty_alias,
-                )
+                )?
                 .into(),
             });
         }
@@ -699,7 +699,7 @@ impl ArrayLoader {
             BString::from(target),
             parsed_constraint,
             Some(BString::from(description)),
-            BString::from(pretty_constraint),
+            Some(BString::from(pretty_constraint)),
         ))
     }
 

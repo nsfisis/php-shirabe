@@ -258,17 +258,20 @@ fn test_repository_writes_installed_php() {
     );
     root_package.set_source_reference(Some(BString::from("sourceref-by-default")));
     root_package.set_dist_reference(Some(BString::from("distref")));
-    root_package.set_provides(configure_links(
-        BStr::new("__root__"),
-        BStr::new("dev-master"),
-        Link::TYPE_PROVIDE,
-        &[(BStr::new("foo/impl"), BStr::new("2.0"))],
-    ));
+    root_package
+        .set_provides(configure_links(
+            BStr::new("__root__"),
+            BStr::new("dev-master"),
+            Link::TYPE_PROVIDE,
+            &[(BStr::new("foo/impl"), BStr::new("2.0"))],
+        ))
+        .unwrap();
     let root_package = RootAliasPackageHandle::new(
         root_package,
         bstr::BString::from(&VersionParser.normalize("1.10.x-dev", None).unwrap()[..]),
         BString::from("1.10.x-dev"),
-    );
+    )
+    .unwrap();
 
     let mut repository =
         FilesystemRepository::new(json, true, Some(root_package.into()), None).unwrap();

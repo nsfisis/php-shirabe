@@ -91,30 +91,38 @@ impl CheckPlatformReqsCommand {
         if format == "json" {
             let rows: Vec<PlatformRequirementJson> = results
                 .iter()
-                .map(|result| PlatformRequirementJson {
-                    name: result.platform_package.clone(),
-                    version: result.version.clone(),
-                    status: strip_tags(&result.status),
-                    failed_requirement: result.link.as_ref().map(|link| FailedRequirementJson {
-                        source: BString::from(link.get_source()),
-                        r#type: BString::from(link.get_description()),
-                        target: BString::from(link.get_target()),
-                        constraint: BString::from(link.get_pretty_constraint()),
-                    }),
-                    provider: if result.provider.is_empty() {
-                        None
-                    } else {
-                        Some(strip_tags(&result.provider))
-                    },
+                .map(|result| {
+                    Ok(PlatformRequirementJson {
+                        name: result.platform_package.clone(),
+                        version: result.version.clone(),
+                        status: strip_tags(&result.status),
+                        failed_requirement: result
+                            .link
+                            .as_ref()
+                            .map(|link| {
+                                anyhow::Ok(FailedRequirementJson {
+                                    source: BString::from(link.get_source()),
+                                    r#type: BString::from(link.get_description()),
+                                    target: BString::from(link.get_target()),
+                                    constraint: BString::from(link.get_pretty_constraint()?),
+                                })
+                            })
+                            .transpose()?,
+                        provider: if result.provider.is_empty() {
+                            None
+                        } else {
+                            Some(strip_tags(&result.provider))
+                        },
+                    })
                 })
-                .collect();
+                .collect::<anyhow::Result<_>>()?;
 
             io.write(&JsonFile::encode(&rows)?);
         } else {
             let rows: Vec<PhpMixed> = results
                 .iter()
                 .map(|result| {
-                    PhpMixed::List(vec![
+                    Ok(PhpMixed::List(vec![
                         PhpMixed::string(result.platform_package.clone()),
                         PhpMixed::string(result.version.clone()),
                         match &result.link {
@@ -129,16 +137,16 @@ impl CheckPlatformReqsCommand {
                                 " ",
                                 link.get_target(),
                                 " (",
-                                link.get_pretty_constraint(),
+                                link.get_pretty_constraint()?,
                                 ")"
                             ))
                         } else {
                             PhpMixed::string(BString::default())
                         },
                         PhpMixed::string(rtrim(bconcat!(result.status, " ", result.provider))),
-                    ])
+                    ]))
                 })
-                .collect();
+                .collect::<anyhow::Result<_>>()?;
 
             self.render_table(rows, output)?;
         }

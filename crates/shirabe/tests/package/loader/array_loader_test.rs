@@ -231,7 +231,7 @@ fn test_parse_dump_default_load_config() {
     let package = loader.load(config.clone(), None).unwrap();
     let dumper = ArrayDumper::new();
     let expected_config = fix_config_when_load_config_is_false(&config);
-    assert_eq!(expected_config, dumper.dump(package));
+    assert_eq!(expected_config, dumper.dump(package).unwrap());
 }
 
 #[test]
@@ -241,7 +241,7 @@ fn test_parse_dump_true_load_config() {
     let package = loader.load(config.clone(), None).unwrap();
     let dumper = ArrayDumper::new();
     let expected_config = config;
-    assert_eq!(expected_config, dumper.dump(package));
+    assert_eq!(expected_config, dumper.dump(package).unwrap());
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn test_parse_dump_false_load_config() {
     let package = loader.load(config.clone(), None).unwrap();
     let dumper = ArrayDumper::new();
     let expected_config = fix_config_when_load_config_is_false(&config);
-    assert_eq!(expected_config, dumper.dump(package));
+    assert_eq!(expected_config, dumper.dump(package).unwrap());
 }
 
 #[test]

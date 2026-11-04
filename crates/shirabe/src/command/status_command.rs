@@ -127,7 +127,7 @@ impl StatusCommand {
 
             if let Some(vcs_downloader) = downloader.as_vcs_capable_downloader_interface()
                 && vcs_downloader
-                    .get_vcs_reference(package.clone(), &target_path)
+                    .get_vcs_reference(package.clone(), &target_path)?
                     .is_some()
             {
                 let previous_ref = match package
@@ -141,7 +141,7 @@ impl StatusCommand {
                 };
 
                 let current_version =
-                    guesser.guess_version(&dumper.dump(package.clone()), &target_path)?;
+                    guesser.guess_version(&dumper.dump(package.clone())?, &target_path)?;
 
                 if let (Some(prev_ref), Some(cur_version)) = (&previous_ref, &current_version)
                     && cur_version.commit.as_ref() != Some(prev_ref)

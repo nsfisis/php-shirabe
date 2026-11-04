@@ -496,14 +496,14 @@ impl RepositorySet {
                                 complete,
                                 alias.alias_normalized.clone(),
                                 alias.alias.clone(),
-                            )
+                            )?
                             .into()
                         } else {
                             AliasPackageHandle::new(
                                 package.as_package().unwrap(),
                                 alias.alias_normalized.clone(),
                                 alias.alias.clone(),
-                            )
+                            )?
                             .into()
                         };
                     if let Some(alias_handle) = alias_package.as_alias() {

@@ -665,15 +665,16 @@ impl PoolBuilder {
                 .cloned()
                 .unwrap_or_default();
             let alias_pretty = alias.get(b"alias".as_slice()).cloned().unwrap_or_default();
-            let alias_handle: AliasPackageHandle =
-                if let Some(complete) = base_package.as_complete_package() {
-                    CompleteAliasPackageHandle::new(complete, alias_normalized, alias_pretty).into()
-                } else {
-                    let real = base_package
-                        .as_package()
-                        .expect("non-alias base package must be a real Package");
-                    AliasPackageHandle::new(real, alias_normalized, alias_pretty)
-                };
+            let alias_handle: AliasPackageHandle = if let Some(complete) =
+                base_package.as_complete_package()
+            {
+                CompleteAliasPackageHandle::new(complete, alias_normalized, alias_pretty)?.into()
+            } else {
+                let real = base_package
+                    .as_package()
+                    .expect("non-alias base package must be a real Package");
+                AliasPackageHandle::new(real, alias_normalized, alias_pretty)?
+            };
             alias_handle.set_root_package_alias(true);
 
             let new_index = self.index_counter;

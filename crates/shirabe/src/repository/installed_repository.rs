@@ -268,7 +268,7 @@ impl InstalledRepository {
                                 bstr::BString::from(link.get_target()),
                                 MatchAllConstraint::new(None).into(),
                                 Some(Link::TYPE_REQUIRE.to_owned()),
-                                bconcat!(link.get_pretty_constraint(), " ", description),
+                                Some(bconcat!(link.get_pretty_constraint()?, " ", description)),
                             ),
                             None,
                         ));
@@ -338,7 +338,11 @@ impl InstalledRepository {
                                         bstr::BString::from(link.get_target()),
                                         MatchAllConstraint::new(None).into(),
                                         Some(Link::TYPE_DOES_NOT_REQUIRE.to_owned()),
-                                        bconcat!("but ", pkg.get_pretty_version(), " is installed"),
+                                        Some(bconcat!(
+                                            "but ",
+                                            pkg.get_pretty_version(),
+                                            " is installed"
+                                        )),
                                     ),
                                     None,
                                 ));

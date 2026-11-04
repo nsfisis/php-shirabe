@@ -1036,56 +1036,56 @@ macro_rules! impl_root_package_interface_handle {
             pub fn set_requires(
                 &self,
                 requires: indexmap::IndexMap<BString, crate::package::Link>,
-            ) {
+            ) -> anyhow::Result<()> {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
                     .expect("RootPackage handle invariant")
-                    .set_requires(requires);
+                    .set_requires(requires)
             }
 
             pub fn set_dev_requires(
                 &self,
                 dev_requires: indexmap::IndexMap<BString, crate::package::Link>,
-            ) {
+            ) -> anyhow::Result<()> {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
                     .expect("RootPackage handle invariant")
-                    .set_dev_requires(dev_requires);
+                    .set_dev_requires(dev_requires)
             }
 
             pub fn set_conflicts(
                 &self,
                 conflicts: indexmap::IndexMap<BString, crate::package::Link>,
-            ) {
+            ) -> anyhow::Result<()> {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
                     .expect("RootPackage handle invariant")
-                    .set_conflicts(conflicts);
+                    .set_conflicts(conflicts)
             }
 
             pub fn set_provides(
                 &self,
                 provides: indexmap::IndexMap<BString, crate::package::Link>,
-            ) {
+            ) -> anyhow::Result<()> {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
                     .expect("RootPackage handle invariant")
-                    .set_provides(provides);
+                    .set_provides(provides)
             }
 
             pub fn set_replaces(
                 &self,
                 replaces: indexmap::IndexMap<BString, crate::package::Link>,
-            ) {
+            ) -> anyhow::Result<()> {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
                     .expect("RootPackage handle invariant")
-                    .set_replaces(replaces);
+                    .set_replaces(replaces)
             }
 
             pub fn set_autoload(
@@ -1665,8 +1665,16 @@ impl AliasPackageHandle {
         )))
     }
 
-    pub fn new(alias_of: PackageHandle, version: BString, pretty_version: BString) -> Self {
-        Self::from_alias_package(AliasPackage::new(alias_of, version, pretty_version))
+    pub fn new(
+        alias_of: PackageHandle,
+        version: BString,
+        pretty_version: BString,
+    ) -> anyhow::Result<Self> {
+        Ok(Self::from_alias_package(AliasPackage::new(
+            alias_of,
+            version,
+            pretty_version,
+        )?))
     }
 
     /// PHP `getAliasOf()`. The aliased package is always real.
@@ -1714,11 +1722,13 @@ impl CompleteAliasPackageHandle {
         )))
     }
 
-    pub fn new(alias_of: CompletePackageHandle, version: BString, pretty_version: BString) -> Self {
-        Self::from_complete_alias_package(CompleteAliasPackage::new(
-            alias_of,
-            version,
-            pretty_version,
+    pub fn new(
+        alias_of: CompletePackageHandle,
+        version: BString,
+        pretty_version: BString,
+    ) -> anyhow::Result<Self> {
+        Ok(Self::from_complete_alias_package(
+            CompleteAliasPackage::new(alias_of, version, pretty_version)?,
         ))
     }
 
@@ -1747,8 +1757,16 @@ impl RootAliasPackageHandle {
         )))
     }
 
-    pub fn new(alias_of: RootPackageHandle, version: BString, pretty_version: BString) -> Self {
-        Self::from_root_alias_package(RootAliasPackage::new(alias_of, version, pretty_version))
+    pub fn new(
+        alias_of: RootPackageHandle,
+        version: BString,
+        pretty_version: BString,
+    ) -> anyhow::Result<Self> {
+        Ok(Self::from_root_alias_package(RootAliasPackage::new(
+            alias_of,
+            version,
+            pretty_version,
+        )?))
     }
 
     /// PHP `getAliasOf()` narrowed to `RootPackage`.

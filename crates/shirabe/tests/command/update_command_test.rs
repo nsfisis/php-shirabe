@@ -473,7 +473,7 @@ fn test_interactive_tmp() {
                 BString::from("dep/pkg"),
                 AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
                 Some(Link::TYPE_REQUIRE.to_owned()),
-                BString::from("^1"),
+                Some(BString::from("^1")),
             ),
         );
         requires.insert(
@@ -483,7 +483,7 @@ fn test_interactive_tmp() {
                 BString::from("another-dep/pkg"),
                 AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
                 Some(Link::TYPE_REQUIRE.to_owned()),
-                BString::from("^1"),
+                Some(BString::from("^1")),
             ),
         );
         root_package.__set_requires(requires.into_iter().collect::<indexmap::IndexMap<_, _>>());

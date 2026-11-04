@@ -396,7 +396,7 @@ fn test_why_command_outputs() {
                 BString::from("vendor1/package2"),
                 match_all(),
                 Some(Link::TYPE_REQUIRE.to_owned()),
-                BString::from("^2"),
+                Some(BString::from("^2")),
             ),
         );
         first_required_package
@@ -411,7 +411,7 @@ fn test_why_command_outputs() {
                 BString::from("vendor1/package3"),
                 match_all(),
                 Some(Link::TYPE_REQUIRE.to_owned()),
-                BString::from("^1"),
+                Some(BString::from("^1")),
             ),
         );
         second_required_package
@@ -580,7 +580,7 @@ fn test_why_not_command_outputs() {
                 BString::from("vendor2/package3"),
                 match_all(),
                 Some(Link::TYPE_REQUIRE.to_owned()),
-                BString::from("1.4.*"),
+                Some(BString::from("1.4.*")),
             ),
         );
         req.insert(
@@ -597,7 +597,7 @@ fn test_why_not_command_outputs() {
                     None,
                 )),
                 Some(Link::TYPE_REQUIRE.to_owned()),
-                BString::from("^8.2"),
+                Some(BString::from("^8.2")),
             ),
         );
         second_dev_required_package

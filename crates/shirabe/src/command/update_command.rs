@@ -118,7 +118,8 @@ impl UpdateCommand {
             let current_version = package.get_pretty_version();
             let constraint = requires
                 .get(&package.get_name())
-                .map(|link| link.get_pretty_constraint());
+                .map(|link| link.get_pretty_constraint())
+                .transpose()?;
             let stability = match stability_flags.get(&package.get_name()) {
                 Some(flag) => base_package::STABILITIES
                     .iter()
@@ -416,7 +417,7 @@ impl Command for UpdateCommand {
                         "\" for \"",
                         package,
                         "\" must be a subset of the constraint in your composer.json (",
-                        root_req.get_pretty_constraint(),
+                        root_req.get_pretty_constraint()?,
                         ")</error>"
                     ),
                     true,

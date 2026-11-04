@@ -74,7 +74,7 @@ fn require_link(package_name: &BStr, target: &BStr, pretty_constraint: &BStr) ->
         bconcat!(target),
         parser.parse_constraints(pretty_constraint).unwrap(),
         Some(Link::TYPE_REQUIRE.to_owned()),
-        bconcat!(pretty_constraint),
+        Some(bconcat!(pretty_constraint)),
     )
 }
 
@@ -624,6 +624,7 @@ fn test_default_branch_alias_is_never_returned() {
         VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
         VersionParser::DEFAULT_BRANCH_ALIAS.to_owned(),
     )
+    .unwrap()
     .into();
     let packages = vec![package, package2_alias];
 

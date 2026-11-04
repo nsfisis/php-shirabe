@@ -1,0 +1,12 @@
+{
+    "name": "link-pretty-constraint-v1",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "autoload": { "psr-0": { "LinkPrettyConstraint": "" } },
+    "extra": {
+        "class": "LinkPrettyConstraint\\Plugin"
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    }
+}

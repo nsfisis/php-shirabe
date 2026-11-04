@@ -503,19 +503,22 @@ fn test_select_local_repos_first() {
         CompletePackageHandle::from_rc_unchecked(package_a.as_rc().clone()),
         BString::from("2.1.9999999.9999999-dev"),
         BString::from("2.1.x-dev"),
-    );
+    )
+    .unwrap();
     let package_a_important = get_package("A", "dev-feature-a");
     let package_a_alias_important = CompleteAliasPackageHandle::new(
         CompletePackageHandle::from_rc_unchecked(package_a_important.as_rc().clone()),
         BString::from("2.1.9999999.9999999-dev"),
         BString::from("2.1.x-dev"),
-    );
+    )
+    .unwrap();
     let package_a2_important = get_package("A", "dev-master");
     let package_a2_alias_important = CompleteAliasPackageHandle::new(
         CompletePackageHandle::from_rc_unchecked(package_a2_important.as_rc().clone()),
         BString::from("2.1.9999999.9999999-dev"),
         BString::from("2.1.x-dev"),
-    );
+    )
+    .unwrap();
     package_a_alias_important.set_root_package_alias(true);
 
     fixtures.repo.add_package(package_a).unwrap();
@@ -577,7 +580,7 @@ fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::
         bconcat!(target),
         constraint,
         Some(r#type.to_owned()),
-        pretty,
+        Some(pretty),
     )
 }
 

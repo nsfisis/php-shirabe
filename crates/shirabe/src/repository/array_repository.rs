@@ -154,19 +154,19 @@ impl ArrayRepository {
         package: BasePackageHandle,
         alias: BString,
         pretty_alias: BString,
-    ) -> BasePackageHandle {
+    ) -> anyhow::Result<BasePackageHandle> {
         let mut package = package;
         while let Some(alias_pkg) = package.as_alias() {
             package = alias_pkg.get_alias_of().into();
         }
 
         if let Some(complete) = package.as_complete_package() {
-            CompleteAliasPackageHandle::new(complete, alias, pretty_alias).into()
+            Ok(CompleteAliasPackageHandle::new(complete, alias, pretty_alias)?.into())
         } else {
             let real = package
                 .as_package()
                 .expect("non-alias package must be a real Package");
-            AliasPackageHandle::new(real, alias, pretty_alias).into()
+            Ok(AliasPackageHandle::new(real, alias, pretty_alias)?.into())
         }
     }
 

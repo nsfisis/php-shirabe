@@ -105,7 +105,7 @@ fn set_on_root_or_base_package<T>(
     package: &mut AnyPackage,
     method_name: &BStr,
     value: T,
-    root: impl FnOnce(&mut dyn crate::package::RootPackageInterface, T),
+    root: impl FnOnce(&mut dyn crate::package::RootPackageInterface, T) -> anyhow::Result<()>,
     base: impl FnOnce(&mut crate::package::Package, T),
 ) -> Result<(), PhpThrow> {
     if package.is_root() {
@@ -114,7 +114,8 @@ fn set_on_root_or_base_package<T>(
                 .as_root_package_interface_mut()
                 .expect("a root package exposes RootPackageInterface"),
             value,
-        );
+        )
+        .map_err(|error| error_throw(bconcat!(method_name, " failed"), &error))?;
     } else {
         base(base_package_mut(package, method_name)?, value);
     }
@@ -253,28 +254,40 @@ pub(crate) fn dispatch_package_method(
             &mut package.borrow_mut(),
             method_name,
             arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?,
-            |p, autoload| p.set_autoload(autoload),
+            |p, autoload| {
+                p.set_autoload(autoload);
+                Ok(())
+            },
             |p, autoload| p.set_autoload(autoload),
         )?,
         b"setDevAutoload" => set_on_root_or_base_package(
             &mut package.borrow_mut(),
             method_name,
             arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?,
-            |p, autoload| p.set_dev_autoload(autoload),
+            |p, autoload| {
+                p.set_dev_autoload(autoload);
+                Ok(())
+            },
             |p, autoload| p.set_dev_autoload(autoload),
         )?,
         b"setSuggests" => set_on_root_or_base_package(
             &mut package.borrow_mut(),
             method_name,
             arg::<IndexMap<BString, BString>>(method_name, args, 0)?,
-            |p, suggests| p.set_suggests(suggests),
+            |p, suggests| {
+                p.set_suggests(suggests);
+                Ok(())
+            },
             |p, suggests| p.set_suggests(suggests),
         )?,
         b"setExtra" => set_on_root_or_base_package(
             &mut package.borrow_mut(),
             method_name,
             arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?,
-            |p, extra| p.set_extra(extra),
+            |p, extra| {
+                p.set_extra(extra);
+                Ok(())
+            },
             |p, extra| p.set_extra(extra),
         )?,
         b"setType" => {

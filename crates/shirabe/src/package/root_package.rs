@@ -95,24 +95,29 @@ impl RootPackageInterface for RootPackage {
         self.aliases.clone()
     }
 
-    fn set_requires(&mut self, requires: IndexMap<BString, Link>) {
+    fn set_requires(&mut self, requires: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.set_requires(requires);
+        Ok(())
     }
 
-    fn set_dev_requires(&mut self, dev_requires: IndexMap<BString, Link>) {
+    fn set_dev_requires(&mut self, dev_requires: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.set_dev_requires(dev_requires);
+        Ok(())
     }
 
-    fn set_conflicts(&mut self, conflicts: IndexMap<BString, Link>) {
+    fn set_conflicts(&mut self, conflicts: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.set_conflicts(conflicts);
+        Ok(())
     }
 
-    fn set_provides(&mut self, provides: IndexMap<BString, Link>) {
+    fn set_provides(&mut self, provides: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.set_provides(provides);
+        Ok(())
     }
 
-    fn set_replaces(&mut self, replaces: IndexMap<BString, Link>) {
+    fn set_replaces(&mut self, replaces: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.set_replaces(replaces);
+        Ok(())
     }
 
     fn set_autoload(&mut self, autoload: IndexMap<BString, PhpMixed>) {

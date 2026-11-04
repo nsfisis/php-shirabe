@@ -245,7 +245,7 @@ impl Locker {
                                         .and_then(|v| v.as_string())
                                         .unwrap_or_default(),
                                 ),
-                            );
+                            )?;
                             alias_pkg.set_root_package_alias(true);
                             packages.add_package(alias_pkg.into())?;
                         }
@@ -714,7 +714,7 @@ impl Locker {
                 .into());
             }
 
-            let mut spec = self.dumper.dump(package.clone());
+            let mut spec = self.dumper.dump(package.clone())?;
             spec.shift_remove(B("version_normalized"));
 
             // always move time to the end of the package definition
@@ -893,7 +893,7 @@ impl Locker {
                 if PlatformRepository::is_platform_package(link.get_target()) {
                     continue;
                 }
-                if link.get_pretty_constraint() == "self.version" {
+                if link.get_pretty_constraint()? == "self.version" {
                     continue;
                 }
                 if installed_repo
@@ -927,7 +927,7 @@ impl Locker {
                                         description = bconcat!(
                                             verb,
                                             " as ",
-                                            provider_link.get_pretty_constraint(),
+                                            provider_link.get_pretty_constraint()?,
                                             " by ",
                                             provider.get_pretty_name(),
                                             " ",
@@ -946,7 +946,7 @@ impl Locker {
                             "\" is in the lock file as \"",
                             description,
                             "\" but that does not satisfy your constraint \"",
-                            link.get_pretty_constraint(),
+                            link.get_pretty_constraint()?,
                             "\"."
                         ));
                     } else {

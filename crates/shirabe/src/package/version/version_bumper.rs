@@ -32,7 +32,7 @@ impl VersionBumper {
         if version.starts_with(b"dev-") {
             let loader = ArrayLoader::new(Some(parser.clone()), false);
             let dumper = ArrayDumper::new();
-            let dumped = dumper.dump(package);
+            let dumped = dumper.dump(package)?;
             let extra = loader.get_branch_alias(&dumped)?;
 
             if extra.is_none()

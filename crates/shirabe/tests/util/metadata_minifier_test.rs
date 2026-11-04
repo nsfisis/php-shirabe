@@ -64,9 +64,9 @@ fn test_minify_expand() {
     ];
 
     let source = vec![
-        dumper.dump(package1.into()),
-        dumper.dump(package2.into()),
-        dumper.dump(package3.into()),
+        dumper.dump(package1.into()).unwrap(),
+        dumper.dump(package2.into()).unwrap(),
+        dumper.dump(package3.into()).unwrap(),
     ];
 
     assert_eq!(source, MetadataMinifier::expand(minified).into_vec());

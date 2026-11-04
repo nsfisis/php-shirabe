@@ -23,7 +23,7 @@ fn mk_link(
         bconcat!(target),
         constraint,
         Some(r#type.to_owned()),
-        pretty,
+        Some(pretty),
     )
 }
 

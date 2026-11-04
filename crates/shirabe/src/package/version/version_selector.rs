@@ -195,7 +195,7 @@ impl VersionSelector {
                                     " ",
                                     link.get_target(),
                                     " ",
-                                    link.get_pretty_constraint(),
+                                    link.get_pretty_constraint()?,
                                     " which ",
                                     reason,
                                     ".</>"
@@ -273,7 +273,7 @@ impl VersionSelector {
 
         let loader = ArrayLoader::new(Some(self.get_parser().clone()), false);
         let dumper = ArrayDumper::new();
-        let extra = loader.get_branch_alias(&dumper.dump(package.clone()))?;
+        let extra = loader.get_branch_alias(&dumper.dump(package.clone())?)?;
         if let Some(extra) = extra
             && extra != VersionParser::DEFAULT_BRANCH_ALIAS
         {

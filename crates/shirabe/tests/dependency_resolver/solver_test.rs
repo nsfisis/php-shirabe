@@ -62,7 +62,7 @@ fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::
         bconcat!(target),
         constraint,
         Some(r#type.to_owned()),
-        pretty,
+        Some(pretty),
     )
 }
 
@@ -79,7 +79,7 @@ fn link_pretty(
         bconcat!(target),
         constraint,
         Some(r#type.to_owned()),
-        bconcat!(pretty),
+        Some(bconcat!(pretty)),
     )
 }
 

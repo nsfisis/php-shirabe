@@ -355,12 +355,12 @@ impl ShowCommand {
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         self.print_meta(package.clone(), versions, installed_repo, latest_package)?;
-        self.print_links(package.clone(), Link::TYPE_REQUIRE, None);
+        self.print_links(package.clone(), Link::TYPE_REQUIRE, None)?;
         self.print_links(
             package.clone(),
             Link::TYPE_DEV_REQUIRE,
             Some(BStr::new("requires (dev)")),
-        );
+        )?;
 
         if !package.get_suggests().is_empty() {
             self.get_io().write("\n<info>suggests</info>");
@@ -370,9 +370,9 @@ impl ShowCommand {
             }
         }
 
-        self.print_links(package.clone(), Link::TYPE_PROVIDE, None);
-        self.print_links(package.clone(), Link::TYPE_CONFLICT, None);
-        self.print_links(package, Link::TYPE_REPLACE, None);
+        self.print_links(package.clone(), Link::TYPE_PROVIDE, None)?;
+        self.print_links(package.clone(), Link::TYPE_CONFLICT, None)?;
+        self.print_links(package, Link::TYPE_REPLACE, None)?;
         Ok(())
     }
 
@@ -592,7 +592,7 @@ impl ShowCommand {
         package: CompletePackageInterfaceHandle,
         link_type: &BStr,
         title: Option<&BStr>,
-    ) {
+    ) -> anyhow::Result<()> {
         let title = title.unwrap_or(link_type);
         let io = self.get_io();
         let links = package.get_links_for_type(link_type);
@@ -603,11 +603,13 @@ impl ShowCommand {
                 io.write(bconcat!(
                     link.1.get_target(),
                     " <comment>",
-                    link.1.get_pretty_constraint(),
+                    link.1.get_pretty_constraint()?,
                     "</comment>"
                 ));
             }
         }
+
+        Ok(())
     }
 
     /// Prints the licenses of a package with metadata
@@ -745,7 +747,7 @@ impl ShowCommand {
             json.include_path = Some(package.get_include_paths());
         }
 
-        Self::append_links(&mut json, package);
+        Self::append_links(&mut json, package)?;
 
         self.get_io().write(&JsonFile::encode(&json)?);
         Ok(())
@@ -835,17 +837,22 @@ impl ShowCommand {
         }
     }
 
-    fn append_links(json: &mut PackageInfoJson, package: CompletePackageInterfaceHandle) {
+    fn append_links(
+        json: &mut PackageInfoJson,
+        package: CompletePackageInterfaceHandle,
+    ) -> anyhow::Result<()> {
         for link_type in Link::types() {
-            Self::append_link(json, package.clone(), link_type);
+            Self::append_link(json, package.clone(), link_type)?;
         }
+
+        Ok(())
     }
 
     fn append_link(
         json: &mut PackageInfoJson,
         package: CompletePackageInterfaceHandle,
         link_type: &BStr,
-    ) {
+    ) -> anyhow::Result<()> {
         let links = package.get_links_for_type(link_type);
 
         if !links.is_empty() {
@@ -853,7 +860,7 @@ impl ShowCommand {
             for link in links.iter() {
                 m.insert(
                     BString::from(link.1.get_target()),
-                    BString::from(link.1.get_pretty_constraint()),
+                    BString::from(link.1.get_pretty_constraint()?),
                 );
             }
             let slot = if link_type == Link::TYPE_REQUIRE {
@@ -871,6 +878,8 @@ impl ShowCommand {
             };
             *slot = Some(m);
         }
+
+        Ok(())
     }
 
     /// Init styles for tree
@@ -948,7 +957,7 @@ impl ShowCommand {
         package: PackageInterfaceHandle,
         installed_repo: &RepositoryInterfaceHandle,
         remote_repos: &RepositoryInterfaceHandle,
-    ) -> PackageTree {
+    ) -> anyhow::Result<PackageTree> {
         let requires = {
             let mut r = (*package.get_requires()).clone();
             r.sort_keys();
@@ -960,7 +969,7 @@ impl ShowCommand {
 
             let mut tree_child_desc = PackageTreeChild {
                 name: require_name.clone(),
-                version: BString::from(require.get_pretty_constraint()),
+                version: BString::from(require.get_pretty_constraint()?),
                 requires: None,
             };
 
@@ -994,7 +1003,7 @@ impl ShowCommand {
             tree.requires = Some(children);
         }
 
-        tree
+        Ok(tree)
     }
 
     /// Display a package tree
@@ -1064,11 +1073,11 @@ impl ShowCommand {
         packages_in_tree: &[BString],
     ) -> anyhow::Result<Vec<PackageTreeChild>> {
         let mut children: Vec<PackageTreeChild> = Vec::new();
-        let version_arg: PhpMixed = if link.get_pretty_constraint() == "self.version" {
+        let version_arg: PhpMixed = if link.get_pretty_constraint()? == "self.version" {
             // pass the ConstraintInterface object — signal via Null in this scalar shape
             PhpMixed::Null
         } else {
-            PhpMixed::string(link.get_pretty_constraint())
+            PhpMixed::string(link.get_pretty_constraint()?)
         };
         let (package, _) = self.get_package(installed_repo, remote_repos, name, version_arg)?;
         if let Some(package) = package {
@@ -1079,7 +1088,7 @@ impl ShowCommand {
 
                 let mut tree_child_desc = PackageTreeChild {
                     name: require_name.clone(),
-                    version: BString::from(require.get_pretty_constraint()),
+                    version: BString::from(require.get_pretty_constraint()?),
                     requires: None,
                 };
 
@@ -1957,7 +1966,7 @@ impl Command for ShowCommand {
             let mut exit_code: i64 = 0;
             if input.borrow().get_option("tree")?.as_bool() == Some(true) {
                 let array_tree =
-                    self.generate_package_tree(package.clone().into(), &installed_repo, &repos);
+                    self.generate_package_tree(package.clone().into(), &installed_repo, &repos)?;
 
                 if format == "json" {
                     self.get_io().write(&JsonFile::encode(&PackageTreeJson {
@@ -2073,7 +2082,7 @@ impl Command for ShowCommand {
                         package.clone(),
                         &installed_repo,
                         &repos,
-                    ));
+                    )?);
                 }
             }
 

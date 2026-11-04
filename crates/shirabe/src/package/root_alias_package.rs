@@ -17,13 +17,17 @@ pub struct RootAliasPackage {
 }
 
 impl RootAliasPackage {
-    pub fn new(alias_of: RootPackageHandle, version: BString, pretty_version: BString) -> Self {
+    pub fn new(
+        alias_of: RootPackageHandle,
+        version: BString,
+        pretty_version: BString,
+    ) -> anyhow::Result<Self> {
         let inner = CompleteAliasPackage::new(
             CompletePackageHandle::from(alias_of.clone()),
             version,
             pretty_version,
-        );
-        Self { inner, alias_of }
+        )?;
+        Ok(Self { inner, alias_of })
     }
 
     pub fn get_alias_of(&self) -> RootPackageHandle {
@@ -70,51 +74,51 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.get_config()
     }
 
-    fn set_requires(&mut self, requires: IndexMap<BString, Link>) {
+    fn set_requires(&mut self, requires: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.requires = std::rc::Rc::new(
             self.inner
                 .inner
-                .replace_self_version_dependencies(requires.clone(), Link::TYPE_REQUIRE),
+                .replace_self_version_dependencies(requires.clone(), Link::TYPE_REQUIRE)?,
         );
 
-        self.alias_of.set_requires(requires);
+        self.alias_of.set_requires(requires)
     }
 
-    fn set_dev_requires(&mut self, dev_requires: IndexMap<BString, Link>) {
+    fn set_dev_requires(&mut self, dev_requires: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.dev_requires = std::rc::Rc::new(
             self.inner
                 .inner
-                .replace_self_version_dependencies(dev_requires.clone(), Link::TYPE_DEV_REQUIRE),
+                .replace_self_version_dependencies(dev_requires.clone(), Link::TYPE_DEV_REQUIRE)?,
         );
 
-        self.alias_of.set_dev_requires(dev_requires);
+        self.alias_of.set_dev_requires(dev_requires)
     }
 
-    fn set_conflicts(&mut self, conflicts: IndexMap<BString, Link>) {
+    fn set_conflicts(&mut self, conflicts: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.conflicts = std::rc::Rc::new(
             self.inner
                 .inner
-                .replace_self_version_dependencies(conflicts.clone(), Link::TYPE_CONFLICT),
+                .replace_self_version_dependencies(conflicts.clone(), Link::TYPE_CONFLICT)?,
         );
-        self.alias_of.set_conflicts(conflicts);
+        self.alias_of.set_conflicts(conflicts)
     }
 
-    fn set_provides(&mut self, provides: IndexMap<BString, Link>) {
+    fn set_provides(&mut self, provides: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.provides = std::rc::Rc::new(
             self.inner
                 .inner
-                .replace_self_version_dependencies(provides.clone(), Link::TYPE_PROVIDE),
+                .replace_self_version_dependencies(provides.clone(), Link::TYPE_PROVIDE)?,
         );
-        self.alias_of.set_provides(provides);
+        self.alias_of.set_provides(provides)
     }
 
-    fn set_replaces(&mut self, replaces: IndexMap<BString, Link>) {
+    fn set_replaces(&mut self, replaces: IndexMap<BString, Link>) -> anyhow::Result<()> {
         self.inner.inner.replaces = std::rc::Rc::new(
             self.inner
                 .inner
-                .replace_self_version_dependencies(replaces.clone(), Link::TYPE_REPLACE),
+                .replace_self_version_dependencies(replaces.clone(), Link::TYPE_REPLACE)?,
         );
-        self.alias_of.set_replaces(replaces);
+        self.alias_of.set_replaces(replaces)
     }
 
     fn set_autoload(&mut self, autoload: IndexMap<BString, PhpMixed>) {

@@ -238,7 +238,7 @@ impl FilesystemRepository {
         let mut install_paths: IndexMap<BString, Option<BString>> = IndexMap::new();
 
         for package in self.inner.get_canonical_packages() {
-            let mut pkg_array = dumper.dump(package.clone());
+            let mut pkg_array = dumper.dump(package.clone())?;
             let path = installation_manager.get_install_path(package.clone());
             let mut install_path: Option<BString> = None;
             if let Some(path_str) = &path
@@ -559,7 +559,7 @@ impl FilesystemRepository {
                 if PlatformRepository::is_platform_package(replace.get_target()) {
                     continue;
                 }
-                let mut replaced = BString::from(replace.get_pretty_constraint());
+                let mut replaced = BString::from(replace.get_pretty_constraint()?);
                 if replaced == "self.version" {
                     replaced = BString::from(&package.get_pretty_version()[..]);
                 }
@@ -576,7 +576,7 @@ impl FilesystemRepository {
                 if PlatformRepository::is_platform_package(provide.get_target()) {
                     continue;
                 }
-                let mut provided = BString::from(provide.get_pretty_constraint());
+                let mut provided = BString::from(provide.get_pretty_constraint()?);
                 if provided == "self.version" {
                     provided = BString::from(&package.get_pretty_version()[..]);
                 }

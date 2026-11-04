@@ -18,15 +18,15 @@ pub trait RootPackageInterface: CompletePackageInterface {
 
     fn get_config(&self) -> IndexMap<BString, PhpMixed>;
 
-    fn set_requires(&mut self, requires: IndexMap<BString, Link>);
+    fn set_requires(&mut self, requires: IndexMap<BString, Link>) -> anyhow::Result<()>;
 
-    fn set_dev_requires(&mut self, dev_requires: IndexMap<BString, Link>);
+    fn set_dev_requires(&mut self, dev_requires: IndexMap<BString, Link>) -> anyhow::Result<()>;
 
-    fn set_conflicts(&mut self, conflicts: IndexMap<BString, Link>);
+    fn set_conflicts(&mut self, conflicts: IndexMap<BString, Link>) -> anyhow::Result<()>;
 
-    fn set_provides(&mut self, provides: IndexMap<BString, Link>);
+    fn set_provides(&mut self, provides: IndexMap<BString, Link>) -> anyhow::Result<()>;
 
-    fn set_replaces(&mut self, replaces: IndexMap<BString, Link>);
+    fn set_replaces(&mut self, replaces: IndexMap<BString, Link>) -> anyhow::Result<()>;
 
     fn set_autoload(&mut self, autoload: IndexMap<BString, PhpMixed>);
 

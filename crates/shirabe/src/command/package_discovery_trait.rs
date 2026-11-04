@@ -762,7 +762,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             let platform_pkg = match platform_pkg {
                 None => {
                     if platform_repo.is_platform_package_disabled(link.get_target().as_bstr()) {
-                        details.push(bconcat!(candidate.get_pretty_name(), " ", candidate.get_pretty_version(), " requires ", link.get_target(), " ", link.get_pretty_constraint(), " but it is disabled by your platform config. Enable it again with \"shirabe config platform.", link.get_target(), " --unset\"."));
+                        details.push(bconcat!(candidate.get_pretty_name(), " ", candidate.get_pretty_version(), " requires ", link.get_target(), " ", link.get_pretty_constraint()?, " but it is disabled by your platform config. Enable it again with \"shirabe config platform.", link.get_target(), " --unset\"."));
                     } else {
                         details.push(bconcat!(
                             candidate.get_pretty_name(),
@@ -771,7 +771,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             " requires ",
                             link.get_target(),
                             " ",
-                            link.get_pretty_constraint(),
+                            link.get_pretty_constraint()?,
                             " but it is not present."
                         ));
                     }
@@ -812,7 +812,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     " requires ",
                     link.get_target(),
                     " ",
-                    link.get_pretty_constraint(),
+                    link.get_pretty_constraint()?,
                     " which does not match your installed version ",
                     platform_pkg_version,
                     "."

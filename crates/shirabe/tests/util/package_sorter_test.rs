@@ -24,7 +24,7 @@ fn create_package(name: &BStr, requires: &[&BStr]) -> PackageInterfaceHandle {
                 bconcat!(require_name),
                 MatchAllConstraint::new(None).into(),
                 None,
-                BString::from("*"),
+                Some(BString::from("*")),
             ),
         );
     }

@@ -57,7 +57,7 @@ fn link(source: &BStr, target: &BStr, description: &bstr::BStr) -> Link {
         bconcat!(target),
         get_version_constraint(">=", "1.0"),
         Some(description.to_owned()),
-        BString::from("^1.0"),
+        Some(BString::from("^1.0")),
     )
 }
 

@@ -55,7 +55,7 @@ impl VcsDownloaderBase {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-    ) -> Option<bstr::BString> {
+    ) -> anyhow::Result<Option<bstr::BString>> {
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
             self.config.clone(),
@@ -65,12 +65,12 @@ impl VcsDownloaderBase {
         );
         let dumper = ArrayDumper::new();
 
-        let package_config = dumper.dump(package);
+        let package_config = dumper.dump(package)?;
         if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
-            return package_version.commit;
+            return Ok(package_version.commit);
         }
 
-        None
+        Ok(None)
     }
 }
 
@@ -439,7 +439,7 @@ pub trait VcsDownloader:
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-    ) -> Option<bstr::BString> {
+    ) -> anyhow::Result<Option<bstr::BString>> {
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(
             self.config().clone(),
@@ -449,13 +449,13 @@ pub trait VcsDownloader:
         );
         let dumper = ArrayDumper::new();
 
-        let package_config = dumper.dump(package);
+        let package_config = dumper.dump(package)?;
         let mut guesser = guesser;
         if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
-            return package_version.commit;
+            return Ok(package_version.commit);
         }
 
-        None
+        Ok(None)
     }
 
     /// Prompt the user to check if changes should be stashed/removed or the operation aborted

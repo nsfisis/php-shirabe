@@ -221,8 +221,8 @@ impl RequireCommand {
                     section.shift_remove(package.as_bytes());
                 }
             }
-            root_package.set_requires(links[B("require")].clone());
-            root_package.set_dev_requires(links[B("require-dev")].clone());
+            root_package.set_requires(links[B("require")].clone())?;
+            root_package.set_dev_requires(links[B("require-dev")].clone())?;
 
             // extract stability flags & references as they weren't present when loading the unmodified composer.json
             let references =

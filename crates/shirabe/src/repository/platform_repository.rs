@@ -1525,7 +1525,7 @@ impl PlatformRepository {
                     "lib-uuid".into(),
                     SimpleConstraint::new("=", version, None).into(),
                     Some(Link::TYPE_REPLACE.into()),
-                    BString::from(ext.get_pretty_version()),
+                    Some(BString::from(ext.get_pretty_version())),
                 ),
             );
             ext.inner.set_replaces(replaces);
@@ -1590,7 +1590,7 @@ impl PlatformRepository {
                     bconcat!("lib-", replace_lower),
                     SimpleConstraint::new("=", BString::from(&version[..]), None).into(),
                     Some(Link::TYPE_REPLACE.to_owned()),
-                    bstr::BString::from(lib.get_pretty_version()),
+                    Some(bstr::BString::from(lib.get_pretty_version())),
                 ),
             );
         }
@@ -1604,7 +1604,7 @@ impl PlatformRepository {
                     bconcat!("lib-", provide_lower),
                     SimpleConstraint::new("=", BString::from(&version[..]), None).into(),
                     Some(Link::TYPE_PROVIDE.to_owned()),
-                    bstr::BString::from(lib.get_pretty_version()),
+                    Some(bstr::BString::from(lib.get_pretty_version())),
                 ),
             );
         }

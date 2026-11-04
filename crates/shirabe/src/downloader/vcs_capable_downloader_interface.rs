@@ -7,5 +7,5 @@ pub trait VcsCapableDownloaderInterface {
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
-    ) -> Option<bstr::BString>;
+    ) -> anyhow::Result<Option<bstr::BString>>;
 }

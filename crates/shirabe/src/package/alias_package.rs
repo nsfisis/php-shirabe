@@ -34,7 +34,11 @@ pub struct AliasPackage {
 
 impl AliasPackage {
     /// All descendants' constructors should call this parent constructor
-    pub fn new(alias_of: PackageHandle, version: BString, pretty_version: BString) -> Self {
+    pub fn new(
+        alias_of: PackageHandle,
+        version: BString,
+        pretty_version: BString,
+    ) -> anyhow::Result<Self> {
         let alias_name = alias_of.get_name();
 
         let stability = VersionParser::parse_stability(&version);
@@ -63,7 +67,7 @@ impl AliasPackage {
             let links: std::rc::Rc<IndexMap<BString, Link>> =
                 this.alias_of.get_links_for_type(r#type);
             let replaced =
-                std::rc::Rc::new(this.replace_self_version_dependencies((*links).clone(), r#type));
+                std::rc::Rc::new(this.replace_self_version_dependencies((*links).clone(), r#type)?);
             if r#type == Link::TYPE_REQUIRE {
                 this.requires = replaced;
             } else if r#type == Link::TYPE_DEV_REQUIRE {
@@ -79,7 +83,7 @@ impl AliasPackage {
             }
         }
 
-        this
+        Ok(this)
     }
 
     pub fn get_alias_of(&self) -> PackageHandle {
@@ -101,7 +105,7 @@ impl AliasPackage {
         &mut self,
         mut links: IndexMap<BString, Link>,
         link_type: &BStr,
-    ) -> IndexMap<BString, Link> {
+    ) -> anyhow::Result<IndexMap<BString, Link>> {
         // for self.version requirements, we use the original package's branch name instead, to avoid leaking the magic dev-master-alias to users
         let mut pretty_version = self.pretty_version.clone();
         if pretty_version == VersionParser::DEFAULT_BRANCH_ALIAS {
@@ -112,7 +116,7 @@ impl AliasPackage {
             let mut new_links: Vec<Link> = vec![];
             for link in links.values() {
                 // link is self.version, but must be replacing also the replaced version
-                if link.get_pretty_constraint() == "self.version" {
+                if link.get_pretty_constraint()? == "self.version" {
                     let constraint = SimpleConstraint::new(
                         "=",
                         self.version.clone(),
@@ -123,7 +127,7 @@ impl AliasPackage {
                         BString::from(link.get_target()),
                         constraint.into(),
                         Some(link_type.into()),
-                        pretty_version.clone(),
+                        Some(pretty_version.clone()),
                     );
                     new_links.push(new_link);
                 }
@@ -133,7 +137,7 @@ impl AliasPackage {
             }
         } else {
             for link in links.values_mut() {
-                if link.get_pretty_constraint() == "self.version" {
+                if link.get_pretty_constraint()? == "self.version" {
                     if link_type == Link::TYPE_REQUIRE {
                         self.has_self_version_requires = true;
                     }
@@ -147,13 +151,13 @@ impl AliasPackage {
                         BString::from(link.get_target()),
                         constraint.into(),
                         Some(link_type.into()),
-                        pretty_version.clone(),
+                        Some(pretty_version.clone()),
                     );
                 }
             }
         }
 
-        links
+        Ok(links)
     }
 
     pub fn has_self_version_requires(&self) -> bool {

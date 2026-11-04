@@ -273,7 +273,7 @@ fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::
         bconcat!(target),
         constraint,
         Some(r#type.to_owned()),
-        pretty,
+        Some(pretty),
     )
 }
 
@@ -305,7 +305,8 @@ fn provide_installer() -> Vec<InstallerCase> {
         )])
         .into_iter()
         .collect::<indexmap::IndexMap<_, _>>(),
-    );
+    )
+    .unwrap();
     let b = get_package("B", "1.0.0");
     b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
@@ -346,7 +347,8 @@ fn provide_installer() -> Vec<InstallerCase> {
         )])
         .into_iter()
         .collect::<indexmap::IndexMap<_, _>>(),
-    );
+    )
+    .unwrap();
     let b = get_package("B", "1.0.0");
     b.as_complete_package().unwrap().__set_requires(
         IndexMap::from([(
@@ -381,7 +383,10 @@ fn make_packages_comparable(
     packages: &[PackageInterfaceHandle],
 ) -> Vec<IndexMap<BString, PhpMixed>> {
     let dumper = ArrayDumper::new();
-    packages.iter().map(|p| dumper.dump(p.clone())).collect()
+    packages
+        .iter()
+        .map(|p| dumper.dump(p.clone()).unwrap())
+        .collect()
 }
 
 #[test]
@@ -1272,7 +1277,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
             .unwrap()
             .into_iter()
             .map(|package| {
-                let mut dumped = dumper.dump(package);
+                let mut dumped = dumper.dump(package).unwrap();
                 dumped.shift_remove(B("version_normalized"));
                 dumped
             })

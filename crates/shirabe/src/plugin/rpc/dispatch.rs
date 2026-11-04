@@ -285,11 +285,10 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             let alias_of = package_arg(0)?.as_package().ok_or_else(|| {
                 PhpThrow::runtime(bconcat!(class_name, " expects a real Package to alias"))
             })?;
-            AnyPackage::AliasPackage(crate::package::AliasPackage::new(
-                alias_of,
-                string_arg(1)?,
-                string_arg(2)?,
-            ))
+            AnyPackage::AliasPackage(
+                crate::package::AliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
+                    .map_err(|error| error_throw(b"AliasPackage construction failed", &error))?,
+            )
         }
         b"Composer\\Package\\CompleteAliasPackage" => {
             let alias_of = package_arg(0)?.as_complete_package().ok_or_else(|| {
@@ -298,21 +297,23 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                     " expects a real CompletePackage to alias"
                 ))
             })?;
-            AnyPackage::CompleteAliasPackage(crate::package::CompleteAliasPackage::new(
-                alias_of,
-                string_arg(1)?,
-                string_arg(2)?,
-            ))
+            AnyPackage::CompleteAliasPackage(
+                crate::package::CompleteAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
+                    .map_err(|error| {
+                        error_throw(b"CompleteAliasPackage construction failed", &error)
+                    })?,
+            )
         }
         b"Composer\\Package\\RootAliasPackage" => {
             let alias_of = package_arg(0)?.as_root_package().ok_or_else(|| {
                 PhpThrow::runtime(bconcat!(class_name, " expects a real RootPackage to alias"))
             })?;
-            AnyPackage::RootAliasPackage(crate::package::RootAliasPackage::new(
-                alias_of,
-                string_arg(1)?,
-                string_arg(2)?,
-            ))
+            AnyPackage::RootAliasPackage(
+                crate::package::RootAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
+                    .map_err(|error| {
+                        error_throw(b"RootAliasPackage construction failed", &error)
+                    })?,
+            )
         }
         // A solver operation carries no state beyond the packages it names, so a plugin-built
         // one is a complete instance rather than a second view on a Rust-side service.

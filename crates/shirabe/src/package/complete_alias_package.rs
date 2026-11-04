@@ -16,13 +16,17 @@ pub struct CompleteAliasPackage {
 }
 
 impl CompleteAliasPackage {
-    pub fn new(alias_of: CompletePackageHandle, version: BString, pretty_version: BString) -> Self {
+    pub fn new(
+        alias_of: CompletePackageHandle,
+        version: BString,
+        pretty_version: BString,
+    ) -> anyhow::Result<Self> {
         let inner = AliasPackage::new(
             PackageHandle::from(alias_of.clone()),
             version,
             pretty_version,
-        );
-        Self { inner, alias_of }
+        )?;
+        Ok(Self { inner, alias_of })
     }
 
     pub fn get_alias_of(&self) -> CompletePackageHandle {

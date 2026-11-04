@@ -385,7 +385,7 @@ impl CreateProjectCommand {
             );
             for (r#type, meta) in SUPPORTED_LINK_TYPES.iter() {
                 for link in package.get_links_for_type(meta.method).values() {
-                    if link.get_pretty_constraint() == "self.version" {
+                    if link.get_pretty_constraint()? == "self.version" {
                         config_source.add_link(
                             bstr::BStr::new(r#type),
                             link.get_target(),
