@@ -25,39 +25,39 @@ shirabe-symfony-filesystem = { path = "crates/shirabe-symfony-filesystem" }
 shirabe-symfony-finder = { path = "crates/shirabe-symfony-finder" }
 shirabe-symfony-process = { path = "crates/shirabe-symfony-process" }
 shirabe-symfony-string = { path = "crates/shirabe-symfony-string" }
-anyhow = "1.0.102"
-async-trait = "0.1.89"
+anyhow = "1.0.104"
+async-trait = "0.1.92"
 base64 = "0.22.1"
 bstr = "1.13.1"
 bzip2 = "0.6.1"
-chrono = { version = "0.4.44", features = ["serde"] }
+chrono = { version = "0.4.45", features = ["serde"] }
 criterion = { version = "0.8.2", features = ["async_tokio", "html_reports"] }
-fastrand = "2.4.1"
-flate2 = "1.1.9"
-futures = "0.3.32"
-indexmap = { version = "2.14.0", features = ["serde"] }
-jsonschema = { version = "0.46.6", default-features = false }
+fastrand = "2.5.0"
+flate2 = "1.1.10"
+futures = "0.3.34"
+indexmap = { version = "2.14.2", features = ["serde"] }
+jsonschema = { version = "0.46.10", default-features = false }
 md5 = "0.7.0"
 memchr = "2.8.3"
 mimalloc = "0.1.52"
 mockall = "0.14.0"
 nix = { version = "0.31.3", features = ["feature", "fs", "poll", "process", "sched", "signal", "user"] }
-regex = "1.12.3"
-reqwest = { version = "0.13.4", features = ["blocking", "brotli", "deflate", "gzip", "zstd"] }
-serde = { version = "1.0.228", features = ["derive", "rc"] }
-serde_json = { version = "1.0.149", features = ["preserve_order"] }
+regex = "1.13.1"
+reqwest = { version = "0.13.5", features = ["blocking", "brotli", "deflate", "gzip", "zstd"] }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
 serial_test = "3.5.0"
 sha1 = "0.11.0"
-sha2 = "0.11.0"
+sha2 = "0.11.1"
 tar = "0.4.46"
 tempfile = "3.27.0"
-tokio = { version = "1.52.3", features = ["full"] }
+tokio = { version = "1.54.1", features = ["full"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
-twox-hash = "2.1.2"
+twox-hash = "2.1.5"
 tzfile = "0.1.3"
 url = "2.5.8"
-zip = "9.2.1"
+zip = "9.3.0"
 
 [workspace.lints.rust]
 async_fn_in_trait = "allow"
