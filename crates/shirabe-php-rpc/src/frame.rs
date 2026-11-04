@@ -29,14 +29,12 @@ pub enum Frame {
         corr_id: u64,
         function_name: BString,
         args: Vec<PluginValue>,
-        out_param_positions: Vec<u32>,
     },
     CallStaticMethod {
         corr_id: u64,
         pclass: BString,
         method_name: BString,
         args: Vec<PluginValue>,
-        out_param_positions: Vec<u32>,
     },
     NewObject {
         corr_id: u64,
@@ -48,14 +46,12 @@ pub enum Frame {
         phandle: u64,
         method_name: BString,
         args: Vec<PluginValue>,
-        out_param_positions: Vec<u32>,
     },
     CallRustMethod {
         corr_id: u64,
         rhandle: u64,
         method_name: BString,
         args: Vec<PluginValue>,
-        out_param_positions: Vec<u32>,
     },
     Return {
         corr_id: u64,
@@ -117,24 +113,20 @@ impl Frame {
             Frame::CallFunction {
                 function_name,
                 args,
-                out_param_positions,
                 ..
             } => vec![
                 PluginValue::string(function_name.clone()),
                 PluginValue::List(args.clone()),
-                positions_value(out_param_positions),
             ],
             Frame::CallStaticMethod {
                 pclass,
                 method_name,
                 args,
-                out_param_positions,
                 ..
             } => vec![
                 PluginValue::string(pclass.clone()),
                 PluginValue::string(method_name.clone()),
                 PluginValue::List(args.clone()),
-                positions_value(out_param_positions),
             ],
             Frame::NewObject {
                 pclass, ctor_args, ..
@@ -146,25 +138,21 @@ impl Frame {
                 phandle,
                 method_name,
                 args,
-                out_param_positions,
                 ..
             } => vec![
                 int_value(*phandle),
                 PluginValue::String(method_name.clone()),
                 PluginValue::List(args.clone()),
-                positions_value(out_param_positions),
             ],
             Frame::CallRustMethod {
                 rhandle,
                 method_name,
                 args,
-                out_param_positions,
                 ..
             } => vec![
                 int_value(*rhandle),
                 PluginValue::string(method_name.clone()),
                 PluginValue::List(args.clone()),
-                positions_value(out_param_positions),
             ],
             Frame::Return {
                 value, out_params, ..
@@ -203,15 +191,6 @@ impl Frame {
 
 fn int_value(id: u64) -> PluginValue {
     PluginValue::Int(i64::try_from(id).expect("handle id exceeds i64"))
-}
-
-fn positions_value(positions: &[u32]) -> PluginValue {
-    PluginValue::List(
-        positions
-            .iter()
-            .map(|p| PluginValue::Int(i64::from(*p)))
-            .collect(),
-    )
 }
 
 pub fn write_frame(stream: &mut UnixStream, frame: &Frame) -> std::io::Result<()> {
@@ -271,14 +250,12 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             corr_id,
             function_name: expect_bytes(next()),
             args: expect_list(next()),
-            out_param_positions: expect_positions(next()),
         },
         TAG_CALL_STATIC_METHOD => Frame::CallStaticMethod {
             corr_id,
             pclass: expect_bytes(next()),
             method_name: expect_bytes(next()),
             args: expect_list(next()),
-            out_param_positions: expect_positions(next()),
         },
         TAG_NEW_OBJECT => Frame::NewObject {
             corr_id,
@@ -290,14 +267,12 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             phandle: expect_id(next()),
             method_name: expect_bytes(next()),
             args: expect_list(next()),
-            out_param_positions: expect_positions(next()),
         },
         TAG_CALL_RUST_METHOD => Frame::CallRustMethod {
             corr_id,
             rhandle: expect_id(next()),
             method_name: expect_bytes(next()),
             args: expect_list(next()),
-            out_param_positions: expect_positions(next()),
         },
         TAG_RETURN => Frame::Return {
             corr_id,
@@ -361,20 +336,6 @@ fn expect_id(value: PluginValue) -> u64 {
     }
 }
 
-fn expect_positions(value: PluginValue) -> Vec<u32> {
-    expect_list(value)
-        .into_iter()
-        .map(|item| match item {
-            PluginValue::Int(n) => u32::try_from(n).unwrap_or_else(|_| {
-                panic!("PHP RPC: protocol violation — out param position {n} out of range")
-            }),
-            other => {
-                panic!("PHP RPC: protocol violation — out param position is not an int: {other:?}")
-            }
-        })
-        .collect()
-}
-
 fn expect_properties(value: PluginValue) -> IndexMap<BString, PluginValue> {
     match value {
         PluginValue::List(items) if items.is_empty() => IndexMap::new(),
@@ -426,19 +387,16 @@ mod tests {
             corr_id: 7,
             function_name: "defined".into(),
             args: vec![PluginValue::string("PHP_VERSION")],
-            out_param_positions: vec![],
         });
         match frame {
             Frame::CallFunction {
                 corr_id,
                 function_name,
                 args,
-                out_param_positions,
             } => {
                 assert_eq!(corr_id, 7);
                 assert_eq!(function_name, "defined");
                 assert_eq!(args, vec![PluginValue::string("PHP_VERSION")]);
-                assert!(out_param_positions.is_empty());
             }
             other => panic!("unexpected frame: {other:?}"),
         }
@@ -451,7 +409,6 @@ mod tests {
             pclass: b"Caf\xe9".into(),
             method_name: b"m\xff".into(),
             args: vec![],
-            out_param_positions: vec![],
         });
         match frame {
             Frame::CallStaticMethod {

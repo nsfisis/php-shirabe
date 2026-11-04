@@ -743,18 +743,16 @@ impl std::error::Error for PhpThrow {}
 /// Handles `CallRustMethod` requests arriving while a Rust-initiated call is waiting for its
 /// `Return` (the cooperative reentrancy loop). A handler may itself issue nested RPC calls.
 ///
-/// `out_param_positions` names the by-ref parameters of the called method, as the calling stub
-/// declared them. A handler that assigns to one writes the resulting value into `out_params` under
-/// the same position, and the stub copies it back into the caller's variable; leaving a position
-/// out means the method never assigned to it, which is what PHP does with an untouched by-ref
-/// parameter.
+/// A handler whose method takes by-ref parameters writes the value each one holds afterwards into
+/// `out_params` under its position, and the stub copies it back into the caller's variable;
+/// leaving a position out means the method never assigned to it, which is what PHP does with an
+/// untouched by-ref parameter.
 pub trait RustMethodDispatcher {
     fn dispatch(
         &mut self,
         rhandle: u64,
         method_name: &BStr,
         args: Vec<PluginValue>,
-        out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow>;
 }
@@ -805,7 +803,6 @@ pub fn call_function_with_dispatcher(
             corr_id,
             function_name: name.as_ref().into(),
             args,
-            out_param_positions: Vec::new(),
         },
         dispatcher,
     )
@@ -824,7 +821,6 @@ pub fn call_static_method(
             pclass: class.as_ref().into(),
             method_name: method.as_ref().into(),
             args,
-            out_param_positions: Vec::new(),
         },
         dispatcher,
     )
@@ -861,7 +857,6 @@ pub fn call_php_method(
             phandle,
             method_name: method.as_ref().into(),
             args,
-            out_param_positions: Vec::new(),
         },
         dispatcher,
     )
@@ -899,7 +894,16 @@ fn rpc_call(
     loop {
         let incoming = recv_frame()?;
         match incoming {
-            Frame::Return { corr_id, value, .. } if corr_id == my_id => {
+            Frame::Return {
+                corr_id,
+                value,
+                out_params,
+            } if corr_id == my_id => {
+                assert!(
+                    out_params.is_empty(),
+                    "PHP RPC: protocol violation — the worker answered with out params: \
+                     {out_params:?}"
+                );
                 return Ok(Ok(value));
             }
             Frame::Throw {
@@ -927,17 +931,12 @@ fn rpc_call(
                 rhandle,
                 method_name,
                 args,
-                out_param_positions,
             } => {
                 let mut out_params = IndexMap::new();
                 let outcome = match dispatcher.as_deref_mut() {
-                    Some(dispatcher) => dispatcher.dispatch(
-                        rhandle,
-                        method_name.as_bstr(),
-                        args,
-                        &out_param_positions,
-                        &mut out_params,
-                    ),
+                    Some(dispatcher) => {
+                        dispatcher.dispatch(rhandle, method_name.as_bstr(), args, &mut out_params)
+                    }
                     // Never fall back to a silent null: an unroutable callback is reported as an
                     // explicit error on the PHP side.
                     None => Err(PhpThrow::runtime(bconcat!(
@@ -1485,7 +1484,6 @@ mod tests {
                 corr_id: 1,
                 function_name: "defined".into(),
                 args: vec![PluginValue::string("PHP_VERSION")],
-                out_param_positions: Vec::new(),
             },
         );
         frame::read_frame(&mut worker.stream).expect_err("reading from a dead worker should fail");
@@ -1514,7 +1512,6 @@ mod tests {
                 corr_id: 1,
                 function_name: "getenv".into(),
                 args: vec![PluginValue::string("XDEBUG_MODE")],
-                out_param_positions: Vec::new(),
             },
         )
         .expect("failed to ask the worker for its Xdebug mode");

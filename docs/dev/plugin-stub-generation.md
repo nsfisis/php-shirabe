@@ -97,10 +97,9 @@ installs both tools' dependencies and regenerates the report.
   is a `two-world` class the Rust side never hands out as an entity, so the stub
   answers with the worker-side Loop built over the proxied services
   (`docs/dev/plugin-async.md`). An entry no stub declares fails generation.
-* **By-ref parameters** are declared `&$name` on the stub as well. The call
-  carries their positions, and the answer carries the value each of them holds
-  afterwards, which the stub assigns back (see "By-ref parameters" in
-  `docs/dev/php-rpc.md`). A position the answer omits is left alone, so a
+* **By-ref parameters** are declared `&$name` on the stub as well. The answer
+  carries the value each of them holds afterwards, which the stub assigns back
+  (see "By-ref parameters" in `docs/dev/php-rpc.md`). A position the answer omits is left alone, so a
   parameter the callee never assigned to keeps the value it had.
 * **Arity** is reproduced when — and only when — the real method body calls
   `func_num_args()`, in which case the stub trims the argument list to what the

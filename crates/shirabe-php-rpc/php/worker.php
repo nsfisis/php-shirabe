@@ -460,18 +460,16 @@ final class ShirabeRpcRuntime
     /**
      * Sends a CallRustMethod request and drives the cooperative loop until its Return.
      *
-     * `$outParamPositions` names the by-ref parameters of the called method; the Rust side
-     * answers with the value each of them holds afterwards, and the caller (a generated stub)
-     * assigns those back to its own by-ref parameters.
+     * For a method with by-ref parameters, the Rust side answers with the value each of them
+     * holds afterwards, keyed by position, and the caller (a generated stub) assigns those back
+     * to its own by-ref parameters.
      *
-     * @param list<int>  $outParamPositions
      * @param array<int, mixed>|null $outParams
      */
     public static function callRust(
         int $rhandle,
         string $method,
         array $args,
-        array $outParamPositions = [],
         ?array &$outParams = null
     ) {
         $corrId = self::$nextCorrId;
@@ -479,7 +477,7 @@ final class ShirabeRpcRuntime
         self::writeFrame(
             SHIRABE_TAG_CALL_RUST_METHOD,
             $corrId,
-            serialize([$rhandle, $method, self::toWire($args), $outParamPositions])
+            serialize([$rhandle, $method, self::toWire($args)])
         );
         while (true) {
             $frame = self::readFrame();

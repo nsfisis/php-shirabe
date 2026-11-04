@@ -1681,7 +1681,6 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
         rhandle: u64,
         method_name: &BStr,
         args: Vec<PluginValue>,
-        _out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
         let method_name = method_name.to_owned();

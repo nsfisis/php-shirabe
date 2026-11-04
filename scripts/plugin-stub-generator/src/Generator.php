@@ -714,7 +714,7 @@ final class Generator
             return implode("\n", $lines);
         }
 
-        $tail = ', [' . implode(', ', $outPositions) . '], $__out';
+        $tail = ', $__out';
         $call = sprintf($callTemplate, $argsExpr, $tail);
         $lines[] = '        $__out = [];';
         $lines[] = $returnType === 'void' ? "        $call;" : "        \$__result = $call;";

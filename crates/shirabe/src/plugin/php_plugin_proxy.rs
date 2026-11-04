@@ -349,7 +349,6 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
         rhandle: u64,
         method_name: &BStr,
         args: Vec<PluginValue>,
-        _out_param_positions: &[u32],
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
         if rhandle == 0 {
@@ -1699,7 +1698,7 @@ fn dispatch_process_executor_method(
                 .execute(command, &mut captured, cwd.as_deref())
                 .map_err(failed)?;
             // PHP leaves `$output` alone when the child was signaled before the assignment, which
-            // is what an absent out-param position reproduces.
+            // is what leaving it out of the out-params reproduces.
             if let Some(captured) = captured {
                 out_params.insert(1, PluginValue::string(captured));
             }
@@ -5085,7 +5084,7 @@ mod tests {
     fn a_method_name_that_is_not_utf8_reaches_the_error_unchanged() {
         let name = b"method\xff";
         let throw = PluginRpcDispatcher::default()
-            .dispatch(0, BStr::new(name), Vec::new(), &[], &mut IndexMap::new())
+            .dispatch(0, BStr::new(name), Vec::new(), &mut IndexMap::new())
             .unwrap_err();
         assert_eq!(
             BStr::new(b"unknown runtime service method `method\xff`"),

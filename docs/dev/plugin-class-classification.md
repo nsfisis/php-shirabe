@@ -199,8 +199,8 @@ mutators.
 
 #### by-ref parameters
 
-Positions of `&$param` in public methods (the protocol's out-parameter
-positions).
+Positions of `&$param` in public methods (the positions the protocol's
+out-params are keyed by).
 
 #### callable parameters
 

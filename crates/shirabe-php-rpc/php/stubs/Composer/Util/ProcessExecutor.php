@@ -113,7 +113,7 @@ class ProcessExecutor implements \ShirabeRustStub
         $__args = [$command, $output, $cwd];
         array_splice($__args, func_num_args());
         $__out = [];
-        $__result = \ShirabeRpcRuntime::callRust($this->__rhandle, 'execute', $__args, [1], $__out);
+        $__result = \ShirabeRpcRuntime::callRust($this->__rhandle, 'execute', $__args, $__out);
         if (array_key_exists(1, $__out)) {
             $output = $__out[1];
         }

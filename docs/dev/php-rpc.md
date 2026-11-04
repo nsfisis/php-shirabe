@@ -46,11 +46,11 @@ frame is a fatal channel error, not an allocation attempt.
 
 | tag | name | direction | payload fields |
 |---|---|---|---|
-| `0x00` | `CallFunction` | Rust→PHP | `function_name`, `args`, `out_param_positions` |
-| `0x01` | `CallStaticMethod` | Rust→PHP | `pclass`, `method_name`, `args`, `out_param_positions` |
+| `0x00` | `CallFunction` | Rust→PHP | `function_name`, `args` |
+| `0x01` | `CallStaticMethod` | Rust→PHP | `pclass`, `method_name`, `args` |
 | `0x02` | `NewObject` | Rust→PHP | `pclass`, `ctor_args` |
-| `0x03` | `CallPhpMethod` | Rust→PHP | `phandle`, `method_name`, `args`, `out_param_positions` |
-| `0x04` | `CallRustMethod` | PHP→Rust | `rhandle`, `method_name`, `args`, `out_param_positions` |
+| `0x03` | `CallPhpMethod` | Rust→PHP | `phandle`, `method_name`, `args` |
+| `0x04` | `CallRustMethod` | PHP→Rust | `rhandle`, `method_name`, `args` |
 | `0x05` | `Return` | both | `value`, `out_params` |
 | `0x06` | `Throw` | both | `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
 | `0x07` | `ReleaseRustHandle` | PHP→Rust | `rhandle` |
@@ -157,11 +157,12 @@ catalogue lives in [docs/dev/php-worker.md](./php-worker.md).
 
 ### By-ref parameters
 
-`out_param_positions` names the by-ref parameters of the called method, as the caller declared
-them; the answering `Return` carries `out_params`, a map from the same positions to the value
-each parameter holds afterwards, and the caller assigns those back into its own variables. A
-position the answer leaves out was never assigned to, which is what PHP does with an untouched
-by-ref parameter — so an out-param is genuinely optional rather than defaulting to null.
+The `Return` answering a `CallRustMethod` carries `out_params`, a map from the positions of the
+called method's by-ref parameters to the value each one holds afterwards, and the calling stub
+assigns those back into its own variables. A position the answer leaves out was never assigned
+to, which is what PHP does with an untouched by-ref parameter — so an out-param is genuinely
+optional rather than defaulting to null. The worker's `Return` always carries an empty
+`out_params`.
 
 ## Jobs
 
@@ -198,6 +199,4 @@ so only the two processes holding its descriptors can reach it.
 
 ## Out of scope (deferred)
 
-By-ref parameters on Rust-initiated calls (`call_function`/`call_static_method`/`call_php_method`
-always send an empty `out_param_positions` and ignore the answer's `out_params`), the `previous`
-of an exception crossing in either direction, and Windows support.
+The `previous` of an exception crossing in either direction, and Windows support.
