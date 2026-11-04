@@ -193,7 +193,8 @@ fn private_key(declaring_class: &[u8], name: &[u8]) -> BString {
 
 /// The value model of the plugin RPC boundary: PHP scalars, arrays, object records, and handle
 /// descriptors. An array decodes as `List` when its keys are exactly `0..N` and as `Array`
-/// otherwise.
+/// otherwise. A descriptor crosses as the object record of a class reserved for it (see
+/// `RUST_HANDLE_CLASS` and its siblings), so no array is ever read as one.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PluginValue {
     Null,
@@ -221,11 +222,12 @@ impl PluginValue {
 /// hostile payload cannot overflow the stack.
 pub const MAX_DECODE_DEPTH: usize = 512;
 
-const RUST_HANDLE_KEY: &[u8] = b"__rhandle";
-const CLASS_KEY: &[u8] = b"__class";
-const PHP_HANDLE_KEY: &[u8] = b"__phandle";
-const IMPLEMENTS_KEY: &[u8] = b"__implements";
-const JOB_KEY: &[u8] = b"__job";
+/// The descriptor classes, declared in the worker's `php/runtime/Shirabe/Wire/`. The worker never
+/// writes an object of its own as one of these records (it crosses as a `PhpHandle` like any other
+/// object), so a record of one of these classes is always a descriptor.
+const RUST_HANDLE_CLASS: &[u8] = b"Shirabe\\Wire\\RustHandle";
+const PHP_HANDLE_CLASS: &[u8] = b"Shirabe\\Wire\\PhpHandle";
+const JOB_CLASS: &[u8] = b"Shirabe\\Wire\\Job";
 
 /// Encodes a `PluginValue` in PHP `serialize()` grammar, byte-compatible with what the PHP core
 /// implementation produces under `serialize_precision=-1`.
@@ -269,40 +271,25 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
             out.push(b'}');
         }
         PluginValue::Array(map) => serialize_map(map, out),
-        PluginValue::PhpObject(object) => {
-            out.extend_from_slice(b"O:");
-            out.extend_from_slice(&bconcat!(object.class.len()));
-            out.extend_from_slice(b":\"");
-            out.extend_from_slice(&object.class);
-            out.extend_from_slice(b"\":");
-            out.extend_from_slice(&bconcat!(object.props.len()));
-            out.extend_from_slice(b":{");
-            for (name, value) in &object.props {
-                // A property name is always written as a string, even a numeric one, and never
-                // as the int key an array of the same shape would get.
-                serialize_bytes(name, out);
-                serialize_into(value, out);
-            }
-            out.push(b'}');
-        }
+        PluginValue::PhpObject(object) => serialize_object(object, out),
         PluginValue::RustHandle(handle) => {
-            let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
-            map.insert(
-                RUST_HANDLE_KEY.into(),
+            let mut record = PhpObject::new(RUST_HANDLE_CLASS);
+            record.set_public(
+                "rhandle",
                 PluginValue::Int(i64::try_from(handle.rhandle).expect("rhandle exceeds i64")),
             );
-            map.insert(CLASS_KEY.into(), PluginValue::string(handle.class.clone()));
-            serialize_map(&map, out);
+            record.set_public("class", PluginValue::string(handle.class.clone()));
+            serialize_object(&record, out);
         }
         PluginValue::PhpHandle(handle) => {
-            let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
-            map.insert(
-                PHP_HANDLE_KEY.into(),
+            let mut record = PhpObject::new(PHP_HANDLE_CLASS);
+            record.set_public(
+                "phandle",
                 PluginValue::Int(i64::try_from(handle.phandle()).expect("phandle exceeds i64")),
             );
-            map.insert(CLASS_KEY.into(), PluginValue::string(handle.class()));
-            map.insert(
-                IMPLEMENTS_KEY.into(),
+            record.set_public("class", PluginValue::string(handle.class()));
+            record.set_public(
+                "implements",
                 PluginValue::List(
                     handle
                         .implements()
@@ -311,14 +298,34 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
                         .collect(),
                 ),
             );
-            serialize_map(&map, out);
+            serialize_object(&record, out);
         }
         PluginValue::Job(id) => {
-            let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
-            map.insert(JOB_KEY.into(), PluginValue::Int(*id as i64));
-            serialize_map(&map, out);
+            let mut record = PhpObject::new(JOB_CLASS);
+            record.set_public(
+                "id",
+                PluginValue::Int(i64::try_from(*id).expect("job id exceeds i64")),
+            );
+            serialize_object(&record, out);
         }
     }
+}
+
+fn serialize_object(object: &PhpObject, out: &mut Vec<u8>) {
+    out.extend_from_slice(b"O:");
+    out.extend_from_slice(&bconcat!(object.class.len()));
+    out.extend_from_slice(b":\"");
+    out.extend_from_slice(&object.class);
+    out.extend_from_slice(b"\":");
+    out.extend_from_slice(&bconcat!(object.props.len()));
+    out.extend_from_slice(b":{");
+    for (name, value) in &object.props {
+        // A property name is always written as a string, even a numeric one, and never as the
+        // int key an array of the same shape would get.
+        serialize_bytes(name, out);
+        serialize_into(value, out);
+    }
+    out.push(b'}');
 }
 
 fn serialize_bytes(bytes: &[u8], out: &mut Vec<u8>) {
@@ -365,9 +372,9 @@ fn canonical_int_key(key: &[u8]) -> Option<i64> {
 
 /// Decodes a whole `serialize()` payload into a `PluginValue`, rejecting trailing garbage.
 ///
-/// Arrays whose keys are exactly `0..N` decode as `List`; anything else decodes as `Array`.
-/// Arrays carrying the reserved handle-descriptor key sets decode as the
-/// corresponding handle, and an `O:` record decodes as `PhpObject`.
+/// Arrays whose keys are exactly `0..N` decode as `List`; anything else decodes as `Array`. An
+/// `O:` record of a descriptor class decodes as the handle or job it describes, and any other
+/// `O:` record as `PhpObject`.
 pub fn unserialize(payload: &[u8]) -> anyhow::Result<PluginValue> {
     let mut pos = 0;
     let value = parse_value(payload, &mut pos)?;
@@ -440,8 +447,9 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
                 *pos += 1;
                 let frame = stack.pop().expect("frame was just observed");
                 let number = frame.number;
+                let is_object = frame.class.is_some();
                 let value = finish_frame(frame)?;
-                if matches!(value, PluginValue::PhpObject(_)) {
+                if is_object {
                     numbered_objects.insert(number, value.clone());
                 }
                 completed = Some(value);
@@ -571,13 +579,7 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
 
 fn finish_frame(frame: Frame) -> anyhow::Result<PluginValue> {
     if let Some(class) = frame.class {
-        return Ok(PluginValue::PhpObject(PhpObject {
-            class,
-            props: frame.entries,
-        }));
-    }
-    if let Some(handle) = decode_handle(&frame.entries)? {
-        return Ok(handle);
+        return decode_object(class, frame.entries);
     }
     Ok(if frame.is_list {
         PluginValue::List(frame.entries.into_values().collect())
@@ -632,89 +634,67 @@ fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Resu
     Ok(bytes.into())
 }
 
-/// Recognizes the reserved handle-descriptor arrays by their exact key sets.
-///
-/// TODO(type-model): a descriptor travels in-band as a plain array, so its exact key set is the
-/// only thing separating it from plugin data of the same shape. An array that carries a reserved
-/// key without matching a descriptor's whole key set is user data and should decode as an array;
-/// it is a decode error here instead, and that is the fatal lane, so a plugin passing
-/// `['__rhandle' => 1]` to a proxied method takes the channel down with it. The PHP half
-/// (`fromWire` in `php/worker.php`) diverges the other way, matching on the reserved key alone.
-fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Option<PluginValue>> {
-    let get = |key: &[u8]| entries.get(key);
-
-    if entries.len() == 1 {
-        if let Some(value) = get(JOB_KEY) {
-            let PluginValue::Int(id) = value else {
-                bail!("__job descriptor with a non-int id: {value:?}");
+/// Decodes an `O:` record: a descriptor class into the handle or job it describes, and any other
+/// class into a `PhpObject`.
+fn decode_object(
+    class: BString,
+    props: IndexMap<BString, PluginValue>,
+) -> anyhow::Result<PluginValue> {
+    let expect_props = |names: &[&[u8]]| -> anyhow::Result<()> {
+        if props.len() != names.len() || !names.iter().all(|name| props.contains_key(*name)) {
+            bail!("malformed {class:?} record: {props:?}");
+        }
+        Ok(())
+    };
+    match class.as_slice() {
+        RUST_HANDLE_CLASS => {
+            expect_props(&[b"rhandle", b"class"])?;
+            Ok(PluginValue::RustHandle(RustObjHandle {
+                rhandle: descriptor_id(&props[b"rhandle".as_slice()], &class)?,
+                class: descriptor_class(&props[b"class".as_slice()], &class)?,
+            }))
+        }
+        PHP_HANDLE_CLASS => {
+            expect_props(&[b"phandle", b"class", b"implements"])?;
+            let implements = match &props[b"implements".as_slice()] {
+                PluginValue::List(items) => items
+                    .iter()
+                    .map(|item| match item {
+                        PluginValue::String(name) => Ok(name.clone()),
+                        other => bail!("{class:?} implements a non-string: {other:?}"),
+                    })
+                    .collect::<anyhow::Result<_>>()?,
+                other => bail!("{class:?} implements is not a list: {other:?}"),
             };
-            return Ok(Some(PluginValue::Job(*id as u64)));
+            Ok(PluginValue::PhpHandle(PhpObjHandle::intern(
+                descriptor_id(&props[b"phandle".as_slice()], &class)?,
+                descriptor_class(&props[b"class".as_slice()], &class)?,
+                implements,
+            )))
         }
-        return Ok(None);
-    }
-
-    if let Some(value) = get(RUST_HANDLE_KEY) {
-        let allowed = entries
-            .keys()
-            .all(|k| k == RUST_HANDLE_KEY || k == CLASS_KEY);
-        if !allowed || entries.len() != 2 {
-            bail!("malformed __rhandle descriptor: {entries:?}");
+        JOB_CLASS => {
+            expect_props(&[b"id"])?;
+            Ok(PluginValue::Job(descriptor_id(
+                &props[b"id".as_slice()],
+                &class,
+            )?))
         }
-        let rhandle = descriptor_u64(value, "__rhandle")?;
-        let class = descriptor_class(get(CLASS_KEY), "__rhandle")?;
-        return Ok(Some(PluginValue::RustHandle(RustObjHandle {
-            rhandle,
-            class,
-        })));
+        _ => Ok(PluginValue::PhpObject(PhpObject { class, props })),
     }
-
-    if let Some(value) = get(PHP_HANDLE_KEY) {
-        let allowed = entries
-            .keys()
-            .all(|k| k == PHP_HANDLE_KEY || k == CLASS_KEY || k == IMPLEMENTS_KEY);
-        if !allowed || entries.len() != 3 {
-            bail!("malformed __phandle descriptor: {entries:?}");
-        }
-        let phandle = descriptor_u64(value, "__phandle")?;
-        let class = descriptor_class(get(CLASS_KEY), "__phandle")?;
-        let implements = match get(IMPLEMENTS_KEY) {
-            Some(PluginValue::List(items)) => items
-                .iter()
-                .map(|item| match item {
-                    PluginValue::String(name) => Ok(name.clone()),
-                    other => bail!("__implements entry is not a string: {other:?}"),
-                })
-                .collect::<anyhow::Result<_>>()?,
-            other => bail!("__implements is not a list: {other:?}"),
-        };
-        return Ok(Some(PluginValue::PhpHandle(PhpObjHandle::intern(
-            phandle, class, implements,
-        ))));
-    }
-
-    Ok(None)
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "core::fmt: names a descriptor in a protocol error"
-)]
-fn descriptor_u64(value: &PluginValue, what: &str) -> anyhow::Result<u64> {
+fn descriptor_id(value: &PluginValue, record: &BString) -> anyhow::Result<u64> {
     match value {
         PluginValue::Int(n) => u64::try_from(*n)
-            .map_err(|_| anyhow::anyhow!("{what} descriptor holds a negative id: {n}")),
-        other => bail!("{what} descriptor id is not an int: {other:?}"),
+            .map_err(|_| anyhow::anyhow!("{record:?} record holds a negative id: {n}")),
+        other => bail!("{record:?} record id is not an int: {other:?}"),
     }
 }
 
-#[expect(
-    clippy::disallowed_types,
-    reason = "core::fmt: names a descriptor in a protocol error"
-)]
-fn descriptor_class(value: Option<&PluginValue>, what: &str) -> anyhow::Result<BString> {
+fn descriptor_class(value: &PluginValue, record: &BString) -> anyhow::Result<BString> {
     match value {
-        Some(PluginValue::String(class)) => Ok(class.clone()),
-        other => bail!("{what} descriptor lacks a string __class: {other:?}"),
+        PluginValue::String(class) => Ok(class.clone()),
+        other => bail!("{record:?} record class is not a string: {other:?}"),
     }
 }
 
@@ -932,6 +912,29 @@ mod tests {
         }));
         roundtrip_php_handle(9, b"MyPlugin", &[b"Composer\\Plugin\\PluginInterface"]);
         roundtrip(PluginValue::Job(7));
+    }
+
+    #[test]
+    fn decodes_arrays_shaped_like_descriptors_as_data() {
+        let mut map = IndexMap::new();
+        map.insert(BString::from("__rhandle"), PluginValue::Int(1));
+        map.insert(
+            BString::from("__class"),
+            PluginValue::string("Composer\\Script\\Event"),
+        );
+        roundtrip(PluginValue::Array(map));
+        let mut map = IndexMap::new();
+        map.insert(BString::from("__job"), PluginValue::Int(7));
+        roundtrip(PluginValue::Array(map));
+    }
+
+    #[test]
+    fn rejects_malformed_descriptor_records() {
+        assert!(unserialize(b"O:16:\"Shirabe\\Wire\\Job\":0:{}").is_err());
+        assert!(
+            unserialize(b"O:16:\"Shirabe\\Wire\\Job\":2:{s:2:\"id\";i:7;s:1:\"x\";N;}").is_err()
+        );
+        assert!(unserialize(b"O:16:\"Shirabe\\Wire\\Job\":1:{s:2:\"id\";s:1:\"7\";}").is_err());
     }
 
     #[test]

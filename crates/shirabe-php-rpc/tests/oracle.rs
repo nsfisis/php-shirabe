@@ -9,7 +9,9 @@
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::value::{serialize, unserialize};
-use shirabe_php_rpc::{PhpObject, PhpThrow, PluginValue, RustMethodDispatcher, call_function};
+use shirabe_php_rpc::{
+    PhpObject, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
+};
 use shirabe_symfony_process::PhpExecutableFinder;
 
 /// The snippets these tests run never call back into Rust.
@@ -219,6 +221,46 @@ fn decode_direction_matches_php_for_object_records() {
         };
         let decoded = unserialize(&php_bytes)
             .unwrap_or_else(|e| panic!("failed to decode PHP output for `{snippet}`: {e:#}"));
+        assert_eq!(
+            bstr::BStr::new(&serialize(&decoded)),
+            bstr::BStr::new(&php_bytes),
+            "re-encoding diverged for `{snippet}`"
+        );
+    }
+}
+
+/// A descriptor is the record of a class the worker declares, so its bytes are whatever PHP writes
+/// for an instance of that class.
+#[test]
+fn descriptor_records_match_php_in_both_directions() {
+    if !php_available() {
+        return;
+    }
+
+    assert_php_agrees(&PluginValue::RustHandle(RustObjHandle {
+        rhandle: 3,
+        class: "Composer\\Script\\Event".into(),
+    }));
+    assert_php_agrees(&PluginValue::Job(7));
+
+    let snippets = [
+        r#"return serialize(new \Shirabe\Wire\RustHandle(3, 'Composer\Script\Event'));"#,
+        r#"return serialize(new \Shirabe\Wire\PhpHandle(1000003, 'MyPlugin', ['Composer\Plugin\PluginInterface']));"#,
+        r#"return serialize(new \Shirabe\Wire\Job(8));"#,
+    ];
+    for snippet in snippets {
+        let PluginValue::String(php_bytes) = php_eval(snippet) else {
+            panic!("snippet did not return a string: {snippet}");
+        };
+        let decoded = unserialize(&php_bytes)
+            .unwrap_or_else(|e| panic!("failed to decode PHP output for `{snippet}`: {e:#}"));
+        assert!(
+            matches!(
+                decoded,
+                PluginValue::RustHandle(_) | PluginValue::PhpHandle(_) | PluginValue::Job(_)
+            ),
+            "`{snippet}` decoded as {decoded:?}"
+        );
         assert_eq!(
             bstr::BStr::new(&serialize(&decoded)),
             bstr::BStr::new(&php_bytes),

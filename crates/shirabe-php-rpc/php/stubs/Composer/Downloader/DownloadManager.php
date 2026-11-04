@@ -29,12 +29,9 @@ class DownloadManager implements \ShirabeRustStub
         \ShirabeRustObjectRegistry::release($this->__rhandle);
     }
 
-    public function __shirabeRustHandleDescriptor(): array
+    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
     {
-        return [
-            '__rhandle' => $this->__rhandle,
-            '__class' => static::class,
-        ];
+        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
     }
 
     public function __clone()

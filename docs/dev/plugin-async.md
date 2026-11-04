@@ -63,13 +63,13 @@ The additions to [docs/dev/php-rpc.md](./php-rpc.md) are small, deliberately. Th
 
 ### A third descriptor kind
 
-Alongside `{__rhandle, …}` and `{__phandle, …}`, a job travels as a reserved single-key array.
+Alongside `RustHandle` and `PhpHandle`, a job travels as the record of its own reserved class.
 
 ```
-{__job: <int>}
+Shirabe\Wire\Job {id: <int>}
 ```
 
-Ownership is encoded in the parity of the id, as it already is for correlation ids. **Rust allocates odd job ids, the worker even ones.** An even id names either a PHP-owned job or a settled promise the worker built for `__shirabe_resolved_promise` / `__shirabe_rejected_promise` and is holding until the id comes back. The worker's `fromWire` creates and interns a `Deferred` for an id it has not seen, so one id always resolves to the same promise object. The intern table holds the `Deferred` strongly, and the entry is removed when the settle push arrives. A `Deferred` outlives the plugin dropping its promise, until the job settles, just as Composer's `$this->jobs[$id]['resolve']` keeps hold of the promise's internals. The worker's `toWire` maps a `React\Promise\PromiseInterface` to an even id and registers the settle recorder on it. Rust's `decode_handle` matches on the whole key set, as it does for the other three kinds.
+Ownership is encoded in the parity of the id, as it already is for correlation ids. **Rust allocates odd job ids, the worker even ones.** An even id names either a PHP-owned job or a settled promise the worker built for `__shirabe_resolved_promise` / `__shirabe_rejected_promise` and is holding until the id comes back. The worker's `fromWire` creates and interns a `Deferred` for an id it has not seen, so one id always resolves to the same promise object. The intern table holds the `Deferred` strongly, and the entry is removed when the settle push arrives. A `Deferred` outlives the plugin dropping its promise, until the job settles, just as Composer's `$this->jobs[$id]['resolve']` keeps hold of the promise's internals. The worker's `toWire` maps a `React\Promise\PromiseInterface` to an even id and registers the settle recorder on it.
 
 ### Worker functions (Rust → PHP)
 
@@ -77,7 +77,7 @@ Ownership is encoded in the parity of the id, as it already is for correlation i
 |---|---|
 | `__shirabe_resolve_job` | `(id, value)` — resolves the `Deferred` of a Rust-owned job. Runs the plugin's callbacks synchronously. |
 | `__shirabe_reject_job` | `(id, exception)` — the failure half. `exception` is the description a `Throw` frame carries; `\Shirabe\MaterializedThrowable` builds the exception from it and rejects the `Deferred`. |
-| `__shirabe_resolved_promise` | `(value)` — the fast path for a Rust method that must answer with `PromiseInterface` and has the value before building a future. There is no job to register. A promise is never an entity, so this cannot hand the promise itself back: the worker parks it under an even id and answers with `{__job}`, and the Rust method passes that descriptor on as its own answer, where `fromWire` exchanges it for the parked promise. |
+| `__shirabe_resolved_promise` | `(value)` — the fast path for a Rust method that must answer with `PromiseInterface` and has the value before building a future. There is no job to register. A promise is never an entity, so this cannot hand the promise itself back: the worker parks it under an even id, `toWire` answers with that id instead of registering a job, and the Rust method passes the descriptor on as its own answer, where `fromWire` exchanges it for the parked promise. |
 | `__shirabe_rejected_promise` | `(exception)` — the failure half. |
 
 ### Runtime service methods (PHP → Rust, handle 0)
@@ -119,7 +119,7 @@ A job needs an entity to be counted against because Composer's `Loop::wait()` te
 
 ### HttpDownloader
 
-The shape does not change. What changes is when the future runs. `add()` and `addCopy()` build the future, register it, and answer with `{__job}`. The synchronous gates stay where PHP has them, *before* a promise exists: the empty-URL gate and the `enableAsync()` gate still throw out of the call, and only a failed request becomes a rejection. `wait(?int $index)` and `countActiveJobs(?int $index)` acquire their real meaning. Composer's `$index` is the job id, so the registry id serves directly as the index these two take.
+The shape does not change. What changes is when the future runs. `add()` and `addCopy()` build the future, register it, and answer with its `Job` descriptor. The synchronous gates stay where PHP has them, *before* a promise exists: the empty-URL gate and the `enableAsync()` gate still throw out of the call, and only a failed request becomes a rejection. `wait(?int $index)` and `countActiveJobs(?int $index)` acquire their real meaning. Composer's `$index` is the job id, so the registry id serves directly as the index these two take.
 
 The per-downloader job budget (`COMPOSER_MAX_PARALLEL_HTTP`, 12 by default) is a semaphore the Rust-side downloader already holds. It already limits concurrency on the Rust-internal path. Under the job model, requests a plugin starts queue against the same budget for the first time.
 
@@ -175,7 +175,7 @@ Some things are out of scope here: an event loop in the worker, promises crossin
 Stages 1 to 4 exist. Of stage 5, the bridges on the install path are gone; the ones listed in `util/sync_executor.rs` remain.
 
 1. **Make `Loop` and `SyncHelper` `two-world`.** `Composer::getLoop()` serves a memoized worker-side sibling, `abortJobs()` is forwarded, and the progress bar is unblocked.
-2. **The job registry.** The `{__job}` descriptor, `__shirabe_resolve_job` / `__shirabe_reject_job` / `__shirabeCancelJob` / `__shirabeAbortJobs`, a registry with the slot table, the counted-against entity and the bookkeeping entries, the four async methods of `HttpDownloader` on top of it, the six `DownloadManager` methods and `Filesystem::removeDirectoryAsync()` turned into jobs, and the guarded tick in the Rust-side `Loop::wait()`. The registry is `crates/shirabe/src/plugin/job_registry.rs`.
+2. **The job registry.** The `Job` descriptor, `__shirabe_resolve_job` / `__shirabe_reject_job` / `__shirabeCancelJob` / `__shirabeAbortJobs`, a registry with the slot table, the counted-against entity and the bookkeeping entries, the four async methods of `HttpDownloader` on top of it, the six `DownloadManager` methods and `Filesystem::removeDirectoryAsync()` turned into jobs, and the guarded tick in the Rust-side `Loop::wait()`. The registry is `crates/shirabe/src/plugin/job_registry.rs`.
 3. **`Shirabe\RustProcessStub`**, with `ProcessExecutor::executeAsync()`, `wait()` and `countActiveJobs()`.
 4. **PHP-owned jobs.** `__shirabeResolveJob` / `__shirabeRejectJob` and the deadlock check in the Rust-side `Loop::wait()`. The promises a plugin-provided `InstallerInterface` returns are awaited this way.
 5. Independently of all of the above: remove the internal `block_on` bridges. The jobs that wrap ported code overlap once the code they wrap stops blocking.

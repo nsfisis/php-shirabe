@@ -73,7 +73,7 @@ Notable internal helpers:
   description of the kind a `Throw` frame carries stands for.
 - `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, for a Rust method
   whose PHP signature declares `PromiseInterface` and that has the value before any job exists.
-  The worker holds the promise under an even job id and answers with its `{__job}` descriptor,
+  The worker holds the promise under an even job id and answers with its `Job` descriptor,
   which the Rust method passes on as its own answer.
 - `__shirabe_rejected_promise` — the failure half of the same: `\React\Promise\reject()` over
   the exception such a description stands for, so a failed request reaches the caller
@@ -171,8 +171,10 @@ that belongs to a proxied class.
   as a `RuntimeException` when the child does not know the class, and describes an exception
   raised in the child.
 - `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: the closed list of
-  classes `unserialize()` may revive, and the hook that hands such an instance to `serialize()`
-  in place of a handle descriptor.
+  classes `unserialize()` may revive beside the descriptor classes, and the hook that hands such
+  an instance to `serialize()` in place of a handle descriptor.
+- `Shirabe\Wire\RustHandle`, `Shirabe\Wire\PhpHandle` and `Shirabe\Wire\Job` — the descriptor
+  records (see "Values" in [docs/dev/php-rpc.md](./php-rpc.md)).
 - `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust handle (through
   `__shirabeBind`) it proxies like a generated stub, while a natively-constructed instance (real
   Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands

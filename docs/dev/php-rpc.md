@@ -57,7 +57,7 @@ frame is a fatal channel error, not an allocation attempt.
 | `0x08` | `ReleasePhpHandle` | Rust→PHP | `phandle` |
 
 The Rust side allocates odd correlation ids, the PHP side even ones. `NewObject` instantiates
-a class in the worker and returns a `__phandle` descriptor for the new P-table entity;
+a class in the worker and returns a `PhpHandle` descriptor for the new P-table entity;
 `CallPhpMethod` invokes a method on such an entity; `ReleasePhpHandle` drops it.
 
 ### Values: `PluginValue` and the codec
@@ -66,13 +66,19 @@ Payloads are encoded with a Rust reimplementation of the PHP `serialize()` gramm
 (`src/value.rs`), byte-compatible with the PHP core implementation under
 `serialize_precision=-1` (the float formatting itself is ported in `shirabe-php-src`). The value
 model is `PluginValue`: PHP scalars, byte strings (`Vec<u8>` — non-UTF-8 round-trips
-losslessly), lists, ordered maps, object records, and three descriptor kinds encoded as reserved
-arrays:
+losslessly), lists, ordered maps, object records, and three descriptor kinds, each the object
+record of a class reserved for it (declared in `php/runtime/Shirabe/Wire/`):
 
-- `{__rhandle, __class}` — entity lives on the Rust side
-- `{__phandle, __class, __implements}` — entity lives in the PHP child
-- `{__job}` — an asynchronous job, an entity in neither table. The Rust side allocates odd job
-  ids, the PHP side even ones. See "Jobs" below.
+- `Shirabe\Wire\RustHandle {rhandle, class}` — entity lives on the Rust side
+- `Shirabe\Wire\PhpHandle {phandle, class, implements}` — entity lives in the PHP child
+- `Shirabe\Wire\Job {id}` — an asynchronous job, an entity in neither table. The Rust side
+  allocates odd job ids, the PHP side even ones. See "Jobs" below.
+
+A descriptor is told apart from data by its class alone, so an array is always data, whatever its
+keys. Nothing but the codec writes a descriptor record: the worker's `toWire` turns every object
+into a descriptor or a materialized value, so an object of plugin code crosses as a `PhpHandle`
+even when it is an instance of a descriptor class. A descriptor record without exactly its
+declared properties is a protocol error.
 
 An immutable value has no entity to point at, so it crosses in neither table: it travels as the
 object record `serialize()` writes for it (`PluginValue::PhpObject` — the class name and the
@@ -80,9 +86,9 @@ property table, property names carrying PHP's visibility mangling), and each sid
 own value from those fields. `unserialize()` revives the PHP one without running a constructor,
 which is what makes the two directions equivalent: a value whose state a constructor cannot
 express has no faithful constructor call, and no field has to be read back out through
-reflection. The classes that may cross this way are a closed list on both sides — the PHP one is
-the `allowed_classes` list of every `unserialize()` — so a record can never name an arbitrary
-class. Which classes are on the list, and how each one maps to a Rust value, is not part of the
+reflection. The classes that may cross this way are a closed list on both sides — the PHP one, together with
+the descriptor classes, is the `allowed_classes` list of every `unserialize()` — so a record can
+never name an arbitrary class. Which classes are on the list, and how each one maps to a Rust value, is not part of the
 protocol; see "Materialized values" in [docs/dev/php-worker.md](./php-worker.md).
 
 An `a:` record decodes as `List` when its keys are exactly `0..N` and as `Array` otherwise; the
@@ -204,7 +210,7 @@ everything goes away with the worker process.
 
 `ShirabePhpObjectRegistry` holds PHP-owned entities keyed by phandle, strongly referenced until the
 Rust side sends `ReleasePhpHandle`. `ShirabeRpcRuntime::toWire` turns any object that is not a
-handle descriptor, a job or a materialized value of its own into a `__phandle` descriptor through
+proxy stub, a promise or a materialized value into a `PhpHandle` descriptor through
 `ShirabePhpObjectRegistry::descriptor` (interned by `spl_object_id`, so one entity keeps one
 handle); `ShirabeRpcRuntime::fromWire` resolves descriptors back to the live entity through
 `ShirabePhpObjectRegistry::get`.

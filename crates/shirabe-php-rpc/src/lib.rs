@@ -1131,6 +1131,18 @@ const RUNTIME_FILES: &[(&BStr, &[u8])] = &[
         php_str(b"Shirabe/RustCapablePluginStub.php"),
         include_str!("../php/runtime/Shirabe/RustCapablePluginStub.php").as_bytes(),
     ),
+    (
+        php_str(b"Shirabe/Wire/Job.php"),
+        include_str!("../php/runtime/Shirabe/Wire/Job.php").as_bytes(),
+    ),
+    (
+        php_str(b"Shirabe/Wire/PhpHandle.php"),
+        include_str!("../php/runtime/Shirabe/Wire/PhpHandle.php").as_bytes(),
+    ),
+    (
+        php_str(b"Shirabe/Wire/RustHandle.php"),
+        include_str!("../php/runtime/Shirabe/Wire/RustHandle.php").as_bytes(),
+    ),
 ];
 
 /// Guard classes made autoloadable inside the worker, behind the stubs: they shadow the real

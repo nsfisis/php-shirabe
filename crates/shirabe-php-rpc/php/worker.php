@@ -21,9 +21,8 @@ interface ShirabeRustStub
      * Null when this instance holds no Rust handle: a dual-mode class (see php/runtime/) that
      * was constructed natively in this process crosses the wire as a P-table entity instead.
      *
-     * @return ?array{__rhandle: int, __class: string}
      */
-    public function __shirabeRustHandleDescriptor(): ?array;
+    public function __shirabeRustHandleDescriptor(): ?\Shirabe\Wire\RustHandle;
 
     /** Binds this stub to an existing Rust entity, in place of running its constructor. */
     public function __shirabeBind(int $rhandle): void;
@@ -135,14 +134,13 @@ final class ShirabePhpObjectRegistry
         }
     }
 
-    /** @return array{__phandle: int, __class: string, __implements: list<string>} */
-    public static function descriptor(object $obj): array
+    public static function descriptor(object $obj): \Shirabe\Wire\PhpHandle
     {
-        return [
-            '__phandle' => self::register($obj),
-            '__class' => get_class($obj),
-            '__implements' => array_values(class_implements($obj)),
-        ];
+        return new \Shirabe\Wire\PhpHandle(
+            self::register($obj),
+            get_class($obj),
+            array_values(class_implements($obj))
+        );
     }
 }
 
@@ -176,6 +174,8 @@ final class ShirabeJobRegistry
      * @var array<int, \React\Promise\PromiseInterface>
      */
     private static array $parked = [];
+    /** @var array<int, int> spl_object_id => job id of a parked promise */
+    private static array $parkedIdsByObjectId = [];
     private static int $nextId = 2;
 
     private static function requireReact(): void
@@ -193,7 +193,7 @@ final class ShirabeJobRegistry
         if ($id % 2 === 0) {
             if (isset(self::$parked[$id])) {
                 $promise = self::$parked[$id];
-                unset(self::$parked[$id]);
+                unset(self::$parked[$id], self::$parkedIdsByObjectId[spl_object_id($promise)]);
                 return $promise;
             }
             if (!isset(self::$promises[$id])) {
@@ -239,31 +239,32 @@ final class ShirabeJobRegistry
     }
 
     /**
-     * The descriptor of a settled promise the Rust side asked for. It names no job: the Rust
+     * Parks a settled promise the Rust side asked for. Its descriptor names no job: the Rust
      * side passes it on as the answer of the call it is serving, and the promise is handed out
      * when that answer arrives.
-     *
-     * @return array{__job: int}
      */
-    public static function park(\React\Promise\PromiseInterface $promise): array
+    public static function park(\React\Promise\PromiseInterface $promise): \React\Promise\PromiseInterface
     {
         $id = self::$nextId;
         self::$nextId += 2;
         self::$parked[$id] = $promise;
-        return ['__job' => $id];
+        self::$parkedIdsByObjectId[spl_object_id($promise)] = $id;
+        return $promise;
     }
 
     /**
-     * The descriptor of a promise leaving for the Rust side. The recorder attached here reports
-     * the outcome when the promise settles, which is right away for one that already has.
-     *
-     * @return array{__job: int}
+     * The descriptor of a promise leaving for the Rust side: the id it is parked under, or a
+     * PHP-owned job. The recorder attached to a job reports the outcome when the promise
+     * settles, which is right away for one that already has.
      */
-    public static function descriptor(\React\Promise\PromiseInterface $promise): array
+    public static function descriptor(\React\Promise\PromiseInterface $promise): \Shirabe\Wire\Job
     {
         $objectId = spl_object_id($promise);
+        if (isset(self::$parkedIdsByObjectId[$objectId])) {
+            return new \Shirabe\Wire\Job(self::$parkedIdsByObjectId[$objectId]);
+        }
         if (isset(self::$idsByObjectId[$objectId])) {
-            return ['__job' => self::$idsByObjectId[$objectId]];
+            return new \Shirabe\Wire\Job(self::$idsByObjectId[$objectId]);
         }
         $id = self::$nextId;
         self::$nextId += 2;
@@ -289,7 +290,7 @@ final class ShirabeJobRegistry
                 );
             }
         );
-        return ['__job' => $id];
+        return new \Shirabe\Wire\Job($id);
     }
 }
 
@@ -392,8 +393,11 @@ final class ShirabeRpcRuntime
     }
 
     /**
-     * Converts a value about to be serialized onto the wire: proxy stubs become handle
-     * descriptor arrays; plain scalars and arrays pass through.
+     * Converts a value about to be serialized onto the wire: a proxy stub, a promise and any
+     * other object without a materialized value become descriptors; scalars and arrays pass
+     * through. Every object crosses as a descriptor or a materialized value, so a descriptor
+     * record on the wire never stands for an object of plugin code, even one of a descriptor
+     * class.
      */
     public static function toWire($value)
     {
@@ -426,34 +430,36 @@ final class ShirabeRpcRuntime
     }
 
     /**
-     * Converts a decoded wire value: handle descriptor arrays become live objects. A
-     * materialized value arrives as a real instance already, revived by unserialize().
-     *
-     * TODO(type-model): a descriptor travels in-band as a plain array, so its exact key set is
-     * the only thing separating it from plugin data of the same shape. The __rhandle and __phandle
-     * checks below match on the reserved key alone, so an array a plugin built with a __rhandle or
-     * __phandle key of its own is read as a handle rather than kept as data. The Rust half
-     * (`decode_handle` in `src/value.rs`) matches the whole key set, and diverges the other way.
-     * __job is a single-key descriptor and matches on that.
+     * Converts a decoded wire value: descriptors become live objects. A materialized value
+     * arrives as a real instance already, revived by unserialize().
      */
     public static function fromWire($value)
     {
-        if (!is_array($value)) {
-            return $value;
+        if ($value instanceof \Shirabe\Wire\RustHandle) {
+            return ShirabeRustObjectRegistry::stubFor($value->rhandle, $value->class);
         }
-        if (isset($value['__rhandle'])) {
-            return ShirabeRustObjectRegistry::stubFor(
-                $value['__rhandle'],
-                $value['__class']
-            );
+        if ($value instanceof \Shirabe\Wire\PhpHandle) {
+            return ShirabePhpObjectRegistry::get($value->phandle);
         }
-        if (isset($value['__phandle'])) {
-            return ShirabePhpObjectRegistry::get((int) $value['__phandle']);
+        if ($value instanceof \Shirabe\Wire\Job) {
+            return ShirabeJobRegistry::promiseFor($value->id);
         }
-        if (isset($value['__job']) && count($value) === 1) {
-            return ShirabeJobRegistry::promiseFor((int) $value['__job']);
+        if (is_array($value)) {
+            return array_map([self::class, 'fromWire'], $value);
         }
-        return array_map([self::class, 'fromWire'], $value);
+        return $value;
+    }
+
+    /**
+     * Decodes a frame payload. The descriptor records and the materialized values are the only
+     * classes a payload may name.
+     */
+    public static function unserializePayload(string $payload)
+    {
+        return unserialize($payload, ['allowed_classes' => array_merge(
+            [\Shirabe\Wire\RustHandle::class, \Shirabe\Wire\PhpHandle::class, \Shirabe\Wire\Job::class],
+            \Shirabe\MaterializedValue::CLASSES
+        )]);
     }
 
     /**
@@ -488,7 +494,7 @@ final class ShirabeRpcRuntime
                 if ($inId !== $corrId) {
                     self::fail("protocol violation: response for unexpected corr_id {$inId}");
                 }
-                $fields = unserialize($payload, ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES]);
+                $fields = self::unserializePayload($payload);
                 if (!is_array($fields)) {
                     self::fail('protocol violation: unparseable response payload');
                 }
@@ -513,7 +519,7 @@ final class ShirabeRpcRuntime
 
     public static function dispatchRequest(int $tag, int $corrId, string $payload): void
     {
-        $fields = unserialize($payload, ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES]);
+        $fields = self::unserializePayload($payload);
         if (!is_array($fields)) {
             self::fail('protocol violation: unparseable frame payload');
         }
@@ -833,7 +839,7 @@ ShirabeRpcRuntime::$dispatch = [
     '__shirabe_eval' => static fn($args) => eval($args[0]),
     // Round-trips raw serialize() bytes through the PHP core codec, for the codec oracle tests.
     '__shirabe_oracle_roundtrip' => static fn($args) => serialize(
-        unserialize($args[0], ['allowed_classes' => \Shirabe\MaterializedValue::CLASSES])
+        ShirabeRpcRuntime::unserializePayload($args[0])
     ),
     '__shirabe_require' => static function ($args) {
         require_once $args[0];
