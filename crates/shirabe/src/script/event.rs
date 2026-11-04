@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Script/Event.php
+//! ref: composer/src/Composer/Script/Event.php sha1:c8dacd8d044ed5c6cef8cc1d32da2162894f6f3a
 
 use crate::composer::ComposerWeakHandle;
 use crate::event_dispatcher::{Event as BaseEvent, EventFlags, EventInterface};

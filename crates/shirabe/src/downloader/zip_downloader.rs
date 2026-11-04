@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/ZipDownloader.php
+//! ref: composer/src/Composer/Downloader/ZipDownloader.php sha1:c0dad9a7265a79790e7da5a524fe7292a114ce69
 
 use crate::downloader::{ArchiveDownloader, ChangeReportInterface, FileDownloader};
 use crate::io::IOInterfaceWrite;

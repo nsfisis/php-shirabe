@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/ExecutableFinder.php
+//! ref: composer/vendor/symfony/process/ExecutableFinder.php sha1:018f8e4843e52d6779af2720440bbdf232aac198
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{

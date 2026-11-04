@@ -1,4 +1,4 @@
-//! ref: composer/tests/bootstrap.php
+//! ref: composer/tests/bootstrap.php sha1:703e1adc1686d94fa017350e4cffc8aa9a8a884c
 
 use shirabe::util::platform::Platform;
 

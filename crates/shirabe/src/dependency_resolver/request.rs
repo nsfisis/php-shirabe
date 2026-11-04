@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Request.php
+//! ref: composer/src/Composer/DependencyResolver/Request.php sha1:c8a4e75003a06a91be3c4094db2da07abbd23147
 
 use crate::package::BasePackageHandle;
 use crate::repository::{LockArrayRepositoryHandle, RepositoryInterface};

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/Vcs/GitBitbucketDriverTest.php
+//! ref: composer/tests/Composer/Test/Repository/Vcs/GitBitbucketDriverTest.php sha1:fe01cbe1eabc401a9b54d97714cd9815e0c2289f
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;

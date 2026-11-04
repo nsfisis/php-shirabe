@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/EventDispatcher/ScriptExecutionException.php
+//! ref: composer/src/Composer/EventDispatcher/ScriptExecutionException.php sha1:8740e0adecb9efaa8072645070f1c1f142ac5e00
 
 use bstr::BString;
 use shirabe_php_shim::RuntimeException;

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetIteratorTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetIteratorTest.php sha1:720f6ce751357cfb762594ccdfc2d3796c3f93aa
 
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::generic_rule::GenericRule;

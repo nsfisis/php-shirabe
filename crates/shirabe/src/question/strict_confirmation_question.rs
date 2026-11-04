@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Question/StrictConfirmationQuestion.php
+//! ref: composer/src/Composer/Question/StrictConfirmationQuestion.php sha1:bcd82725eac5bd21e87d33e8155b41d65274dafa
 
 use shirabe_php_shim::preg_is_match;
 use shirabe_symfony_console::exception::InvalidArgumentException;

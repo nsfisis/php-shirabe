@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/RuleWatchNode.php
+//! ref: composer/src/Composer/DependencyResolver/RuleWatchNode.php sha1:dd7202effe11ea84f7a7561c945ca60075d32bb2
 
 use crate::dependency_resolver::{Decisions, Rule};
 

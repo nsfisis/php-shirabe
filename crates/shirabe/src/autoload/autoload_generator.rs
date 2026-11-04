@@ -1,6 +1,6 @@
 //! `composerRequire()` is ported to `__shirabe_composer_require()` in shirabe-php-rpc, not here.
 //!
-//! ref: composer/src/Composer/Autoload/AutoloadGenerator.php
+//! ref: composer/src/Composer/Autoload/AutoloadGenerator.php sha1:77752b534c8ad1453f45addaa2adb044eb4dd8be
 
 use crate::autoload::ClassLoader;
 use crate::config::{Config, PlatformCheck};

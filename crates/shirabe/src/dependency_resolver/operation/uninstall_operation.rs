@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Operation/UninstallOperation.php
+//! ref: composer/src/Composer/DependencyResolver/Operation/UninstallOperation.php sha1:19d2137e34a47ec48e5332263060009eba3e894e
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;

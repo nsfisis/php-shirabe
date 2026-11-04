@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/Interval.php
+//! ref: composer/vendor/composer/semver/src/Interval.php sha1:a089bc72d3d61fb825daaf897e6ca2b6bc238f38
 
 use crate::constraint::SimpleConstraint;
 use bstr::BString;

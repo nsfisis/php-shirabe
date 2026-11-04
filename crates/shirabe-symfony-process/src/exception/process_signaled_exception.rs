@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Exception/ProcessSignaledException.php
+//! ref: composer/vendor/symfony/process/Exception/ProcessSignaledException.php sha1:f944ca4505a51a9fbc5e4435947bd917ef3d42c6
 
 use crate::exception::RuntimeException;
 use crate::process::Process;

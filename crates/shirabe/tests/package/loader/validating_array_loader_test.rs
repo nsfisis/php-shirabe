@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Loader/ValidatingArrayLoaderTest.php
+//! ref: composer/tests/Composer/Test/Package/Loader/ValidatingArrayLoaderTest.php sha1:c27941010b8febd9d121a330b08dd1ce19ddb3d0
 
 use crate::test_case;
 use bstr::{BStr, BString};

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Tester/CommandCompletionTester.php
+//! ref: composer/vendor/symfony/console/Tester/CommandCompletionTester.php sha1:0a53b0b5216e3f19394edd7ebb43418fe4902872
 
 use crate::command::Command;
 use crate::completion::{CompletionInput, CompletionSuggestions};

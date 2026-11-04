@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Comparer/Comparer.php
+//! ref: composer/src/Composer/Package/Comparer/Comparer.php sha1:1865cc72cd2b3be711187fdb382c6c56041c6e2c
 
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};

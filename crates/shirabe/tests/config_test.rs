@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/ConfigTest.php
+//! ref: composer/tests/Composer/Test/ConfigTest.php sha1:3e56d46bbf990dfe2ea9afa25fa3e5b00557dabe
 
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;

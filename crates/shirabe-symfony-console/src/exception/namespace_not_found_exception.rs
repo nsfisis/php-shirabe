@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Exception/NamespaceNotFoundException.php
+//! ref: composer/vendor/symfony/console/Exception/NamespaceNotFoundException.php sha1:d05538674c77701898da90ca8f9010ffa14d6aba
 
 use super::command_not_found_exception::CommandNotFoundException;
 use super::exception_interface::ExceptionInterface;

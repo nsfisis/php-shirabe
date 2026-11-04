@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/PoolTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/PoolTest.php sha1:fc8638e44755b1723a2bea9c683ee09af6a31a7a
 
 use crate::test_case::{get_package, get_version_constraint};
 use indexmap::IndexMap;

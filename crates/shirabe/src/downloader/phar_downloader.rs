@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/PharDownloader.php
+//! ref: composer/src/Composer/Downloader/PharDownloader.php sha1:593ef0991745f5b822f3690cecf0143914981bd4
 
 use crate::cache::Cache;
 use crate::config::Config;

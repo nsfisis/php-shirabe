@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DefaultConfigTest.php
+//! ref: composer/tests/Composer/Test/DefaultConfigTest.php sha1:40cf762e10f9fc3999aa68d22bb677d4e55c04ca
 
 use shirabe::config::Config;
 use shirabe_php_shim::PhpMixed;

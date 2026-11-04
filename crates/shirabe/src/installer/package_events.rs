@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/PackageEvents.php
+//! ref: composer/src/Composer/Installer/PackageEvents.php sha1:550c66a4674014d9caf28d7113ffbaa86282a7c7
 
 use bstr::BStr;
 use shirabe_php_shim::php_str;

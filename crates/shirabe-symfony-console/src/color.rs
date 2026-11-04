@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Color.php
+//! ref: composer/vendor/symfony/console/Color.php sha1:57c65c5cfdd8c85853d7eaedaabd932151f5eca8
 
 use crate::exception::InvalidArgumentException;
 use bstr::{BStr, BString, ByteSlice};

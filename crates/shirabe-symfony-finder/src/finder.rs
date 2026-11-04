@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/finder/Finder.php
+//! ref: composer/vendor/symfony/finder/Finder.php sha1:d1c2c5fe811b22be6bd6858b624e783cf96e6fb3
 //!
 //! The iterator pipeline of `searchInDirectory()` is reproduced inline here
 //! instead of as separate `Iterator\*` classes. Entries are materialized as

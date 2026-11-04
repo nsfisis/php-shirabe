@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Config/ConfigSourceInterface.php
+//! ref: composer/src/Composer/Config/ConfigSourceInterface.php sha1:408ad9c3d7093415ff11eeb5630d6e1cabefa60a
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::PhpMixed;

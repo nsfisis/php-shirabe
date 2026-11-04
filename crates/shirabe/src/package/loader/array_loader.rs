@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Loader/ArrayLoader.php
+//! ref: composer/src/Composer/Package/Loader/ArrayLoader.php sha1:9cab84e96514ab3cd179ba408dc6ae9f56da7bb4
 
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;

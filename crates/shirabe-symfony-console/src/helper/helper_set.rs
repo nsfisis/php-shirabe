@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/HelperSet.php
+//! ref: composer/vendor/symfony/console/Helper/HelperSet.php sha1:42581141559106863690d91c4ed00ce6a968be6a
 
 use crate::helper::{
     DebugFormatterHelper, FormatterHelper, HelperInterface, ProcessHelper, QuestionHelper,

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Output/BufferedOutput.php
+//! ref: composer/vendor/symfony/console/Output/BufferedOutput.php sha1:23b43093e5136294158aa8fef3a6fdf16384cd88
 
 use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/RuleSet.php
+//! ref: composer/src/Composer/DependencyResolver/RuleSet.php sha1:1f7d32d4254b98a41c9c533cee9e0ad6abe506af
 
 use crate::dependency_resolver::{Pool, Request, Rule, RuleSetIterator};
 use crate::repository::RepositorySet;

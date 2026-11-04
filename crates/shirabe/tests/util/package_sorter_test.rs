@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/PackageSorterTest.php
+//! ref: composer/tests/Composer/Test/Util/PackageSorterTest.php sha1:4b88c411719eccf0ad4243f0938e16d009393493
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

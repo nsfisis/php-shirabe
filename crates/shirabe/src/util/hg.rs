@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Hg.php
+//! ref: composer/src/Composer/Util/Hg.php sha1:63bfeb84d0a28100dec5607d0bf67fbee4f3ed34
 
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};

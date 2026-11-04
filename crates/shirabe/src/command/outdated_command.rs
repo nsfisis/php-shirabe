@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/OutdatedCommand.php
+//! ref: composer/src/Composer/Command/OutdatedCommand.php sha1:35c29722d782b5b6f5452752135fba0b4ff93832
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};

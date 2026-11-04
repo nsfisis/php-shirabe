@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Console/GithubActionError.php
+//! ref: composer/src/Composer/Console/GithubActionError.php sha1:edfdd2e8cfd2a12c7c484a789141f3a3f0f50b75
 
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::Platform;

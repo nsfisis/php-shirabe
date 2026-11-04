@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/ZipDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Downloader/ZipDownloaderTest.php sha1:921817344e7138c1d863e79705af58b8e24c835c
 //!
 //! `testSystemUnzipOnlyFailed` and `testSystemUnzipOnlyGood` are not ported. They set
 //! `hasZipArchive` to false, which cannot happen in Shirabe: it implements `ZipArchive` natively,

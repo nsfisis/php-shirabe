@@ -29,14 +29,25 @@ Map PHP files and namespaces one-to-one onto Rust files and modules. For example
     3. Replace `.php` with `.rs`.
     4. Prepend `crates/shirabe-symfony-console/src/`.
 
-At the top of each file, write the path of the original PHP file, relative to the repository root:
+At the top of each file, write the path of the original PHP file, relative to the repository root,
+followed by the SHA-1 of that file's content in lowercase hex:
 
 ```rust
-//! ref: composer/src/Composer/Command/InstallCommand.php
+//! ref: composer/src/Composer/Command/InstallCommand.php sha1:<40 hex digits>
 ```
 
 Do not merge multiple PHP files into a single Rust file, except in rare cases. When you do, write a
 `ref:` line for every PHP file.
+
+The hash records the version of the upstream file that the port follows, so that a change upstream
+is detected when `composer/` is updated:
+
+* The `upstream_file_hash` rule of `scripts/linters/lint` recomputes the hash of every `//! ref:`
+  line from the current `composer/` sources. It fails on a line without a hash, on a file that does
+  not exist under `composer/`, and on a hash mismatch, printing both hashes.
+* `scripts/linters/upstream-file-hash update <rust-file>...` writes the current hash into every
+  `//! ref:` line of the files, adding it where it is missing. On a mismatch, compare the upstream
+  change with the Rust port and update the port first.
 
 ## Identifiers and class structure
 

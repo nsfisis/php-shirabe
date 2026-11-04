@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/Http/ProxyItemTest.php
+//! ref: composer/tests/Composer/Test/Util/Http/ProxyItemTest.php sha1:a9f9e114b3c19012083401a243c46e37e2239292
 
 use bstr::{BStr, BString};
 use shirabe::util::http::proxy_item::ProxyItem;

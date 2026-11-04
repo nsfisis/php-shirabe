@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/LockArrayRepository.php
+//! ref: composer/src/Composer/Repository/LockArrayRepository.php sha1:370b8dc4726fa7990c6ac500c05405790359f25e
 
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{

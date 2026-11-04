@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/TableCell.php
+//! ref: composer/vendor/symfony/console/Helper/TableCell.php sha1:93b1e2c2f3285db45b0ba6f7d9a8912eae4112b0
 
 use crate::exception::InvalidArgumentException;
 use crate::helper::TableCellStyle;

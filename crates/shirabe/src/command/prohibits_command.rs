@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/ProhibitsCommand.php
+//! ref: composer/src/Composer/Command/ProhibitsCommand.php sha1:79ea52c04b3bca3b42cb1f47ec94aae1941d95bd
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait};

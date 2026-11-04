@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Version/VersionSelector.php
+//! ref: composer/src/Composer/Package/Version/VersionSelector.php sha1:dd4a0fc4fcb97106bb26398bc3346e7ff03ec517
 
 use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, IgnoreListPlatformRequirementFilter,

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Perforce.php
+//! ref: composer/src/Composer/Util/Perforce.php sha1:00ef5f5b2cdc021dc0a6797dc82db0e65745dad3
 
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{CommandLine, Filesystem, Platform, ProcessExecutor};

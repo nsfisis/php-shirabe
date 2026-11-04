@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Version/StabilityFilter.php
+//! ref: composer/src/Composer/Package/Version/StabilityFilter.php sha1:1fca2c0134cbb85a98b7c297adc0b3bbd154ff3a
 
 use crate::package::stability_priority;
 use bstr::{BStr, BString};

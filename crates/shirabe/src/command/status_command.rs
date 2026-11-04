@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/StatusCommand.php
+//! ref: composer/src/Composer/Command/StatusCommand.php sha1:f06fd28e83aa8c1d61b61f3962a15f413cfd75af
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};

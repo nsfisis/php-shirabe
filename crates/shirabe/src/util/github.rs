@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/GitHub.php
+//! ref: composer/src/Composer/Util/GitHub.php sha1:6cba0f9d259e3f70cc889ffbe76d543bd8b4f8e9
 
 use crate::config::Config;
 use crate::factory::Factory;

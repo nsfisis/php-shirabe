@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Version/VersionParser.php
+//! ref: composer/src/Composer/Package/Version/VersionParser.php sha1:8efacea5e04fc1097a89257f2bf85fce8393a160
 
 use crate::repository::PlatformRepository;
 use bstr::{BStr, BString, ByteSlice};

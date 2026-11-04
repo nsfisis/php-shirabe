@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/IO/ConsoleIO.php
+//! ref: composer/src/Composer/IO/ConsoleIO.php sha1:7a0e5150d632d483425cc5cce27201aafc52ce77
 
 use crate::config::Config;
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Loader/RootPackageLoader.php
+//! ref: composer/src/Composer/Package/Loader/RootPackageLoader.php sha1:8f6673160a0e00e0448e88e8ee16f04187a2f18e
 
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceWrite};

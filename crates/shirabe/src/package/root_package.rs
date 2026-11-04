@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/RootPackage.php
+//! ref: composer/src/Composer/Package/RootPackage.php sha1:ea647c4d9027dc1c7e7d30543cc6148b36822357
 
 use crate::package::{
     CompletePackage, CompletePackageInterface, DisplayMode, Link, Mirror, PackageInterface,

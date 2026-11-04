@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFinder.php
+//! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFinder.php sha1:e0f225e306d276e8426e18aef66ddb66479bb391
 
 use crate::package::archiver::{BaseExcludeFilter, ComposerExcludeFilter, GitExcludeFilter};
 use crate::util::Filesystem;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/WritableArrayRepository.php
+//! ref: composer/src/Composer/Repository/WritableArrayRepository.php sha1:e9c7d8ff15c1d17bbf85191e945b2ae369a457f7
 
 use crate::installer::InstallationManager;
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};

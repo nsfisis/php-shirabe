@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/Capability/CommandProvider.php
+//! ref: composer/src/Composer/Plugin/Capability/CommandProvider.php sha1:3e7a206d6a8f9b0f1f34f1f9cf065a48903b802f
 
 use crate::command::BaseCommand;
 use crate::plugin::capability::Capability;

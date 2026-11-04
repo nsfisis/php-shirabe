@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/spdx-licenses/src/SpdxLicenses.php
+//! ref: composer/vendor/composer/spdx-licenses/src/SpdxLicenses.php sha1:75fb4af5e496bf413119bdd69250df16bfe2ccb2
 
 use bstr::BString;
 use indexmap::IndexMap;

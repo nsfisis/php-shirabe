@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Loader/ValidatingArrayLoader.php
+//! ref: composer/src/Composer/Package/Loader/ValidatingArrayLoader.php sha1:e453f573d1c76ed4d95d3e342b848526a48a8bae
 
 use crate::package::loader::{InvalidPackageException, LoaderInterface};
 use crate::package::version::VersionParser;

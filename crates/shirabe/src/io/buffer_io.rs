@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/IO/BufferIO.php
+//! ref: composer/src/Composer/IO/BufferIO.php sha1:92cbd3ce7909bd23e07b2d280a5f49ad5ea099bb
 
 use crate::io::ConsoleIO;
 use bstr::BString;

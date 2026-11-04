@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/BinaryInstaller.php
+//! ref: composer/src/Composer/Installer/BinaryInstaller.php sha1:098d10272c26a2dcf2ef4bf287922b35ca147bdc
 
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;

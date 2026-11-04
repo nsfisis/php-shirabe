@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/SilencerTest.php
+//! ref: composer/tests/Composer/Test/Util/SilencerTest.php sha1:a6c9e986b2bf701db4fdae9c63852c88f8cdd1bf
 
 use shirabe::util::silencer::Silencer;
 use shirabe_php_shim::{

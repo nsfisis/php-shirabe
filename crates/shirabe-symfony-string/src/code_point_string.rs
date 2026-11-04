@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/string/CodePointString.php
+//! ref: composer/vendor/symfony/string/CodePointString.php sha1:38df14a7a3860f08e4aa5678665c0ec7d6765a2c
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{mb_convert_encoding, utf8_text, wordwrap};

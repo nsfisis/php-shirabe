@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/Vcs/SvnDriverTest.php
+//! ref: composer/tests/Composer/Test/Repository/Vcs/SvnDriverTest.php sha1:ac13898a8c50a3102bfc5b7eed5745566b61effc
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;

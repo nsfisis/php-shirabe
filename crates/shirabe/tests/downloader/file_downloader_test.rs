@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/FileDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Downloader/FileDownloaderTest.php sha1:09f792b7ead57d2b7a5fa9dc5d80e0335e34b7fb
 
 use crate::async_runtime::run;
 use crate::http_downloader_mock::get_http_downloader_mock;

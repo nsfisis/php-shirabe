@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/ConfigCommand.php
+//! ref: composer/src/Composer/Command/ConfigCommand.php sha1:81de5feaf3b7e975424e4cce2c773869b5283f7b
 
 use crate::advisory::Auditor;
 use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};

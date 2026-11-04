@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/RootPackageRepository.php
+//! ref: composer/src/Composer/Repository/RootPackageRepository.php sha1:a76575c7bb8887145c446d80f651b922e333bab3
 
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::repository::{

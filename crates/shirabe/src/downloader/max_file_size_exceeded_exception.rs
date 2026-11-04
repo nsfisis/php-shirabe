@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/MaxFileSizeExceededException.php
+//! ref: composer/src/Composer/Downloader/MaxFileSizeExceededException.php sha1:fb8a1707095551a801808290792a11d9eede273e
 
 use crate::downloader::transport_exception::TransportException;
 use bstr::BString;

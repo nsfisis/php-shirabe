@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/ForgejoDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/ForgejoDriver.php sha1:1e4271376bf377829d2f11e4743927970dbc005b
 
 use crate::cache::Cache;
 use crate::config::Config;

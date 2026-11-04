@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/BaseDependencyCommand.php
+//! ref: composer/src/Composer/Command/BaseDependencyCommand.php sha1:b457d7e058eb7787327ee2571c72636c58fe09ac
 
 use crate::command::BaseCommand;
 use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};

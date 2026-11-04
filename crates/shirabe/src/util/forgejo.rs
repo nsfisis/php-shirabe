@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Forgejo.php
+//! ref: composer/src/Composer/Util/Forgejo.php sha1:f5ff8636de3de676034cbdc6307dd2b53bb34611
 
 use crate::config::Config;
 use crate::downloader::TransportException;

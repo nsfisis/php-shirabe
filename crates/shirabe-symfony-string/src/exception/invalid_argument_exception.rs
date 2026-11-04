@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/string/Exception/InvalidArgumentException.php
+//! ref: composer/vendor/symfony/string/Exception/InvalidArgumentException.php sha1:8925a67d1d745cb23b5bfb625c37046bf1fd4959
 
 use super::exception_interface::ExceptionInterface;
 use bstr::BString;

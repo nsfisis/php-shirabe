@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Archiver/ArchiveManager.php
+//! ref: composer/src/Composer/Package/Archiver/ArchiveManager.php sha1:b6fd583e4dcb3b3bb4b0bd49437949771e66d7cd
 
 use crate::downloader::DownloadManager;
 use crate::json::JsonFile;

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/Vcs/GitLabDriverTest.php
+//! ref: composer/tests/Composer/Test/Repository/Vcs/GitLabDriverTest.php sha1:1599d89fa72c45d18f7ccf739d89cc49f102e62c
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};

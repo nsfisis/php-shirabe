@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/ArchiveCommand.php
+//! ref: composer/src/Composer/Command/ArchiveCommand.php sha1:735beefe6c65976d3dc9179d6d7229436ec617e5
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};

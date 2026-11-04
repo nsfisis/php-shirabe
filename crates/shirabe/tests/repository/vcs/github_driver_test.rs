@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/Vcs/GitHubDriverTest.php
+//! ref: composer/tests/Composer/Test/Repository/Vcs/GitHubDriverTest.php sha1:fcf4538d8e3d441d59ffdaa860390599e71c77a0
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;

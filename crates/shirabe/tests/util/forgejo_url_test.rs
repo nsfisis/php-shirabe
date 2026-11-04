@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/ForgejoUrlTest.php
+//! ref: composer/tests/Composer/Test/Util/ForgejoUrlTest.php sha1:bf985806e781c179d6d422aee9d15fc1ad8a93a7
 
 use bstr::BStr;
 use shirabe::util::forgejo_url::ForgejoUrl;

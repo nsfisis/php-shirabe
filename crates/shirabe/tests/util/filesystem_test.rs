@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/FilesystemTest.php
+//! ref: composer/tests/Composer/Test/Util/FilesystemTest.php sha1:78faaa186186548f6c2fb9e64ddaa92c01fb6058
 
 // These exercise Filesystem path helpers and on-disk operations (sizes, copy, symlinks and
 // junctions over a temp tree). The on-disk tests build their temp tree with tempfile::TempDir in

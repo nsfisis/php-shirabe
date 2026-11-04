@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Script/EventTest.php
+//! ref: composer/tests/Composer/Test/Script/EventTest.php sha1:4bfce5295f319f68461552f61bfe338f670cbbf1
 
 use bstr::BString;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};

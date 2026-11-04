@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/PhpExecutableFinder.php
+//! ref: composer/vendor/symfony/process/PhpExecutableFinder.php sha1:c51b0d1a20509fc57cdc06502e44099f5f3bde17
 
 use super::executable_finder::ExecutableFinder;
 use bstr::BString;

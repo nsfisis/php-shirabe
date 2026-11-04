@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/ValidateCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/ValidateCommandTest.php sha1:67b07e0265185cce539e784327141e2c9404ea7c
 
 use crate::test_case::{
     RunOptions, create_composer_lock, get_application_tester, init_temp_composer,

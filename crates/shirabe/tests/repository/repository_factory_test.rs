@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/RepositoryFactoryTest.php
+//! ref: composer/tests/Composer/Test/Repository/RepositoryFactoryTest.php sha1:a4ea64d39e67e55bf64855a2a813c5165b284173
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

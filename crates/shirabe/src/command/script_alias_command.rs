@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/ScriptAliasCommand.php
+//! ref: composer/src/Composer/Command/ScriptAliasCommand.php sha1:098a85149d8bc3d10182f2f82fad53aaa7c67eb4
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/BaseDependencyCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/BaseDependencyCommandTest.php sha1:6b58afd45ee152f5db6f3ac5897daa4033ea7cf3
 
 use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,

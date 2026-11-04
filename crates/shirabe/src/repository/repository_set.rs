@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/RepositorySet.php
+//! ref: composer/src/Composer/Repository/RepositorySet.php sha1:6ea7dfe98c42ffbf65168a3d034527ef401fb879
 
 use crate::advisory::AnySecurityAdvisory;
 use crate::dependency_resolver::{

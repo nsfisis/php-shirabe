@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/ProgressBar.php
+//! ref: composer/vendor/symfony/console/Helper/ProgressBar.php sha1:240e6cdb125cbeb0137ca60ccf4cc236d5d335c3
 
 use crate::cursor::Cursor;
 use crate::exception::LogicException;

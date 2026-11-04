@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Plugin/PluginInstallerTest.php
+//! ref: composer/tests/Composer/Test/Plugin/PluginInstallerTest.php sha1:8796f169f09df6f0e369d5c6041fa2dc8ad4858d
 
 use crate::async_runtime::run;
 use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_runtime_available};

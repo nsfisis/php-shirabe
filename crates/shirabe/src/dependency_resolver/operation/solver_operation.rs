@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Operation/SolverOperation.php
+//! ref: composer/src/Composer/DependencyResolver/Operation/SolverOperation.php sha1:6458da353f676173fb2fd98e8252fb2cf29f7fd2
 
 use bstr::BStr;
 

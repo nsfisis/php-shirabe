@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/RepositorySecurityException.php
+//! ref: composer/src/Composer/Repository/RepositorySecurityException.php sha1:25f7fbbd8391156425356cc42409d7206f2c4a97
 
 use bstr::BString;
 use shirabe_php_shim::Exception;

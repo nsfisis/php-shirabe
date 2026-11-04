@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/RuleWatchGraph.php
+//! ref: composer/src/Composer/DependencyResolver/RuleWatchGraph.php sha1:41787892024bd13e2d241fc17b03e85bbfa75468
 
 use crate::dependency_resolver::{Decisions, Rule, RuleWatchChain, RuleWatchNode};
 use indexmap::IndexMap;

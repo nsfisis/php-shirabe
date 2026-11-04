@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/RuleSetGenerator.php
+//! ref: composer/src/Composer/DependencyResolver/RuleSetGenerator.php sha1:b6b559c8eb0f7567b8051d1f23943f17c850d01e
 
 use crate::dependency_resolver::rule::{self, Rule};
 use crate::dependency_resolver::{

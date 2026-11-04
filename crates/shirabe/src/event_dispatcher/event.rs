@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/EventDispatcher/Event.php
+//! ref: composer/src/Composer/EventDispatcher/Event.php sha1:bba4e2fefb94fd89492284ee0fe42112847e6608
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

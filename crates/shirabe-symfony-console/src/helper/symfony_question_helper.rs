@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/SymfonyQuestionHelper.php
+//! ref: composer/vendor/symfony/console/Helper/SymfonyQuestionHelper.php sha1:cdcfae1ff1d0881eced4dd69e3b2afab89611514
 
 use crate::formatter::OutputFormatter;
 use crate::helper::{QuestionHelper, QuestionHelperInterface};

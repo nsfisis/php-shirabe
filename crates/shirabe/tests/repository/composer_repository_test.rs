@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/ComposerRepositoryTest.php
+//! ref: composer/tests/Composer/Test/Repository/ComposerRepositoryTest.php sha1:66247b2293fb3020c292dcde7b6341f74371e50c
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use bstr::{B, BStr, BString};

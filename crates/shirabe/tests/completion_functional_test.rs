@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/CompletionFunctionalTest.php
+//! ref: composer/tests/Composer/Test/CompletionFunctionalTest.php sha1:138f5457c86af85b29e484a86d24b8a9f9046805
 //!
 //! Validate autocompletion for all commands.
 //!

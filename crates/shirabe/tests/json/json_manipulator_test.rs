@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Json/JsonManipulatorTest.php
+//! ref: composer/tests/Composer/Test/Json/JsonManipulatorTest.php sha1:22e193835cce967c353ad34d5743dcfc5c3e326b
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/SvnTest.php
+//! ref: composer/tests/Composer/Test/Util/SvnTest.php sha1:2845204ef100384d371b94832b3e2520c28e927e
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/SelfUpdateCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/SelfUpdateCommandTest.php sha1:7fe96bf18edf3e973ff6f47e92deb30c624edca4
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use bstr::{BStr, BString, ByteSlice};

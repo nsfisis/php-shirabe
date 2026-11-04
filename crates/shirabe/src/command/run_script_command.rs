@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/RunScriptCommand.php
+//! ref: composer/src/Composer/Command/RunScriptCommand.php sha1:fd39fdf758c5f1fd032eefcb82e4ce49beba2882
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};

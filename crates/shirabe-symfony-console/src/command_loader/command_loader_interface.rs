@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/CommandLoader/CommandLoaderInterface.php
+//! ref: composer/vendor/symfony/console/CommandLoader/CommandLoaderInterface.php sha1:0705f6a2fd1673715459719c801a657069fdb0e3
 
 use crate::command::Command;
 use bstr::{BStr, BString};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Http/ProxyManager.php
+//! ref: composer/src/Composer/Util/Http/ProxyManager.php sha1:45cc9c51bd1ed998844d08a0b40b59bc854a7d7f
 
 use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Mock/HttpDownloaderMock.php
+//! ref: composer/tests/Composer/Test/Mock/HttpDownloaderMock.php sha1:eb0c0c6f626a83b5b0e331e6a060ce7f56dedc31
 #![allow(dead_code)]
 
 use bstr::BString;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/AdvisoryProviderInterface.php
+//! ref: composer/src/Composer/Repository/AdvisoryProviderInterface.php sha1:79781b3ede3676bac2c45dedc20a84704456babc
 
 use crate::advisory::AnySecurityAdvisory;
 use bstr::BString;

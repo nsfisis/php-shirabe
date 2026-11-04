@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Archiver/ZipArchiverTest.php
+//! ref: composer/tests/Composer/Test/Package/Archiver/ZipArchiverTest.php sha1:0c48cf2bc2810e10439d89b1d11ec8c133635320
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;

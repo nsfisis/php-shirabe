@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/Capable.php
+//! ref: composer/src/Composer/Plugin/Capable.php sha1:550b5a5a70f9e6b986380b3c296004a5b0bec2a9
 
 use bstr::BString;
 use indexmap::IndexMap;

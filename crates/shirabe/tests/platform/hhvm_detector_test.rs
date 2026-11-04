@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Platform/HhvmDetectorTest.php
+//! ref: composer/tests/Composer/Test/Platform/HhvmDetectorTest.php sha1:1dd7d505fe443328ec02c58cdfff72939a60108b
 
 use shirabe::platform::hhvm_detector::{HhvmDetector, HhvmDetectorInterface};
 use shirabe::util::{Platform, ProcessExecutor};

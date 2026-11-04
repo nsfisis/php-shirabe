@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Output/StreamOutput.php
+//! ref: composer/vendor/symfony/console/Output/StreamOutput.php sha1:cf141c31878a50b8e0dbc39ce0c3af77753a7ad6
 
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;

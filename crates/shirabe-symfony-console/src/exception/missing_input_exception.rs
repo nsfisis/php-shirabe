@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Exception/MissingInputException.php
+//! ref: composer/vendor/symfony/console/Exception/MissingInputException.php sha1:74cde09c0e0e708505feca111cc942abd8200149
 
 use super::exception_interface::ExceptionInterface;
 use super::runtime_exception::RuntimeException;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/CompleteAliasPackage.php
+//! ref: composer/src/Composer/Package/CompleteAliasPackage.php sha1:5c9bf40e01a3b3dab0eb10ddea81f5a0f44ed061
 
 use crate::package::handle::delegate_package_interface_to_inner;
 use crate::package::{

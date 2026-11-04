@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/xdebug-handler/src/XdebugHandler.php
+//! ref: composer/vendor/composer/xdebug-handler/src/XdebugHandler.php sha1:b9341902dbfe674026faa2c362fc6513277ef605
 //!
 //! Keeping Xdebug out of the PHP worker, which is where Composer's restart of itself lands in
 //! this port. See `docs/dev/xdebug.md`.

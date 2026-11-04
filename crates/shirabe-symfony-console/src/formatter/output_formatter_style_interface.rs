@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyleInterface.php
+//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyleInterface.php sha1:a93cf4516abdf53f4db32a8f0d1d279db5b6c7dc
 
 use bstr::{BStr, BString};
 

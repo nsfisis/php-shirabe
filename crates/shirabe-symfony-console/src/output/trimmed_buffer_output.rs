@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Output/TrimmedBufferOutput.php
+//! ref: composer/vendor/symfony/console/Output/TrimmedBufferOutput.php sha1:dcb1a0d236fc666b56314ca17768233f7bbccf6d
 
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;

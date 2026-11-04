@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/ProcessHelper.php
+//! ref: composer/vendor/symfony/console/Helper/ProcessHelper.php sha1:fa7a183ca1b817982c97017e48d81084a1c914a9
 
 use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};

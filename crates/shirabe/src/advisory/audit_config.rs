@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Advisory/AuditConfig.php
+//! ref: composer/src/Composer/Advisory/AuditConfig.php sha1:3f6d194a8e6b10196a730c4b189602356f058455
 
 use crate::advisory::Auditor;
 use crate::config::Config;

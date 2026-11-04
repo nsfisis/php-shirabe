@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Command/ListCommand.php
+//! ref: composer/vendor/symfony/console/Command/ListCommand.php sha1:89f524e92adad752f60a172c332ca10a2ea2256f
 
 use crate::command::{Command, CommandData, SetDefinitionArg};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};

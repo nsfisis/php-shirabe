@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/RuleTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/RuleTest.php sha1:80378af97fa96f3d2903f6d689d0ca8624fb9aaa
 
 use crate::test_case::get_package;
 use bstr::BString;

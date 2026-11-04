@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/VcsRepositoryTest.php
+//! ref: composer/tests/Composer/Test/Repository/VcsRepositoryTest.php sha1:628daae845b6a291274618b8cd28d0fd8069a6a9
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, IndexSet};

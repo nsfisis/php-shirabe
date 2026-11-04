@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/PerforceTest.php
+//! ref: composer/tests/Composer/Test/Util/PerforceTest.php sha1:d37373d44bb83053fb3c561efdcf46db74af7a56
 
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};

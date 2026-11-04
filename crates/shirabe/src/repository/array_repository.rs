@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/ArrayRepository.php
+//! ref: composer/src/Composer/Repository/ArrayRepository.php sha1:c86c028d65ef36490532e1351fb7bc2d0aac0ab6
 
 use crate::package::version::{StabilityFilter, VersionParser};
 use crate::package::{

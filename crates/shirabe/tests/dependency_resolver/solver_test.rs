@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/SolverTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/SolverTest.php sha1:610482ab53412620c19a0c0dc15f4ed1023fd1b9
 
 use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 use bstr::{BStr, BString, ByteSlice};

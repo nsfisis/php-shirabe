@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/SecurityAdvisoryPoolFilter.php
+//! ref: composer/src/Composer/DependencyResolver/SecurityAdvisoryPoolFilter.php sha1:b95e59555186ef17ae5182ef757b8311884d521d
 
 use crate::advisory::{AnySecurityAdvisory, AuditConfig, Auditor};
 use crate::dependency_resolver::{Pool, Request};

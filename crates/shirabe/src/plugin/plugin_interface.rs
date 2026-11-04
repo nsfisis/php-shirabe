@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/PluginInterface.php
+//! ref: composer/src/Composer/Plugin/PluginInterface.php sha1:83f0931d0114bbfd41a05d0834b2e7ca4efe07d1
 
 use crate::composer::ComposerHandle;
 use crate::event_dispatcher::EventSubscriberInterface;

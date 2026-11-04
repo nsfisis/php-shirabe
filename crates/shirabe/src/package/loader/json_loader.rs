@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Loader/JsonLoader.php
+//! ref: composer/src/Composer/Package/Loader/JsonLoader.php sha1:dc021a33715145a45b0f6c9c1c2934cc0aec36d2
 
 use crate::json::JsonFile;
 use crate::package::PackageInterfaceHandle;

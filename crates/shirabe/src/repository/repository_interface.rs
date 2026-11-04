@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/RepositoryInterface.php
+//! ref: composer/src/Composer/Repository/RepositoryInterface.php sha1:1e40e4834d2f03a4a5d4e2402429de63596c6d12
 
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::AdvisoryProviderInterface;

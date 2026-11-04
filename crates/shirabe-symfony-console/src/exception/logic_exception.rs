@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Exception/LogicException.php
+//! ref: composer/vendor/symfony/console/Exception/LogicException.php sha1:155ed6fa39f969cbbc1728d95d00f2ebc206fdb4
 
 use super::exception_interface::ExceptionInterface;
 use bstr::BString;

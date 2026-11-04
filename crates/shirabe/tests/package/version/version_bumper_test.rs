@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Version/VersionBumperTest.php
+//! ref: composer/tests/Composer/Test/Package/Version/VersionBumperTest.php sha1:e31209bb4527aabf134daa2b14f52885f91cf8c5
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

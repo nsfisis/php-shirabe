@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Json/JsonValidationExceptionTest.php
+//! ref: composer/tests/Composer/Test/Json/JsonValidationExceptionTest.php sha1:b2be5018acb9f0ff3103dfce8ac215e649caacf5
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::json::json_validation_exception::JsonValidationException;

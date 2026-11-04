@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/AliasPackage.php
+//! ref: composer/src/Composer/Package/AliasPackage.php sha1:76dd979737366ab94d582e11a667bbe61e07ba41
 
 use crate::package::version::VersionParser;
 use crate::package::{BasePackage, Link, Mirror, PackageHandle, PackageInterface};

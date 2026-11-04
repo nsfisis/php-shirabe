@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/StreamContextFactoryTest.php
+//! ref: composer/tests/Composer/Test/Util/StreamContextFactoryTest.php sha1:a3618224224c00ccb58a28fbfd28fd9b9fb4d480
 
 // These build a stream context and assert proxy/option handling driven by HTTP(S)_PROXY /
 // no_proxy environment variables. PHP's setUp/tearDown isolation (which resets the env vars and

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Transaction.php
+//! ref: composer/src/Composer/DependencyResolver/Transaction.php sha1:3bcb69f614ea3a729f5c59d600a0b0b8a6e2fc1b
 
 use crate::dependency_resolver::operation::{
     AnyOperation, InstallOperation, MarkAliasInstalledOperation, MarkAliasUninstalledOperation,

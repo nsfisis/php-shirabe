@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/StatusCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/StatusCommandTest.php sha1:83d8b868e6ae024b6e8ad12fc72092e63fed1a1c
 
 use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,

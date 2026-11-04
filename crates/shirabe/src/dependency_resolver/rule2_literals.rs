@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Rule2Literals.php
+//! ref: composer/src/Composer/DependencyResolver/Rule2Literals.php sha1:4e7a2f52b5a4abe8daa958d8593c91f1b8864afb
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use bstr::BString;

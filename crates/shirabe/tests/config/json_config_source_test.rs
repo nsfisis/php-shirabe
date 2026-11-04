@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Config/JsonConfigSourceTest.php
+//! ref: composer/tests/Composer/Test/Config/JsonConfigSourceTest.php sha1:97705eb746c7a88f7083059db9ba74d3e6d0f1ac
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

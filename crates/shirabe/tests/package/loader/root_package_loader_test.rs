@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Loader/RootPackageLoaderTest.php
+//! ref: composer/tests/Composer/Test/Package/Loader/RootPackageLoaderTest.php sha1:a30c01bfbcebdcd8619aef65c655302077a39a69
 
 // These build a RootPackageLoader with a mocked RepositoryManager and either a mocked
 // ProcessExecutor / VersionGuesser or require constraints whose parsing goes through a

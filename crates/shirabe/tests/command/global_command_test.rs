@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/GlobalCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/GlobalCommandTest.php sha1:54897c80f4687529818c2caf72d311dbd69947f5
 
 use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,

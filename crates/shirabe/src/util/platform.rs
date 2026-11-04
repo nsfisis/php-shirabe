@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Platform.php
+//! ref: composer/src/Composer/Util/Platform.php sha1:49a0644016351e98716ab8029b0d72b12d3f21f0
 
 use crate::util::ProcessExecutor;
 use bstr::{BStr, BString, ByteSlice};

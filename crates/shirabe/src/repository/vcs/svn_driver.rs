@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/SvnDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/SvnDriver.php sha1:a7e7457342c2fa9b1796ea31288306a4a74a1815
 
 use crate::cache::Cache;
 use crate::config::Config;

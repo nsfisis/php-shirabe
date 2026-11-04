@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/CommandEvent.php
+//! ref: composer/src/Composer/Plugin/CommandEvent.php sha1:49a67f60d60f95d2a6013eee5970f90d4c57b01a
 
 use crate::event_dispatcher::{Event, EventFlags};
 use bstr::BString;

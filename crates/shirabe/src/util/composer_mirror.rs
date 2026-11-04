@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/ComposerMirror.php
+//! ref: composer/src/Composer/Util/ComposerMirror.php sha1:e4cc008153020824edc33a99b32f3687dd35b9aa
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{

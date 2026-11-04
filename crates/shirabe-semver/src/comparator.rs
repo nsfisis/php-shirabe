@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/Comparator.php
+//! ref: composer/vendor/composer/semver/src/Comparator.php sha1:9769c930754b45cc1ec40ec1f17cfaa7ac75c0e6
 
 use crate::constraint::SimpleConstraint;
 

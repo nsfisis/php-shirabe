@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Loop.php
+//! ref: composer/src/Composer/Util/Loop.php sha1:54f0907047c3f5d67ef41b69d9696ed6a88804e2
 
 use crate::plugin::job_registry;
 use crate::plugin::job_registry::JobOwner;

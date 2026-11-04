@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Autoload/ClassLoader.php
+//! ref: composer/src/Composer/Autoload/ClassLoader.php sha1:7f146de662b0599355b3b049a161e23cbdbbdaeb
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;

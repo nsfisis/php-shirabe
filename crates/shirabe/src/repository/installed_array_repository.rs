@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/InstalledArrayRepository.php
+//! ref: composer/src/Composer/Repository/InstalledArrayRepository.php sha1:1fa649c567a505c90b3d1aec1b3c25ad9793e443
 
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{

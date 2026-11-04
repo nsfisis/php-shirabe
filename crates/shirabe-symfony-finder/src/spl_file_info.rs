@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/finder/SplFileInfo.php
+//! ref: composer/vendor/symfony/finder/SplFileInfo.php sha1:0f6a7fd778c5a770c81ff68a72e1ce2f795b5d2d
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{

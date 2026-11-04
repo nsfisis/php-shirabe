@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Command/HelpCommand.php
+//! ref: composer/vendor/symfony/console/Command/HelpCommand.php sha1:0c7e6dc4ac80cabe2b45d676e936e634122f4c5c
 
 use crate::command::{Command, CommandData, SetDefinitionArg};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};

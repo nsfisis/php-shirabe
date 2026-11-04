@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Filter/PlatformRequirementFilter/PlatformRequirementFilterInterface.php
+//! ref: composer/src/Composer/Filter/PlatformRequirementFilter/PlatformRequirementFilterInterface.php sha1:490c0cb96843f0c969bbecb89ff8957c028d7cbc
 
 use bstr::BStr;
 

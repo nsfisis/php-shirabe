@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Url.php
+//! ref: composer/src/Composer/Util/Url.php sha1:3475ac829753710b8beeb4b3f9f82066b3d32b8b
 
 use crate::config::Config;
 use crate::util::GitHub;

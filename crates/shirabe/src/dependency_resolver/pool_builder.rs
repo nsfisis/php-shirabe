@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/PoolBuilder.php
+//! ref: composer/src/Composer/DependencyResolver/PoolBuilder.php sha1:11ae156bf9d4644c5b5ba938fa3957b6ded56ec6
 
 use crate::dependency_resolver::{Pool, PoolOptimizer, Request, SecurityAdvisoryPoolFilter};
 use crate::event_dispatcher::EventDispatcherInterface;

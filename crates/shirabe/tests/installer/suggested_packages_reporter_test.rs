@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Installer/SuggestedPackagesReporterTest.php
+//! ref: composer/tests/Composer/Test/Installer/SuggestedPackagesReporterTest.php sha1:fc222e6961d3734db2ce476fed031ff247b74127
 
 use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
 use crate::test_case::get_package;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/BumpCommand.php
+//! ref: composer/src/Composer/Command/BumpCommand.php sha1:9779ca6e6334d1c464f8bec6258eb38439cd65ac
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};

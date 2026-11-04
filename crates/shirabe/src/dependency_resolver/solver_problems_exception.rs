@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/SolverProblemsException.php
+//! ref: composer/src/Composer/DependencyResolver/SolverProblemsException.php sha1:19fcbddb76767fa34141021c02fb1646e80e7d8d
 
 use crate::dependency_resolver::{Pool, Problem, Request, Rule};
 use crate::repository::RepositorySet;

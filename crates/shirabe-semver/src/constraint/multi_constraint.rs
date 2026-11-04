@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/Constraint/MultiConstraint.php
+//! ref: composer/vendor/composer/semver/src/Constraint/MultiConstraint.php sha1:a4a8656b4a2edf9d780ca1aff5d1678bd98d6615
 
 use crate::constraint::{AnyConstraint, Bound, MatchAllConstraint};
 use bstr::BString;

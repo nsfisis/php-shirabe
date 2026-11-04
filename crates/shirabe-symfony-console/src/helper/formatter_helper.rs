@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/FormatterHelper.php
+//! ref: composer/vendor/symfony/console/Helper/FormatterHelper.php sha1:9150365b39cd8bb9dcd96bf9422e1a2af5ad15a7
 
 use crate::formatter::OutputFormatter;
 use crate::helper::{Helper, HelperInterface, HelperSet};

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/Vcs/HgDriverTest.php
+//! ref: composer/tests/Composer/Test/Repository/Vcs/HgDriverTest.php sha1:511bb9ce87570bab4384147ae32e05eb25eb3c0a
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;

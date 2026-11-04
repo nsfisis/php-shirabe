@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/ReinstallCommand.php
+//! ref: composer/src/Composer/Command/ReinstallCommand.php sha1:87dab56e3f81a929fe8f8ed8ebdd2d13480e4267
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};

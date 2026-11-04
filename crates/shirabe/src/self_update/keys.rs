@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/SelfUpdate/Keys.php
+//! ref: composer/src/Composer/SelfUpdate/Keys.php sha1:3c9a1c33f7058f86f385fd0b9473c49ecbb87914
 
 use bstr::BString;
 use shirabe_php_shim::{file_get_contents, hash, implode, php_regex, preg_replace, strtoupper};

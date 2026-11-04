@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/SecurityAdvisoryPoolFilterTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/SecurityAdvisoryPoolFilterTest.php sha1:85b97377005b1d7c540c946f9172976e15693ad9
 
 // The filter parses each advisory's affectedVersions (e.g. ">=1.0.0,<1.1.0") into a
 // constraint, which goes through the version parser's look-around regex that the regex

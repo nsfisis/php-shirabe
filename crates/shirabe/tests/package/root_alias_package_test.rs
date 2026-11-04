@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/RootAliasPackageTest.php
+//! ref: composer/tests/Composer/Test/Package/RootAliasPackageTest.php sha1:fd66027c1f11794c1380df060c71848bcd49de34
 
 use bstr::BString;
 use indexmap::IndexMap;

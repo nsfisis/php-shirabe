@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/PluginBlockedException.php
+//! ref: composer/src/Composer/Plugin/PluginBlockedException.php sha1:aa7b95b50977653112c523868c37453e8523d220
 
 use bstr::BString;
 use shirabe_php_shim::UnexpectedValueException;

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Exception/LogicException.php
+//! ref: composer/vendor/symfony/process/Exception/LogicException.php sha1:b98331d61ea70e49b2fb67fa94c63ebe5a7c61c3
 
 use bstr::BString;
 

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/VcsCapableDownloaderInterface.php
+//! ref: composer/src/Composer/Downloader/VcsCapableDownloaderInterface.php sha1:bd36e4e76818618ff9d2bf3ba7b4ffcbc9fcda6b
 
 use crate::package::PackageInterfaceHandle;
 

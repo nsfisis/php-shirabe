@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/ComposerRepository.php
+//! ref: composer/src/Composer/Repository/ComposerRepository.php sha1:f071149e14403af3b4808b0950aa4ebc2b212654
 
 use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory};
 use crate::cache::Cache;

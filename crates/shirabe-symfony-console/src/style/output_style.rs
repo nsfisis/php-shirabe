@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Style/OutputStyle.php
+//! ref: composer/vendor/symfony/console/Style/OutputStyle.php sha1:254d6603453813b06f00b5484b791e1832c4dc9e
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::ProgressBar;

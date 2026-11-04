@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Platform/Version.php
+//! ref: composer/src/Composer/Platform/Version.php sha1:d86d2f11211b2d0adb582c1c910d231717dd7dcc
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

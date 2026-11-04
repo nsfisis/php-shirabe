@@ -1,4 +1,4 @@
-//! ref: composer/vendor/seld/jsonlint/src/Seld/JsonLint/ParsingException.php
+//! ref: composer/vendor/seld/jsonlint/src/Seld/JsonLint/ParsingException.php sha1:1433fd9e1c22309eeb8574e82aa4a264163ba3eb
 
 use bstr::BString;
 use shirabe_php_shim::Exception;

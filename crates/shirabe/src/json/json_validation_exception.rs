@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Json/JsonValidationException.php
+//! ref: composer/src/Composer/Json/JsonValidationException.php sha1:12472643e8abf0e6f472b8f333040bf2d4501f24
 
 use bstr::BString;
 use shirabe_php_shim::Exception;

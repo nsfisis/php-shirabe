@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/ArtifactRepository.php
+//! ref: composer/src/Composer/Repository/ArtifactRepository.php sha1:d62680f1fd480d3b47a30a5b68e0df7b27e2a572
 
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::JsonFile;

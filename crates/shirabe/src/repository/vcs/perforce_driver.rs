@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/PerforceDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/PerforceDriver.php sha1:473ac3d0c3979d689706fd8d138091101937395f
 
 use crate::cache::Cache;
 use crate::config::Config;

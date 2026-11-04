@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/CanonicalPackagesTrait.php
+//! ref: composer/src/Composer/Repository/CanonicalPackagesTrait.php sha1:365425a55ee8d98b6525f35444b7e33ce5d74910
 
 use crate::package::PackageInterfaceHandle;
 use crate::repository::RepositoryInterface;

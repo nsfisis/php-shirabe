@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/StreamContextFactory.php
+//! ref: composer/src/Composer/Util/StreamContextFactory.php sha1:a9dd88a37c5f0e86a5f093e6a0e230ae27d69645
 
 use crate::composer;
 use crate::downloader::TransportException;

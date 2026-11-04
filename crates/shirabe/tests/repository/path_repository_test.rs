@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/PathRepositoryTest.php
+//! ref: composer/tests/Composer/Test/Repository/PathRepositoryTest.php sha1:07002f7c81985331ff41fa16bc1c8ecf69b80151
 
 use crate::test_case::get_package;
 use bstr::{BStr, BString, ByteSlice};

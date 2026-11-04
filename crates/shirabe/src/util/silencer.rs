@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Silencer.php
+//! ref: composer/src/Composer/Util/Silencer.php sha1:e2654f7e6050f3dccbeddcd7a4932990455a3fb9
 
 use shirabe_php_shim::{
     E_DEPRECATED, E_NOTICE, E_USER_DEPRECATED, E_USER_NOTICE, E_USER_WARNING, E_WARNING,

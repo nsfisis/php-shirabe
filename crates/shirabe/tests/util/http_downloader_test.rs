@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/HttpDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Util/HttpDownloaderTest.php sha1:9bc6a3fab2209e8ba0ad56c89f921f6b42af94ee
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, get_io_mock};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/MultiConflictRule.php
+//! ref: composer/src/Composer/DependencyResolver/MultiConflictRule.php sha1:5d81b33b93543b78d3419ac8bb4247a556dbb4cb
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use bstr::BString;

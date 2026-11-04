@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/NoProxyPattern.php
+//! ref: composer/src/Composer/Util/NoProxyPattern.php sha1:97892c888dbc5712de7e494d83e561b2fffff3a6
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;

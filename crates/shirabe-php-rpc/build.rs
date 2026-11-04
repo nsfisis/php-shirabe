@@ -1,7 +1,7 @@
 //! Builds the Composer PHP runtime phar bundle embedded in the distributed binary. See also
 //! `docs/dev/composer-runtime-bundle.md`.
 //!
-//! ref: composer/src/Composer/Compiler.php
+//! ref: composer/src/Composer/Compiler.php sha1:9c0d11aa05bfdbfee70f2fc21cbf72ec57101496
 
 #![allow(
     clippy::disallowed_types,

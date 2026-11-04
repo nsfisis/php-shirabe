@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/FilesystemException.php
+//! ref: composer/src/Composer/Downloader/FilesystemException.php sha1:bba6413089b969fe05dc64513efa5ef997d756a9
 
 use bstr::BString;
 use shirabe_php_shim::{Exception, bconcat};

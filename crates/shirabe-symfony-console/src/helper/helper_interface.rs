@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/HelperInterface.php
+//! ref: composer/vendor/symfony/console/Helper/HelperInterface.php sha1:1a5ec81e253b2f3f8dbd96b14b3b205b76a4c655
 
 use crate::helper::HelperSet;
 use bstr::BString;

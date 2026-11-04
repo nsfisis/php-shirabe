@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Platform/HhvmDetector.php
+//! ref: composer/src/Composer/Platform/HhvmDetector.php sha1:42fd0ae414fda46e18f745ed0abce5df762a6546
 
 use crate::util::{Platform, ProcessExecutor};
 use bstr::BString;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Exception/NoSslException.php
+//! ref: composer/src/Composer/Exception/NoSslException.php sha1:028672aabe912923f0bb37f7bb2ef7bd6df2a31b
 
 use bstr::BString;
 use shirabe_php_shim::RuntimeException;

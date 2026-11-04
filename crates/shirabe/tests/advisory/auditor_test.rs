@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Advisory/AuditorTest.php
+//! ref: composer/tests/Composer/Test/Advisory/AuditorTest.php sha1:ac30dd8d1e88a98370b4c9297cab377a5a6eae8e
 
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::test_case::{get_complete_package, get_package};

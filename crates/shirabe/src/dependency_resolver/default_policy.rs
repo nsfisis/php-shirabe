@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/DefaultPolicy.php
+//! ref: composer/src/Composer/DependencyResolver/DefaultPolicy.php sha1:de68b2b8ac0bcf09f2c71c7f997ab1ce131a6053
 
 use crate::dependency_resolver::{PolicyInterface, Pool};
 use crate::package::{BasePackageHandle, stability_priority};

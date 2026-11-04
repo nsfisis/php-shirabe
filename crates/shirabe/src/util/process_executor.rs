@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/ProcessExecutor.php
+//! ref: composer/src/Composer/Util/ProcessExecutor.php sha1:1852637f6e0380d92e650c6305e11f6c8cbc43ae
 
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::signal::SignalSubscription;

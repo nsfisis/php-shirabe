@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/Constraint/MatchNoneConstraint.php
+//! ref: composer/vendor/composer/semver/src/Constraint/MatchNoneConstraint.php sha1:fd6e00f957b8eabd78601e8d5543225ec77cd496
 
 use crate::constraint::Bound;
 use bstr::BString;

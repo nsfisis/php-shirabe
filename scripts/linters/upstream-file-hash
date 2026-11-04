@@ -1,0 +1,60 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Shirabe\Lint\Support\Paths;
+use Shirabe\Lint\Support\RefHeader;
+
+const USAGE = <<<'TXT'
+Usage:
+  upstream-file-hash update <rust-file>...
+      Write the current hash of the upstream file into every `//! ref:` header, adding it where
+      it is missing. Run it only after checking that the Rust port follows the upstream file.
+
+TXT;
+
+$rootDir = dirname(__DIR__, 2);
+
+function update(string $rootDir, string $rustPath): bool
+{
+    $lines = explode("\n", file_get_contents($rustPath));
+    $relative = Paths::relativeTo($rootDir, realpath($rustPath));
+    $ok = true;
+
+    foreach ($lines as $idx => $line) {
+        if (!preg_match(RefHeader::CANDIDATE_RE, $line)) {
+            continue;
+        }
+        if (!preg_match(RefHeader::UPDATABLE_RE, $line, $m)) {
+            fwrite(STDERR, "{$relative}:" . ($idx + 1) . ": malformed header: {$line}\n");
+            $ok = false;
+            continue;
+        }
+        try {
+            $lines[$idx] = RefHeader::format($m[1], RefHeader::hash($rootDir, $m[1]));
+        } catch (\RuntimeException $e) {
+            fwrite(STDERR, "{$relative}:" . ($idx + 1) . ": {$e->getMessage()}\n");
+            $ok = false;
+        }
+    }
+    file_put_contents($rustPath, implode("\n", $lines));
+
+    return $ok;
+}
+
+$command = $argv[1] ?? null;
+$args = array_slice($argv, 2);
+
+if ($command === 'update' && $args !== []) {
+    $ok = true;
+    foreach ($args as $rustPath) {
+        $ok = update($rootDir, $rustPath) && $ok;
+    }
+    exit($ok ? 0 : 1);
+}
+
+fwrite(STDERR, USAGE);
+exit(2);

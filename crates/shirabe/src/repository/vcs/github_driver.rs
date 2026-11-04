@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/GitHubDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/GitHubDriver.php sha1:56976c58127fa021b07a4781f6204fc0810790da
 
 use crate::cache::Cache;
 use crate::config::Config;

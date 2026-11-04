@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Config/JsonConfigSource.php
+//! ref: composer/src/Composer/Config/JsonConfigSource.php sha1:23ab63730bd6fa191f3911aec3213b39ed0a1a28
 
 use crate::config::ConfigSourceInterface;
 use crate::json::{JsonFile, JsonManipulator, JsonValidationException};

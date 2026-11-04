@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/PathRepository.php
+//! ref: composer/src/Composer/Repository/PathRepository.php sha1:165867ec14f12952f23e50411983c9e2483b0c8a
 
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;

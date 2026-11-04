@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Http/ProxyItem.php
+//! ref: composer/src/Composer/Util/Http/ProxyItem.php sha1:fdf304362154e79a965509a498ad52d603efdfea
 
 use crate::util::http::RequestProxy;
 use bstr::BString;

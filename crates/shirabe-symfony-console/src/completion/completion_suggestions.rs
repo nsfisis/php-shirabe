@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Completion/CompletionSuggestions.php
+//! ref: composer/vendor/symfony/console/Completion/CompletionSuggestions.php sha1:121d175eca0b11077eb86448e5a6513791f21e20
 
 use crate::completion::Suggestion;
 use crate::input::InputOption;

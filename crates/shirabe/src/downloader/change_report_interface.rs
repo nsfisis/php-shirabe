@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/ChangeReportInterface.php
+//! ref: composer/src/Composer/Downloader/ChangeReportInterface.php sha1:d07a5b043bba79b9862b144e0cff1ece2cbd3683
 
 use crate::package::PackageInterfaceHandle;
 

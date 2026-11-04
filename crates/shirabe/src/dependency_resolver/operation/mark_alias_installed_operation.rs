@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php
+//! ref: composer/src/Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php sha1:52a7354ef1ccc5439bbe76480a311fc4c365b1d7
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::AliasPackageHandle;

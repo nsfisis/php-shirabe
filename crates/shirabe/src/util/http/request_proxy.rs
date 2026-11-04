@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Http/RequestProxy.php
+//! ref: composer/src/Composer/Util/Http/RequestProxy.php sha1:1beec93773cdfefc2959a00847f9c5519e879119
 
 use crate::downloader::TransportException;
 use bstr::{B, BStr, BString, ByteSlice};

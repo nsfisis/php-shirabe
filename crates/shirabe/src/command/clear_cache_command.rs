@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/ClearCacheCommand.php
+//! ref: composer/src/Composer/Command/ClearCacheCommand.php sha1:f8702b19db8724cfbb8cf8424192b612dbfe4b99
 
 use crate::cache::Cache;
 use crate::command::base_command::base_command_initialize;

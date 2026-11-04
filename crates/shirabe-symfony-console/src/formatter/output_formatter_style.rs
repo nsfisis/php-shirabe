@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyle.php
+//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyle.php sha1:75b0572d0f3bb48553b2a6d7caa468fe77bceb0d
 
 use crate::color::Color;
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;

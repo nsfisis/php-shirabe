@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/IO/BufferIOTest.php
+//! ref: composer/tests/Composer/Test/IO/BufferIOTest.php sha1:182a18be83ead9e2a60c96143b9baee30292a800
 
 use bstr::BString;
 use shirabe::io::IOInterfaceWrite;

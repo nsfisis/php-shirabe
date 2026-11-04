@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/LocalRepoTransaction.php
+//! ref: composer/src/Composer/DependencyResolver/LocalRepoTransaction.php sha1:a08654862c97044f7cc5631bd05010fbe7a16028
 
 use super::Transaction;
 use crate::dependency_resolver::operation::AnyOperation;

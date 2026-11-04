@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/PackageInterface.php
+//! ref: composer/src/Composer/Package/PackageInterface.php sha1:d56f829ff52eb38dbcfbcad930264bbe37838898
 
 use crate::package::{Link, Mirror};
 use crate::repository::RepositoryInterfaceHandle;

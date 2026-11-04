@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/RepositoryCommand.php
+//! ref: composer/src/Composer/Command/RepositoryCommand.php sha1:c02582e37b0040d5cf80534502873f1f61fc16d9
 
 use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};

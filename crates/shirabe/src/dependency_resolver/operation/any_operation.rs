@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Operation/OperationInterface.php
+//! ref: composer/src/Composer/DependencyResolver/Operation/OperationInterface.php sha1:be6415b99eece523d947c345d5832745da935d79
 //!
 //! PHP's `OperationInterface` is not ported as a trait. Operations are only ever constructed by the
 //! dependency resolver, so a plugin has no way to inject an implementation of its own and the set is

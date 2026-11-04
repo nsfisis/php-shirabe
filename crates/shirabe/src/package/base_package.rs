@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/BasePackage.php
+//! ref: composer/src/Composer/Package/BasePackage.php sha1:a9d85c796bc6f6bddfda2d83848bee03e9a97f1c
 
 use crate::package::{DisplayMode, Link, PackageInterface};
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};

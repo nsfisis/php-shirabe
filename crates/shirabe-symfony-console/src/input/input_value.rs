@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Input/InputInterface.php
+//! ref: composer/vendor/symfony/console/Input/InputInterface.php sha1:7c0149e375832cad7933bbe51f11975bf856effb
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::PhpMixed;

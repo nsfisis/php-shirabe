@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/BasePackageTest.php
+//! ref: composer/tests/Composer/Test/Package/BasePackageTest.php sha1:1e16b5fbd5f7d20eec3ea3324574a57d6b57bef4
 
 use crate::test_case::get_package;
 use bstr::{BStr, BString};

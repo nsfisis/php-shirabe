@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/ForgejoRepositoryData.php
+//! ref: composer/src/Composer/Util/ForgejoRepositoryData.php sha1:85eba081222dc3953261a55bb8a32c9f16490d49
 
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;

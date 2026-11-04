@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/IniHelper.php
+//! ref: composer/src/Composer/Util/IniHelper.php sha1:1533d2baf9088a804193ca464c0081145da3ede4
 
 use bstr::BString;
 use shirabe_php_shim::bconcat;

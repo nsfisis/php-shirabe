@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/VersionParser.php
+//! ref: composer/vendor/composer/semver/src/VersionParser.php sha1:97feef6b409ee997ebbff1c03f9e44181990fa92
 
 use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint};
 use bstr::{BStr, BString, ByteVec};

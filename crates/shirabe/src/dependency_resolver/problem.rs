@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Problem.php
+//! ref: composer/src/Composer/DependencyResolver/Problem.php sha1:1ad7bd4a1ebe9e5afea59f7f2c091e65c7997bfc
 
 use crate::dependency_resolver::rule::{self, Rule};
 use crate::dependency_resolver::{Pool, Request};

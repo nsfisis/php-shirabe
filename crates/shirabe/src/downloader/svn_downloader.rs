@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/SvnDownloader.php
+//! ref: composer/src/Composer/Downloader/SvnDownloader.php sha1:6fddad1ae8a9f25c250ea83feb467a7fb40b1b06
 
 use crate::config::Config;
 use crate::downloader::{

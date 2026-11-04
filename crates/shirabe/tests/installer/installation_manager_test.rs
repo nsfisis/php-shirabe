@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Installer/InstallationManagerTest.php
+//! ref: composer/tests/Composer/Test/Installer/InstallationManagerTest.php sha1:892eeb469ee602fc9aca0922194e874ffc05bf33
 
 use crate::async_runtime::run;
 use crate::test_case::get_package;

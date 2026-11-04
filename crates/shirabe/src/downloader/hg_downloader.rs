@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/HgDownloader.php
+//! ref: composer/src/Composer/Downloader/HgDownloader.php sha1:9496daaea288046919ee19734989f4197a415843
 
 use crate::config::Config;
 use crate::downloader::{

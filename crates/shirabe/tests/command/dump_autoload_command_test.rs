@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/DumpAutoloadCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/DumpAutoloadCommandTest.php sha1:41bb20c0bf948d9748398ec32689cbe462bdce89
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use bstr::ByteSlice;

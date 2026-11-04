@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Installer/InstallerEventTest.php
+//! ref: composer/tests/Composer/Test/Installer/InstallerEventTest.php sha1:45b5be5aca04d9c00e40b9c67689f3a128f05883
 
 use bstr::BString;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/IO/IOInterface.php
+//! ref: composer/src/Composer/IO/IOInterface.php sha1:b5ee8ddd2c0eb6b0697a101aa084b2a755d77fd3
 
 use crate::config::Config;
 use bstr::{BStr, BString};

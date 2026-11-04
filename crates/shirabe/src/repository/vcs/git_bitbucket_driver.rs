@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/GitBitbucketDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/GitBitbucketDriver.php sha1:f958f63885b38251fdc982d31b8c961eed6b4ff9
 
 use crate::cache::Cache;
 use crate::config::Config;

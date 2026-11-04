@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Factory.php
+//! ref: composer/src/Composer/Factory.php sha1:7a476d1c754885b1552953a806535ddcff25cd94
 
 use crate::autoload::AutoloadGenerator;
 use crate::cache::Cache;

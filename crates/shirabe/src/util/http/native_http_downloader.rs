@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Http/CurlDownloader.php
+//! ref: composer/src/Composer/Util/Http/CurlDownloader.php sha1:9f36e0e6628dcf49f7ed709364d4396f85d20d07
 //!
 //! The downloader `HttpDownloader` hands http(s) requests to, in the place of Composer's
 //! `CurlDownloader`. It performs the requests in-process over reqwest instead of libcurl, so it

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/VersionCacheInterface.php
+//! ref: composer/src/Composer/Repository/VersionCacheInterface.php sha1:53915c4de637de35eca5599eb19967bc6f01b66d
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

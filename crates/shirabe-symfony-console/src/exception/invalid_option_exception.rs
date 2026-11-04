@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Exception/InvalidOptionException.php
+//! ref: composer/vendor/symfony/console/Exception/InvalidOptionException.php sha1:51165519b00fcacc0a70597e0716e38ae3bdd159
 
 use super::exception_interface::ExceptionInterface;
 use bstr::BString;

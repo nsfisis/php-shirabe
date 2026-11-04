@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Pipes/WindowsPipes.php
+//! ref: composer/vendor/symfony/process/Pipes/WindowsPipes.php sha1:e294fa4f934ab4c1723aeb675ae52db743b936b9
 
 use crate::pipes::abstract_pipes::AbstractPipes;
 use crate::pipes::pipes_interface::PipesInterface;

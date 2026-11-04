@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Question/StrictConfirmationQuestionTest.php
+//! ref: composer/tests/Composer/Test/Question/StrictConfirmationQuestionTest.php sha1:4183e14821c5bc6a4e1f61eb7c879051d0039071
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::question::StrictConfirmationQuestion;

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Version/VersionGuesserTest.php
+//! ref: composer/tests/Composer/Test/Package/Version/VersionGuesserTest.php sha1:8c118f239fac2151952ca2d79e621e2f0f568313
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use bstr::{BStr, BString, ByteSlice};

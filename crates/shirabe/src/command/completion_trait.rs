@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/CompletionTrait.php
+//! ref: composer/src/Composer/Command/CompletionTrait.php sha1:a5a5253b1db61b7a579b086b08465e5cecda21ae
 
 use crate::command::BaseCommand;
 use crate::console::input::SuggestedValues;

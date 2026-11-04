@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/RarDownloader.php
+//! ref: composer/src/Composer/Downloader/RarDownloader.php sha1:43bf14277835650fb2a53d82857340d00add82a0
 
 use crate::cache::Cache;
 use crate::config::Config;

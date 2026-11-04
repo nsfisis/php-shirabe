@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Exception/InvalidArgumentException.php
+//! ref: composer/vendor/symfony/process/Exception/InvalidArgumentException.php sha1:1afc135760927a15f53345e49d763fef6cea2098
 
 use bstr::BString;
 

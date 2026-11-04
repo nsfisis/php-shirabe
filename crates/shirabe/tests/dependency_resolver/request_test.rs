@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/RequestTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/RequestTest.php sha1:6b4cb585c7f271227a686420bd50e678c036bb9b
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

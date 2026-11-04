@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/UpdateCommand.php
+//! ref: composer/src/Composer/Command/UpdateCommand.php sha1:9736a7deae25a549c219cfca41b5a8c128047e9b
 
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;

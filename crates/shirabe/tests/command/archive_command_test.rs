@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/ArchiveCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/ArchiveCommandTest.php sha1:c90d9d37e73bef49fceaf4b790f25f3b496c8395
 
 use crate::config_stub::ConfigStubBuilder;
 use bstr::{BStr, BString};

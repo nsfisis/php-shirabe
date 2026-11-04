@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/ZipTest.php
+//! ref: composer/tests/Composer/Test/Util/ZipTest.php sha1:eb19980a56f6652c9ae7fce4e2f8f7e0225e5f49
 
 use shirabe::util::zip::Zip;
 

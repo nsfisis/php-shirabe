@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Cache.php
+//! ref: composer/src/Composer/Cache.php sha1:184c5863c06dfba0950c0d70a167269306a42aa2
 
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Filesystem, Platform};

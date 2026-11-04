@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/InstallerEvent.php
+//! ref: composer/src/Composer/Installer/InstallerEvent.php sha1:1d678ec1d927d7a151afb1cf1cf37a70809ffa57
 
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::AnyTransaction;

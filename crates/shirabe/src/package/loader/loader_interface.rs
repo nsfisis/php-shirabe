@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Loader/LoaderInterface.php
+//! ref: composer/src/Composer/Package/Loader/LoaderInterface.php sha1:d15acd1b52befbc1fa6554adb0308060c31fc58e
 
 use crate::package::PackageInterfaceHandle;
 use bstr::BString;

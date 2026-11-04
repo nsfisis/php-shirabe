@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Filter/PlatformRequirementFilter/IgnoreAllPlatformRequirementFilter.php
+//! ref: composer/src/Composer/Filter/PlatformRequirementFilter/IgnoreAllPlatformRequirementFilter.php sha1:96b2dc8767336772bb829d4f33d94e8063d64242
 
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::repository::PlatformRepository;

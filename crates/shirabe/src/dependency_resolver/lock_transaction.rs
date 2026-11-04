@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/LockTransaction.php
+//! ref: composer/src/Composer/DependencyResolver/LockTransaction.php sha1:8a0928374d9cc3e593bfede005a4802e880b9203
 
 use crate::dependency_resolver::{Decisions, Pool, Transaction};
 use crate::package::PackageInterfaceHandle;

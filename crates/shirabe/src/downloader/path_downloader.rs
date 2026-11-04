@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/PathDownloader.php
+//! ref: composer/src/Composer/Downloader/PathDownloader.php sha1:c3739e3625a622f943c9d14090fbd9ebbcd31468
 
 use crate::cache::Cache;
 use crate::config::Config;

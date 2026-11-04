@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Git.php
+//! ref: composer/src/Composer/Util/Git.php sha1:122bf88edc1ff375541af8c8ccf697c0f330408a
 
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};

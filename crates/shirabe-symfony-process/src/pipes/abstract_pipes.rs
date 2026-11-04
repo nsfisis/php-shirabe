@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Pipes/AbstractPipes.php
+//! ref: composer/vendor/symfony/process/Pipes/AbstractPipes.php sha1:eab3b093613ef0837f4962e4910ae2bf43ad9689
 
 use bstr::BString;
 use indexmap::IndexMap;

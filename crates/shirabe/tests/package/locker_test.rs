@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/LockerTest.php
+//! ref: composer/tests/Composer/Test/Package/LockerTest.php sha1:ee0b07a0d06518399706b1b00cdc0459e819cbf3
 
 use crate::test_case::installation_manager;
 use bstr::{BStr, BString, ByteSlice};

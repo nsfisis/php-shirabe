@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/Table.php
+//! ref: composer/vendor/symfony/console/Helper/Table.php sha1:e458d671b2e7908f5aad83a962b45970162a16d1
 
 use crate::exception::InvalidArgumentException;
 use crate::formatter::{OutputFormatter, WrappableOutputFormatterInterface};

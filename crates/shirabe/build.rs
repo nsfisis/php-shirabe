@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Compiler.php
+//! ref: composer/src/Composer/Compiler.php sha1:9c0d11aa05bfdbfee70f2fc21cbf72ec57101496
 //!
 //! Generates the constant values of:
 //!

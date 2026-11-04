@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Command/DumpCompletionCommand.php
+//! ref: composer/vendor/symfony/console/Command/DumpCompletionCommand.php sha1:a8ba4c807d6f78c8be16f3f4ee6db1741987161e
 
 use crate::command::{Command, CommandData};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};

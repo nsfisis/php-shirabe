@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/HomeCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/HomeCommandTest.php sha1:4145ff15b54d8d5408ab88173ec6047a353416d6
 
 use crate::test_case::{
     RunOptions, create_installed_json, get_application_tester, get_complete_package,

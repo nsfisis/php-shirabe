@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/TableCellStyle.php
+//! ref: composer/vendor/symfony/console/Helper/TableCellStyle.php sha1:f9e49e378f9c8190048b498c5d9e31c50832b0b7
 
 use crate::exception::InvalidArgumentException;
 use bstr::{B, BStr, BString};

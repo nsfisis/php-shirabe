@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/ArchiveDownloader.php
+//! ref: composer/src/Composer/Downloader/ArchiveDownloader.php sha1:c22f4b27ad7bab8f09c8764a2e4eff7f88eceede
 
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::downloader::{DownloaderInterface, FileDownloader};

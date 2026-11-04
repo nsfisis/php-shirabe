@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/DownloadManager.php
+//! ref: composer/src/Composer/Downloader/DownloadManager.php sha1:23dd906e08541a3fa87196c1ecf1446aa1729b08
 
 use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;

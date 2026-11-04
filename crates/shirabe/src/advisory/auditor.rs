@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Advisory/Auditor.php
+//! ref: composer/src/Composer/Advisory/Auditor.php sha1:e2575416d104b436981565df0389ffe67cad9f4f
 
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
 use crate::io::{ConsoleIO, IOInterface, IOInterfaceWrite};

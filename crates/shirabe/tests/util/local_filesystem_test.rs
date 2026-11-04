@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/RemoteFilesystemTest.php
+//! ref: composer/tests/Composer/Test/Util/RemoteFilesystemTest.php sha1:8f8013da605e130bf96449777561cb2e8a08d74a
 //!
 //! The local reads of `RemoteFilesystemTest` (`testGetContents`, `testCopy`), which `HttpDownloader`
 //! hands to `LocalFilesystem` rather than to `RemoteFilesystem`.

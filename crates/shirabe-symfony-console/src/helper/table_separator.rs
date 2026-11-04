@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/TableSeparator.php
+//! ref: composer/vendor/symfony/console/Helper/TableSeparator.php sha1:743a39854683ad7fc65e45572ec83d3ea9dc67da
 
 use crate::exception::InvalidArgumentException;
 use crate::helper::{TableCell, TableCellOption};

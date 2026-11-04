@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Console/HtmlOutputFormatter.php
+//! ref: composer/src/Composer/Console/HtmlOutputFormatter.php sha1:033297416ea8bcf048b614e1c206f2f5b973f5d8
 
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;

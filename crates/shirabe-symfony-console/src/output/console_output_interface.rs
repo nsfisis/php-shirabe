@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Output/ConsoleOutputInterface.php
+//! ref: composer/vendor/symfony/console/Output/ConsoleOutputInterface.php sha1:7db8c06b37a63bfb40819361a437f2b5809e25e3
 
 use crate::output::{ConsoleSectionOutput, OutputInterface};
 

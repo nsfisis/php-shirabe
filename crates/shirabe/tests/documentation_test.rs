@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DocumentationTest.php
+//! ref: composer/tests/Composer/Test/DocumentationTest.php sha1:683180f3a77f548922fcfffb6ff2fc8f3437234c
 
 use bstr::{BString, ByteSlice};
 use shirabe::console::application::ApplicationHandle;

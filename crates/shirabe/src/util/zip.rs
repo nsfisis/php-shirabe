@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Zip.php
+//! ref: composer/src/Composer/Util/Zip.php sha1:d6b1e4700db652c170f1317e805db1ed05a5d570
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/EventDispatcher/EventDispatcher.php
+//! ref: composer/src/Composer/EventDispatcher/EventDispatcher.php sha1:7ee457208f3d134d389add482cdffa5fce71d424
 
 use crate::autoload::ClassLoader;
 use crate::composer::{PartialComposerHandle, PartialComposerWeakHandle};

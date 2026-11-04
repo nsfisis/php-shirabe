@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/PackageEvent.php
+//! ref: composer/src/Composer/Installer/PackageEvent.php sha1:281091ce5960f7bef66ca303fea29bacd86f9ebe
 
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::operation::AnyOperation;

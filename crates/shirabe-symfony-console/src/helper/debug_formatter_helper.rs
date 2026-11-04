@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/DebugFormatterHelper.php
+//! ref: composer/vendor/symfony/console/Helper/DebugFormatterHelper.php sha1:461237b23d2cff0bf7b0875647a78d54bcb79af5
 
 use crate::helper::{Helper, HelperInterface, HelperSet};
 use bstr::{BStr, BString};

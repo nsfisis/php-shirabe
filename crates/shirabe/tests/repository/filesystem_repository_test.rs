@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/FilesystemRepositoryTest.php
+//! ref: composer/tests/Composer/Test/Repository/FilesystemRepositoryTest.php sha1:4154499d3819d9388049af193e825d43d1ef8fae
 
 use crate::php_worker::{load_composer_php_runtime, php_call_static, php_runtime_available};
 use crate::test_case::{get_alias_package, get_package};

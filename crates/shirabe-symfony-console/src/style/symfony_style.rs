@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Style/SymfonyStyle.php
+//! ref: composer/vendor/symfony/console/Style/SymfonyStyle.php sha1:7f214d121b04636b9508de280456273d709bab8b
 
 use crate::formatter::{OutputFormatter, OutputFormatterInterface};
 use crate::helper::{Cell, Helper, QuestionHelperInterface, Row, SymfonyQuestionHelper, Table};

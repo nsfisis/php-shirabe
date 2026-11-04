@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/ProcessUtils.php
+//! ref: composer/vendor/symfony/process/ProcessUtils.php sha1:1fd6fdf6b636d32f4bc58fe71d7ab1c6a42a3fc0
 
 use crate::exception::InvalidArgumentException;
 use bstr::BStr;

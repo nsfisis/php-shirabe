@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Output/OutputInterface.php
+//! ref: composer/vendor/symfony/console/Output/OutputInterface.php sha1:57e42dae8f9763b26040982213a9232bea9d43ca
 
 use crate::formatter::OutputFormatterInterface;
 use bstr::BString;

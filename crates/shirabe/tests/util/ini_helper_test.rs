@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/IniHelperTest.php
+//! ref: composer/tests/Composer/Test/Util/IniHelperTest.php sha1:29368f17d810020f7f4a2a4d90cc590df5dcc660
 //!
 //! All four cases of this test feed IniHelper made-up ini paths through COMPOSER_ORIGINAL_INIS.
 //! That variable exists so a process restarted without Xdebug can name the ini files it replaced;

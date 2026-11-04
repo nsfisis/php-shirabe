@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Version/VersionBumper.php
+//! ref: composer/src/Composer/Package/Version/VersionBumper.php sha1:bee3bd6235d24b16c7ad7af1b39e8ab466afed28
 
 use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;

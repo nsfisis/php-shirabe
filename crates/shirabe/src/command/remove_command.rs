@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/RemoveCommand.php
+//! ref: composer/src/Composer/Command/RemoveCommand.php sha1:6fc635adbb71d96ddf7e00e7a1373b7d0045bccb
 
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;

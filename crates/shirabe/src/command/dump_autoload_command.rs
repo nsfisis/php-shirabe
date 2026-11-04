@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/DumpAutoloadCommand.php
+//! ref: composer/src/Composer/Command/DumpAutoloadCommand.php sha1:940644a813d290de4cf46a71c886aac126410f3c
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};

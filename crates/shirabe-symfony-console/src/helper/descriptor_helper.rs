@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/DescriptorHelper.php
+//! ref: composer/vendor/symfony/console/Helper/DescriptorHelper.php sha1:fe292e81f5328111654359a6650dc6b87d18a2b1
 
 use crate::descriptor::{
     DescribableObject, DescriptorInterface, DescriptorOptions, JsonDescriptor, MarkdownDescriptor,

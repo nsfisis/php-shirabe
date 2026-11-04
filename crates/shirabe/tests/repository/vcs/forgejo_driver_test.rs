@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/Vcs/ForgejoDriverTest.php
+//! ref: composer/tests/Composer/Test/Repository/Vcs/ForgejoDriverTest.php sha1:51f76b7136ed2d355179260c96ee37ec9ffda1cc
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};

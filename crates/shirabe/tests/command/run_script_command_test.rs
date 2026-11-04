@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/RunScriptCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/RunScriptCommandTest.php sha1:44e03da3d598f41319e50a07e29a659d0d8b4010
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use bstr::ByteSlice;

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/XzDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Downloader/XzDownloaderTest.php sha1:a64362aa02e8f92c98f1ad72f81f23d2a656873d
 
 use crate::async_runtime::run;
 use bstr::{BStr, BString};

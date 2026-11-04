@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyleStack.php
+//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyleStack.php sha1:0fd11705cc75d284828d4f058fe7677932cd14ea
 
 use crate::exception::InvalidArgumentException;
 use crate::formatter::output_formatter_style::OutputFormatterStyle;

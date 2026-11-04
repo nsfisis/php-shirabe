@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/RepositoryManagerTest.php
+//! ref: composer/tests/Composer/Test/Repository/RepositoryManagerTest.php sha1:61d442a8b5929f119f7c7f98e2d7a4002e93a852
 
 // These construct a RepositoryManager (which builds an HttpDownloader reaching
 // curl_multi_init, todo!()) with a mocked IO/Config/EventDispatcher and exercise repo

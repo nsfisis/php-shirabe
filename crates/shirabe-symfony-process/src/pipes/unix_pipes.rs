@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Pipes/UnixPipes.php
+//! ref: composer/vendor/symfony/process/Pipes/UnixPipes.php sha1:3dc0695870857e218472857b3c9a53c89dc60e2c
 
 use crate::pipes::abstract_pipes::AbstractPipes;
 use crate::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};

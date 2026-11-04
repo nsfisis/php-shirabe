@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Tar.php
+//! ref: composer/src/Composer/Util/Tar.php sha1:2875dd676bae73e0302b3f0608fb65ac257ce2d3
 
 use bstr::BString;
 use indexmap::IndexMap;

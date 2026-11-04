@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/Vcs/FossilDriverTest.php
+//! ref: composer/tests/Composer/Test/Repository/Vcs/FossilDriverTest.php sha1:34866db75424df152980619fff8ccb23c4fce503
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

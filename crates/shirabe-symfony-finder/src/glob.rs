@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/finder/Glob.php
+//! ref: composer/vendor/symfony/finder/Glob.php sha1:c3790810cef503a99d883b9353bc7fa278b5b04f
 
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{bconcat, implode};

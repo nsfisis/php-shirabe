@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/VcsDownloader.php
+//! ref: composer/src/Composer/Downloader/VcsDownloader.php sha1:0a461edec5b5c8fbff8b2fb858dd1bf33598df7f
 
 use crate::config::Config;
 use crate::dependency_resolver::operation::{

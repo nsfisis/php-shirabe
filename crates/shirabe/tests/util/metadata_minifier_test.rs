@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/MetadataMinifierTest.php
+//! ref: composer/tests/Composer/Test/Util/MetadataMinifierTest.php sha1:6cb5a0b6376d730734463850d30779469546c69a
 
 use bstr::BString;
 use indexmap::{IndexMap, indexmap};

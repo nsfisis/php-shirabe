@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Archiver/PharArchiverTest.php
+//! ref: composer/tests/Composer/Test/Package/Archiver/PharArchiverTest.php sha1:bb3df0d5b21448501a2b6f9bf54744293b1a33ec
 
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;

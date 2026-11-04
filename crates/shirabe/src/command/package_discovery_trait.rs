@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/PackageDiscoveryTrait.php
+//! ref: composer/src/Composer/Command/PackageDiscoveryTrait.php sha1:3604a040ca3dfd0f6ef6f89c2a93d60e4f7a0861
 
 use crate::command::BaseCommand;
 use crate::factory::Factory;

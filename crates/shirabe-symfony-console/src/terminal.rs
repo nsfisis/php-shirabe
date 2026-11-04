@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Terminal.php
+//! ref: composer/vendor/symfony/console/Terminal.php sha1:e9ca51f4cd459635b19cafdb8a46077d50a0f1ed
 
 use bstr::BString;
 use shirabe_php_shim::{

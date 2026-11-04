@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/MetapackageInstaller.php
+//! ref: composer/src/Composer/Installer/MetapackageInstaller.php sha1:5d4cf8ff19cfc98aac224c92f432b6bad02d689c
 
 use crate::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,

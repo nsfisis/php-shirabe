@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/PackageRepository.php
+//! ref: composer/src/Composer/Repository/PackageRepository.php sha1:2a84b144db6dffdf89c90dad295af26658b59b71
 
 use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory};
 use crate::package::loader::{ArrayLoader, LoaderInterface, ValidatingArrayLoader};

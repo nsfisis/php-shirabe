@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/InstalledFilesystemRepository.php
+//! ref: composer/src/Composer/Repository/InstalledFilesystemRepository.php sha1:67c4cff619a86728e1eb35d1d1bac3b96c102163
 
 use crate::json::JsonFile;
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Loader/InvalidPackageException.php
+//! ref: composer/src/Composer/Package/Loader/InvalidPackageException.php sha1:be37904970764b3091d04e97838ad5969a8a12c3
 
 use bstr::BString;
 use indexmap::IndexMap;

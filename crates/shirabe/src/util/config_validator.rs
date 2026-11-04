@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/ConfigValidator.php
+//! ref: composer/src/Composer/Util/ConfigValidator.php sha1:f49a09f59d510e61572d94c4668964b88ff64747
 
 use crate::io::IOInterface;
 use crate::json::{JsonFile, JsonValidationException};

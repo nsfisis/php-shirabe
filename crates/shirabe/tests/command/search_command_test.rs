@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/SearchCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/SearchCommandTest.php sha1:94362ef761078fdebc57ef6dfaaf2f902d3231b8
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use bstr::{BStr, ByteSlice};

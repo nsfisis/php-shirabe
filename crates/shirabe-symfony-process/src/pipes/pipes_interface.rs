@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Pipes/PipesInterface.php
+//! ref: composer/vendor/symfony/process/Pipes/PipesInterface.php sha1:cfec64166c31d850525a82ff16e66c8debe95000
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{Descriptor, PhpResource};

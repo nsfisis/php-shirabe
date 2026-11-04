@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/CompilingMatcher.php
+//! ref: composer/vendor/composer/semver/src/CompilingMatcher.php sha1:ac42c345fc54411069b305772a4532eff4c2d6b3
 
 use crate::constraint::{AnyConstraint, SimpleConstraint};
 use bstr::BString;

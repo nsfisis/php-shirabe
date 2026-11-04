@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/TransactionTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/TransactionTest.php sha1:44497ca1cb158b8ba79cfd82a1e76f303a10d1b5
 
 use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 use bstr::{BStr, BString};

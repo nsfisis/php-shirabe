@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Archiver/ZipArchiver.php
+//! ref: composer/src/Composer/Package/Archiver/ZipArchiver.php sha1:74ea7f2edcbab098260db246217cad9f7f9de350
 
 use crate::package::archiver::{ArchivableFilesFinder, ArchiverInterface};
 use crate::util::{Filesystem, Platform};

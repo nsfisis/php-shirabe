@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/CreateProjectCommand.php
+//! ref: composer/src/Composer/Command/CreateProjectCommand.php sha1:028857d3493a517f6883959aeb89cea1068f369a
 
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;

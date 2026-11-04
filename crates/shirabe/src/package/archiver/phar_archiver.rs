@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Archiver/PharArchiver.php
+//! ref: composer/src/Composer/Package/Archiver/PharArchiver.php sha1:70cb485566b274a87c4bf5ed4e47e1b9a35f0851
 
 use crate::package::archiver::{ArchivableFilesFilter, ArchivableFilesFinder, ArchiverInterface};
 use bstr::{BStr, BString, ByteSlice};

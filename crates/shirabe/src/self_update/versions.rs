@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/SelfUpdate/Versions.php
+//! ref: composer/src/Composer/SelfUpdate/Versions.php sha1:b751b151425007c9645371a3e3c29bf4acde0784
 
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceWrite};

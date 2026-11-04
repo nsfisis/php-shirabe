@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php sha1:03d43302268d6664f350b63398ce191085833df9
 
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;

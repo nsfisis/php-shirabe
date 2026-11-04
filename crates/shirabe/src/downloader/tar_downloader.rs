@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/TarDownloader.php
+//! ref: composer/src/Composer/Downloader/TarDownloader.php sha1:ab507d2e498a51e16cfc6dd419960a542209f818
 
 use crate::cache::Cache;
 use crate::config::Config;

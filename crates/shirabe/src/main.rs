@@ -1,4 +1,4 @@
-//! ref: composer/bin/composer
+//! ref: composer/bin/composer sha1:ccaa40f848b5fa236d5cd8d824b315e2fea2d819
 
 use shirabe_php_shim::{PHP_ENV, PHP_SERVER, getenv, path_to_bytes, utf8_text};
 use std::io::IsTerminal as _;

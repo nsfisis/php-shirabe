@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Json/JsonFile.php
+//! ref: composer/src/Composer/Json/JsonFile.php sha1:1769fe849f0bf7f8e0727be30497de38ce137aac
 
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};

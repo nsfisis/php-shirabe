@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Platform/VersionTest.php
+//! ref: composer/tests/Composer/Test/Platform/VersionTest.php sha1:dac663441d569b0c89b96df5fde03d8272991b0e
 
 use bstr::BStr;
 use shirabe::platform::version::Version;

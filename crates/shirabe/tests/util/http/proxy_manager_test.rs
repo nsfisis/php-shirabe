@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/Http/ProxyManagerTest.php
+//! ref: composer/tests/Composer/Test/Util/Http/ProxyManagerTest.php sha1:46e551dbac42c7a0306d66a89c7a05863a80c932
 
 // ProxyManager reads HTTP(S)_PROXY / CGI_HTTP_PROXY / no_proxy environment variables; the
 // env-dependent setup (without its setUp/tearDown isolation) is not ported.

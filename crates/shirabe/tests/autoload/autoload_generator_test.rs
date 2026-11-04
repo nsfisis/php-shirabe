@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Autoload/AutoloadGeneratorTest.php
+//! ref: composer/tests/Composer/Test/Autoload/AutoloadGeneratorTest.php sha1:49ef7fbbc645f03edff5d75bd89005271cbfffd2
 
 use crate::config_stub::ConfigStubBuilder;
 use bstr::{B, BStr, BString, ByteSlice};

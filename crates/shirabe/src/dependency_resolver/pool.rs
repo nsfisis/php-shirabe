@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Pool.php
+//! ref: composer/src/Composer/DependencyResolver/Pool.php sha1:fd2bcf23bdfbe17f39faa20a29acdb1a16433c5b
 
 use crate::advisory::AnySecurityAdvisory;
 use crate::package::BasePackageHandle;

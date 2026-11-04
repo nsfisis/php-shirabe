@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/QuestionHelper.php
+//! ref: composer/vendor/symfony/console/Helper/QuestionHelper.php sha1:8abb8babab68ebd26d086355a98f61bb83b8f5b7
 
 use crate::cursor::Cursor;
 use crate::exception::{InvalidArgumentException, MissingInputException, RuntimeException};

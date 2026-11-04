@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Version/VersionGuesser.php
+//! ref: composer/src/Composer/Package/Version/VersionGuesser.php sha1:fa31581eef5544e44fb563b446e0e287dcbe5fd5
 
 use crate::config::Config;
 use crate::io::{IOInterface, NullIO};

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/Constraint/Constraint.php
+//! ref: composer/vendor/composer/semver/src/Constraint/Constraint.php sha1:2e43c3fc693a454e0409be204ad2c962fe4dc227
 
 use crate::constraint::Bound;
 use bstr::{BStr, BString, ByteSlice};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer.php
+//! ref: composer/src/Composer/Installer.php sha1:90decc9845ae09cf84f1117f0b4386e22bc51d57
 
 mod binary_installer;
 mod binary_presence_interface;

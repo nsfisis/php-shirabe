@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/DvcsDownloaderInterface.php
+//! ref: composer/src/Composer/Downloader/DvcsDownloaderInterface.php sha1:48c885abec6e9f6ab7c0317a1983f4b216b5d26d
 
 use crate::package::PackageInterfaceHandle;
 

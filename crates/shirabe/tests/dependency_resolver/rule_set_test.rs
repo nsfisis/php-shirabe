@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetTest.php sha1:05301cf8e1ecb7df75cd43339bf6926c34edd2b1
 
 use crate::test_case::get_package;
 use bstr::ByteSlice;

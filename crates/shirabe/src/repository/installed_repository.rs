@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/InstalledRepository.php
+//! ref: composer/src/Composer/Repository/InstalledRepository.php sha1:28810aeb71635b257c2ee9e1e66b208bb007e3b3
 
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link, PackageInterfaceHandle};

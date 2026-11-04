@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/DiagnoseCommand.php
+//! ref: composer/src/Composer/Command/DiagnoseCommand.php sha1:fc82ca5045451163f82c40d1acbc3a9c1feb0a38
 
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;

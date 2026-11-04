@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/CheckPlatformReqsCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/CheckPlatformReqsCommandTest.php sha1:0a087e1d3d62ddbbbcd4da30a89dac5416c3829e
 
 use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,

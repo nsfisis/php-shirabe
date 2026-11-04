@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Filesystem.php
+//! ref: composer/src/Composer/Util/Filesystem.php sha1:3792e765baeceda1cb9bf3998d12a2b3037d50b1
 
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BString, ByteVec};

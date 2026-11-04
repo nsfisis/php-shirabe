@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/DownloadManagerTest.php
+//! ref: composer/tests/Composer/Test/Downloader/DownloadManagerTest.php sha1:beed3b24639e01796f78c002a129c1d4d65fb5d4
 
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;

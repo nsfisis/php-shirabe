@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Filter/PlatformRequirementFilter/PlatformRequirementFilterFactoryTest.php
+//! ref: composer/tests/Composer/Test/Filter/PlatformRequirementFilter/PlatformRequirementFilterFactoryTest.php sha1:2340d795e6535a71d43c409bf180b9a3e38411f8
 
 use bstr::BString;
 use shirabe::filter::platform_requirement_filter::{

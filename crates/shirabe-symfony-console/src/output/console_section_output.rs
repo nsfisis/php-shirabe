@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Output/ConsoleSectionOutput.php
+//! ref: composer/vendor/symfony/console/Output/ConsoleSectionOutput.php sha1:bc4a55cae95d8100b49c72892fc9665d0a6a558e
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;

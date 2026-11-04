@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Input/ArgvInput.php
+//! ref: composer/vendor/symfony/console/Input/ArgvInput.php sha1:d6cbab5f0516935a462d7e2a7a0261a74d22e22f
 
 use crate::exception::RuntimeException;
 use crate::input::{

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/Constraint/ConstraintInterface.php
+//! ref: composer/vendor/composer/semver/src/Constraint/ConstraintInterface.php sha1:a6d3812511054cdfc4113607abd70dfa858ce3f5
 
 use crate::constraint::{
     Bound, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,

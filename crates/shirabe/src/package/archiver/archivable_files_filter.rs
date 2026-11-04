@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFilter.php
+//! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFilter.php sha1:2d1bba20104bf436c2d3edb2315a98d7ad315de8
 
 use shirabe_php_shim::{PharData, bconcat, path_to_bytes, str_replace};
 use std::path::{Path, PathBuf};

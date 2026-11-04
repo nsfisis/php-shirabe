@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Bitbucket.php
+//! ref: composer/src/Composer/Util/Bitbucket.php sha1:049881a96886e4ad19694d4b9d8baa3dd7c11e03
 
 use crate::config::Config;
 use crate::downloader::TransportException;

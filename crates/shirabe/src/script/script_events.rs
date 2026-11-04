@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Script/ScriptEvents.php
+//! ref: composer/src/Composer/Script/ScriptEvents.php sha1:607d2734bebe11b38b88d62ab28aef78605a1f1f
 
 use bstr::BStr;
 use shirabe_php_shim::php_str;

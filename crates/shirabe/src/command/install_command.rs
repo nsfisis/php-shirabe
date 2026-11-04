@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/InstallCommand.php
+//! ref: composer/src/Composer/Command/InstallCommand.php sha1:f259b576a55a58e2be6884e9e4c3bcd97ceec5a2
 
 use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;

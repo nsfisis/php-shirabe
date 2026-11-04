@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Loader/ArrayLoaderTest.php
+//! ref: composer/tests/Composer/Test/Package/Loader/ArrayLoaderTest.php sha1:ac1df879301118c11ed2de9285820aaec772e72d
 
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;

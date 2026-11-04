@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Svn.php
+//! ref: composer/src/Composer/Util/Svn.php sha1:49634190b2b4684ef42c9ccf8a263f365d7eb904
 
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};

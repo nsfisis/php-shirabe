@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/FilterRepositoryTest.php
+//! ref: composer/tests/Composer/Test/Repository/FilterRepositoryTest.php sha1:d3394ae137863043a7a36d660dcb7a8a86a9f124
 
 use crate::test_case::get_package;
 use bstr::{BStr, BString};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Advisory/SecurityAdvisory.php
+//! ref: composer/src/Composer/Advisory/SecurityAdvisory.php sha1:739e9f98d2a018b965a8c75aa97140787cf3b6b2
 
 use crate::advisory::{IgnoredSecurityAdvisory, PartialSecurityAdvisory};
 use bstr::{BStr, BString, ByteSlice};

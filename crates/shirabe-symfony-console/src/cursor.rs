@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Cursor.php
+//! ref: composer/vendor/symfony/console/Cursor.php sha1:66ee50b1358c7e580c858d4e1754674e58561f9b
 
 use crate::output::{OutputInterface, output_interface};
 use shirabe_php_shim::{PhpResource, STDIN, bconcat};

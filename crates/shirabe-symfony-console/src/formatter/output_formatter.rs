@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Formatter/OutputFormatter.php
+//! ref: composer/vendor/symfony/console/Formatter/OutputFormatter.php sha1:d7a9e8fe948164afe0627c7b18e986be19245d87
 
 use crate::exception::InvalidArgumentException;
 use crate::formatter::output_formatter_interface::OutputFormatterInterface;

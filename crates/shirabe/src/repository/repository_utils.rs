@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/RepositoryUtils.php
+//! ref: composer/src/Composer/Repository/RepositoryUtils.php sha1:65b85d34acfe21bd69cadf5c2a7371449060236f
 
 use crate::package::Link;
 use crate::repository::{

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Exception/ProcessFailedException.php
+//! ref: composer/vendor/symfony/process/Exception/ProcessFailedException.php sha1:a5b53e81219ba83308d6436ec5977972aea42d8f
 
 use crate::exception::{InvalidArgumentException, RuntimeException};
 use crate::process::Process;

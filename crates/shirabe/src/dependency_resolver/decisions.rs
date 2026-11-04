@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Decisions.php
+//! ref: composer/src/Composer/DependencyResolver/Decisions.php sha1:b7885dc0c6742ad7a6e7555b04efcae525701c2c
 
 use crate::dependency_resolver::{Pool, Rule, SolverBugException};
 use bstr::{BString, ByteVec};

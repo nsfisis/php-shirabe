@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/RepositoryFactory.php
+//! ref: composer/src/Composer/Repository/RepositoryFactory.php sha1:8d286ef80b8f0cf3ef132033cae5d595a995ee1c
 
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/TransportException.php
+//! ref: composer/src/Composer/Downloader/TransportException.php sha1:b7bd47db7402a92d600ea4ce8abd9c66d23f1b27
 
 use bstr::BString;
 use shirabe_php_shim::{PhpMixed, RuntimeException};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Advisory/PartialSecurityAdvisory.php
+//! ref: composer/src/Composer/Advisory/PartialSecurityAdvisory.php sha1:150ea20e74d196bb28fe8a57c6a840412c505487
 
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
 use crate::package::version::VersionParser;

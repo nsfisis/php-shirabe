@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/VcsDriverInterface.php
+//! ref: composer/src/Composer/Repository/Vcs/VcsDriverInterface.php sha1:4cbb9ae7d4a16682c229b47ba57e86006b770c2e
 
 use crate::config::Config;
 use crate::io::IOInterface;

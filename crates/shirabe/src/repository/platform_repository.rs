@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/PlatformRepository.php
+//! ref: composer/src/Composer/Repository/PlatformRepository.php sha1:0bf0ef70b423a02ec1928d6f4987614af7e3ab6a
 
 use crate::composer;
 use crate::package::version::VersionParser;

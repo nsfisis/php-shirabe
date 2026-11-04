@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Exception/ProcessTimedOutException.php
+//! ref: composer/vendor/symfony/process/Exception/ProcessTimedOutException.php sha1:7bed6e96f41a9c813a9f71419e703905ae3d4872
 
 use crate::exception::RuntimeException;
 use crate::process::Process;

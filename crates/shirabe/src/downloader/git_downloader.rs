@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/GitDownloader.php
+//! ref: composer/src/Composer/Downloader/GitDownloader.php sha1:bb0cfc0a89c9ebdb269ee88834640b63a57d290b
 
 use crate::cache::Cache;
 use crate::config::{Config, DiscardChanges};

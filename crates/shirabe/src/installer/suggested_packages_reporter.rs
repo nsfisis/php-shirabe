@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/SuggestedPackagesReporter.php
+//! ref: composer/src/Composer/Installer/SuggestedPackagesReporter.php sha1:c89042e970ee94b6d0b3847f3d9bafd83f40d89d
 
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;

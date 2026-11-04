@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/ShowCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/ShowCommandTest.php sha1:449252e87e8f4cba0646a963d493bcc161b4b9cd
 
 use crate::test_case::{
     RunOptions, get_application_tester, get_complete_package, get_package, get_version_constraint,

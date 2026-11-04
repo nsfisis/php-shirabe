@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/LicensesCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/LicensesCommandTest.php sha1:87f29bdadde2055e9a5f52745669a2c357247a97
 
 use crate::test_case::{
     RunOptions, TearDown, create_composer_lock, create_installed_json, get_application_tester,

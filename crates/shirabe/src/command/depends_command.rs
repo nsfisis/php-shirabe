@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/DependsCommand.php
+//! ref: composer/src/Composer/Command/DependsCommand.php sha1:ef866385da112c0e53ce15edb1616d96952d6d55
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait};

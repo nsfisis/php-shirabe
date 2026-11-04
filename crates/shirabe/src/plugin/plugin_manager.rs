@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/PluginManager.php
+//! ref: composer/src/Composer/Plugin/PluginManager.php sha1:96ebce86543a37e1b6fa37f7a39732271fcac193
 
 use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle};
 use crate::config::AllowPlugins;

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Process.php
+//! ref: composer/vendor/symfony/process/Process.php sha1:d81bd61719c0997634421f36adad98e9601bbbb9
 
 use crate::exception::{
     InvalidArgumentException, LogicException, ProcessSignaledException, ProcessTimedOutException,

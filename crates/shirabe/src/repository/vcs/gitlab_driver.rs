@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/GitLabDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/GitLabDriver.php sha1:7b294b289a8a66ec427bee5e036bc4f20c294230
 
 use crate::cache::Cache;
 use crate::config::Config;

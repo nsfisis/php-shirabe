@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/metadata-minifier/src/MetadataMinifier.php
+//! ref: composer/vendor/composer/metadata-minifier/src/MetadataMinifier.php sha1:78353ceb15436d7adef366c133f9f018e529195f
 
 use bstr::BString;
 use indexmap::IndexMap;

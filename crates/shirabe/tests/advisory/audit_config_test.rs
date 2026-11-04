@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Advisory/AuditConfigTest.php
+//! ref: composer/tests/Composer/Test/Advisory/AuditConfigTest.php sha1:ec83fc0e007309d7d47241f7308ab88f3800efd9
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

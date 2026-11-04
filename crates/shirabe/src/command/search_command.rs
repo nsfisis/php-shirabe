@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/SearchCommand.php
+//! ref: composer/src/Composer/Command/SearchCommand.php sha1:d7a378817f3a2321c5ca4564477de847bb902f13
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};

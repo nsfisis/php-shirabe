@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/AuthHelperTest.php
+//! ref: composer/tests/Composer/Test/Util/AuthHelperTest.php sha1:dc54c7cef1a7b2728b4a8071c7e3f4192216749e
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, IOMock, get_io_mock};

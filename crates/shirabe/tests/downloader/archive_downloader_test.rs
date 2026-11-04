@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/ArchiveDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Downloader/ArchiveDownloaderTest.php sha1:b491be023082501d01d424a28c7d8dd511691b57
 
 // The PHP test builds an anonymous ArchiveDownloader subclass; getFileName/processUrl are
 // inherited unchanged from FileDownloader, so the concrete FileDownloader is exercised here

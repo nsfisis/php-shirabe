@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Filter/PlatformRequirementFilter/IgnoreNothingPlatformRequirementFilterTest.php
+//! ref: composer/tests/Composer/Test/Filter/PlatformRequirementFilter/IgnoreNothingPlatformRequirementFilterTest.php sha1:b86874924122eddc1f9808bd87b07caa7cc9a873
 
 use bstr::BStr;
 use shirabe::filter::platform_requirement_filter::{

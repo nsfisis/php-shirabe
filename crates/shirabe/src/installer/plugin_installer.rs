@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/PluginInstaller.php
+//! ref: composer/src/Composer/Installer/PluginInstaller.php sha1:77e05a27feeecd7efccc141118bb09016989b8bb
 
 use crate::composer::PartialComposerWeakHandle;
 use crate::installer::{BinaryPresenceInterface, InstallerInterface, LibraryInstaller};

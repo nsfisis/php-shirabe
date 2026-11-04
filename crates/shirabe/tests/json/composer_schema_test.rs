@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Json/ComposerSchemaTest.php
+//! ref: composer/tests/Composer/Test/Json/ComposerSchemaTest.php sha1:97e1586fd6c3f40789aba5b2541947eade15981d
 //!
 //! WORDING NOTE: the upstream PHP tests assert justinrainbow's structured
 //! `{property, message, constraint}` error arrays (e.g. "Does not match the regex pattern …",

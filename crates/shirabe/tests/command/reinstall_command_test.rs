@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/ReinstallCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/ReinstallCommandTest.php sha1:7e95f88a54d07278b8d0bde60becb57264152ac0
 
 use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,

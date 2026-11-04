@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/EventDispatcher/EventDispatcherTest.php
+//! ref: composer/tests/Composer/Test/EventDispatcher/EventDispatcherTest.php sha1:a442e982a12ea580c37cef848e294882192c65f5
 
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::php_worker::{

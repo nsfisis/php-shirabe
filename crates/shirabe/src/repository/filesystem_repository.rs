@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/FilesystemRepository.php
+//! ref: composer/src/Composer/Repository/FilesystemRepository.php sha1:5d96f85f11239302b49400fe9625697a25ad0428
 
 use crate::config::is_php_integer_key;
 use crate::installer::InstallationManagerInterface;

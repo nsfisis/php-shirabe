@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/ForgejoUrl.php
+//! ref: composer/src/Composer/Util/ForgejoUrl.php sha1:8480d4237e6f93687fb716042375cc06a4b381bb
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{InvalidArgumentException, bconcat, php_str, preg_match, strtolower};

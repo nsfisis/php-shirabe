@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/GenericRule.php
+//! ref: composer/src/Composer/DependencyResolver/GenericRule.php sha1:404c5dc2a6ee6681ca3dfccfe173de73e775813d
 
 use super::rule::ReasonData;
 use crate::dependency_resolver::{Rule, RuleBase};

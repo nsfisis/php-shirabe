@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/BumpCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/BumpCommandTest.php sha1:3f345ef6bdfeb6e37995ba524b87dbfcde7c4246
 
 use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,

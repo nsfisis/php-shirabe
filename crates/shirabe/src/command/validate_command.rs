@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/ValidateCommand.php
+//! ref: composer/src/Composer/Command/ValidateCommand.php sha1:4eb6eacebeea00753a769b0f558d22007698dcf9
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/AllFunctionalTest.php
+//! ref: composer/tests/Composer/Test/AllFunctionalTest.php sha1:fc0a05aadf7b6357625d063090ec1024ebd63948
 
 // The phar build (testBuildPhar / bin/compile) has no Rust equivalent: the binary under test is
 // produced by cargo and located via CARGO_BIN_EXE_shirabe. testIntegration runs the .test

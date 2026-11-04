@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/PerforceDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Downloader/PerforceDownloaderTest.php sha1:01fb7aeda65456a7ec14e2519586ab01c3ddc94a
 
 use crate::async_runtime::run;
 use crate::io_mock::{Expectation, get_io_mock};

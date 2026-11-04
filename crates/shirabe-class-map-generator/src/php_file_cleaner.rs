@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
+//! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php sha1:ba515660a7328fb03f89aeba8e77450280a67619
 
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;

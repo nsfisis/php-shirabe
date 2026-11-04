@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Installer/MetapackageInstallerTest.php
+//! ref: composer/tests/Composer/Test/Installer/MetapackageInstallerTest.php sha1:70722976843d3b1eb16f37cbb457b7e5331f2fdb
 //!
 //! PHP verifies the mocked repository's add/remove/hasPackage calls; here the same
 //! behaviour is checked against a real InstalledArrayRepository by observing its state.

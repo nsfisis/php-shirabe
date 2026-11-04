@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/FossilDownloader.php
+//! ref: composer/src/Composer/Downloader/FossilDownloader.php sha1:1dbb589ce0f0041da9868e719afc0c231bdb661e
 
 use crate::config::Config;
 use crate::downloader::{

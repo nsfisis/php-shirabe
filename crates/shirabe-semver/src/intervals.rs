@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/semver/src/Intervals.php
+//! ref: composer/vendor/composer/semver/src/Intervals.php sha1:7422d5459c9d2940adb1d5e3ebe84e0c9ade080c
 
 use crate::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,

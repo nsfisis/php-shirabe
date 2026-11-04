@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Json/JsonManipulator.php
+//! ref: composer/src/Composer/Json/JsonManipulator.php sha1:0839a5737a15817bd43d87e1cbc3b8df934a8dee
 
 use crate::json::JsonFile;
 use crate::json::json_grammar::{self, ValueKind};

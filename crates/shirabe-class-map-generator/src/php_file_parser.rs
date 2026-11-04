@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php
+//! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php sha1:1821ab732459e48071a256712448da79e66cb2c8
 
 use crate::php_file_cleaner::PhpFileCleaner;
 use bstr::{BStr, BString, ByteSlice, ByteVec};

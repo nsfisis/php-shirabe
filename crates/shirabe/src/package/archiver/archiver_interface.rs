@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Archiver/ArchiverInterface.php
+//! ref: composer/src/Composer/Package/Archiver/ArchiverInterface.php sha1:db7d9e46c3bfbf8e0e4a596450f08057c2381d73
 
 use bstr::{BStr, BString};
 use std::path::{Path, PathBuf};

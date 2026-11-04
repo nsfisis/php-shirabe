@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/PluginEvents.php
+//! ref: composer/src/Composer/Plugin/PluginEvents.php sha1:e619b45d3b105a443ed909469cdd96cb9856d201
 
 use bstr::BStr;
 use shirabe_php_shim::php_str;

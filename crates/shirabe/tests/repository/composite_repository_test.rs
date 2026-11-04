@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/CompositeRepositoryTest.php
+//! ref: composer/tests/Composer/Test/Repository/CompositeRepositoryTest.php sha1:68af22eb7e57c179d65b64dc41de82efa4ec9a9a
 
 use crate::test_case::get_package;
 use bstr::BString;

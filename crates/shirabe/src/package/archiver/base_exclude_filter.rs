@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Archiver/BaseExcludeFilter.php
+//! ref: composer/src/Composer/Package/Archiver/BaseExcludeFilter.php sha1:16a9cbcc09a710ac828d7dd91d2b1812411fdb9d
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{bconcat, ltrim2, preg_is_match, trim, trim2};

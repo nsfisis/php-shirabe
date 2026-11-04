@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/class-map-generator/src/ClassMapGenerator.php
+//! ref: composer/vendor/composer/class-map-generator/src/ClassMapGenerator.php sha1:18d9e8606fcfd875c1cfb2e3341840f1a02ea4c5
 
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;

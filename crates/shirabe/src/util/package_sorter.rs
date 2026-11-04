@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/PackageSorter.php
+//! ref: composer/src/Composer/Util/PackageSorter.php sha1:4488e3bf475de3b3fea9c14e739714bc8998b794
 
 use crate::package::{Link, PackageInterfaceHandle};
 use bstr::{BStr, BString};

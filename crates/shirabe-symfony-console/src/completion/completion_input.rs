@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
+//! ref: composer/vendor/symfony/console/Completion/CompletionInput.php sha1:10f8872f338f08bf6c7c4bf8e03d9eddd2db542b
 
 use crate::input::{ArgvInput, InputDefinition, InputOption, InputValue};
 use bstr::{BStr, BString, ByteSlice};

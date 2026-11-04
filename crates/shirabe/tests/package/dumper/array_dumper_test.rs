@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Dumper/ArrayDumperTest.php
+//! ref: composer/tests/Composer/Test/Package/Dumper/ArrayDumperTest.php sha1:22fca181226f3131664353f16777163ad4c368b0
 
 use bstr::{B, BString};
 use indexmap::IndexMap;

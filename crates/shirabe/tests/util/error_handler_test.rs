@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/ErrorHandlerTest.php
+//! ref: composer/tests/Composer/Test/Util/ErrorHandlerTest.php sha1:556b731ac1584d066b73f8857939822da878aa84
 
 // These tests rely on PHP's runtime error-handling machinery: ErrorHandler::register()
 // installs a handler that converts notices/warnings into \ErrorException, and the tests

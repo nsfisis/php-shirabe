@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/ApplicationTest.php
+//! ref: composer/tests/Composer/Test/ApplicationTest.php sha1:295a619c49ad8dc40e9be415a23b6d4b5b7552c7
 
 #[path = "common/bootstrap.rs"]
 mod bootstrap;

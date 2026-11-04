@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/BaseConfigCommand.php
+//! ref: composer/src/Composer/Command/BaseConfigCommand.php sha1:b3b6b6fae4224776ba59b8fad4e26013467e6c73
 
 use crate::command::BaseCommand;
 use crate::command::base_command::base_command_initialize;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/ErrorHandler.php
+//! ref: composer/src/Composer/Util/ErrorHandler.php sha1:f6945f00fd097a36ed223e0c527ff1b7fe1cd0ac
 
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use bstr::{BString, ByteSlice, ByteVec};

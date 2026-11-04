@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/Http/RequestProxyTest.php
+//! ref: composer/tests/Composer/Test/Util/Http/RequestProxyTest.php sha1:0dcc6e2087a176d317bbcefedfae299a7d98660c
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

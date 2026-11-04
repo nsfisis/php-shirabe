@@ -1,4 +1,4 @@
-//! ref: composer/vendor/composer/ca-bundle/src/CaBundle.php
+//! ref: composer/vendor/composer/ca-bundle/src/CaBundle.php sha1:bfe1c7a75eb51fb1c2a7c2ec8277fb6e2296f91b
 
 use shirabe_php_shim::{PHP_SERVER, getenv};
 

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Console/Input/InputOption.php
+//! ref: composer/src/Composer/Console/Input/InputOption.php sha1:35222d2e5a27079bab1ab2d597d30431106c1494
 
 use crate::console::input::SuggestedValues;
 use shirabe_symfony_console::completion::{CompletionInput, CompletionSuggestions};

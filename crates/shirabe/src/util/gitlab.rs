@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/GitLab.php
+//! ref: composer/src/Composer/Util/GitLab.php sha1:f26a739c413e8bab27efaf6e61ad11f927f928b6
 
 use crate::config::Config;
 use crate::downloader::TransportException;

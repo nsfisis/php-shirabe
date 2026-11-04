@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/HgDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/HgDriver.php sha1:f59d7fe72894a4442ea6628e1950470a185e97b3
 
 use crate::cache::Cache;
 use crate::config::Config;

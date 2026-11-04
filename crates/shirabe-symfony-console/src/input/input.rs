@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Input/Input.php
+//! ref: composer/vendor/symfony/console/Input/Input.php sha1:24998ae1142e7cb978dd47935e0db3dafa2ce766
 
 use crate::exception::{InvalidArgumentException, RuntimeException};
 use crate::input::{ArgumentName, InputDefinition, InputValue};

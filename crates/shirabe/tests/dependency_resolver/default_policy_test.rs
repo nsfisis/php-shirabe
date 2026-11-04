@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/DependencyResolver/DefaultPolicyTest.php
+//! ref: composer/tests/Composer/Test/DependencyResolver/DefaultPolicyTest.php sha1:b98d689c298f3566c253314d82f8f472a62ce4e0
 
 use crate::test_case::get_package;
 use bstr::{BStr, BString};

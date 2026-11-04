@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/ProjectInstaller.php
+//! ref: composer/src/Composer/Installer/ProjectInstaller.php sha1:922f8e9e0da328fb8b95a8493cb2bb08579f62c0
 
 use crate::downloader::DownloadManagerInterface;
 use crate::installer::InstallerInterface;

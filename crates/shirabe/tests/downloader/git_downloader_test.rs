@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/GitDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Downloader/GitDownloaderTest.php sha1:a9bcb3ee839fdf412f8d8c9842be34da113389ef
 
 use crate::async_runtime::run;
 use crate::config_stub::ConfigStubBuilder;

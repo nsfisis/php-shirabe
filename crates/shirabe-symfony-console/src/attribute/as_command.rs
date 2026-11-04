@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Attribute/AsCommand.php
+//! ref: composer/vendor/symfony/console/Attribute/AsCommand.php sha1:4b62ed2311d58a400a4ec9dfdfbc8444dca29c37
 
 use bstr::BString;
 use shirabe_php_shim::{explode, implode};

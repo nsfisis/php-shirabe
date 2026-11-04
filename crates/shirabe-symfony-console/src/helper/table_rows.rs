@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/TableRows.php
+//! ref: composer/vendor/symfony/console/Helper/TableRows.php sha1:572416731b4bcdc0ea1c45e78b16eb4a5a7a36a7
 
 use crate::helper::Row;
 

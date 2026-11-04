@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/UrlTest.php
+//! ref: composer/tests/Composer/Test/Util/UrlTest.php sha1:800df887918797f0a3d414af0a5c000bcb90887a
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

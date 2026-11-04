@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/SyncHelper.php
+//! ref: composer/src/Composer/Util/SyncHelper.php sha1:113bfee35e9ccac03bf1b90b38b702f684186ac9
 
 use crate::downloader::{DownloadManagerInterface, DownloaderInterface};
 use crate::package::PackageInterfaceHandle;

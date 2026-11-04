@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/ProcessExecutorTest.php
+//! ref: composer/tests/Composer/Test/Util/ProcessExecutorTest.php sha1:d6b094aa21f74a4439808f10bdf1299bba46b704
 
 // These run real subprocesses (capturing output/stderr/timeout) and assert ProcessExecutor's
 // password hiding, line splitting and argument escaping. A few data points remain unportable —

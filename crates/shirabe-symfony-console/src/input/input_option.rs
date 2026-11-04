@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Input/InputOption.php
+//! ref: composer/vendor/symfony/console/Input/InputOption.php sha1:660d571d521d374ccff9934cd84e8c96dcf30ec5
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;

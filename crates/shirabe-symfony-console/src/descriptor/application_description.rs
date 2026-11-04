@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Descriptor/ApplicationDescription.php
+//! ref: composer/vendor/symfony/console/Descriptor/ApplicationDescription.php sha1:4f2b97c48cff4273a632dfb0b60b3804bcd5b1ed
 
 use crate::application::Application;
 use crate::command::Command;

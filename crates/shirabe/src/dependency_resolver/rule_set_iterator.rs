@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/RuleSetIterator.php
+//! ref: composer/src/Composer/DependencyResolver/RuleSetIterator.php sha1:cc3a4cfca3c13955594e988a6172be1a8f352e73
 
 use crate::dependency_resolver::Rule;
 use indexmap::IndexMap;

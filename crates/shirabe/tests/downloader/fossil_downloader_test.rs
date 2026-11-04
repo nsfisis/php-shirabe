@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/FossilDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Downloader/FossilDownloaderTest.php sha1:57e4459743317898a15af7032cd33cd14bf68406
 
 use crate::async_runtime::run;
 use crate::config_stub::ConfigStubBuilder;

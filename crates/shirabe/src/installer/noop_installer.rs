@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/NoopInstaller.php
+//! ref: composer/src/Composer/Installer/NoopInstaller.php sha1:fb18b7402c0a2de503f31cb5df7c076049650011
 
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;

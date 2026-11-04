@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/string/ByteString.php
+//! ref: composer/vendor/symfony/string/ByteString.php sha1:cb3e2b07672e990bb8bccff8b657d7cdcf697e6a
 
 use crate::code_point_string::CodePointString;
 use crate::exception::InvalidArgumentException;

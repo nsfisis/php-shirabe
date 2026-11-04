@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Console/HtmlOutputFormatterTest.php
+//! ref: composer/tests/Composer/Test/Console/HtmlOutputFormatterTest.php sha1:642aef4d50f76841668d1b5453342299553c58cf
 
 use indexmap::IndexMap;
 use shirabe::console::html_output_formatter::HtmlOutputFormatter;

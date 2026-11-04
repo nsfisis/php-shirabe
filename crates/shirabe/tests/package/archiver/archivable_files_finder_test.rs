@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Archiver/ArchivableFilesFinderTest.php
+//! ref: composer/tests/Composer/Test/Package/Archiver/ArchivableFilesFinderTest.php sha1:9d96f4e20720a26a3662e8c5d191999cc82eda1d
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Command/CompleteCommand.php
+//! ref: composer/vendor/symfony/console/Command/CompleteCommand.php sha1:78febd02a74ab09d930d8a6c220c13a8b69641d2
 
 use crate::command::{Command, CommandData};
 use crate::completion::{

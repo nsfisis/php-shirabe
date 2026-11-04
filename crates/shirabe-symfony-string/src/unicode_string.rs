@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/string/UnicodeString.php
+//! ref: composer/vendor/symfony/string/UnicodeString.php sha1:57d5475c56812b0bbb190092e4b07818b3b21d47
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{mb_strlen, mb_substr, str_replace_array};

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/BitbucketTest.php
+//! ref: composer/tests/Composer/Test/Util/BitbucketTest.php sha1:589c26ee28f1b7defe5cab32058ec11e320676e6
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};

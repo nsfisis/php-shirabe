@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/LibraryInstaller.php
+//! ref: composer/src/Composer/Installer/LibraryInstaller.php sha1:bd1907262133c533faf839ee4e2dc8dc7688c9a3
 
 use crate::composer::PartialComposerWeakHandle;
 use crate::downloader::DownloadManagerInterface;

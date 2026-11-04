@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Locker.php
+//! ref: composer/src/Composer/Package/Locker.php sha1:0b7e34ecb6699239b99aec6b79c095aaf17fffd3
 
 use crate::installer::InstallationManager;
 use crate::io::IOInterface;

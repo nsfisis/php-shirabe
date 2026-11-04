@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php
+//! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php sha1:f49884ce2fd5ab13e64dc4c89f38bafce1946657
 
 use crate::package::archiver::{BaseExcludeFilter, BaseExcludeFilterBase};
 use bstr::{BStr, BString, ByteSlice};

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/VcsDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/VcsDriver.php sha1:e68e732845314774fc135a638a8cf55082ab11be
 
 use crate::cache::Cache;
 use crate::config::Config;

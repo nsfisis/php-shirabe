@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Rule.php
+//! ref: composer/src/Composer/DependencyResolver/Rule.php sha1:1450490f3c739a8fb736d211069f5cfb49130e1e
 
 use crate::dependency_resolver::{
     GenericRule, MultiConflictRule, Pool, Problem, Request, Rule2Literals,

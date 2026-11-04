@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/PoolOptimizer.php
+//! ref: composer/src/Composer/DependencyResolver/PoolOptimizer.php sha1:12cd78f3f433fa4ff1891edf6cb0f58d5d9892b3
 
 use crate::dependency_resolver::{PolicyInterface, Pool, Request};
 use crate::package::BasePackageHandle;

@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Helper/TableStyle.php
+//! ref: composer/vendor/symfony/console/Helper/TableStyle.php sha1:41923866396e55c48a949bbb29cac419b6465252
 
 use bstr::BString;
 use shirabe_php_shim::STR_PAD_RIGHT;

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/GitTest.php
+//! ref: composer/tests/Composer/Test/Util/GitTest.php sha1:86ded931da91943a22fedb9168568216fe944720
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};

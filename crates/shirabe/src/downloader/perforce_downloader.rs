@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/PerforceDownloader.php
+//! ref: composer/src/Composer/Downloader/PerforceDownloader.php sha1:995b512db7959e657420460cfd911b43dd6baa21
 
 use crate::config::Config;
 use crate::downloader::{

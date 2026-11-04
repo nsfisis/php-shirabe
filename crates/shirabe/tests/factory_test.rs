@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/FactoryTest.php
+//! ref: composer/tests/Composer/Test/FactoryTest.php sha1:42dc812351ccb668ee5a90d7f8b96d15b1ef1ce5
 
 use indexmap::IndexMap;
 use serial_test::serial;

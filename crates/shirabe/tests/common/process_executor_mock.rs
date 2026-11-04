@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Mock/ProcessExecutorMock.php
+//! ref: composer/tests/Composer/Test/Mock/ProcessExecutorMock.php sha1:fd3bb92a020bed3c6639bc6c44f606b37689ae2d
 
 use shirabe::util::process_executor::{CommandLine, MockExpectation, MockHandler, ProcessExecutor};
 

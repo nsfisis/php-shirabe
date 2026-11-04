@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/IO/ConsoleIOTest.php
+//! ref: composer/tests/Composer/Test/IO/ConsoleIOTest.php sha1:b1bbca3c0b7835dbab4922a1e9bc6b49e9f101f4
 
 // PHP drives ConsoleIO with PHPUnit mocks of Symfony's InputInterface/OutputInterface/HelperSet
 // (and QuestionHelper). There is no mocking framework here, so the mocks are reproduced with real,

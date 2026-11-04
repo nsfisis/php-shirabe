@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/ForgejoTest.php
+//! ref: composer/tests/Composer/Test/Util/ForgejoTest.php sha1:bf7dac878aca450af7cce39fc0546345b62f5f84
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/InstalledVersionsTest.php
+//! ref: composer/tests/Composer/Test/InstalledVersionsTest.php sha1:dff7aafa70bbd5c37a4bdb35619697fa5d6cdddd
 //!
 //! `InstalledVersions` has no Rust port: its readers are plugins and project code, which run in
 //! the PHP worker against the copy `FilesystemRepository::write` dumps. These tests drive the real

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/XzDownloader.php
+//! ref: composer/src/Composer/Downloader/XzDownloader.php sha1:bb1e2f46045e665a55d732bf37fb7629af66b139
 
 use crate::cache::Cache;
 use crate::config::Config;

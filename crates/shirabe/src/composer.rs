@@ -1,5 +1,5 @@
-//! ref: composer/src/Composer/Composer.php
-//! ref: composer/src/Composer/PartialComposer.php
+//! ref: composer/src/Composer/Composer.php sha1:0855f16a82789ec64c5c5c7d946e3ffd67c05b11
+//! ref: composer/src/Composer/PartialComposer.php sha1:dc5eb5f37ab64d0b51dbb5bbe66c442e8a71b063
 
 use crate::autoload::AutoloadGeneratorInterface;
 use crate::config::Config;

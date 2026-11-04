@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/IO/NullIOTest.php
+//! ref: composer/tests/Composer/Test/IO/NullIOTest.php sha1:8c4905f3700076910fcbe9397d238050e2c063fe
 
 use bstr::BString;
 use indexmap::{IndexMap, indexmap};

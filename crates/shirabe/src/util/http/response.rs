@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Http/Response.php
+//! ref: composer/src/Composer/Util/Http/Response.php sha1:03cbb36fbfd3c9aa1dce23627100c2de3bc6a8db
 
 use crate::json::JsonFile;
 use bstr::{BStr, BString, ByteSlice};

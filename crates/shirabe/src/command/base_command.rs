@@ -1,5 +1,5 @@
-//! ref: composer/src/Composer/Command/BaseCommand.php
-//! ref: composer/vendor/symfony/console/Command/Command.php
+//! ref: composer/src/Composer/Command/BaseCommand.php sha1:7416f85434a7e81cb09a56a2729ed9987d3386df
+//! ref: composer/vendor/symfony/console/Command/Command.php sha1:ff5e9f0b654e88fe02d8b81db7b1c7d6f1be8330
 
 use crate::advisory::{AuditConfig, Auditor};
 use crate::composer::PartialComposerHandle;

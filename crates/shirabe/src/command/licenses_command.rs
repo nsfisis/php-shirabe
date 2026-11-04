@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/LicensesCommand.php
+//! ref: composer/src/Composer/Command/LicensesCommand.php sha1:daf0ea7245bbc82d223618fb711d1e17468c3706
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};

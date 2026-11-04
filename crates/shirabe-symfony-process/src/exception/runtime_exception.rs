@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/process/Exception/RuntimeException.php
+//! ref: composer/vendor/symfony/process/Exception/RuntimeException.php sha1:c166d875f9b7b1503969bb0e28b79842218ff8e9
 
 use bstr::BString;
 

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/Vcs/FossilDriver.php
+//! ref: composer/src/Composer/Repository/Vcs/FossilDriver.php sha1:d69c8c7cb64ec5141b05b28b1f48115323f68a05
 
 use crate::cache::Cache;
 use crate::config::Config;

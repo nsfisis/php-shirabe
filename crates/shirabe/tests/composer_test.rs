@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/ComposerTest.php
+//! ref: composer/tests/Composer/Test/ComposerTest.php sha1:c237b7414989161eef4bb451b40c75a64fa1ce62
 
 use bstr::BString;
 use indexmap::IndexMap;

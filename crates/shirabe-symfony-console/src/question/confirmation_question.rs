@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Question/ConfirmationQuestion.php
+//! ref: composer/vendor/symfony/console/Question/ConfirmationQuestion.php sha1:888ffafa800697c28b1fe6068ca50b7680ff30cf
 
 use crate::exception::InvalidArgumentException;
 use crate::input::InputValue;

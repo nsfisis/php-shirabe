@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/CompletePackageTest.php
+//! ref: composer/tests/Composer/Test/Package/CompletePackageTest.php sha1:49d1cc8808cabebb0080c40aee4cb75be9179bfd
 
 use bstr::{BStr, BString};
 use shirabe::package::package::Package;

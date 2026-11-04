@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Installer/InstallerInterface.php
+//! ref: composer/src/Composer/Installer/InstallerInterface.php sha1:60282d6b5820c6f8268e431cad3d87b79749d5ef
 
 use crate::installer::{BinaryPresenceInterface, PluginInstaller};
 use crate::package::PackageInterfaceHandle;

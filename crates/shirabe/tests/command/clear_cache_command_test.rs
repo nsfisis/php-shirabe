@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Command/ClearCacheCommandTest.php
+//! ref: composer/tests/Composer/Test/Command/ClearCacheCommandTest.php sha1:a97e8743c57def78525051f4cb4a8ea6edfee4b4
 
 use crate::test_case::{RunOptions, get_application_tester};
 use bstr::ByteSlice;

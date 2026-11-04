@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/PostFileDownloadEvent.php
+//! ref: composer/src/Composer/Plugin/PostFileDownloadEvent.php sha1:21d11fc8bbd40bf24affc6731b52fb6c2f2670e2
 
 use crate::event_dispatcher::{Event, EventFlags};
 use crate::package::PackageInterfaceHandle;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/AuthHelper.php
+//! ref: composer/src/Composer/Util/AuthHelper.php sha1:2d67580a0eec6feb2cc022ccbef5669713e42854
 
 use crate::config::Config;
 use crate::downloader::TransportException;

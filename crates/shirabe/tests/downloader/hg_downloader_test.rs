@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Downloader/HgDownloaderTest.php
+//! ref: composer/tests/Composer/Test/Downloader/HgDownloaderTest.php sha1:bdae19ace358bd18971b021f8d1e4834e452a769
 
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;

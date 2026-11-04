@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Package/Version/VersionParserTest.php
+//! ref: composer/tests/Composer/Test/Package/Version/VersionParserTest.php sha1:ae8b539ae640cfcdbe5f182da498ebf1516da2b9
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;

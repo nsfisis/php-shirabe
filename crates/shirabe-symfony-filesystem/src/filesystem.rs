@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/filesystem/Filesystem.php
+//! ref: composer/vendor/symfony/filesystem/Filesystem.php sha1:860bd30e3ba881e71bdd41c9a37bac53706f125b
 
 use crate::exception::IOException;
 use bstr::BString;

@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/VcsRepository.php
+//! ref: composer/src/Composer/Repository/VcsRepository.php sha1:8d6e08727e0e9867443e4b119468e48a8c419233
 
 use crate::config::Config;
 use crate::downloader::TransportException;

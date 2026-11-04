@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Installer/BinaryInstallerTest.php
+//! ref: composer/tests/Composer/Test/Installer/BinaryInstallerTest.php sha1:d7895f44cd080bd7f8b6faa332f2a81cbe827305
 
 use crate::test_case::get_package;
 use base64::Engine;

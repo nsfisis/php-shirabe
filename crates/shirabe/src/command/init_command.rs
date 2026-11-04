@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Command/InitCommand.php
+//! ref: composer/src/Composer/Command/InitCommand.php sha1:a93b652d60d0065d28b054d23ed093664106d9cb
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};

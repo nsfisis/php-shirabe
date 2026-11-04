@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/HttpDownloader.php
+//! ref: composer/src/Composer/Util/HttpDownloader.php sha1:87f8314e3bf11a6b4719ebd0e93284ec827a9e3c
 
 use crate::composer;
 use crate::config::Config;

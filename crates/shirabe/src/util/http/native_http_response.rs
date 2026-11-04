@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/Http/CurlResponse.php
+//! ref: composer/src/Composer/Util/Http/CurlResponse.php sha1:53b4e5706c2305027b58d53c5868fa9f48fa10d9
 //!
 //! The response `NativeHttpDownloader` builds, in the place of Composer's `CurlResponse`.
 

@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Mock/IOMock.php
+//! ref: composer/tests/Composer/Test/Mock/IOMock.php sha1:3bacded1f921d96583c78932d0678a08b83bc488
 
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;

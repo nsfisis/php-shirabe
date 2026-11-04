@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/RemoteFilesystem.php
+//! ref: composer/src/Composer/Util/RemoteFilesystem.php sha1:27ac0473e50d4f24137f3c4ac66fe7843aa34e9f
 //!
 //! The real `Composer\Util\RemoteFilesystem`, running in the PHP worker: every method forwards
 //! to an instance there. `HttpDownloader` reaches for it last, for the requests neither

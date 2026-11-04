@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Repository/FilterRepository.php
+//! ref: composer/src/Composer/Repository/FilterRepository.php sha1:63951cee4daa9079d39fa4d0d354c5bce16ef0b6
 
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, base_package};
 use crate::repository::{

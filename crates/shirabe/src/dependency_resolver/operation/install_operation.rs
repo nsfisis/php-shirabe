@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/DependencyResolver/Operation/InstallOperation.php
+//! ref: composer/src/Composer/DependencyResolver/Operation/InstallOperation.php sha1:d31107e28df4ef1adfa315b011fe7826d98c722a
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;

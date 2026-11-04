@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Util/TarTest.php
+//! ref: composer/tests/Composer/Test/Util/TarTest.php sha1:6625d2a4241e77fd2afa33180269d753b42e0f5b
 
 use shirabe::util::tar::Tar;
 

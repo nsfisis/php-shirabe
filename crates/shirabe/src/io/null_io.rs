@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/IO/NullIO.php
+//! ref: composer/src/Composer/IO/NullIO.php sha1:f36480c2ba0704f5d52fb278b24cfffd70429440
 
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
 use bstr::BString;

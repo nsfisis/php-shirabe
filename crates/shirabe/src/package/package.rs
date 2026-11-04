@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Package.php
+//! ref: composer/src/Composer/Package/Package.php sha1:15873ee38aca1d51f6ac6abb22c5b173d8da861e
 
 use crate::package::version::VersionParser;
 use crate::package::{BasePackage, DisplayMode, Link, PackageInterface};

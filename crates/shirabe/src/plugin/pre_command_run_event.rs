@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Plugin/PreCommandRunEvent.php
+//! ref: composer/src/Composer/Plugin/PreCommandRunEvent.php sha1:0d6e0f6ec661b502b6461814365548d5e52fb136
 
 use crate::event_dispatcher::{Event, EventFlags};
 use bstr::BString;

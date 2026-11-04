@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Downloader/DownloaderInterface.php
+//! ref: composer/src/Composer/Downloader/DownloaderInterface.php sha1:ff1543a20f529978e3ab0539c09ed7ce90a93f70
 
 use crate::package::PackageInterfaceHandle;
 use bstr::{BStr, BString};

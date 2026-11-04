@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Config.php
+//! ref: composer/src/Composer/Config.php sha1:7e0a18fcbf536c9e5003f72a666077a4559cb226
 
 use shirabe_php_shim::{
     E_USER_DEPRECATED, Error, PhpMixed, PregMatches, RuntimeException, TypeError, array_key_exists,

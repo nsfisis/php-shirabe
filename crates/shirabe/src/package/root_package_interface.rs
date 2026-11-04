@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/RootPackageInterface.php
+//! ref: composer/src/Composer/Package/RootPackageInterface.php sha1:8aac67e10d83fe5f33c4d4ed0a09348da4bd81d2
 
 use crate::package::{CompletePackageInterface, Link, PackageInterface};
 use bstr::BString;

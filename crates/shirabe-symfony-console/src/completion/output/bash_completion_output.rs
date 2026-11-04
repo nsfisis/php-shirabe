@@ -1,4 +1,4 @@
-//! ref: composer/vendor/symfony/console/Completion/Output/BashCompletionOutput.php
+//! ref: composer/vendor/symfony/console/Completion/Output/BashCompletionOutput.php sha1:9f252051691f23b42011cfd4bd2d6d91c3b14d18
 
 use crate::completion::{CompletionOutputInterface, CompletionSuggestions};
 use crate::output::OutputInterface;

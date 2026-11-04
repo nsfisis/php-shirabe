@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/Repository/Vcs/PerforceDriverTest.php
+//! ref: composer/tests/Composer/Test/Repository/Vcs/PerforceDriverTest.php sha1:6c072a07aec086188a523097f460d8a86499a83e
 
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
 use bstr::{BStr, BString};

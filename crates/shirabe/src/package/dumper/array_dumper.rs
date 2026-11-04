@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Package/Dumper/ArrayDumper.php
+//! ref: composer/src/Composer/Package/Dumper/ArrayDumper.php sha1:cd67d7a1974578d373248d47d28e55263f9cf101
 
 use crate::package::{Mirror, PackageInterfaceHandle, SUPPORTED_LINK_TYPES};
 use bstr::BString;

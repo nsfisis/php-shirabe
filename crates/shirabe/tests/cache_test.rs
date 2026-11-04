@@ -1,4 +1,4 @@
-//! ref: composer/tests/Composer/Test/CacheTest.php
+//! ref: composer/tests/Composer/Test/CacheTest.php sha1:7fe2a014d894e069a4fcc574ab2f83e1b726f146
 
 use bstr::BStr;
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};
