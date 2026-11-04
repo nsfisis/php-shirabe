@@ -11,6 +11,9 @@ We plan to support all platforms that Composer does, but currently:
 * macOS: unsupported
 * Windows: unsupported
 
+Unlike Composer, Shirabe does not support 32-bit builds of PHP and never will: it aborts as soon
+as it starts the PHP process.
+
 
 ## Commands
 
