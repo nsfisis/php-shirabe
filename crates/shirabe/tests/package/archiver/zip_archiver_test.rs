@@ -7,8 +7,8 @@ use shirabe::package::archiver::{ArchiverInterface, ZipArchiver};
 use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::Platform;
 use shirabe_php_shim::{
-    ZipArchive, bconcat, class_exists, dirname, file_exists, file_put_contents, mkdir,
-    path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
+    ZipArchive, bconcat, dirname, file_exists, file_put_contents, mkdir, path_from_bytes,
+    path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use tempfile::TempDir;
 
@@ -57,10 +57,8 @@ impl ArchiverTestCase {
     }
 
     fn assert_zip_archive(&mut self, mut files: IndexMap<BString, Option<BString>>) {
-        if !class_exists("ZipArchive") {
-            // markTestSkipped('Cannot run ZipArchiverTest, missing class "ZipArchive".')
-            return;
-        }
+        // class_exists('ZipArchive') is always true in Shirabe, which implements ZipArchive
+        // natively, so the missing-class skip never applies here.
 
         self.setup_dummy_repo(&mut files);
         let package = self.setup_package();

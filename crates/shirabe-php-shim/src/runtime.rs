@@ -48,16 +48,6 @@ pub fn defined(name: impl AsRef<[u8]>) -> bool {
     )
 }
 
-// Models the classes available in a standard PHP CLI environment running Composer:
-// the common bundled extensions (zip, Phar) plus Composer's own runtime classes.
-pub fn class_exists(name: impl AsRef<[u8]>) -> bool {
-    let name = BStr::new(name.as_ref());
-    matches!(
-        name.as_bytes(),
-        b"Composer\\InstalledVersions" | b"Phar" | b"ZipArchive"
-    )
-}
-
 // Models the functions available in a standard modern PHP CLI environment on a
 // non-Windows platform with the common extensions loaded (curl, mbstring, iconv,
 // zlib, posix, pcntl). Opt-in or Windows-only functions are reported absent.

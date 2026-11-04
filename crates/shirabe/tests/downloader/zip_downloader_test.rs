@@ -1,4 +1,8 @@
 //! ref: composer/tests/Composer/Test/Downloader/ZipDownloaderTest.php
+//!
+//! `testSystemUnzipOnlyFailed` and `testSystemUnzipOnlyGood` are not ported. They set
+//! `hasZipArchive` to false, which cannot happen in Shirabe: it implements `ZipArchive` natively,
+//! so `ZipDownloader` has no such state.
 
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;
@@ -71,8 +75,6 @@ fn set_up() -> SetUp {
 fn tear_down(test_dir: &std::path::Path) {
     let mut fs = Filesystem::new(None);
     fs.remove_directory(test_dir).unwrap();
-    // setPrivateProperty('hasZipArchive', null)
-    ZipDownloader::__set_has_zip_archive(None);
 }
 
 struct TearDown {
@@ -117,8 +119,8 @@ fn make_downloader_with_process(
 #[test]
 #[serial]
 fn test_error_messages() {
-    // class_exists('ZipArchive') is always true in the shim, so the zip-extension-missing skip never
-    // applies here.
+    // class_exists('ZipArchive') is always true in Shirabe, which implements ZipArchive natively, so
+    // the zip-extension-missing skip never applies here.
     let test_dir = TempDir::new().unwrap();
     let _tear_down = TearDown::new(test_dir.path().to_path_buf());
 
@@ -209,7 +211,6 @@ fn test_zip_archive_only_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
 
-    ZipDownloader::__set_has_zip_archive(Some(true));
     let downloader = make_downloader(&set_up);
     let zip_archive = ZipArchive::__mock(ZipArchiveMock {
         open: Ok(()),
@@ -238,7 +239,6 @@ fn test_zip_archive_extract_only_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
 
-    ZipDownloader::__set_has_zip_archive(Some(true));
     let downloader = make_downloader(&set_up);
     let zip_archive = ZipArchive::__mock(ZipArchiveMock {
         open: Ok(()),
@@ -270,7 +270,6 @@ fn test_zip_archive_only_good() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
 
-    ZipDownloader::__set_has_zip_archive(Some(true));
     let downloader = make_downloader(&set_up);
     let zip_archive = ZipArchive::__mock(ZipArchiveMock {
         open: Ok(()),
@@ -301,80 +300,11 @@ fn unzip_command_spec() -> Vec<Vec<bstr::BString>> {
 
 #[test]
 #[serial]
-fn test_system_unzip_only_failed() {
-    let set_up = set_up();
-    let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
-
-    ZipDownloader::__set_is_windows(Some(false));
-    ZipDownloader::__set_has_zip_archive(Some(false));
-    ZipDownloader::__set_unzip_commands(Some(unzip_command_spec()));
-
-    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
-    process.borrow_mut().__expects(
-        vec![],
-        false,
-        MockHandler {
-            r#return: 1,
-            stdout: BString::default(),
-            stderr: BString::from("output"),
-        },
-    );
-    let downloader = make_downloader_with_process(&set_up, process);
-
-    let filename = set_up.filename.to_path_buf();
-    let result = run(downloader.extract(
-        set_up.package,
-        std::path::Path::new(&filename),
-        std::path::Path::new("vendor/dir"),
-    ));
-
-    let e = result.expect_err("expected RuntimeException");
-    assert!(
-        error_message(&e).contains_str("Failed to extract test/pkg: (1) unzip"),
-        "got: {e}"
-    );
-}
-
-#[test]
-#[serial]
-fn test_system_unzip_only_good() {
-    let set_up = set_up();
-    let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
-
-    ZipDownloader::__set_is_windows(Some(false));
-    ZipDownloader::__set_has_zip_archive(Some(false));
-    ZipDownloader::__set_unzip_commands(Some(unzip_command_spec()));
-
-    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
-    process.borrow_mut().__expects(
-        vec![],
-        false,
-        MockHandler {
-            r#return: 0,
-            stdout: BString::default(),
-            stderr: BString::from("output"),
-        },
-    );
-    let downloader = make_downloader_with_process(&set_up, process);
-
-    let filename = set_up.filename.to_path_buf();
-    let result = run(downloader.extract(
-        set_up.package,
-        std::path::Path::new(&filename),
-        std::path::Path::new("vendor/dir"),
-    ));
-
-    result.expect("extract should succeed");
-}
-
-#[test]
-#[serial]
 fn test_non_windows_fallback_good() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
 
     ZipDownloader::__set_is_windows(Some(false));
-    ZipDownloader::__set_has_zip_archive(Some(true));
     ZipDownloader::__set_unzip_commands(Some(unzip_command_spec()));
 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
@@ -412,7 +342,6 @@ fn test_non_windows_fallback_failed() {
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
 
     ZipDownloader::__set_is_windows(Some(false));
-    ZipDownloader::__set_has_zip_archive(Some(true));
     ZipDownloader::__set_unzip_commands(Some(unzip_command_spec()));
 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));

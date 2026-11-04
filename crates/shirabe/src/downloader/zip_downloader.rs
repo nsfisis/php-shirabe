@@ -3,20 +3,19 @@
 use crate::downloader::{ArchiveDownloader, ChangeReportInterface, FileDownloader};
 use crate::io::IOInterfaceWrite;
 use crate::package::PackageInterfaceHandle;
-use crate::util::{IniHelper, Platform};
+use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
-    ZipArchive, bconcat, bin2hex, class_exists, error_message, file_exists, file_get_contents,
-    filesize, hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex,
-    preg_match, random_int, rtrim, str_replace, strlen, substr, version_compare,
+    ZipArchive, bconcat, bin2hex, error_message, file_exists, file_get_contents, filesize,
+    hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex, preg_match,
+    random_int, rtrim, str_replace, strlen, substr, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
 
 static UNZIP_COMMANDS: Mutex<Option<Vec<Vec<BString>>>> = Mutex::new(None);
-static HAS_ZIP_ARCHIVE: Mutex<Option<bool>> = Mutex::new(None);
 static IS_WINDOWS: Mutex<Option<bool>> = Mutex::new(None);
 
 #[derive(Debug)]
@@ -63,7 +62,8 @@ impl ZipDownloader {
     ) -> anyhow::Result<Option<PhpMixed>> {
         static WARNED_7ZIP_LINUX: Mutex<bool> = Mutex::new(false);
 
-        let is_last_chance = !HAS_ZIP_ARCHIVE.lock().unwrap().unwrap_or(false);
+        // PHP throws the unzip error instead of falling back when class_exists('ZipArchive') is
+        // false. Shirabe implements ZipArchive natively, so the fallback is always available.
 
         let unzip_commands_empty = UNZIP_COMMANDS
             .lock()
@@ -174,7 +174,6 @@ impl ZipDownloader {
                                 output
                             ))
                             .into(),
-                            is_last_chance,
                             file,
                             path,
                             package,
@@ -185,26 +184,18 @@ impl ZipDownloader {
 
                 Ok(None)
             }
-            Err(e) => {
-                self.try_fallback(e, is_last_chance, file, path, package, &executable)
-                    .await
-            }
+            Err(e) => self.try_fallback(e, file, path, package, &executable).await,
         }
     }
 
     async fn try_fallback(
         &self,
         process_error: anyhow::Error,
-        is_last_chance: bool,
         file: &std::path::Path,
         path: &std::path::Path,
         package: PackageInterfaceHandle,
         executable: &BString,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if is_last_chance {
-            return Err(process_error);
-        }
-
         if error_message(&process_error).contains_str("zip bomb") {
             return Err(process_error);
         }
@@ -405,12 +396,6 @@ impl ZipDownloader {
         }
     }
 
-    /// For testing only. Mirrors the test's `setPrivateProperty('hasZipArchive', ...)` reflection on
-    /// the `ZipDownloader::$hasZipArchive` static.
-    pub fn __set_has_zip_archive(value: Option<bool>) {
-        *HAS_ZIP_ARCHIVE.lock().unwrap() = value;
-    }
-
     /// For testing only. Mirrors the test's `setPrivateProperty('isWindows', ...)` reflection.
     pub fn __set_is_windows(value: Option<bool>) {
         *IS_WINDOWS.lock().unwrap() = value;
@@ -544,28 +529,15 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
             }
         }
 
-        {
-            let mut has_zip_archive = HAS_ZIP_ARCHIVE.lock().unwrap();
-            if has_zip_archive.is_none() {
-                *has_zip_archive = Some(class_exists("ZipArchive"));
-            }
-        }
-
-        let has_zip_archive = HAS_ZIP_ARCHIVE.lock().unwrap().unwrap_or(false);
         let unzip_commands_empty = UNZIP_COMMANDS
             .lock()
             .unwrap()
             .as_ref()
             .is_none_or(|v| v.is_empty());
 
-        if !has_zip_archive && unzip_commands_empty {
-            let ini_message = IniHelper::get_message()?;
-            let error = bconcat!(
-                "The zip extension and unzip/7z commands are both missing, skipping.\n",
-                ini_message
-            );
-            return Err(RuntimeException::new(error).into());
-        }
+        // PHP throws "The zip extension and unzip/7z commands are both missing" here when
+        // class_exists('ZipArchive') is false. Shirabe implements ZipArchive natively, so zip files
+        // can always be extracted.
 
         {
             let mut is_windows_guard = IS_WINDOWS.lock().unwrap();

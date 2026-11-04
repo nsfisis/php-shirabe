@@ -5,7 +5,7 @@ use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, ZipArchive, bconcat, class_exists, fileperms, path_to_bytes, realpath, strtr,
+    RuntimeException, ZipArchive, bconcat, fileperms, path_to_bytes, realpath, strtr,
 };
 use std::path::{Path, PathBuf};
 
@@ -30,7 +30,9 @@ impl ZipArchiver {
     }
 
     fn compression_available(&self) -> bool {
-        class_exists("ZipArchive")
+        // PHP: class_exists('ZipArchive'). Shirabe implements ZipArchive natively, so it always
+        // exists regardless of whether ext-zip is loaded.
+        true
     }
 }
 

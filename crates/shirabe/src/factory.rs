@@ -32,10 +32,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
     PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, bconcat,
-    class_exists, dirname, error_message, extension_loaded, file_exists, file_get_contents,
-    file_put_contents, implode, is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir,
-    path_from_bytes, path_to_bytes, pathinfo, realpath, rename, rtrim2, strpos, strtr, substr,
-    trim2,
+    dirname, error_message, extension_loaded, file_exists, file_get_contents, file_put_contents,
+    implode, is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir, path_from_bytes,
+    path_to_bytes, pathinfo, realpath, rename, rtrim2, strpos, strtr, substr, trim2,
 };
 use shirabe_symfony_console::{
     formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
@@ -1173,12 +1172,11 @@ impl Factory {
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
     ) -> anyhow::Result<ArchiveManager> {
         let mut am = ArchiveManager::new(dm.clone(), r#loop.clone());
-        if class_exists("ZipArchive") {
-            am.add_archiver(Box::new(ZipArchiver::new()));
-        }
-        if class_exists("Phar") {
-            am.add_archiver(Box::new(PharArchiver::new()));
-        }
+        // Composer registers each archiver only if `class_exists(ZipArchive::class)` /
+        // `class_exists(Phar::class)`. Shirabe implements both classes natively, so they always
+        // exist regardless of the PHP extensions loaded.
+        am.add_archiver(Box::new(ZipArchiver::new()));
+        am.add_archiver(Box::new(PharArchiver::new()));
 
         Ok(am)
     }
