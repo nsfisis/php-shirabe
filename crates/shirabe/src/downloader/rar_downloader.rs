@@ -9,9 +9,10 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, IniHelper, Platform, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_rpc::rar::RarArchive;
 use shirabe_php_shim::{
-    PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, bconcat, class_exists,
-    impl_php_class, implode, path_to_bytes,
+    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, impl_php_class, implode,
+    path_to_bytes,
 };
 
 #[derive(Debug)]
@@ -92,7 +93,7 @@ impl ArchiveDownloader for RarDownloader {
             ));
         }
 
-        if !class_exists("RarArchive") {
+        if !shirabe_php_rpc::class_exists("RarArchive")? {
             let ini_message = IniHelper::get_message()?;
             let error = if !Platform::is_windows() {
                 bconcat!(
@@ -110,7 +111,7 @@ impl ArchiveDownloader for RarDownloader {
             return Err(RuntimeException::new(error).into());
         }
 
-        let rar_archive = RarArchive::open(file);
+        let rar_archive = RarArchive::open(file)?;
         if rar_archive.is_none() {
             return Err(UnexpectedValueException::new(bconcat!(
                 "Could not open RAR archive: ",
@@ -120,7 +121,7 @@ impl ArchiveDownloader for RarDownloader {
         }
         let rar_archive = rar_archive.unwrap();
 
-        let entries = rar_archive.get_entries();
+        let entries = rar_archive.get_entries()?;
         if entries.is_none() {
             return Err(RuntimeException::new(BString::from(
                 "Could not retrieve RAR archive entries",
@@ -129,12 +130,12 @@ impl ArchiveDownloader for RarDownloader {
         }
 
         for entry in entries.unwrap() {
-            if !entry.extract(path) {
+            if !entry.extract(path)? {
                 return Err(RuntimeException::new(BString::from("Could not extract entry")).into());
             }
         }
 
-        rar_archive.close();
+        rar_archive.close()?;
 
         Ok(None)
     }

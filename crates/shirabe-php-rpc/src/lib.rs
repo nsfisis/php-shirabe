@@ -3,6 +3,7 @@
 pub mod composer_runtime;
 mod env;
 pub mod frame;
+pub mod rar;
 pub mod session;
 pub mod value;
 pub mod wire;
@@ -517,22 +518,30 @@ fn query<T: FromWire>(name: impl AsRef<[u8]>, request: impl ToWire) -> anyhow::R
     Ok(protocol_value(&value, bconcat!("the answer of ", name)))
 }
 
+/// An answer typed `T|false`, with `false` mapped to `None`. Any other answer that does not decode
+/// as `T` is a protocol violation, as for [`query`].
+fn or_false<T: FromWire>(value: &PluginValue, what: impl AsRef<[u8]>) -> Option<T> {
+    match value {
+        PluginValue::Bool(false) => None,
+        value => Some(protocol_value(value, what)),
+    }
+}
+
 /// A PHP function answering `string|false`, with `false` mapped to `None`.
 fn string_or_false(name: impl AsRef<[u8]>, arg: &BStr) -> anyhow::Result<Option<BString>> {
-    let name = name.as_ref();
-    Ok(match query(name, arg)? {
-        PhpMixed::String(s) => Some(s),
-        PhpMixed::Bool(false) => None,
-        other => panic!(
-            "PHP RPC: protocol violation — `{}` answered with {other:?}",
-            name.as_bstr().display_lossy()
-        ),
-    })
+    let name = name.as_ref().as_bstr();
+    let value: PluginValue = query(name, arg)?;
+    Ok(or_false(&value, bconcat!("the answer of ", name)))
 }
 
 /// PHP `phpversion($extension)`.
 pub fn phpversion(extension: impl AsRef<[u8]>) -> anyhow::Result<Option<BString>> {
     string_or_false("phpversion", extension.as_ref().as_bstr())
+}
+
+/// PHP `class_exists($class)`, autoloading through the worker's autoloaders.
+pub fn class_exists(class: impl AsRef<[u8]>) -> anyhow::Result<bool> {
+    query("class_exists", class.as_ref().as_bstr())
 }
 
 /// PHP `stream_resolve_include_path($filename)`. It is answered by the worker because the
