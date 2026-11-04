@@ -79,6 +79,7 @@ multiple_inherent_impl = "warn"
 type_complexity = "allow"
 
 [profile.release]
+codegen-units = 1
 lto = "fat"
 strip = "debuginfo"
 
