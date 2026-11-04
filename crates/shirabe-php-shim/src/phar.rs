@@ -14,7 +14,51 @@ enum PharEntryData {
     Disk(std::path::PathBuf),
     /// Loaded from an existing archive.
     Memory(Vec<u8>),
+    /// A file of an opened tar-based archive: the byte range of its data in `ArchiveSource::Tar`.
+    TarRange(std::ops::Range<usize>),
+    /// A file of an opened zip-based archive: its index in `ArchiveSource::Zip`.
+    ZipIndex(usize),
     Dir,
+}
+
+/// The decompressed bytes of an opened tar- or zip-based archive. The content of an entry is read
+/// out of them only when it is accessed.
+#[derive(Debug)]
+enum ArchiveSource {
+    Tar(Vec<u8>),
+    Zip(std::cell::RefCell<zip::ZipArchive<std::io::Cursor<Vec<u8>>>>),
+}
+
+fn entry_content<'a>(
+    archive_path: &std::path::Path,
+    source: Option<&'a ArchiveSource>,
+    data: &'a PharEntryData,
+) -> anyhow::Result<std::borrow::Cow<'a, [u8]>> {
+    match (data, source) {
+        (PharEntryData::Memory(content), _) => Ok(std::borrow::Cow::Borrowed(content)),
+        (PharEntryData::TarRange(range), Some(ArchiveSource::Tar(bytes))) => {
+            Ok(std::borrow::Cow::Borrowed(&bytes[range.clone()]))
+        }
+        (PharEntryData::ZipIndex(index), Some(ArchiveSource::Zip(zip))) => {
+            let invalid_entry = |e: &dyn std::fmt::Display| {
+                corruption_error(
+                    archive_path,
+                    crate::bconcat!("invalid zip entry: ", crate::display_to_bytes(e)),
+                )
+            };
+            let mut zip = zip.borrow_mut();
+            let mut file = zip.by_index(*index).map_err(|e| invalid_entry(&e))?;
+            let mut content = Vec::new();
+            file.read_to_end(&mut content)
+                .map_err(|e| invalid_entry(&e))?;
+            Ok(std::borrow::Cow::Owned(content))
+        }
+        (PharEntryData::Disk(path), _) => Ok(std::borrow::Cow::Owned(std::fs::read(path)?)),
+        (PharEntryData::Dir, _) => Ok(std::borrow::Cow::Borrowed(&[])),
+        (PharEntryData::TarRange(_) | PharEntryData::ZipIndex(_), _) => {
+            unreachable!("an archived entry is read from the archive it was listed from")
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -48,9 +92,12 @@ fn gzip_isize_hint(bytes: &[u8]) -> usize {
     (u32::from_le_bytes(*trailer) as usize).min(MAX_HINT)
 }
 
-/// Reads a tar- or zip-based archive (optionally gzip/bzip2 compressed as a whole)
-/// into memory. Returns the entries and the detected `Phar::TAR`/`Phar::ZIP` format.
-fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry>, i64)> {
+/// Reads a tar- or zip-based archive (optionally gzip/bzip2 compressed as a whole) into memory and
+/// lists its entries without reading their contents. Returns the entries, the source to read the
+/// contents from, and the detected `Phar::TAR`/`Phar::ZIP` format.
+fn read_archive_entries(
+    path: &std::path::Path,
+) -> anyhow::Result<(Vec<PharEntry>, ArchiveSource, i64)> {
     let bytes = std::fs::read(path).map_err(|e| {
         corruption_error(
             path,
@@ -92,7 +139,7 @@ fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry
         })?;
         let mut entries = Vec::new();
         for i in 0..zip.len() {
-            let mut file = zip.by_index(i).map_err(|e| {
+            let file = zip.by_index_raw(i).map_err(|e| {
                 corruption_error(
                     path,
                     crate::bconcat!("invalid zip entry: ", crate::display_to_bytes(e)),
@@ -107,24 +154,22 @@ fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry
                     mtime: None,
                 });
             } else {
-                let mut content = Vec::new();
-                file.read_to_end(&mut content).map_err(|e| {
-                    corruption_error(
-                        path,
-                        crate::bconcat!("invalid zip entry: ", crate::display_to_bytes(e)),
-                    )
-                })?;
                 entries.push(PharEntry {
                     localname,
-                    data: PharEntryData::Memory(content),
+                    data: PharEntryData::ZipIndex(i),
                     mode: file.unix_mode().map(|m| m & 0o7777),
                     mtime: None,
                 });
             }
         }
-        return Ok((entries, Phar::ZIP));
+        return Ok((
+            entries,
+            ArchiveSource::Zip(std::cell::RefCell::new(zip)),
+            Phar::ZIP,
+        ));
     }
 
+    let len = bytes.len();
     let mut archive = tar::Archive::new(std::io::Cursor::new(bytes));
     let mut entries = Vec::new();
     for entry in archive.entries().map_err(|e| {
@@ -154,9 +199,8 @@ fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry
                 mode,
                 mtime,
             });
-        } else {
-            // Symlink and hardlink entries become empty regular files, matching how
-            // PharData::extractTo materializes them.
+        } else if entry_type.is_gnu_sparse() {
+            // The data of a sparse file is not stored contiguously, so it is read out here.
             let mut content = Vec::new();
             entry.read_to_end(&mut content).map_err(|e| {
                 corruption_error(
@@ -170,9 +214,27 @@ fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry
                 mode,
                 mtime,
             });
+        } else {
+            // Symlink and hardlink entries become empty regular files, matching how
+            // PharData::extractTo materializes them.
+            let start = entry.raw_file_position() as usize;
+            let end = start + entry.size() as usize;
+            if end > len {
+                return Err(corruption_error(
+                    path,
+                    BStr::new("invalid tar entry: truncated file contents"),
+                ));
+            }
+            entries.push(PharEntry {
+                localname,
+                data: PharEntryData::TarRange(start..end),
+                mode,
+                mtime,
+            });
         }
     }
-    Ok((entries, Phar::TAR))
+    let bytes = archive.into_inner().into_inner();
+    Ok((entries, ArchiveSource::Tar(bytes), Phar::TAR))
 }
 
 /// Appends `suffix` to the file name, as phar does when it names the compressed archive
@@ -191,6 +253,7 @@ fn unix_mtime(time: std::time::SystemTime) -> u64 {
 
 fn extract_entries(
     archive_path: &std::path::Path,
+    source: Option<&ArchiveSource>,
     entries: &[PharEntry],
     directory: &std::path::Path,
     files: Option<&[&BStr]>,
@@ -247,7 +310,7 @@ fn extract_entries(
                 std::fs::create_dir_all(&dest)
                     .map_err(|e| extract_error(crate::display_to_bytes(e)))?;
             }
-            PharEntryData::Memory(content) => {
+            PharEntryData::Memory(_) | PharEntryData::TarRange(_) | PharEntryData::ZipIndex(_) => {
                 if !overwrite && dest.exists() {
                     return Err(extract_error(crate::bconcat!(
                         "\"",
@@ -259,6 +322,7 @@ fn extract_entries(
                     std::fs::create_dir_all(parent)
                         .map_err(|e| extract_error(crate::display_to_bytes(e)))?;
                 }
+                let content = entry_content(archive_path, source, &entry.data)?;
                 std::fs::write(&dest, content)
                     .map_err(|e| extract_error(crate::display_to_bytes(e)))?;
             }
@@ -548,6 +612,7 @@ impl Phar {
     ) -> anyhow::Result<()> {
         extract_entries(
             &self.path,
+            None,
             &self.entries,
             directory.as_ref(),
             files,
@@ -575,13 +640,14 @@ crate::impl_php_exception!(PharException, inner, r"PharException");
 #[derive(Debug)]
 pub struct PharFileInfo {
     file_name: BString,
-    is_dir: bool,
-    content: Vec<u8>,
+    archive_path: std::path::PathBuf,
+    source: Option<std::rc::Rc<ArchiveSource>>,
+    data: PharEntryData,
 }
 
 impl PharFileInfo {
-    pub fn get_content(&self) -> Vec<u8> {
-        self.content.clone()
+    pub fn get_content(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(entry_content(&self.archive_path, self.source.as_deref(), &self.data)?.into_owned())
     }
 
     pub fn get_basename(&self) -> BString {
@@ -592,7 +658,7 @@ impl PharFileInfo {
     }
 
     pub fn is_dir(&self) -> bool {
-        self.is_dir
+        matches!(self.data, PharEntryData::Dir)
     }
 }
 
@@ -601,6 +667,7 @@ pub struct PharData {
     path: std::path::PathBuf,
     format: i64,
     entries: std::cell::RefCell<Vec<PharEntry>>,
+    source: Option<std::rc::Rc<ArchiveSource>>,
 }
 
 impl PharData {
@@ -620,11 +687,12 @@ impl PharData {
 
     fn open(path: std::path::PathBuf, format: Option<i64>) -> anyhow::Result<Self> {
         if crate::file_exists(&path) {
-            let (entries, detected_format) = read_archive_entries(&path)?;
+            let (entries, source, detected_format) = read_archive_entries(&path)?;
             return Ok(Self {
                 path,
                 format: detected_format,
                 entries: std::cell::RefCell::new(entries),
+                source: Some(std::rc::Rc::new(source)),
             });
         }
         let parent_exists = match path.parent() {
@@ -649,6 +717,7 @@ impl PharData {
             path,
             format,
             entries: std::cell::RefCell::new(Vec::new()),
+            source: None,
         })
     }
 
@@ -665,14 +734,7 @@ impl PharData {
         let key = rtrim2(key, "/");
         for entry in entries.iter() {
             if entry.localname == key {
-                return Some(PharFileInfo {
-                    file_name: entry.localname.clone(),
-                    is_dir: matches!(entry.data, PharEntryData::Dir),
-                    content: match &entry.data {
-                        PharEntryData::Memory(content) => content.clone(),
-                        _ => Vec::new(),
-                    },
-                });
+                return Some(self.file_info(entry.localname.clone(), entry.data.clone()));
             }
         }
         let prefix = crate::bconcat!(&key, "/");
@@ -680,11 +742,7 @@ impl PharData {
             .iter()
             .any(|e| e.localname.starts_with(prefix.as_slice()))
         {
-            return Some(PharFileInfo {
-                file_name: key,
-                is_dir: true,
-                content: Vec::new(),
-            });
+            return Some(self.file_info(key, PharEntryData::Dir));
         }
         None
     }
@@ -693,38 +751,34 @@ impl PharData {
     /// directories) in sorted order, like a `DirectoryIterator` over the phar root.
     pub fn iter(&self) -> impl Iterator<Item = PharFileInfo> {
         let entries = self.entries.borrow();
-        let mut top_level: indexmap::IndexMap<BString, (bool, Vec<u8>)> = indexmap::IndexMap::new();
+        let mut top_level: indexmap::IndexMap<BString, PharEntryData> = indexmap::IndexMap::new();
         for entry in entries.iter() {
             match entry.localname.find_byte(b'/') {
                 Some(slash) => {
                     top_level
                         .entry(BString::from(&entry.localname[..slash]))
-                        .or_insert((true, Vec::new()));
+                        .or_insert(PharEntryData::Dir);
                 }
                 None => {
-                    top_level.insert(
-                        entry.localname.clone(),
-                        (
-                            matches!(entry.data, PharEntryData::Dir),
-                            match &entry.data {
-                                PharEntryData::Memory(content) => content.clone(),
-                                _ => Vec::new(),
-                            },
-                        ),
-                    );
+                    top_level.insert(entry.localname.clone(), entry.data.clone());
                 }
             }
         }
         let mut items: Vec<PharFileInfo> = top_level
             .into_iter()
-            .map(|(file_name, (is_dir, content))| PharFileInfo {
-                file_name,
-                is_dir,
-                content,
-            })
+            .map(|(file_name, data)| self.file_info(file_name, data))
             .collect();
         items.sort_by(|a, b| a.file_name.cmp(&b.file_name));
         items.into_iter()
+    }
+
+    fn file_info(&self, file_name: BString, data: PharEntryData) -> PharFileInfo {
+        PharFileInfo {
+            file_name,
+            archive_path: self.path.clone(),
+            source: self.source.clone(),
+            data,
+        }
     }
 
     pub fn extract_to(
@@ -735,6 +789,7 @@ impl PharData {
     ) -> anyhow::Result<()> {
         extract_entries(
             &self.path,
+            self.source.as_deref(),
             &self.entries.borrow(),
             directory.as_ref(),
             files,
@@ -888,7 +943,10 @@ impl PharData {
                         .append_data(&mut header, path_from_bytes(&entry.localname), file)
                         .map_err(write_error)?;
                 }
-                PharEntryData::Memory(content) => {
+                PharEntryData::Memory(_)
+                | PharEntryData::TarRange(_)
+                | PharEntryData::ZipIndex(_) => {
+                    let content = entry_content(&self.path, self.source.as_deref(), &entry.data)?;
                     header.set_entry_type(tar::EntryType::Regular);
                     header.set_size(content.len() as u64);
                     header.set_mode(entry.mode.unwrap_or(0o644));
@@ -957,7 +1015,10 @@ impl PharData {
                     std::io::copy(&mut file, &mut writer)
                         .map_err(|e| write_error(crate::display_to_bytes(e)))?;
                 }
-                PharEntryData::Memory(content) => {
+                PharEntryData::Memory(_)
+                | PharEntryData::TarRange(_)
+                | PharEntryData::ZipIndex(_) => {
+                    let content = entry_content(&self.path, self.source.as_deref(), &entry.data)?;
                     let options = match entry.mode {
                         Some(mode) => options.unix_permissions(mode),
                         None => options,
@@ -966,7 +1027,7 @@ impl PharData {
                         .start_file_with_options(options.name(localname))
                         .map_err(|e| write_error(crate::display_to_bytes(e)))?;
                     writer
-                        .write_all(content)
+                        .write_all(&content)
                         .map_err(|e| write_error(crate::display_to_bytes(e)))?;
                 }
                 PharEntryData::Dir => {
@@ -1006,7 +1067,11 @@ mod tests {
 
         let read_back = PharData::new(&tar_path).unwrap();
         assert_eq!(
-            read_back.get(b"caf\xE9.txt").unwrap().get_content(),
+            read_back
+                .get(b"caf\xE9.txt")
+                .unwrap()
+                .get_content()
+                .unwrap(),
             b"hello"
         );
     }
@@ -1027,7 +1092,11 @@ mod tests {
 
         let read_back = PharData::new(&zip_path).unwrap();
         assert_eq!(
-            read_back.get(b"caf\xE9.txt").unwrap().get_content(),
+            read_back
+                .get(b"caf\xE9.txt")
+                .unwrap()
+                .get_content()
+                .unwrap(),
             b"hello"
         );
         let archive = zip::ZipArchive::new(std::fs::File::open(&zip_path).unwrap()).unwrap();
@@ -1073,8 +1142,14 @@ mod tests {
 
         let read_back = PharData::new(&tar_path).unwrap();
         assert!(read_back.valid());
-        assert_eq!(read_back.get("a.txt").unwrap().get_content(), b"hello");
-        assert_eq!(read_back.get("sub/b.txt").unwrap().get_content(), b"world");
+        assert_eq!(
+            read_back.get("a.txt").unwrap().get_content().unwrap(),
+            b"hello"
+        );
+        assert_eq!(
+            read_back.get("sub/b.txt").unwrap().get_content().unwrap(),
+            b"world"
+        );
         assert!(read_back.get("sub").unwrap().is_dir());
         assert!(read_back.get("missing").is_none());
         let top: Vec<(BString, bool)> = read_back
@@ -1113,7 +1188,10 @@ mod tests {
         assert!(tar_path.exists());
         for compressed in ["out.tar.gz", "out.tar.bz2"] {
             let read_back = PharData::new(dir.path().join(compressed)).unwrap();
-            assert_eq!(read_back.get("a.txt").unwrap().get_content(), b"hello");
+            assert_eq!(
+                read_back.get("a.txt").unwrap().get_content().unwrap(),
+                b"hello"
+            );
         }
     }
 

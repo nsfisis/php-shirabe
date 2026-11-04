@@ -19,7 +19,7 @@ impl Tar {
 
     fn extract_composer_json_from_folder(phar: &PharData) -> anyhow::Result<BString> {
         if let Some(file) = phar.get("composer.json") {
-            return Ok(file.get_content().into());
+            return Ok(file.get_content()?.into());
         }
 
         let mut top_level_paths: IndexMap<BString, bool> = IndexMap::new();
@@ -40,7 +40,7 @@ impl Tar {
         if !top_level_paths.is_empty()
             && let Some(file) = phar.get(&composer_json_path)
         {
-            return Ok(file.get_content().into());
+            return Ok(file.get_content()?.into());
         }
 
         Err(RuntimeException::new(BString::from(
