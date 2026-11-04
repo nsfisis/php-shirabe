@@ -9,8 +9,8 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, array_replace_recursive, bconcat, extension_loaded, implode, is_dir, path_from_bytes,
-    path_to_bytes, php_uname, stream_context_create, stripos, uasort,
+    PhpMixed, array_replace_recursive, bconcat, explode, extension_loaded, implode, is_dir,
+    path_from_bytes, path_to_bytes, php_uname, stream_context_create, stripos, uasort,
 };
 
 pub struct StreamContextFactory;
@@ -68,28 +68,20 @@ impl StreamContextFactory {
     ) -> anyhow::Result<Result<IndexMap<BString, PhpMixed>, Box<TransportException>>> {
         let url = url.as_ref();
         // Make sure the headers are in an array form
-        let has_header = options
-            .get(B("http"))
-            .and_then(|v| v.as_array())
-            .map(|a| a.contains_key(B("header")))
-            .unwrap_or(false);
-        if !has_header && let Some(PhpMixed::Array(http)) = options.get_mut(B("http")) {
-            http.insert("header".into(), PhpMixed::List(vec![]));
+        let http = options
+            .entry(BString::from("http"))
+            .or_insert(PhpMixed::Null);
+        if http.get(B("header")).is_none_or(PhpMixed::is_null) {
+            http.offset_set_target()?
+                .insert("header".into(), PhpMixed::List(vec![]));
         }
-        // Convert string header to array
-        let header_is_string = options
-            .get(B("http"))
-            .and_then(|v| v.as_array())
-            .and_then(|a| a.get(B("header")))
-            .map(|v| matches!(*v, PhpMixed::String(_)))
-            .unwrap_or(false);
-        if header_is_string
-            && let Some(PhpMixed::Array(http)) = options.get_mut(B("http"))
-            && let Some(PhpMixed::String(header_str)) = http.get(B("header")).cloned()
-        {
-            let parts: Vec<PhpMixed> = header_str
-                .split_str("\r\n")
-                .map(|s| PhpMixed::String(s.into()))
+        let http = http
+            .as_array_mut()
+            .expect("`http` holds a header, so it is an array");
+        if let Some(PhpMixed::String(header_str)) = http.get(B("header")).cloned() {
+            let parts: Vec<PhpMixed> = explode("\r\n", &header_str)
+                .into_iter()
+                .map(PhpMixed::String)
                 .collect();
             http.insert("header".into(), PhpMixed::List(parts));
         }
