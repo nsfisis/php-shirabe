@@ -515,8 +515,10 @@ then the same entity the graph sees. It is filled in per class, driven by
 the explicit errors real plugins hit — today `Package`, `CompletePackage`,
 the three alias packages, the five solver operations,
 `Composer\Util\Filesystem` (with or without its `ProcessExecutor` argument),
-`Composer\Util\ProcessExecutor` and `Composer\Util\HttpDownloader` can be
-built this way. Every other
+`Composer\Util\ProcessExecutor`, `Composer\Util\HttpDownloader` and
+`Composer\IO\BufferIO` (without its `OutputFormatterInterface` argument, a
+Symfony object no proxy carries to the Rust side) can be built this way.
+Every other
 proxied class answers with an explicit error naming it.
 `Composer\EventDispatcher\Event` and `Composer\Plugin\PreCommandRunEvent`
 are the exception: their worker-side definitions are hand-written dual-mode

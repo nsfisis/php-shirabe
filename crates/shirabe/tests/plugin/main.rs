@@ -9,6 +9,7 @@ mod alias_package_test;
 mod anonymous_class_message_test;
 mod e2e_async_test;
 mod e2e_autoload_generator_test;
+mod e2e_buffer_io_test;
 #[cfg(unix)]
 mod e2e_bytes_command_test;
 mod e2e_command_event_test;

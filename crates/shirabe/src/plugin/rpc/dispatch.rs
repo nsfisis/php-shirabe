@@ -397,6 +397,34 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
             return Ok(construction_result(rhandle));
         }
+        // A BufferIO writes into a memory stream of its own and reads from its own string
+        // input, so a plugin-built one is a complete instance rather than a second view on the
+        // graph's IO.
+        b"Composer\\IO\\BufferIO" => {
+            // TODO(plugin): an OutputFormatterInterface is a Symfony object the plugin builds in
+            // its own process, and no proxy carries one to the Rust side.
+            if !matches!(ctor_args.get(2), None | Some(PluginValue::Null)) {
+                return Err(PhpThrow::runtime(bconcat!(
+                    "Shirabe does not support passing an output formatter to ",
+                    class_name,
+                    " inside the plugin process yet"
+                )));
+            }
+            let io = crate::io::buffer_io::BufferIO::new(
+                arg_or::<BString>(class_name, ctor_args, 0, BString::default())?,
+                arg_or::<i64>(
+                    class_name,
+                    ctor_args,
+                    1,
+                    shirabe_symfony_console::output::VERBOSITY_NORMAL,
+                )?,
+                None,
+            )
+            .map_err(|error| error_throw(b"BufferIO::__construct failed", &error))?;
+            let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+                std::rc::Rc::new(std::cell::RefCell::new(io));
+            return Ok(construction_result(register_entity(RustEntity::Io(io))));
+        }
         // TODO(plugin): the remaining proxied classes get a construction story on demand,
         // driven by explicit errors from real plugins. Each one has to decide what a
         // plugin-built instance means for the Rust-side graph, which is why none of them is

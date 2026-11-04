@@ -98,7 +98,7 @@ impl BufferIO {
         output
     }
 
-    pub fn set_user_inputs(&mut self, inputs: Vec<impl AsRef<[u8]>>) -> anyhow::Result<()> {
+    pub fn set_user_inputs(&self, inputs: Vec<impl AsRef<[u8]>>) -> anyhow::Result<()> {
         let stream = self.create_stream(inputs)?;
 
         let mut input = self.inner.input.borrow_mut();

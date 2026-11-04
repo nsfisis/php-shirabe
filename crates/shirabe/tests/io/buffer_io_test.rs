@@ -8,7 +8,7 @@ use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
 #[test]
 fn test_set_user_inputs() {
-    let mut buffer_io = BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap();
+    let buffer_io = BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap();
 
     // The Rust port always uses a StreamableInputInterface, so the version-guard
     // exception branch in the original test does not apply.

@@ -1,8 +1,9 @@
 //! The methods a `Composer\IO\IOInterface` entity answers over RPC.
 
 use crate::io::IOInterface;
+use crate::io::buffer_io::BufferIO;
 use crate::plugin::rpc::codec::{arg, arg_or};
-use crate::plugin::rpc::dispatch::unavailable_method;
+use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 
@@ -31,10 +32,26 @@ pub(crate) fn dispatch_io_method(
         b"isVeryVerbose" => Ok(io.borrow().is_very_verbose().to_wire()),
         b"isDebug" => Ok(io.borrow().is_debug().to_wire()),
         b"isDecorated" => Ok(io.borrow().is_decorated().to_wire()),
+        // Only a `Composer\IO\BufferIO` stub forwards these, and that stub is handed out for a
+        // BufferIO entity alone.
+        b"getOutput" => Ok(PluginValue::string(buffer_io(&*io.borrow()).get_output())),
+        b"setUserInputs" => {
+            let inputs = arg::<Vec<BString>>(method_name, args, 0)?;
+            buffer_io(&*io.borrow())
+                .set_user_inputs(inputs)
+                .map_err(|error| error_throw(b"setUserInputs failed", &error))?;
+            Ok(PluginValue::Null)
+        }
         // TODO(plugin): the remaining IOInterface surface (ask*, authentications, ...) is
         // widened on demand, driven by explicit errors from real plugins.
         other => Err(unavailable_method("IO", other)),
     }
+}
+
+fn buffer_io(io: &dyn IOInterface) -> &BufferIO {
+    io.as_any()
+        .downcast_ref::<BufferIO>()
+        .expect("only a BufferIO stub forwards the BufferIO methods")
 }
 
 /// Decodes `($messages, bool $newline, int $verbosity)`: `$messages` is a string or a list of
