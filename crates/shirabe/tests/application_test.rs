@@ -274,7 +274,9 @@ fn a_non_utf8_exception_message_reaches_the_output_unchanged() {
     )));
     let error: anyhow::Error = RuntimeException::new(b"bad name \xff".as_slice()).into();
 
-    application.do_render_throwable(&error, output.clone());
+    application
+        .do_render_throwable(&error, output.clone())
+        .unwrap();
 
     assert!(output.borrow().fetch().contains_str(b"bad name \xff"));
 }

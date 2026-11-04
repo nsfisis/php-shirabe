@@ -28,7 +28,7 @@ use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
-    LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpClass, PhpMixed,
+    LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpClass, PhpMixed, PregMatches,
     RuntimeException, STDIN, STR_PAD_RIGHT, basename, bconcat, bin2hex, chdir, defined, dirname,
     disk_free_space, display_to_bytes, error_message, exec, explode, explode_limit,
     extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists,
@@ -37,10 +37,10 @@ use shirabe_php_shim::{
     mb_convert_encoding, mb_convert_variables, mb_detect_encoding, mb_strwidth,
     memory_get_peak_usage, memory_get_usage, microtime, os_str_from_bytes, path_from_bytes,
     path_to_bytes, php_regex, php_str, php_to_string, php_truthy, php_uname, posix_getuid,
-    preg_grep, preg_match, preg_quote, preg_split, putenv, random_bytes, realpath,
-    restore_error_handler, round, sort_natural_flag_case, str_pad, str_repeat, str_replace,
-    str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time,
-    trim, unlink,
+    preg_grep, preg_match, preg_quote, preg_replace_callback, preg_split, putenv, random_bytes,
+    realpath, restore_error_handler, round, sort_natural_flag_case, str_pad, str_repeat,
+    str_replace, str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count,
+    sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::input::InputInterfaceByName;
@@ -1250,12 +1250,12 @@ impl Application {
         &self,
         e: &anyhow::Error,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
+    ) -> anyhow::Result<()> {
         output
             .borrow()
             .writeln(&[BString::from("")], output_interface::VERBOSITY_QUIET);
 
-        self.do_render_throwable(e, output.clone());
+        self.do_render_throwable(e, output.clone())?;
 
         if let Some(running_command) = &self.running_command {
             // PHP: sprintf('<info>%s</info>', OutputFormatter::escape(sprintf($synopsis, $this->getName())))
@@ -1274,17 +1274,19 @@ impl Application {
                 .borrow()
                 .writeln(&[BString::from("")], output_interface::VERBOSITY_QUIET);
         }
+
+        Ok(())
     }
 
     pub fn do_render_throwable(
         &self,
         e: &anyhow::Error,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
+    ) -> anyhow::Result<()> {
         let mut current = Some(e);
         while let Some(e) = current {
             let exception = AnyThrowable::of(e);
-            let message = trim(error_message(e));
+            let mut message = trim(error_message(e));
             let verbosity = output.borrow().get_verbosity();
 
             let mut len;
@@ -1307,10 +1309,15 @@ impl Application {
                 len = 0;
             }
 
-            // PHP rewrites `@anonymous\0` markers via class_exists/get_parent_class/class_implements.
-            // Rust error messages never carry PHP's anonymous-class marker and those reflection
-            // primitives have no Rust equivalent, so the branch is unreachable here.
-            // TODO(port): port the @anonymous rewrite if it ever becomes relevant.
+            if message.contains_str(b"@anonymous\0") {
+                message = preg_replace_callback(
+                    php_regex!(
+                        r"/[a-zA-Z_\x7f-\xff][\\a-zA-Z0-9_\x7f-\xff]*@anonymous\x00.*?\.php(?:0x?|:[0-9]+\$)?[0-9a-fA-F]+/"
+                    ),
+                    |m: &PregMatches| anonymous_class_display_name(m.get(0).unwrap()),
+                    &message,
+                )?;
+            }
 
             let width = if self.terminal.get_width() != 0 {
                 self.terminal.get_width() - 1
@@ -1385,6 +1392,8 @@ impl Application {
 
             current = exception.and_then(AnyThrowable::get_previous);
         }
+
+        Ok(())
     }
 
     /// Configures the input and output instances based on the user arguments and options.
@@ -2662,7 +2671,7 @@ impl ApplicationHandle {
                     return Err(e);
                 }
 
-                render_exception(&application.borrow(), &e, &output);
+                render_exception(&application.borrow(), &e, &output)?;
 
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
@@ -2949,9 +2958,47 @@ fn throwable_get_code(e: Option<&AnyThrowable>) -> i64 {
 }
 
 /// PHP's `get_debug_type($e)` for the title line, reached only when the message is empty or output
-/// is verbose.
+/// is verbose. Only the name of an anonymous class contains a NUL byte, and `get_debug_type` names
+/// such a class by what precedes it, e.g. `RuntimeException@anonymous`.
 fn throwable_debug_type(e: Option<&AnyThrowable>) -> &BStr {
-    e.map_or_else(|| BStr::new("Exception"), PhpClass::php_class_name)
+    let class = e.map_or_else(|| BStr::new("Exception"), PhpClass::php_class_name);
+    match class.find_byte(0) {
+        Some(end) => &class[..end],
+        None => class,
+    }
+}
+
+/// The replacement `doRenderThrowable` writes for an anonymous class name found in a message:
+/// `(get_parent_class($class) ?: key(class_implements($class)) ?: 'class').'@anonymous'` when
+/// `class_exists($class, false)`, else the name unchanged. Anonymous classes are declared only by
+/// PHP code the worker ran, so the worker's class table answers, and without a worker no such
+/// class exists.
+fn anonymous_class_display_name(class: &BStr) -> anyhow::Result<BString> {
+    let string = || shirabe_php_rpc::PluginValue::string(class);
+    let exists = shirabe_php_rpc::worker_is_running()
+        && PhpCall::Function(BStr::new("class_exists"))
+            .run::<bool>(vec![string(), shirabe_php_rpc::PluginValue::Bool(false)])?;
+    if !exists {
+        return Ok(class.to_owned());
+    }
+
+    let get_parent_class = PhpCall::Function(BStr::new("get_parent_class"));
+    let parent = match get_parent_class.run::<shirabe_php_rpc::PluginValue>(vec![string()])? {
+        shirabe_php_rpc::PluginValue::Bool(false) => None,
+        value => Some(
+            <BString as shirabe_php_rpc::FromWire>::from_wire(&value)
+                .map_err(|throw| get_parent_class.unsupported_shape(throw))?,
+        ),
+    };
+    let name = match parent {
+        Some(parent) => parent,
+        None => PhpCall::Function(BStr::new("class_implements"))
+            .run::<IndexMap<BString, shirabe_php_rpc::PluginValue>>(vec![string()])?
+            .into_keys()
+            .next()
+            .unwrap_or_else(|| BString::from("class")),
+    };
+    Ok(bconcat!(name, "@anonymous"))
 }
 
 /// Borrows the shared input as a mutable `dyn InputInterface` for passing to
