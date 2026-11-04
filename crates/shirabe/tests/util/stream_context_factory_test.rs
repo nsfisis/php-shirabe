@@ -1,4 +1,8 @@
 //! ref: composer/tests/Composer/Test/Util/StreamContextFactoryTest.php sha1:a3618224224c00ccb58a28fbfd28fd9b9fb4d480
+//!
+//! `testEnsureThatfixHttpHeaderFieldMovesContentTypeToEndOfOptions` is not ported, since
+//! `StreamContextFactory::fix_http_header_field()` does not reorder the headers (see its doc
+//! comment).
 
 // These build a stream context and assert proxy/option handling driven by HTTP(S)_PROXY /
 // no_proxy environment variables. PHP's setUp/tearDown isolation (which resets the env vars and
@@ -113,7 +117,6 @@ fn test_get_context() {
 
 #[test]
 #[serial_test::serial]
-#[ignore = "fix_http_header_field's uasort comparator (ported verbatim, ignores its second argument) is not a valid ordering; Rust's stable sort_by resolves the resulting ties differently than PHP's Zend sort, so the header order diverges from expected"]
 fn test_http_proxy() {
     let _tear_down = TearDown;
     set_up();
@@ -255,7 +258,6 @@ fn test_http_proxy_with_no_proxy_wildcard() {
 
 #[test]
 #[serial_test::serial]
-#[ignore = "fix_http_header_field's uasort comparator (ported verbatim, ignores its second argument) is not a valid ordering; Rust's stable sort_by resolves the resulting ties differently than PHP's Zend sort, so the header order diverges from expected"]
 fn test_options_are_preserved() {
     let _tear_down = TearDown;
     set_up();
@@ -318,7 +320,6 @@ fn test_options_are_preserved() {
 
 #[test]
 #[serial_test::serial]
-#[ignore = "fix_http_header_field's uasort comparator (ported verbatim, ignores its second argument) is not a valid ordering; Rust's stable sort_by resolves the resulting ties differently than PHP's Zend sort, so the header order diverges from expected"]
 fn test_http_proxy_without_port() {
     let _tear_down = TearDown;
     set_up();
@@ -449,40 +450,6 @@ fn test_ssl_proxy() {
             );
         }
     }
-}
-
-#[test]
-#[serial_test::serial]
-fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() {
-    let _tear_down = TearDown;
-    set_up();
-    let options = map(vec![(
-        BStr::new("http"),
-        arr(vec![(
-            BStr::new("header"),
-            s(BStr::new(
-                "User-agent: foo\r\nX-Foo: bar\r\nContent-Type: application/json\r\nAuthorization: Basic aW52YWxpZA==",
-            )),
-        )]),
-    )]);
-    let expected_header = [
-        s(BStr::new("User-agent: foo")),
-        s(BStr::new("X-Foo: bar")),
-        s(BStr::new("Authorization: Basic aW52YWxpZA==")),
-        s(BStr::new("Content-Type: application/json")),
-    ];
-    let context =
-        StreamContextFactory::get_context("http://example.org", options.into(), IndexMap::new())
-            .unwrap()
-            .unwrap();
-    let ctxoptions = stream_context_get_options(&context);
-    let ctx_header = ctxoptions
-        .get(B("http"))
-        .and_then(|v| v.as_array())
-        .and_then(|a| a.get(B("header")))
-        .and_then(|v| v.as_list())
-        .unwrap();
-    assert_eq!(expected_header.last().unwrap(), ctx_header.last().unwrap());
 }
 
 #[test]

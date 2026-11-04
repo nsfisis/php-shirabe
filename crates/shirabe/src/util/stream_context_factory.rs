@@ -11,7 +11,7 @@ use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
     PhpMixed, TypeError, array_replace_recursive, bconcat, explode, extension_loaded,
     get_debug_type, is_dir, path_from_bytes, path_to_bytes, php_uname, stream_context_create,
-    stripos, uasort, uasort_map,
+    stripos,
 };
 
 pub struct StreamContextFactory;
@@ -311,11 +311,12 @@ impl StreamContextFactory {
         Ok(defaults)
     }
 
-    /// A bug in PHP prevents the headers from correctly being sent when a content-type header is
-    /// present and NOT at the end of the array. This method fixes the array by moving the
-    /// content-type header to the end.
+    /// PHP's fixHttpHeaderField() also moves the content-type header to the end of the array, to
+    /// work around a bug of PHP's http stream wrapper (https://bugs.php.net/bug.php?id=61548).
+    /// Requests are sent through reqwest, which does not have the bug, so the headers keep their
+    /// order.
     fn fix_http_header_field(header: PhpMixed) -> anyhow::Result<PhpMixed> {
-        let mut header = match header {
+        let header = match header {
             PhpMixed::String(s) => PhpMixed::List(
                 explode("\r\n", s)
                     .into_iter()
@@ -332,7 +333,7 @@ impl StreamContextFactory {
                 .into());
             }
         };
-        // The comparator runs only when there are two elements to compare, and the file declares
+        // PHP's comparator runs only when there are two elements to compare, and the file declares
         // strict_types, so stripos() rejects any element that is not a string.
         if header.values().len() > 1
             && let Some(other) = header
@@ -346,18 +347,6 @@ impl StreamContextFactory {
                 " given"
             ))
             .into());
-        }
-        let compare = |el: &PhpMixed, _: &PhpMixed| {
-            if stripos(el.as_string().unwrap_or_default(), "content-type") == Some(0) {
-                1
-            } else {
-                -1
-            }
-        };
-        match &mut header {
-            PhpMixed::List(list) => uasort(list, compare),
-            PhpMixed::Array(map) => uasort_map(map, compare),
-            _ => unreachable!("header was made an array above"),
         }
         Ok(header)
     }
