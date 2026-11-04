@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+#
+# Runs every test target of the workspace (each lib, bin, integration test binary and doctest set)
+# as a separate `cargo test` process, several at a time.
+#
+# This is a temporary workaround. Many tests are `#[serial]` because they touch process-wide state
+# (the current directory, environment variables, global caches), so a single `cargo test` process
+# spends most of its time running tests one by one. Running the targets in separate processes
+# sidesteps that. Once the tests stop depending on process-wide state and `#[serial]` is no longer
+# needed, plain `cargo test` becomes fast enough and this script should be deleted.
+#
+# Usage: scripts/test-parallel [-j JOBS] [-- ARGS...]
+#   -j JOBS  number of `cargo test` processes to run at once (default: number of CPUs)
+#   ARGS     passed to every test binary, e.g. `-- --include-ignored`
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+jobs=$(nproc)
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -j)
+            jobs="$2"
+            shift 2
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+test_args=("$@")
+
+targets=()
+while IFS= read -r line; do
+    targets+=("$line")
+done < <(
+    # Integration test binaries are the slowest, so they are started first.
+    cargo metadata --no-deps --format-version 1 | jq -r '
+        [
+            .packages[] | .name as $pkg | .targets[] | select(.test or .doctest) |
+            (if .test then
+                if .kind == ["lib"] then {order: 1, args: "-p \($pkg) --lib"}
+                elif .kind == ["bin"] then {order: 1, args: "-p \($pkg) --bin \(.name)"}
+                elif .kind == ["test"] then {order: 0, args: "-p \($pkg) --test \(.name)"}
+                else empty end
+            else empty end),
+            (if .doctest then {order: 2, args: "-p \($pkg) --doc"} else empty end)
+        ] | sort_by(.order) | .[].args
+    '
+)
+
+cargo test --workspace --no-run
+
+log_dir=$(mktemp -d)
+trap 'rm -rf "$log_dir"' EXIT
+
+run_target() {
+    local index="$1"
+    local target="$2"
+    local start=$SECONDS
+    local status=0
+    # Background jobs of a non-interactive shell ignore SIGINT and SIGQUIT, and the test processes
+    # would inherit that. Some tests check the default disposition of these signals.
+    trap - INT QUIT
+    # shellcheck disable=SC2086
+    cargo test $target -- "${test_args[@]}" > "$log_dir/$index.log" 2>&1 || status=$?
+    echo "$status" > "$log_dir/$index.status"
+    if [[ $status -eq 0 ]]; then
+        printf 'ok      %4ds  %s\n' $((SECONDS - start)) "$target"
+    else
+        printf 'FAILED  %4ds  %s\n' $((SECONDS - start)) "$target"
+    fi
+}
+
+running=0
+for i in "${!targets[@]}"; do
+    if [[ $running -ge $jobs ]]; then
+        wait -n || true
+        running=$((running - 1))
+    fi
+    run_target "$i" "${targets[$i]}" &
+    running=$((running + 1))
+done
+wait
+
+failed=0
+for i in "${!targets[@]}"; do
+    if [[ "$(cat "$log_dir/$i.status")" -ne 0 ]]; then
+        failed=$((failed + 1))
+        echo
+        echo "==== cargo test ${targets[$i]} ===="
+        cat "$log_dir/$i.log"
+    fi
+done
+
+echo
+if [[ $failed -ne 0 ]]; then
+    echo "$failed of ${#targets[@]} test targets failed"
+    exit 1
+fi
+echo "all ${#targets[@]} test targets passed"
