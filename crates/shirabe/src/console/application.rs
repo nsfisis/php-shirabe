@@ -2789,7 +2789,7 @@ impl ApplicationHandle {
 
                 let alternative = single_alternative.unwrap();
 
-                let mut style = SymfonyStyle::new(input.clone(), output.clone());
+                let style = SymfonyStyle::new(input.clone(), output.clone());
                 output
                     .borrow()
                     .writeln(&[BString::from("")], output_interface::OUTPUT_NORMAL);
@@ -2801,7 +2801,7 @@ impl ApplicationHandle {
                 output
                     .borrow()
                     .writeln(&[formatted_block], output_interface::OUTPUT_NORMAL);
-                if !style.confirm(
+                if !style.borrow().confirm(
                     bconcat!("Do you want to run \"", alternative, "\" instead? ").as_ref(),
                     false,
                 ) {

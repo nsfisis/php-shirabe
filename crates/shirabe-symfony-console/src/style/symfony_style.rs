@@ -22,9 +22,11 @@ pub struct SymfonyStyle {
     inner: OutputStyle,
     input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    question_helper: Option<SymfonyQuestionHelper>,
+    question_helper: std::cell::RefCell<Option<SymfonyQuestionHelper>>,
     line_length: i64,
     buffered_output: TrimmedBufferOutput,
+    /// The handle this style is built in, passed on wherever PHP passes `$this`.
+    this: std::rc::Weak<std::cell::RefCell<SymfonyStyle>>,
 }
 
 pub const MAX_LINE_LENGTH: i64 = 120;
@@ -33,7 +35,7 @@ impl SymfonyStyle {
     pub fn new(
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Self {
+    ) -> std::rc::Rc<std::cell::RefCell<Self>> {
         let buffered_output = TrimmedBufferOutput::new(
             if cfg!(windows) { 4 } else { 2 },
             Some(output.borrow().get_verbosity()),
@@ -51,19 +53,22 @@ impl SymfonyStyle {
 
         let inner = OutputStyle::new(output.clone());
 
-        Self {
-            inner,
-            input,
-            output,
-            question_helper: None,
-            line_length,
-            buffered_output,
-        }
+        std::rc::Rc::new_cyclic(|this| {
+            std::cell::RefCell::new(Self {
+                inner,
+                input,
+                output,
+                question_helper: std::cell::RefCell::new(None),
+                line_length,
+                buffered_output,
+                this: this.clone(),
+            })
+        })
     }
 
     /// Formats a message as a block of text.
     pub fn block(
-        &mut self,
+        &self,
         messages: &[BString],
         r#type: Option<&BStr>,
         style: Option<&BStr>,
@@ -77,25 +82,21 @@ impl SymfonyStyle {
         self.new_line(1);
     }
 
-    pub fn ask_question(&mut self, question: &impl QuestionInterface) -> PhpMixed {
+    pub fn ask_question(&self, question: &impl QuestionInterface) -> PhpMixed {
         if self.input.borrow().is_interactive() {
             self.auto_prepend_block();
         }
 
-        if self.question_helper.is_none() {
-            self.question_helper = Some(SymfonyQuestionHelper::new());
-        }
-
-        // TODO(symfony): PHP passes `$this` as the OutputInterface, so SymfonyQuestionHelper's
-        // write_error renders through SymfonyStyle::error; SymfonyStyle is not an OutputInterface
-        // trait object here, so the raw output is passed instead.
+        let this: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = self
+            .this
+            .upgrade()
+            .expect("SymfonyStyle is only reachable through its own handle");
         let answer = {
+            let mut question_helper = self.question_helper.borrow_mut();
+            let question_helper = question_helper.get_or_insert_with(SymfonyQuestionHelper::new);
             let input = self.input.clone();
             let mut input = input.borrow_mut();
-            self.question_helper
-                .as_mut()
-                .unwrap()
-                .ask(&mut *input, self.output.clone(), question)
+            question_helper.ask(&mut *input, this, question)
         };
         // PHP `askQuestion` returns the answer directly; exceptions propagate. The double
         // `Result` is collapsed here by panicking on either error.
@@ -112,7 +113,7 @@ impl SymfonyStyle {
         answer
     }
 
-    pub fn create_table(&mut self) -> Table {
+    pub fn create_table(&self) -> Table {
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
             if Self::is_console_output_interface(&self.output) {
                 Self::as_console_output_interface(&self.output)
@@ -131,7 +132,7 @@ impl SymfonyStyle {
         table
     }
 
-    fn auto_prepend_block(&mut self) {
+    fn auto_prepend_block(&self) {
         let chars = substr(
             str_replace(PHP_EOL, "\n", self.buffered_output.fetch()),
             -2,
@@ -147,14 +148,14 @@ impl SymfonyStyle {
         self.new_line(2 - substr_count(&chars, "\n"));
     }
 
-    fn write_buffer(&mut self, message: &BStr, new_line: bool, r#type: i64) {
+    fn write_buffer(&self, message: &BStr, new_line: bool, r#type: i64) {
         // We need to know if the last chars are PHP_EOL
         self.buffered_output
             .write(&[BString::from(message)], new_line, r#type);
     }
 
     fn create_block(
-        &mut self,
+        &self,
         messages: &[BString],
         r#type: Option<&BStr>,
         style: Option<&BStr>,
@@ -246,10 +247,6 @@ impl SymfonyStyle {
         lines
     }
 
-    fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>> {
-        self.output.borrow().get_formatter()
-    }
-
     fn is_console_output_interface(
         output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> bool {
@@ -270,17 +267,70 @@ impl SymfonyStyle {
         })
         .ok()
     }
+}
 
-    pub fn writeln(&mut self, messages: &[BString], r#type: i64) {
+impl OutputInterface for SymfonyStyle {
+    fn write(&self, messages: &[BString], newline: bool, r#type: i64) {
+        for message in messages {
+            self.inner
+                .write(std::slice::from_ref(message), newline, r#type);
+            self.write_buffer(message.as_bstr(), newline, r#type);
+        }
+    }
+
+    fn writeln(&self, messages: &[BString], r#type: i64) {
         for message in messages {
             self.inner.writeln(std::slice::from_ref(message), r#type);
             self.write_buffer(message.as_bstr(), true, r#type);
         }
     }
+
+    fn set_verbosity(&self, level: i64) {
+        self.inner.set_verbosity(level);
+    }
+
+    fn get_verbosity(&self) -> i64 {
+        self.inner.get_verbosity()
+    }
+
+    fn is_quiet(&self) -> bool {
+        self.inner.is_quiet()
+    }
+
+    fn is_verbose(&self) -> bool {
+        self.inner.is_verbose()
+    }
+
+    fn is_very_verbose(&self) -> bool {
+        self.inner.is_very_verbose()
+    }
+
+    fn is_debug(&self) -> bool {
+        self.inner.is_debug()
+    }
+
+    fn set_decorated(&self, decorated: bool) {
+        self.inner.set_decorated(decorated);
+    }
+
+    fn is_decorated(&self) -> bool {
+        self.inner.is_decorated()
+    }
+
+    fn set_formatter(
+        &self,
+        formatter: std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>,
+    ) {
+        self.inner.set_formatter(formatter);
+    }
+
+    fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>> {
+        self.inner.get_formatter()
+    }
 }
 
 impl StyleInterface for SymfonyStyle {
-    fn error(&mut self, message: &[BString]) {
+    fn error(&self, message: &[BString]) {
         self.block(
             message,
             Some("ERROR".into()),
@@ -291,7 +341,7 @@ impl StyleInterface for SymfonyStyle {
         );
     }
 
-    fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) -> anyhow::Result<()> {
+    fn table(&self, headers: Vec<Cell>, rows: Vec<Row>) -> anyhow::Result<()> {
         self.create_table()
             .set_headers(headers)
             .set_rows(rows)
@@ -302,15 +352,56 @@ impl StyleInterface for SymfonyStyle {
         Ok(())
     }
 
-    fn confirm(&mut self, question: &BStr, default: bool) -> bool {
+    fn confirm(&self, question: &BStr, default: bool) -> bool {
         let answer = self.ask_question(&ConfirmationQuestion::new(question, default, "/^y/i"));
 
         boolval(&answer)
     }
 
-    fn new_line(&mut self, count: i64) {
+    fn new_line(&self, count: i64) {
         self.inner.new_line(count);
         self.buffered_output
             .write(&[str_repeat("\n", count as usize)], false, OUTPUT_NORMAL);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::exception::InvalidArgumentException;
+    use crate::input::{ArrayInput, StreamableInputInterface};
+    use crate::output::BufferedOutput;
+    use crate::question::Question;
+    use shirabe_php_shim::{fopen, fwrite, rewind};
+
+    #[test]
+    fn ask_question_reports_validation_errors_through_the_style() {
+        let stream = fopen("php://memory", "r+").unwrap();
+        fwrite(&stream, "bad\ngood\n", None);
+        rewind(&stream);
+        let mut input = ArrayInput::new(vec![], None).unwrap();
+        input.set_stream(stream);
+        let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(input));
+        let output = std::rc::Rc::new(std::cell::RefCell::new(BufferedOutput::new(
+            None, false, None,
+        )));
+        let output_handle: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = output.clone();
+
+        let mut question = Question::new("Value?", None);
+        question.set_validator(Some(Box::new(|answer: Option<PhpMixed>| {
+            let answer = answer.unwrap();
+            if answer.as_string() == Some(BStr::new("good")) {
+                Ok(answer)
+            } else {
+                Err(InvalidArgumentException::new("Not good"))
+            }
+        })));
+
+        let style = SymfonyStyle::new(input, output_handle);
+        let answer = style.borrow().ask_question(&question);
+
+        assert_eq!(answer.as_string(), Some(BStr::new("good")));
+        assert!(output.borrow().fetch().contains_str("[ERROR] Not good"));
     }
 }

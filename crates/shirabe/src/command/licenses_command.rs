@@ -308,8 +308,8 @@ impl Command for LicensesCommand {
                     })
                     .collect();
 
-                let mut symfony_io = SymfonyStyle::new(input, output);
-                symfony_io.table(
+                let symfony_io = SymfonyStyle::new(input, output);
+                symfony_io.borrow().table(
                     vec!["License".into(), "Number of dependencies".into()],
                     rows,
                 )?;

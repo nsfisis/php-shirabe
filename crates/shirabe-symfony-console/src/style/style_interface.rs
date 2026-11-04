@@ -6,14 +6,14 @@ use bstr::{BStr, BString};
 /// Output style helpers.
 pub trait StyleInterface {
     /// Formats an error result bar.
-    fn error(&mut self, message: &[BString]);
+    fn error(&self, message: &[BString]);
 
     /// Formats a table.
-    fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) -> anyhow::Result<()>;
+    fn table(&self, headers: Vec<Cell>, rows: Vec<Row>) -> anyhow::Result<()>;
 
     /// Asks for confirmation.
-    fn confirm(&mut self, question: &BStr, default: bool) -> bool;
+    fn confirm(&self, question: &BStr, default: bool) -> bool;
 
     /// Add newline(s).
-    fn new_line(&mut self, count: i64);
+    fn new_line(&self, count: i64);
 }

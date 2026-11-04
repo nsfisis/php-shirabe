@@ -130,8 +130,8 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
         error: &Exception,
     ) {
         {
-            let mut borrowed = output.borrow_mut();
-            if let Some(style) = (*borrowed).as_any_mut().downcast_mut::<SymfonyStyle>() {
+            let borrowed = output.borrow();
+            if let Some(style) = (*borrowed).as_any().downcast_ref::<SymfonyStyle>() {
                 style.new_line(1);
                 style.error(&[error.get_message().into()]);
 
