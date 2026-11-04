@@ -81,12 +81,9 @@ fn test_error_messages() {
         PhpMixed::string(path_to_bytes(&test_dir)),
     );
     let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(config_options, false)));
-    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
-        io.clone(),
-        config.clone(),
-        IndexMap::new(),
-        false,
-    )));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+        HttpDownloader::new(io.clone(), config.clone(), IndexMap::new(), false).unwrap(),
+    ));
     let filesystem = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),

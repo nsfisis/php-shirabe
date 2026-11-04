@@ -239,12 +239,9 @@ fn test_load_versions() {
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
-        io.clone(),
-        config.clone(),
-        IndexMap::new(),
-        false,
-    )));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+        HttpDownloader::new(io.clone(), config.clone(), IndexMap::new(), false).unwrap(),
+    ));
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));

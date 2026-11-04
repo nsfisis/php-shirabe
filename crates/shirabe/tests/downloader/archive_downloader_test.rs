@@ -39,12 +39,9 @@ fn get_archive_downloader(vendor_dir: Option<&BStr>) -> FileDownloader {
     }
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
-    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
-        io.clone(),
-        config.clone(),
-        IndexMap::new(),
-        false,
-    )));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+        HttpDownloader::new(io.clone(), config.clone(), IndexMap::new(), false).unwrap(),
+    ));
 
     FileDownloader::new(io, config, http_downloader, None, None, None, None).unwrap()
 }

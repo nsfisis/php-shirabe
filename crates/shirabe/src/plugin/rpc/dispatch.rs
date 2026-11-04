@@ -366,17 +366,20 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // reads, both of which it receives as the proxies the plugin already holds.
         b"Composer\\Util\\HttpDownloader" => {
             let rhandle = register_entity(RustEntity::HttpDownloader(std::rc::Rc::new(
-                std::cell::RefCell::new(crate::util::HttpDownloader::new(
-                    io_arg(0)?,
-                    config_arg(1)?,
-                    arg_or::<IndexMap<BString, PhpMixed>>(
-                        class_name,
-                        ctor_args,
-                        2,
-                        IndexMap::new(),
-                    )?,
-                    arg_or::<bool>(class_name, ctor_args, 3, false)?,
-                )),
+                std::cell::RefCell::new(
+                    crate::util::HttpDownloader::new(
+                        io_arg(0)?,
+                        config_arg(1)?,
+                        arg_or::<IndexMap<BString, PhpMixed>>(
+                            class_name,
+                            ctor_args,
+                            2,
+                            IndexMap::new(),
+                        )?,
+                        arg_or::<bool>(class_name, ctor_args, 3, false)?,
+                    )
+                    .map_err(|error| error_throw(b"HttpDownloader construction failed", &error))?,
+                ),
             )));
             return Ok(construction_result(rhandle));
         }

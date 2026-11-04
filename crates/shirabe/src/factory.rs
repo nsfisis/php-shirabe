@@ -1427,12 +1427,12 @@ impl Factory {
             }
             http_downloader_options = array_replace_recursive(http_downloader_options, options);
         }
-        let http_downloader_result: anyhow::Result<HttpDownloader> = Ok(HttpDownloader::new(
+        let http_downloader_result: anyhow::Result<HttpDownloader> = HttpDownloader::new(
             io.clone(),
             config.clone(),
             http_downloader_options,
             disable_tls,
-        ));
+        );
         let http_downloader = match http_downloader_result {
             Ok(h) => h,
             Err(e) => {

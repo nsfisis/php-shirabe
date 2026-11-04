@@ -23,12 +23,9 @@ fn http_downloader(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
-    std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
-        io.clone(),
-        config,
-        IndexMap::new(),
-        true,
-    )))
+    std::rc::Rc::new(std::cell::RefCell::new(
+        HttpDownloader::new(io.clone(), config, IndexMap::new(), true).unwrap(),
+    ))
 }
 
 fn installation_manager(

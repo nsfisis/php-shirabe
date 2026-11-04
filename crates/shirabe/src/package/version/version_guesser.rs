@@ -395,7 +395,7 @@ impl VersionGuesser {
                 self.config.clone(),
                 IndexMap::new(),
                 false,
-            )));
+            )?));
             let mut driver = HgDriver::new(
                 repo_config,
                 io,

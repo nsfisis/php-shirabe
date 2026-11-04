@@ -98,7 +98,7 @@ impl HttpDownloader {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         options: IndexMap<BString, PhpMixed>,
         disable_tls: bool,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let disabled = Platform::get_env("COMPOSER_DISABLE_NETWORK")
             .is_some_and(|s| !s.is_empty() && s != "0");
 
@@ -106,7 +106,7 @@ impl HttpDownloader {
         // The cafile option can be set via config.json
         let mut self_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         if !disable_tls {
-            self_options = StreamContextFactory::get_tls_defaults(&options, ()).unwrap_or_default();
+            self_options = StreamContextFactory::get_tls_defaults(&options, ()).map_err(|e| *e)?;
         }
 
         // handle the other externally set options normally.
@@ -135,7 +135,7 @@ impl HttpDownloader {
             max_jobs = intval(&max_jobs_env_mixed).clamp(1, 50);
         }
 
-        Self {
+        Ok(Self {
             io,
             config,
             options: self_options,
@@ -146,7 +146,7 @@ impl HttpDownloader {
             disabled,
             allow_async: false,
             mock: None,
-        }
+        })
     }
 
     /// Download a file synchronously

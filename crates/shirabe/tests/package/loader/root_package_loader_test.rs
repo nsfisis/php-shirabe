@@ -31,12 +31,9 @@ fn http_downloader(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: &std::rc::Rc<std::cell::RefCell<Config>>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
-    std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
-        io.clone(),
-        config.clone(),
-        IndexMap::new(),
-        true,
-    )))
+    std::rc::Rc::new(std::cell::RefCell::new(
+        HttpDownloader::new(io.clone(), config.clone(), IndexMap::new(), true).unwrap(),
+    ))
 }
 
 // `$config = new Config; $config->merge(['repositories' => ['packagist' => false]]);`

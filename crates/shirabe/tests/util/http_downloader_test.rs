@@ -43,7 +43,7 @@ fn test_capture_authentication_params_from_url() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1").unwrap();
-    let fs = HttpDownloader::new(io, config, IndexMap::new(), false);
+    let fs = HttpDownloader::new(io, config, IndexMap::new(), false).unwrap();
     Platform::clear_env("COMPOSER_DISABLE_NETWORK").unwrap();
 
     if let Err(e) = fs.get(
@@ -147,5 +147,29 @@ fn test_output_warnings() {
             PHP_EOL
         ),
         io.borrow().get_output()
+    );
+}
+
+// Not in Composer's test suite: the constructor throws the TransportException of
+// StreamContextFactory::getTlsDefaults(), which Factory::createHttpDownloader() catches.
+#[test]
+fn test_constructor_rejects_an_unreadable_cafile() {
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
+        std::cell::RefCell::new(BufferIO::new("", VERBOSITY_NORMAL, None).unwrap()),
+    );
+    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let mut ssl = IndexMap::new();
+    ssl.insert(
+        BString::from("cafile"),
+        PhpMixed::string("/nonexistent/shirabe/cafile.pem"),
+    );
+    let mut options = IndexMap::new();
+    options.insert(BString::from("ssl"), PhpMixed::Array(ssl));
+
+    let error = HttpDownloader::new(io, config, options, false).unwrap_err();
+
+    assert_eq!(
+        "The configured cafile was not valid or could not be read.",
+        error.catch::<TransportException>().unwrap().get_message()
     );
 }

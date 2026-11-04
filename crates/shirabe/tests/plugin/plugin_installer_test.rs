@@ -212,12 +212,9 @@ fn locker_installation_manager(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
-    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
-        io.clone(),
-        config,
-        IndexMap::new(),
-        true,
-    )));
+    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+        HttpDownloader::new(io.clone(), config, IndexMap::new(), true).unwrap(),
+    ));
     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
     std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
         r#loop,

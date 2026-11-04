@@ -169,12 +169,9 @@ mod tests {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
-        let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
-            io,
-            config,
-            IndexMap::new(),
-            true,
-        )));
+        let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+            HttpDownloader::new(io, config, IndexMap::new(), true).unwrap(),
+        ));
         let process_executor =
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
         let r#loop = Loop::new(http_downloader, Some(process_executor.clone()));
