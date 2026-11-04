@@ -76,17 +76,17 @@ Ownership is encoded in the parity of the id, as it already is for correlation i
 | Name | Purpose |
 |---|---|
 | `__shirabe_resolve_job` | `(id, value)` — resolves the `Deferred` of a Rust-owned job. Runs the plugin's callbacks synchronously. |
-| `__shirabe_reject_job` | `(id, class, message, code, properties)` — the failure half. `\Shirabe\MaterializedThrowable` builds the exception from the same four fields a `Throw` frame carries and rejects the `Deferred`. |
+| `__shirabe_reject_job` | `(id, exception)` — the failure half. `exception` is the description a `Throw` frame carries; `\Shirabe\MaterializedThrowable` builds the exception from it and rejects the `Deferred`. |
 | `__shirabe_resolved_promise` | `(value)` — the fast path for a Rust method that must answer with `PromiseInterface` and has the value before building a future. There is no job to register. A promise is never an entity, so this cannot hand the promise itself back: the worker parks it under an even id and answers with `{__job}`, and the Rust method passes that descriptor on as its own answer, where `fromWire` exchanges it for the parked promise. |
-| `__shirabe_rejected_promise` | `(class, message, code, properties)` — the failure half. |
+| `__shirabe_rejected_promise` | `(exception)` — the failure half. |
 
 ### Runtime service methods (PHP → Rust, handle 0)
 
 | Name | Purpose |
 |---|---|
 | `__shirabeResolveJob` | `(id, value)` — the worker reports that a PHP-owned job resolved. |
-| `__shirabeRejectJob` | `(id, class, message, code, properties)` — the failure half. |
-| `__shirabeCancelJob` | `(id)` — called from the canceller of the job's promise. Drops the future, and with it whatever the future owns: for a process job that is the `Process`, whose drop stops the child. If the job had started, it returns the exception the canceller should throw, as the same four fields a `Throw` carries. If it had not, it returns `null`. Composer's canceller throws only for `STATUS_STARTED` and silently turns a `STATUS_QUEUED` job into `STATUS_ABORTED`. |
+| `__shirabeRejectJob` | `(id, exception)` — the failure half. |
+| `__shirabeCancelJob` | `(id)` — called from the canceller of the job's promise. Drops the future, and with it whatever the future owns: for a process job that is the `Process`, whose drop stops the child. If the job had started, it returns the exception the canceller should throw, as the description a `Throw` carries. If it had not, it returns `null`. Composer's canceller throws only for `STATUS_STARTED` and silently turns a `STATUS_QUEUED` job into `STATUS_ABORTED`. |
 | `__shirabeAbortJobs` | `()` — forwards `Loop::abortJobs()`, so that the requests the Rust-side execution is awaiting (the recorded entries of rule 5) are cancelled too. |
 
 These four are served for every dispatcher: the worker reports on a job whenever the promise behind it settles, whichever call happens to be in flight then.
@@ -158,7 +158,7 @@ The Rust side keeps its own `Loop` (`crates/shirabe/src/util/loop.rs`) for the e
 
 ## Failure model
 
-A job rejection crosses the boundary as the four fields a `Throw` frame carries and is rebuilt in the worker by `\Shirabe\MaterializedThrowable`. So `catch (TransportException $e)` keeps working and the status code can still be read off it. Nothing changes here.
+A job rejection crosses the boundary as the description a `Throw` frame carries and is rebuilt in the worker by `\Shirabe\MaterializedThrowable`. So `catch (TransportException $e)` keeps working and the status code can still be read off it.
 
 What is new is the **deadlock case**, which becomes an explicit error rather than a hang. A PHP-owned job settles only when PHP code runs, and PHP code runs only when Rust calls PHP. So when all that is left in the group of a Rust-side `Loop::wait()` is awaits of PHP-owned jobs, and the registry has no Rust-owned job left to tick for the loop's services, that promise is waiting on something outside the model (a plugin promise that no Composer job resolves). Instead of spinning, Rust fails those awaits, naming the job. The check is made over the whole group because as long as a sibling future (one that calls another package's installer, for instance) can still call PHP, that PHP code may settle the promise in question. It is a count: the group is stuck when at least as many awaits are parked on a PHP-owned job as it has futures left. A future that awaits a PHP-owned job *alongside* something else is therefore misjudged; the ported callers await one step at a time. The equivalent situation in Composer is an infinite `while (true)`, which is not behaviour worth reproducing. An await of a PHP-owned job outside any `Loop::wait()` has no group to check and parks forever in that situation.
 

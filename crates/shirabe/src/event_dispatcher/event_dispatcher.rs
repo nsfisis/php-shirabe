@@ -13,7 +13,7 @@ use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::plugin::throwable_bridge::{described_throw, throw_into_error, unwrap_php_result};
+use crate::plugin::throwable_bridge::{throw_into_error, unwrap_php_result};
 use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
@@ -844,29 +844,25 @@ try {
                             Some(&mut dispatcher),
                         )?;
                         let result = match outcome {
-                            Ok(value) => value.to_php_mixed()?,
+                            Ok(PluginValue::Array(result)) => result,
+                            Ok(other) => {
+                                panic!("the eval snippet always returns an array, got {other:?}")
+                            }
                             Err(throw) => return Err(throw_into_error(throw)),
                         };
-                        let command_output = BString::from(
-                            result
-                                .as_array()
-                                .and_then(|map| map.get(B("output")))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        );
+                        let command_output = match result.get(B("output")) {
+                            Some(PluginValue::String(output)) => output,
+                            other => {
+                                panic!("the eval snippet always returns its output, got {other:?}")
+                            }
+                        };
                         if !command_output.is_empty() {
-                            self.io.write3(&command_output, false, crate::io::NORMAL);
+                            self.io.write3(command_output, false, crate::io::NORMAL);
                         }
-                        if let Some(throw) = result.as_array().and_then(|map| map.get(B("throw"))) {
-                            let throw = described_throw(
-                                throw
-                                    .as_list()
-                                    .expect("the eval snippet reports exceptions as a list"),
-                            );
-                            let caught = result
-                                .as_array()
-                                .and_then(|map| map.get(B("caught")))
-                                .is_some_and(|caught| matches!(caught, PhpMixed::Bool(true)));
+                        if let Some(throw) = result.get(B("throw")) {
+                            let throw = PhpThrow::from_wire(throw.clone());
+                            let caught =
+                                matches!(result.get(B("caught")), Some(PluginValue::Bool(true)));
                             if caught {
                                 self.io.write_error3(
                                     bconcat!(
@@ -882,8 +878,8 @@ try {
                             }
                             return Err(throw_into_error(throw));
                         }
-                        r#return = match result.as_array().and_then(|map| map.get(B("status"))) {
-                            Some(PhpMixed::Int(status)) => *status,
+                        r#return = match result.get(B("status")) {
+                            Some(PluginValue::Int(status)) => *status,
                             other => panic!(
                                 "the eval snippet always returns an int status, got {other:?}"
                             ),

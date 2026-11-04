@@ -2,6 +2,7 @@
 //! everything after itself (tag + corr_id + payload) and the payload is the frame's remaining
 //! fields as a PHP-serialized list. See `docs/dev/php-rpc.md`.
 
+use crate::PhpThrow;
 use crate::value::{self, PluginValue};
 use bstr::BString;
 use indexmap::IndexMap;
@@ -58,18 +59,10 @@ pub enum Frame {
         value: PluginValue,
         out_params: IndexMap<u32, PluginValue>,
     },
+    /// The payload is the exception's description (`PhpThrow::to_wire`) itself.
     Throw {
         corr_id: u64,
-        exception_class: BString,
-        message: BString,
-        code: i64,
-        /// The state the exception carries beyond `message` and `code`, keyed by the property
-        /// names its class declares. Empty for an exception that carries none.
-        properties: IndexMap<BString, PluginValue>,
-        file: BString,
-        line: i64,
-        /// The superclasses of `exception_class`, nearest first.
-        parents: Vec<BString>,
+        throw: PhpThrow,
     },
     ReleaseRustHandle {
         rhandle: u64,
@@ -165,24 +158,7 @@ impl Frame {
                         .collect(),
                 ),
             ],
-            Frame::Throw {
-                exception_class,
-                message,
-                code,
-                properties,
-                file,
-                line,
-                parents,
-                ..
-            } => vec![
-                PluginValue::string(exception_class.clone()),
-                PluginValue::string(message.clone()),
-                PluginValue::Int(*code),
-                PluginValue::Array(properties.clone()),
-                PluginValue::string(file.clone()),
-                PluginValue::Int(*line),
-                PluginValue::List(parents.iter().cloned().map(PluginValue::string).collect()),
-            ],
+            Frame::Throw { throw, .. } => throw.wire_fields(),
             Frame::ReleaseRustHandle { rhandle } => vec![int_value(*rhandle)],
             Frame::ReleasePhpHandle { phandle } => vec![int_value(*phandle)],
         }
@@ -281,28 +257,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         },
         TAG_THROW => Frame::Throw {
             corr_id,
-            exception_class: expect_bytes(next()),
-            message: expect_bytes(next()),
-            code: match next() {
-                PluginValue::Int(code) => code,
-                other => {
-                    panic!("PHP RPC: protocol violation — Throw code is not an int: {other:?}")
-                }
-            },
-            properties: expect_properties(next()),
-            file: match next() {
-                PluginValue::String(bytes) => bytes,
-                other => {
-                    panic!("PHP RPC: protocol violation — Throw file is not a string: {other:?}")
-                }
-            },
-            line: match next() {
-                PluginValue::Int(line) => line,
-                other => {
-                    panic!("PHP RPC: protocol violation — Throw line is not an int: {other:?}")
-                }
-            },
-            parents: expect_list(next()).into_iter().map(expect_bytes).collect(),
+            throw: PhpThrow::from_wire_fields(fields.collect()),
         },
         TAG_RELEASE_RUST_HANDLE => Frame::ReleaseRustHandle {
             rhandle: expect_id(next()),
@@ -333,16 +288,6 @@ fn expect_id(value: PluginValue) -> u64 {
         PluginValue::Int(n) => u64::try_from(n)
             .unwrap_or_else(|_| panic!("PHP RPC: protocol violation — negative handle id {n}")),
         other => panic!("PHP RPC: protocol violation — expected an int id field: {other:?}"),
-    }
-}
-
-fn expect_properties(value: PluginValue) -> IndexMap<BString, PluginValue> {
-    match value {
-        PluginValue::List(items) if items.is_empty() => IndexMap::new(),
-        PluginValue::Array(map) => map,
-        other => {
-            panic!("PHP RPC: protocol violation — exception properties is not an array: {other:?}")
-        }
     }
 }
 
@@ -425,51 +370,45 @@ mod tests {
 
     #[test]
     fn frame_roundtrip_throw_with_properties() {
-        let frame = roundtrip(Frame::Throw {
-            corr_id: 11,
-            exception_class: "Composer\\Downloader\\TransportException".into(),
-            message: "The \"https://example.org\" file could not be downloaded".into(),
-            code: 401,
-            properties: [
-                ("statusCode".into(), PluginValue::Int(401)),
-                ("response".into(), PluginValue::Null),
-            ]
-            .into_iter()
-            .collect(),
-            file: "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".into(),
-            line: 42,
-            parents: vec!["RuntimeException".into(), "Exception".into()],
-        });
+        let mut throw = PhpThrow::new(
+            "Composer\\Downloader\\TransportException",
+            "The \"https://example.org\" file could not be downloaded",
+            401,
+        );
+        *throw.properties = [
+            ("statusCode".into(), PluginValue::Int(401)),
+            ("response".into(), PluginValue::Null),
+        ]
+        .into_iter()
+        .collect();
+        throw.file = "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".into();
+        throw.line = 42;
+        throw.parents = vec!["RuntimeException".into(), "Exception".into()];
+        let frame = roundtrip(Frame::Throw { corr_id: 11, throw });
         match frame {
-            Frame::Throw {
-                corr_id,
-                exception_class,
-                message,
-                code,
-                properties,
-                file,
-                line,
-                parents,
-            } => {
+            Frame::Throw { corr_id, throw } => {
                 assert_eq!(
-                    file,
+                    throw.file,
                     "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php"
                 );
-                assert_eq!(line, 42);
-                assert_eq!(parents, vec!["RuntimeException", "Exception"]);
+                assert_eq!(throw.line, 42);
+                assert_eq!(throw.parents, vec!["RuntimeException", "Exception"]);
                 assert_eq!(corr_id, 11);
-                assert_eq!(exception_class, "Composer\\Downloader\\TransportException");
                 assert_eq!(
-                    message,
+                    throw.exception_class,
+                    "Composer\\Downloader\\TransportException"
+                );
+                assert_eq!(
+                    throw.message,
                     "The \"https://example.org\" file could not be downloaded"
                 );
-                assert_eq!(code, 401);
+                assert_eq!(throw.code, 401);
                 assert_eq!(
-                    properties.get(bstr::B("statusCode")),
+                    throw.properties.get(bstr::B("statusCode")),
                     Some(&PluginValue::Int(401))
                 );
                 assert_eq!(
-                    properties.get(bstr::B("response")),
+                    throw.properties.get(bstr::B("response")),
                     Some(&PluginValue::Null)
                 );
             }

@@ -725,6 +725,93 @@ impl PhpThrow {
     pub fn runtime(message: impl Into<BString>) -> PhpThrow {
         PhpThrow::new("RuntimeException", message, 0)
     }
+
+    /// The exception as it crosses the boundary wherever it does — as the payload of a `Throw`
+    /// frame, a job rejection, or a value an entry point answers with: `[class, message, code,
+    /// properties, file, line, parents]`. `\Shirabe\MaterializedThrowable::describe()` writes the
+    /// same list on the PHP side.
+    pub fn to_wire(&self) -> PluginValue {
+        PluginValue::List(self.wire_fields())
+    }
+
+    /// Rebuilds the exception [`PhpThrow::to_wire`] describes. Both sides write the description
+    /// in the same commit of Shirabe, so one that does not decode is a protocol violation.
+    pub fn from_wire(value: PluginValue) -> PhpThrow {
+        match value {
+            PluginValue::List(fields) => PhpThrow::from_wire_fields(fields),
+            other => panic!(
+                "PHP RPC: protocol violation — an exception description is not a list: {other:?}"
+            ),
+        }
+    }
+
+    pub(crate) fn wire_fields(&self) -> Vec<PluginValue> {
+        vec![
+            PluginValue::string(self.exception_class.clone()),
+            PluginValue::string(self.message.clone()),
+            PluginValue::Int(self.code),
+            PluginValue::Array((*self.properties).clone()),
+            PluginValue::string(self.file.clone()),
+            PluginValue::Int(self.line),
+            PluginValue::List(
+                self.parents
+                    .iter()
+                    .cloned()
+                    .map(PluginValue::string)
+                    .collect(),
+            ),
+        ]
+    }
+
+    pub(crate) fn from_wire_fields(fields: Vec<PluginValue>) -> PhpThrow {
+        let Ok([class, message, code, properties, file, line, parents]) =
+            <[PluginValue; 7]>::try_from(fields)
+        else {
+            panic!("PHP RPC: protocol violation — an exception description has not 7 fields");
+        };
+        let string = |value: PluginValue, what: &[u8]| match value {
+            PluginValue::String(bytes) => bytes,
+            other => panic!(
+                "PHP RPC: protocol violation — the exception {:?} is not a string: {other:?}",
+                what.as_bstr()
+            ),
+        };
+        let int = |value: PluginValue, what: &[u8]| match value {
+            PluginValue::Int(n) => n,
+            other => {
+                panic!(
+                    "PHP RPC: protocol violation — the exception {:?} is not an int: {other:?}",
+                    what.as_bstr()
+                )
+            }
+        };
+        PhpThrow {
+            exception_class: string(class, b"class"),
+            message: string(message, b"message"),
+            code: int(code, b"code"),
+            properties: Box::new(match properties {
+                // An empty PHP array crosses as a list.
+                PluginValue::List(items) if items.is_empty() => IndexMap::new(),
+                PluginValue::Array(map) => map,
+                other => panic!(
+                    "PHP RPC: protocol violation — the exception properties are not an array: \
+                     {other:?}"
+                ),
+            }),
+            file: string(file, b"file"),
+            line: int(line, b"line"),
+            parents: match parents {
+                PluginValue::List(items) => items
+                    .into_iter()
+                    .map(|parent| string(parent, b"parent"))
+                    .collect(),
+                other => panic!(
+                    "PHP RPC: protocol violation — the exception parents are not a list: \
+                     {other:?}"
+                ),
+            },
+        }
+    }
 }
 
 impl std::fmt::Display for PhpThrow {
@@ -899,25 +986,8 @@ fn rpc_call(
                 );
                 return Ok(Ok(value));
             }
-            Frame::Throw {
-                corr_id,
-                exception_class,
-                message,
-                code,
-                properties,
-                file,
-                line,
-                parents,
-            } if corr_id == my_id => {
-                return Ok(Err(PhpThrow {
-                    exception_class,
-                    message,
-                    code,
-                    properties: Box::new(properties),
-                    file,
-                    line,
-                    parents,
-                }));
+            Frame::Throw { corr_id, throw } if corr_id == my_id => {
+                return Ok(Err(throw));
             }
             Frame::CallRustMethod {
                 corr_id,
@@ -946,16 +1016,7 @@ fn rpc_call(
                         value,
                         out_params,
                     },
-                    Err(throw) => Frame::Throw {
-                        corr_id,
-                        exception_class: throw.exception_class,
-                        message: throw.message,
-                        code: throw.code,
-                        properties: *throw.properties,
-                        file: throw.file,
-                        line: throw.line,
-                        parents: throw.parents,
-                    },
+                    Err(throw) => Frame::Throw { corr_id, throw },
                 };
                 send_frame(&reply)?;
             }

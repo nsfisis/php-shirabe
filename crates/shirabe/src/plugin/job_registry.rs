@@ -193,11 +193,10 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
             "__shirabe_resolve_job",
             vec![PluginValue::Int(id as i64), value],
         ),
-        Err(throw) => {
-            let mut args = vec![PluginValue::Int(id as i64)];
-            args.extend(throw_fields(throw));
-            ("__shirabe_reject_job", args)
-        }
+        Err(throw) => (
+            "__shirabe_reject_job",
+            vec![PluginValue::Int(id as i64), throw.to_wire()],
+        ),
     };
     match call_function_with_dispatcher(function, args, Some(&mut PluginRpcDispatcher::default())) {
         Ok(Ok(_)) => Ok(()),
@@ -209,20 +208,6 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
             error_chain_message(&error)
         ))),
     }
-}
-
-/// The fields a `Throw` frame carries, as the argument list the worker rebuilds an exception
-/// from: class, message, code, declared state, file and line.
-pub(crate) fn throw_fields(throw: PhpThrow) -> Vec<PluginValue> {
-    let properties = PluginValue::Array(*throw.properties);
-    vec![
-        PluginValue::string(throw.exception_class),
-        PluginValue::string(throw.message),
-        PluginValue::Int(throw.code),
-        properties,
-        PluginValue::string(throw.file),
-        PluginValue::Int(throw.line),
-    ]
 }
 
 /// One tick of `owner`: advance its jobs, settle the ones that finished, and report how many

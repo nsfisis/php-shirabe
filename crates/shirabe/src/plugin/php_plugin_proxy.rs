@@ -407,25 +407,16 @@ pub(crate) fn dispatch_job_service_method(
             job_registry::settle_php_job(id, Ok(value));
             PluginValue::Null
         }),
-        b"__shirabeRejectJob" => (|| {
-            let id = job_id()?;
-            let mut throw = PhpThrow::new(
-                arg::<BString>(method_name, args, 1)?,
-                arg::<BString>(method_name, args, 2)?,
-                arg::<i64>(method_name, args, 3)?,
-            );
-            *throw.properties = match args.get(4) {
-                Some(PluginValue::Array(properties)) => properties.clone(),
-                _ => IndexMap::new(),
-            };
-            throw.file = arg::<bstr::BString>(method_name, args, 5)?;
-            throw.line = arg::<i64>(method_name, args, 6)?;
-            throw.parents = arg::<Vec<bstr::BString>>(method_name, args, 7)?;
-            job_registry::settle_php_job(id, Err(throw));
-            Ok(PluginValue::Null)
-        })(),
+        b"__shirabeRejectJob" => job_id().map(|id| {
+            let description = args
+                .get(1)
+                .cloned()
+                .expect("the worker rejects a job with the description of its exception");
+            job_registry::settle_php_job(id, Err(PhpThrow::from_wire(description)));
+            PluginValue::Null
+        }),
         b"__shirabeCancelJob" => job_id().map(|id| match job_registry::cancel(id) {
-            Some(throw) => PluginValue::List(job_registry::throw_fields(throw)),
+            Some(throw) => throw.to_wire(),
             None => PluginValue::Null,
         }),
         b"__shirabeAbortJobs" => {
@@ -1382,7 +1373,7 @@ fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
 fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
     match call_function_with_dispatcher(
         "__shirabe_rejected_promise",
-        job_registry::throw_fields(throw),
+        vec![throw.to_wire()],
         Some(&mut PluginRpcDispatcher::default()),
     ) {
         Ok(Ok(promise)) => Ok(promise),

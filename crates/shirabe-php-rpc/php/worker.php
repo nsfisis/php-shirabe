@@ -210,8 +210,7 @@ final class ShirabeJobRegistry
                 unset(self::$deferreds[$id]);
                 $thrown = ShirabeRpcRuntime::callRust(0, '__shirabeCancelJob', [$id]);
                 if ($thrown !== null) {
-                    [$class, $message, $code, $properties, $file, $line] = $thrown;
-                    throw \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line);
+                    throw \Shirabe\MaterializedThrowable::revive($thrown);
                 }
             });
         }
@@ -286,7 +285,7 @@ final class ShirabeJobRegistry
                 ShirabeRpcRuntime::callRust(
                     0,
                     '__shirabeRejectJob',
-                    array_merge([$id], \Shirabe\MaterializedThrowable::describe($reason))
+                    [$id, \Shirabe\MaterializedThrowable::describe($reason)]
                 );
             }
         );
@@ -497,15 +496,7 @@ final class ShirabeRpcRuntime
                     $outParams = self::fromWire($fields[1] ?? []);
                     return self::fromWire($fields[0]);
                 }
-                [$class, $message, $code, $properties, $file, $line] = $fields;
-                throw \Shirabe\MaterializedThrowable::revive(
-                    $class,
-                    $message,
-                    (int) $code,
-                    self::fromWire($properties),
-                    $file,
-                    (int) $line
-                );
+                throw \Shirabe\MaterializedThrowable::revive(self::fromWire($fields));
             }
             self::dispatchRequest($tag, $inId, $payload);
         }
@@ -593,9 +584,11 @@ final class ShirabeRpcRuntime
                 serialize([self::toWire($result), []])
             );
         } catch (Throwable $e) {
-            $fields = \Shirabe\MaterializedThrowable::describe($e);
-            $fields[3] = self::toWire($fields[3]);
-            self::writeFrame(SHIRABE_TAG_THROW, $corrId, serialize($fields));
+            self::writeFrame(
+                SHIRABE_TAG_THROW,
+                $corrId,
+                serialize(self::toWire(\Shirabe\MaterializedThrowable::describe($e)))
+            );
         }
     }
 
@@ -1016,10 +1009,8 @@ ShirabeRpcRuntime::$dispatch = [
                 'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
             );
         }
-        [$class, $message, $code, $properties, $file, $line] = $args;
-
         return ShirabeJobRegistry::park(\React\Promise\reject(
-            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line)
+            \Shirabe\MaterializedThrowable::revive($args[0])
         ));
     },
     // The settle pushes of a Rust-owned job, sent from inside the tick that saw it finish. The
@@ -1029,11 +1020,8 @@ ShirabeRpcRuntime::$dispatch = [
         return null;
     },
     '__shirabe_reject_job' => static function ($args) {
-        [$id, $class, $message, $code, $properties, $file, $line] = $args;
-        ShirabeJobRegistry::reject(
-            (int) $id,
-            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line)
-        );
+        [$id, $description] = $args;
+        ShirabeJobRegistry::reject((int) $id, \Shirabe\MaterializedThrowable::revive($description));
         return null;
     },
     // Replays environment writes the Rust side made after this process was spawned, which only

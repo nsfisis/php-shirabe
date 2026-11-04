@@ -52,7 +52,7 @@ frame is a fatal channel error, not an allocation attempt.
 | `0x03` | `CallPhpMethod` | Rust→PHP | `phandle`, `method_name`, `args` |
 | `0x04` | `CallRustMethod` | PHP→Rust | `rhandle`, `method_name`, `args` |
 | `0x05` | `Return` | both | `value`, `out_params` |
-| `0x06` | `Throw` | both | `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
+| `0x06` | `Throw` | both | the exception's description: `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
 | `0x07` | `ReleaseRustHandle` | PHP→Rust | `rhandle` |
 | `0x08` | `ReleasePhpHandle` | Rust→PHP | `phandle` |
 
@@ -125,7 +125,11 @@ same dispatch while waiting for its own `Return`.
   state attached as context).
 - The inner `Result<PluginValue, PhpThrow>` is the recoverable lane: a PHP exception crossing
   the boundary as a `Throw` frame.
-- A `Throw` names the class the exception was thrown as, `properties` carries the state that
+- An exception crosses as its description, the list a `Throw` frame carries as its payload, and
+  as nothing else wherever else it crosses (a job rejection, a value an entry point answers
+  with). `PhpThrow::to_wire` / `PhpThrow::from_wire` on the Rust side and
+  `\Shirabe\MaterializedThrowable::describe` / `revive` in the worker are its only codec.
+- A description names the class the exception was thrown as, `properties` carries the state that
   class declares beyond `message` and `code`, and `file` and `line` are where it was created.
   Rust to PHP, `\Shirabe\MaterializedThrowable` rebuilds the exception in the child —
   `new $class($message, $code)` for a class whose constructor has `\Exception`'s shape, an

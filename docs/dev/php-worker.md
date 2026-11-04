@@ -39,14 +39,14 @@ Notable internal helpers:
   even autoloadable there, i.e. no Composer PHP runtime and therefore no observer code.
 - `__shirabe_resolve_job` / `__shirabe_reject_job` — the settle pushes of a Rust-owned job: the
   worker resolves or rejects the `Deferred` behind the job's promise, which runs the callbacks
-  plugin code chained on it before the call returns. The rejection is the exception the fields
-  of a `Throw` frame describe.
+  plugin code chained on it before the call returns. The rejection is the exception a
+  description of the kind a `Throw` frame carries stands for.
 - `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, for a Rust method
   whose PHP signature declares `PromiseInterface` and that has the value before any job exists.
   The worker holds the promise under an even job id and answers with its `{__job}` descriptor,
   which the Rust method passes on as its own answer.
 - `__shirabe_rejected_promise` — the failure half of the same: `\React\Promise\reject()` over
-  the exception the fields of a `Throw` frame describe, so a failed request reaches the caller
+  the exception such a description stands for, so a failed request reaches the caller
   as a rejection it handles rather than as a throw out of the call that started it.
 - `__shirabe_sync_env` — replays the environment writes the Rust side made after the worker was
   spawned into the storage each one names (`putenv()`, `$_ENV`, `$_SERVER`); see
@@ -135,10 +135,10 @@ that belongs to a proxied class.
   `executeAsync()` promise resolves with: the child was spawned by the Rust side, so it answers
   from what the Rust-side `Process` reports about the terminated process instead of from a
   `proc_open()` resource.
-- `Shirabe\MaterializedThrowable` — the PHP half of the `Throw` codec: rebuilds the exception a
-  `Throw` frame (or a job rejection) describes as its own class, or as a `RuntimeException` when
-  the child does not know the class, and describes an exception raised in the child as the fields
-  of a `Throw`.
+- `Shirabe\MaterializedThrowable` — the PHP half of the exception codec: rebuilds the exception
+  a description (the payload of a `Throw` frame, a job rejection) stands for as its own class, or
+  as a `RuntimeException` when the child does not know the class, and describes an exception
+  raised in the child.
 - `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: the closed list of
   classes `unserialize()` may revive, and the hook that hands such an instance to `serialize()`
   in place of a handle descriptor.

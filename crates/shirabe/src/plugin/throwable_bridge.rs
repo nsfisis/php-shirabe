@@ -61,39 +61,6 @@ pub(crate) fn unwrap_php_result(
     }
 }
 
-/// The `Throw` the fields of `MaterializedThrowable::describe()` stand for, when they come back
-/// as a plain value rather than as a frame.
-pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
-    let string = |position: usize| {
-        fields
-            .get(position)
-            .and_then(PhpMixed::as_string)
-            .unwrap_or_default()
-            .to_owned()
-    };
-    let int = |position: usize| fields.get(position).and_then(PhpMixed::as_int).unwrap_or(0);
-    let mut throw = PhpThrow::new(string(0), string(1), int(2));
-    if let Some(PhpMixed::Array(properties)) = fields.get(3) {
-        *throw.properties = properties
-            .iter()
-            .map(|(name, value)| (name.clone(), PluginValue::from_php_mixed(value)))
-            .collect();
-    }
-    throw.file = fields
-        .get(4)
-        .and_then(PhpMixed::as_string)
-        .map(bstr::BString::from)
-        .unwrap_or_default();
-    throw.line = int(5);
-    if let Some(PhpMixed::List(parents)) = fields.get(6) {
-        throw.parents = parents
-            .iter()
-            .filter_map(|parent| parent.as_string().map(BString::from))
-            .collect();
-    }
-    throw
-}
-
 /// The ported exception of exactly `class`, built from what `throw` carries, or `None` if the
 /// port has no type for it or cannot build one from a `Throw`.
 fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
