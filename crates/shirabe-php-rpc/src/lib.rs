@@ -5,9 +5,11 @@ mod env;
 pub mod frame;
 pub mod session;
 pub mod value;
+pub mod wire;
 pub mod xdebug;
 
 pub use value::{PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
+pub use wire::{FromWire, ToWire};
 
 use bstr::{B, BStr, BString, ByteSlice};
 use frame::Frame;
@@ -17,6 +19,7 @@ use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
+use wire::protocol_value;
 
 /// The version constants of the PHP the worker runs.
 #[derive(Debug)]
@@ -737,12 +740,7 @@ impl PhpThrow {
     /// Rebuilds the exception [`PhpThrow::to_wire`] describes. Both sides write the description
     /// in the same commit of Shirabe, so one that does not decode is a protocol violation.
     pub fn from_wire(value: PluginValue) -> PhpThrow {
-        match value {
-            PluginValue::List(fields) => PhpThrow::from_wire_fields(fields),
-            other => panic!(
-                "PHP RPC: protocol violation — an exception description is not a list: {other:?}"
-            ),
-        }
+        PhpThrow::from_wire_fields(protocol_value(&value, "an exception description"))
     }
 
     pub(crate) fn wire_fields(&self) -> Vec<PluginValue> {
@@ -769,47 +767,14 @@ impl PhpThrow {
         else {
             panic!("PHP RPC: protocol violation — an exception description has not 7 fields");
         };
-        let string = |value: PluginValue, what: &[u8]| match value {
-            PluginValue::String(bytes) => bytes,
-            other => panic!(
-                "PHP RPC: protocol violation — the exception {:?} is not a string: {other:?}",
-                what.as_bstr()
-            ),
-        };
-        let int = |value: PluginValue, what: &[u8]| match value {
-            PluginValue::Int(n) => n,
-            other => {
-                panic!(
-                    "PHP RPC: protocol violation — the exception {:?} is not an int: {other:?}",
-                    what.as_bstr()
-                )
-            }
-        };
         PhpThrow {
-            exception_class: string(class, b"class"),
-            message: string(message, b"message"),
-            code: int(code, b"code"),
-            properties: Box::new(match properties {
-                // An empty PHP array crosses as a list.
-                PluginValue::List(items) if items.is_empty() => IndexMap::new(),
-                PluginValue::Array(map) => map,
-                other => panic!(
-                    "PHP RPC: protocol violation — the exception properties are not an array: \
-                     {other:?}"
-                ),
-            }),
-            file: string(file, b"file"),
-            line: int(line, b"line"),
-            parents: match parents {
-                PluginValue::List(items) => items
-                    .into_iter()
-                    .map(|parent| string(parent, b"parent"))
-                    .collect(),
-                other => panic!(
-                    "PHP RPC: protocol violation — the exception parents are not a list: \
-                     {other:?}"
-                ),
-            },
+            exception_class: protocol_value(&class, "the exception class"),
+            message: protocol_value(&message, "the exception message"),
+            code: protocol_value(&code, "the exception code"),
+            properties: Box::new(protocol_value(&properties, "the exception properties")),
+            file: protocol_value(&file, "the exception file"),
+            line: protocol_value(&line, "the exception line"),
+            parents: protocol_value(&parents, "the exception parents"),
         }
     }
 }
@@ -1047,9 +1012,7 @@ fn call(name: impl AsRef<[u8]>, arg: impl AsRef<[u8]>) -> PhpMixed {
         Ok(value) => value,
         Err(throw) => panic!("PHP RPC: request {name:?} threw {throw}"),
     };
-    value
-        .to_php_mixed()
-        .unwrap_or_else(|e| panic!("PHP RPC: request {name:?} returned an unusable value: {e:#}"))
+    protocol_value(&value, bconcat!("the answer of ", name))
 }
 
 const GLUE_SCRIPT: &[u8] = include_bytes!("../php/worker.php");
@@ -1578,10 +1541,7 @@ mod tests {
         .expect("failed to ask the worker for its Xdebug mode");
         let reply = frame::read_frame(&mut worker.stream).expect("failed to read the worker reply");
         match reply {
-            Frame::Return { value, .. } => assert_eq!(
-                value.to_php_mixed().expect("unusable reply"),
-                PhpMixed::string("off")
-            ),
+            Frame::Return { value, .. } => assert_eq!(value, PluginValue::string("off")),
             other => panic!("unexpected reply: {other:?}"),
         }
 

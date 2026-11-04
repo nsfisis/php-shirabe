@@ -2,7 +2,8 @@
 //! `docs/dev/php-rpc.md`.
 //!
 //! `PluginValue` is the value type crossing the Rust/PHP RPC boundary. It is deliberately
-//! independent from `shirabe_php_shim::PhpMixed`: handles exist only at the plugin boundary,
+//! independent from `shirabe_php_shim::PhpMixed`: handles exist only at the plugin boundary, the
+//! one conversion between the two is the `ToWire` / `FromWire` pair of `PhpMixed` in `wire.rs`,
 //! and the codec below is a separate implementation from `shirabe_php_shim::var::serialize`.
 //!
 //! Strings and array keys are byte strings (`BString`), matching PHP's string semantics: the
@@ -11,7 +12,7 @@
 use anyhow::bail;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat, utf8_text};
+use shirabe_php_shim::{bconcat, utf8_text};
 use std::sync::{Arc, LazyLock, Mutex, MutexGuard, Weak};
 
 /// A handle to an object whose entity lives on the Rust side. PHP holds a thin proxy stub.
@@ -191,12 +192,8 @@ fn private_key(declaring_class: &[u8], name: &[u8]) -> BString {
 }
 
 /// The value model of the plugin RPC boundary: PHP scalars, arrays, object records, and handle
-/// descriptors.
-///
-/// `Object` is encode-only: the wire representation of a PHP array does not distinguish arrays
-/// from objects, so the decoder only ever produces `List` (contiguous 0-based int keys) or
-/// `Array`. An encoded `Object` lands on the PHP side as a plain array. A class-tagged object
-/// record is `PhpObject` instead, and does round-trip.
+/// descriptors. An array decodes as `List` when its keys are exactly `0..N` and as `Array`
+/// otherwise.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PluginValue {
     Null,
@@ -206,7 +203,6 @@ pub enum PluginValue {
     String(BString),
     List(Vec<PluginValue>),
     Array(IndexMap<BString, PluginValue>),
-    Object(IndexMap<BString, PluginValue>),
     PhpObject(PhpObject),
     RustHandle(RustObjHandle),
     PhpHandle(PhpObjHandle),
@@ -218,61 +214,6 @@ pub enum PluginValue {
 impl PluginValue {
     pub fn string(s: impl Into<BString>) -> PluginValue {
         PluginValue::String(s.into())
-    }
-
-    /// Converts a plain data value (no handles are ever produced) coming from ported code.
-    pub fn from_php_mixed(value: &PhpMixed) -> PluginValue {
-        match value {
-            PhpMixed::Null => PluginValue::Null,
-            PhpMixed::Bool(b) => PluginValue::Bool(*b),
-            PhpMixed::Int(n) => PluginValue::Int(*n),
-            PhpMixed::Float(f) => PluginValue::Float(*f),
-            PhpMixed::String(s) => PluginValue::String(s.clone()),
-            PhpMixed::List(items) => {
-                PluginValue::List(items.iter().map(PluginValue::from_php_mixed).collect())
-            }
-            PhpMixed::Array(map) => PluginValue::Array(
-                map.iter()
-                    .map(|(k, v)| (k.clone(), PluginValue::from_php_mixed(v)))
-                    .collect(),
-            ),
-            PhpMixed::Object(map) => PluginValue::Object(
-                map.iter()
-                    .map(|(k, v)| (k.clone(), PluginValue::from_php_mixed(v)))
-                    .collect(),
-            ),
-        }
-    }
-
-    /// Converts back to `PhpMixed` for callers outside the plugin boundary. Handles have no
-    /// `PhpMixed` counterpart and fail.
-    pub fn to_php_mixed(&self) -> anyhow::Result<PhpMixed> {
-        Ok(match self {
-            PluginValue::Null => PhpMixed::Null,
-            PluginValue::Bool(b) => PhpMixed::Bool(*b),
-            PluginValue::Int(n) => PhpMixed::Int(*n),
-            PluginValue::Float(f) => PhpMixed::Float(*f),
-            PluginValue::String(bytes) => PhpMixed::String(bytes.clone()),
-            PluginValue::List(items) => PhpMixed::List(
-                items
-                    .iter()
-                    .map(PluginValue::to_php_mixed)
-                    .collect::<anyhow::Result<_>>()?,
-            ),
-            PluginValue::Array(map) | PluginValue::Object(map) => PhpMixed::Array(
-                map.iter()
-                    .map(|(k, v)| Ok((k.clone(), v.to_php_mixed()?)))
-                    .collect::<anyhow::Result<_>>()?,
-            ),
-            PluginValue::PhpObject(_)
-            | PluginValue::RustHandle(_)
-            | PluginValue::PhpHandle(_)
-            | PluginValue::Job(_) => {
-                bail!(
-                    "an object record or handle descriptor cannot be represented as PhpMixed: {self:?}"
-                )
-            }
-        })
     }
 }
 
@@ -327,9 +268,7 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
             }
             out.push(b'}');
         }
-        // An object with no class lands on the PHP side as a plain array: the wire has no shape
-        // for it, so `Object` is a write-only label (see docs/dev/php-rpc.md).
-        PluginValue::Array(map) | PluginValue::Object(map) => serialize_map(map, out),
+        PluginValue::Array(map) => serialize_map(map, out),
         PluginValue::PhpObject(object) => {
             out.extend_from_slice(b"O:");
             out.extend_from_slice(&bconcat!(object.class.len()));
@@ -426,9 +365,8 @@ fn canonical_int_key(key: &[u8]) -> Option<i64> {
 
 /// Decodes a whole `serialize()` payload into a `PluginValue`, rejecting trailing garbage.
 ///
-/// The decoder never produces `Object`: PHP's wire format erases the array/object distinction
-/// for a class-less object. Arrays whose keys are exactly `0..N` decode as `List`; anything else
-/// decodes as `Array`. Arrays carrying the reserved handle-descriptor key sets decode as the
+/// Arrays whose keys are exactly `0..N` decode as `List`; anything else decodes as `Array`.
+/// Arrays carrying the reserved handle-descriptor key sets decode as the
 /// corresponding handle, and an `O:` record decodes as `PhpObject`.
 pub fn unserialize(payload: &[u8]) -> anyhow::Result<PluginValue> {
     let mut pos = 0;
@@ -852,15 +790,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn object_is_encode_only_and_collapses_to_array() {
-        let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
-        map.insert(b"a".into(), PluginValue::Int(1));
-        let encoded = serialize(&PluginValue::Object(map.clone()));
-        assert_eq!(encoded, serialize(&PluginValue::Array(map.clone())));
-        assert_eq!(unserialize(&encoded).unwrap(), PluginValue::Array(map));
-    }
-
     /// The bytes are what PHP writes for
     /// `new MatchAllConstraint()` and `new DateTimeImmutable('2026-08-07 12:34:56.123456', new
     /// DateTimeZone('UTC'))`: a protected property is mangled, a public one is not, and both are
@@ -1037,22 +966,5 @@ mod tests {
         assert!(unserialize(b"i:42;i:43;").is_err());
         assert!(unserialize(b"s:5:\"ab\";").is_err());
         assert!(unserialize(b"a:2:{i:0;i:1;}").is_err());
-    }
-
-    #[test]
-    fn php_mixed_conversions() {
-        let mixed = PhpMixed::Array(
-            [
-                ("a".into(), PhpMixed::Int(1)),
-                ("b".into(), PhpMixed::List(vec![PhpMixed::Null])),
-            ]
-            .into_iter()
-            .collect(),
-        );
-        let value = PluginValue::from_php_mixed(&mixed);
-        assert_eq!(value.to_php_mixed().unwrap(), mixed);
-
-        let handle = PluginValue::Job(1);
-        assert!(handle.to_php_mixed().is_err());
     }
 }

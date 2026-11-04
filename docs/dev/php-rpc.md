@@ -85,9 +85,9 @@ the `allowed_classes` list of every `unserialize()` — so a record can never na
 class. Which classes are on the list, and how each one maps to a Rust value, is not part of the
 protocol; see "Materialized values" in [docs/dev/php-worker.md](./php-worker.md).
 
-`PluginValue::Object` is encode-only: the wire erases the array/object distinction for a
-class-less object, so the decoder only produces `List` (contiguous 0-based int keys) or `Array`
-for an `a:` record. A repeated object instance arrives as PHP's `r:` back-reference, which the
+An `a:` record decodes as `List` when its keys are exactly `0..N` and as `Array` otherwise; the
+wire has no shape for an object without a class, so such an object crosses as an array. A
+repeated object instance arrives as PHP's `r:` back-reference, which the
 decoder resolves by copying the value it names (identity means nothing to a value on this side);
 a cyclic object graph and a PHP reference (`R:`) are both rejected. The decoder is iterative
 (input nesting never becomes call-stack depth) and additionally rejects payloads nested deeper
@@ -96,6 +96,22 @@ than 512 levels.
 The codec is verified against the real PHP `serialize()`/`unserialize()` by oracle tests
 (`tests/oracle.rs`), with floats, non-UTF-8 byte strings, object records and deep nesting as
 focus areas.
+
+### Typed values: `ToWire` and `FromWire`
+
+Code on either side of a call never takes a `PluginValue` apart by hand: `ToWire` encodes a Rust
+value as the PHP value the receiving side declares, and `FromWire` decodes one, failing with the
+`PhpThrow` a PHP caller gets for a value of the wrong shape (`src/wire.rs`). The same pair serves
+the arguments and the answer of a call in either direction. A value absent where PHP reads null
+(an omitted argument, a missing property) decodes from `PluginValue::Null`. Where a malformed
+value can only be a bug in Shirabe — a frame, or a payload only Shirabe's own worker code writes
+— `wire::protocol_value` turns the failure into a panic instead.
+
+`src/wire.rs` implements the pair for the scalars, byte strings and paths, the containers
+(`Option`, `Vec`, `IndexMap`), the handles, `\DateTimeInterface` (as the `\DateTimeImmutable`
+record, rebased on UTC because the Rust side carries no timezone database) and
+`shirabe_php_shim::PhpMixed`, which is the only conversion between `PhpMixed` and `PluginValue`.
+A crate that ports a class implements the pair for its own types.
 
 ## Concurrency and reentrancy
 

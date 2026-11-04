@@ -21,7 +21,7 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
-    PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
+    FromWire, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, ToWire, call_function,
     call_function_with_dispatcher, call_php_method, call_static_method,
 };
 use shirabe_php_shim::{
@@ -1189,7 +1189,7 @@ try {
             Some(&mut dispatcher),
         )?;
         match outcome {
-            Ok(value) => Ok(value.to_php_mixed()?),
+            Ok(value) => PhpMixed::from_wire(&value).map_err(throw_into_error),
             Err(throw) => Err(throw_into_error(throw)),
         }
     }
@@ -1749,9 +1749,7 @@ pub(crate) fn dispatch_event_method(
                 .map(|arg| PluginValue::string(arg.clone()))
                 .collect(),
         )),
-        b"getFlags" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-            event.get_flags().clone(),
-        ))),
+        b"getFlags" => Ok(PhpMixed::Array(event.get_flags().clone()).to_wire()),
         b"isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
         b"stopPropagation" => {
             event.stop_propagation();

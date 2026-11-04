@@ -9,9 +9,10 @@
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, config_handle_value, io_handle_value};
+use crate::plugin::throwable_bridge::throw_into_error;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue};
+use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, bconcat, display_to_bytes, path_from_bytes, path_to_bytes,
     php_regex, php_str, preg_match, utf8_text,
@@ -69,7 +70,7 @@ impl RemoteFilesystem {
                 PluginValue::string(file_url.as_ref()),
                 PluginValue::string(path_to_bytes(file_name.as_ref())),
                 PluginValue::Bool(progress),
-                PluginValue::from_php_mixed(&PhpMixed::Array(options)),
+                PhpMixed::Array(options).to_wire(),
             ],
         )?;
         Self::get_result(value)
@@ -88,17 +89,15 @@ impl RemoteFilesystem {
                 PluginValue::string(origin_url.as_ref()),
                 PluginValue::string(file_url.as_ref()),
                 PluginValue::Bool(progress),
-                PluginValue::from_php_mixed(&PhpMixed::Array(options)),
+                PhpMixed::Array(options).to_wire(),
             ],
         )?;
         Self::get_result(value)
     }
 
     pub fn get_options(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        match self
-            .call(BStr::new("getOptions"), Vec::new())?
-            .to_php_mixed()?
-        {
+        let value = self.call(BStr::new("getOptions"), Vec::new())?;
+        match PhpMixed::from_wire(&value).map_err(throw_into_error)? {
             PhpMixed::Array(options) => Ok(options),
             PhpMixed::List(list) if list.is_empty() => Ok(IndexMap::new()),
             other => Err(Self::shape_error(BStr::new("getOptions"), &other)),
@@ -108,7 +107,7 @@ impl RemoteFilesystem {
     pub fn set_options(&self, options: IndexMap<BString, PhpMixed>) -> anyhow::Result<()> {
         self.call(
             BStr::new("setOptions"),
-            vec![PluginValue::from_php_mixed(&PhpMixed::Array(options))],
+            vec![PhpMixed::Array(options).to_wire()],
         )?;
         Ok(())
     }
@@ -173,7 +172,7 @@ impl RemoteFilesystem {
             vec![
                 io_handle_value(&self.io)?,
                 config_handle_value(&self.config),
-                PluginValue::from_php_mixed(&PhpMixed::Array(self.options.clone())),
+                PhpMixed::Array(self.options.clone()).to_wire(),
                 PluginValue::Bool(self.disable_tls),
             ],
             Some(&mut PluginRpcDispatcher::default()),
@@ -252,10 +251,10 @@ impl RemoteFilesystem {
             BStr::new("getOptionsForUrl"),
             vec![
                 PluginValue::string(origin_url.as_ref()),
-                PluginValue::from_php_mixed(&PhpMixed::Array(additional_options)),
+                PhpMixed::Array(additional_options).to_wire(),
             ],
         )?;
-        match value.to_php_mixed()? {
+        match PhpMixed::from_wire(&value).map_err(throw_into_error)? {
             PhpMixed::Array(options) => Ok(options),
             other => Err(Self::shape_error(BStr::new("getOptionsForUrl"), &other)),
         }

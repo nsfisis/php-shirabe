@@ -12,7 +12,8 @@ use crate::plugin::PluginBlockedException;
 use crate::repository::{InvalidRepositoryException, RepositorySecurityException};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::wire::protocol_value;
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{
     AnyThrowable, BadFunctionCallException, BadMethodCallException, Catch as _, Error, Exception,
     InvalidArgumentException, LogicException, OutOfBoundsException, PhpClass as _, PhpMixed,
@@ -70,11 +71,7 @@ fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {
         throw
             .properties
             .get(bstr::B(name))
-            .map(|value| {
-                value
-                    .to_php_mixed()
-                    .expect("an exception property is a plain PHP value")
-            })
+            .map(|value| protocol_value::<PhpMixed>(value, "an exception property"))
             .unwrap_or(PhpMixed::Null)
     };
     let byte_strings = |name: &BStr| -> Vec<BString> {
@@ -272,7 +269,8 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
                 exception
                     .get_response_info()
                     .iter()
-                    .map(PluginValue::from_php_mixed)
+                    .cloned()
+                    .map(PhpMixed::to_wire)
                     .collect(),
             ),
         );
@@ -282,7 +280,7 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
         properties.insert("warnings".into(), byte_strings(exception.get_warnings()));
         properties.insert(
             "data".into(),
-            PluginValue::from_php_mixed(&PhpMixed::Array(exception.get_data().clone())),
+            PhpMixed::Array(exception.get_data().clone()).to_wire(),
         );
     }
     if let Some(exception) = error.catch::<JsonValidationException>() {

@@ -85,8 +85,9 @@ are an explicit error naming them.
 ## Materialized values
 
 The two halves of the materialized-value codec are `crates/shirabe/src/plugin/php_plugin_value.rs`
-and `Shirabe\MaterializedValue`, whose `CLASSES` constant is the closed list of classes that may
-cross as object records.
+(and, for the PHP built-in `\DateTimeInterface`, the `ToWire` / `FromWire` impls of
+`shirabe-php-rpc`) and `Shirabe\MaterializedValue`, whose `CLASSES` constant is the closed list of
+classes that may cross as object records.
 
 `Composer\Package\Link` travels this way, together with the `composer/semver` constraint it holds
 (a `Link` can be built without a pretty constraint, which no constructor call reproduces), and so

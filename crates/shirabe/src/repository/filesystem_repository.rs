@@ -14,6 +14,7 @@ use crate::repository::{
 use crate::util::{Filesystem, Platform};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
+use shirabe_php_rpc::ToWire;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
     UnexpectedValueException, array_flip, bconcat, dirname, error_message, get_debug_type,
@@ -356,7 +357,7 @@ impl FilesystemRepository {
                 unwrap_php_result(shirabe_php_rpc::call_function(
                     "__shirabe_installed_versions_reload",
                     vec![
-                        shirabe_php_rpc::PluginValue::from_php_mixed(&PhpMixed::Array(versions)),
+                        PhpMixed::Array(versions).to_wire(),
                         shirabe_php_rpc::PluginValue::string(path_to_bytes(&repo_dir)),
                     ],
                 ))?;

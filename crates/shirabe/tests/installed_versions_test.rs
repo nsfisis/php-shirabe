@@ -14,7 +14,7 @@ use php_worker::{
     load_composer_php_runtime, lock_php_worker, php_call_static, php_eval, php_runtime_available,
     php_single_quote,
 };
-use shirabe_php_rpc::PluginValue;
+use shirabe_php_rpc::{PluginValue, ToWire};
 use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str, realpath};
 use tempfile::TempDir;
 
@@ -374,7 +374,7 @@ fn test_get_root_package() {
     ]));
 
     assert_eq!(
-        PluginValue::from_php_mixed(&expected),
+        expected.clone().to_wire(),
         call_static(BStr::new("getRootPackage"), vec![])
     );
 }
@@ -521,10 +521,11 @@ fn test_with_class_loader_loaded() {
             "versions".into(),
             PluginValue::Array(IndexMap::from([(
                 "foo/bar".into(),
-                PluginValue::from_php_mixed(&PhpMixed::Array(IndexMap::from([
+                PhpMixed::Array(IndexMap::from([
                     ("version".into(), PhpMixed::string(BString::from("1.0.0"))),
                     ("dev_requirement".into(), PhpMixed::Bool(false)),
-                ]))),
+                ]))
+                .to_wire(),
             )])),
         ),
     ]));

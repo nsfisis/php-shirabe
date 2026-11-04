@@ -4,6 +4,7 @@
 
 use crate::PhpThrow;
 use crate::value::{self, PluginValue};
+use crate::wire::{FromWire, protocol_value};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{bconcat, utf8_text};
@@ -224,31 +225,31 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
     match tag {
         TAG_CALL_FUNCTION => Frame::CallFunction {
             corr_id,
-            function_name: expect_bytes(next()),
-            args: expect_list(next()),
+            function_name: field(next()),
+            args: field(next()),
         },
         TAG_CALL_STATIC_METHOD => Frame::CallStaticMethod {
             corr_id,
-            pclass: expect_bytes(next()),
-            method_name: expect_bytes(next()),
-            args: expect_list(next()),
+            pclass: field(next()),
+            method_name: field(next()),
+            args: field(next()),
         },
         TAG_NEW_OBJECT => Frame::NewObject {
             corr_id,
-            pclass: expect_bytes(next()),
-            ctor_args: expect_list(next()),
+            pclass: field(next()),
+            ctor_args: field(next()),
         },
         TAG_CALL_PHP_METHOD => Frame::CallPhpMethod {
             corr_id,
             phandle: expect_id(next()),
-            method_name: expect_bytes(next()),
-            args: expect_list(next()),
+            method_name: field(next()),
+            args: field(next()),
         },
         TAG_CALL_RUST_METHOD => Frame::CallRustMethod {
             corr_id,
             rhandle: expect_id(next()),
-            method_name: expect_bytes(next()),
-            args: expect_list(next()),
+            method_name: field(next()),
+            args: field(next()),
         },
         TAG_RETURN => Frame::Return {
             corr_id,
@@ -269,51 +270,28 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
     }
 }
 
-fn expect_bytes(value: PluginValue) -> BString {
-    match value {
-        PluginValue::String(bytes) => bytes,
-        other => panic!("PHP RPC: protocol violation — expected a string field: {other:?}"),
-    }
-}
-
-fn expect_list(value: PluginValue) -> Vec<PluginValue> {
-    match value {
-        PluginValue::List(items) => items,
-        other => panic!("PHP RPC: protocol violation — expected a list field: {other:?}"),
-    }
+fn field<T: FromWire>(value: PluginValue) -> T {
+    protocol_value(&value, "a frame field")
 }
 
 fn expect_id(value: PluginValue) -> u64 {
-    match value {
-        PluginValue::Int(n) => u64::try_from(n)
-            .unwrap_or_else(|_| panic!("PHP RPC: protocol violation — negative handle id {n}")),
-        other => panic!("PHP RPC: protocol violation — expected an int id field: {other:?}"),
-    }
+    let id: i64 = field(value);
+    u64::try_from(id)
+        .unwrap_or_else(|_| panic!("PHP RPC: protocol violation — negative handle id {id}"))
 }
 
 fn expect_out_params(value: PluginValue) -> IndexMap<u32, PluginValue> {
-    match value {
-        PluginValue::List(items) if items.is_empty() => IndexMap::new(),
-        PluginValue::List(items) => items
-            .into_iter()
-            .enumerate()
-            .map(|(index, item)| (index as u32, item))
-            .collect(),
-        PluginValue::Array(map) => map
-            .into_iter()
-            .map(|(key, item)| {
-                let position = utf8_text(&key)
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "PHP RPC: protocol violation — out param key is not a position: {key:?}"
-                        )
-                    });
-                (position, item)
-            })
-            .collect(),
-        other => panic!("PHP RPC: protocol violation — out_params is not an array: {other:?}"),
-    }
+    field::<IndexMap<BString, PluginValue>>(value)
+        .into_iter()
+        .map(|(key, item)| {
+            let position = utf8_text(&key)
+                .and_then(|s| s.parse().ok())
+                .unwrap_or_else(|| {
+                    panic!("PHP RPC: protocol violation — out param key is not a position: {key:?}")
+                });
+            (position, item)
+        })
+        .collect()
 }
 
 #[cfg(test)]
