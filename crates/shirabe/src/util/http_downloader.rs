@@ -8,16 +8,16 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::util::http::{NativeHttpDownloader, Response};
 use crate::util::{
-    GetResult, LocalFilesystem, Platform, RemoteFilesystem, StreamContextFactory, Url,
+    GetResult, LocalFilesystem, Platform, RemoteFilesystem, Silencer, StreamContextFactory, Url,
     sync_executor,
 };
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed,
-    array_replace_recursive, bconcat, empty, extension_loaded, file_get_contents, implode, intval,
-    is_numeric, path_to_bytes, pcre_check_utf8_subject, php_regex, preg_is_match, preg_match,
-    preg_replace, rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
+    array_replace_recursive, bconcat, empty, extension_loaded, implode, intval, is_numeric,
+    path_to_bytes, pcre_check_utf8_subject, php_regex, php_truthy, preg_is_match, preg_match,
+    preg_replace, rawurldecode, stripos, strpos, substr, ucfirst, utf8_text,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -599,6 +599,7 @@ impl HttpDownloader {
         if strpos(e_as_transport.get_message(), "Resolving timed out").is_some()
             || strpos(e_as_transport.get_message(), "Could not resolve host").is_some()
         {
+            Silencer::suppress(None);
             let mut ctx_options: IndexMap<BString, PhpMixed> = IndexMap::new();
             let mut ssl_map: IndexMap<BString, PhpMixed> = IndexMap::new();
             ssl_map.insert("verify_peer".into(), PhpMixed::Bool(false));
@@ -607,10 +608,9 @@ impl HttpDownloader {
             http_map.insert("follow_location".into(), PhpMixed::Bool(false));
             http_map.insert("ignore_errors".into(), PhpMixed::Bool(true));
             ctx_options.insert("http".into(), PhpMixed::Array(http_map));
-            // TODO(http): file_get_contents only takes a path; the stream context arg is dropped
-            // until the PHP stream-context layer is modeled.
-            let _ = stream_context_create(&ctx_options, None);
-            let test_connectivity = file_get_contents("https://8.8.8.8");
+            let test_connectivity =
+                get_as_php_http_wrapper(BStr::new("https://8.8.8.8"), &ctx_options);
+            Silencer::restore();
             if test_connectivity.is_ok() {
                 return Some(vec![BString::from(
                     "<error>The following exception probably indicates you have misconfigured DNS resolver(s)</error>",
@@ -820,5 +820,158 @@ impl HttpDownloader {
         e.set_response(Some(body.into()));
 
         Err(e.into())
+    }
+}
+
+/// Stands in for PHP's `file_get_contents($url, false, stream_context_create($options))` on an
+/// `http://` or `https://` URL: performs a GET the way PHP's http stream wrapper does and returns
+/// the body. It honors the context options `ssl.verify_peer`, `ssl.verify_peer_name`,
+/// `http.follow_location` and `http.ignore_errors`, and panics on any other option.
+/// TODO(http): the remaining options of PHP's `http` and `ssl` contexts (`method`, `header`,
+/// `content`, `timeout`, `max_redirects`, `proxy`, `cafile`, ...) are not modeled.
+fn get_as_php_http_wrapper(
+    url: &BStr,
+    options: &IndexMap<BString, PhpMixed>,
+) -> anyhow::Result<Vec<u8>> {
+    assert!(
+        preg_is_match(php_regex!(r"{^https?://}i"), url),
+        "{url:?} is not an http:// or https:// URL",
+    );
+    for key in options.keys() {
+        assert!(
+            key == "ssl" || key == "http",
+            "the stream context option {key:?} is not supported",
+        );
+    }
+    let wrapper_options = |wrapper: &[u8], known: &[&[u8]]| -> IndexMap<BString, PhpMixed> {
+        let map = options
+            .get(wrapper)
+            .and_then(PhpMixed::as_array)
+            .cloned()
+            .unwrap_or_default();
+        for key in map.keys() {
+            assert!(
+                known.contains(&key.as_slice()),
+                "the {:?} stream context option {key:?} is not supported",
+                wrapper.as_bstr(),
+            );
+        }
+        map
+    };
+    let ssl = wrapper_options(b"ssl", &[b"verify_peer", b"verify_peer_name"]);
+    let http = wrapper_options(b"http", &[b"follow_location", b"ignore_errors"]);
+    let is_true_or = |map: &IndexMap<BString, PhpMixed>, key: &[u8], default: bool| {
+        map.get(key).map_or(default, php_truthy)
+    };
+    let verify_peer = is_true_or(&ssl, b"verify_peer", true);
+    let verify_peer_name = is_true_or(&ssl, b"verify_peer_name", true);
+    let follow_location = is_true_or(&http, b"follow_location", true);
+    let ignore_errors = is_true_or(&http, b"ignore_errors", false);
+    // PHP's default `max_redirects` and `default_socket_timeout`.
+    let max_redirects = 20;
+    let timeout = std::time::Duration::from_secs(60);
+
+    let url = utf8_text(url)
+        .ok_or_else(|| anyhow::anyhow!("the URL is not valid UTF-8"))?
+        .to_owned();
+    let fetch = async move {
+        let client = reqwest::Client::builder()
+            // PHP's http wrapper speaks HTTP/1.x, sends no Accept-Encoding, does not decode the
+            // body and does not read the *_proxy environment variables.
+            .http1_only()
+            .no_gzip()
+            .no_brotli()
+            .no_deflate()
+            .no_zstd()
+            .no_proxy()
+            .redirect(if follow_location {
+                reqwest::redirect::Policy::limited(max_redirects)
+            } else {
+                reqwest::redirect::Policy::none()
+            })
+            .tls_danger_accept_invalid_certs(!verify_peer)
+            .tls_danger_accept_invalid_hostnames(!verify_peer_name)
+            .connect_timeout(timeout)
+            .read_timeout(timeout)
+            .build()?;
+        let mut response = client.get(url).send().await?;
+        if !ignore_errors {
+            response = response.error_for_status()?;
+        }
+        Ok(response.bytes().await?.to_vec())
+    };
+    // The request runs on a runtime of its own so that the function works whether or not the
+    // caller is inside a tokio runtime.
+    std::thread::spawn(move || {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?
+            .block_on(fetch)
+    })
+    .join()
+    .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shirabe_php_shim::display_to_bytes;
+    use std::io::{Read as _, Write as _};
+
+    // Serves one HTTP/1.1 request on a loopback port with `response` and returns its URL.
+    fn serve_once(response: &'static [u8]) -> BString {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut buf = [0u8; 1024];
+            while !request.ends_with(b"\r\n\r\n") {
+                let n = stream.read(&mut buf).unwrap();
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buf[..n]);
+            }
+            stream.write_all(response).unwrap();
+        });
+        bconcat!("http://", display_to_bytes(addr), "/")
+    }
+
+    fn http_options(follow_location: bool, ignore_errors: bool) -> IndexMap<BString, PhpMixed> {
+        let mut http = IndexMap::new();
+        http.insert("follow_location".into(), PhpMixed::Bool(follow_location));
+        http.insert("ignore_errors".into(), PhpMixed::Bool(ignore_errors));
+        let mut options = IndexMap::new();
+        options.insert("http".into(), PhpMixed::Array(http));
+        options
+    }
+
+    const NOT_FOUND: &[u8] =
+        b"HTTP/1.1 404 Not Found\r\nContent-Length: 4\r\nConnection: close\r\n\r\nnope";
+    const REDIRECT: &[u8] = b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/\r\nContent-Length: 5\r\nConnection: close\r\n\r\nmoved";
+
+    #[test]
+    fn http_error_status_fails_without_ignore_errors() {
+        let url = serve_once(NOT_FOUND);
+        assert!(get_as_php_http_wrapper(url.as_bstr(), &http_options(true, false)).is_err());
+    }
+
+    #[test]
+    fn http_error_status_returns_body_with_ignore_errors() {
+        let url = serve_once(NOT_FOUND);
+        assert_eq!(
+            get_as_php_http_wrapper(url.as_bstr(), &http_options(true, true)).unwrap(),
+            b"nope"
+        );
+    }
+
+    #[test]
+    fn http_redirect_is_not_followed_without_follow_location() {
+        let url = serve_once(REDIRECT);
+        assert_eq!(
+            get_as_php_http_wrapper(url.as_bstr(), &http_options(false, false)).unwrap(),
+            b"moved"
+        );
     }
 }
