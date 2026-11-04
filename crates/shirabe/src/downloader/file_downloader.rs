@@ -70,7 +70,7 @@ impl FileDownloader {
         cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let process = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
                 io.clone(),
@@ -102,22 +102,12 @@ impl FileDownloader {
                 true,
                 crate::io::io_interface::VERY_VERBOSE,
             );
-            let ttl = this
-                .config
-                .borrow_mut()
-                .get("cache-files-ttl")
-                .as_int()
-                .unwrap_or(0);
-            let max_size = this
-                .config
-                .borrow_mut()
-                .get("cache-files-maxsize")
-                .as_int()
-                .unwrap_or(0);
+            let ttl = this.config.borrow().get_cache_files_ttl();
+            let max_size = this.config.borrow().get_cache_files_maxsize()?;
             cache.borrow_mut().gc(ttl, max_size);
         }
 
-        this
+        Ok(this)
     }
 
     /// Shared body of `ChangeReportInterface::get_local_changes`.
@@ -266,7 +256,11 @@ impl FileDownloader {
     }
 
     /// Gets file name for specific package
-    pub(crate) fn get_file_name(&self, package: PackageInterfaceHandle, _path: &Path) -> PathBuf {
+    pub(crate) fn get_file_name(
+        &self,
+        package: PackageInterfaceHandle,
+        _path: &Path,
+    ) -> anyhow::Result<PathBuf> {
         let extension = self.get_dist_path(package.clone(), PATHINFO_EXTENSION);
         let extension = if extension.is_empty() {
             package.get_dist_type().unwrap_or_default()
@@ -274,13 +268,9 @@ impl FileDownloader {
             extension
         };
 
-        PathBuf::from(path_from_bytes(&rtrim2(
+        Ok(PathBuf::from(path_from_bytes(&rtrim2(
             bconcat!(
-                self.config
-                    .borrow_mut()
-                    .get("vendor-dir")
-                    .as_string()
-                    .unwrap_or_default(),
+                self.config.borrow().get_path("vendor-dir")?,
                 "/composer/tmp-",
                 hash(
                     "md5",
@@ -290,7 +280,7 @@ impl FileDownloader {
                 extension,
             ),
             ".",
-        )))
+        ))))
     }
 
     /// Gets appendix message to add to the "- Upgrading x" string being output on update
@@ -303,7 +293,11 @@ impl FileDownloader {
     }
 
     /// For testing only: invoke the crate-private `get_file_name`.
-    pub fn __get_file_name(&self, package: PackageInterfaceHandle, path: &Path) -> PathBuf {
+    pub fn __get_file_name(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> anyhow::Result<PathBuf> {
         self.get_file_name(package, path)
     }
 
@@ -332,7 +326,7 @@ impl FileDownloader {
 
         let mut url = BString::from(url);
         if let Some(dist_reference) = package.get_dist_reference() {
-            url = UrlUtil::update_dist_reference(&self.config.borrow(), &url, &dist_reference);
+            url = UrlUtil::update_dist_reference(&self.config.borrow(), &url, &dist_reference)?;
         }
 
         Ok(url)
@@ -394,7 +388,7 @@ impl DownloaderInterface for FileDownloader {
         }
         debug_assert!(!urls.is_empty());
 
-        let file_name = self.get_file_name(package.clone(), path);
+        let file_name = self.get_file_name(package.clone(), path)?;
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         let dir_of_file = dirname(path_to_bytes(&file_name));
         self.filesystem
@@ -678,18 +672,12 @@ impl DownloaderInterface for FileDownloader {
         path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let file_name = self.get_file_name(package.clone(), path);
+        let file_name = self.get_file_name(package.clone(), path)?;
         if file_exists(&file_name) {
             self.filesystem.borrow_mut().unlink(&file_name)?;
         }
 
-        let vendor_dir = self
-            .config
-            .borrow_mut()
-            .get("vendor-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_owned();
+        let vendor_dir = self.config.borrow().get_path("vendor-dir")?;
         let first_segment = explode("/", package.get_pretty_name())
             .first()
             .cloned()
@@ -738,13 +726,7 @@ impl DownloaderInterface for FileDownloader {
             ));
         }
 
-        let vendor_dir = self
-            .config
-            .borrow_mut()
-            .get("vendor-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_owned();
+        let vendor_dir = self.config.borrow().get_path("vendor-dir")?;
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the file to be installed. This is the case when installing with create-project in the current directory
@@ -771,7 +753,7 @@ impl DownloaderInterface for FileDownloader {
         }
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         self.filesystem.borrow_mut().rename(
-            self.get_file_name(package.clone(), path),
+            self.get_file_name(package.clone(), path)?,
             path_from_bytes(&bconcat!(
                 path,
                 "/",

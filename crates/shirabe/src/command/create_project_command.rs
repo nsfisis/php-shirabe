@@ -256,21 +256,10 @@ impl CreateProjectCommand {
                 .borrow_mut()
                 .set_output_progress(!no_progress);
 
-            let optimize_autoloader = config
-                .borrow()
-                .get("optimize-autoloader")
-                .as_bool()
-                .unwrap_or(false);
-            let class_map_authoritative = config
-                .borrow()
-                .get("classmap-authoritative")
-                .as_bool()
-                .unwrap_or(false);
-            let apcu_autoloader = config
-                .borrow()
-                .get("apcu-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+            let optimize_autoloader = config.borrow().get_strict_bool("optimize-autoloader")?;
+            let class_map_authoritative =
+                config.borrow().get_strict_bool("classmap-authoritative")?;
+            let apcu_autoloader = config.borrow().get_strict_bool("apcu-autoloader")?;
             let audit_config = self.create_audit_config(&mut config.borrow_mut(), input.clone())?;
 
             let mut installer = Installer::create(io.clone(), &composer_handle);
@@ -630,16 +619,8 @@ impl CreateProjectCommand {
             ))?;
         }
 
-        let platform_overrides = config.borrow_mut().get("platform");
-        let mut platform_repo = PlatformRepository::new(
-            vec![],
-            match platform_overrides {
-                PhpMixed::Array(m) => m,
-                _ => indexmap::IndexMap::new(),
-            },
-            None,
-            None,
-        )?;
+        let platform_overrides = config.borrow().get_map("platform")?;
+        let mut platform_repo = PlatformRepository::new(vec![], platform_overrides, None, None)?;
 
         // find the latest version if there are multiple
         let mut version_selector = VersionSelector::new(

@@ -254,7 +254,7 @@ impl NativeHttpDownloader {
                         tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
                     }
                     current_url = new_url;
-                    current_origin = Url::get_origin(&self.config.borrow(), &current_url);
+                    current_origin = Url::get_origin(&self.config.borrow(), &current_url)?;
                     continue;
                 }
                 Decision::Done(response) => return Ok(Ok(response)),
@@ -824,13 +824,11 @@ impl NativeHttpDownloader {
         }
 
         // check for gitlab 404 when downloading archives
-        let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
-        let gitlab_domains_list: Vec<PhpMixed> = match gitlab_domains {
-            PhpMixed::List(l) => l,
-            _ => Vec::new(),
-        };
         if response.inner.get_status_code() == 404
-            && in_array_strict(PhpMixed::string(origin), &gitlab_domains_list)
+            && in_array_strict(
+                PhpMixed::string(origin),
+                &self.config.borrow().get_list("gitlab-domains")?,
+            )
             && strpos(url, "archive.zip").is_some()
         {
             needs_auth_retry = Some(BStr::new(

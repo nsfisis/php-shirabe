@@ -1,11 +1,12 @@
 //! ref: composer/src/Composer/Config.php
 
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
-    array_search_mixed, array_unique, bconcat, canonical_int_key, display_to_bytes, empty,
-    filter_var_url, implode, in_array_loose, in_array_strict, intval, is_array, is_string,
-    parse_url, php_regex, php_str, php_to_string, preg_is_match, preg_match, preg_replace_callback,
-    rtrim2, strtolower, strtoupper, strtr, substr, trigger_error, utf8_text,
+    E_USER_DEPRECATED, Error, PhpMixed, PregMatches, RuntimeException, TypeError, array_key_exists,
+    array_merge, array_search_mixed, array_unique, bconcat, canonical_int_key, empty,
+    filter_var_url, get_debug_type, implode, in_array_loose, in_array_strict, intval, is_array,
+    is_numeric_string, is_string, loose_eq, parse_url, php_regex, php_str, php_to_string,
+    preg_is_match, preg_match, preg_replace_callback, rtrim2, strtolower, strtoupper, strtr,
+    substr, trigger_error, utf8_text,
 };
 mod config_source_interface;
 mod json_config_source;
@@ -19,7 +20,83 @@ use indexmap::IndexMap;
 
 use crate::advisory::Auditor;
 use crate::downloader::TransportException;
-use crate::util::{Platform, ProcessExecutor};
+use crate::util::{Platform, ProcessExecutor, StoreAuth};
+
+/// The value of the `discard-changes` setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiscardChanges {
+    Bool(bool),
+    Stash,
+}
+
+/// The value of the `preferred-install` setting.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PreferredInstall {
+    /// One install method for every package.
+    Method(BString),
+    /// Install methods keyed by package name pattern.
+    PerPackage(IndexMap<BString, PhpMixed>),
+    /// A value of neither type the schema allows.
+    Other(PhpMixed),
+}
+
+impl PreferredInstall {
+    /// PHP's loose `==`, as the `switch` statements over the setting compare it.
+    pub fn loosely_equals(&self, method: impl AsRef<[u8]>) -> bool {
+        let method = PhpMixed::string(BString::from(method.as_ref()));
+        match self {
+            Self::Method(value) => loose_eq(&PhpMixed::string(value.clone()), &method),
+            Self::PerPackage(map) => loose_eq(&PhpMixed::Array(map.clone()), &method),
+            Self::Other(value) => loose_eq(value, &method),
+        }
+    }
+}
+
+/// The value of the `allow-plugins` setting.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AllowPlugins {
+    Bool(bool),
+    /// Whether to allow each plugin, keyed by package name pattern.
+    Rules(IndexMap<BString, PhpMixed>),
+}
+
+/// The value of the `use-parent-dir` setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UseParentDir {
+    Bool(bool),
+    Prompt,
+}
+
+/// The value of the `platform-check` setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlatformCheck {
+    Disabled,
+    /// Checks the PHP version and the extensions.
+    Full,
+    /// Checks the PHP version only.
+    PhpOnly,
+}
+
+/// The value of the `bump-after-update` setting, or of the update command's
+/// `--bump-after-update` option.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BumpAfterUpdate {
+    Disabled,
+    Dev,
+    NoDev,
+    All,
+}
+
+impl BumpAfterUpdate {
+    pub fn from_value(value: &PhpMixed) -> Self {
+        match value {
+            PhpMixed::Bool(false) => Self::Disabled,
+            PhpMixed::String(s) if s == "dev" => Self::Dev,
+            PhpMixed::String(s) if s == "no-dev" => Self::NoDev,
+            _ => Self::All,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Config {
@@ -516,285 +593,58 @@ impl Config {
     }
 
     /// Returns a setting
-    pub fn get(&self, key: impl AsRef<[u8]>) -> PhpMixed {
-        self.get_with_flags(key, 0).unwrap_or(PhpMixed::Null)
-    }
-
-    /// Typed convenience accessor for keys whose `get()` value is always a string.
-    pub fn get_str(&self, key: impl AsRef<[u8]>) -> anyhow::Result<BString> {
-        Ok(self
-            .get_with_flags(key, 0)?
-            .as_string()
-            .unwrap_or_default()
-            .to_owned())
+    pub fn get(&self, key: impl AsRef<[u8]>) -> anyhow::Result<PhpMixed> {
+        self.get_with_flags(key, 0)
     }
 
     pub fn get_with_flags(&self, key: impl AsRef<[u8]>, flags: i64) -> anyhow::Result<PhpMixed> {
         let key = key.as_ref();
         match key {
             // strings/paths with env var and {$refs} support
-            b"vendor-dir" | b"bin-dir" | b"process-timeout" | b"data-dir" | b"cache-dir"
-            | b"cache-files-dir" | b"cache-repo-dir" | b"cache-vcs-dir" | b"cafile" | b"capath" => {
-                // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
-                let env = bconcat!("COMPOSER_", strtoupper(strtr(key, "-", "_")));
-
-                let val = self.get_composer_env(&env);
-                if !matches!(val, PhpMixed::Bool(false)) {
-                    self.set_source_of_config_value(&val, key, &env);
-                }
-
-                if key == b"process-timeout" {
-                    let raw = if matches!(val, PhpMixed::Bool(false)) {
-                        self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null)
-                    } else {
-                        val
-                    };
-                    return Ok(PhpMixed::Int(intval(&raw).max(0)));
-                }
-
-                let raw_val = if matches!(val, PhpMixed::Bool(false)) {
-                    self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null)
-                } else {
-                    val
-                };
-                let processed = self.process(raw_val, flags)?;
-                let mut val_str = rtrim2(php_to_string(&processed), "/\\");
-                val_str = Platform::expand_path(&val_str);
-
-                if substr(key, -4, None) != "-dir" {
-                    return Ok(PhpMixed::string(val_str));
-                }
-
-                Ok(PhpMixed::string(
-                    if (flags & Self::RELATIVE_PATHS) == Self::RELATIVE_PATHS {
-                        val_str
-                    } else {
-                        self.realpath(val_str.as_ref())
-                    },
-                ))
+            b"vendor-dir" | b"bin-dir" | b"data-dir" | b"cache-dir" | b"cache-files-dir"
+            | b"cache-repo-dir" | b"cache-vcs-dir" | b"cafile" | b"capath" => {
+                Ok(PhpMixed::string(self.get_path_with_flags(key, flags)?))
             }
+            b"process-timeout" => Ok(self.process_timeout()),
 
             // booleans with env var support
-            b"cache-read-only" | b"htaccess-protect" => {
-                // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
-                let env = bconcat!("COMPOSER_", strtoupper(strtr(key, "-", "_")));
-
-                let val = self.get_composer_env(&env);
-                let val = if matches!(val, PhpMixed::Bool(false)) {
-                    self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null)
-                } else {
-                    self.set_source_of_config_value(&val, key, &env);
-                    val
-                };
-
-                Ok(PhpMixed::Bool(
-                    val.as_string() != Some("false".into()) && val.to_bool(),
-                ))
-            }
-
+            b"cache-read-only" | b"htaccess-protect"
             // booleans without env var support
-            b"disable-tls" | b"secure-http" | b"use-github-api" | b"lock" => {
-                // special case for secure-http
-                if key == b"secure-http"
-                    && self.get_with_flags("disable-tls", 0)?.as_bool() == Some(true)
-                {
-                    return Ok(PhpMixed::Bool(false));
-                }
-
-                let v = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
-                Ok(PhpMixed::Bool(
-                    v.as_string() != Some("false".into()) && v.to_bool(),
-                ))
+            | b"disable-tls" | b"secure-http" | b"use-github-api" | b"lock" => {
+                Ok(PhpMixed::Bool(self.get_bool(key)))
             }
 
             // ints without env var support
-            b"cache-ttl" => Ok(PhpMixed::Int(
-                self.config.get(B(key)).map(intval).unwrap_or(0).max(0),
-            )),
+            b"cache-ttl" => Ok(PhpMixed::Int(self.get_cache_ttl())),
 
             // numbers with kb/mb/gb support, without env var support
-            b"cache-files-maxsize" => {
-                let raw = self
-                    .config
-                    .get(B(key))
-                    .map(php_to_string)
-                    .unwrap_or_default();
-                let Some(matches) = preg_match(
-                    php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
-                    &raw,
-                ) else {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Could not parse the value of '",
-                        key.as_bstr(),
-                        "': ",
-                        raw
-                    ))
-                    .into());
-                };
-                let mut size = utf8_text(matches.get(1).unwrap_or_default())
-                    .and_then(|size| size.parse::<f64>().ok())
-                    .unwrap_or(0.0);
-                if let Some(unit) = matches.get(2) {
-                    match strtolower(unit).as_slice() {
-                        b"g" => {
-                            size *= 1024.0;
-                            size *= 1024.0;
-                            size *= 1024.0;
-                        }
-                        b"m" => {
-                            size *= 1024.0;
-                            size *= 1024.0;
-                        }
-                        b"k" => {
-                            size *= 1024.0;
-                        }
-                        _ => {}
-                    }
-                }
-
-                Ok(PhpMixed::Int((size as i64).max(0)))
-            }
+            b"cache-files-maxsize" => Ok(PhpMixed::Int(self.get_cache_files_maxsize()?)),
 
             // special cases below
-            b"cache-files-ttl" => {
-                let v = self.config.get(B(key)).cloned();
-                if let Some(v) = v
-                    && !v.is_null()
-                {
-                    return Ok(PhpMixed::Int(intval(&v).max(0)));
-                }
+            b"cache-files-ttl" => Ok(PhpMixed::Int(self.get_cache_files_ttl())),
 
-                self.get_with_flags("cache-ttl", 0)
-            }
+            b"home" => Ok(PhpMixed::string(self.get_home_with_flags(flags)?)),
 
-            b"home" => {
-                let v = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
-                let expanded = Platform::expand_path(v.as_string().unwrap_or_default());
-                let processed = self.process(PhpMixed::string(expanded), flags)?;
-                Ok(PhpMixed::string(rtrim2(
-                    processed.as_string().unwrap_or_default(),
-                    "/\\",
-                )))
-            }
+            b"bin-compat" => self.bin_compat(),
 
-            b"bin-compat" => {
-                let env_val = self.get_composer_env("COMPOSER_BIN_COMPAT");
-                let value = match env_val {
-                    PhpMixed::Bool(false) | PhpMixed::Null => self
-                        .config
-                        .get(B(key))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_owned(),
-                    other => other.as_string().unwrap_or_default().to_owned(),
-                };
-
-                if !in_array_loose(
-                    value.clone(),
-                    &[
-                        PhpMixed::string(BString::from("auto")),
-                        PhpMixed::string(BString::from("full")),
-                        PhpMixed::string(BString::from("proxy")),
-                        PhpMixed::string(BString::from("symlink")),
-                    ],
-                ) {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Invalid value for 'bin-compat': ",
-                        value,
-                        ". Expected auto, full or proxy"
-                    ))
-                    .into());
-                }
-
-                if value == "symlink" {
-                    trigger_error(
-                        "config.bin-compat \"symlink\" is deprecated since Composer 2.2, use auto, full (for Windows compatibility) or proxy instead.",
-                        E_USER_DEPRECATED,
-                    );
-                }
-
-                Ok(PhpMixed::string(value))
-            }
-
-            b"discard-changes" => {
-                let env = self.get_composer_env("COMPOSER_DISCARD_CHANGES");
-                if !matches!(env, PhpMixed::Bool(false)) {
-                    let env_str = env.as_string().unwrap_or_default();
-                    if !matches!(
-                        env_str.as_bytes(),
-                        b"stash" | b"true" | b"false" | b"1" | b"0"
-                    ) {
-                        return Err(RuntimeException::new(bconcat!(
-                            "Invalid value for COMPOSER_DISCARD_CHANGES: ",
-                            env_str,
-                            ". Expected 1, 0, true, false or stash"
-                        ))
-                        .into());
-                    }
-                    if env_str == "stash" {
-                        return Ok(PhpMixed::string(BString::from("stash")));
-                    }
-
-                    // convert string value to bool
-                    return Ok(PhpMixed::Bool(
-                        env_str != "false" && !env_str.is_empty() && env_str != "0",
-                    ));
-                }
-
-                let val = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
-                let allowed =
-                    matches!(&val, PhpMixed::Bool(_)) || val.as_string() == Some("stash".into());
-                if !allowed {
-                    return Err(RuntimeException::new(display_to_bytes(format_args!(
-                        "Invalid value for 'discard-changes': {:?}. Expected true, false or stash",
-                        val
-                    )))
-                    .into());
-                }
-
-                Ok(val)
-            }
+            b"discard-changes" => Ok(match self.get_discard_changes()? {
+                DiscardChanges::Bool(value) => PhpMixed::Bool(value),
+                DiscardChanges::Stash => PhpMixed::string(BString::from("stash")),
+            }),
 
             b"github-protocols" => {
-                let mut protos: Vec<BString> = self
-                    .config
-                    .get(B("github-protocols"))
-                    .and_then(|v| v.as_list())
-                    .map(|l| {
-                        l.iter()
-                            .filter_map(|v| v.as_string().map(BStr::to_owned))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let secure_http = self
-                    .config
-                    .get(B("secure-http"))
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                if secure_http {
-                    let found = array_search_mixed(
-                        &PhpMixed::string(BString::from("git")),
-                        &PhpMixed::List(protos.iter().cloned().map(PhpMixed::string).collect()),
-                        false,
-                    );
-                    if let Some(idx_val) = found {
-                        let idx = idx_val.as_int().expect("list search index") as usize;
-                        protos.remove(idx);
-                    }
-                }
-                let first = protos.first().cloned();
-                if first.as_ref().is_some_and(|proto| proto == "http") {
-                    return Err(RuntimeException::new(BString::from("The http protocol for github is not available anymore, update your config's github-protocols to use \"https\", \"git\" or \"ssh\""))
-                    .into());
-                }
-
-                Ok(PhpMixed::List(
-                    protos.into_iter().map(PhpMixed::string).collect(),
-                ))
+                let protos = self.github_protocols()?;
+                Ok(
+                    if protos.keys().enumerate().all(|(i, k)| *k == bconcat!(i)) {
+                        PhpMixed::List(protos.into_values().collect())
+                    } else {
+                        PhpMixed::Array(protos)
+                    },
+                )
             }
 
             b"autoloader-suffix" => {
-                let v = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
+                let v = self.raw_value(key);
                 if v.as_string() == Some("".into()) {
                     // we need to guarantee null or non-empty-string
                     return Ok(PhpMixed::Null);
@@ -803,70 +653,678 @@ impl Config {
                 self.process(v, flags)
             }
 
-            b"audit" => {
-                let mut result = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
-                let abandoned_env = self.get_composer_env("COMPOSER_AUDIT_ABANDONED");
-                if !matches!(abandoned_env, PhpMixed::Bool(false)) {
-                    let abandoned_env_str =
-                        abandoned_env.as_string().unwrap_or_default().to_owned();
-                    let valid_choices: Vec<BString> =
-                        Auditor::ABANDONEDS.iter().map(|s| bconcat!(s)).collect();
-                    if !in_array_strict(
-                        abandoned_env_str.clone(),
-                        &valid_choices
-                            .iter()
-                            .map(|s| PhpMixed::string(s.clone()))
-                            .collect::<Vec<_>>(),
-                    ) {
-                        return Err(RuntimeException::new(bconcat!(
-                            "Invalid value for COMPOSER_AUDIT_ABANDONED: ",
-                            abandoned_env_str,
-                            ". Expected one of ",
-                            implode(", ", &valid_choices),
-                            "."
-                        ))
-                        .into());
-                    }
-                    if let PhpMixed::Array(ref mut m) = result {
-                        m.insert("abandoned".into(), PhpMixed::string(abandoned_env_str));
-                    }
-                }
+            b"audit" => self.audit(),
 
-                let block_abandoned_env =
-                    self.get_composer_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
-                if !matches!(block_abandoned_env, PhpMixed::Bool(false)) {
-                    let env_str = block_abandoned_env.as_string().unwrap_or_default();
-                    if !matches!(env_str.as_bytes(), b"0" | b"1") {
-                        return Err(RuntimeException::new(bconcat!(
-                            "Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: ",
-                            env_str,
-                            ". Expected 0 or 1."
-                        ))
-                        .into());
-                    }
-                    if let PhpMixed::Array(ref mut m) = result {
-                        m.insert(
-                            "block-abandoned".into(),
-                            PhpMixed::Bool(env_str.as_bytes() == b"1"),
-                        );
-                    }
-                }
-
-                Ok(result)
-            }
-
-            _ => {
-                if !self.config.contains_key(B(key)) {
-                    return Ok(PhpMixed::Null);
-                }
-
-                let v = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
-                self.process(v, flags)
-            }
+            _ => self.get_default(key, flags),
         }
     }
 
-    pub fn all(&mut self, flags: i64) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+    /// `get()` of one of the path settings (`vendor-dir`, `bin-dir`, `data-dir`, `cache-dir`,
+    /// `cache-files-dir`, `cache-repo-dir`, `cache-vcs-dir`, `cafile`, `capath`).
+    pub fn get_path(&self, key: impl AsRef<[u8]>) -> anyhow::Result<BString> {
+        self.get_path_with_flags(key, 0)
+    }
+
+    pub fn get_path_with_flags(
+        &self,
+        key: impl AsRef<[u8]>,
+        flags: i64,
+    ) -> anyhow::Result<BString> {
+        let key = key.as_ref();
+        assert!(
+            matches!(
+                key,
+                b"vendor-dir"
+                    | b"bin-dir"
+                    | b"data-dir"
+                    | b"cache-dir"
+                    | b"cache-files-dir"
+                    | b"cache-repo-dir"
+                    | b"cache-vcs-dir"
+                    | b"cafile"
+                    | b"capath"
+            ),
+            "{:?} is not a path setting",
+            key.as_bstr()
+        );
+        // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
+        let env = bconcat!("COMPOSER_", strtoupper(strtr(key, "-", "_")));
+
+        let val = self.get_composer_env(&env);
+        let raw_val = match val {
+            Some(val) => {
+                let val = PhpMixed::string(val);
+                self.set_source_of_config_value(&val, key, &env);
+                val
+            }
+            None => self.raw_value(key),
+        };
+
+        let processed = self.process(raw_val, flags)?;
+        let mut val_str = rtrim2(php_to_string(&processed), "/\\");
+        val_str = Platform::expand_path(&val_str);
+
+        if substr(key, -4, None) != "-dir" {
+            return Ok(val_str);
+        }
+
+        Ok(if (flags & Self::RELATIVE_PATHS) == Self::RELATIVE_PATHS {
+            val_str
+        } else {
+            self.realpath(val_str.as_ref())
+        })
+    }
+
+    /// PHP's `max(0, ...)` over the `process-timeout` setting, which casts the environment
+    /// variable but not the configured value.
+    fn process_timeout(&self) -> PhpMixed {
+        let env = "COMPOSER_PROCESS_TIMEOUT";
+        if let Some(val) = self.get_composer_env(env) {
+            let val = PhpMixed::string(val);
+            self.set_source_of_config_value(&val, "process-timeout", env);
+            return PhpMixed::Int(intval(&val).max(0));
+        }
+
+        let val = self.raw_value(b"process-timeout");
+        let greater_than_zero = match &val {
+            PhpMixed::Null => false,
+            PhpMixed::Bool(b) => *b,
+            PhpMixed::Int(i) => *i > 0,
+            PhpMixed::Float(f) => *f > 0.0,
+            PhpMixed::String(s) => {
+                if is_numeric_string(s) {
+                    utf8_text(s)
+                        .expect("a numeric string is ASCII")
+                        .trim()
+                        .parse::<f64>()
+                        .expect("a numeric string parses as a float")
+                        > 0.0
+                } else {
+                    s.as_slice() > b"0".as_slice()
+                }
+            }
+            PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_) => true,
+        };
+        if greater_than_zero {
+            val
+        } else {
+            PhpMixed::Int(0)
+        }
+    }
+
+    /// `get('process-timeout')` as `ProcessExecutor::setTimeout()` receives it.
+    pub fn get_process_timeout(&self) -> anyhow::Result<i64> {
+        match self.process_timeout() {
+            PhpMixed::Int(timeout) => Ok(timeout),
+            other => Err(TypeError::new(bconcat!(
+                "Composer\\Util\\ProcessExecutor::setTimeout(): Argument #1 ($timeout) must be of type int, ",
+                get_debug_type(&other),
+                " given"
+            ))
+            .into()),
+        }
+    }
+
+    /// `get()` of one of the boolean settings that PHP casts (`cache-read-only`,
+    /// `htaccess-protect`, `disable-tls`, `secure-http`, `use-github-api`, `lock`).
+    pub fn get_bool(&self, key: impl AsRef<[u8]>) -> bool {
+        let key = key.as_ref();
+        let val = match key {
+            // booleans with env var support
+            b"cache-read-only" | b"htaccess-protect" => {
+                // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
+                let env = bconcat!("COMPOSER_", strtoupper(strtr(key, "-", "_")));
+
+                match self.get_composer_env(&env) {
+                    None => self.raw_value(key),
+                    Some(val) => {
+                        let val = PhpMixed::string(val);
+                        self.set_source_of_config_value(&val, key, &env);
+                        val
+                    }
+                }
+            }
+
+            // booleans without env var support
+            b"disable-tls" | b"secure-http" | b"use-github-api" | b"lock" => {
+                // special case for secure-http
+                if key == b"secure-http" && self.get_bool("disable-tls") {
+                    return false;
+                }
+
+                self.raw_value(key)
+            }
+
+            _ => panic!(
+                "{:?} is not a boolean setting cast by Config",
+                key.as_bstr()
+            ),
+        };
+
+        val.as_string() != Some("false".into()) && val.to_bool()
+    }
+
+    pub fn get_cache_ttl(&self) -> i64 {
+        intval(&self.raw_value(b"cache-ttl")).max(0)
+    }
+
+    pub fn get_cache_files_maxsize(&self) -> anyhow::Result<i64> {
+        let key = "cache-files-maxsize";
+        let raw = php_to_string(&self.raw_value(key));
+        let Some(matches) = preg_match(
+            php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
+            &raw,
+        ) else {
+            return Err(RuntimeException::new(bconcat!(
+                "Could not parse the value of '",
+                key,
+                "': ",
+                raw
+            ))
+            .into());
+        };
+        let mut size = utf8_text(matches.get(1).expect("the size group always participates"))
+            .and_then(|size| size.parse::<f64>().ok())
+            .unwrap_or(0.0);
+        if let Some(unit) = matches.get(2) {
+            match strtolower(unit).as_slice() {
+                b"g" => {
+                    size *= 1024.0;
+                    size *= 1024.0;
+                    size *= 1024.0;
+                }
+                b"m" => {
+                    size *= 1024.0;
+                    size *= 1024.0;
+                }
+                b"k" => {
+                    size *= 1024.0;
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        Ok(intval(&PhpMixed::Float(size)).max(0))
+    }
+
+    pub fn get_cache_files_ttl(&self) -> i64 {
+        let v = self.raw_value(b"cache-files-ttl");
+        if !v.is_null() {
+            return intval(&v).max(0);
+        }
+
+        self.get_cache_ttl()
+    }
+
+    pub fn get_home(&self) -> anyhow::Result<BString> {
+        self.get_home_with_flags(0)
+    }
+
+    fn get_home_with_flags(&self, flags: i64) -> anyhow::Result<BString> {
+        let v = self.raw_value(b"home");
+        let Some(home) = v.as_string() else {
+            return Err(TypeError::new(bconcat!(
+                "Composer\\Util\\Platform::expandPath(): Argument #1 ($path) must be of type string, ",
+                get_debug_type(&v),
+                " given"
+            ))
+            .into());
+        };
+        let processed = self.process(PhpMixed::string(Platform::expand_path(home)), flags)?;
+        Ok(rtrim2(php_to_string(&processed), "/\\"))
+    }
+
+    fn bin_compat(&self) -> anyhow::Result<PhpMixed> {
+        let value = match self.get_composer_env("COMPOSER_BIN_COMPAT") {
+            Some(env) if PhpMixed::string(env.clone()).to_bool() => PhpMixed::string(env),
+            _ => self.raw_value(b"bin-compat"),
+        };
+
+        if !in_array_loose(
+            value.clone(),
+            &[
+                PhpMixed::string(BString::from("auto")),
+                PhpMixed::string(BString::from("full")),
+                PhpMixed::string(BString::from("proxy")),
+                PhpMixed::string(BString::from("symlink")),
+            ],
+        ) {
+            return Err(RuntimeException::new(bconcat!(
+                "Invalid value for 'bin-compat': ",
+                php_to_string(&value),
+                ". Expected auto, full or proxy"
+            ))
+            .into());
+        }
+
+        if value.as_string() == Some("symlink".into()) {
+            trigger_error(
+                "config.bin-compat \"symlink\" is deprecated since Composer 2.2, use auto, full (for Windows compatibility) or proxy instead.",
+                E_USER_DEPRECATED,
+            );
+        }
+
+        Ok(value)
+    }
+
+    /// `get('bin-compat')` as `BinaryInstaller` receives it.
+    pub fn get_bin_compat(&self) -> anyhow::Result<BString> {
+        let value = self.bin_compat()?;
+        match value {
+            PhpMixed::String(value) => Ok(value),
+            other => Err(TypeError::new(bconcat!(
+                "Composer\\Installer\\BinaryInstaller::__construct(): Argument #3 ($binCompat) must be of type string, ",
+                get_debug_type(&other),
+                " given"
+            ))
+            .into()),
+        }
+    }
+
+    pub fn get_discard_changes(&self) -> anyhow::Result<DiscardChanges> {
+        if let Some(env) = self.get_composer_env("COMPOSER_DISCARD_CHANGES") {
+            if !matches!(env.as_slice(), b"stash" | b"true" | b"false" | b"1" | b"0") {
+                return Err(RuntimeException::new(bconcat!(
+                    "Invalid value for COMPOSER_DISCARD_CHANGES: ",
+                    env,
+                    ". Expected 1, 0, true, false or stash"
+                ))
+                .into());
+            }
+            if env == "stash" {
+                return Ok(DiscardChanges::Stash);
+            }
+
+            // convert string value to bool
+            return Ok(DiscardChanges::Bool(
+                env != "false" && PhpMixed::string(env).to_bool(),
+            ));
+        }
+
+        match self.raw_value(b"discard-changes") {
+            PhpMixed::Bool(value) => Ok(DiscardChanges::Bool(value)),
+            PhpMixed::String(s) if s == "stash" => Ok(DiscardChanges::Stash),
+            other => Err(RuntimeException::new(bconcat!(
+                "Invalid value for 'discard-changes': ",
+                php_to_string(&other),
+                ". Expected true, false or stash"
+            ))
+            .into()),
+        }
+    }
+
+    fn github_protocols(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        let mut protos = match self.raw_value(b"github-protocols") {
+            PhpMixed::List(list) => list
+                .into_iter()
+                .enumerate()
+                .map(|(i, v)| (bconcat!(i), v))
+                .collect(),
+            PhpMixed::Array(map) => map,
+            other => {
+                return Err(TypeError::new(bconcat!(
+                    "array_search(): Argument #2 ($haystack) must be of type array, ",
+                    get_debug_type(&other),
+                    " given"
+                ))
+                .into());
+            }
+        };
+        if self.raw_value(b"secure-http").to_bool()
+            && let Some(index) = protos
+                .iter()
+                .find(|(_, v)| loose_eq(v, &PhpMixed::string(BString::from("git"))))
+                .map(|(k, _)| k.clone())
+        {
+            protos.shift_remove(&index);
+        }
+        if protos.values().next().and_then(|v| v.as_string()) == Some("http".into()) {
+            return Err(RuntimeException::new(BString::from("The http protocol for github is not available anymore, update your config's github-protocols to use \"https\", \"git\" or \"ssh\""))
+                .into());
+        }
+
+        Ok(protos)
+    }
+
+    /// `get('github-protocols')`, with each protocol converted to a string as the consumers
+    /// concatenate or strictly compare them with strings.
+    pub fn get_github_protocols(&self) -> anyhow::Result<Vec<BString>> {
+        Ok(self
+            .github_protocols()?
+            .values()
+            .map(php_to_string)
+            .collect())
+    }
+
+    /// `get('autoloader-suffix')` as `AutoloadGenerator` uses it: `null`, or the suffix
+    /// that `getAutoloadFile()` receives as a string.
+    pub fn get_autoloader_suffix(&self) -> anyhow::Result<Option<BString>> {
+        match self.get_with_flags("autoloader-suffix", 0)? {
+            PhpMixed::Null => Ok(None),
+            PhpMixed::String(suffix) => Ok(Some(suffix)),
+            other => Err(TypeError::new(bconcat!(
+                "Composer\\Autoload\\AutoloadGenerator::getAutoloadFile(): Argument #2 ($suffix) must be of type string, ",
+                get_debug_type(&other),
+                " given"
+            ))
+            .into()),
+        }
+    }
+
+    fn audit(&self) -> anyhow::Result<PhpMixed> {
+        let mut result = self.raw_value(b"audit");
+        if let Some(abandoned_env) = self.get_composer_env("COMPOSER_AUDIT_ABANDONED") {
+            if !Auditor::ABANDONEDS.iter().any(|c| abandoned_env == *c) {
+                let valid_choices: Vec<BString> =
+                    Auditor::ABANDONEDS.iter().map(|s| bconcat!(s)).collect();
+                return Err(RuntimeException::new(bconcat!(
+                    "Invalid value for COMPOSER_AUDIT_ABANDONED: ",
+                    abandoned_env,
+                    ". Expected one of ",
+                    implode(", ", &valid_choices),
+                    "."
+                ))
+                .into());
+            }
+            Self::audit_map(&mut result)?
+                .insert("abandoned".into(), PhpMixed::string(abandoned_env));
+        }
+
+        if let Some(env) = self.get_composer_env("COMPOSER_SECURITY_BLOCKING_ABANDONED") {
+            if !matches!(env.as_slice(), b"0" | b"1") {
+                return Err(RuntimeException::new(bconcat!(
+                    "Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: ",
+                    env,
+                    ". Expected 0 or 1."
+                ))
+                .into());
+            }
+            Self::audit_map(&mut result)?
+                .insert("block-abandoned".into(), PhpMixed::Bool(env == "1"));
+        }
+
+        Ok(result)
+    }
+
+    fn audit_map(result: &mut PhpMixed) -> anyhow::Result<&mut IndexMap<BString, PhpMixed>> {
+        match result {
+            // PHP auto-vivifies an array on assignment to an offset of null or false
+            PhpMixed::Null | PhpMixed::Bool(false) => *result = PhpMixed::Array(IndexMap::new()),
+            PhpMixed::List(list) => {
+                *result = PhpMixed::Array(
+                    std::mem::take(list)
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, v)| (bconcat!(i), v))
+                        .collect(),
+                )
+            }
+            _ => {}
+        }
+        match result {
+            PhpMixed::Array(map) => Ok(map),
+            PhpMixed::String(_) => {
+                Err(Error::new("Cannot access offset of type string on string").into())
+            }
+            _ => Err(Error::new("Cannot use a scalar value as an array").into()),
+        }
+    }
+
+    /// `get('audit')` as `AuditConfig::fromConfig()` reads it.
+    pub fn get_audit(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        let mut result = self.audit()?;
+        Ok(Self::audit_map(&mut result)?.clone())
+    }
+
+    /// `$this->config[$key]`, `null` for a missing key.
+    fn raw_value(&self, key: impl AsRef<[u8]>) -> PhpMixed {
+        self.config
+            .get(B(key.as_ref()))
+            .cloned()
+            .unwrap_or(PhpMixed::Null)
+    }
+
+    /// The `default:` branch of `get()`: the value neither cast nor validated.
+    fn get_default(&self, key: &[u8], flags: i64) -> anyhow::Result<PhpMixed> {
+        match self.config.get(B(key)) {
+            None | Some(PhpMixed::Null) => Ok(PhpMixed::Null),
+            Some(v) => self.process(v.clone(), flags),
+        }
+    }
+
+    // TODO(error-model): PHP raises the consumer's own error instead, a TypeError or the
+    // ErrorException that Composer's error handler makes of a warning, with its own message.
+    fn type_error(key: &[u8], expected: impl AsRef<[u8]>, value: &PhpMixed) -> anyhow::Error {
+        TypeError::new(bconcat!(
+            "The value of config.",
+            key.as_bstr(),
+            " must be of type ",
+            expected.as_ref().as_bstr(),
+            ", ",
+            get_debug_type(value),
+            " given"
+        ))
+        .into()
+    }
+
+    /// `get()` of a setting that consumers only test for truthiness (`if ($config->get(...))`,
+    /// `$option || $config->get(...)`).
+    pub fn get_truthy(&self, key: impl AsRef<[u8]>) -> anyhow::Result<bool> {
+        let key = key.as_ref();
+        assert!(
+            matches!(
+                key,
+                b"notify-on-install"
+                    | b"sort-packages"
+                    | b"optimize-autoloader"
+                    | b"classmap-authoritative"
+                    | b"apcu-autoloader"
+                    | b"update-with-minimal-changes"
+                    | b"allow-missing-requirements"
+            ),
+            "{:?} is not a boolean setting",
+            key.as_bstr()
+        );
+        Ok(self.get_default(key, 0)?.to_bool())
+    }
+
+    /// `get()` of a boolean setting that a consumer passes to a `bool` parameter, where PHP's
+    /// strict types reject any other type.
+    pub fn get_strict_bool(&self, key: impl AsRef<[u8]>) -> anyhow::Result<bool> {
+        let key = key.as_ref();
+        assert!(
+            matches!(
+                key,
+                b"use-include-path"
+                    | b"optimize-autoloader"
+                    | b"classmap-authoritative"
+                    | b"apcu-autoloader"
+            ),
+            "{:?} is not a boolean setting",
+            key.as_bstr()
+        );
+        match self.get_default(key, 0)? {
+            PhpMixed::Bool(value) => Ok(value),
+            other => Err(Self::type_error(key, "bool", &other)),
+        }
+    }
+
+    /// `get('prepend-autoloader') !== false`
+    pub fn get_prepend_autoloader(&self) -> anyhow::Result<bool> {
+        Ok(!matches!(
+            self.get_default(b"prepend-autoloader", 0)?,
+            PhpMixed::Bool(false)
+        ))
+    }
+
+    /// `get('github-expose-hostname') === true`
+    pub fn get_github_expose_hostname(&self) -> anyhow::Result<bool> {
+        Ok(matches!(
+            self.get_default(b"github-expose-hostname", 0)?,
+            PhpMixed::Bool(true)
+        ))
+    }
+
+    /// `get('gitlab-protocol')` when it is a string; consumers ignore any other value.
+    pub fn get_gitlab_protocol(&self) -> anyhow::Result<Option<BString>> {
+        Ok(match self.get_default(b"gitlab-protocol", 0)? {
+            PhpMixed::String(protocol) => Some(protocol),
+            _ => None,
+        })
+    }
+
+    /// `get()` of a string setting that a consumer passes to a `string` parameter
+    /// (`archive-format`, `archive-dir`).
+    pub fn get_string(&self, key: impl AsRef<[u8]>) -> anyhow::Result<BString> {
+        let key = key.as_ref();
+        assert!(
+            matches!(key, b"archive-format" | b"archive-dir"),
+            "{:?} is not a string setting",
+            key.as_bstr()
+        );
+        match self.get_default(key, 0)? {
+            PhpMixed::String(value) => Ok(value),
+            other => Err(Self::type_error(key, "string", &other)),
+        }
+    }
+
+    /// The values of a list setting (`github-domains`, `gitlab-domains`, `forgejo-domains`,
+    /// `secure-svn-domains`). Consumers pass it to `in_array()`, which rejects a non-array, and
+    /// compare its elements with PHP semantics, so the elements keep their type.
+    pub fn get_list(&self, key: impl AsRef<[u8]>) -> anyhow::Result<Vec<PhpMixed>> {
+        let key = key.as_ref();
+        assert!(
+            matches!(
+                key,
+                b"github-domains" | b"gitlab-domains" | b"forgejo-domains" | b"secure-svn-domains"
+            ),
+            "{:?} is not a list setting",
+            key.as_bstr()
+        );
+        match self.get_default(key, 0)? {
+            PhpMixed::List(list) => Ok(list),
+            PhpMixed::Array(map) => Ok(map.into_values().collect()),
+            other => Err(Self::type_error(key, "array", &other)),
+        }
+    }
+
+    /// A map setting (`platform`, and the per-host authentication and header settings).
+    pub fn get_map(&self, key: impl AsRef<[u8]>) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        let key = key.as_ref();
+        Self::assert_map_key(key);
+        Self::to_map(key, self.get_default(key, 0)?)
+    }
+
+    /// `get($key) ?: []` of a map setting.
+    pub fn get_map_or_empty(
+        &self,
+        key: impl AsRef<[u8]>,
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        let key = key.as_ref();
+        Self::assert_map_key(key);
+        let value = self.get_default(key, 0)?;
+        if !value.to_bool() {
+            return Ok(IndexMap::new());
+        }
+        Self::to_map(key, value)
+    }
+
+    fn assert_map_key(key: &[u8]) {
+        assert!(
+            matches!(
+                key,
+                b"platform"
+                    | b"bitbucket-oauth"
+                    | b"github-oauth"
+                    | b"gitlab-oauth"
+                    | b"gitlab-token"
+                    | b"http-basic"
+                    | b"bearer"
+                    | b"custom-headers"
+                    | b"client-certificate"
+                    | b"forgejo-token"
+            ),
+            "{:?} is not a map setting",
+            key.as_bstr()
+        );
+    }
+
+    fn to_map(key: &[u8], value: PhpMixed) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        match value {
+            PhpMixed::Array(map) => Ok(map),
+            PhpMixed::List(list) => Ok(list
+                .into_iter()
+                .enumerate()
+                .map(|(i, v)| (bconcat!(i), v))
+                .collect()),
+            other => Err(Self::type_error(key, "array", &other)),
+        }
+    }
+
+    pub fn get_preferred_install(&self) -> anyhow::Result<PreferredInstall> {
+        Ok(match self.get_default(b"preferred-install", 0)? {
+            PhpMixed::String(method) => PreferredInstall::Method(method),
+            PhpMixed::Array(map) => PreferredInstall::PerPackage(map),
+            PhpMixed::List(list) => PreferredInstall::PerPackage(
+                list.into_iter()
+                    .enumerate()
+                    .map(|(i, v)| (bconcat!(i), v))
+                    .collect(),
+            ),
+            other => PreferredInstall::Other(other),
+        })
+    }
+
+    /// `get('allow-plugins')` as `PluginManager::parseAllowedPlugins()` receives it.
+    pub fn get_allow_plugins(&self) -> anyhow::Result<AllowPlugins> {
+        let key = b"allow-plugins";
+        match self.get_default(key, 0)? {
+            PhpMixed::Bool(value) => Ok(AllowPlugins::Bool(value)),
+            value @ (PhpMixed::Array(_) | PhpMixed::List(_)) => {
+                Ok(AllowPlugins::Rules(Self::to_map(key, value)?))
+            }
+            other => Err(Self::type_error(key, "array|bool", &other)),
+        }
+    }
+
+    /// `get('store-auths')` as `AuthHelper::storeAuth()` compares it: `=== true`, `=== 'prompt'`,
+    /// and nothing stored for any other value.
+    pub fn get_store_auths(&self) -> anyhow::Result<StoreAuth> {
+        Ok(match self.get_default(b"store-auths", 0)? {
+            PhpMixed::Bool(true) => StoreAuth::Bool(true),
+            PhpMixed::String(s) if s == "prompt" => StoreAuth::Prompt,
+            _ => StoreAuth::Bool(false),
+        })
+    }
+
+    /// `get('use-parent-dir')` as the application compares it: `=== true`, `=== false`, and
+    /// prompting for any other value.
+    pub fn get_use_parent_dir(&self) -> anyhow::Result<UseParentDir> {
+        Ok(match self.get_default(b"use-parent-dir", 0)? {
+            PhpMixed::Bool(value) => UseParentDir::Bool(value),
+            _ => UseParentDir::Prompt,
+        })
+    }
+
+    /// `get('platform-check')` as `AutoloadGenerator` compares it: `!== false` enables the check,
+    /// `=== true` extends it to extensions, and any other value checks the PHP version only.
+    pub fn get_platform_check(&self) -> anyhow::Result<PlatformCheck> {
+        Ok(match self.get_default(b"platform-check", 0)? {
+            PhpMixed::Bool(false) => PlatformCheck::Disabled,
+            PhpMixed::Bool(true) => PlatformCheck::Full,
+            _ => PlatformCheck::PhpOnly,
+        })
+    }
+
+    /// `get('bump-after-update')` as the update command compares it: `false !== ...` runs the
+    /// bump, `=== 'dev'` and `=== 'no-dev'` restrict it, and any other value bumps everything.
+    pub fn get_bump_after_update(&self) -> anyhow::Result<BumpAfterUpdate> {
+        Ok(BumpAfterUpdate::from_value(
+            &self.get_default(b"bump-after-update", 0)?,
+        ))
+    }
+
+    pub fn all(&self, flags: i64) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let mut all: IndexMap<BString, PhpMixed> = IndexMap::new();
         all.insert(
             "repositories".into(),
@@ -883,15 +1341,16 @@ impl Config {
         Ok(all)
     }
 
-    pub fn get_source_of_value(&mut self, key: impl AsRef<[u8]>) -> BString {
+    pub fn get_source_of_value(&self, key: impl AsRef<[u8]>) -> anyhow::Result<BString> {
         let key = key.as_ref();
-        let _ = self.get(key);
+        self.get(key)?;
 
-        self.source_of_config_value
+        Ok(self
+            .source_of_config_value
             .borrow()
             .get(B(key))
             .cloned()
-            .unwrap_or_else(|| Self::SOURCE_UNKNOWN.into())
+            .unwrap_or_else(|| Self::SOURCE_UNKNOWN.into()))
     }
 
     fn set_source_of_config_value(
@@ -972,15 +1431,12 @@ impl Config {
     ///
     /// This should be used to read COMPOSER_ environment variables
     /// that overload config values.
-    fn get_composer_env(&self, var: impl AsRef<[u8]>) -> PhpMixed {
+    fn get_composer_env(&self, var: impl AsRef<[u8]>) -> Option<BString> {
         if self.use_environment {
-            return match Platform::get_env(var) {
-                Some(v) => PhpMixed::string(v),
-                None => PhpMixed::Bool(false),
-            };
+            return Platform::get_env(var);
         }
 
-        PhpMixed::Bool(false)
+        None
     }
 
     fn disable_repo_by_name(&mut self, name: &BStr) {
@@ -1012,11 +1468,11 @@ impl Config {
             scheme.as_ref().map(|scheme| scheme.as_slice()),
             Some(b"http" | b"git" | b"ftp" | b"svn")
         ) {
-            if self.get_with_flags("secure-http", 0)?.as_bool() == Some(true) {
+            if self.get_bool("secure-http") {
                 if scheme.as_ref().is_some_and(|scheme| scheme == "svn") {
                     if in_array_strict(
                         hostname.map(PhpMixed::string).unwrap_or(PhpMixed::Null),
-                        self.get_with_flags("secure-svn-domains", 0)?.values(),
+                        &self.get_list("secure-svn-domains")?,
                     ) {
                         return Ok(());
                     }

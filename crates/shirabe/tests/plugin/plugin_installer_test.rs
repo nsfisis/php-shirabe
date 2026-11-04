@@ -373,12 +373,15 @@ pub(crate) fn set_up() -> SetUp {
         composer.borrow_mut().set_locker(locker);
     }
 
-    let pm = std::rc::Rc::new(std::cell::RefCell::new(PluginManager::new(
-        io_dyn.clone(),
-        composer.downgrade(),
-        None,
-        DisablePlugins::None,
-    )));
+    let pm = std::rc::Rc::new(std::cell::RefCell::new(
+        PluginManager::new(
+            io_dyn.clone(),
+            composer.downgrade(),
+            None,
+            DisablePlugins::None,
+        )
+        .unwrap(),
+    ));
     composer.borrow_mut().set_plugin_manager(pm.clone());
 
     SetUp {
@@ -419,6 +422,7 @@ pub(crate) fn new_installer(set_up: &SetUp) -> PluginInstaller {
         None,
         None,
     )
+    .unwrap()
 }
 
 #[test]
@@ -651,12 +655,15 @@ fn set_plugin_api_version_with_plugins(
     new_plugin_api_version: &BStr,
     plugins: Vec<PackageInterfaceHandle>,
 ) -> std::rc::Rc<std::cell::RefCell<PluginManager>> {
-    let pm = std::rc::Rc::new(std::cell::RefCell::new(PluginManager::new(
-        set_up.io_dyn.clone(),
-        set_up.composer.downgrade(),
-        None,
-        DisablePlugins::None,
-    )));
+    let pm = std::rc::Rc::new(std::cell::RefCell::new(
+        PluginManager::new(
+            set_up.io_dyn.clone(),
+            set_up.composer.downgrade(),
+            None,
+            DisablePlugins::None,
+        )
+        .unwrap(),
+    ));
     pm.borrow_mut()
         .__set_plugin_api_version(BStr::new(new_plugin_api_version));
     set_up.composer.borrow_mut().set_plugin_manager(pm.clone());

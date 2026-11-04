@@ -292,13 +292,7 @@ impl Command for ValidateCommand {
         let composer =
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?;
         let composer = crate::composer::composer_full(&composer);
-        let check_lock = (check_lock
-            && composer
-                .get_config()
-                .borrow_mut()
-                .get("lock")
-                .as_bool()
-                .unwrap_or(true))
+        let check_lock = (check_lock && composer.get_config().borrow().get_bool("lock"))
             || input
                 .borrow()
                 .get_option("check-lock")?

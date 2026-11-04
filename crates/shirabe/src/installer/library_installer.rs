@@ -37,7 +37,7 @@ impl LibraryInstaller {
         r#type: Option<BString>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         binary_installer: Option<std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let composer_rc = composer
             .upgrade()
             .expect("LibraryInstaller must lives longer than Composer");
@@ -51,12 +51,7 @@ impl LibraryInstaller {
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let vendor_dir = PathBuf::from(path_from_bytes(&rtrim2(
-            composer_ref
-                .get_config()
-                .borrow_mut()
-                .get("vendor-dir")
-                .as_string()
-                .unwrap_or_default(),
+            composer_ref.get_config().borrow().get_path("vendor-dir")?,
             "/",
         )));
         let binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>> =
@@ -64,21 +59,10 @@ impl LibraryInstaller {
                 Some(binary_installer) => binary_installer,
                 None => {
                     let bin_dir = PathBuf::from(path_from_bytes(&rtrim2(
-                        composer_ref
-                            .get_config()
-                            .borrow_mut()
-                            .get("bin-dir")
-                            .as_string()
-                            .unwrap_or_default(),
+                        composer_ref.get_config().borrow().get_path("bin-dir")?,
                         "/",
                     )));
-                    let bin_compat = composer_ref
-                        .get_config()
-                        .borrow_mut()
-                        .get("bin-compat")
-                        .as_string()
-                        .unwrap_or_default()
-                        .to_owned();
+                    let bin_compat = composer_ref.get_config().borrow().get_bin_compat()?;
                     std::rc::Rc::new(std::cell::RefCell::new(BinaryInstaller::new(
                         io.clone(),
                         bin_dir,
@@ -89,7 +73,7 @@ impl LibraryInstaller {
                 }
             };
 
-        Self {
+        Ok(Self {
             composer,
             download_manager,
             io,
@@ -97,7 +81,7 @@ impl LibraryInstaller {
             filesystem,
             vendor_dir: std::cell::RefCell::new(vendor_dir),
             binary_installer,
-        }
+        })
     }
 
     /// For testing only: swap the binary installer for a recording double, mirroring the

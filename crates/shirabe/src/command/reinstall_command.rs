@@ -260,21 +260,13 @@ impl Command for ReinstallCommand {
                 .get_option("optimize-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-                || config
-                    .borrow_mut()
-                    .get("optimize-autoloader")
-                    .as_bool()
-                    .unwrap_or(false);
+                || config.borrow().get_truthy("optimize-autoloader")?;
             let authoritative = input
                 .borrow()
                 .get_option("classmap-authoritative")?
                 .as_bool()
                 .unwrap_or(false)
-                || config
-                    .borrow_mut()
-                    .get("classmap-authoritative")
-                    .as_bool()
-                    .unwrap_or(false);
+                || config.borrow().get_truthy("classmap-authoritative")?;
             let apcu_prefix = input
                 .borrow()
                 .get_option("apcu-autoloader-prefix")?
@@ -286,11 +278,7 @@ impl Command for ReinstallCommand {
                     .get_option("apcu-autoloader")?
                     .as_bool()
                     .unwrap_or(false)
-                || config
-                    .borrow_mut()
-                    .get("apcu-autoloader")
-                    .as_bool()
-                    .unwrap_or(false);
+                || config.borrow().get_truthy("apcu-autoloader")?;
 
             let autoload_generator = composer.get_autoload_generator();
             autoload_generator

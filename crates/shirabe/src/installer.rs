@@ -145,7 +145,7 @@ impl Installer {
             SuggestedPackagesReporter::new(io.clone()),
         ));
         let platform_requirement_filter = PlatformRequirementFilterFactory::ignore_nothing();
-        let write_lock = config.borrow_mut().get("lock").as_bool().unwrap_or(false);
+        let write_lock = config.borrow().get_bool("lock");
 
         Self {
             io,
@@ -280,12 +280,7 @@ impl Installer {
             Err(e) => {
                 if self.execute_operations
                     && self.install
-                    && self
-                        .config
-                        .borrow_mut()
-                        .get("notify-on-install")
-                        .as_bool()
-                        .unwrap_or(false)
+                    && self.config.borrow().get_truthy("notify-on-install")?
                 {
                     self.installation_manager
                         .borrow_mut()
@@ -299,12 +294,7 @@ impl Installer {
 
         if self.execute_operations
             && self.install
-            && self
-                .config
-                .borrow_mut()
-                .get("notify-on-install")
-                .as_bool()
-                .unwrap_or(false)
+            && self.config.borrow().get_truthy("notify-on-install")?
         {
             self.installation_manager
                 .borrow_mut()
@@ -768,13 +758,7 @@ impl Installer {
                 }
             }
 
-            if self
-                .config
-                .borrow_mut()
-                .get("lock")
-                .as_bool()
-                .unwrap_or(false)
-            {
+            if self.config.borrow().get_bool("lock") {
                 self.io.write_error(bconcat!(
                     "<info>Lock file operations: ",
                     (install_names.len() as i64),
@@ -834,12 +818,7 @@ impl Installer {
             }
 
             // output op if lock file is enabled, but alias op only in debug verbosity
-            if self
-                .config
-                .borrow_mut()
-                .get("lock")
-                .as_bool()
-                .unwrap_or(false)
+            if self.config.borrow().get_bool("lock")
                 && (strpos(operation.get_operation_type(), "Alias").is_none() || self.io.is_debug())
             {
                 let mut source_repo = BString::default();
@@ -868,11 +847,8 @@ impl Installer {
             .collect();
         let platform_overrides: IndexMap<BString, PhpMixed> = self
             .config
-            .borrow_mut()
-            .get("platform")
-            .as_array()
-            .cloned()
-            .unwrap_or_default()
+            .borrow()
+            .get_map_or_empty("platform")?
             .into_iter()
             .collect();
         let updated_lock = self.locker.borrow_mut().set_lock_data(
@@ -991,13 +967,7 @@ impl Installer {
         local_repo: crate::repository::RepositoryInterfaceHandle,
         already_solved: bool,
     ) -> anyhow::Result<i64> {
-        if self
-            .config
-            .borrow_mut()
-            .get("lock")
-            .as_bool()
-            .unwrap_or(false)
-        {
+        if self.config.borrow().get_bool("lock") {
             self.io.write_error(bconcat!(
                 "<info>Installing dependencies from lock file",
                 if self.dev_mode {
@@ -1059,10 +1029,8 @@ impl Installer {
 
                 if !self
                     .config
-                    .borrow_mut()
-                    .get("allow-missing-requirements")
-                    .as_bool()
-                    .unwrap_or(false)
+                    .borrow()
+                    .get_truthy("allow-missing-requirements")?
                 {
                     return Ok(Self::ERROR_LOCK_FILE_INVALID);
                 }
@@ -1264,13 +1232,8 @@ impl Installer {
 
             // see https://github.com/composer/composer/issues/2764
             if !local_repo_transaction.get_operations().is_empty() {
-                let vendor_dir = BString::from(
-                    self.config
-                        .borrow_mut()
-                        .get("vendor-dir")
-                        .as_string()
-                        .unwrap_or_default(),
-                );
+                let vendor_dir =
+                    BString::from(self.config.borrow().get_path("vendor-dir")?.as_bstr());
                 let vendor_dir = path_from_bytes(&vendor_dir);
                 if is_dir(vendor_dir) {
                     // suppress errors as this fails sometimes on OSX for no apparent reason
@@ -1296,11 +1259,8 @@ impl Installer {
     ) -> anyhow::Result<PlatformRepositoryHandle> {
         let platform_overrides: IndexMap<BString, PhpMixed> = if for_update {
             self.config
-                .borrow_mut()
-                .get("platform")
-                .as_array()
-                .cloned()
-                .unwrap_or_default()
+                .borrow()
+                .get_map_or_empty("platform")?
                 .into_iter()
                 .collect()
         } else {

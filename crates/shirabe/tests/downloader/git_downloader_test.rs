@@ -264,6 +264,7 @@ fn test_download_with_cache() {
     let config = setup_config(Config::new(false, None));
     let cache_vcs_dir = config
         .get("cache-vcs-dir")
+        .unwrap()
         .as_string()
         .unwrap_or_default()
         .to_owned();

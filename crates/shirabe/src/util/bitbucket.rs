@@ -305,7 +305,7 @@ impl Bitbucket {
         consumer_key: &BStr,
         consumer_secret: &BStr,
     ) -> anyhow::Result<BString> {
-        if self.token.is_some() || self.get_token_from_config(origin_url) {
+        if self.token.is_some() || self.get_token_from_config(origin_url)? {
             return Ok(self
                 .token
                 .as_ref()
@@ -400,45 +400,45 @@ impl Bitbucket {
         Ok(())
     }
 
-    fn get_token_from_config(&mut self, origin_url: &BStr) -> bool {
-        let auth_config = self.config.borrow_mut().get("bitbucket-oauth");
+    fn get_token_from_config(&mut self, origin_url: &BStr) -> anyhow::Result<bool> {
+        let auth_config = self.config.borrow().get("bitbucket-oauth")?;
 
         let auth_map = match auth_config.as_array() {
             Some(m) => m.clone(),
-            None => return false,
+            None => return Ok(false),
         };
         let origin_config = match auth_map.get(origin_url) {
             Some(v) => match v.as_array() {
                 Some(m) => m.clone(),
-                None => return false,
+                None => return Ok(false),
             },
-            None => return false,
+            None => return Ok(false),
         };
 
         if !origin_config.contains_key(B("access-token"))
             || !origin_config.contains_key(B("access-token-expiration"))
         {
-            return false;
+            return Ok(false);
         }
         if let Some(expiration) = origin_config
             .get(B("access-token-expiration"))
             .and_then(|v| v.as_int())
         {
             if time() > expiration {
-                return false;
+                return Ok(false);
             }
         } else {
-            return false;
+            return Ok(false);
         }
 
         let access_token = match origin_config.get(B("access-token")).cloned() {
             Some(t) => t,
-            None => return false,
+            None => return Ok(false),
         };
         let mut token = IndexMap::new();
         token.insert("access_token".into(), access_token);
         self.token = Some(token);
 
-        true
+        Ok(true)
     }
 }

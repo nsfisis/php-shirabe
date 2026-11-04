@@ -105,21 +105,13 @@ impl ConfigCommand {
         if key == "disable-tls" {
             let config = self.config.borrow().as_ref().unwrap().clone();
             if !normalized_value.as_bool().unwrap_or(false)
-                && config
-                    .borrow()
-                    .get("disable-tls")
-                    .as_bool()
-                    .unwrap_or(false)
+                && config.borrow().get_bool("disable-tls")
             {
                 self.get_io().write_error(
                     "<info>You are now running Shirabe with SSL/TLS protection enabled.</info>",
                 );
             } else if normalized_value.as_bool().unwrap_or(false)
-                && !config
-                    .borrow()
-                    .get("disable-tls")
-                    .as_bool()
-                    .unwrap_or(false)
+                && !config.borrow().get_bool("disable-tls")
             {
                 self.get_io().write_error("<warning>You are now running Shirabe with SSL/TLS protection disabled.</warning>");
             }
@@ -184,7 +176,7 @@ impl ConfigCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         k: Option<BString>,
         show_source: bool,
-    ) {
+    ) -> anyhow::Result<()> {
         let orig_k = k.clone();
         let contents_arr = contents.as_array().cloned().unwrap_or_default();
         let raw_contents_arr = raw_contents.as_array().cloned().unwrap_or_default();
@@ -218,7 +210,7 @@ impl ConfigCommand {
                     output.clone(),
                     k.clone(),
                     show_source,
-                );
+                )?;
                 k = orig_k.clone();
 
                 continue;
@@ -249,8 +241,8 @@ impl ConfigCommand {
                         .borrow()
                         .as_ref()
                         .unwrap()
-                        .borrow_mut()
-                        .get_source_of_value(bconcat!(k.clone().unwrap_or_default(), key)),
+                        .borrow()
+                        .get_source_of_value(bconcat!(k.clone().unwrap_or_default(), key))?,
                     ")"
                 )
             } else {
@@ -311,6 +303,7 @@ impl ConfigCommand {
                 );
             }
         }
+        Ok(())
     }
 
     /// Suggest setting-keys, while taking given options in account.
@@ -385,7 +378,13 @@ impl ConfigCommand {
                     BString::from(path_to_bytes(config_file.get_path())),
                     BString::from(path_to_bytes(auth_config_file.get_path())),
                 ];
-                keys.retain(|key| sources.contains(&config.get_source_of_value(key)));
+                let mut customized_keys = Vec::new();
+                for key in keys {
+                    if sources.contains(&config.get_source_of_value(&key)?) {
+                        customized_keys.push(key);
+                    }
+                }
+                keys = customized_keys;
 
             // … else if showing or setting a value …
             } else {
@@ -644,7 +643,7 @@ impl Command for ConfigCommand {
 
         // List the configuration of the file settings
         if input.borrow().get_option("list")?.as_bool() == Some(true) {
-            let all_map = config.borrow_mut().all(0)?;
+            let all_map = config.borrow().all(0)?;
             let raw_map = config.borrow().raw();
             let to_mixed = |m: IndexMap<BString, PhpMixed>| -> PhpMixed {
                 PhpMixed::Array(m.into_iter().collect())
@@ -655,7 +654,7 @@ impl Command for ConfigCommand {
                 output,
                 None,
                 input.borrow().get_option("source")?.as_bool() == Some(true),
-            );
+            )?;
 
             return Ok(0);
         }
@@ -699,7 +698,7 @@ impl Command for ConfigCommand {
             properties_defaults.insert("extra".into(), PhpMixed::List(vec![]));
             let raw_data = config_file.borrow_mut().read()?;
             let data = config.borrow_mut().all(0)?;
-            let mut source = config.borrow_mut().get_source_of_value(&setting_key);
+            let mut source = config.borrow().get_source_of_value(&setting_key)?;
 
             let mut value: PhpMixed;
             if let Some(matches) = preg_match(
@@ -890,13 +889,7 @@ impl Command for ConfigCommand {
             && (unique_config_values.contains_key(&setting_key)
                 || multi_config_values.contains_key(&setting_key))
         {
-            if setting_key == "disable-tls"
-                && config
-                    .borrow()
-                    .get("disable-tls")
-                    .as_bool()
-                    .unwrap_or(false)
-            {
+            if setting_key == "disable-tls" && config.borrow().get_bool("disable-tls") {
                 self.get_io().write_error(
                     "<info>You are now running Shirabe with SSL/TLS protection enabled.</info>",
                 );

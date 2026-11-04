@@ -114,25 +114,10 @@ impl AuthHelper {
     ) -> anyhow::Result<PromptAuthResult> {
         let mut store_auth: StoreAuth = StoreAuth::Bool(false);
 
-        let github_domains = self.config.borrow_mut().get("github-domains");
-        let github_domain_list = match github_domains.as_array() {
-            Some(arr) => arr.clone(),
-            None => IndexMap::new(),
-        };
-        let in_github_domains = github_domain_list
-            .values()
-            .any(|v| v.as_string() == Some(origin));
-
-        let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
-        let gitlab_domain_list = match gitlab_domains.as_array() {
-            Some(arr) => arr.clone(),
-            None => IndexMap::new(),
-        };
-        let in_gitlab_domains = gitlab_domain_list
-            .values()
-            .any(|v| v.as_string() == Some(origin));
-
-        if in_github_domains {
+        if in_array_strict(
+            PhpMixed::string(origin),
+            &self.config.borrow().get_list("github-domains")?,
+        ) {
             let mut git_hub_util = GitHub::new(self.io.clone(), self.config.clone(), None, None)?;
             let mut message = BString::from("\n");
 
@@ -232,7 +217,10 @@ impl AuthHelper {
                 )
                 .into());
             }
-        } else if in_gitlab_domains {
+        } else if in_array_strict(
+            PhpMixed::string(origin),
+            &self.config.borrow().get_list("gitlab-domains")?,
+        ) {
             let message = bconcat!(
                 "\nCould not fetch ",
                 url,
@@ -436,12 +424,7 @@ impl AuthHelper {
                 BString::from(username.as_string().unwrap_or_default()),
                 password,
             );
-            // PHP: $this->config->get('store-auths') returns 'prompt'|bool
-            store_auth = match self.config.borrow_mut().get("store-auths") {
-                PhpMixed::Bool(b) => StoreAuth::Bool(b),
-                PhpMixed::String(ref s) if s == "prompt" => StoreAuth::Prompt,
-                _ => StoreAuth::Bool(false),
-            };
+            store_auth = self.config.borrow().get_store_auths()?;
         }
 
         Ok(PromptAuthResult {
@@ -563,14 +546,10 @@ impl AuthHelper {
             } else if matches!(
                 password.as_slice(),
                 b"oauth2" | b"private-token" | b"gitlab-ci-token"
-            ) && in_array_strict(PhpMixed::string(origin), &{
-                let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
-                match &gitlab_domains {
-                    PhpMixed::List(l) => l.clone(),
-                    PhpMixed::Array(a) => a.values().cloned().collect(),
-                    _ => vec![],
-                }
-            }) {
+            ) && in_array_strict(
+                PhpMixed::string(origin),
+                &self.config.borrow().get_list("gitlab-domains")?,
+            ) {
                 if password == "oauth2" {
                     headers.push(PhpMixed::string(bconcat!(
                         "Authorization: Bearer ",

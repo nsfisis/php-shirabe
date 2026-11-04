@@ -4,7 +4,9 @@ use crate::advisory::Auditor;
 use crate::config::Config;
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat, canonical_int_key};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, TypeError, bconcat, canonical_int_key, get_debug_type,
+};
 
 #[derive(Debug, Clone)]
 pub struct AuditConfig {
@@ -137,53 +139,61 @@ impl AuditConfig {
         audit: bool,
         audit_format: &BStr,
     ) -> anyhow::Result<Self> {
-        let audit_config_raw = config.get("audit");
-        let audit_config = audit_config_raw.as_array();
+        let audit_config = config.get_audit()?;
 
         let empty_array = PhpMixed::Array(IndexMap::new());
 
         let ignore_raw = audit_config
-            .and_then(|m| m.get(B("ignore")))
+            .get(B("ignore"))
+            .filter(|v| !v.is_null())
             .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_list_for_audit, ignore_list_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_raw)?;
 
         let ignore_abandoned_raw = audit_config
-            .and_then(|m| m.get(B("ignore-abandoned")))
+            .get(B("ignore-abandoned"))
+            .filter(|v| !v.is_null())
             .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_abandoned_for_audit, ignore_abandoned_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_abandoned_raw)?;
 
         let ignore_severity_raw = audit_config
-            .and_then(|m| m.get(B("ignore-severity")))
+            .get(B("ignore-severity"))
+            .filter(|v| !v.is_null())
             .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_severity_for_audit, ignore_severity_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_severity_raw)?;
 
-        let audit_abandoned = BString::from(
-            audit_config
-                .and_then(|m| m.get(B("abandoned")))
-                .and_then(|v| v.as_string())
-                .unwrap_or(Auditor::ABANDONED_FAIL),
-        );
+        let audit_abandoned = match audit_config.get(B("abandoned")) {
+            None | Some(PhpMixed::Null) => BString::from(Auditor::ABANDONED_FAIL),
+            Some(PhpMixed::String(abandoned)) => abandoned.clone(),
+            Some(other) => {
+                return Err(TypeError::new(bconcat!(
+                    "Composer\\Advisory\\AuditConfig::__construct(): Argument #3 ($auditAbandoned) must be of type string, ",
+                    get_debug_type(other),
+                    " given"
+                ))
+                .into());
+            }
+        };
 
         let block_insecure = audit_config
-            .and_then(|m| m.get(B("block-insecure")))
+            .get(B("block-insecure"))
             .and_then(|v| v.as_opt())
             .map(|v| v.to_bool())
             .unwrap_or(true);
 
         let block_abandoned = audit_config
-            .and_then(|m| m.get(B("block-abandoned")))
+            .get(B("block-abandoned"))
             .and_then(|v| v.as_opt())
             .map(|v| v.to_bool())
             .unwrap_or(false);
 
         let ignore_unreachable = audit_config
-            .and_then(|m| m.get(B("ignore-unreachable")))
+            .get(B("ignore-unreachable"))
             .and_then(|v| v.as_opt())
             .map(|v| v.to_bool())
             .unwrap_or(false);

@@ -362,35 +362,25 @@ impl Command for ArchiveCommand {
             std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?))
         };
 
-        let format = input
+        let format_option = input
             .borrow()
             .get_option("format")?
             .as_string()
-            .map(BString::from)
-            .unwrap_or_else(|| {
-                BString::from(
-                    config
-                        .borrow_mut()
-                        .get("archive-format")
-                        .as_string()
-                        .unwrap_or("tar".into()),
-                )
-            });
+            .map(BString::from);
+        let format = match format_option {
+            Some(format) => format,
+            None => config.borrow().get_string("archive-format")?,
+        };
 
-        let dir = input
+        let dir_option = input
             .borrow()
             .get_option("dir")?
             .as_string()
-            .map(BString::from)
-            .unwrap_or_else(|| {
-                BString::from(
-                    config
-                        .borrow_mut()
-                        .get("archive-dir")
-                        .as_string()
-                        .unwrap_or(".".into()),
-                )
-            });
+            .map(BString::from);
+        let dir = match dir_option {
+            Some(dir) => dir,
+            None => config.borrow().get_string("archive-dir")?,
+        };
 
         let io = self.get_io().clone();
         let return_code = self

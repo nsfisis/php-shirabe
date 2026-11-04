@@ -24,7 +24,7 @@ pub(crate) fn dispatch_config_method(
         }
         b"all" => {
             let all = config
-                .borrow_mut()
+                .borrow()
                 .all(flags(0)?)
                 .map_err(|error| error_throw(b"all failed", &error))?;
             Ok(all.to_wire())
@@ -32,7 +32,13 @@ pub(crate) fn dispatch_config_method(
         b"raw" => Ok(config.borrow().raw().to_wire()),
         b"has" => Ok(config.borrow().has(&key(0)?).to_wire()),
         b"getRepositories" => Ok(config.borrow().get_repositories().to_wire()),
-        b"getSourceOfValue" => Ok(config.borrow_mut().get_source_of_value(&key(0)?).to_wire()),
+        b"getSourceOfValue" => {
+            let source = config
+                .borrow()
+                .get_source_of_value(&key(0)?)
+                .map_err(|error| error_throw(b"getSourceOfValue failed", &error))?;
+            Ok(source.to_wire())
+        }
         b"merge" => {
             let values = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
             let source = arg_or::<BString>(

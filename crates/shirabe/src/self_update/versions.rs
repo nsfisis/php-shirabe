@@ -53,11 +53,7 @@ impl Versions {
         }
 
         let channel_file = bconcat!(
-            self.config
-                .borrow_mut()
-                .get("home")
-                .as_string()
-                .unwrap_or_default(),
+            self.config.borrow().get_home()?.as_bstr(),
             "/update-channel"
         );
         let channel_file = path_from_bytes(&channel_file);
@@ -91,11 +87,7 @@ impl Versions {
         }
 
         let channel_file = bconcat!(
-            self.config
-                .borrow_mut()
-                .get("home")
-                .as_string()
-                .unwrap_or_default(),
+            self.config.borrow().get_home()?.as_bstr(),
             "/update-channel"
         );
         let channel_file = path_from_bytes(&channel_file);
@@ -166,7 +158,7 @@ impl Versions {
 
     fn get_versions_data(&mut self) -> anyhow::Result<PhpMixed> {
         if self.versions_data.is_none() {
-            let protocol = if self.config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
+            let protocol = if self.config.borrow().get_bool("disable-tls") {
                 "http"
             } else {
                 "https"

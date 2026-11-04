@@ -195,7 +195,7 @@ impl DiagnoseCommand {
 
         let mut result_list: Vec<BString> = vec![];
         let mut tls_warning: Option<BString> = None;
-        if proto == "https" && config.borrow().get("disable-tls").as_bool() == Some(true) {
+        if proto == "https" && config.borrow().get_bool("disable-tls") {
             tls_warning = Some(BString::from(
                 "<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>",
             ));
@@ -259,9 +259,7 @@ impl DiagnoseCommand {
 
         let mut result_list: Vec<BString> = vec![];
         let mut tls_warning: Option<BString> = None;
-        if url.starts_with(b"https://")
-            && config.borrow().get("disable-tls").as_bool() == Some(true)
-        {
+        if url.starts_with(b"https://") && config.borrow().get_bool("disable-tls") {
             tls_warning = Some(BString::from(
                 "<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>",
             ));
@@ -519,8 +517,8 @@ impl DiagnoseCommand {
         }
 
         let min_space_free: f64 = (1024 * 1024) as f64;
-        let home_dir = config.get("home");
-        let dir = path_from_bytes(home_dir.as_string().unwrap_or_default());
+        let home_dir = config.get_home()?;
+        let dir = path_from_bytes(&home_dir);
         let df_home = disk_free_space(dir);
         if df_home.map(|d| d < min_space_free).unwrap_or(false) {
             return Ok(CheckResult::Message(bconcat!(
@@ -529,8 +527,8 @@ impl DiagnoseCommand {
                 " is full</error>"
             )));
         }
-        let vendor_dir = config.get("vendor-dir");
-        let dir = path_from_bytes(vendor_dir.as_string().unwrap_or_default());
+        let vendor_dir = config.get_path("vendor-dir")?;
+        let dir = path_from_bytes(&vendor_dir);
         let df_vendor = disk_free_space(dir);
         if df_vendor.map(|d| d < min_space_free).unwrap_or(false) {
             return Ok(CheckResult::Message(bconcat!(
@@ -544,8 +542,7 @@ impl DiagnoseCommand {
     }
 
     fn check_pub_keys(&self, config: &Config) -> anyhow::Result<CheckResult> {
-        let home = config.get("home");
-        let home = home.as_string().unwrap_or_default();
+        let home = config.get_home()?;
         let keys_tags = bconcat!(home, "/keys.tags.pub");
         let keys_tags = path_from_bytes(&keys_tags);
         let keys_dev = bconcat!(home, "/keys.dev.pub");
@@ -1317,12 +1314,7 @@ impl Command for DiagnoseCommand {
         let r = self.check_composer_audit(&config)?;
         self.output_result(r);
 
-        let platform_overrides = config
-            .borrow_mut()
-            .get("platform")
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
+        let platform_overrides = config.borrow().get_map_or_empty("platform")?;
         let platform_overrides_unboxed: indexmap::IndexMap<BString, PhpMixed> =
             platform_overrides.into_iter().collect();
         let mut platform_repo =
@@ -1485,7 +1477,7 @@ impl Command for DiagnoseCommand {
             }
         }
 
-        let protos: Vec<&BStr> = if config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
+        let protos: Vec<&BStr> = if config.borrow().get_bool("disable-tls") {
             vec![BStr::new("http")]
         } else {
             vec![BStr::new("http"), BStr::new("https")]
@@ -1519,12 +1511,7 @@ impl Command for DiagnoseCommand {
             }
         }
 
-        let oauth = config
-            .borrow_mut()
-            .get("github-oauth")
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
+        let oauth = config.borrow().get_map("github-oauth")?;
         if oauth.len() as i64 > 0 {
             for (domain, token) in &oauth {
                 io.write_no_newline(bconcat!("Checking ", domain, " oauth access: "));

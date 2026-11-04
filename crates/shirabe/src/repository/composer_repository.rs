@@ -322,7 +322,7 @@ impl ComposerRepository {
         assert!(!base_url.is_empty());
 
         let cache_dir = bconcat!(
-            config.get("cache-repo-dir").as_string().unwrap_or_default(),
+            config.get_path("cache-repo-dir")?.as_bstr(),
             "/",
             preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&url)),
         );
@@ -381,7 +381,7 @@ impl ComposerRepository {
         };
         this.cache
             .borrow_mut()
-            .set_read_only(config.get("cache-read-only").as_bool().unwrap_or(false));
+            .set_read_only(config.get_bool("cache-read-only"));
         Ok(this)
     }
 

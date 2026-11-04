@@ -106,7 +106,7 @@ impl Svn {
         verbose: bool,
     ) -> anyhow::Result<Option<BString>> {
         // Regenerate the command at each try, to use the newly user-provided credentials
-        let command = self.get_command(svn_command.clone(), url, path);
+        let command = self.get_command(svn_command.clone(), url, path)?;
 
         let output: std::rc::Rc<std::cell::RefCell<Option<BString>>> =
             std::rc::Rc::new(std::cell::RefCell::new(None));
@@ -150,7 +150,7 @@ impl Svn {
             return Err(RuntimeException::new(full_output.to_owned()).into());
         }
 
-        if !self.has_auth() {
+        if !self.has_auth()? {
             self.do_auth_dance()?;
         }
 
@@ -219,9 +219,9 @@ impl Svn {
         mut cmd: Vec<BString>,
         url: &BStr,
         path: Option<&Path>,
-    ) -> Vec<BString> {
+    ) -> anyhow::Result<Vec<BString>> {
         cmd.push("--non-interactive".into());
-        cmd.extend(self.get_credential_args());
+        cmd.extend(self.get_credential_args()?);
         cmd.push("--".into());
         cmd.push(url.to_owned());
 
@@ -229,15 +229,15 @@ impl Svn {
             cmd.push(path_to_bytes(path).into());
         }
 
-        cmd
+        Ok(cmd)
     }
 
     /// Return the credential string for the svn command.
     ///
     /// Adds --no-auth-cache when credentials are present.
-    fn get_credential_args(&mut self) -> Vec<BString> {
-        if !self.has_auth() {
-            return vec![];
+    fn get_credential_args(&mut self) -> anyhow::Result<Vec<BString>> {
+        if !self.has_auth()? {
+            return Ok(vec![]);
         }
 
         let mut args = self.get_auth_cache_args();
@@ -245,7 +245,7 @@ impl Svn {
         args.push(self.get_username().unwrap());
         args.push("--password".into());
         args.push(self.get_password().unwrap());
-        args
+        Ok(args)
     }
 
     /// For testing only: invoke the crate-private `get_command`.
@@ -254,12 +254,12 @@ impl Svn {
         cmd: Vec<BString>,
         url: &BStr,
         path: Option<&Path>,
-    ) -> Vec<BString> {
+    ) -> anyhow::Result<Vec<BString>> {
         self.get_command(cmd, url, path)
     }
 
     /// For testing only: invoke the crate-private `get_credential_args`.
-    pub fn __get_credential_args(&mut self) -> Vec<BString> {
+    pub fn __get_credential_args(&mut self) -> anyhow::Result<Vec<BString>> {
         self.get_credential_args()
     }
 
@@ -282,16 +282,16 @@ impl Svn {
     }
 
     /// Detect Svn Auth.
-    fn has_auth(&mut self) -> bool {
+    fn has_auth(&mut self) -> anyhow::Result<bool> {
         if let Some(has_auth) = self.has_auth {
-            return has_auth;
+            return Ok(has_auth);
         }
 
-        if !self.create_auth_from_config() {
+        if !self.create_auth_from_config()? {
             self.create_auth_from_url();
         }
 
-        self.has_auth.unwrap_or(false)
+        Ok(self.has_auth.unwrap_or(false))
     }
 
     /// Return the no-auth-cache switch.
@@ -304,13 +304,13 @@ impl Svn {
     }
 
     /// Create the auth params from the configuration file.
-    fn create_auth_from_config(&mut self) -> bool {
+    fn create_auth_from_config(&mut self) -> anyhow::Result<bool> {
         if !self.config.borrow().has("http-basic") {
             self.has_auth = Some(false);
-            return false;
+            return Ok(false);
         }
 
-        let auth_config = self.config.borrow_mut().get("http-basic");
+        let auth_config = self.config.borrow().get("http-basic")?;
 
         let host = parse_url(&self.url)
             .and_then(|parsed| parsed.host)
@@ -336,11 +336,11 @@ impl Svn {
             });
 
             self.has_auth = Some(true);
-            return true;
+            return Ok(true);
         }
 
         self.has_auth = Some(false);
-        false
+        Ok(false)
     }
 
     /// Create the auth params from the url

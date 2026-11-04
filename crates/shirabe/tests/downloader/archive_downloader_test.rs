@@ -46,7 +46,7 @@ fn get_archive_downloader(vendor_dir: Option<&BStr>) -> FileDownloader {
         false,
     )));
 
-    FileDownloader::new(io, config, http_downloader, None, None, None, None)
+    FileDownloader::new(io, config, http_downloader, None, None, None, None).unwrap()
 }
 
 #[test]
@@ -56,12 +56,16 @@ fn test_get_file_name() {
 
     let downloader = get_archive_downloader(Some(BStr::new("/vendor")));
 
-    let first = downloader.__get_file_name(package.clone(), std::path::Path::new("/path"));
+    let first = downloader
+        .__get_file_name(package.clone(), std::path::Path::new("/path"))
+        .unwrap();
     let re = regex::bytes::Regex::new(r"/vendor/composer/tmp-[a-z0-9]+\.js").unwrap();
     assert!(re.is_match(path_to_bytes(&first)));
     assert_eq!(
         first,
-        downloader.__get_file_name(package, std::path::Path::new("/path"))
+        downloader
+            .__get_file_name(package, std::path::Path::new("/path"))
+            .unwrap()
     );
 }
 

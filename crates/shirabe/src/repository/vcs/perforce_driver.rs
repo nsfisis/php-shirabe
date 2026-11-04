@@ -74,10 +74,9 @@ impl PerforceDriver {
         let cache_vcs_dir = BString::from(
             self.inner
                 .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default(),
+                .borrow()
+                .get_path("cache-vcs-dir")?
+                .as_bstr(),
         );
         if !Cache::is_usable(path_from_bytes(&cache_vcs_dir)) {
             return Err(RuntimeException::new(BString::from("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled")).into());

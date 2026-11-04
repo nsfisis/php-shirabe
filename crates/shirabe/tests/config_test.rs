@@ -276,7 +276,7 @@ fn test_preferred_install_as_string() {
 
     assert_eq!(
         PhpMixed::string(BString::from("dist")),
-        config.get("preferred-install")
+        config.get("preferred-install").unwrap()
     );
 }
 
@@ -311,7 +311,7 @@ fn test_merge_preferred_install() {
         ),
         (BStr::new("*"), PhpMixed::string(BString::from("dist"))),
     ]);
-    match config.get("preferred-install") {
+    match config.get("preferred-install").unwrap() {
         PhpMixed::Array(actual) => assert_map_equals(&expected, &actual),
         other => panic!("expected array, got {other:?}"),
     }
@@ -345,7 +345,7 @@ fn test_merge_github_oauth() {
         (BStr::new("foo"), PhpMixed::string(BString::from("bar"))),
         (BStr::new("bar"), PhpMixed::string(BString::from("baz"))),
     ]);
-    match config.get("github-oauth") {
+    match config.get("github-oauth").unwrap() {
         PhpMixed::Array(actual) => assert_map_equals(&expected, &actual),
         other => panic!("expected array, got {other:?}"),
     }
@@ -380,11 +380,17 @@ fn test_var_replacement() {
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
     let home = rtrim2(&home_raw, "\\/");
-    assert_eq!(PhpMixed::string(BString::from("b")), config.get("c"));
-    assert_eq!(PhpMixed::string(home.clone()), config.get("bin-dir"));
+    assert_eq!(
+        PhpMixed::string(BString::from("b")),
+        config.get("c").unwrap()
+    );
+    assert_eq!(
+        PhpMixed::string(home.clone()),
+        config.get("bin-dir").unwrap()
+    );
     assert_eq!(
         PhpMixed::string(shirabe_php_shim::bconcat!(home, "/foo")),
-        config.get("cache-dir")
+        config.get("cache-dir").unwrap()
     );
 }
 
@@ -416,15 +422,15 @@ fn test_realpath_replacement() {
     let home = rtrim2(&home_raw, "\\/");
     assert_eq!(
         PhpMixed::string(BString::from("/foo/bar/vendor")),
-        config.get("vendor-dir")
+        config.get("vendor-dir").unwrap()
     );
     assert_eq!(
         PhpMixed::string(shirabe_php_shim::bconcat!(home, "/foo")),
-        config.get("bin-dir")
+        config.get("bin-dir").unwrap()
     );
     assert_eq!(
         PhpMixed::string(BString::from("/baz")),
-        config.get("cache-dir")
+        config.get("cache-dir").unwrap()
     );
 }
 
@@ -441,7 +447,7 @@ fn test_stream_wrapper_dirs() {
 
     assert_eq!(
         PhpMixed::string(BString::from("s3://baz")),
-        config.get("cache-dir")
+        config.get("cache-dir").unwrap()
     );
 }
 
@@ -464,11 +470,11 @@ fn test_fetching_relative_paths() {
 
     assert_eq!(
         PhpMixed::string(BString::from("/foo/bar/vendor")),
-        config.get("vendor-dir")
+        config.get("vendor-dir").unwrap()
     );
     assert_eq!(
         PhpMixed::string(BString::from("/foo/bar/vendor/foo")),
-        config.get("bin-dir")
+        config.get("bin-dir").unwrap()
     );
     assert_eq!(
         PhpMixed::string(BString::from("vendor")),
@@ -507,7 +513,7 @@ fn test_override_github_protocols() {
 
     assert_eq!(
         PhpMixed::List(vec![PhpMixed::string(BString::from("https"))]),
-        config.get("github-protocols")
+        config.get("github-protocols").unwrap()
     );
 }
 
@@ -526,7 +532,7 @@ fn test_git_disabled_by_default_in_github_protocols() {
     );
     assert_eq!(
         PhpMixed::List(vec![PhpMixed::string(BString::from("https"))]),
-        config.get("github-protocols")
+        config.get("github-protocols").unwrap()
     );
 
     config.merge(
@@ -538,7 +544,7 @@ fn test_git_disabled_by_default_in_github_protocols() {
             PhpMixed::string(BString::from("https")),
             PhpMixed::string(BString::from("git")),
         ]),
-        config.get("github-protocols")
+        config.get("github-protocols").unwrap()
     );
 }
 
@@ -628,7 +634,7 @@ fn test_disable_tls_can_be_overridden() {
         )]),
         "test",
     );
-    assert_eq!(PhpMixed::Bool(false), config.get("disable-tls"));
+    assert_eq!(PhpMixed::Bool(false), config.get("disable-tls").unwrap());
     config.merge(
         &config_section(vec![(
             BStr::new("disable-tls"),
@@ -636,7 +642,7 @@ fn test_disable_tls_can_be_overridden() {
         )]),
         "test",
     );
-    assert_eq!(PhpMixed::Bool(true), config.get("disable-tls"));
+    assert_eq!(PhpMixed::Bool(true), config.get("disable-tls").unwrap());
 }
 
 #[test]
@@ -644,7 +650,7 @@ fn test_disable_tls_can_be_overridden() {
 fn test_process_timeout() {
     Platform::put_env("COMPOSER_PROCESS_TIMEOUT", "0");
     let config = Config::new(true, None);
-    let result = config.get("process-timeout");
+    let result = config.get("process-timeout").unwrap();
     Platform::clear_env("COMPOSER_PROCESS_TIMEOUT");
 
     assert_eq!(PhpMixed::Int(0), result);
@@ -655,7 +661,7 @@ fn test_process_timeout() {
 fn test_htaccess_protect() {
     Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
     let config = Config::new(true, None);
-    let result = config.get("htaccess-protect");
+    let result = config.get("htaccess-protect").unwrap();
     Platform::clear_env("COMPOSER_HTACCESS_PROTECT");
 
     assert_eq!(PhpMixed::Bool(false), result);
@@ -670,7 +676,7 @@ fn test_get_source_of_value() {
 
     assert_eq!(
         Config::SOURCE_DEFAULT,
-        config.get_source_of_value("process-timeout")
+        config.get_source_of_value("process-timeout").unwrap()
     );
 
     config.merge(
@@ -680,7 +686,7 @@ fn test_get_source_of_value() {
 
     assert_eq!(
         "phpunit-test",
-        config.get_source_of_value("process-timeout")
+        config.get_source_of_value("process-timeout").unwrap()
     );
 }
 
@@ -688,8 +694,8 @@ fn test_get_source_of_value() {
 #[serial]
 fn test_get_source_of_value_env_variables() {
     Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
-    let mut config = Config::new(true, None);
-    let result = config.get_source_of_value("htaccess-protect");
+    let config = Config::new(true, None);
+    let result = config.get_source_of_value("htaccess-protect").unwrap();
     Platform::clear_env("COMPOSER_HTACCESS_PROTECT");
 
     assert_eq!("COMPOSER_HTACCESS_PROTECT", result);
@@ -699,7 +705,7 @@ fn test_get_source_of_value_env_variables() {
 #[serial]
 fn test_audit() {
     let mut config = Config::new(true, None);
-    let result = config.get("audit");
+    let result = config.get("audit").unwrap();
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("abandoned")));
     assert!(result.contains_key(B("ignore")));
@@ -713,7 +719,7 @@ fn test_audit() {
     );
 
     Platform::put_env("COMPOSER_AUDIT_ABANDONED", Auditor::ABANDONED_IGNORE);
-    let result = config.get("audit");
+    let result = config.get("audit").unwrap();
     Platform::clear_env("COMPOSER_AUDIT_ABANDONED");
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("abandoned")));
@@ -753,7 +759,7 @@ fn test_audit() {
         )]),
         "test",
     );
-    let result = config.get("audit");
+    let result = config.get("audit").unwrap();
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("ignore")));
     assert_eq!(
@@ -768,7 +774,7 @@ fn test_audit() {
 
     // Test COMPOSER_SECURITY_BLOCKING_ABANDONED env var
     Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "1");
-    let result = config.get("audit");
+    let result = config.get("audit").unwrap();
     Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("block-abandoned")));
@@ -778,7 +784,7 @@ fn test_audit() {
     );
 
     Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "0");
-    let result = config.get("audit");
+    let result = config.get("audit").unwrap();
     Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("block-abandoned")));
@@ -801,7 +807,7 @@ fn test_get_defaults_to_an_empty_array() {
         "bearer",
     ];
     for key in keys {
-        let value = config.get(key);
+        let value = config.get(key).unwrap();
         match value {
             PhpMixed::Array(m) => assert_eq!(0, m.len(), "key {key:?}"),
             other => panic!("key {key:?}: expected array, got {other:?}"),
@@ -819,7 +825,7 @@ fn test_merges_plugin_config() {
         )]),
         "test",
     );
-    match config.get("allow-plugins") {
+    match config.get("allow-plugins").unwrap() {
         PhpMixed::Array(actual) => assert_map_equals(
             &map(vec![(BStr::new("some/plugin"), PhpMixed::Bool(true))]),
             &actual,
@@ -837,7 +843,7 @@ fn test_merges_plugin_config() {
         )]),
         "test",
     );
-    match config.get("allow-plugins") {
+    match config.get("allow-plugins").unwrap() {
         PhpMixed::Array(actual) => assert_map_equals(
             &map(vec![
                 (BStr::new("some/plugin"), PhpMixed::Bool(true)),
@@ -856,7 +862,7 @@ fn test_overrides_global_boolean_plugins_config() {
         &config_section(vec![(BStr::new("allow-plugins"), PhpMixed::Bool(true))]),
         "test",
     );
-    assert_eq!(PhpMixed::Bool(true), config.get("allow-plugins"));
+    assert_eq!(PhpMixed::Bool(true), config.get("allow-plugins").unwrap());
 
     config.merge(
         &config_section(vec![(
@@ -868,7 +874,7 @@ fn test_overrides_global_boolean_plugins_config() {
         )]),
         "test",
     );
-    match config.get("allow-plugins") {
+    match config.get("allow-plugins").unwrap() {
         PhpMixed::Array(actual) => assert_map_equals(
             &map(vec![(BStr::new("another/plugin"), PhpMixed::Bool(true))]),
             &actual,
@@ -887,7 +893,7 @@ fn test_allows_all_plugins_from_local_boolean() {
         )]),
         "test",
     );
-    match config.get("allow-plugins") {
+    match config.get("allow-plugins").unwrap() {
         PhpMixed::Array(actual) => assert_map_equals(
             &map(vec![(BStr::new("some/plugin"), PhpMixed::Bool(true))]),
             &actual,
@@ -899,5 +905,5 @@ fn test_allows_all_plugins_from_local_boolean() {
         &config_section(vec![(BStr::new("allow-plugins"), PhpMixed::Bool(true))]),
         "test",
     );
-    assert_eq!(PhpMixed::Bool(true), config.get("allow-plugins"));
+    assert_eq!(PhpMixed::Bool(true), config.get("allow-plugins").unwrap());
 }

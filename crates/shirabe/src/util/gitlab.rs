@@ -52,12 +52,9 @@ impl GitLab {
         // before composer 1.9, origin URLs had no port number in them
         let bc_origin_url = preg_replace(php_regex!("{:\\d+}"), "", origin_url);
 
-        let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
-        if !in_array_strict(PhpMixed::string(origin_url), gitlab_domains.values())
-            && !in_array_strict(
-                PhpMixed::string(bc_origin_url.clone()),
-                gitlab_domains.values(),
-            )
+        let gitlab_domains = self.config.borrow().get_list("gitlab-domains")?;
+        if !in_array_strict(PhpMixed::string(origin_url), &gitlab_domains)
+            && !in_array_strict(PhpMixed::string(bc_origin_url.clone()), &gitlab_domains)
         {
             return Ok(false);
         }
@@ -113,7 +110,7 @@ impl GitLab {
         }
 
         // if available use token from composer config
-        let auth_tokens = self.config.borrow_mut().get("gitlab-token");
+        let auth_tokens = self.config.borrow().get("gitlab-token")?;
 
         let mut token: Option<PhpMixed> = None;
 
@@ -465,8 +462,8 @@ impl GitLab {
         Ok(token)
     }
 
-    pub fn is_oauth_expired(&self, origin_url: &BStr) -> bool {
-        let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
+    pub fn is_oauth_expired(&self, origin_url: &BStr) -> anyhow::Result<bool> {
+        let auth_tokens = self.config.borrow().get("gitlab-oauth")?;
         if let Some(map) = auth_tokens.as_array()
             && let Some(token_info) = map.get(origin_url)
             && let Some(token_map) = token_info.as_array()
@@ -474,14 +471,14 @@ impl GitLab {
             && let Some(expires_at_int) = expires_at.as_int()
             && expires_at_int < time()
         {
-            return true;
+            return Ok(true);
         }
 
-        false
+        Ok(false)
     }
 
     fn refresh_token(&mut self, scheme: &BStr, origin_url: &BStr) -> anyhow::Result<PhpMixed> {
-        let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
+        let auth_tokens = self.config.borrow().get("gitlab-oauth")?;
         let refresh_token = auth_tokens
             .as_array()
             .and_then(|map| map.get(origin_url))

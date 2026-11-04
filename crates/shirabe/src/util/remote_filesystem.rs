@@ -138,10 +138,10 @@ impl RemoteFilesystem {
             return Ok(entity);
         }
 
-        let cache_dir = self.config.borrow().get_str("cache-dir")?;
-        crate::event_dispatcher::EventDispatcher::ensure_composer_php_runtime(path_from_bytes(
-            &cache_dir,
-        ))?;
+        crate::event_dispatcher::EventDispatcher::ensure_composer_php_runtime(|| {
+            let cache_dir = self.config.borrow().get_path("cache-dir")?;
+            Ok(path_from_bytes(&cache_dir).to_path_buf())
+        })?;
         let handle: PhpObjHandle = PhpCall::New(CLASS).run(vec![
             io_handle_value(&self.io)?,
             config_handle_value(&self.config),

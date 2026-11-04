@@ -32,8 +32,8 @@ impl GzipDownloader {
         cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             inner: FileDownloader::new(
                 io,
                 config,
@@ -42,9 +42,9 @@ impl GzipDownloader {
                 cache,
                 Some(filesystem),
                 Some(process),
-            ),
+            )?,
             cleanup_executed: std::cell::RefCell::new(IndexMap::new()),
-        }
+        })
     }
 
     fn extract_using_ext(&self, file: &std::path::Path, target_filepath: &std::path::Path) {

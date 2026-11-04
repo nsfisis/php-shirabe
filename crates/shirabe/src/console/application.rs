@@ -12,6 +12,7 @@ use crate::command::{
 };
 use crate::composer;
 use crate::composer::PartialComposerHandle;
+use crate::config::UseParentDir;
 use crate::console::GithubActionError;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::{EventDispatcher, ScriptExecutionException};
@@ -217,18 +218,14 @@ impl Application {
 
                 let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
                 let mut dir = path_from_bytes(config
-                    .borrow_mut()
-                    .get("home")
-                    .as_string()
-                    .unwrap_or_default()).to_path_buf();
+                    .borrow()
+                    .get_home()?.as_bstr()).to_path_buf();
                 let df = disk_free_space(&dir);
                 let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 if !hit {
                     dir = path_from_bytes(config
-                        .borrow_mut()
-                        .get("vendor-dir")
-                        .as_string()
-                        .unwrap_or_default()).to_path_buf();
+                        .borrow()
+                        .get_path("vendor-dir")?.as_bstr()).to_path_buf();
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
@@ -638,13 +635,10 @@ impl Application {
         self.disable_scripts_by_default
     }
 
-    fn get_use_parent_dir_config_value(&self) -> PhpMixed {
-        let config = match Factory::create_config(Some(self.io.clone()), None) {
-            Ok(c) => c,
-            Err(_) => return PhpMixed::Bool(false),
-        };
+    fn get_use_parent_dir_config_value(&self) -> anyhow::Result<UseParentDir> {
+        let config = Factory::create_config(Some(self.io.clone()), None)?;
 
-        config.get("use-parent-dir")
+        config.get_use_parent_dir()
     }
 
     fn is_running_as_root(&self) -> bool {
@@ -1953,8 +1947,7 @@ impl ApplicationHandle {
         }
 
         // prompt user for dir change if no composer.json is present in current dir
-        let use_parent_dir_if_no_json_available =
-            application.borrow().get_use_parent_dir_config_value();
+        let use_parent_dir_if_no_json_available;
         if new_work_dir.is_none()
             && !matches!(
                 command_name
@@ -1971,7 +1964,11 @@ impl ApplicationHandle {
                     | b"outdated"
             )
             && !file_exists(Factory::get_composer_file().unwrap_or_default())
-            && use_parent_dir_if_no_json_available.as_bool() != Some(false)
+            && {
+                use_parent_dir_if_no_json_available =
+                    application.borrow().get_use_parent_dir_config_value()?;
+                use_parent_dir_if_no_json_available != UseParentDir::Bool(false)
+            }
             && (command_name.as_ref().is_none_or(|name| name != "config")
                 || (!input.borrow().has_parameter_option(&["--file"], true)
                     && !input.borrow().has_parameter_option(&["-f"], true)))
@@ -1993,7 +1990,7 @@ impl ApplicationHandle {
                     "/",
                     Factory::get_composer_file().unwrap_or_default()
                 ))) {
-                    if use_parent_dir_if_no_json_available.as_bool() != Some(true)
+                    if use_parent_dir_if_no_json_available != UseParentDir::Bool(true)
                         && !io.is_interactive()
                     {
                         io.write_error(bconcat!(
@@ -2003,10 +2000,10 @@ impl ApplicationHandle {
                         ));
                         break;
                     }
-                    if use_parent_dir_if_no_json_available.as_bool() == Some(true)
+                    if use_parent_dir_if_no_json_available == UseParentDir::Bool(true)
                         || io.ask_confirmation(bconcat!("<info>No composer.json in current directory, do you want to use the one at ", dir, "?</info> [<comment>y,n</comment>]? "), true)?
                     {
-                        if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
+                        if use_parent_dir_if_no_json_available == UseParentDir::Bool(true) {
                             io.write_error(bconcat!("<info>No composer.json in current directory, changing working directory to ", dir, "</info>"));
                         } else {
                             io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
@@ -2323,9 +2320,8 @@ impl ApplicationHandle {
                                         composer
                                             .get_config()
                                             .borrow()
-                                            .get("vendor-dir")
-                                            .as_string()
-                                            .map(|s| s.to_owned()),
+                                            .get_path("vendor-dir")
+                                            .map(Some)?,
                                     )?;
                                     loader.register(false);
                                 }
@@ -2347,19 +2343,21 @@ impl ApplicationHandle {
                                     && crate::plugin::rpc::dispatch::find_file_in_registered_loaders(dummy_str)?
                                         .is_some()
                                     && {
-                                        let cache_dir = match composer_opt {
-                                            Some(ref composer_handle) => {
-                                                crate::composer::composer_full(composer_handle)
-                                                    .get_config()
-                                                    .borrow()
-                                                    .get_str("cache-dir")?
-                                            }
-                                            None => Factory::create_config(Some(io.clone()), None)?
-                                                .get_str("cache-dir")?,
-                                        };
-                                        EventDispatcher::ensure_composer_php_runtime(
-                                            path_from_bytes(&cache_dir),
-                                        )?;
+                                        EventDispatcher::ensure_composer_php_runtime(|| {
+                                            let cache_dir = match composer_opt {
+                                                Some(ref composer_handle) => {
+                                                    crate::composer::composer_full(composer_handle)
+                                                        .get_config()
+                                                        .borrow()
+                                                        .get_path("cache-dir")?
+                                                }
+                                                None => {
+                                                    Factory::create_config(Some(io.clone()), None)?
+                                                        .get_path("cache-dir")?
+                                                }
+                                            };
+                                            Ok(path_from_bytes(&cache_dir).to_path_buf())
+                                        })?;
                                         crate::plugin::php_class_query(
                                             BStr::new("class_exists"),
                                             vec![shirabe_php_rpc::PluginValue::string(dummy_str)],

@@ -331,7 +331,7 @@ impl EventDispatcher {
         let mut return_max = 0_i64;
         for callable in listeners {
             let mut r#return: i64 = 0;
-            self.ensure_bin_dir_is_in_path();
+            self.ensure_bin_dir_is_in_path()?;
 
             let mut additional_args = event.get_arguments().clone();
             let mut callable = callable;
@@ -691,13 +691,7 @@ impl EventDispatcher {
                         // The user's command class extends Symfony's Command, so the child
                         // process needs the real symfony/console classes before it can even
                         // autoload the user class.
-                        let cache_dir = self
-                            .composer()
-                            .borrow_partial()
-                            .get_config()
-                            .borrow()
-                            .get_str("cache-dir")?;
-                        Self::ensure_composer_php_runtime(path_from_bytes(&cache_dir))?;
+                        Self::ensure_composer_php_runtime(|| self.cache_dir())?;
                         if !self.php_runtime_bool(
                             BStr::new("class_exists"),
                             vec![PluginValue::string(class_name.clone())],
@@ -1123,13 +1117,7 @@ try {
         // The event stub the script receives hands out stubs of the Composer object graph, and
         // those extend and implement the real Composer contracts (`PackageInterface` and the
         // rest), which only the Composer PHP runtime carries.
-        let cache_dir = self
-            .composer()
-            .borrow_partial()
-            .get_config()
-            .borrow()
-            .get_str("cache-dir")?;
-        Self::ensure_composer_php_runtime(path_from_bytes(&cache_dir))?;
+        Self::ensure_composer_php_runtime(|| self.cache_dir())?;
         Self::ensure_script_autoloader()?;
         let rhandle = shirabe_php_rpc::alloc_rhandle();
         let mut dispatcher = ScriptRpcDispatcher {
@@ -1387,7 +1375,7 @@ try {
         array_pop(&mut self.event_stack)
     }
 
-    fn ensure_bin_dir_is_in_path(&self) {
+    fn ensure_bin_dir_is_in_path(&self) -> anyhow::Result<()> {
         let mut path_env = "PATH";
 
         // checking if only Path and not PATH is set then we probably need to update the Path env
@@ -1404,10 +1392,8 @@ try {
             .borrow_partial()
             .get_config()
             .borrow()
-            .get("bin-dir")
-            .as_string()
-            .map(|s| std::path::PathBuf::from(path_from_bytes(s)))
-            .unwrap_or_default();
+            .get_path("bin-dir")?;
+        let bin_dir = std::path::PathBuf::from(path_from_bytes(&bin_dir));
         if is_dir(&bin_dir) {
             let bin_dir = realpath(&bin_dir).unwrap_or(bin_dir);
             let path_value = Platform::get_env(path_env).unwrap_or_default();
@@ -1420,6 +1406,7 @@ try {
                 Platform::put_env(path_env, path_to_bytes(&path_value));
             }
         }
+        Ok(())
     }
 
     fn make_autoloader(
@@ -1509,10 +1496,8 @@ try {
             .borrow()
             .get_config()
             .borrow()
-            .get("vendor-dir")
-            .as_string()
-            .map(|s| s.to_owned());
-        let loader = generator.borrow().create_loader(&map, vendor_dir)?;
+            .get_path("vendor-dir")?;
+        let loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
         loader.register(false);
         self.loader = Some(loader);
         Ok(())
@@ -1529,7 +1514,9 @@ try {
 
     /// Loads the Composer PHP runtime (symfony/console and friends) into the worker, needed
     /// before a `scripts` Command class can be autoloaded and hosted.
-    pub(crate) fn ensure_composer_php_runtime(cache_dir: &std::path::Path) -> anyhow::Result<()> {
+    pub(crate) fn ensure_composer_php_runtime(
+        cache_dir: impl FnOnce() -> anyhow::Result<std::path::PathBuf>,
+    ) -> anyhow::Result<()> {
         let autoload = Self::composer_php_runtime_autoload(cache_dir)?;
         PhpCall::Function(BStr::new("__shirabe_require"))
             .run::<PluginValue>(vec![PluginValue::string(autoload)])?;
@@ -1540,11 +1527,13 @@ try {
     /// PHP runtime in the worker before a class of its own can implement a Composer interface
     /// there.
     pub fn __ensure_composer_php_runtime(cache_dir: &std::path::Path) -> anyhow::Result<()> {
-        Self::ensure_composer_php_runtime(cache_dir)
+        Self::ensure_composer_php_runtime(|| Ok(cache_dir.to_path_buf()))
     }
 
     /// The `vendor/autoload.php` of the Composer PHP runtime.
-    fn composer_php_runtime_autoload(cache_dir: &std::path::Path) -> anyhow::Result<BString> {
+    fn composer_php_runtime_autoload(
+        cache_dir: impl FnOnce() -> anyhow::Result<std::path::PathBuf>,
+    ) -> anyhow::Result<BString> {
         Ok(bconcat!(
             shirabe_php_rpc::composer_runtime::base_path(cache_dir)?,
             "/vendor/autoload.php"
@@ -1560,6 +1549,16 @@ try {
             event: None,
         };
         PhpCall::Function(function).run_with(args, &mut dispatcher)
+    }
+
+    fn cache_dir(&self) -> anyhow::Result<std::path::PathBuf> {
+        let cache_dir = self
+            .composer()
+            .borrow_partial()
+            .get_config()
+            .borrow()
+            .get_path("cache-dir")?;
+        Ok(path_from_bytes(&cache_dir).to_path_buf())
     }
 
     fn io_clone(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {

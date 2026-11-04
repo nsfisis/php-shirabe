@@ -114,6 +114,7 @@ fn make_downloader_with_process(
         filesystem,
         process,
     )
+    .unwrap()
 }
 
 #[test]
@@ -171,7 +172,8 @@ fn test_error_messages() {
         None,
         filesystem,
         process,
-    );
+    )
+    .unwrap();
 
     let path = std::env::temp_dir().join("composer-zip-test").to_path_buf();
 

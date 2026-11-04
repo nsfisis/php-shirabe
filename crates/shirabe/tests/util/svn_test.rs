@@ -58,7 +58,7 @@ fn test_credentials() {
         let mut svn = Svn::new(url.into(), io, config, None);
 
         let expect: Vec<BString> = expect.iter().map(|s| bconcat!(s)).collect();
-        assert_eq!(expect, svn.__get_credential_args());
+        assert_eq!(expect, svn.__get_credential_args().unwrap());
     }
 }
 
@@ -80,6 +80,7 @@ fn test_interactive_string() {
             BString::from("http://svn.example.org"),
         ],
         svn.__get_command(vec!["svn".into(), "ls".into()], url.into(), None)
+            .unwrap()
     );
 }
 
@@ -113,7 +114,7 @@ fn test_credentials_from_config() {
             BString::from("--password"),
             BString::from("bar"),
         ],
-        svn.__get_credential_args()
+        svn.__get_credential_args().unwrap()
     );
 }
 
@@ -148,7 +149,7 @@ fn test_credentials_from_config_with_cache_credentials_true() {
             BString::from("--password"),
             BString::from("bar"),
         ],
-        svn.__get_credential_args()
+        svn.__get_credential_args().unwrap()
     );
 }
 
@@ -184,6 +185,6 @@ fn test_credentials_from_config_with_cache_credentials_false() {
             BString::from("--password"),
             BString::from("bar"),
         ],
-        svn.__get_credential_args()
+        svn.__get_credential_args().unwrap()
     );
 }

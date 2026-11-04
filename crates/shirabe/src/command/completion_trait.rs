@@ -80,11 +80,7 @@ pub trait CompletionTrait: BaseCommand {
                         .collect();
                     PlatformRepository::new(vec![], overrides, None, None)?
                 } else {
-                    let platform_cfg = composer.get_config().borrow().get("platform");
-                    let overrides: IndexMap<BString, PhpMixed> = platform_cfg
-                        .as_array()
-                        .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                        .unwrap_or_default();
+                    let overrides = composer.get_config().borrow().get_map("platform")?;
                     PlatformRepository::new(vec![], overrides, None, None)?
                 };
                 if input.get_completion_value().is_empty() {
@@ -276,11 +272,7 @@ pub trait CompletionTrait: BaseCommand {
         SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             let composer = this.require_composer(None, None)?;
             let composer = crate::composer::composer_full(&composer);
-            let platform_cfg = composer.get_config().borrow().get("platform");
-            let overrides: IndexMap<BString, PhpMixed> = platform_cfg
-                .as_array()
-                .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                .unwrap_or_default();
+            let overrides = composer.get_config().borrow().get_map("platform")?;
             let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 
             let pattern =

@@ -851,6 +851,7 @@ fn test_private_repository_no_interaction() {
         config
             .borrow_mut()
             .get("cache-vcs-dir")
+            .unwrap()
             .as_string()
             .unwrap_or_default(),
     );

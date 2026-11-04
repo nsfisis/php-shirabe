@@ -53,8 +53,8 @@ impl GlobalCommand {
         }
 
         let config = Factory::create_config(None, None)?;
-        let home = config.get("home");
-        let home = path_from_bytes(home.as_string().unwrap_or_default());
+        let home = config.get_home()?;
+        let home = path_from_bytes(&home);
 
         if !home.is_dir() {
             let mut fs = Filesystem::new(None);

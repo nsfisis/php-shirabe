@@ -256,13 +256,8 @@ impl VcsDownloader for SvnDownloader {
         }
 
         if !self.inner.io.is_interactive() {
-            if self
-                .inner
-                .config
-                .borrow_mut()
-                .get("discard-changes")
-                .as_bool()
-                == Some(true)
+            if self.inner.config.borrow().get_discard_changes()?
+                == crate::config::DiscardChanges::Bool(true)
             {
                 return self.discard_changes(path).await;
             }

@@ -39,8 +39,8 @@ impl PathDownloader {
         cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             inner: FileDownloader::new(
                 io,
                 config,
@@ -49,8 +49,8 @@ impl PathDownloader {
                 cache,
                 Some(filesystem),
                 Some(process),
-            ),
-        }
+            )?,
+        })
     }
 
     pub fn get_vcs_reference(

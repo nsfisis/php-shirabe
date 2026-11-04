@@ -9,8 +9,7 @@ use crate::util::Platform;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, chmod, dirname, path_from_bytes, path_to_bytes,
-    php_to_string, touch,
+    PhpMixed, RuntimeException, bconcat, chmod, dirname, path_from_bytes, path_to_bytes, touch,
 };
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
@@ -59,7 +58,7 @@ pub trait BaseConfigCommand: BaseCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let home = php_to_string(&config_rc.borrow_mut().get("home"));
+            let home = config_rc.borrow().get_home()?;
             config_rc.borrow_mut().set_base_dir(Some(home));
         }
 
@@ -70,10 +69,7 @@ pub trait BaseConfigCommand: BaseCommand {
             || config_file.as_os_str() == "./composer.json")
             && !std::path::Path::new(&config_file).exists()
             && std::fs::canonicalize(Platform::get_cwd(false)?).ok()
-                == std::fs::canonicalize(path_from_bytes(&php_to_string(
-                    &config_rc.borrow_mut().get("home"),
-                )))
-                .ok()
+                == std::fs::canonicalize(path_from_bytes(&config_rc.borrow().get_home()?)).ok()
         {
             std::fs::write(&config_file, "{\n}\n")?;
         }
@@ -135,7 +131,7 @@ pub trait BaseConfigCommand: BaseCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            Ok(path_from_bytes(&php_to_string(&config.get("home"))).join("config.json"))
+            Ok(path_from_bytes(&config.get_home()?).join("config.json"))
         } else {
             match input
                 .borrow()
@@ -162,7 +158,7 @@ pub trait BaseConfigCommand: BaseCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            Ok(path_from_bytes(&php_to_string(&config.get("home"))).join("auth.json"))
+            Ok(path_from_bytes(&config.get_home()?).join("auth.json"))
         } else {
             let composer_config = self.get_composer_config_file(input, config)?;
             Ok(path_from_bytes(&bconcat!(

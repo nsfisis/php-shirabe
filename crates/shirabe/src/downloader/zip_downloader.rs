@@ -38,8 +38,8 @@ impl ZipDownloader {
         cache: Option<std::rc::Rc<std::cell::RefCell<crate::cache::Cache>>>,
         filesystem: std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             inner: FileDownloader::new(
                 io,
                 config,
@@ -48,10 +48,10 @@ impl ZipDownloader {
                 cache,
                 Some(filesystem),
                 Some(process),
-            ),
+            )?,
             cleanup_executed: std::cell::RefCell::new(IndexMap::new()),
             zip_archive_object: std::cell::RefCell::new(None),
-        }
+        })
     }
 
     async fn extract_with_system_unzip(

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Downloader/GitDownloader.php
 
 use crate::cache::Cache;
-use crate::config::Config;
+use crate::config::{Config, DiscardChanges};
 use crate::downloader::{
     ChangeReportInterface, DvcsDownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
@@ -13,9 +13,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, bconcat, dirname, impl_php_class,
-    implode, in_array_strict, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen,
-    strpos, substr, trim, version_compare,
+    implode, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
+    preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen, strpos, substr,
+    trim, version_compare,
 };
 use std::path::{Path, PathBuf};
 
@@ -511,17 +511,17 @@ impl GitDownloader {
         if let Some(match_) = preg_match(
             bconcat!(
                 "{^(?:https?|git)://",
-                GitUtil::get_github_domains_regex(&self.inner.config.borrow()),
+                GitUtil::get_github_domains_regex(&self.inner.config.borrow())?,
                 "/([^/]+)/([^/]+?)(?:\\.git)?$}"
             ),
             url,
         ) {
-            let protocols = self.inner.config.borrow_mut().get("github-protocols");
+            let protocols = self.inner.config.borrow().get_github_protocols()?;
             let m1 = match_.get(1).unwrap_or_default();
             let m2 = match_.get(2).unwrap_or_default();
             let m3 = match_.get(3).unwrap_or_default();
             let mut push_url = bconcat!("git@", m1, ":", m2, "/", m3, ".git");
-            if !in_array_strict(BString::from("ssh"), protocols.values()) {
+            if !protocols.iter().any(|protocol| protocol == "ssh") {
                 push_url = bconcat!("https://", m1, "/", m2, "/", m3, ".git");
             }
             let cmd: Vec<BString> = vec![
@@ -789,10 +789,9 @@ impl VcsDownloader for GitDownloader {
         let cache_path = PathBuf::from(path_from_bytes(&bconcat!(
             self.inner
                 .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default(),
+                .borrow()
+                .get_path("cache-vcs-dir")?
+                .as_bstr(),
             "/",
             preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
             "/",
@@ -863,10 +862,9 @@ impl VcsDownloader for GitDownloader {
         let cache_path = bconcat!(
             self.inner
                 .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default(),
+                .borrow()
+                .get_path("cache-vcs-dir")?
+                .as_bstr(),
             "/",
             preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
             "/",
@@ -1026,10 +1024,9 @@ impl VcsDownloader for GitDownloader {
         let cache_path = bconcat!(
             self.inner
                 .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default(),
+                .borrow()
+                .get_path("cache-vcs-dir")?
+                .as_bstr(),
             "/",
             preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
             "/",
@@ -1164,13 +1161,8 @@ impl VcsDownloader for GitDownloader {
         let unpushed = self.get_unpushed_changes(package.clone(), &path)?;
         if let Some(unpushed) = unpushed.as_ref()
             && (self.inner.io.is_interactive()
-                || self
-                    .inner
-                    .config
-                    .borrow_mut()
-                    .get("discard-changes")
-                    .as_bool()
-                    != Some(true))
+                || self.inner.config.borrow().get_discard_changes()?
+                    != crate::config::DiscardChanges::Bool(true))
         {
             return Err(RuntimeException::new(bconcat!(
                 "Source directory ",
@@ -1187,11 +1179,11 @@ impl VcsDownloader for GitDownloader {
         };
 
         if !self.inner.io.is_interactive() {
-            let discard_changes = self.inner.config.borrow_mut().get("discard-changes");
-            if discard_changes.as_bool() == Some(true) {
+            let discard_changes = self.inner.config.borrow().get_discard_changes()?;
+            if discard_changes == DiscardChanges::Bool(true) {
                 return self.discard_changes(&path).await;
             }
-            if discard_changes.as_string() == Some("stash".into()) {
+            if discard_changes == DiscardChanges::Stash {
                 if !update {
                     self.fail_on_local_changes(package.clone(), &path).await?;
                     return Ok(None);

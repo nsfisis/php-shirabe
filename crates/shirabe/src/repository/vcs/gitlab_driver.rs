@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
     array_search_mixed, array_shift, bconcat, date_create, empty, explode, extension_loaded,
-    implode, in_array_loose, is_array, is_string, path_from_bytes, php_regex, php_str,
-    preg_is_match, preg_match, preg_replace, sprintf, strpos, strtolower,
+    implode, in_array_loose, is_array, path_from_bytes, php_regex, php_str, preg_is_match,
+    preg_match, preg_replace, sprintf, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -82,7 +82,7 @@ impl GitLabDriver {
             .filter(|s| !s.is_empty())
             .map(BString::from)
             .unwrap_or_else(|| BString::from(match_.name("domain2").unwrap_or_default()));
-        let configured_domains = self.inner.config.borrow_mut().get("gitlab-domains");
+        let configured_domains = self.inner.config.borrow().get_list("gitlab-domains")?;
         let mut url_parts: Vec<BString> = explode("/", match_.name("parts").unwrap_or_default())
             .to_vec()
             .into_iter()
@@ -114,11 +114,7 @@ impl GitLabDriver {
         };
         self.inner.origin_url = origin;
 
-        let protocol_value = self.inner.config.borrow_mut().get("gitlab-protocol");
-        if let Some(protocol) = protocol_value
-            .as_string()
-            .filter(|_| is_string(&protocol_value))
-        {
+        if let Some(protocol) = self.inner.config.borrow().get_gitlab_protocol()? {
             // https treated as a synonym for http.
             if !matches!(protocol.as_bytes(), b"git" | b"http" | b"https") {
                 return Err(RuntimeException::new(BString::from(
@@ -153,10 +149,9 @@ impl GitLabDriver {
             path_from_bytes(&bconcat!(
                 self.inner
                     .config
-                    .borrow_mut()
-                    .get("cache-repo-dir")
-                    .as_string()
-                    .unwrap_or_default(),
+                    .borrow()
+                    .get_path("cache-repo-dir")?
+                    .as_bstr(),
                 "/",
                 self.inner.origin_url,
                 "/",
@@ -169,14 +164,7 @@ impl GitLabDriver {
             false,
         ));
         if let Some(c) = self.inner.cache.as_mut() {
-            c.set_read_only(
-                self.inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-read-only")
-                    .as_bool()
-                    .unwrap_or(false),
-            )
+            c.set_read_only(self.inner.config.borrow().get_bool("cache-read-only"))
         }
 
         self.fetch_project()?;
@@ -874,7 +862,7 @@ impl GitLabDriver {
                     return self.inner.get_contents(url);
                 }
 
-                if git_lab_util.is_oauth_expired(self.inner.origin_url.as_bstr())
+                if git_lab_util.is_oauth_expired(self.inner.origin_url.as_bstr())?
                     && git_lab_util.authorize_oauth_refresh(
                         self.scheme.as_bstr(),
                         self.inner.origin_url.as_bstr(),
@@ -965,7 +953,7 @@ impl GitLabDriver {
             .collect::<Vec<_>>();
 
         if Self::determine_origin(
-            &config.borrow().get("gitlab-domains"),
+            &config.borrow().get_list("gitlab-domains")?,
             guessed_domain,
             &mut url_parts,
             match_.name("port").map(bstr::BString::from),
@@ -1013,18 +1001,18 @@ impl GitLabDriver {
     }
 
     fn determine_origin(
-        configured_domains: &PhpMixed,
+        configured_domains: &[PhpMixed],
         guessed_domain: BString,
         url_parts: &mut Vec<BString>,
         port_number: Option<BString>,
     ) -> Option<BString> {
         let mut guessed_domain = BString::from(&strtolower(&guessed_domain)[..]);
 
-        if in_array_loose(guessed_domain.clone(), configured_domains.values())
+        if in_array_loose(guessed_domain.clone(), configured_domains)
             || (port_number.is_some()
                 && in_array_loose(
                     bconcat!(guessed_domain, ":", port_number.clone().unwrap_or_default()),
-                    configured_domains.values(),
+                    configured_domains,
                 ))
         {
             if let Some(ref port) = port_number {
@@ -1041,11 +1029,11 @@ impl GitLabDriver {
         while let Some(part) = array_shift(url_parts) {
             guessed_domain.push_str(&bconcat!("/", part));
 
-            if in_array_loose(guessed_domain.clone(), configured_domains.values())
+            if in_array_loose(guessed_domain.clone(), configured_domains)
                 || (port_number.is_some()
                     && in_array_loose(
                         preg_replace(php_regex!(r"{:\d+}"), "", &guessed_domain),
-                        configured_domains.values(),
+                        configured_domains,
                     ))
             {
                 return Some(guessed_domain);

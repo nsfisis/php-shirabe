@@ -4,6 +4,7 @@ use crate::advisory::Auditor;
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, BumpCommand, CompletionTrait};
 use crate::composer::PartialComposerHandle;
+use crate::config::BumpAfterUpdate;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
@@ -565,21 +566,13 @@ impl Command for UpdateCommand {
             .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
-            || config
-                .borrow_mut()
-                .get("optimize-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+            || config.borrow().get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || config
-                .borrow_mut()
-                .get("classmap-authoritative")
-                .as_bool()
-                .unwrap_or(false);
+            || config.borrow().get_truthy("classmap-authoritative")?;
         let apcu_prefix: Option<BString> = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -591,21 +584,13 @@ impl Command for UpdateCommand {
                 .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-            || config
-                .borrow_mut()
-                .get("apcu-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+            || config.borrow().get_truthy("apcu-autoloader")?;
         let minimal_changes = input
             .borrow()
             .get_option("minimal-changes")?
             .as_bool()
             .unwrap_or(false)
-            || config
-                .borrow_mut()
-                .get("update-with-minimal-changes")
-                .as_bool()
-                .unwrap_or(false);
+            || config.borrow().get_truthy("update-with-minimal-changes")?;
 
         let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
         if input
@@ -710,14 +695,16 @@ impl Command for UpdateCommand {
                 .as_bool()
                 .unwrap_or(false)
         {
-            let mut bump_after_update: PhpMixed =
+            let bump_after_update_option: PhpMixed =
                 input.borrow().get_option("bump-after-update")?.into();
             // PHP: false === $bumpAfterUpdate (strict)
-            if matches!(bump_after_update, PhpMixed::Bool(false)) {
-                bump_after_update = composer.get_config().borrow().get("bump-after-update");
-            }
+            let bump_after_update = if matches!(bump_after_update_option, PhpMixed::Bool(false)) {
+                composer.get_config().borrow().get_bump_after_update()?
+            } else {
+                BumpAfterUpdate::from_value(&bump_after_update_option)
+            };
 
-            if !matches!(bump_after_update, PhpMixed::Bool(false)) {
+            if bump_after_update != BumpAfterUpdate::Disabled {
                 io.write_error3(
                     "<info>Bumping dependencies</info>",
                     true,
@@ -727,8 +714,8 @@ impl Command for UpdateCommand {
                 bump_command.set_composer(composer_handle.clone());
                 result = bump_command.do_bump(
                     io.clone(),
-                    bump_after_update.as_string() == Some("dev".into()),
-                    bump_after_update.as_string() == Some("no-dev".into()),
+                    bump_after_update == BumpAfterUpdate::Dev,
+                    bump_after_update == BumpAfterUpdate::NoDev,
                     input
                         .borrow()
                         .get_option("dry-run")?

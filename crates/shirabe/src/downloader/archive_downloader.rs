@@ -69,14 +69,7 @@ pub trait ArchiveDownloader {
             ));
         }
 
-        let vendor_dir = self
-            .inner()
-            .config
-            .borrow_mut()
-            .get("vendor-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_owned();
+        let vendor_dir = self.inner().config.borrow().get_path("vendor-dir")?;
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
@@ -130,7 +123,7 @@ pub trait ArchiveDownloader {
             .filesystem
             .borrow_mut()
             .ensure_directory_exists(&temporary_dir);
-        let file_name = self.inner().get_file_name(package.clone(), path);
+        let file_name = self.inner().get_file_name(package.clone(), path)?;
 
         match self
             .extract(package.clone(), &file_name, &temporary_dir)

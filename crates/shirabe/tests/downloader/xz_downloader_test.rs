@@ -99,7 +99,8 @@ fn test_error_messages() {
         None,
         filesystem,
         process,
-    );
+    )
+    .unwrap();
 
     let install_path = test_dir.join("install-path");
     let install_path = install_path.to_path_buf();

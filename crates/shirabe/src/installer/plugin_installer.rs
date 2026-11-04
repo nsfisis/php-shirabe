@@ -23,16 +23,16 @@ impl PluginInstaller {
         binary_installer: Option<
             std::rc::Rc<std::cell::RefCell<dyn crate::installer::BinaryInstallerInterface>>,
         >,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             inner: LibraryInstaller::new(
                 io,
                 composer,
                 Some("composer-plugin".into()),
                 fs,
                 binary_installer,
-            ),
-        }
+            )?,
+        })
     }
 
     pub fn disable_plugins(&self) {

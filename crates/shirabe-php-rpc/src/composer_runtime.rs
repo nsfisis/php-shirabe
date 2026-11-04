@@ -26,10 +26,12 @@ const OVERRIDE_ENV: &BStr = php_str(b"SHIRABE_COMPOSER_PHP_DIR");
 
 /// The path the Composer PHP runtime's files sit under in the worker: the checkout `OVERRIDE_ENV`
 /// names, or else the bundle, either inside this executable or in the directory it was extracted
-/// to. A bundle the worker cannot read in place is unpacked under `cache_dir`, Composer's cache
-/// directory; the process answers with the path it resolved first, so a later call's `cache_dir`
-/// no longer moves the runtime.
-pub fn base_path(cache_dir: &std::path::Path) -> anyhow::Result<BString> {
+/// to. A bundle the worker cannot read in place is unpacked under the directory `cache_dir`
+/// returns, Composer's cache directory, which is only looked up then; the process answers with
+/// the path it resolved first, so a later call's `cache_dir` no longer moves the runtime.
+pub fn base_path(
+    cache_dir: impl FnOnce() -> anyhow::Result<std::path::PathBuf>,
+) -> anyhow::Result<BString> {
     static BASE: std::sync::OnceLock<Result<BString, BString>> = std::sync::OnceLock::new();
     BASE.get_or_init(|| {
         resolve(cache_dir).map_err(|e| match AnyThrowable::of(&e) {
@@ -41,14 +43,16 @@ pub fn base_path(cache_dir: &std::path::Path) -> anyhow::Result<BString> {
     .map_err(|message| RuntimeException::new(message).into())
 }
 
-fn resolve(cache_dir: &std::path::Path) -> anyhow::Result<BString> {
+fn resolve(
+    cache_dir: impl FnOnce() -> anyhow::Result<std::path::PathBuf>,
+) -> anyhow::Result<BString> {
     if let Some(directory) = override_directory()? {
         return Ok(path_to_bytes(&directory).into());
     }
     if worker_opens_bundle()? {
         return Ok(bconcat!("phar://", ALIAS));
     }
-    Ok(path_to_bytes(&extract_into(&cache_dir.join("runtime"))?).into())
+    Ok(path_to_bytes(&extract_into(&cache_dir()?.join("runtime"))?).into())
 }
 
 /// The checkout that stands in for the bundle, if `OVERRIDE_ENV` names one. Both the worker and
@@ -205,7 +209,10 @@ mod tests {
         }
 
         let cache = tempfile::tempdir().unwrap();
-        assert_eq!(base_path(cache.path()).unwrap(), bconcat!("phar://", ALIAS));
+        assert_eq!(
+            base_path(|| Ok(cache.path().to_path_buf())).unwrap(),
+            bconcat!("phar://", ALIAS)
+        );
     }
 
     /// The other half of `base_path`: a worker whose PHP cannot open the bundle is handed the

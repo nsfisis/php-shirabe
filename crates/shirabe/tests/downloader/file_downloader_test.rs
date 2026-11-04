@@ -69,7 +69,7 @@ fn get_downloader(
     );
 
     let downloader =
-        FileDownloader::new(io, config, http_downloader.clone(), None, None, None, None);
+        FileDownloader::new(io, config, http_downloader.clone(), None, None, None, None).unwrap();
 
     (downloader, http_downloader, guard)
 }
@@ -131,7 +131,9 @@ fn test_get_file_name() {
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, Some(config));
 
-    let file_name = downloader.__get_file_name(package, std::path::Path::new("/path"));
+    let file_name = downloader
+        .__get_file_name(package, std::path::Path::new("/path"))
+        .unwrap();
     let re = regex::bytes::Regex::new(r"/vendor/composer/tmp-[a-z0-9]+\.js").unwrap();
     assert!(
         re.is_match(path_to_bytes(&file_name)),
@@ -251,7 +253,8 @@ fn test_cache_garbage_collection_is_called() {
         Some(cache.clone()),
         None,
         None,
-    );
+    )
+    .unwrap();
 
     let gc_calls = cache.borrow().__gc_calls();
     assert_eq!(gc_calls.len(), 1, "gc should be called exactly once");
@@ -282,7 +285,9 @@ fn test_download_file_with_invalid_checksum() {
     let (downloader, http_downloader, _guard) = get_downloader(None, Some(config));
 
     // make sure the file expected to be downloaded is on disk already
-    let dl_file = downloader.__get_file_name(package.clone(), std::path::Path::new(&path));
+    let dl_file = downloader
+        .__get_file_name(package.clone(), std::path::Path::new(&path))
+        .unwrap();
     let dir = std::path::Path::new(&dl_file).parent().unwrap();
     std::fs::create_dir_all(dir).unwrap();
     std::fs::write(&dl_file, b"").unwrap();
@@ -365,10 +370,13 @@ fn test_downgrade_shows_appropriate_message() {
         None,
         Some(filesystem.clone()),
         None,
-    );
+    )
+    .unwrap();
 
     // make sure the file expected to be downloaded is on disk already
-    let dl_file = downloader.__get_file_name(new_package.clone(), std::path::Path::new(&path));
+    let dl_file = downloader
+        .__get_file_name(new_package.clone(), std::path::Path::new(&path))
+        .unwrap();
     let dir = std::path::Path::new(&dl_file).parent().unwrap();
     std::fs::create_dir_all(dir).unwrap();
     std::fs::write(&dl_file, b"").unwrap();

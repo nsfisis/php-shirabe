@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Plugin/PluginManager.php
 
 use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle};
+use crate::config::AllowPlugins;
 use crate::event_dispatcher::EventDispatcher;
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
@@ -60,7 +61,7 @@ impl PluginManager {
         composer: ComposerWeakHandle,
         global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let composer_rc = composer
             .upgrade()
             .expect("PluginManager must not outlive Composer");
@@ -68,25 +69,24 @@ impl PluginManager {
             .borrow()
             .get_config()
             .borrow()
-            .get("allow-plugins");
+            .get_allow_plugins()?;
         let locker = composer_rc.borrow().get_locker().clone();
         let mut locker = locker.borrow_mut();
         let allow_plugin_rules =
             Self::parse_allowed_plugins(allow_plugins_config, Some(&mut *locker));
         drop(locker);
         let allow_global_plugin_rules = Self::parse_allowed_plugins(
-            global_composer
-                .as_ref()
-                .map(|gc| {
-                    gc.borrow_partial()
-                        .get_config()
-                        .borrow_mut()
-                        .get("allow-plugins")
-                })
-                .unwrap_or(PhpMixed::Bool(false)),
+            match &global_composer {
+                Some(gc) => gc
+                    .borrow_partial()
+                    .get_config()
+                    .borrow()
+                    .get_allow_plugins()?,
+                None => AllowPlugins::Bool(false),
+            },
             None,
         );
-        Self {
+        Ok(Self {
             io,
             composer,
             global_composer,
@@ -98,7 +98,7 @@ impl PluginManager {
             allow_global_plugin_rules,
             running_in_global_dir: false,
             plugin_api_version_override: None,
-        }
+        })
     }
 
     /// For testing only: makes `get_plugin_api_version` report `version` instead of the
@@ -397,20 +397,20 @@ impl PluginManager {
             .borrow()
             .get_config()
             .borrow()
-            .get("vendor-dir")
-            .as_string()
-            .map(|s| s.to_owned());
-        let mut class_loader = generator.borrow().create_loader(&map, vendor_dir)?;
+            .get_path("vendor-dir")?;
+        let mut class_loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
         class_loader.register(false);
 
         // The plugin code runs in the PHP worker: load the Composer PHP runtime (contracts like
         // PluginInterface) and the reverse-RPC autoloader before touching plugin classes there.
-        let cache_dir = composer
-            .borrow()
-            .get_config()
-            .borrow()
-            .get_str("cache-dir")?;
-        EventDispatcher::ensure_composer_php_runtime(path_from_bytes(&cache_dir))?;
+        EventDispatcher::ensure_composer_php_runtime(|| {
+            let cache_dir = composer
+                .borrow()
+                .get_config()
+                .borrow()
+                .get_path("cache-dir")?;
+            Ok(path_from_bytes(&cache_dir).to_path_buf())
+        })?;
         EventDispatcher::ensure_script_autoloader()?;
 
         if let Some(files) = map.get(B("files")).and_then(|v| v.as_array()) {
@@ -1112,14 +1112,12 @@ impl PluginManager {
     }
 
     fn parse_allowed_plugins(
-        allow_plugins_config: PhpMixed,
+        allow_plugins_config: AllowPlugins,
         mut locker: Option<&mut dyn LockerInterface>,
     ) -> Option<IndexMap<BString, bool>> {
         // PHP: [] === $allowPluginsConfig && $locker !== null && $locker->isLocked() && version_compare($locker->getPluginApi(), '2.2.0', '<')
-        let is_empty_array = allow_plugins_config
-            .as_array()
-            .map(|a| a.is_empty())
-            .unwrap_or(false);
+        let is_empty_array =
+            matches!(&allow_plugins_config, AllowPlugins::Rules(rules) if rules.is_empty());
         let plugin_api_under_2_2_0 = if is_empty_array {
             match locker.as_deref_mut() {
                 Some(l) => {
@@ -1139,20 +1137,20 @@ impl PluginManager {
             return None;
         }
 
-        if allow_plugins_config.as_bool() == Some(true) {
+        if allow_plugins_config == AllowPlugins::Bool(true) {
             let mut m: IndexMap<BString, bool> = IndexMap::new();
             m.insert(BString::from("{}"), true);
             return Some(m);
         }
 
-        if allow_plugins_config.as_bool() == Some(false) {
+        if allow_plugins_config == AllowPlugins::Bool(false) {
             let mut m: IndexMap<BString, bool> = IndexMap::new();
             m.insert(BString::from("{}"), false);
             return Some(m);
         }
 
         let mut rules: IndexMap<BString, bool> = IndexMap::new();
-        if let Some(arr) = allow_plugins_config.as_array() {
+        if let AllowPlugins::Rules(arr) = &allow_plugins_config {
             for (pattern, allow) in arr {
                 rules.insert(
                     base_package::package_name_to_regexp(pattern),
@@ -1266,16 +1264,11 @@ impl PluginManager {
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == b"y" || answer_str == b"n" {
-                            let allow_plugins_value = config.borrow_mut().get("allow-plugins");
+                            let allow_plugins_value = config.borrow().get("allow-plugins")?;
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
                                 allow_plugins.insert(BString::from(package), PhpMixed::Bool(allow));
-                                if config
-                                    .borrow_mut()
-                                    .get("sort-packages")
-                                    .as_bool()
-                                    .unwrap_or(false)
-                                {
+                                if config.borrow().get_truthy("sort-packages")? {
                                     ksort(&mut allow_plugins);
                                 }
                                 config

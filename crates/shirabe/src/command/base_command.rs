@@ -425,21 +425,11 @@ impl BaseCommand for BaseCommandData {
         let mut prefer_source = false;
         let mut prefer_dist = false;
 
-        match config
-            .get("preferred-install")
-            .as_string()
-            .unwrap_or_default()
-            .as_bytes()
-        {
-            b"source" => {
-                prefer_source = true;
-            }
-            b"dist" => {
-                prefer_dist = true;
-            }
-            _ => {
-                // noop
-            }
+        let preferred_install = config.get_preferred_install()?;
+        if preferred_install.loosely_equals("source") {
+            prefer_source = true;
+        } else if preferred_install.loosely_equals("dist") {
+            prefer_dist = true;
         }
 
         if !input.borrow().has_option("prefer-dist") || !input.borrow().has_option("prefer-source")

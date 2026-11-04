@@ -93,10 +93,9 @@ impl SvnDriver {
             path_from_bytes(&bconcat!(
                 self.inner
                     .config
-                    .borrow_mut()
-                    .get("cache-repo-dir")
-                    .as_string()
-                    .unwrap_or_default(),
+                    .borrow()
+                    .get_path("cache-repo-dir")?
+                    .as_bstr(),
                 "/",
                 preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&self.base_url)),
             )),
@@ -104,14 +103,11 @@ impl SvnDriver {
             None,
             false,
         ));
-        self.inner.cache.as_mut().unwrap().set_read_only(
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-read-only")
-                .as_bool()
-                .unwrap_or(false),
-        );
+        self.inner
+            .cache
+            .as_mut()
+            .unwrap()
+            .set_read_only(self.inner.config.borrow().get_bool("cache-read-only"));
 
         self.get_branches()?;
         self.get_tags()?;

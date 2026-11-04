@@ -96,10 +96,9 @@ impl GitHubDriver {
             path_from_bytes(&bconcat!(
                 self.inner
                     .config
-                    .borrow_mut()
-                    .get("cache-repo-dir")
-                    .as_string()
-                    .unwrap_or_default(),
+                    .borrow()
+                    .get_path("cache-repo-dir")?
+                    .as_bstr(),
                 "/",
                 self.inner.origin_url,
                 "/",
@@ -112,14 +111,7 @@ impl GitHubDriver {
             false,
         ));
         if let Some(c) = self.inner.cache.as_mut() {
-            c.set_read_only(
-                self.inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-read-only")
-                    .as_bool()
-                    .unwrap_or(false),
-            )
+            c.set_read_only(self.inner.config.borrow().get_bool("cache-read-only"))
         }
 
         if self
@@ -132,13 +124,7 @@ impl GitHubDriver {
             self.allow_git_fallback = false;
         }
 
-        if self
-            .inner
-            .config
-            .borrow_mut()
-            .get("use-github-api")
-            .as_bool()
-            == Some(false)
+        if !self.inner.config.borrow().get_bool("use-github-api")
             || self
                 .inner
                 .repo_config
@@ -951,7 +937,7 @@ impl GitHubDriver {
             .unwrap_or_else(|| BString::from(matches.get(3).unwrap_or_default()));
         if !in_array_loose(
             strtolower(preg_replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
-            config.borrow().get("github-domains").values(),
+            config.borrow().get_list("github-domains")?.iter(),
         ) {
             return Ok(false);
         }

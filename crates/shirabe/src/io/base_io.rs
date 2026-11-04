@@ -95,309 +95,266 @@ pub trait BaseIO: IOInterface {
     }
 
     fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
-        let bitbucket_oauth = config.get("bitbucket-oauth");
-        let github_oauth = config.get("github-oauth");
-        let gitlab_oauth = config.get("gitlab-oauth");
-        let gitlab_token = config.get("gitlab-token");
-        let forgejo_token = config.get("forgejo-token");
-        let http_basic = config.get("http-basic");
-        let bearer_token = config.get("bearer");
-        let custom_headers = config.get("custom-headers");
-        let client_certificate = config.get("client-certificate");
+        let bitbucket_oauth = config.get_map("bitbucket-oauth")?;
+        let github_oauth = config.get_map("github-oauth")?;
+        let gitlab_oauth = config.get_map("gitlab-oauth")?;
+        let gitlab_token = config.get_map("gitlab-token")?;
+        let forgejo_token = config.get_map("forgejo-token")?;
+        let http_basic = config.get_map("http-basic")?;
+        let bearer_token = config.get_map("bearer")?;
+        let custom_headers = config.get_map("custom-headers")?;
+        let client_certificate = config.get_map("client-certificate")?;
 
-        if let Some(map) = bitbucket_oauth.as_opt().and_then(|v| v.as_array()) {
-            for (domain, cred) in map.clone() {
-                if let Some(cred_map) = cred.as_array() {
-                    let consumer_key = BString::from(
-                        cred_map
-                            .get(B("consumer-key"))
+        for (domain, cred) in bitbucket_oauth {
+            if let Some(cred_map) = cred.as_array() {
+                let consumer_key = BString::from(
+                    cred_map
+                        .get(B("consumer-key"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                );
+                let consumer_secret = cred_map
+                    .get(B("consumer-secret"))
+                    .and_then(|v| v.as_string())
+                    .map(BString::from);
+                self.check_and_set_authentication(domain, consumer_key, consumer_secret);
+            }
+        }
+
+        for (domain, token) in github_oauth {
+            let token_str = BString::from(token.as_string().unwrap_or_default());
+            let github_domains = config.get_list("github-domains")?;
+            if domain != "github.com"
+                && !in_array_strict(PhpMixed::string(domain.clone()), &github_domains)
+            {
+                <Self as BaseIO>::debug(
+                    self,
+                    BStr::new(&bconcat!(
+                        domain,
+                        " is not in the configured github-domains, adding it implicitly as authentication is configured for this domain"
+                    )),
+                    &[],
+                );
+                let merged = array_merge(
+                    PhpMixed::List(github_domains),
+                    PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
+                );
+                let mut inner = IndexMap::new();
+                inner.insert("github-domains".into(), merged);
+                let mut config_outer = IndexMap::new();
+                config_outer.insert("config".into(), PhpMixed::Array(inner));
+                config.merge(&config_outer, "implicit-due-to-auth");
+            }
+
+            if !preg_is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), token_str.as_bstr()) {
+                return Err(UnexpectedValueException::new(bconcat!(
+                    "Your github oauth token for ",
+                    domain,
+                    " contains invalid characters: \"",
+                    token_str,
+                    "\""
+                ))
+                .into());
+            }
+            self.check_and_set_authentication(
+                domain,
+                token_str,
+                Some(BString::from("x-oauth-basic")),
+            );
+        }
+
+        for (domain, token) in gitlab_oauth {
+            let gitlab_domains = config.get_list("gitlab-domains")?;
+            if domain != "gitlab.com"
+                && !in_array_strict(PhpMixed::string(domain.clone()), &gitlab_domains)
+            {
+                <Self as BaseIO>::debug(
+                    self,
+                    BStr::new(&bconcat!(
+                        domain,
+                        " is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
+                    )),
+                    &[],
+                );
+                let merged = array_merge(
+                    PhpMixed::List(gitlab_domains),
+                    PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
+                );
+                let mut inner = IndexMap::new();
+                inner.insert("gitlab-domains".into(), merged);
+                let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
+                config_outer.insert("config".into(), PhpMixed::Array(inner));
+                config.merge(&config_outer, "implicit-due-to-auth");
+            }
+
+            let token_str = if let Some(arr) = token.as_array() {
+                BString::from(
+                    arr.get(B("token"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                )
+            } else {
+                BString::from(token.as_string().unwrap_or_default())
+            };
+            self.check_and_set_authentication(domain, token_str, Some(BString::from("oauth2")));
+        }
+
+        for (domain, token) in gitlab_token {
+            let gitlab_domains = config.get_list("gitlab-domains")?;
+            if domain != "gitlab.com"
+                && !in_array_strict(PhpMixed::string(domain.clone()), &gitlab_domains)
+            {
+                <Self as BaseIO>::debug(
+                    self,
+                    BStr::new(&bconcat!(
+                        domain,
+                        " is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
+                    )),
+                    &[],
+                );
+                let merged = array_merge(
+                    PhpMixed::List(gitlab_domains),
+                    PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
+                );
+                let mut inner = IndexMap::new();
+                inner.insert("gitlab-domains".into(), merged);
+                let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
+                config_outer.insert("config".into(), PhpMixed::Array(inner));
+                config.merge(&config_outer, "implicit-due-to-auth");
+            }
+
+            let (username, password) = if let Some(arr) = token.as_array() {
+                (
+                    BString::from(
+                        arr.get(B("username"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    );
-                    let consumer_secret = cred_map
-                        .get(B("consumer-secret"))
-                        .and_then(|v| v.as_string())
-                        .map(BString::from);
-                    self.check_and_set_authentication(domain, consumer_key, consumer_secret);
-                }
-            }
-        }
-
-        if let Some(map) = github_oauth.as_opt().and_then(|v| v.as_array()) {
-            for (domain, token) in map.clone() {
-                let token_str = BString::from(token.as_string().unwrap_or_default());
-                let github_domains = config.get("github-domains");
-                if domain != "github.com"
-                    && !in_array_strict(
-                        PhpMixed::string(domain.clone()),
-                        github_domains
-                            .clone()
-                            .unwrap_or(PhpMixed::List(vec![]))
-                            .values(),
-                    )
-                {
-                    <Self as BaseIO>::debug(
-                        self,
-                        BStr::new(&bconcat!(
-                            domain,
-                            " is not in the configured github-domains, adding it implicitly as authentication is configured for this domain"
-                        )),
-                        &[],
-                    );
-                    let merged = array_merge(
-                        github_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
-                    );
-                    let mut inner = IndexMap::new();
-                    inner.insert("github-domains".into(), merged);
-                    let mut config_outer = IndexMap::new();
-                    config_outer.insert("config".into(), PhpMixed::Array(inner));
-                    config.merge(&config_outer, "implicit-due-to-auth");
-                }
-
-                if !preg_is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), token_str.as_bstr()) {
-                    return Err(UnexpectedValueException::new(bconcat!(
-                        "Your github oauth token for ",
-                        domain,
-                        " contains invalid characters: \"",
-                        token_str,
-                        "\""
-                    ))
-                    .into());
-                }
-                self.check_and_set_authentication(
-                    domain,
-                    token_str,
-                    Some(BString::from("x-oauth-basic")),
-                );
-            }
-        }
-
-        if let Some(map) = gitlab_oauth.as_opt().and_then(|v| v.as_array()) {
-            for (domain, token) in map.clone() {
-                let gitlab_domains = config.get("gitlab-domains");
-                if domain != "gitlab.com"
-                    && !in_array_strict(
-                        PhpMixed::string(domain.clone()),
-                        gitlab_domains
-                            .clone()
-                            .unwrap_or(PhpMixed::List(vec![]))
-                            .values(),
-                    )
-                {
-                    <Self as BaseIO>::debug(
-                        self,
-                        BStr::new(&bconcat!(
-                            domain,
-                            " is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
-                        )),
-                        &[],
-                    );
-                    let merged = array_merge(
-                        gitlab_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
-                    );
-                    let mut inner = IndexMap::new();
-                    inner.insert("gitlab-domains".into(), merged);
-                    let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
-                    config_outer.insert("config".into(), PhpMixed::Array(inner));
-                    config.merge(&config_outer, "implicit-due-to-auth");
-                }
-
-                let token_str = if let Some(arr) = token.as_array() {
+                    ),
                     BString::from(
                         arr.get(B("token"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    )
-                } else {
-                    BString::from(token.as_string().unwrap_or_default())
-                };
-                self.check_and_set_authentication(domain, token_str, Some(BString::from("oauth2")));
-            }
+                    ),
+                )
+            } else {
+                (
+                    BString::from(token.as_string().unwrap_or_default()),
+                    BString::from("private-token"),
+                )
+            };
+            self.check_and_set_authentication(domain, username, Some(password));
         }
 
-        if let Some(map) = gitlab_token.as_opt().and_then(|v| v.as_array()) {
-            for (domain, token) in map.clone() {
-                let gitlab_domains = config.get("gitlab-domains");
-                if domain != "gitlab.com"
-                    && !in_array_strict(
-                        PhpMixed::string(domain.clone()),
-                        gitlab_domains
-                            .clone()
-                            .unwrap_or(PhpMixed::List(vec![]))
-                            .values(),
-                    )
-                {
-                    <Self as BaseIO>::debug(
-                        self,
-                        BStr::new(&bconcat!(
-                            domain,
-                            " is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
-                        )),
-                        &[],
-                    );
-                    let merged = array_merge(
-                        gitlab_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
-                    );
-                    let mut inner = IndexMap::new();
-                    inner.insert("gitlab-domains".into(), merged);
-                    let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
-                    config_outer.insert("config".into(), PhpMixed::Array(inner));
-                    config.merge(&config_outer, "implicit-due-to-auth");
-                }
-
-                let (username, password) = if let Some(arr) = token.as_array() {
-                    (
-                        BString::from(
-                            arr.get(B("username"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        ),
-                        BString::from(
-                            arr.get(B("token"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        ),
-                    )
-                } else {
-                    (
-                        BString::from(token.as_string().unwrap_or_default()),
-                        BString::from("private-token"),
-                    )
-                };
-                self.check_and_set_authentication(domain, username, Some(password));
-            }
-        }
-
-        if let Some(map) = forgejo_token.as_opt().and_then(|v| v.as_array()) {
-            for (domain, cred) in map.clone() {
-                let forgejo_domains = config.get("forgejo-domains");
-                if !in_array_strict(
-                    PhpMixed::string(domain.clone()),
-                    forgejo_domains
-                        .clone()
-                        .unwrap_or(PhpMixed::List(vec![]))
-                        .values(),
-                ) {
-                    <Self as BaseIO>::debug(
-                        self,
-                        BStr::new(&bconcat!(
-                            domain,
-                            " is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain"
-                        )),
-                        &[],
-                    );
-                    let merged = array_merge(
-                        forgejo_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
-                    );
-                    let mut inner = IndexMap::new();
-                    inner.insert("forgejo-domains".into(), merged);
-                    let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
-                    config_outer.insert("config".into(), PhpMixed::Array(inner));
-                    config.merge(&config_outer, "implicit-due-to-auth");
-                }
-
-                if let Some(cred_map) = cred.as_array() {
-                    let username = BString::from(
-                        cred_map
-                            .get(B("username"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default(),
-                    );
-                    let token = cred_map
-                        .get(B("token"))
-                        .and_then(|v| v.as_string())
-                        .map(BString::from);
-                    self.check_and_set_authentication(domain, username, token);
-                }
-            }
-        }
-
-        if let Some(map) = http_basic.as_opt().and_then(|v| v.as_array()) {
-            for (domain, cred) in map.clone() {
-                if let Some(cred_map) = cred.as_array() {
-                    let username = BString::from(
-                        cred_map
-                            .get(B("username"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default(),
-                    );
-                    let password = cred_map
-                        .get(B("password"))
-                        .and_then(|v| v.as_string())
-                        .map(BString::from);
-                    self.check_and_set_authentication(domain, username, password);
-                }
-            }
-        }
-
-        if let Some(map) = bearer_token.as_opt().and_then(|v| v.as_array()) {
-            for (domain, token) in map.clone() {
-                let token_str = BString::from(token.as_string().unwrap_or_default());
-                self.check_and_set_authentication(domain, token_str, Some(BString::from("bearer")));
-            }
-        }
-
-        if let Some(map) = custom_headers.as_opt().and_then(|v| v.as_array()) {
-            for (domain, headers) in map.clone() {
-                if !headers.is_null() {
-                    let json_str = json_encode_ex(&headers, 0).unwrap_or_default();
-                    self.check_and_set_authentication(
+        for (domain, cred) in forgejo_token {
+            let forgejo_domains = config.get_list("forgejo-domains")?;
+            if !in_array_strict(PhpMixed::string(domain.clone()), &forgejo_domains) {
+                <Self as BaseIO>::debug(
+                    self,
+                    BStr::new(&bconcat!(
                         domain,
-                        json_str,
-                        Some(BString::from("custom-headers")),
-                    );
-                }
+                        " is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain"
+                    )),
+                    &[],
+                );
+                let merged = array_merge(
+                    PhpMixed::List(forgejo_domains),
+                    PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
+                );
+                let mut inner = IndexMap::new();
+                inner.insert("forgejo-domains".into(), merged);
+                let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
+                config_outer.insert("config".into(), PhpMixed::Array(inner));
+                config.merge(&config_outer, "implicit-due-to-auth");
+            }
+
+            if let Some(cred_map) = cred.as_array() {
+                let username = BString::from(
+                    cred_map
+                        .get(B("username"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                );
+                let token = cred_map
+                    .get(B("token"))
+                    .and_then(|v| v.as_string())
+                    .map(BString::from);
+                self.check_and_set_authentication(domain, username, token);
             }
         }
 
-        if let Some(map) = client_certificate.as_opt().and_then(|v| v.as_array()) {
-            for (domain, cred) in map.clone() {
-                if let Some(cred_map) = cred.as_array() {
-                    let local_cert = cred_map
-                        .get(B("local_cert"))
+        for (domain, cred) in http_basic {
+            if let Some(cred_map) = cred.as_array() {
+                let username = BString::from(
+                    cred_map
+                        .get(B("username"))
                         .and_then(|v| v.as_string())
-                        .map(BString::from);
-                    let local_pk = cred_map
-                        .get(B("local_pk"))
-                        .and_then(|v| v.as_string())
-                        .map(BString::from);
-                    let passphrase = cred_map
-                        .get(B("passphrase"))
-                        .and_then(|v| v.as_string())
-                        .map(BString::from);
-
-                    let mut ssl_options = IndexMap::new();
-                    if let Some(cert) = local_cert {
-                        ssl_options.insert("local_cert".into(), PhpMixed::string(cert));
-                    }
-                    if let Some(pk) = local_pk {
-                        ssl_options.insert("local_pk".into(), PhpMixed::string(pk));
-                    }
-                    if let Some(pass) = passphrase {
-                        ssl_options.insert("passphrase".into(), PhpMixed::string(pass));
-                    }
-
-                    if !ssl_options.contains_key(B("local_cert")) {
-                        self.write_error3(bconcat!("<warning>Warning: Client certificate configuration is missing key `local_cert` for ", domain, ".</warning>"), true, io_interface::NORMAL);
-                        continue;
-                    }
-
-                    let json_str =
-                        json_encode_ex(&PhpMixed::Array(ssl_options), 0).unwrap_or_default();
-                    self.check_and_set_authentication(
-                        domain,
-                        BString::from("client-certificate"),
-                        Some(json_str),
-                    );
-                }
+                        .unwrap_or_default(),
+                );
+                let password = cred_map
+                    .get(B("password"))
+                    .and_then(|v| v.as_string())
+                    .map(BString::from);
+                self.check_and_set_authentication(domain, username, password);
             }
         }
 
-        ProcessExecutor::set_timeout(config.get("process-timeout"));
+        for (domain, token) in bearer_token {
+            let token_str = BString::from(token.as_string().unwrap_or_default());
+            self.check_and_set_authentication(domain, token_str, Some(BString::from("bearer")));
+        }
+
+        for (domain, headers) in custom_headers {
+            if !headers.is_null() {
+                let json_str = json_encode_ex(&headers, 0).unwrap_or_default();
+                self.check_and_set_authentication(
+                    domain,
+                    json_str,
+                    Some(BString::from("custom-headers")),
+                );
+            }
+        }
+
+        for (domain, cred) in client_certificate {
+            if let Some(cred_map) = cred.as_array() {
+                let local_cert = cred_map
+                    .get(B("local_cert"))
+                    .and_then(|v| v.as_string())
+                    .map(BString::from);
+                let local_pk = cred_map
+                    .get(B("local_pk"))
+                    .and_then(|v| v.as_string())
+                    .map(BString::from);
+                let passphrase = cred_map
+                    .get(B("passphrase"))
+                    .and_then(|v| v.as_string())
+                    .map(BString::from);
+
+                let mut ssl_options = IndexMap::new();
+                if let Some(cert) = local_cert {
+                    ssl_options.insert("local_cert".into(), PhpMixed::string(cert));
+                }
+                if let Some(pk) = local_pk {
+                    ssl_options.insert("local_pk".into(), PhpMixed::string(pk));
+                }
+                if let Some(pass) = passphrase {
+                    ssl_options.insert("passphrase".into(), PhpMixed::string(pass));
+                }
+
+                if !ssl_options.contains_key(B("local_cert")) {
+                    self.write_error3(bconcat!("<warning>Warning: Client certificate configuration is missing key `local_cert` for ", domain, ".</warning>"), true, io_interface::NORMAL);
+                    continue;
+                }
+
+                let json_str = json_encode_ex(&PhpMixed::Array(ssl_options), 0).unwrap_or_default();
+                self.check_and_set_authentication(
+                    domain,
+                    BString::from("client-certificate"),
+                    Some(json_str),
+                );
+            }
+        }
+
+        ProcessExecutor::set_timeout(config.get_process_timeout()?);
 
         Ok(())
     }

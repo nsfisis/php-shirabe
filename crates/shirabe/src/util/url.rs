@@ -4,8 +4,8 @@ use crate::config::Config;
 use crate::util::GitHub;
 use bstr::BString;
 use shirabe_php_shim::{
-    PhpMixed, bconcat, in_array_strict, parse_url, php_regex, preg_is_match, preg_match,
-    preg_replace, preg_replace_callback,
+    PhpMixed, TypeError, bconcat, get_debug_type, in_array_strict, parse_url, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_replace_callback,
 };
 
 pub struct Url;
@@ -15,7 +15,7 @@ impl Url {
         config: &Config,
         url: impl AsRef<[u8]>,
         r#ref: impl AsRef<[u8]>,
-    ) -> BString {
+    ) -> anyhow::Result<BString> {
         let mut url = BString::from(url.as_ref());
         let r#ref = r#ref.as_ref();
         let host = parse_url(&url)
@@ -108,7 +108,7 @@ impl Url {
             }
         } else if in_array_strict(
             PhpMixed::string(host.clone()),
-            config.get("github-domains").values(),
+            config.get_list("github-domains")?.iter(),
         ) {
             url = preg_replace(
                 php_regex!(r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i"),
@@ -117,7 +117,7 @@ impl Url {
             );
         } else if in_array_strict(
             PhpMixed::string(host),
-            config.get("gitlab-domains").values(),
+            config.get_list("gitlab-domains")?.iter(),
         ) {
             url = preg_replace(
                 php_regex!(
@@ -130,13 +130,13 @@ impl Url {
 
         assert!(!url.is_empty());
 
-        url
+        Ok(url)
     }
 
-    pub fn get_origin(config: &Config, url: impl AsRef<[u8]>) -> BString {
+    pub fn get_origin(config: &Config, url: impl AsRef<[u8]>) -> anyhow::Result<BString> {
         let url = url.as_ref();
         if url.starts_with(b"file://") {
-            return url.into();
+            return Ok(url.into());
         }
 
         let parsed = parse_url(url);
@@ -152,11 +152,11 @@ impl Url {
         }
 
         if origin.ends_with(b".github.com") && origin != "codeload.github.com" {
-            return "github.com".into();
+            return Ok("github.com".into());
         }
 
         if origin == "repo.packagist.org" {
-            return "packagist.org".into();
+            return Ok("packagist.org".into());
         }
 
         if origin.is_empty() {
@@ -168,24 +168,25 @@ impl Url {
         if !origin.contains(&b'/')
             && !in_array_strict(
                 PhpMixed::string(origin.clone()),
-                config.get("gitlab-domains").values(),
+                config.get_list("gitlab-domains")?.iter(),
             )
         {
-            let gitlab_domains: Vec<BString> = match config.get("gitlab-domains") {
-                PhpMixed::List(list) => list
-                    .iter()
-                    .filter_map(|v| v.as_string().map(BString::from))
-                    .collect(),
-                _ => vec![],
-            };
-            for gitlab_domain in gitlab_domains {
+            for gitlab_domain in config.get_list("gitlab-domains")? {
+                let PhpMixed::String(gitlab_domain) = gitlab_domain else {
+                    return Err(TypeError::new(bconcat!(
+                        "str_starts_with(): Argument #1 ($haystack) must be of type string, ",
+                        get_debug_type(&gitlab_domain),
+                        " given"
+                    ))
+                    .into());
+                };
                 if !gitlab_domain.is_empty() && gitlab_domain.starts_with(&origin) {
-                    return gitlab_domain;
+                    return Ok(gitlab_domain);
                 }
             }
         }
 
-        origin
+        Ok(origin)
     }
 
     pub fn sanitize(url: impl AsRef<[u8]>) -> BString {

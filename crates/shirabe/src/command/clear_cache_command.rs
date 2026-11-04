@@ -86,18 +86,18 @@ impl Command for ClearCacheCommand {
 
         let gc = input.borrow().get_option("gc")?.as_bool().unwrap_or(false);
 
-        let cache_paths: [(&BStr, PathBuf); 4] = [
-            BStr::new("cache-vcs-dir"),
-            BStr::new("cache-repo-dir"),
-            BStr::new("cache-files-dir"),
-            BStr::new("cache-dir"),
-        ]
-        .map(|key| {
-            (
-                key,
-                path_from_bytes(config.get(key).as_string().unwrap_or_default()).to_path_buf(),
-            )
-        });
+        let mut cache_paths: Vec<(&BStr, PathBuf)> = Vec::new();
+        for key in [
+            "cache-vcs-dir",
+            "cache-repo-dir",
+            "cache-files-dir",
+            "cache-dir",
+        ] {
+            cache_paths.push((
+                BStr::new(key),
+                path_from_bytes(&config.get_path(key)?).to_path_buf(),
+            ));
+        }
 
         for (key, cache_path) in cache_paths {
             // only individual dirs get garbage collected
@@ -119,7 +119,7 @@ impl Command for ClearCacheCommand {
                 }
             };
             let mut cache = Cache::new(io.clone(), &cache_path, None, None, false);
-            cache.set_read_only(config.get("cache-read-only").as_bool().unwrap_or(false));
+            cache.set_read_only(config.get_bool("cache-read-only"));
             if !cache.is_enabled() {
                 io.write_error(bconcat!(
                     "<info>Cache is not enabled (",
@@ -141,16 +141,16 @@ impl Command for ClearCacheCommand {
                 ));
                 if key == "cache-files-dir" {
                     cache.gc(
-                        config.get("cache-files-ttl").as_int().unwrap_or(0),
-                        config.get("cache-files-maxsize").as_int().unwrap_or(0),
+                        config.get_cache_files_ttl(),
+                        config.get_cache_files_maxsize()?,
                     );
                 } else if key == "cache-repo-dir" {
                     cache.gc(
-                        config.get("cache-ttl").as_int().unwrap_or(0),
+                        config.get_cache_ttl(),
                         1024 * 1024 * 1024, // 1GB, this should almost never clear anything that is not outdated
                     );
                 } else if key == "cache-vcs-dir" {
-                    cache.gc_vcs_cache(config.get("cache-ttl").as_int().unwrap_or(0));
+                    cache.gc_vcs_cache(config.get_cache_ttl());
                 }
             } else {
                 io.write_error(bconcat!(

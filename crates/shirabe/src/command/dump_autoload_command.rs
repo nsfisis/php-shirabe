@@ -108,21 +108,13 @@ impl Command for DumpAutoloadCommand {
             .get_option("optimize")?
             .as_bool()
             .unwrap_or(false)
-            || config
-                .borrow_mut()
-                .get("optimize-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+            || config.borrow().get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || config
-                .borrow_mut()
-                .get("classmap-authoritative")
-                .as_bool()
-                .unwrap_or(false);
+            || config.borrow().get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-prefix")?
@@ -134,11 +126,7 @@ impl Command for DumpAutoloadCommand {
                 .get_option("apcu")?
                 .as_bool()
                 .unwrap_or(false)
-            || config
-                .borrow_mut()
-                .get("apcu-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+            || config.borrow().get_truthy("apcu-autoloader")?;
 
         if input
             .borrow()

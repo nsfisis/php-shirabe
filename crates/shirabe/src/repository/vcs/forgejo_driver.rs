@@ -12,7 +12,8 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, base64_decode, bconcat, date_create, explode,
-    extension_loaded, path_from_bytes, php_regex, preg_match, strtolower, urlencode,
+    extension_loaded, in_array_strict, path_from_bytes, php_regex, preg_match, strtolower,
+    urlencode,
 };
 
 #[derive(Debug)]
@@ -50,10 +51,9 @@ impl ForgejoDriver {
         let cache_dir = bconcat!(
             self.inner
                 .config
-                .borrow_mut()
-                .get("cache-repo-dir")
-                .as_string()
-                .unwrap_or_default(),
+                .borrow()
+                .get_path("cache-repo-dir")?
+                .as_bstr(),
             "/",
             forgejo_url.origin_url,
             "/",
@@ -71,14 +71,7 @@ impl ForgejoDriver {
             false,
         ));
         if let Some(c) = self.inner.cache.as_mut() {
-            c.set_read_only(
-                self.inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-read-only")
-                    .as_bool()
-                    .unwrap_or(false),
-            )
+            c.set_read_only(self.inner.config.borrow().get_bool("cache-read-only"))
         }
 
         self.fetch_repository_data()?;
@@ -479,16 +472,10 @@ impl ForgejoDriver {
         }
         let forgejo_url = forgejo_url.unwrap();
 
-        let forgejo_domains = config.borrow().get("forgejo-domains");
-        let in_domains = if let Some(list) = forgejo_domains.as_list() {
-            list.iter().any(|d| {
-                d.as_string()
-                    .is_some_and(|s| s == strtolower(&forgejo_url.origin_url))
-            })
-        } else {
-            false
-        };
-        if !in_domains {
+        if !in_array_strict(
+            PhpMixed::string(strtolower(&forgejo_url.origin_url)),
+            &config.borrow().get_list("forgejo-domains")?,
+        ) {
             return Ok(false);
         }
 

@@ -6,7 +6,7 @@ use crate::composer::{
     ComposerHandle, ComposerWeakHandle, PartialComposerHandle, PartialComposerWeakHandle,
     PartialOrFullComposer,
 };
-use crate::config::{Config, JsonConfigSource};
+use crate::config::{Config, JsonConfigSource, PreferredInstall};
 use crate::downloader::{
     DownloadManager, FileDownloader, FossilDownloader, GitDownloader, GzipDownloader, HgDownloader,
     PathDownloader, PerforceDownloader, PharDownloader, RarDownloader, SvnDownloader,
@@ -231,7 +231,7 @@ impl Factory {
         config.merge(&defaults, Config::SOURCE_DEFAULT);
 
         // load global config
-        let global_config_path = path_from_bytes(&config.get_str("home")?).join("config.json");
+        let global_config_path = path_from_bytes(&config.get_home()?).join("config.json");
         let file = JsonFile::new(global_config_path, None, io.clone())?;
         if file.exists() {
             if let Some(io_ref) = &io {
@@ -258,15 +258,15 @@ impl Factory {
             false,
         )));
 
-        let htaccess_protect = config.get("htaccess-protect").as_bool().unwrap_or(false);
+        let htaccess_protect = config.get_bool("htaccess-protect");
         if htaccess_protect {
             // Protect directory against web access. Since HOME could be
             // the www-data's user home and be web-accessible it is a
             // potential security risk
             let dirs = [
-                config.get_str("home")?,
-                config.get_str("cache-dir")?,
-                config.get_str("data-dir")?,
+                config.get_home()?,
+                config.get_path("cache-dir")?,
+                config.get_path("data-dir")?,
             ];
             for dir in &dirs {
                 let dir = path_from_bytes(dir);
@@ -281,7 +281,7 @@ impl Factory {
         }
 
         // load global auth file
-        let auth_file_path = path_from_bytes(&config.get_str("home")?).join("auth.json");
+        let auth_file_path = path_from_bytes(&config.get_home()?).join("auth.json");
         let auth_file = JsonFile::new(auth_file_path, None, io.clone())?;
         if auth_file.exists() {
             if let Some(io_ref) = &io {
@@ -471,7 +471,7 @@ impl Factory {
             Self::create_config(Some(io.clone()), Some(&cwd))?
         };
         let is_global = local_config_source != Config::SOURCE_UNKNOWN
-            && realpath(path_from_bytes(&config.get_str("home")?)).map(PathBuf::into_os_string)
+            && realpath(path_from_bytes(&config.get_home()?)).map(PathBuf::into_os_string)
                 == realpath(path_from_bytes(&dirname(&local_config_source)))
                     .map(PathBuf::into_os_string);
         config.merge(&local_config_data, &local_config_source);
@@ -531,7 +531,7 @@ impl Factory {
         // make sure we load the auth env again over the local auth.json + composer.json config
         Self::load_composer_auth_env(&mut config, Some(io.clone()))?;
 
-        let vendor_dir = config.get_str("vendor-dir")?;
+        let vendor_dir = config.get_path("vendor-dir")?;
 
         let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
@@ -560,7 +560,7 @@ impl Factory {
                         // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
                         // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
                         let installed_versions_path =
-                            path_from_bytes(&config.borrow_mut().get_str("vendor-dir")?)
+                            path_from_bytes(&config.borrow().get_path("vendor-dir")?)
                                 .join("composer/installed.php");
                         // The two class_exists() checks run in the PHP worker, where
                         // InstalledVersions lives; see `__shirabe_safely_load_installed_versions`.
@@ -710,11 +710,7 @@ impl Factory {
                     if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
                         if let Some(ref composer_file_path) = composer_file {
                             let lock_file = Self::get_lock_file(composer_file_path);
-                            let lock_enabled = config
-                                .borrow_mut()
-                                .get("lock")
-                                .and_then(|v| v.as_bool())
-                                .unwrap_or(true);
+                            let lock_enabled = config.borrow().get_bool("lock");
                             if !lock_enabled && file_exists(&lock_file) {
                                 io.write_error3(
                                     bconcat!("<warning>", lock_file, " is present but ignored as the \"lock\" config option is disabled.</warning>"),
@@ -795,7 +791,7 @@ impl Factory {
                 PartialComposerWeakHandle::from_weak(std::rc::Rc::downgrade(&composer)),
                 io.clone(),
                 process.as_ref(),
-            );
+            )?;
         }
 
         // initialize plugin manager
@@ -825,7 +821,7 @@ impl Factory {
                 ComposerWeakHandle::from_weak(std::rc::Rc::downgrade(&composer)),
                 global_composer,
                 disable_plugins,
-            );
+            )?;
             let pm = std::rc::Rc::new(std::cell::RefCell::new(pm));
             composer
                 .borrow_mut()
@@ -933,10 +929,10 @@ impl Factory {
         match self.create_composer(
             io.clone(),
             Some(LocalConfigInput::Path(
-                path_from_bytes(&config.get_str("home").ok()?).join("composer.json"),
+                path_from_bytes(&config.get_home().ok()?).join("composer.json"),
             )),
             disable_plugins,
-            Some(path_from_bytes(&config.get_str("home").ok()?)),
+            Some(path_from_bytes(&config.get_home().ok()?)),
             full_load,
             disable_scripts,
         ) {
@@ -960,26 +956,16 @@ impl Factory {
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         event_dispatcher: Option<&std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<DownloadManager>>> {
-        let cache_files_ttl = config
-            .borrow_mut()
-            .get("cache-files-ttl")
-            .and_then(|v| v.as_int())
-            .unwrap_or(0);
+        let cache_files_ttl = config.borrow().get_cache_files_ttl();
         let cache = if cache_files_ttl > 0 {
             let mut cache = Cache::new(
                 io.clone(),
-                path_from_bytes(&config.borrow_mut().get_str("cache-files-dir")?),
+                path_from_bytes(&config.borrow().get_path("cache-files-dir")?),
                 Some(BStr::new("a-z0-9_./")),
                 None,
                 false,
             );
-            cache.set_read_only(
-                config
-                    .borrow_mut()
-                    .get("cache-read-only")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
-            );
+            cache.set_read_only(config.borrow().get_bool("cache-read-only"));
             Some(std::rc::Rc::new(std::cell::RefCell::new(cache)))
         } else {
             None
@@ -990,20 +976,14 @@ impl Factory {
         ))));
 
         let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
-        let preferred = config.borrow_mut().get("preferred-install");
-        match preferred.as_string().map(|s| &**s) {
-            Some(b"dist") => {
-                dm.set_prefer_dist(true);
-            }
-            Some(b"source") => {
-                dm.set_prefer_source(true);
-            }
-            _ => {
-                // noop
-            }
+        let preferred = config.borrow().get_preferred_install()?;
+        if preferred.loosely_equals("dist") {
+            dm.set_prefer_dist(true);
+        } else if preferred.loosely_equals("source") {
+            dm.set_prefer_source(true);
         }
 
-        if let PhpMixed::Array(prefs) = preferred {
+        if let PreferredInstall::PerPackage(prefs) = preferred {
             dm.set_preferences(
                 prefs
                     .into_iter()
@@ -1075,7 +1055,7 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            ))),
+            )?)),
         );
         dm.set_downloader(
             "rar",
@@ -1087,7 +1067,7 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            ))),
+            )?)),
         );
         dm.set_downloader(
             "tar",
@@ -1099,7 +1079,7 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            ))),
+            )?)),
         );
         dm.set_downloader(
             "gzip",
@@ -1111,7 +1091,7 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            ))),
+            )?)),
         );
         dm.set_downloader(
             "xz",
@@ -1123,7 +1103,7 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            ))),
+            )?)),
         );
         dm.set_downloader(
             "phar",
@@ -1135,7 +1115,7 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            ))),
+            )?)),
         );
         dm.set_downloader(
             "file",
@@ -1147,7 +1127,7 @@ impl Factory {
                 cache.clone(),
                 Some(fs.clone()),
                 Some(process.clone()),
-            ))),
+            )?)),
         );
         dm.set_downloader(
             "path",
@@ -1159,7 +1139,7 @@ impl Factory {
                 cache,
                 fs,
                 process.clone(),
-            ))),
+            )?)),
         );
 
         Ok(std::rc::Rc::new(std::cell::RefCell::new(dm)))
@@ -1187,7 +1167,7 @@ impl Factory {
         composer: ComposerWeakHandle,
         global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
-    ) -> PluginManager {
+    ) -> anyhow::Result<PluginManager> {
         PluginManager::new(io, composer, global_composer, disable_plugins)
     }
 
@@ -1210,10 +1190,10 @@ impl Factory {
         composer: PartialComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
-    ) {
+    ) -> anyhow::Result<()> {
         // FactoryMock::createDefaultInstallers is a noop (no installers registered).
         if self.mock {
-            return;
+            return Ok(());
         }
 
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
@@ -1226,25 +1206,12 @@ impl Factory {
             let composer_ref = composer_rc.borrow_partial();
             let config = composer_ref.get_config();
             let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim2(
-                config
-                    .borrow_mut()
-                    .get("bin-dir")
-                    .as_string()
-                    .unwrap_or_default(),
+                config.borrow().get_path("bin-dir")?,
                 "/",
             )));
-            let bin_compat = config
-                .borrow_mut()
-                .get("bin-compat")
-                .as_string()
-                .unwrap_or_default()
-                .to_owned();
+            let bin_compat = config.borrow().get_bin_compat()?;
             let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim2(
-                config
-                    .borrow_mut()
-                    .get("vendor-dir")
-                    .as_string()
-                    .unwrap_or_default(),
+                config.borrow().get_path("vendor-dir")?,
                 "/",
             )));
             (bin_dir, bin_compat, vendor_dir)
@@ -1268,17 +1235,18 @@ impl Factory {
                 None,
                 Some(fs.clone()),
                 Some(binary_installer.clone()),
-            )));
+            )?));
         im.borrow_mut()
             .add_installer(std::rc::Rc::new(crate::installer::PluginInstaller::new(
                 io.clone(),
                 composer,
                 Some(fs),
                 Some(binary_installer),
-            )));
+            )?));
         im.borrow_mut().add_installer(std::rc::Rc::new(
             crate::installer::MetapackageInstaller::new(io),
         ));
+        Ok(())
     }
 
     fn purge_packages(
@@ -1419,12 +1387,7 @@ impl Factory {
         {
             unsafe { WARNED = true };
             disable_tls = !extension_loaded("openssl");
-        } else if config
-            .borrow_mut()
-            .get("disable-tls")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
+        } else if config.borrow().get_bool("disable-tls") {
             if !unsafe { WARNED } {
                 io.write_error3(
                     "<warning>You are running Shirabe with SSL/TLS protection disabled.</warning>",
@@ -1439,16 +1402,16 @@ impl Factory {
         }
         let mut http_downloader_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         if !disable_tls {
-            if "" != config.borrow_mut().get_str("cafile").unwrap_or_default() {
+            if "" != config.borrow().get_path("cafile").unwrap_or_default() {
                 let mut ssl_map: IndexMap<BString, PhpMixed> = IndexMap::new();
                 ssl_map.insert(
                     "cafile".into(),
-                    PhpMixed::string(config.borrow_mut().get_str("cafile").unwrap_or_default()),
+                    PhpMixed::string(config.borrow().get_path("cafile").unwrap_or_default()),
                 );
                 http_downloader_options
                     .insert("ssl".into(), PhpMixed::Array(ssl_map.into_iter().collect()));
             }
-            if "" != config.borrow_mut().get_str("capath").unwrap_or_default() {
+            if "" != config.borrow().get_path("capath").unwrap_or_default() {
                 let existing_ssl = http_downloader_options
                     .get(B("ssl"))
                     .and_then(|v| v.as_array())
@@ -1457,7 +1420,7 @@ impl Factory {
                 let mut ssl_map = existing_ssl;
                 ssl_map.insert(
                     "capath".into(),
-                    PhpMixed::string(config.borrow_mut().get_str("capath").unwrap_or_default()),
+                    PhpMixed::string(config.borrow().get_path("capath").unwrap_or_default()),
                 );
                 http_downloader_options.insert("ssl".into(), PhpMixed::Array(ssl_map));
             }

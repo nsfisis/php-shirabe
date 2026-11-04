@@ -1605,15 +1605,7 @@ impl Command for ShowCommand {
         let mut platform_overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
         if let Some(ref composer) = composer {
             let composer = crate::composer::composer_full(composer);
-            if let Some(p) = composer
-                .get_config()
-                .borrow()
-                .get("platform")
-                .as_array()
-                .cloned()
-            {
-                platform_overrides = p.into_iter().collect();
-            }
+            platform_overrides = composer.get_config().borrow().get_map("platform")?;
         }
         let platform_repo = PlatformRepositoryHandle::new(PlatformRepository::new(
             vec![],

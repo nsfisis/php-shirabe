@@ -217,7 +217,7 @@ impl HttpDownloader {
             .into());
         }
 
-        let (options, origin) = self.prepare_request(url, options);
+        let (options, origin) = self.prepare_request(url, options)?;
         if !self.can_use_native(url, &options) {
             return self.download_with_filesystem(origin.as_bstr(), url, options, copy_to);
         }
@@ -273,9 +273,9 @@ impl HttpDownloader {
         &self,
         url: &BStr,
         options: IndexMap<BString, PhpMixed>,
-    ) -> (IndexMap<BString, PhpMixed>, BString) {
+    ) -> anyhow::Result<(IndexMap<BString, PhpMixed>, BString)> {
         let options = array_replace_recursive(self.options.clone(), options);
-        let origin = Url::get_origin(&self.config.borrow(), url);
+        let origin = Url::get_origin(&self.config.borrow(), url)?;
 
         // capture username/password from URL if there is one
         if let Some(m) = preg_match(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url) {
@@ -286,7 +286,7 @@ impl HttpDownloader {
             );
         }
 
-        (options, origin)
+        Ok((options, origin))
     }
 
     /// The job behind `add()` / `add_copy()` for a caller that registers it instead of awaiting it
@@ -318,7 +318,7 @@ impl HttpDownloader {
             .into());
         }
 
-        let (options, origin) = self.prepare_request(url, options);
+        let (options, origin) = self.prepare_request(url, options)?;
         if !self.can_use_native(url, &options) {
             return Ok(HttpDownloaderJob::Settled(self.download_with_filesystem(
                 origin.as_bstr(),

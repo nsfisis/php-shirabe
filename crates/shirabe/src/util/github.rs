@@ -52,8 +52,8 @@ impl GitHub {
     }
 
     pub fn authorize_oauth(&mut self, origin_url: &BStr) -> anyhow::Result<bool> {
-        let github_domains = self.config.borrow_mut().get("github-domains");
-        if !in_array_loose(PhpMixed::string(origin_url), github_domains.values()) {
+        let github_domains = self.config.borrow().get_list("github-domains")?;
+        if !in_array_loose(PhpMixed::string(origin_url), &github_domains) {
             return Ok(false);
         }
 
@@ -89,12 +89,7 @@ impl GitHub {
         }
 
         let mut note = BString::from("Shirabe");
-        let expose_hostname = self
-            .config
-            .borrow_mut()
-            .get("github-expose-hostname")
-            .as_bool()
-            .unwrap_or(false);
+        let expose_hostname = self.config.borrow().get_github_expose_hostname()?;
         if expose_hostname {
             let mut output = BString::default();
             if self

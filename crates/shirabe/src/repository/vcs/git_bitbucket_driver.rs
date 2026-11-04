@@ -88,10 +88,9 @@ impl GitBitbucketDriver {
                     BString::from(
                         self.inner
                             .config
-                            .borrow_mut()
-                            .get("cache-repo-dir")
-                            .as_string()
-                            .unwrap_or_default(),
+                            .borrow()
+                            .get_path("cache-repo-dir")?
+                            .as_bstr(),
                     ),
                     self.inner.origin_url.clone(),
                     self.owner.clone(),
@@ -102,14 +101,11 @@ impl GitBitbucketDriver {
             None,
             false,
         ));
-        self.inner.cache.as_mut().unwrap().set_read_only(
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-read-only")
-                .as_bool()
-                .unwrap_or(false),
-        );
+        self.inner
+            .cache
+            .as_mut()
+            .unwrap()
+            .set_read_only(self.inner.config.borrow().get_bool("cache-read-only"));
 
         Ok(())
     }

@@ -110,10 +110,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             let platform_overrides: IndexMap<BString, PhpMixed> = composer
                 .get_config()
                 .borrow()
-                .get("platform")
-                .as_array()
-                .cloned()
-                .unwrap_or_default()
+                .get_map_or_empty("platform")?
                 .into_iter()
                 .collect();
             repos.push(crate::repository::RepositoryInterfaceHandle::new(

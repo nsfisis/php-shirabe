@@ -62,20 +62,18 @@ impl FossilDriver {
                 &BString::from(
                     self.inner
                         .config
-                        .borrow_mut()
-                        .get("cache-repo-dir")
-                        .as_string()
-                        .unwrap_or_default(),
+                        .borrow()
+                        .get_path("cache-repo-dir")?
+                        .as_bstr(),
                 )[..],
             );
             let cache_vcs_dir = BString::from(
                 &BString::from(
                     self.inner
                         .config
-                        .borrow_mut()
-                        .get("cache-vcs-dir")
-                        .as_string()
-                        .unwrap_or_default(),
+                        .borrow()
+                        .get_path("cache-vcs-dir")?
+                        .as_bstr(),
                 )[..],
             );
             if !Cache::is_usable(path_from_bytes(&cache_repo_dir))

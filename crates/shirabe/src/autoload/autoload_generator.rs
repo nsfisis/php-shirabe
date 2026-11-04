@@ -3,7 +3,7 @@
 //! ref: composer/src/Composer/Autoload/AutoloadGenerator.php
 
 use crate::autoload::ClassLoader;
-use crate::config::Config;
+use crate::config::{Config, PlatformCheck};
 use crate::event_dispatcher::{EventDispatcher, EventFlags};
 use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
@@ -130,7 +130,7 @@ impl AutoloadGenerator {
 
             let installed_json = JsonFile::new(
                 path_from_bytes(&bconcat!(
-                    config.get("vendor-dir").as_string().unwrap_or_default(),
+                    config.get_path("vendor-dir")?.as_bstr(),
                     "/composer/installed.json"
                 )),
                 None,
@@ -183,11 +183,7 @@ impl AutoloadGenerator {
         class_map_generator.avoid_duplicate_scans(None);
 
         let mut filesystem = Filesystem::new(None);
-        let vendor_dir = config
-            .get("vendor-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_owned();
+        let vendor_dir = config.get_path("vendor-dir")?;
         filesystem.ensure_directory_exists(path_from_bytes(&vendor_dir))?;
         // Do not remove double realpath() calls.
         // Fixes failing Windows realpath() implementation.
@@ -200,11 +196,13 @@ impl AutoloadGenerator {
             realpath(realpath(path_from_bytes(&vendor_dir)).unwrap_or_default())
                 .unwrap_or_default(),
         );
-        let use_global_include_path = config.get("use-include-path").as_bool().unwrap_or(false);
-        let prepend_autoloader = if config.get("prepend-autoloader").as_bool() == Some(false) {
-            BStr::new("false")
-        } else {
+        // PHP raises the TypeError for a non-boolean value only where getAutoloadRealFile()
+        // receives it.
+        let use_global_include_path = config.get_strict_bool("use-include-path");
+        let prepend_autoloader = if config.get_prepend_autoloader()? {
             BStr::new("true")
+        } else {
+            BStr::new("false")
         };
         let target_dir = PathBuf::from(path_from_bytes(&bconcat!(vendor_path, "/", target_dir)));
         filesystem.ensure_directory_exists(&target_dir)?;
@@ -568,10 +566,7 @@ impl AutoloadGenerator {
             suffix = None;
         }
         if suffix.is_none() {
-            suffix = config
-                .get("autoloader-suffix")
-                .as_string()
-                .map(BStr::to_owned);
+            suffix = config.get_autoloader_suffix()?;
 
             // carry over existing autoload.php's suffix if possible and none is configured
             let autoload_file =
@@ -664,7 +659,8 @@ impl AutoloadGenerator {
             target_file(BStr::new("autoload_static.php")),
             self.get_static_file(suffix.as_bstr(), &target_dir, &vendor_path, &base_path)?,
         )?;
-        let mut check_platform = config.get("platform-check").as_bool() != Some(false)
+        let platform_check = config.get_platform_check()?;
+        let mut check_platform = platform_check != PlatformCheck::Disabled
             && self
                 .platform_requirement_filter
                 .borrow()
@@ -673,11 +669,8 @@ impl AutoloadGenerator {
                 .is_none();
         let mut platform_check_content: Option<BString> = None;
         if check_platform {
-            platform_check_content = self.get_platform_check(
-                &package_map,
-                config.get("platform-check"),
-                &dev_package_names,
-            );
+            platform_check_content =
+                self.get_platform_check(&package_map, platform_check, &dev_package_names);
             if platform_check_content.is_none() {
                 check_platform = false;
             }
@@ -704,7 +697,7 @@ impl AutoloadGenerator {
                 vendor_path_code.as_bstr(),
                 app_base_dir_code.as_bstr(),
                 suffix.as_bstr(),
-                use_global_include_path,
+                use_global_include_path?,
                 prepend_autoloader,
                 check_platform,
             ),
@@ -1188,7 +1181,7 @@ impl AutoloadGenerator {
     fn get_platform_check(
         &self,
         package_map: &Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
-        check_platform: PhpMixed,
+        check_platform: PlatformCheck,
         dev_package_names: &[BString],
     ) -> Option<BString> {
         let mut lowest_php_version = Bound::zero();
@@ -1248,7 +1241,7 @@ impl AutoloadGenerator {
                     required_php_64bit = true;
                 }
 
-                if check_platform.as_bool() == Some(true)
+                if check_platform == PlatformCheck::Full
                     && let Some(matches) =
                         preg_match(php_regex!("{^ext-(.+)$}iD"), link.get_target())
                 {

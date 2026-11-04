@@ -192,7 +192,7 @@ fn test_installer_creation_should_not_create_vendor_directory() {
     let mut setup = set_up();
     setup.fs.remove_directory(&setup.vendor_dir).unwrap();
 
-    LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None).unwrap();
     assert!(!setup.vendor_dir.exists());
 
     tear_down(&mut setup);
@@ -203,7 +203,7 @@ fn test_installer_creation_should_not_create_bin_directory() {
     let mut setup = set_up();
     setup.fs.remove_directory(&setup.bin_dir).unwrap();
 
-    LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None).unwrap();
     assert!(!setup.bin_dir.exists());
 
     tear_down(&mut setup);
@@ -212,7 +212,8 @@ fn test_installer_creation_should_not_create_bin_directory() {
 #[test]
 fn test_is_installed() {
     let mut setup = set_up();
-    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None).unwrap();
     let package = get_package("test/pkg", "1.0.0");
 
     let repository =
@@ -261,7 +262,8 @@ fn test_install() {
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
 
-    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None).unwrap();
 
     let repository =
         InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap());
@@ -318,7 +320,8 @@ fn test_update() {
         .unwrap();
 
     // The default Filesystem is fine; the LibraryInstaller's own filesystem performs the rename.
-    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None).unwrap();
 
     run(library.update(&repository, initial.clone(), target.clone())).unwrap();
 
@@ -364,7 +367,8 @@ fn test_uninstall() {
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
 
-    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None).unwrap();
 
     // PHP mocks hasPackage to return (true, false) over two calls; a real repository
     // seeded with the package reproduces this naturally: present, then absent after
@@ -394,7 +398,8 @@ fn test_uninstall() {
 #[test]
 fn test_get_install_path_without_target_dir() {
     let mut setup = set_up();
-    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None).unwrap();
     let package = get_package("Vendor/Pkg", "1.0.0");
 
     assert_eq!(
@@ -411,7 +416,8 @@ fn test_get_install_path_without_target_dir() {
 #[test]
 fn test_get_install_path_with_target_dir() {
     let mut setup = set_up();
-    let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
+    let library =
+        LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None).unwrap();
     let package = get_package("Foo/Bar", "1.0.0");
     package.__set_target_dir(Some(BString::from("Some/Namespace")));
 
@@ -436,7 +442,8 @@ fn test_ensure_binaries_installed() {
         Some(BString::from("library")),
         None,
         None,
-    );
+    )
+    .unwrap();
     let package = get_package("foo/bar", "1.0.0");
     let expected_path = library.get_install_path(package.clone()).unwrap();
 

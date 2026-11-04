@@ -10,9 +10,9 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
-    RuntimeException, array_map, bconcat, clearstatcache, error_message, explode,
-    explode_with_limit, implode, in_array_loose, in_array_strict, is_dir, path_to_bytes, php_regex,
-    preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
+    RuntimeException, TypeError, array_map, bconcat, clearstatcache, error_message, explode,
+    explode_with_limit, get_debug_type, implode, in_array_loose, is_dir, path_to_bytes, php_regex,
+    php_to_string, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
     str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use std::path::{Path, PathBuf};
@@ -222,25 +222,19 @@ impl Git {
             }
         }
 
-        let protocols = self.config.borrow_mut().get("github-protocols");
+        let protocols = self.config.borrow().get_github_protocols()?;
         // public github, autoswitch protocols
         if let Some(m) = preg_match(
             bconcat!(
                 "{^(?:https?|git)://",
-                Self::get_github_domains_regex(&self.config.borrow()),
+                Self::get_github_domains_regex(&self.config.borrow())?,
                 "/(.*)}"
             ),
             url,
         ) {
             let mut messages: Vec<BString> = vec![];
-            let protocols_list: Vec<BString> = match &protocols {
-                PhpMixed::List(l) => l
-                    .iter()
-                    .filter_map(|v| v.as_string().map(BStr::to_owned))
-                    .collect(),
-                _ => vec![],
-            };
-            for protocol in &protocols_list {
+            let protocols_list = &protocols;
+            for protocol in protocols_list {
                 let m1 = m.get(1).unwrap_or_default();
                 let m2 = m.get(2).unwrap_or_default();
                 let proto_url = if protocol == "ssh" {
@@ -278,7 +272,7 @@ impl Git {
                         "Failed to clone ",
                         url,
                         " via ",
-                        implode(", ", &protocols_list),
+                        implode(", ", protocols_list),
                         " protocols, aborting.\n\n",
                         implode("\n", &messages)
                     )
@@ -289,15 +283,15 @@ impl Git {
         }
 
         // if we have a private github url and the ssh protocol is disabled then we skip it and directly fallback to https
-        let protocols = self.config.borrow_mut().get("github-protocols");
+        let protocols = self.config.borrow().get_github_protocols()?;
         let bypass_ssh_for_github = preg_is_match(
             bconcat!(
                 "{^git@",
-                Self::get_github_domains_regex(&self.config.borrow()),
+                Self::get_github_domains_regex(&self.config.borrow())?,
                 ":(.+?)\\.git$}i"
             ),
             url,
-        ) && !in_array_strict(BString::from("ssh"), protocols.values());
+        ) && !protocols.iter().any(|protocol| protocol == "ssh");
 
         let mut auth: Option<IndexMap<BString, Option<BString>>> = None;
         let mut credentials: Vec<BString> = vec![];
@@ -311,24 +305,24 @@ impl Git {
         {
             let mut error_msg = self.process.borrow().get_error_output();
             // private github repository without ssh key access, try https with auth
-            let github_matched = preg_match(
+            let github_matched = match preg_match(
                 bconcat!(
                     "{^git@",
-                    Self::get_github_domains_regex(&self.config.borrow()),
+                    Self::get_github_domains_regex(&self.config.borrow())?,
                     ":(.+?)\\.git$}i"
                 ),
                 url,
-            )
-            .or_else(|| {
-                preg_match(
+            ) {
+                Some(m) => Some(m),
+                None => preg_match(
                     bconcat!(
                         "{^https?://",
-                        Self::get_github_domains_regex(&self.config.borrow()),
+                        Self::get_github_domains_regex(&self.config.borrow())?,
                         "/(.*?)(?:\\.git)?$}i"
                     ),
                     url,
-                )
-            });
+                ),
+            };
             if let Some(m) = github_matched {
                 let m1 = m.get(1).unwrap_or_default();
                 let m2 = m.get(2).unwrap_or_default();
@@ -538,24 +532,24 @@ impl Git {
                 }
 
                 error_msg = self.process.borrow().get_error_output();
-            } else if let Some(m) = preg_match(
+            } else if let Some(m) = match preg_match(
                 bconcat!(
                     "{^(git)@",
-                    Self::get_gitlab_domains_regex(&self.config.borrow()),
+                    Self::get_gitlab_domains_regex(&self.config.borrow())?,
                     ":(.+?\\.git)$}i"
                 ),
                 url,
-            )
-            .or_else(|| {
-                preg_match(
+            ) {
+                Some(m) => Some(m),
+                None => preg_match(
                     bconcat!(
                         "{^(https?)://",
-                        Self::get_gitlab_domains_regex(&self.config.borrow()),
+                        Self::get_gitlab_domains_regex(&self.config.borrow())?,
                         "/(.*)}i"
                     ),
                     url,
-                )
-            }) {
+                ),
+            } {
                 let mut m1 = m.get(1).unwrap_or_default().to_owned();
                 let m2 = m.get(2).unwrap_or_default();
                 let m3 = m.get(3).unwrap_or_default();
@@ -654,7 +648,7 @@ impl Git {
                 }
 
                 let origin = m2.clone();
-                let mut store_auth: PhpMixed = PhpMixed::Bool(false);
+                let mut store_auth = StoreAuth::Bool(false);
                 if self.io.has_authentication(origin.as_bstr()) {
                     auth = Some(self.io.get_authentication(origin.as_bstr()));
                 } else if self.io.is_interactive() {
@@ -697,7 +691,7 @@ impl Git {
                         self.io.ask_and_hide_answer("      Password: ")?,
                     );
                     auth = Some(auth_map);
-                    store_auth = self.config.borrow_mut().get("store-auths");
+                    store_auth = self.config.borrow().get_store_auths()?;
                 }
 
                 if let Some(auth_inner) = auth.as_ref() {
@@ -734,12 +728,7 @@ impl Git {
                             Some(password),
                         );
                         let auth_helper = AuthHelper::new(self.io.clone(), self.config.clone());
-                        let store_auth_enum = match &store_auth {
-                            PhpMixed::String(s) if s == "prompt" => StoreAuth::Prompt,
-                            PhpMixed::Bool(b) => StoreAuth::Bool(*b),
-                            _ => StoreAuth::Bool(false),
-                        };
-                        auth_helper.store_auth(origin.as_bstr(), store_auth_enum)?;
+                        auth_helper.store_auth(origin.as_bstr(), store_auth.clone())?;
 
                         return Ok(());
                     }
@@ -1228,24 +1217,31 @@ impl Git {
         Ok(())
     }
 
-    pub fn get_github_domains_regex(config: &Config) -> BString {
+    pub fn get_github_domains_regex(config: &Config) -> anyhow::Result<BString> {
         Self::get_domains_regex(config, BStr::new("github-domains"))
     }
 
-    pub fn get_gitlab_domains_regex(config: &Config) -> BString {
+    pub fn get_gitlab_domains_regex(config: &Config) -> anyhow::Result<BString> {
         Self::get_domains_regex(config, BStr::new("gitlab-domains"))
     }
 
-    fn get_domains_regex(config: &Config, key: &BStr) -> BString {
-        let domains: Vec<BString> = match config.get(key) {
-            PhpMixed::List(l) => l
-                .iter()
-                .filter_map(|v| v.as_string().map(BStr::to_owned))
-                .collect(),
-            _ => vec![],
-        };
-        let escaped: Vec<BString> = array_map(|s: &BString| preg_quote(s, None), &domains);
-        bconcat!("(", implode("|", &escaped), ")")
+    fn get_domains_regex(config: &Config, key: &BStr) -> anyhow::Result<BString> {
+        let mut escaped: Vec<BString> = Vec::new();
+        for domain in config.get_list(key)? {
+            if matches!(
+                domain,
+                PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
+            ) {
+                return Err(TypeError::new(bconcat!(
+                    "preg_quote(): Argument #1 ($str) must be of type string, ",
+                    get_debug_type(&domain),
+                    " given"
+                ))
+                .into());
+            }
+            escaped.push(preg_quote(php_to_string(&domain), None));
+        }
+        Ok(bconcat!("(", implode("|", &escaped), ")"))
     }
 
     fn throw_exception(&mut self, message: &BStr, url: &BStr) -> anyhow::Result<()> {

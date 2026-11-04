@@ -249,9 +249,7 @@ impl RequireCommand {
             || composer
                 .get_config()
                 .borrow()
-                .get("optimize-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+                .get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
@@ -260,9 +258,7 @@ impl RequireCommand {
             || composer
                 .get_config()
                 .borrow()
-                .get("classmap-authoritative")
-                .as_bool()
-                .unwrap_or(false);
+                .get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -277,9 +273,7 @@ impl RequireCommand {
             || composer
                 .get_config()
                 .borrow()
-                .get("apcu-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+                .get_truthy("apcu-autoloader")?;
         let minimal_changes = input
             .borrow()
             .get_option("minimal-changes")?
@@ -288,9 +282,7 @@ impl RequireCommand {
             || composer
                 .get_config()
                 .borrow()
-                .get("update-with-minimal-changes")
-                .as_bool()
-                .unwrap_or(false);
+                .get_truthy("update-with-minimal-changes")?;
 
         let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
         let mut flags = BString::default();
@@ -545,14 +537,7 @@ impl RequireCommand {
         if !dry_run {
             let json = self.json.borrow().as_ref().unwrap().clone();
             self.update_file(&json, &requirements, require_key, remove_key, sort_packages);
-            if locker_is_locked
-                && composer
-                    .get_config()
-                    .borrow_mut()
-                    .get("lock")
-                    .as_bool()
-                    .unwrap_or(false)
-            {
+            if locker_is_locked && composer.get_config().borrow().get_bool("lock") {
                 let stability_flags = RootPackageLoader::extract_stability_flags(
                     &(requirements),
                     bstr::BStr::new(&composer.get_package().get_minimum_stability()),
@@ -871,11 +856,7 @@ impl Command for RequireCommand {
         let repository_manager = repository_manager.borrow();
         let repos = repository_manager.get_repositories();
 
-        let platform_overrides = composer.get_config().borrow_mut().get("platform");
-        let platform_overrides_map: IndexMap<BString, PhpMixed> = platform_overrides
-            .as_array()
-            .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-            .unwrap_or_default();
+        let platform_overrides_map = composer.get_config().borrow().get_map("platform")?;
         // initialize self.repos as it is used by the PackageDiscoveryTrait
         let platform_repo = PlatformRepositoryHandle::new(PlatformRepository::new(
             vec![],
@@ -1130,12 +1111,7 @@ impl Command for RequireCommand {
             .get_option("sort-packages")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get("sort-packages")
-                .as_bool()
-                .unwrap_or(false);
+            || composer.get_config().borrow().get_truthy("sort-packages")?;
 
         self.first_require.set(self.newly_created.get());
         if !self.first_require.get() {

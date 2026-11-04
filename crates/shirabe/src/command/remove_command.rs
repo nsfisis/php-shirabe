@@ -535,7 +535,7 @@ impl Command for RemoveCommand {
             .borrow_mut()
             .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
 
-        let allow_plugins = composer.get_config().borrow_mut().get("allow-plugins");
+        let allow_plugins = composer.get_config().borrow().get("allow-plugins")?;
         let removed_plugins: Vec<BString> =
             if let Some(allow_map) = allow_plugins.as_opt().and_then(|v| v.as_array()) {
                 packages
@@ -594,9 +594,7 @@ impl Command for RemoveCommand {
             || composer
                 .get_config()
                 .borrow()
-                .get("optimize-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+                .get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
@@ -605,9 +603,7 @@ impl Command for RemoveCommand {
             || composer
                 .get_config()
                 .borrow()
-                .get("classmap-authoritative")
-                .as_bool()
-                .unwrap_or(false);
+                .get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -622,9 +618,7 @@ impl Command for RemoveCommand {
             || composer
                 .get_config()
                 .borrow()
-                .get("apcu-autoloader")
-                .as_bool()
-                .unwrap_or(false);
+                .get_truthy("apcu-autoloader")?;
         let minimal_changes = input
             .borrow()
             .get_option("minimal-changes")?
@@ -633,9 +627,7 @@ impl Command for RemoveCommand {
             || composer
                 .get_config()
                 .borrow()
-                .get("update-with-minimal-changes")
-                .as_bool()
-                .unwrap_or(false);
+                .get_truthy("update-with-minimal-changes")?;
 
         let mut update_allow_transitive_dependencies =
             UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire;

@@ -30,8 +30,8 @@ impl PharDownloader {
         cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             inner: FileDownloader::new(
                 io,
                 config,
@@ -40,9 +40,9 @@ impl PharDownloader {
                 cache,
                 Some(filesystem),
                 Some(process),
-            ),
+            )?,
             cleanup_executed: std::cell::RefCell::new(IndexMap::new()),
-        }
+        })
     }
 }
 
