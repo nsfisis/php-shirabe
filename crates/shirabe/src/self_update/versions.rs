@@ -147,7 +147,7 @@ impl Versions {
             for version in list {
                 if let PhpMixed::Array(ref v) = *version {
                     let min_php = v.get(B("min-php")).and_then(|p| p.as_int()).unwrap_or(0);
-                    if min_php <= shirabe_php_rpc::get_php_version().version_id {
+                    if min_php <= shirabe_php_rpc::get_php_version()?.version_id {
                         return Ok(Ok(v
                             .iter()
                             .map(|(k, val)| (k.clone(), val.clone()))
@@ -159,7 +159,7 @@ impl Versions {
 
         Ok(Err(UnexpectedValueException::new(bconcat!(
             "There is no version of Composer available for your PHP version (",
-            shirabe_php_rpc::get_php_version().version,
+            shirabe_php_rpc::get_php_version()?.version,
             ")"
         ))))
     }

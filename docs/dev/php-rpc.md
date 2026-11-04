@@ -138,9 +138,9 @@ same dispatch while waiting for its own `Return`.
   is killed by the signal that killed it, as Composer would be by a plugin's `exit()`, a fatal
   error or a signal.
 - The outer `anyhow::Result` of `call_function`, `call_static_method`, `new_object` and
-  `call_php_method` is the fatal lane: broken
-  framing, oversized frames, and an I/O failure while the worker is still running (with its
-  state attached as context).
+  `call_php_method` is the fatal lane: a worker that cannot be spawned (no PHP executable, for
+  one), broken framing, oversized frames, and an I/O failure while the worker is still running
+  (with its state attached as context).
 - The inner `Result<PluginValue, PhpThrow>` is the recoverable lane: a PHP exception crossing
   the boundary as a `Throw` frame.
 - An exception crosses as its description, the list a `Throw` frame carries as its payload, and
@@ -162,8 +162,6 @@ same dispatch while waiting for its own `Return`.
   Rust side ports, listed in `MaterializedThrowable::PROPERTIES`.
 - A frame that decodes to something protocol-invalid is a bug in Shirabe itself (both halves
   ship in the same commit) and panics; the PHP side symmetrically dies so Rust observes EOF.
-- The legacy scalar query API (`get_php_version` etc.) keeps its historical contract: every
-  failure panics.
 - There is no timeout. A plugin that never returns hangs Shirabe exactly as it hangs Composer,
   which runs it in its own process.
 

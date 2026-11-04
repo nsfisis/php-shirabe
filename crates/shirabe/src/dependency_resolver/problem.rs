@@ -379,7 +379,9 @@ impl Problem {
                 let version = Self::get_platform_package_version(
                     pool,
                     package_name,
-                    shirabe_php_rpc::phpversion("").unwrap_or_default().as_ref(),
+                    shirabe_php_rpc::phpversion("")?
+                        .unwrap_or_default()
+                        .as_ref(),
                 );
 
                 let msg = bconcat!(
@@ -453,7 +455,7 @@ impl Problem {
                     " but "
                 );
 
-                let runtime_version = shirabe_php_rpc::phpversion(&ext);
+                let runtime_version = shirabe_php_rpc::phpversion(&ext)?;
                 let effective_version = match runtime_version {
                     None => BString::from("0"),
                     Some(v) => v,

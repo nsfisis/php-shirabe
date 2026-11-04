@@ -42,7 +42,7 @@ fn test_find_file() {
             .add_psr4("ShinyVendor\\ShinyPackage\\", vec![fixtures.clone()], false)
             .unwrap();
         assert_eq!(
-            loader.find_file(class),
+            loader.find_file(class).unwrap(),
             Some(bconcat!(fixtures, "/", file)),
             "->findFile() finds '{}'",
             class.display_lossy()

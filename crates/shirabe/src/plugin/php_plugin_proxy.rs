@@ -319,14 +319,16 @@ pub(crate) fn io_stub_class(
 /// registered loaders are the only autoload stack here, registering a second plugin loader under
 /// the same vendor-dir evicts the first one, and a class of the earlier plugin that was never
 /// loaded can become unresolvable (PHP would still find it).
-pub(crate) fn find_file_in_registered_loaders(class: impl AsRef<[u8]>) -> Option<BString> {
+pub(crate) fn find_file_in_registered_loaders(
+    class: impl AsRef<[u8]>,
+) -> anyhow::Result<Option<BString>> {
     let class = class.as_ref();
     for (_vendor_dir, mut loader) in ClassLoader::get_registered_loaders() {
-        if let Some(file) = loader.find_file(class) {
-            return Some(file);
+        if let Some(file) = loader.find_file(class)? {
+            return Ok(Some(file));
         }
     }
-    None
+    Ok(None)
 }
 
 /// Serves `CallRustMethod` requests from the child while a plugin-related call is in flight:
@@ -354,7 +356,9 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
                 let class = arg::<BString>(method_name, &args, 0)?;
-                return Ok(find_file_in_registered_loaders(&class).to_wire());
+                return Ok(find_file_in_registered_loaders(&class)
+                    .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?
+                    .to_wire());
             }
             if method_name == "__shirabe_run_rust_command" {
                 let name = arg::<BString>(method_name, &args, 0)?;
@@ -3120,7 +3124,7 @@ pub(crate) fn unavailable_method(class: impl AsRef<[u8]>, method: impl AsRef<[u8
 /// exception keeps that exception's class, code and declared state, so a plugin catches what it
 /// would catch under Composer; one carrying no exception keeps the `RuntimeException` shape,
 /// with `context` naming the call that failed.
-fn error_throw(context: impl AsRef<[u8]>, error: &anyhow::Error) -> PhpThrow {
+pub(crate) fn error_throw(context: impl AsRef<[u8]>, error: &anyhow::Error) -> PhpThrow {
     match AnyThrowable::of(error) {
         Some(exception) => exception_into_throw(exception, error),
         None => PhpThrow::runtime(bconcat!(context.as_ref(), ": ", error_chain_message(error))),

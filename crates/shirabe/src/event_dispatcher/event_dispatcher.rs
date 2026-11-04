@@ -10,7 +10,7 @@ use crate::event_dispatcher::{
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::plugin::php_call::PhpCall;
-use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, unavailable_method};
+use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, error_throw, unavailable_method};
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
@@ -1648,16 +1648,16 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                         ))));
                     }
                 };
-                return Ok(
-                    match self
-                        .loader
-                        .as_mut()
-                        .and_then(|loader| loader.find_file(class))
-                    {
-                        Some(file) => PluginValue::string(file),
-                        None => PluginValue::Null,
-                    },
-                );
+                let file = match self.loader.as_mut() {
+                    Some(loader) => loader
+                        .find_file(class)
+                        .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?,
+                    None => None,
+                };
+                return Ok(match file {
+                    Some(file) => PluginValue::string(file),
+                    None => PluginValue::Null,
+                });
             }
             if method_name == "__shirabeConstruct" {
                 return crate::plugin::php_plugin_proxy::construct_entity(&args);

@@ -559,7 +559,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
             .is_none_or(|v| v.is_empty());
 
         if !has_zip_archive && unzip_commands_empty {
-            let ini_message = IniHelper::get_message();
+            let ini_message = IniHelper::get_message()?;
             let error = bconcat!(
                 "The zip extension and unzip/7z commands are both missing, skipping.\n",
                 ini_message

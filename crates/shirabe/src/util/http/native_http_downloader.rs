@@ -229,7 +229,7 @@ impl NativeHttpDownloader {
                 current_url.as_bstr(),
             )?;
             let send_options =
-                crate::util::StreamContextFactory::init_options(&current_url, send_options, true)?;
+                crate::util::StreamContextFactory::init_options(&current_url, send_options, true)??;
 
             let send_result = self
                 .send_once(current_url.as_bstr(), &send_options, copy_to, &attributes)

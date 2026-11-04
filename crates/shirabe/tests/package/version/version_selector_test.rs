@@ -670,7 +670,7 @@ fn test_false_returned_on_no_packages() {
 
 #[test]
 fn test_find_recommended_require_version() {
-    let php = shirabe_php_rpc::get_php_version();
+    let php = shirabe_php_rpc::get_php_version().unwrap();
     let php_version = bconcat!(php.major, ".", php.minor, ".", php.release);
     // real version, expected recommendation, [branch-alias], [pkg name]
     let cases: Vec<(BString, &BStr, Option<&BStr>, &BStr)> = vec![

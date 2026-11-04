@@ -40,28 +40,39 @@ static PHP_VERSION: OnceLock<PhpVersion> = OnceLock::new();
 
 /// The PHP version the worker runs. The worker is queried once per process; subsequent calls
 /// reuse the cached constants.
-pub fn get_php_version() -> &'static PhpVersion {
-    PHP_VERSION.get_or_init(|| PhpVersion {
-        version: string_constant("PHP_VERSION"),
-        version_id: int_constant("PHP_VERSION_ID"),
-        major: int_constant("PHP_MAJOR_VERSION"),
-        minor: int_constant("PHP_MINOR_VERSION"),
-        release: int_constant("PHP_RELEASE_VERSION"),
+pub fn get_php_version() -> anyhow::Result<&'static PhpVersion> {
+    cached(&PHP_VERSION, || {
+        Ok(PhpVersion {
+            version: constant("PHP_VERSION")?,
+            version_id: constant("PHP_VERSION_ID")?,
+            major: constant("PHP_MAJOR_VERSION")?,
+            minor: constant("PHP_MINOR_VERSION")?,
+            release: constant("PHP_RELEASE_VERSION")?,
+        })
     })
 }
 
 /// PHP `\PHP_BINARY`.
-pub fn get_php_binary() -> std::path::PathBuf {
-    path_from_bytes(&string_constant("PHP_BINARY")).to_path_buf()
+pub fn get_php_binary() -> anyhow::Result<std::path::PathBuf> {
+    constant("PHP_BINARY")
 }
 
 /// PHP `constant($name)`.
-fn string_constant(name: impl AsRef<[u8]>) -> BString {
+fn constant<T: FromWire>(name: impl AsRef<[u8]>) -> anyhow::Result<T> {
     query("constant", name.as_ref().as_bstr())
 }
 
-fn int_constant(name: impl AsRef<[u8]>) -> i64 {
-    query("constant", name.as_ref().as_bstr())
+/// The value `cell` caches, computing it with `init` on first use. A failed `init` caches
+/// nothing, so the next call asks again.
+fn cached<T>(
+    cell: &'static OnceLock<T>,
+    init: impl FnOnce() -> anyhow::Result<T>,
+) -> anyhow::Result<&'static T> {
+    if let Some(value) = cell.get() {
+        return Ok(value);
+    }
+    let value = init()?;
+    Ok(cell.get_or_init(|| value))
 }
 
 wire_record! {
@@ -194,8 +205,8 @@ static DIAGNOSTICS: OnceLock<Diagnostics> = OnceLock::new();
 
 /// PHP runtime information for the `diagnose` command. The worker is queried once per process;
 /// subsequent calls reuse the cached payload.
-pub fn get_diagnostics() -> &'static Diagnostics {
-    DIAGNOSTICS.get_or_init(|| {
+pub fn get_diagnostics() -> anyhow::Result<&'static Diagnostics> {
+    cached(&DIAGNOSTICS, || {
         query(
             "diagnose",
             DiagnoseQuery {
@@ -460,8 +471,8 @@ static PLATFORM_INFO: OnceLock<PlatformInfo> = OnceLock::new();
 
 /// PHP runtime information for `PlatformRepository`. The worker is queried once per process;
 /// subsequent calls reuse the cached payload.
-pub fn get_platform_info() -> &'static PlatformInfo {
-    PLATFORM_INFO.get_or_init(|| {
+pub fn get_platform_info() -> anyhow::Result<&'static PlatformInfo> {
+    cached(&PLATFORM_INFO, || {
         let payload: PlatformPayload = query(
             "platform",
             PlatformQuery {
@@ -469,8 +480,8 @@ pub fn get_platform_info() -> &'static PlatformInfo {
                 classes: bstr_list(PLATFORM_CLASSES),
                 extension_info: bstr_list(PLATFORM_EXTENSION_INFO),
             },
-        );
-        PlatformInfo {
+        )?;
+        Ok(PlatformInfo {
             extensions: payload.extensions,
             extension_versions: payload.extension_versions,
             extension_info: payload.extension_info,
@@ -492,55 +503,59 @@ pub fn get_platform_info() -> &'static PlatformInfo {
             resource_bundle_version: payload.resource_bundle_version,
             intl_char_unicode_version: payload.intl_char_unicode_version,
             imagick_version_string: payload.imagick_version_string,
-        }
+        })
     })
 }
 
-/// Runs a composite query, whose answer only the worker's own code writes.
-fn query<T: FromWire>(name: impl AsRef<[u8]>, request: impl ToWire) -> T {
+/// Runs a query against the worker: a PHP function, or an entry point answering one consumer's
+/// questions about the runtime. A failure to reach the worker and an exception the call throws are
+/// errors; an answer that does not decode as `T` is a protocol violation, because only the
+/// worker's own code or a PHP builtin with a fixed return type writes it.
+fn query<T: FromWire>(name: impl AsRef<[u8]>, request: impl ToWire) -> anyhow::Result<T> {
     let name = name.as_ref().as_bstr();
-    let outcome = call_internal_function(name, vec![request.to_wire()])
-        .unwrap_or_else(|e| panic!("PHP RPC: request {name:?} failed: {e:#}"));
-    match outcome {
-        Ok(value) => protocol_value(&value, bconcat!("the answer of ", name)),
-        Err(throw) => panic!("PHP RPC: request {name:?} threw {throw}"),
-    }
+    let value = call_internal_function(name, vec![request.to_wire()])??;
+    Ok(protocol_value(&value, bconcat!("the answer of ", name)))
+}
+
+/// A PHP function answering `string|false`, with `false` mapped to `None`.
+fn string_or_false(name: impl AsRef<[u8]>, arg: &BStr) -> anyhow::Result<Option<BString>> {
+    let name = name.as_ref();
+    Ok(match query(name, arg)? {
+        PhpMixed::String(s) => Some(s),
+        PhpMixed::Bool(false) => None,
+        other => panic!(
+            "PHP RPC: protocol violation — `{}` answered with {other:?}",
+            name.as_bstr().display_lossy()
+        ),
+    })
 }
 
 /// PHP `phpversion($extension)`.
-pub fn phpversion(extension: impl AsRef<[u8]>) -> Option<BString> {
-    match query("phpversion", extension.as_ref().as_bstr()) {
-        PhpMixed::String(s) => Some(s),
-        PhpMixed::Bool(false) => None,
-        other => panic!("PHP RPC: `phpversion` returned an unexpected value: {other:?}"),
-    }
+pub fn phpversion(extension: impl AsRef<[u8]>) -> anyhow::Result<Option<BString>> {
+    string_or_false("phpversion", extension.as_ref().as_bstr())
 }
 
 /// PHP `stream_resolve_include_path($filename)`. It is answered by the worker because the
 /// `include_path` it searches is the worker's own, including whatever a required `autoload_real.php`
 /// put there with `set_include_path()`.
-pub fn stream_resolve_include_path(filename: impl AsRef<[u8]>) -> Option<std::path::PathBuf> {
-    let filename = filename.as_ref();
-    match query("stream_resolve_include_path", filename.as_bstr()) {
-        PhpMixed::String(s) => Some(path_from_bytes(&s).to_path_buf()),
-        PhpMixed::Bool(false) => None,
-        other => {
-            panic!("PHP RPC: `stream_resolve_include_path` returned an unexpected value: {other:?}")
-        }
-    }
+pub fn stream_resolve_include_path(
+    filename: impl AsRef<[u8]>,
+) -> anyhow::Result<Option<std::path::PathBuf>> {
+    let resolved = string_or_false("stream_resolve_include_path", filename.as_ref().as_bstr())?;
+    Ok(resolved.map(|s| path_from_bytes(&s).to_path_buf()))
 }
 
 /// What `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` measures: `[(string)
 /// php_ini_loaded_file()]` merged with the trimmed, comma-split `php_ini_scanned_files()` list
 /// when scanning is active. The worker runs on the ini files of the machine, so these are the
 /// user's own.
-pub fn get_all_ini_files() -> Vec<std::path::PathBuf> {
+pub fn get_all_ini_files() -> anyhow::Result<Vec<std::path::PathBuf>> {
     query("get_all_ini_files", PluginValue::Null)
 }
 
 /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()` as measured in the worker, which is
 /// the process Xdebug is loaded into.
-fn xdebug_active() -> bool {
+fn xdebug_active() -> anyhow::Result<bool> {
     query("xdebug_active", PluginValue::Null)
 }
 
@@ -1214,13 +1229,6 @@ fn with_worker<T>(f: impl FnOnce(&mut Worker) -> T) -> anyhow::Result<T> {
     Ok(f(worker))
 }
 
-/// Spawns the PHP worker unless it is already running, and reports a failed spawn as an error.
-/// The scalar query API (`get_php_version` etc.) panics on any failure, so an entry point calls
-/// this before its first query to report a missing or broken PHP as an ordinary error.
-pub fn ensure_worker() -> anyhow::Result<()> {
-    with_worker(|_| ())
-}
-
 /// Writes one frame while holding the worker mutex only for the duration of the write, so the
 /// session owner (see `session`) can interleave sends and blocking reads without keeping the
 /// worker locked across a whole call. A `ReleasePhpHandle` for every P handle dropped since the
@@ -1419,7 +1427,7 @@ mod tests {
 
         // XdebugHandler::getAllIniFiles() always yields at least one entry, which is the empty
         // string when no php.ini is loaded.
-        assert!(!get_all_ini_files().is_empty());
+        assert!(!get_all_ini_files().unwrap().is_empty());
     }
 
     #[test]
@@ -1429,10 +1437,10 @@ mod tests {
             return;
         }
 
-        let diagnostics = get_diagnostics();
-        assert_eq!(diagnostics.php_version, get_php_version().version);
+        let diagnostics = get_diagnostics().unwrap();
+        assert_eq!(diagnostics.php_version, get_php_version().unwrap().version);
         assert!(diagnostics.php_version_id >= 70205);
-        let php_binary = get_php_binary();
+        let php_binary = get_php_binary().unwrap();
         assert_eq!(
             diagnostics.php_binary.as_deref(),
             Some(php_binary.as_path())
@@ -1453,7 +1461,7 @@ mod tests {
             return;
         }
 
-        let php = get_php_version();
+        let php = get_php_version().unwrap();
         assert!(!php.version.is_empty(), "expected a PHP version");
         assert_eq!(
             php.version
@@ -1469,7 +1477,7 @@ mod tests {
             php.major * 10000 + php.minor * 100 + php.release
         );
 
-        let binary = get_php_binary();
+        let binary = get_php_binary().unwrap();
         assert!(!binary.as_os_str().is_empty(), "expected a PHP binary path");
         assert!(
             std::path::Path::new(&binary).exists(),
@@ -1485,7 +1493,7 @@ mod tests {
             return;
         }
 
-        let platform_info = get_platform_info();
+        let platform_info = get_platform_info().unwrap();
 
         let extensions = platform_info.get_extensions();
         assert!(
@@ -1494,7 +1502,7 @@ mod tests {
         );
         assert_eq!(
             platform_info.get_extension_version("Core"),
-            get_php_version().version
+            get_php_version().unwrap().version
         );
 
         assert!(platform_info.has_constant("PHP_VERSION", None));

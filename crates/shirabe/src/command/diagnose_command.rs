@@ -132,7 +132,7 @@ impl DiagnoseCommand {
     }
 
     fn check_git(&self) -> anyhow::Result<BString> {
-        if !shirabe_php_rpc::get_diagnostics().function_exists("proc_open") {
+        if !shirabe_php_rpc::get_diagnostics()?.function_exists("proc_open") {
             return Ok(BString::from(
                 "<comment>proc_open is not available, git cannot be used</comment>",
             ));
@@ -187,7 +187,7 @@ impl DiagnoseCommand {
         proto: &BStr,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
     ) -> anyhow::Result<CheckResult> {
-        let result = self.check_connectivity_and_composer_network_http_enablement();
+        let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
@@ -251,7 +251,7 @@ impl DiagnoseCommand {
         url: &BStr,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
     ) -> anyhow::Result<CheckResult> {
-        let result = self.check_connectivity_and_composer_network_http_enablement();
+        let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
@@ -315,7 +315,7 @@ impl DiagnoseCommand {
         proxy: &RequestProxy,
         protocol: &BStr,
     ) -> anyhow::Result<CheckResult> {
-        let result = self.check_connectivity_and_composer_network_http_enablement();
+        let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
@@ -402,7 +402,7 @@ impl DiagnoseCommand {
     }
 
     fn check_github_oauth(&self, domain: &BStr, token: &BStr) -> anyhow::Result<CheckResult> {
-        let result = self.check_connectivity_and_composer_network_http_enablement();
+        let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
@@ -467,7 +467,7 @@ impl DiagnoseCommand {
         domain: &BStr,
         token: Option<&BStr>,
     ) -> anyhow::Result<GithubRateLimit> {
-        let result = self.check_connectivity_and_composer_network_http_enablement();
+        let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(GithubRateLimit::Unavailable(result));
         }
@@ -512,9 +512,9 @@ impl DiagnoseCommand {
             .unwrap_or(GithubRateLimit::Unavailable(CheckResult::Failed)))
     }
 
-    fn check_disk_space(&self, config: &Config) -> CheckResult {
-        if !shirabe_php_rpc::get_diagnostics().function_exists("disk_free_space") {
-            return CheckResult::Ok;
+    fn check_disk_space(&self, config: &Config) -> anyhow::Result<CheckResult> {
+        if !shirabe_php_rpc::get_diagnostics()?.function_exists("disk_free_space") {
+            return Ok(CheckResult::Ok);
         }
 
         let min_space_free: f64 = (1024 * 1024) as f64;
@@ -522,24 +522,24 @@ impl DiagnoseCommand {
         let dir = path_from_bytes(home_dir.as_string().unwrap_or_default());
         let df_home = disk_free_space(dir);
         if df_home.map(|d| d < min_space_free).unwrap_or(false) {
-            return CheckResult::Message(bconcat!(
+            return Ok(CheckResult::Message(bconcat!(
                 "<error>The disk hosting ",
                 dir,
                 " is full</error>"
-            ));
+            )));
         }
         let vendor_dir = config.get("vendor-dir");
         let dir = path_from_bytes(vendor_dir.as_string().unwrap_or_default());
         let df_vendor = disk_free_space(dir);
         if df_vendor.map(|d| d < min_space_free).unwrap_or(false) {
-            return CheckResult::Message(bconcat!(
+            return Ok(CheckResult::Message(bconcat!(
                 "<error>The disk hosting ",
                 dir,
                 " is full</error>"
-            ));
+            )));
         }
 
-        CheckResult::Ok
+        Ok(CheckResult::Ok)
     }
 
     fn check_pub_keys(&self, config: &Config) -> anyhow::Result<CheckResult> {
@@ -595,7 +595,7 @@ impl DiagnoseCommand {
         &self,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
     ) -> anyhow::Result<CheckResult> {
-        let result = self.check_connectivity_and_composer_network_http_enablement();
+        let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
@@ -633,7 +633,7 @@ impl DiagnoseCommand {
         &self,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
     ) -> anyhow::Result<CheckResult> {
-        let result = self.check_connectivity_and_composer_network_http_enablement();
+        let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
@@ -730,15 +730,16 @@ impl DiagnoseCommand {
         Ok(CheckResult::Ok)
     }
 
-    fn get_curl_version(&self) -> BString {
-        if shirabe_php_rpc::get_diagnostics().extension_loaded("curl") {
+    fn get_curl_version(&self) -> anyhow::Result<BString> {
+        let diagnostics = shirabe_php_rpc::get_diagnostics()?;
+        if diagnostics.extension_loaded("curl") {
             if !HttpDownloader::is_curl_enabled() {
-                return BString::from(
+                return Ok(BString::from(
                     "<error>disabled via disable_functions; Shirabe itself does not use curl, but some plugins may be affected</error>",
-                );
+                ));
             }
 
-            let version = shirabe_php_rpc::get_diagnostics()
+            let version = diagnostics
                 .curl
                 .as_ref()
                 .expect("the diagnose payload carries curl details while the extension is loaded");
@@ -774,7 +775,7 @@ impl DiagnoseCommand {
                 http_versions.push_str(", 3");
             }
 
-            return bconcat!(
+            return Ok(bconcat!(
                 "<comment>",
                 version.version,
                 "</comment> libz <comment>",
@@ -788,12 +789,12 @@ impl DiagnoseCommand {
                 "</comment> HTTP <comment>",
                 http_versions,
                 "</comment>"
-            );
+            ));
         }
 
-        BString::from(
+        Ok(BString::from(
             "<error>missing; Shirabe itself does not use curl, but some plugins may be affected</error>",
-        )
+        ))
     }
 
     fn output_result(&self, result: CheckResult) {
@@ -850,10 +851,10 @@ impl DiagnoseCommand {
         let mut output = BString::default();
         let mut display_ini_message = false;
 
-        let mut ini_message = bconcat!(PHP_EOL, PHP_EOL, IniHelper::get_message());
+        let mut ini_message = bconcat!(PHP_EOL, PHP_EOL, IniHelper::get_message()?);
         ini_message.push_str(&bconcat!(PHP_EOL, "If you can not modify the ini file, you can also run `php -d option=value` to modify ini values on the fly. You can use -d multiple times."));
 
-        let diagnostics = shirabe_php_rpc::get_diagnostics();
+        let diagnostics = shirabe_php_rpc::get_diagnostics()?;
 
         // PHP stores `true` for an issue with no detail, and a version string otherwise.
         let mut errors: IndexMap<BString, Option<BString>> = IndexMap::new();
@@ -1173,30 +1174,32 @@ impl DiagnoseCommand {
     }
 
     /// Check if allow_url_fopen is ON
-    fn check_connectivity(&self) -> CheckResult {
+    fn check_connectivity(&self) -> anyhow::Result<CheckResult> {
         // PHP: if (!ini_get('allow_url_fopen')) — a missing setting, "" and "0" are all falsey.
-        let allow_url_fopen = shirabe_php_rpc::get_diagnostics().ini_get("allow_url_fopen");
+        let allow_url_fopen = shirabe_php_rpc::get_diagnostics()?.ini_get("allow_url_fopen");
         if !allow_url_fopen.is_some_and(|value| !value.is_empty() && value != "0") {
-            return CheckResult::Message(BString::from(
+            return Ok(CheckResult::Message(BString::from(
                 "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>",
-            ));
+            )));
         }
 
-        CheckResult::Ok
+        Ok(CheckResult::Ok)
     }
 
-    fn check_connectivity_and_composer_network_http_enablement(&self) -> CheckResult {
-        let result = self.check_connectivity();
+    fn check_connectivity_and_composer_network_http_enablement(
+        &self,
+    ) -> anyhow::Result<CheckResult> {
+        let result = self.check_connectivity()?;
         if !matches!(result, CheckResult::Ok) {
-            return result;
+            return Ok(result);
         }
 
         let result = self.check_composer_network_http_enablement();
         if !matches!(result, CheckResult::Ok) {
-            return result;
+            return Ok(result);
         }
 
-        CheckResult::Ok
+        Ok(CheckResult::Ok)
     }
 
     /// Check if Composer network is enabled for HTTP/S
@@ -1345,7 +1348,7 @@ impl Command for DiagnoseCommand {
             "</comment>"
         ));
 
-        let diagnostics = shirabe_php_rpc::get_diagnostics();
+        let diagnostics = shirabe_php_rpc::get_diagnostics()?;
 
         if let Some(php_binary) = &diagnostics.php_binary {
             io.write(bconcat!(
@@ -1362,7 +1365,7 @@ impl Command for DiagnoseCommand {
                 None => BString::from("<error>missing</error>"),
             }
         ));
-        io.write(bconcat!("curl version: ", self.get_curl_version()));
+        io.write(bconcat!("curl version: ", self.get_curl_version()?));
 
         let finder = ExecutableFinder::new();
         let has_system_unzip = finder.find("unzip", None, &[]).is_some();
@@ -1504,7 +1507,7 @@ impl Command for DiagnoseCommand {
         if let Err(e) = proxy_check_result {
             if let Some(_te) = e.catch::<TransportException>() {
                 io.write_no_newline("Checking HTTP proxy: ");
-                let status = self.check_connectivity_and_composer_network_http_enablement();
+                let status = self.check_connectivity_and_composer_network_http_enablement()?;
                 self.output_result(if matches!(status, CheckResult::Message(_)) {
                     status
                 } else {
@@ -1553,7 +1556,7 @@ impl Command for DiagnoseCommand {
         }
 
         io.write_no_newline("Checking disk free space: ");
-        let r = self.check_disk_space(&config.borrow());
+        let r = self.check_disk_space(&config.borrow())?;
         self.output_result(r);
 
         Ok(self.exit_code.get())

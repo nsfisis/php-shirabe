@@ -433,7 +433,7 @@ impl PluginManager {
             let mut class = class;
             if self.php_runtime_class_exists(class.as_bstr(), false)? {
                 class = trim2(&class, "\\");
-                let path = class_loader.find_file(&class).unwrap_or_else(|| {
+                let path = class_loader.find_file(&class)?.unwrap_or_else(|| {
                     panic!(
                         "plugin class `{}` is already defined but has no autoloadable file",
                         class.display_lossy()

@@ -31,6 +31,15 @@ constants, classes and extension info for `platform`) with the query, so the lis
 there, and decodes the answer into a struct cached in a `OnceLock` (`Diagnostics` for
 `diagnose`, `PlatformInfo` for `platform`) whose accessors panic on a name the list does not hold.
 
+The functions of `shirabe-php-rpc` that answer questions about the runtime — the two composite
+queries (`get_diagnostics`, `get_platform_info`), the PHP version and binary, and the few PHP
+functions whose answer depends on the worker (`phpversion`, `stream_resolve_include_path`, the
+loaded ini files, whether Xdebug is active) — return `anyhow::Result` like every other call into
+the worker: a worker that cannot be spawned or reached, and an exception the call throws, are
+errors the caller propagates. An answer that does not decode is a protocol violation and panics,
+since only the worker's own code or a PHP builtin with a fixed return type writes it. A cached
+answer is cached only once it has arrived, so a failed query is asked again on the next call.
+
 ### Records
 
 A composite payload — the answer of a composite query, the console application handoff, a

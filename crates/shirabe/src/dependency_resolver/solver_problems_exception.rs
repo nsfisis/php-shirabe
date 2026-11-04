@@ -81,7 +81,7 @@ impl SolverProblemsException {
         }
 
         if !missing_extensions.is_empty() {
-            hints.push(self.create_extension_hint(&missing_extensions));
+            hints.push(self.create_extension_hint(&missing_extensions)?);
         }
 
         if is_caused_by_lock
@@ -114,12 +114,12 @@ impl SolverProblemsException {
         &self.problems
     }
 
-    fn create_extension_hint(&self, missing_extensions: &[BString]) -> BString {
-        let mut paths = IniHelper::get_all();
+    fn create_extension_hint(&self, missing_extensions: &[BString]) -> anyhow::Result<BString> {
+        let mut paths = IniHelper::get_all()?;
 
         if paths.first().is_some_and(|s| s.as_os_str().is_empty()) {
             if paths.len() == 1 {
-                return BString::default();
+                return Ok(BString::default());
             }
             paths.remove(0);
         }
@@ -147,7 +147,7 @@ impl SolverProblemsException {
             "` to temporarily ignore these required extensions."
         ));
 
-        text
+        Ok(text)
     }
 
     fn get_extension_problems(

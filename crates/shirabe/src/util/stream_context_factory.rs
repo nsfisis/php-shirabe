@@ -21,7 +21,7 @@ impl StreamContextFactory {
         url: impl AsRef<[u8]>,
         default_options: IndexMap<BString, PhpMixed>,
         default_params: IndexMap<BString, PhpMixed>,
-    ) -> anyhow::Result<PhpMixed, Box<TransportException>> {
+    ) -> anyhow::Result<Result<PhpMixed, Box<TransportException>>> {
         let mut options: IndexMap<BString, PhpMixed> = {
             let mut http = IndexMap::new();
             // specify defaults again to try and work better with curlwrappers enabled
@@ -34,7 +34,10 @@ impl StreamContextFactory {
 
         options = array_replace_recursive(
             options,
-            Self::init_options(url, default_options.clone(), false)?,
+            match Self::init_options(url, default_options.clone(), false)? {
+                Ok(options) => options,
+                Err(e) => return Ok(Err(e)),
+            },
         );
         let default_options = {
             let mut o = default_options;
@@ -55,14 +58,14 @@ impl StreamContextFactory {
             );
         }
 
-        Ok(stream_context_create(&options, Some(&default_params)))
+        Ok(Ok(stream_context_create(&options, Some(&default_params))))
     }
 
     pub fn init_options(
         url: impl AsRef<[u8]>,
         mut options: IndexMap<BString, PhpMixed>,
         for_curl: bool,
-    ) -> anyhow::Result<IndexMap<BString, PhpMixed>, Box<TransportException>> {
+    ) -> anyhow::Result<Result<IndexMap<BString, PhpMixed>, Box<TransportException>>> {
         let url = url.as_ref();
         // Make sure the headers are in an array form
         let has_header = options
@@ -95,35 +98,38 @@ impl StreamContextFactory {
         if !for_curl {
             let proxy_manager = ProxyManager::get_instance();
             let proxy_manager = proxy_manager.as_ref().unwrap();
-            let proxy = proxy_manager.get_proxy_for_request(url)?;
+            let proxy = match proxy_manager.get_proxy_for_request(url) {
+                Ok(proxy) => proxy,
+                Err(e) => return Ok(Err(e)),
+            };
             let proxy_options = proxy.get_context_options();
             if let Some(proxy_options) = proxy_options {
                 let is_https_request = url.starts_with(b"https://");
 
                 if proxy.is_secure() {
                     if !extension_loaded("openssl") {
-                        return Err(Box::new(TransportException::new(
+                        return Ok(Err(Box::new(TransportException::new(
                             BString::from(
                                 "You must enable the openssl extension to use a secure proxy.",
                             ),
                             0,
-                        )));
+                        ))));
                     }
                     if is_https_request {
-                        return Err(Box::new(TransportException::new(
+                        return Ok(Err(Box::new(TransportException::new(
                             BString::from(
                                 "You must enable the curl extension to make https requests through a secure proxy.",
                             ),
                             0,
-                        )));
+                        ))));
                     }
                 } else if is_https_request && !extension_loaded("openssl") {
-                    return Err(Box::new(TransportException::new(
+                    return Ok(Err(Box::new(TransportException::new(
                         BString::from(
                             "You must enable the openssl extension to make https requests through a proxy.",
                         ),
                         0,
-                    )));
+                    ))));
                 }
 
                 // Header will be a Proxy-Authorization string or not set
@@ -150,7 +156,7 @@ impl StreamContextFactory {
             }
         }
 
-        let php = shirabe_php_rpc::get_php_version();
+        let php = shirabe_php_rpc::get_php_version()?;
         let php_version = bconcat!("PHP ", php.major, ".", php.minor, ".", php.release);
 
         let http_version = if for_curl {
@@ -210,7 +216,7 @@ impl StreamContextFactory {
             }
         }
 
-        Ok(options)
+        Ok(Ok(options))
     }
 
     pub fn get_tls_defaults(

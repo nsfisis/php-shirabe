@@ -93,7 +93,7 @@ impl ArchiveDownloader for RarDownloader {
         }
 
         if !class_exists("RarArchive") {
-            let ini_message = IniHelper::get_message();
+            let ini_message = IniHelper::get_message()?;
             let error = if !Platform::is_windows() {
                 bconcat!(
                     "Could not decompress the archive, enable the PHP rar extension.\n",

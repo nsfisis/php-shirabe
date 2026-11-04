@@ -1881,8 +1881,6 @@ impl ApplicationHandle {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i32> {
         let application = &self.0;
-        shirabe_php_rpc::ensure_worker()?;
-
         application.borrow_mut().disable_plugins_by_default = input
             .borrow()
             .has_parameter_option(&["--no-plugins"], false);
@@ -2189,7 +2187,7 @@ impl ApplicationHandle {
                     ", based on Composer ",
                     composer::VERSION,
                     ") with PHP ",
-                    shirabe_php_rpc::get_php_version().version,
+                    shirabe_php_rpc::get_php_version()?.version,
                     " on ",
                     php_uname("s"),
                     " / ",
@@ -2199,11 +2197,11 @@ impl ApplicationHandle {
                 io_interface::DEBUG,
             );
 
-            if shirabe_php_rpc::get_php_version().version_id < 70205 {
-                io.write_error(bconcat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP ", shirabe_php_rpc::get_php_version().version, ". Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>"));
+            if shirabe_php_rpc::get_php_version()?.version_id < 70205 {
+                io.write_error(bconcat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP ", shirabe_php_rpc::get_php_version()?.version, ". Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>"));
             }
 
-            if shirabe_php_rpc::xdebug::is_xdebug_active()
+            if shirabe_php_rpc::xdebug::is_xdebug_active()?
                 && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none()
             {
                 io.write_error("<warning>Shirabe is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
@@ -2355,7 +2353,7 @@ impl ApplicationHandle {
                                 // `Composer\Command\AboutCommand`) is imported as a command by
                                 // PHP but falls through to ScriptAliasCommand here.
                                 let is_command_class = is_string(dummy)
-                                    && crate::plugin::find_file_in_registered_loaders(dummy_str)
+                                    && crate::plugin::find_file_in_registered_loaders(dummy_str)?
                                         .is_some()
                                     && {
                                         let cache_dir = match composer_opt {
@@ -2484,9 +2482,9 @@ impl ApplicationHandle {
             {
                 io.write_error(bconcat!(
                     "<info>PHP</info> version <comment>",
-                    shirabe_php_rpc::get_php_version().version,
+                    shirabe_php_rpc::get_php_version()?.version,
                     "</comment> (",
-                    shirabe_php_rpc::get_php_binary(),
+                    shirabe_php_rpc::get_php_binary()?,
                     ")"
                 ));
                 io.write_error(
