@@ -1,7 +1,7 @@
 # PHP RPC
 
-Composer can require a specific PHP version or loaded extensions, i.e., platform requirements,
-and its plugin/script machinery executes real PHP code. To mimic this behavior needs a real PHP
+Composer checks platform requirements (a specific PHP version or loaded extensions), and its
+plugin and script machinery executes real PHP code. Mimicking this behavior requires a real PHP
 runtime.
 
 The `shirabe-php-rpc` crate spawns the system PHP as a child process and talks to it over a Unix
@@ -9,7 +9,7 @@ domain socket. There is exactly one child process per Shirabe process, shared by
 
 ## Locating and spawning PHP
 
-The existing `PhpExecutableFinder` class resolves the PHP binary.
+The ported `PhpExecutableFinder` class resolves the PHP binary.
 
 The child is started with the following arguments:
 
@@ -86,10 +86,11 @@ property table, property names carrying PHP's visibility mangling), and each sid
 own value from those fields. `unserialize()` revives the PHP one without running a constructor,
 which is what makes the two directions equivalent: a value whose state a constructor cannot
 express has no faithful constructor call, and no field has to be read back out through
-reflection. The classes that may cross this way are a closed list on both sides — the PHP one, together with
-the descriptor classes, is the `allowed_classes` list of every `unserialize()` — so a record can
-never name an arbitrary class. Which classes are on the list, and how each one maps to a Rust value, is not part of the
-protocol; see "Materialized values" in [docs/dev/php-worker.md](./php-worker.md).
+reflection. The classes that may cross this way are a closed list on both sides — the PHP one,
+together with the descriptor classes, is the `allowed_classes` list of every `unserialize()` — so
+a record can never name an arbitrary class. Which classes are on the list, and how each one maps
+to a Rust value, is not part of the protocol; see "Materialized values" in
+[docs/dev/php-worker.md](./php-worker.md).
 
 An `a:` record decodes as `List` when its keys are exactly `0..N` and as `Array` otherwise; the
 wire has no shape for an object without a class, so such an object crosses as an array. A
@@ -131,8 +132,8 @@ mutex itself is only held per frame, not across a call.
 While a Rust-initiated call waits for its `Return`, incoming `CallRustMethod` frames are
 dispatched to the `RustMethodDispatcher` every call takes (the cooperative loop). The calls the
 crate makes for itself, none of which runs code that calls back, answer every callback with an
-explicit `Throw`, never a silent null. Rust handle
-0 is reserved for the runtime service endpoint, which answers calls that have no receiver entity.
+explicit `Throw`, never a silent null. Rust handle 0 is reserved for the runtime service endpoint,
+which answers calls that have no receiver entity.
 
 The PHP side mirrors this: its top level is a standing serve loop, and `callRust` drives the
 same dispatch while waiting for its own `Return`.

@@ -74,8 +74,8 @@ Notable internal helpers:
   even autoloadable there, i.e. no Composer PHP runtime and therefore no observer code.
 - `__shirabe_resolve_job` / `__shirabe_reject_job` — the settle pushes of a Rust-owned job: the
   worker resolves or rejects the `Deferred` behind the job's promise, which runs the callbacks
-  plugin code chained on it before the call returns. The rejection is the exception a
-  description of the kind a `Throw` frame carries stands for.
+  plugin code chained on it before the call returns. The rejection is the exception described in
+  the form a `Throw` frame carries.
 - `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, for a Rust method
   whose PHP signature declares `PromiseInterface` and that has the value before any job exists.
   The worker holds the promise under an even job id and answers with its `Job` descriptor,
@@ -204,8 +204,8 @@ resolved with highest priority, so these FQCNs can never be shadowed by the real
 Stubs are interned per rhandle (`WeakReference`-based registry) so identity (`===`) holds, and
 their destructors send `ReleaseRustHandle`. Reviving a stub for an existing entity bypasses its
 constructor (`newInstanceWithoutConstructor` plus `__shirabeBind`), because the constructor
-carries the real class's own signature and belongs to plugin code building a *new* entity. `clone` on a stub calls `__shirabe_clone` on the
-entity and rebinds the copy to the handle that answers, so the two stubs never share (and never
+carries the real class's own signature and belongs to plugin code building a *new* entity.
+`clone` on a stub calls `__shirabe_clone` on the entity and rebinds the copy to the handle that answers, so the two stubs never share (and never
 double-release) one entity; entities with no clone semantics answer with an explicit error.
 
 ## The R table
