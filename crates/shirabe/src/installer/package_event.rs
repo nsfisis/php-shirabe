@@ -2,12 +2,11 @@
 
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::event_dispatcher::{Event, EventInterface};
+use crate::event_dispatcher::Event;
 use crate::io::IOInterface;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 
 /// The operations are shared rather than owned so that the same operation crosses the plugin
 /// boundary as one object for both the pre- and the post-event, as it does in PHP.
@@ -72,32 +71,4 @@ impl PackageEvent {
     }
 }
 
-impl EventInterface for PackageEvent {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-
-    fn get_name(&self) -> &bstr::BStr {
-        self.inner.get_name()
-    }
-
-    fn get_arguments(&self) -> &Vec<bstr::BString> {
-        self.inner.get_arguments()
-    }
-
-    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
-        self.inner.get_flags()
-    }
-
-    fn is_propagation_stopped(&self) -> bool {
-        self.inner.is_propagation_stopped()
-    }
-
-    fn stop_propagation(&mut self) {
-        self.inner.stop_propagation();
-    }
-}
+crate::event_dispatcher::delegate_event_interface_to_inner!(PackageEvent, inner);
