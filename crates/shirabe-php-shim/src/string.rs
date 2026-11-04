@@ -354,6 +354,24 @@ pub fn implode(glue: impl AsRef<[u8]>, pieces: &[impl AsRef<[u8]>]) -> BString {
     BString::from(bstr::join(glue.as_ref(), pieces))
 }
 
+/// `implode()` of a value that may not be an array: its values are converted to strings, and
+/// anything else fails as PHP's type check does.
+pub fn implode_mixed(glue: impl AsRef<[u8]>, pieces: &PhpMixed) -> anyhow::Result<BString> {
+    let pieces: Vec<BString> = match pieces {
+        PhpMixed::List(list) => list.iter().map(crate::php_to_string).collect(),
+        PhpMixed::Array(map) => map.values().map(crate::php_to_string).collect(),
+        other => {
+            return Err(crate::TypeError::new(bconcat!(
+                "implode(): Argument #2 ($array) must be of type ?array, ",
+                crate::get_debug_type(other),
+                " given"
+            ))
+            .into());
+        }
+    };
+    Ok(implode(glue, &pieces))
+}
+
 pub fn explode(delimiter: impl AsRef<[u8]>, string: impl AsRef<[u8]>) -> Vec<BString> {
     string
         .as_ref()

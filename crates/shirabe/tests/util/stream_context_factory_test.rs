@@ -14,8 +14,8 @@ use shirabe::util::http::proxy_manager::ProxyManager;
 use shirabe::util::platform::Platform;
 use shirabe::util::stream_context_factory::StreamContextFactory;
 use shirabe_php_shim::{
-    PhpMixed, base64_encode, bconcat, extension_loaded, implode, stream_context_get_options,
-    stripos,
+    PhpMixed, base64_encode, bconcat, error_message, extension_loaded, implode,
+    stream_context_get_options, stripos,
 };
 
 fn s(value: &BStr) -> PhpMixed {
@@ -523,4 +523,75 @@ fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
     let headers = implode(" ", &header_list);
 
     assert!(stripos(&headers, "Proxy-Authorization").is_none());
+}
+
+// Not in Composer's test suite: the header handling of initOptions() and fixHttpHeaderField() for
+// values PHP converts or rejects.
+#[test]
+#[serial_test::serial]
+fn test_init_options_finds_the_user_agent_in_a_keyed_header_array() {
+    let _tear_down = TearDown;
+    set_up();
+
+    let options = map(vec![(
+        BStr::new("http"),
+        arr(vec![(
+            BStr::new("header"),
+            arr(vec![(BStr::new("ua"), s(BStr::new("User-Agent: foo")))]),
+        )]),
+    )]);
+    let options = StreamContextFactory::init_options("https://example.org", options, true)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        Some(&arr(vec![(
+            BStr::new("ua"),
+            s(BStr::new("User-Agent: foo"))
+        )])),
+        options
+            .get(B("http"))
+            .and_then(|http| http.get(B("header")))
+    );
+}
+
+#[test]
+#[serial_test::serial]
+fn test_init_options_rejects_a_scalar_header() {
+    let _tear_down = TearDown;
+    set_up();
+
+    let options = map(vec![(
+        BStr::new("http"),
+        arr(vec![(BStr::new("header"), PhpMixed::Int(1))]),
+    )]);
+    let error =
+        StreamContextFactory::init_options("https://example.org", options, true).unwrap_err();
+
+    assert!(
+        error_message(&error)
+            .contains_str("implode(): Argument #2 ($array) must be of type ?array, int given")
+    );
+}
+
+#[test]
+#[serial_test::serial]
+fn test_get_context_rejects_a_header_line_that_is_not_a_string() {
+    let _tear_down = TearDown;
+    set_up();
+
+    let options = map(vec![(
+        BStr::new("http"),
+        arr(vec![(
+            BStr::new("header"),
+            list(vec![s(BStr::new("X-Foo: bar")), PhpMixed::Int(1)]),
+        )]),
+    )]);
+    let error = StreamContextFactory::get_context("http://example.org", options, IndexMap::new())
+        .unwrap_err();
+
+    assert!(
+        error_message(&error)
+            .contains_str("stripos(): Argument #1 ($haystack) must be of type string, int given")
+    );
 }

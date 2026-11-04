@@ -15,9 +15,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed,
-    array_replace_recursive, bconcat, empty, extension_loaded, implode, intval, is_numeric,
-    path_to_bytes, pcre_check_utf8_subject, php_regex, php_truthy, preg_is_match, preg_match,
-    preg_replace, rawurldecode, stripos, strpos, substr, ucfirst, utf8_text,
+    array_replace_recursive, bconcat, empty, extension_loaded, implode, implode_mixed, intval,
+    is_numeric, path_to_bytes, pcre_check_utf8_subject, php_regex, php_truthy, preg_is_match,
+    preg_match, preg_replace, rawurldecode, stripos, strpos, substr, ucfirst, utf8_text,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -369,34 +369,13 @@ impl HttpDownloader {
         }
 
         if disabled {
-            let has_if_modified_since = {
-                let http_header = options
-                    .get(B("http"))
-                    .and_then(|v| match v {
-                        PhpMixed::Array(m) => m.get(B("header")),
-                        _ => None,
-                    })
-                    .cloned();
-                if let Some(PhpMixed::List(list)) = http_header.as_ref() {
-                    let joined = implode(
-                        "",
-                        &list
-                            .iter()
-                            .map(|v| v.as_string().unwrap_or_default())
-                            .collect::<Vec<_>>(),
-                    );
-                    stripos(&joined, "if-modified-since").is_some()
-                } else if let Some(PhpMixed::Array(m)) = http_header.as_ref() {
-                    let joined = implode(
-                        "",
-                        &m.values()
-                            .map(|v| v.as_string().unwrap_or_default())
-                            .collect::<Vec<_>>(),
-                    );
-                    stripos(&joined, "if-modified-since").is_some()
-                } else {
-                    false
-                }
+            let http_header = options
+                .get(B("http"))
+                .and_then(|http| http.get(B("header")))
+                .filter(|header| !header.is_null());
+            let has_if_modified_since = match http_header {
+                Some(header) => stripos(implode_mixed("", header)?, "if-modified-since").is_some(),
+                None => false,
             };
             if has_if_modified_since {
                 return Ok(Response::new(url, Some(304), Vec::new(), Some(Vec::new())));

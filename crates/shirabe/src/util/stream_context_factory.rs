@@ -5,12 +5,13 @@ use crate::downloader::TransportException;
 use crate::repository::PlatformRepository;
 use crate::util::http::ProxyManager;
 use crate::util::{Filesystem, Platform};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, array_replace_recursive, bconcat, explode, extension_loaded, implode, is_dir,
-    path_from_bytes, path_to_bytes, php_uname, stream_context_create, stripos, uasort,
+    PhpMixed, TypeError, array_replace_recursive, bconcat, explode, extension_loaded,
+    get_debug_type, implode_mixed, is_dir, path_from_bytes, path_to_bytes, php_uname,
+    stream_context_create, stripos, uasort, uasort_map,
 };
 
 pub struct StreamContextFactory;
@@ -49,13 +50,10 @@ impl StreamContextFactory {
         options = array_replace_recursive(options, default_options);
 
         if let Some(PhpMixed::Array(http)) = options.get_mut(B("http"))
-            && let Some(header) = http.get(B("header")).cloned()
+            && let Some(header) = http.get(B("header")).filter(|header| !header.is_null())
         {
-            let fixed = Self::fix_http_header_field(&header);
-            http.insert(
-                "header".into(),
-                PhpMixed::List(fixed.into_iter().map(PhpMixed::string).collect()),
-            );
+            let fixed = Self::fix_http_header_field(header.clone())?;
+            http.insert("header".into(), fixed);
         }
 
         Ok(Ok(stream_context_create(&options, Some(&default_params))))
@@ -126,11 +124,8 @@ impl StreamContextFactory {
 
                 // Header will be a Proxy-Authorization string or not set
                 let proxy_http = proxy_options.get(bstr::B("http"));
-                if let Some(proxy_header) = proxy_http.and_then(|h| h.get(B("header")))
-                    && let Some(PhpMixed::Array(http)) = options.get_mut(B("http"))
-                    && let Some(PhpMixed::List(headers)) = http.get_mut(B("header"))
-                {
-                    headers.push(proxy_header.clone());
+                if let Some(proxy_header) = proxy_http.and_then(|h| h.get(B("header"))) {
+                    Self::http_header_mut(&mut options).push(proxy_header.clone())?;
                 }
 
                 let proxy_options_flat: IndexMap<BString, PhpMixed> = proxy_options
@@ -159,24 +154,11 @@ impl StreamContextFactory {
             "streams"
         };
 
-        let has_user_agent = options
-            .get(B("http"))
-            .and_then(|v| v.as_array())
-            .and_then(|a| a.get(B("header")))
-            .and_then(|v| match v {
-                PhpMixed::List(list) => {
-                    let joined = implode(
-                        "",
-                        &list
-                            .iter()
-                            .filter_map(|item| item.as_string())
-                            .collect::<Vec<_>>(),
-                    );
-                    Some(stripos(joined, "user-agent").is_some())
-                }
-                _ => None,
-            })
-            .unwrap_or(false);
+        let has_user_agent = stripos(
+            implode_mixed("", Self::http_header_mut(&mut options))?,
+            "user-agent",
+        )
+        .is_some();
 
         if !has_user_agent {
             let platform_php_version = PlatformRepository::get_platform_php_version();
@@ -201,11 +183,7 @@ impl StreamContextFactory {
                 },
                 ")"
             );
-            if let Some(PhpMixed::Array(http)) = options.get_mut(B("http"))
-                && let Some(PhpMixed::List(headers)) = http.get_mut(B("header"))
-            {
-                headers.push(PhpMixed::string(user_agent));
-            }
+            Self::http_header_mut(&mut options).push(PhpMixed::string(user_agent))?;
         }
 
         Ok(Ok(options))
@@ -359,26 +337,63 @@ impl StreamContextFactory {
         Ok(defaults)
     }
 
+    /// `$options['http']['header']`, which the start of `init_options` has set.
+    fn http_header_mut(options: &mut IndexMap<BString, PhpMixed>) -> &mut PhpMixed {
+        options
+            .get_mut(B("http"))
+            .and_then(PhpMixed::as_array_mut)
+            .and_then(|http| http.get_mut(B("header")))
+            .expect("init_options sets http.header before reading it")
+    }
+
     /// A bug in PHP prevents the headers from correctly being sent when a content-type header is
     /// present and NOT at the end of the array. This method fixes the array by moving the
     /// content-type header to the end.
-    fn fix_http_header_field(header: &PhpMixed) -> Vec<BString> {
-        let mut headers: Vec<BString> = match header {
-            PhpMixed::String(s) => s.split_str("\r\n").map(BString::from).collect(),
-            PhpMixed::List(list) => list
-                .iter()
-                .filter_map(|v| v.as_string())
-                .map(BStr::to_owned)
-                .collect(),
-            _ => vec![],
+    fn fix_http_header_field(header: PhpMixed) -> anyhow::Result<PhpMixed> {
+        let mut header = match header {
+            PhpMixed::String(s) => PhpMixed::List(
+                explode("\r\n", s)
+                    .into_iter()
+                    .map(PhpMixed::String)
+                    .collect(),
+            ),
+            header @ (PhpMixed::List(_) | PhpMixed::Array(_)) => header,
+            other => {
+                return Err(TypeError::new(bconcat!(
+                    "explode(): Argument #2 ($string) must be of type string, ",
+                    get_debug_type(&other),
+                    " given"
+                ))
+                .into());
+            }
         };
-        uasort(&mut headers, |el, _| {
-            if stripos(el, "content-type") == Some(0) {
+        // The comparator runs only when there are two elements to compare, and the file declares
+        // strict_types, so stripos() rejects any element that is not a string.
+        if header.values().len() > 1
+            && let Some(other) = header
+                .values()
+                .into_iter()
+                .find(|value| !matches!(value, PhpMixed::String(_)))
+        {
+            return Err(TypeError::new(bconcat!(
+                "stripos(): Argument #1 ($haystack) must be of type string, ",
+                get_debug_type(other),
+                " given"
+            ))
+            .into());
+        }
+        let compare = |el: &PhpMixed, _: &PhpMixed| {
+            if stripos(el.as_string().unwrap_or_default(), "content-type") == Some(0) {
                 1
             } else {
                 -1
             }
-        });
-        headers
+        };
+        match &mut header {
+            PhpMixed::List(list) => uasort(list, compare),
+            PhpMixed::Array(map) => uasort_map(map, compare),
+            _ => unreachable!("header was made an array above"),
+        }
+        Ok(header)
     }
 }
