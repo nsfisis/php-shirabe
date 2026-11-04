@@ -403,18 +403,21 @@ impl DownloaderInterface for FileDownloader {
             let mut url = urls[0].clone();
 
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
-                let mut pre_file_download_event = PreFileDownloadEvent::new(
-                    bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
-                    self.http_downloader.clone(),
-                    url.processed.clone(),
-                    "package".into(),
-                    Some(FileDownloadContext::Package(package.clone())),
-                );
-                let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
+                let pre_file_download_event =
+                    std::rc::Rc::new(std::cell::RefCell::new(PreFileDownloadEvent::new(
+                        bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
+                        self.http_downloader.clone(),
+                        url.processed.clone(),
+                        "package".into(),
+                        Some(FileDownloadContext::Package(package.clone())),
+                    )));
+                let pre_file_download_event_name =
+                    pre_file_download_event.borrow().get_name().to_owned();
                 event_dispatcher.borrow_mut().dispatch(
                     Some(pre_file_download_event_name.as_ref()),
-                    Some(&mut pre_file_download_event),
+                    Some(pre_file_download_event.clone()),
                 )?;
+                let pre_file_download_event = pre_file_download_event.borrow();
                 if let Some(custom_cache_key) = pre_file_download_event.get_custom_cache_key() {
                     url.cache_key = cache_key_generator(package.clone(), custom_cache_key);
                 } else if pre_file_download_event.get_processed_url() != url.processed {
@@ -636,7 +639,7 @@ impl DownloaderInterface for FileDownloader {
             }
 
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
-                let mut post_file_download_event = PostFileDownloadEvent::new(
+                let post_file_download_event = PostFileDownloadEvent::new(
                     bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                     Some(file_name.clone()),
                     checksum.clone(),
@@ -647,7 +650,9 @@ impl DownloaderInterface for FileDownloader {
                 let post_file_download_event_name = post_file_download_event.get_name().to_owned();
                 event_dispatcher.borrow_mut().dispatch(
                     Some(post_file_download_event_name.as_ref()),
-                    Some(&mut post_file_download_event),
+                    Some(std::rc::Rc::new(std::cell::RefCell::new(
+                        post_file_download_event,
+                    ))),
                 )?;
             }
 

@@ -1,0 +1,36 @@
+{
+    "name": "shirabe/e2e-kept-event",
+    "description": "E2E fixture project: a plugin and a script keep event objects past their listener call.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/kept-event-keeper": "1.0.0",
+        "shirabe-test/lib-a": "1.0.0",
+        "shirabe-test/lib-b": "1.0.0"
+    },
+    "scripts": {
+        "post-autoload-dump": "ShirabeTest\\KeptEvent\\Script::keep"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/kept-event-keeper": true
+        }
+    }
+}

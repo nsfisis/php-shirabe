@@ -15,6 +15,7 @@ use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
 use crate::plugin::rpc::dispatch::{PluginRpcDispatcher, error_throw, unavailable_method};
+use crate::plugin::rpc::table::{RustEntity, register_entity, rust_handle_value};
 use crate::plugin::throwable_bridge::throw_into_error;
 use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
@@ -22,7 +23,7 @@ use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, bconcat, display_to_bytes, error_message, explode,
@@ -191,17 +192,19 @@ impl EventDispatcher {
     pub fn dispatch(
         &mut self,
         event_name: Option<&BStr>,
-        event: Option<&mut dyn EventInterface>,
+        event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64> {
         match event {
             None => {
                 let name = event_name.ok_or_else(|| -> anyhow::Error {
                     InvalidArgumentException::new(BString::from("If no $event is passed in to Composer\\EventDispatcher\\EventDispatcher::dispatch you have to pass in an $eventName, got null.")).into()
                 })?;
-                let mut event = Event::new(name, Vec::new(), EventFlags::default());
-                self.do_dispatch(&mut event)
+                let event: std::rc::Rc<std::cell::RefCell<dyn EventInterface>> = std::rc::Rc::new(
+                    std::cell::RefCell::new(Event::new(name, Vec::new(), EventFlags::default())),
+                );
+                self.do_dispatch(&event)
             }
-            Some(event) => self.do_dispatch(event),
+            Some(event) => self.do_dispatch(&event),
         }
     }
 
@@ -287,7 +290,10 @@ impl EventDispatcher {
     }
 
     /// Triggers the listeners of an event.
-    fn do_dispatch(&mut self, event: &mut dyn EventInterface) -> anyhow::Result<i64> {
+    fn do_dispatch(
+        &mut self,
+        event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
+    ) -> anyhow::Result<i64> {
         if Platform::get_env("COMPOSER_DEBUG_EVENTS").is_some() {
             // TODO(plugin): PackageEvent / CommandEvent / PreCommandRunEvent specialization
             // requires polymorphic dispatch; the simple Event branch is sufficient for now.
@@ -295,7 +301,7 @@ impl EventDispatcher {
             self.io.write_error3(
                 bconcat!(
                     "Dispatching <info>",
-                    event.get_name(),
+                    event.borrow().get_name(),
                     "</info>",
                     details
                         .as_ref()
@@ -308,9 +314,9 @@ impl EventDispatcher {
             );
         }
 
-        let listeners = self.get_listeners(&*event);
+        let listeners = self.get_listeners(&*event.borrow());
 
-        self.push_event(&*event)?;
+        self.push_event(&*event.borrow())?;
 
         let result = self.do_dispatch_body(event, listeners);
 
@@ -325,15 +331,17 @@ impl EventDispatcher {
 
     fn do_dispatch_body(
         &mut self,
-        event: &mut dyn EventInterface,
+        event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         listeners: Vec<Callable>,
     ) -> anyhow::Result<i64> {
+        // An event's name, arguments and flags are fixed at construction.
+        let event_name = event.borrow().get_name().to_owned();
         let mut return_max = 0_i64;
         for callable in listeners {
             let mut r#return: i64 = 0;
             self.ensure_bin_dir_is_in_path()?;
 
-            let mut additional_args = event.get_arguments().clone();
+            let mut additional_args = event.borrow().get_arguments().clone();
             let mut callable = callable;
             if let Callable::String(ref s) = callable
                 && s.contains_str("@no_additional_args")
@@ -343,7 +351,7 @@ impl EventDispatcher {
                 additional_args = Vec::new();
             }
             let formatted_event_name_with_args = bconcat!(
-                event.get_name(),
+                event_name.as_bstr(),
                 if !additional_args.is_empty() {
                     bconcat!(" (", implode(", ", &additional_args), ")")
                 } else {
@@ -355,7 +363,7 @@ impl EventDispatcher {
                 self.make_autoloader(event, &callable)?;
                 // Closures are always callable in PHP (is_callable() returns true for any \Closure),
                 // so the is_callable()/RuntimeException branch below never applies here.
-                r#return = if matches!(closure(event), PhpMixed::Bool(false)) {
+                r#return = if matches!(closure(&*event.borrow()), PhpMixed::Bool(false)) {
                     1
                 } else {
                     0
@@ -377,7 +385,7 @@ impl EventDispatcher {
                         "::",
                         method_name,
                         " for event ",
-                        event.get_name(),
+                        event_name.as_bstr(),
                         " is not callable, make sure the function is defined and public"
                     ))
                     .into());
@@ -395,11 +403,11 @@ impl EventDispatcher {
                     crate::io::VERBOSE,
                 );
                 let stub_class =
-                    Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
+                    Self::event_stub_class(&*event.borrow()).ok_or_else(|| -> anyhow::Error {
                         // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
                         RuntimeException::new(bconcat!(
                             "no proxy stub is available yet for the event `",
-                            event.get_name(),
+                            event_name.as_bstr(),
                             "` dispatched to ",
                             handle.class(),
                             "::",
@@ -407,16 +415,12 @@ impl EventDispatcher {
                         ))
                         .into()
                     })?;
-                let event_rhandle = shirabe_php_rpc::alloc_rhandle();
-                let mut dispatcher = PluginRpcDispatcher {
-                    event: Some((event_rhandle, event)),
-                };
                 let value: PluginValue = PhpCall::Method(handle, method_name.as_bstr()).run_with(
-                    vec![PluginValue::RustHandle(RustObjHandle {
-                        rhandle: event_rhandle,
-                        class: bconcat!(stub_class),
-                    })],
-                    &mut dispatcher,
+                    vec![rust_handle_value(
+                        register_entity(RustEntity::Event(event.clone())),
+                        stub_class,
+                    )],
+                    &mut PluginRpcDispatcher,
                 )?;
                 r#return = if matches!(value, PluginValue::Bool(false)) {
                     1
@@ -448,7 +452,7 @@ impl EventDispatcher {
                         "::",
                         method,
                         " for event ",
-                        event.get_name(),
+                        event_name.as_bstr(),
                         " is not callable, make sure the function is defined and public"
                     ))
                     .into());
@@ -504,7 +508,7 @@ impl EventDispatcher {
                             merged.extend(additional_args.clone());
                             args = merged;
                         }
-                        let mut flags = event.get_flags().clone();
+                        let mut flags = event.borrow().get_flags().clone();
                         if let Some(script_alias_input) = &mut flags.script_alias_input {
                             let args_string = implode(
                                 " ",
@@ -533,7 +537,7 @@ impl EventDispatcher {
                                         "<error>Script ",
                                         callable_str,
                                         " handling the ",
-                                        event.get_name(),
+                                        event_name.as_bstr(),
                                         " event returned with error code ",
                                         bconcat!(exit_code),
                                         "</error>"
@@ -573,7 +577,7 @@ impl EventDispatcher {
 
                             // TODO(plugin): reached only with a fully loaded Composer (script dispatch asserts full upstream).
                             let composer = self.composer();
-                            let mut script_event = ScriptEvent::new(
+                            let script_event = ScriptEvent::new(
                                 script_name.clone(),
                                 composer
                                     .as_full()
@@ -587,8 +591,10 @@ impl EventDispatcher {
                                 flags,
                             );
                             // TODO(plugin): script_event.set_originating_event(event.clone())
-                            match self.dispatch(Some(script_name.as_ref()), Some(&mut script_event))
-                            {
+                            match self.dispatch(
+                                Some(script_name.as_ref()),
+                                Some(std::rc::Rc::new(std::cell::RefCell::new(script_event))),
+                            ) {
                                 Ok(v) => r#return = v,
                                 Err(e) => {
                                     if e.is_instanceof::<ScriptExecutionException>() {
@@ -597,7 +603,7 @@ impl EventDispatcher {
                                                 "<error>Script ",
                                                 callable_str,
                                                 " was called via ",
-                                                event.get_name(),
+                                                event_name.as_bstr(),
                                                 "</error>"
                                             ),
                                             true,
@@ -626,7 +632,7 @@ impl EventDispatcher {
                                     "<warning>Class ",
                                     class_name,
                                     " is not autoloadable, can not call ",
-                                    event.get_name(),
+                                    event_name.as_bstr(),
                                     " script</warning>"
                                 ),
                                 true,
@@ -643,7 +649,7 @@ impl EventDispatcher {
                                     "<warning>Method ",
                                     callable_str,
                                     " is not callable, can not call ",
-                                    event.get_name(),
+                                    event_name.as_bstr(),
                                     " script</warning>"
                                 ),
                                 true,
@@ -666,7 +672,7 @@ impl EventDispatcher {
                                         "<error>Script ",
                                         callable_str,
                                         " handling the ",
-                                        event.get_name(),
+                                        event_name.as_bstr(),
                                         " event terminated with an exception</error>"
                                     ),
                                     true,
@@ -701,7 +707,7 @@ impl EventDispatcher {
                                     "<warning>Class ",
                                     class_name,
                                     " is not autoloadable, can not call ",
-                                    event.get_name(),
+                                    event_name.as_bstr(),
                                     " script</warning>"
                                 ),
                                 true,
@@ -719,20 +725,20 @@ impl EventDispatcher {
                                 PluginValue::Bool(true),
                             ],
                         )? {
-                            self.io.write_error3(bconcat!("<warning>Class ", class_name, " does not extend Symfony\\Component\\Console\\Command\\Command, can not call ", event.get_name(), " script</warning>"), true, crate::io::QUIET);
+                            self.io.write_error3(bconcat!("<warning>Class ", class_name, " does not extend Symfony\\Component\\Console\\Command\\Command, can not call ", event_name.as_bstr(), " script</warning>"), true, crate::io::QUIET);
                             continue;
                         }
                         if self.php_runtime_bool(
                             BStr::new("defined"),
                             vec![PluginValue::string(bconcat!(
                                 "Composer\\Script\\ScriptEvents::",
-                                str_replace("-", "_", strtoupper(event.get_name()))
+                                str_replace("-", "_", strtoupper(event_name.as_bstr()))
                             ))],
                         )? {
                             self.io.write_error3(
                                 bconcat!(
                                     "<warning>You cannot bind ",
-                                    event.get_name(),
+                                    event_name.as_bstr(),
                                     " to a Command class, use a non-reserved name</warning>"
                                 ),
                                 true,
@@ -756,8 +762,12 @@ impl EventDispatcher {
                                 .map(ProcessExecutor::escape)
                                 .collect::<Vec<_>>(),
                         );
-                        let string_input =
-                            event.get_flags().script_alias_input.clone().unwrap_or(args);
+                        let string_input = event
+                            .borrow()
+                            .get_flags()
+                            .script_alias_input
+                            .clone()
+                            .unwrap_or(args);
                         let verbosity = if self.io.is_debug() {
                             output_interface::VERBOSITY_DEBUG
                         } else if self.io.is_very_verbose() {
@@ -778,7 +788,7 @@ if (method_exists($app, 'setCatchErrors')) {
 }
 $app->setAutoExit(false);
 $cmd = new $className("#,
-                            php_single_quote(event.get_name()),
+                            php_single_quote(event_name.as_bstr()),
                             r#");
 if (method_exists($app, 'addCommand')) {
     $app->addCommand($cmd);
@@ -808,7 +818,6 @@ try {
                         Self::ensure_script_autoloader()?;
                         let mut dispatcher = ScriptRpcDispatcher {
                             loader: self.loader.clone(),
-                            event: None,
                         };
                         let result: ScriptCommandResult =
                             PhpCall::Function(BStr::new("__shirabe_eval"))
@@ -823,7 +832,7 @@ try {
                                         "<error>Script ",
                                         callable_str,
                                         " handling the ",
-                                        event.get_name(),
+                                        event_name.as_bstr(),
                                         " event terminated with an exception</error>"
                                     ),
                                     true,
@@ -863,11 +872,11 @@ try {
 
                         if self.io.is_verbose() {
                             self.io.write_error3(
-                                bconcat!("> ", event.get_name(), ": ", exec),
+                                bconcat!("> ", event_name.as_bstr(), ": ", exec),
                                 true,
                                 crate::io::NORMAL,
                             );
-                        } else if self.event_needs_to_output(event) {
+                        } else if self.event_needs_to_output(&*event.borrow()) {
                             self.io
                                 .write_error3(bconcat!("> ", exec), true, crate::io::NORMAL);
                         }
@@ -985,7 +994,7 @@ try {
                                     "<error>Script ",
                                     callable_str,
                                     " handling the ",
-                                    event.get_name(),
+                                    event_name.as_bstr(),
                                     " event returned with error code ",
                                     bconcat!(exit_code),
                                     "</error>"
@@ -1012,23 +1021,32 @@ try {
 
             return_max = std::cmp::max(return_max, r#return);
 
-            if event.is_propagation_stopped() {
+            if event.borrow().is_propagation_stopped() {
                 break;
             }
         }
         Ok(return_max)
     }
 
-    fn do_dispatch_script(&mut self, mut event: ScriptEvent) -> anyhow::Result<i64> {
-        self.do_dispatch(&mut event)
+    fn do_dispatch_script(&mut self, event: ScriptEvent) -> anyhow::Result<i64> {
+        self.do_dispatch(
+            &(std::rc::Rc::new(std::cell::RefCell::new(event))
+                as std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
+        )
     }
 
-    fn do_dispatch_package(&mut self, mut event: PackageEvent) -> anyhow::Result<i64> {
-        self.do_dispatch(&mut event)
+    fn do_dispatch_package(&mut self, event: PackageEvent) -> anyhow::Result<i64> {
+        self.do_dispatch(
+            &(std::rc::Rc::new(std::cell::RefCell::new(event))
+                as std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
+        )
     }
 
-    fn do_dispatch_installer(&mut self, mut event: InstallerEvent) -> anyhow::Result<i64> {
-        self.do_dispatch(&mut event)
+    fn do_dispatch_installer(&mut self, event: InstallerEvent) -> anyhow::Result<i64> {
+        self.do_dispatch(
+            &(std::rc::Rc::new(std::cell::RefCell::new(event))
+                as std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
+        )
     }
 
     fn execute_tty(&self, exec: &BString) -> anyhow::Result<i64> {
@@ -1085,15 +1103,16 @@ try {
         &self,
         class_name: &BStr,
         method_name: &BStr,
-        event: &mut dyn EventInterface,
+        event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
     ) -> anyhow::Result<PhpMixed> {
+        let event_name = event.borrow().get_name().to_owned();
         if self.io.is_verbose() {
             self.io.write_error3(
-                bconcat!("> ", event.get_name(), ": ", class_name, "::", method_name),
+                bconcat!("> ", event_name, ": ", class_name, "::", method_name),
                 true,
                 crate::io::NORMAL,
             );
-        } else if self.event_needs_to_output(event) {
+        } else if self.event_needs_to_output(&*event.borrow()) {
             self.io.write_error3(
                 bconcat!("> ", class_name, "::", method_name),
                 true,
@@ -1101,34 +1120,33 @@ try {
             );
         }
 
-        let stub_class = Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
-            // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
-            RuntimeException::new(bconcat!(
-                "no proxy stub is available yet for the event `",
-                event.get_name(),
-                "` dispatched to ",
-                class_name,
-                "::",
-                method_name
-            ))
-            .into()
-        })?;
+        let stub_class =
+            Self::event_stub_class(&*event.borrow()).ok_or_else(|| -> anyhow::Error {
+                // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
+                RuntimeException::new(bconcat!(
+                    "no proxy stub is available yet for the event `",
+                    event_name,
+                    "` dispatched to ",
+                    class_name,
+                    "::",
+                    method_name
+                ))
+                .into()
+            })?;
 
         // The event stub the script receives hands out stubs of the Composer object graph, and
         // those extend and implement the real Composer contracts (`PackageInterface` and the
         // rest), which only the Composer PHP runtime carries.
         Self::ensure_composer_php_runtime(|| self.cache_dir())?;
         Self::ensure_script_autoloader()?;
-        let rhandle = shirabe_php_rpc::alloc_rhandle();
         let mut dispatcher = ScriptRpcDispatcher {
             loader: self.loader.clone(),
-            event: Some((rhandle, event)),
         };
         PhpCall::StaticMethod(class_name, method_name).run_with(
-            vec![PluginValue::RustHandle(RustObjHandle {
-                rhandle,
-                class: bconcat!(stub_class),
-            })],
+            vec![rust_handle_value(
+                register_entity(RustEntity::Event(event.clone())),
+                stub_class,
+            )],
             &mut dispatcher,
         )
     }
@@ -1411,7 +1429,7 @@ try {
 
     fn make_autoloader(
         &mut self,
-        event: &dyn EventInterface,
+        event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         callable: &Callable,
     ) -> anyhow::Result<()> {
         let composer = self.composer();
@@ -1448,6 +1466,7 @@ try {
                 .map(|p| bconcat!(p.get_name(), "/", p.get_version()))
                 .collect::<Vec<_>>(),
         );
+        let event = event.borrow();
         let dev_mode = event
             .as_any()
             .downcast_ref::<ScriptEvent>()
@@ -1546,7 +1565,6 @@ try {
         Self::ensure_script_autoloader()?;
         let mut dispatcher = ScriptRpcDispatcher {
             loader: self.loader.clone(),
-            event: None,
         };
         PhpCall::Function(function).run_with(args, &mut dispatcher)
     }
@@ -1599,18 +1617,13 @@ shirabe_php_rpc::wire_record! {
 
 /// Serves `CallRustMethod` requests issued by the PHP worker while a script-related call is in
 /// flight: Rust handle 0 is the runtime service endpoint (autoload lookups against the
-/// Rust-side [`ClassLoader`]), every other rhandle resolves through the R table, except the
-/// one live event handle exposed per dispatched call.
-///
-/// TODO(plugin): a script that stores the event stub beyond its own call observes an unknown
-/// handle error afterwards; keeping events in the R table needs full proxying of the object
-/// graph an event exposes, which does not exist yet.
-struct ScriptRpcDispatcher<'a> {
+/// Rust-side [`ClassLoader`]), every other rhandle resolves through the R table.
+#[derive(Debug)]
+struct ScriptRpcDispatcher {
     loader: Option<ClassLoader>,
-    event: Option<(u64, &'a mut dyn EventInterface)>,
 }
 
-impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
+impl RustMethodDispatcher for ScriptRpcDispatcher {
     fn dispatch(
         &mut self,
         rhandle: u64,
@@ -1658,22 +1671,16 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                 "`"
             )));
         }
-        match self.event {
-            Some((event_rhandle, ref mut event)) if event_rhandle == rhandle => {
-                dispatch_event_method(&mut **event, method_name, &args)
-            }
-            _ => crate::plugin::rpc::dispatch::dispatch_r_table_method(
-                rhandle,
-                method_name,
-                &args,
-                out_params,
-            ),
-        }
+        crate::plugin::rpc::dispatch::dispatch_r_table_method(
+            rhandle,
+            method_name,
+            &args,
+            out_params,
+        )
     }
 }
 
-/// Serves an event proxy stub's method call, shared by the script dispatcher and the plugin
-/// dispatcher (both expose one live event handle per dispatched call).
+/// Serves a method call on an event entity of the R table.
 pub(crate) fn dispatch_event_method(
     event: &mut dyn EventInterface,
     method_name: &BStr,
@@ -1880,7 +1887,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
     fn dispatch(
         &mut self,
         event_name: Option<&BStr>,
-        event: Option<&mut dyn EventInterface>,
+        event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64>;
     fn dispatch_script(
         &mut self,
@@ -1906,7 +1913,7 @@ impl EventDispatcherInterface for EventDispatcher {
     fn dispatch(
         &mut self,
         event_name: Option<&BStr>,
-        event: Option<&mut dyn EventInterface>,
+        event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64> {
         self.dispatch(event_name, event)
     }

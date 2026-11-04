@@ -255,7 +255,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
 
-    let mut event = ScriptEvent::new(
+    let event = ScriptEvent::new(
         BString::from("root"),
         composer.downgrade(),
         io_dyn,
@@ -264,7 +264,10 @@ fn test_dispatcher_can_execute_composer_script_groups() {
         EventFlags::default(),
     );
     dispatcher
-        .dispatch(Some("root".into()), Some(&mut event))
+        .dispatch(
+            Some("root".into()),
+            Some(std::rc::Rc::new(std::cell::RefCell::new(event))),
+        )
         .unwrap();
 
     let expected = bconcat!(
@@ -311,7 +314,7 @@ fn test_recursion_in_scripts_names() {
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
 
-    let mut event = ScriptEvent::new(
+    let event = ScriptEvent::new(
         BString::from("helloWorld"),
         composer.downgrade(),
         io_dyn,
@@ -320,7 +323,10 @@ fn test_recursion_in_scripts_names() {
         EventFlags::default(),
     );
     dispatcher
-        .dispatch(Some("helloWorld".into()), Some(&mut event))
+        .dispatch(
+            Some("helloWorld".into()),
+            Some(std::rc::Rc::new(std::cell::RefCell::new(event))),
+        )
         .unwrap();
 
     let expected = bconcat!(
@@ -351,7 +357,7 @@ fn test_dispatcher_detect_infinite_recursion() {
         });
     let mut dispatcher = dispatcher_with_listeners(&composer, io.clone(), process, callback);
 
-    let mut event = ScriptEvent::new(
+    let event = ScriptEvent::new(
         BString::from("root"),
         composer.downgrade(),
         io,
@@ -359,7 +365,10 @@ fn test_dispatcher_detect_infinite_recursion() {
         vec![],
         EventFlags::default(),
     );
-    let result = dispatcher.dispatch(Some("root".into()), Some(&mut event));
+    let result = dispatcher.dispatch(
+        Some("root".into()),
+        Some(std::rc::Rc::new(std::cell::RefCell::new(event))),
+    );
     let err = result.expect_err("infinite recursion must raise a RuntimeException");
     assert!(
         err.is_instanceof::<RuntimeException>(),
@@ -680,7 +689,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
         let mut dispatcher =
             EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
 
-        let mut event = ScriptEvent::new(
+        let event = ScriptEvent::new(
             BString::from("scriptName"),
             composer.downgrade(),
             null_io(),
@@ -690,7 +699,10 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
         );
 
         dispatcher
-            .dispatch(Some("scriptName".into()), Some(&mut event))
+            .dispatch(
+                Some("scriptName".into()),
+                Some(std::rc::Rc::new(std::cell::RefCell::new(event))),
+            )
             .unwrap();
     }
 }

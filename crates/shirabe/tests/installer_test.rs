@@ -164,7 +164,7 @@ impl EventDispatcherInterface for StubEventDispatcher {
     fn dispatch(
         &mut self,
         _event_name: Option<&bstr::BStr>,
-        _event: Option<&mut dyn EventInterface>,
+        _event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }

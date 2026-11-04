@@ -1,0 +1,5 @@
+{
+    "name": "shirabe-test/lib-b",
+    "version": "1.0.0",
+    "description": "Second fixture package installed while the keeper plugin is active."
+}

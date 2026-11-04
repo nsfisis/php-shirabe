@@ -27,7 +27,7 @@ pub enum PhpCall<'a> {
 impl PhpCall<'_> {
     /// Runs the call. A PHP exception becomes the error of the ported exception it stands for.
     pub fn run<R: FromWire>(self, args: Vec<PluginValue>) -> anyhow::Result<R> {
-        self.run_with(args, &mut PluginRpcDispatcher::default())
+        self.run_with(args, &mut PluginRpcDispatcher)
     }
 
     /// [`PhpCall::run`], for a caller that catches the PHP exception itself.
@@ -35,7 +35,7 @@ impl PhpCall<'_> {
         self,
         args: Vec<PluginValue>,
     ) -> anyhow::Result<Result<R, PhpThrow>> {
-        self.try_run_with(args, &mut PluginRpcDispatcher::default())
+        self.try_run_with(args, &mut PluginRpcDispatcher)
     }
 
     /// [`PhpCall::run`] with `dispatcher` serving the callbacks.

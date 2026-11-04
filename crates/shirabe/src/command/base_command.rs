@@ -829,7 +829,7 @@ pub fn base_command_initialize(
     };
     if let Some(composer) = composer.as_ref() {
         let command_name = cmd.get_name().unwrap_or_default();
-        let mut pre_command_run_event = PreCommandRunEvent::new(
+        let pre_command_run_event = PreCommandRunEvent::new(
             bconcat!(PluginEvents::PRE_COMMAND_RUN),
             input.clone(),
             command_name,
@@ -838,7 +838,9 @@ pub fn base_command_initialize(
         let dispatcher = composer.borrow_partial().get_event_dispatcher();
         dispatcher.borrow_mut().dispatch(
             Some(pre_command_run_event_name.as_ref()),
-            Some(&mut pre_command_run_event),
+            Some(std::rc::Rc::new(std::cell::RefCell::new(
+                pre_command_run_event,
+            ))),
         )?;
     }
 

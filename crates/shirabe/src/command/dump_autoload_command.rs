@@ -70,17 +70,17 @@ impl Command for DumpAutoloadCommand {
         let composer = self.require_composer(None, None)?;
         let composer = crate::composer::composer_full(&composer);
 
-        let mut command_event = CommandEvent::new(
+        let command_event = CommandEvent::new(
             PluginEvents::COMMAND,
             "dump-autoload",
             input.clone(),
             output,
         );
         let command_event_name = command_event.get_name().to_owned();
-        composer
-            .get_event_dispatcher()
-            .borrow_mut()
-            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
+        composer.get_event_dispatcher().borrow_mut().dispatch(
+            Some(command_event_name.as_ref()),
+            Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
+        )?;
 
         let config = composer.get_config();
 

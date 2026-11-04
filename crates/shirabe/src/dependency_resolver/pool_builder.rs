@@ -306,28 +306,30 @@ impl PoolBuilder {
         let mut unacceptable_fixed_or_locked_packages =
             std::mem::take(&mut self.unacceptable_fixed_or_locked_packages);
         if let Some(event_dispatcher) = self.event_dispatcher.clone() {
-            let mut pre_pool_create_event = PrePoolCreateEvent::new(
-                bconcat!(PluginEvents::PRE_POOL_CREATE),
-                repositories.clone(),
-                std::mem::replace(request, Request::new(None)),
-                self.acceptable_stabilities.clone(),
-                self.stability_flags.clone(),
-                self.root_aliases.clone(),
-                self.root_references.clone(),
-                packages,
-                unacceptable_fixed_or_locked_packages,
-            );
-            let pre_pool_create_event_name = pre_pool_create_event.get_name().to_owned();
+            let pre_pool_create_event =
+                std::rc::Rc::new(std::cell::RefCell::new(PrePoolCreateEvent::new(
+                    bconcat!(PluginEvents::PRE_POOL_CREATE),
+                    repositories.clone(),
+                    std::mem::replace(request, Request::new(None)),
+                    self.acceptable_stabilities.clone(),
+                    self.stability_flags.clone(),
+                    self.root_aliases.clone(),
+                    self.root_references.clone(),
+                    packages,
+                    unacceptable_fixed_or_locked_packages,
+                )));
+            let pre_pool_create_event_name = pre_pool_create_event.borrow().get_name().to_owned();
             let dispatched = event_dispatcher.borrow_mut().dispatch(
                 Some(pre_pool_create_event_name.as_ref()),
-                Some(&mut pre_pool_create_event),
+                Some(pre_pool_create_event.clone()),
             );
-            let (lent_request, event_packages, event_unacceptable_fixed_packages) =
-                pre_pool_create_event.into_parts();
-            *request = lent_request;
+            let mut pre_pool_create_event = pre_pool_create_event.borrow_mut();
+            *request = pre_pool_create_event.take_request();
             dispatched?;
-            packages = event_packages;
-            unacceptable_fixed_or_locked_packages = event_unacceptable_fixed_packages;
+            packages = pre_pool_create_event.get_packages().clone();
+            unacceptable_fixed_or_locked_packages = pre_pool_create_event
+                .get_unacceptable_fixed_packages()
+                .clone();
         }
 
         let mut pool = Pool::new(

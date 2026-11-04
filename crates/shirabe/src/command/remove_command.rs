@@ -523,17 +523,17 @@ impl Command for RemoveCommand {
                 .set_dev_requires(links.shift_remove(B("require-dev")).unwrap_or_default())?;
         }
 
-        let mut command_event = crate::plugin::CommandEvent::new(
+        let command_event = crate::plugin::CommandEvent::new(
             crate::plugin::PluginEvents::COMMAND,
             "remove",
             input.clone(),
             output,
         );
         let command_event_name = command_event.get_name().to_owned();
-        composer
-            .get_event_dispatcher()
-            .borrow_mut()
-            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
+        composer.get_event_dispatcher().borrow_mut().dispatch(
+            Some(command_event_name.as_ref()),
+            Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
+        )?;
 
         let allow_plugins = composer.get_config().borrow().get("allow-plugins")?;
         let removed_plugins: Vec<BString> =

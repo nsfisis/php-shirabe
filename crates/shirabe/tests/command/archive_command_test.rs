@@ -93,10 +93,10 @@ mod mock_event_dispatcher {
         #[derive(Debug)]
         pub EventDispatcher {}
         impl EventDispatcherInterface for EventDispatcher {
-            fn dispatch<'a, 'b>(
+            fn dispatch<'a>(
                 &mut self,
                 event_name: Option<&'a bstr::BStr>,
-                event: Option<&'b mut dyn EventInterface>,
+                event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
             ) -> anyhow::Result<i64>;
             fn dispatch_script(
                 &mut self,

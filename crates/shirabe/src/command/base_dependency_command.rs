@@ -43,7 +43,7 @@ pub trait BaseDependencyCommand: BaseCommand {
     ) -> anyhow::Result<i64> {
         // Emit command event on startup
         let composer = self.require_composer(None, None)?;
-        let mut command_event = CommandEvent::new(
+        let command_event = CommandEvent::new(
             PluginEvents::COMMAND,
             self.get_name().unwrap_or_default(),
             input.clone(),
@@ -51,9 +51,10 @@ pub trait BaseDependencyCommand: BaseCommand {
         );
         let command_event_name = command_event.get_name().to_owned();
         let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
-        event_dispatcher
-            .borrow_mut()
-            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
+        event_dispatcher.borrow_mut().dispatch(
+            Some(command_event_name.as_ref()),
+            Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
+        )?;
         let composer = crate::composer::composer_full(&composer);
 
         let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =

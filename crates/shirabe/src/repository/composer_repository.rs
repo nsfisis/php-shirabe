@@ -2785,10 +2785,13 @@ impl ComposerRepository {
                         .set_transport_options(self.options.clone().into_iter().collect());
                     let pre_file_download_event_name =
                         pre_file_download_event.get_name().to_owned();
+                    let pre_file_download_event =
+                        std::rc::Rc::new(std::cell::RefCell::new(pre_file_download_event));
                     dispatcher.dispatch(
                         Some(pre_file_download_event_name.as_ref()),
-                        Some(&mut pre_file_download_event),
+                        Some(pre_file_download_event.clone()),
                     )?;
+                    let pre_file_download_event = pre_file_download_event.borrow();
                     filename = BString::from(pre_file_download_event.get_processed_url());
                     options = pre_file_download_event
                         .get_transport_options()
@@ -2820,7 +2823,7 @@ impl ComposerRepository {
 
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
-                    let mut post_file_download_event = PostFileDownloadEvent::new(
+                    let post_file_download_event = PostFileDownloadEvent::new(
                         bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                         None,
                         sha256.map(BString::from),
@@ -2832,7 +2835,9 @@ impl ComposerRepository {
                         post_file_download_event.get_name().to_owned();
                     dispatcher.dispatch(
                         Some(post_file_download_event_name.as_ref()),
-                        Some(&mut post_file_download_event),
+                        Some(std::rc::Rc::new(std::cell::RefCell::new(
+                            post_file_download_event,
+                        ))),
                     )?;
                 }
 
@@ -2951,10 +2956,13 @@ impl ComposerRepository {
                 pre_file_download_event
                     .set_transport_options(self.options.clone().into_iter().collect());
                 let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
+                let pre_file_download_event =
+                    std::rc::Rc::new(std::cell::RefCell::new(pre_file_download_event));
                 dispatcher.dispatch(
                     Some(pre_file_download_event_name.as_ref()),
-                    Some(&mut pre_file_download_event),
+                    Some(pre_file_download_event.clone()),
                 )?;
+                let pre_file_download_event = pre_file_download_event.borrow();
                 filename = BString::from(pre_file_download_event.get_processed_url());
                 options = pre_file_download_event
                     .get_transport_options()
@@ -2997,7 +3005,7 @@ impl ComposerRepository {
 
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
-                let mut post_file_download_event = PostFileDownloadEvent::new(
+                let post_file_download_event = PostFileDownloadEvent::new(
                     bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                     None,
                     None,
@@ -3008,7 +3016,9 @@ impl ComposerRepository {
                 let post_file_download_event_name = post_file_download_event.get_name().to_owned();
                 dispatcher.dispatch(
                     Some(post_file_download_event_name.as_ref()),
-                    Some(&mut post_file_download_event),
+                    Some(std::rc::Rc::new(std::cell::RefCell::new(
+                        post_file_download_event,
+                    ))),
                 )?;
             }
 
@@ -3102,10 +3112,13 @@ impl ComposerRepository {
             pre_file_download_event
                 .set_transport_options(self.options.clone().into_iter().collect());
             let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
+            let pre_file_download_event =
+                std::rc::Rc::new(std::cell::RefCell::new(pre_file_download_event));
             dispatcher.dispatch(
                 Some(pre_file_download_event_name.as_ref()),
-                Some(&mut pre_file_download_event),
+                Some(pre_file_download_event.clone()),
             )?;
+            let pre_file_download_event = pre_file_download_event.borrow();
             filename = BString::from(pre_file_download_event.get_processed_url());
             options = pre_file_download_event
                 .get_transport_options()
@@ -3176,7 +3189,7 @@ impl ComposerRepository {
         }
 
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
-            let mut post_file_download_event = PostFileDownloadEvent::new(
+            let post_file_download_event = PostFileDownloadEvent::new(
                 bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
                 None,
                 None,
@@ -3187,7 +3200,9 @@ impl ComposerRepository {
             let post_file_download_event_name = post_file_download_event.get_name().to_owned();
             dispatcher.borrow_mut().dispatch(
                 Some(post_file_download_event_name.as_ref()),
-                Some(&mut post_file_download_event),
+                Some(std::rc::Rc::new(std::cell::RefCell::new(
+                    post_file_download_event,
+                ))),
             )?;
         }
 

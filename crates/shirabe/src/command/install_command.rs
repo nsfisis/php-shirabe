@@ -134,13 +134,13 @@ impl Command for InstallCommand {
         // Composer warns here that it runs slower without the curl extension when there is no lock
         // file. Shirabe does not use curl for its own downloads, so there is nothing to warn about.
 
-        let mut command_event =
+        let command_event =
             CommandEvent::new(PluginEvents::COMMAND, "install", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
-        composer
-            .get_event_dispatcher()
-            .borrow_mut()
-            .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
+        composer.get_event_dispatcher().borrow_mut().dispatch(
+            Some(command_event_name.as_ref()),
+            Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
+        )?;
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 

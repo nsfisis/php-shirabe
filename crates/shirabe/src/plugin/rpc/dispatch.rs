@@ -3,7 +3,6 @@
 
 use crate::autoload::ClassLoader;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::event_dispatcher::EventInterface;
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
@@ -60,18 +59,10 @@ pub(crate) fn find_file_in_registered_loaders(
 /// Serves `CallRustMethod` requests from the child while a plugin-related call is in flight:
 /// rhandle 0 is the runtime service endpoint (autoload lookups), every other rhandle resolves
 /// through the R table. Unsupported methods are explicit errors, never silent fallbacks.
-#[derive(Debug, Default)]
-pub(crate) struct PluginRpcDispatcher<'a> {
-    /// At most one live event handle exposed per dispatched listener call, alongside the
-    /// persistent R table.
-    ///
-    /// TODO(plugin): a listener that stores the event stub beyond its own call observes an
-    /// unknown handle error afterwards; keeping events in the R table needs full proxying of
-    /// the object graph an event exposes, which does not exist yet.
-    pub(crate) event: Option<(u64, &'a mut dyn EventInterface)>,
-}
+#[derive(Debug)]
+pub(crate) struct PluginRpcDispatcher;
 
-impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
+impl RustMethodDispatcher for PluginRpcDispatcher {
     fn dispatch(
         &mut self,
         rhandle: u64,
@@ -111,12 +102,6 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
                 method_name,
                 "`"
             )));
-        }
-
-        if let Some((event_rhandle, ref mut event)) = self.event
-            && event_rhandle == rhandle
-        {
-            return dispatch_event_method(&mut **event, method_name, &args);
         }
 
         dispatch_r_table_method(rhandle, method_name, &args, out_params)
@@ -221,6 +206,9 @@ pub(crate) fn dispatch_r_table_method(
             dispatch_http_downloader_method(&downloader, method_name, args)
         }
         Some(RustEntity::Process(process)) => dispatch_process_method(&process, method_name),
+        Some(RustEntity::Event(event)) => {
+            dispatch_event_method(&mut *event.borrow_mut(), method_name, args)
+        }
         None => Err(PhpThrow::runtime(bconcat!("unknown Rust handle ", rhandle))),
     }
 }
@@ -484,7 +472,8 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::Plugin(_)
         | RustEntity::ProcessExecutor(_)
         | RustEntity::HttpDownloader(_)
-        | RustEntity::Process(_) => {
+        | RustEntity::Process(_)
+        | RustEntity::Event(_) => {
             return Err(PhpThrow::runtime(
                 "cloning this Rust-side entity over RPC is not supported",
             ));
@@ -622,7 +611,7 @@ mod tests {
     #[test]
     fn a_method_name_that_is_not_utf8_reaches_the_error_unchanged() {
         let name = b"method\xff";
-        let throw = PluginRpcDispatcher::default()
+        let throw = PluginRpcDispatcher
             .dispatch(0, BStr::new(name), Vec::new(), &mut IndexMap::new())
             .unwrap_err();
         assert_eq!(

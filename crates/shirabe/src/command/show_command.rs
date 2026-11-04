@@ -1851,7 +1851,7 @@ impl Command for ShowCommand {
 
         if let Some(ref composer) = composer {
             let composer = crate::composer::composer_full(composer);
-            let mut command_event = CommandEvent::new6(
+            let command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
                 "show",
                 input.clone(),
@@ -1860,10 +1860,10 @@ impl Command for ShowCommand {
                 EventFlags::default(),
             );
             let command_event_name = command_event.get_name().to_owned();
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch(Some(command_event_name.as_ref()), Some(&mut command_event))?;
+            composer.get_event_dispatcher().borrow_mut().dispatch(
+                Some(command_event_name.as_ref()),
+                Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
+            )?;
         }
 
         if input.borrow().get_option("latest")?.as_bool() == Some(true) && composer.is_none() {

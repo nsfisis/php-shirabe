@@ -883,8 +883,8 @@ fn rpc_call(
             }
             Frame::ReleaseRustHandle { rhandle } => {
                 // A one-way notification sent by a child-side stub's __destruct; the shirabe
-                // crate registers a hook that drops the matching R-table entry. Per-call
-                // script-event handles carry no table state, so an unhooked release is a no-op.
+                // crate registers a hook that drops the matching R-table entry. The hook is
+                // installed before any entry exists, so an unhooked release is a no-op.
                 RELEASE_RUST_HANDLE_HOOK.with(|hook| {
                     if let Some(hook) = hook.borrow().as_ref() {
                         hook(rhandle);

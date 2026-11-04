@@ -47,6 +47,7 @@ pub(crate) enum RustEntity {
     HttpDownloader(std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>),
     /// A child a `ProcessExecutor` job ran to its exit, behind a `Shirabe\RustProcessStub`.
     Process(std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>>),
+    Event(std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventInterface>>),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -81,6 +82,7 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
             std::rc::Rc::as_ptr(downloader) as *const () as usize
         }
         RustEntity::Process(process) => std::rc::Rc::as_ptr(process) as *const () as usize,
+        RustEntity::Event(event) => std::rc::Rc::as_ptr(event) as *const () as usize,
     }
 }
 

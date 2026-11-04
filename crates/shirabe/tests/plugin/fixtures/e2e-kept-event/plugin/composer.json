@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/kept-event-keeper",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin keeping the event objects it receives and using them later.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\KeptEvent\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\KeptEvent\\Plugin"
+    }
+}

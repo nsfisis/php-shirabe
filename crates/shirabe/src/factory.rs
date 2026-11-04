@@ -838,12 +838,13 @@ impl Factory {
         if full_load {
             // The back-reference is now upgradeable, so dispatching the INIT event (which may read
             // the Composer through the dispatcher) is safe only after the Rc has been constructed.
-            let mut init_event = Event::from_name(bconcat!(PluginEvents::INIT));
+            let init_event = Event::from_name(bconcat!(PluginEvents::INIT));
             let init_event_name = init_event.get_name().to_owned();
             let dispatcher = composer.borrow().get_event_dispatcher();
-            dispatcher
-                .borrow_mut()
-                .dispatch(Some(init_event_name.as_ref()), Some(&mut init_event))?;
+            dispatcher.borrow_mut().dispatch(
+                Some(init_event_name.as_ref()),
+                Some(std::rc::Rc::new(std::cell::RefCell::new(init_event))),
+            )?;
 
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem
