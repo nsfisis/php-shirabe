@@ -37,6 +37,17 @@ fn corruption_error(path: &std::path::Path, detail: impl AsRef<[u8]>) -> anyhow:
     .into()
 }
 
+/// Returns the uncompressed size recorded in the ISIZE trailer of the last gzip member, for use as
+/// a capacity hint. ISIZE is the size modulo 2^32 and covers only the last member, so the value is
+/// capped and the buffer still grows past it when needed.
+fn gzip_isize_hint(bytes: &[u8]) -> usize {
+    const MAX_HINT: usize = 64 * 1024 * 1024;
+    let Some(trailer) = bytes.last_chunk::<4>() else {
+        return 0;
+    };
+    (u32::from_le_bytes(*trailer) as usize).min(MAX_HINT)
+}
+
 /// Reads a tar- or zip-based archive (optionally gzip/bzip2 compressed as a whole)
 /// into memory. Returns the entries and the detected `Phar::TAR`/`Phar::ZIP` format.
 fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry>, i64)> {
@@ -47,7 +58,7 @@ fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry
         )
     })?;
     let bytes = if bytes.starts_with(&[0x1f, 0x8b]) {
-        let mut out = Vec::new();
+        let mut out = Vec::with_capacity(gzip_isize_hint(&bytes));
         flate2::read::MultiGzDecoder::new(&bytes[..])
             .read_to_end(&mut out)
             .map_err(|e| {
