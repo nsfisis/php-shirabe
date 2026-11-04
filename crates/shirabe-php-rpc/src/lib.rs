@@ -836,19 +836,37 @@ pub fn alloc_rhandle() -> u64 {
     NEXT_RHANDLE.fetch_add(1, Ordering::Relaxed)
 }
 
-/// Calls a PHP function in the worker. The outer `Result` is the fatal lane (dead worker, broken
-/// framing); the inner one carries a PHP exception if the call threw.
+/// Answers every `CallRustMethod` with an explicit error: the dispatcher of the calls this crate
+/// makes for itself, none of which runs code that calls back.
+#[derive(Debug)]
+struct RefuseCallbacks;
+
+impl RustMethodDispatcher for RefuseCallbacks {
+    fn dispatch(
+        &mut self,
+        rhandle: u64,
+        method_name: &BStr,
+        _args: Vec<PluginValue>,
+        _out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Err(PhpThrow::runtime(bconcat!(
+            "no Rust method dispatcher is active for this call (rhandle ",
+            rhandle,
+            ", method `",
+            method_name,
+            "`)"
+        )))
+    }
+}
+
+/// Calls a PHP function in the worker, or the worker's entry point of that name. The outer
+/// `Result` is the fatal lane (dead worker, broken framing); the inner one carries a PHP
+/// exception if the call threw. `dispatcher` serves the `CallRustMethod` requests the worker
+/// makes while the call is in flight.
 pub fn call_function(
     name: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
-) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
-    call_function_with_dispatcher(name, args, None)
-}
-
-pub fn call_function_with_dispatcher(
-    name: impl AsRef<[u8]>,
-    args: Vec<PluginValue>,
-    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallFunction {
@@ -865,7 +883,7 @@ pub fn call_static_method(
     class: impl AsRef<[u8]>,
     method: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
-    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallStaticMethod {
@@ -884,7 +902,7 @@ pub fn call_static_method(
 pub fn new_object(
     class: impl AsRef<[u8]>,
     ctor_args: Vec<PluginValue>,
-    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::NewObject {
@@ -901,7 +919,7 @@ pub fn call_php_method(
     handle: &PhpObjHandle,
     method: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
-    dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallPhpMethod {
@@ -912,6 +930,14 @@ pub fn call_php_method(
         },
         dispatcher,
     )
+}
+
+/// [`call_function`] for the calls this crate makes for itself.
+pub(crate) fn call_internal_function(
+    name: impl AsRef<[u8]>,
+    args: Vec<PluginValue>,
+) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+    call_function(name, args, &mut RefuseCallbacks)
 }
 
 /// Whether the PHP worker process has been spawned by this process. Callers that only need to
@@ -926,7 +952,7 @@ pub fn worker_is_running() -> bool {
 
 fn rpc_call(
     request: impl FnOnce(u64) -> Frame,
-    mut dispatcher: Option<&mut dyn RustMethodDispatcher>,
+    dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     // Held for the whole logical call session; nested calls from the same thread (issued by a
     // dispatcher handler) re-enter immediately, other threads are serialized.
@@ -961,20 +987,8 @@ fn rpc_call(
                 args,
             } => {
                 let mut out_params = IndexMap::new();
-                let outcome = match dispatcher.as_deref_mut() {
-                    Some(dispatcher) => {
-                        dispatcher.dispatch(rhandle, method_name.as_bstr(), args, &mut out_params)
-                    }
-                    // Never fall back to a silent null: an unroutable callback is reported as an
-                    // explicit error on the PHP side.
-                    None => Err(PhpThrow::runtime(bconcat!(
-                        "no Rust method dispatcher is active for this call (rhandle ",
-                        rhandle,
-                        ", method `",
-                        method_name,
-                        "`)"
-                    ))),
-                };
+                let outcome =
+                    dispatcher.dispatch(rhandle, method_name.as_bstr(), args, &mut out_params);
                 let reply = match outcome {
                     Ok(value) => Frame::Return {
                         corr_id,
@@ -1006,7 +1020,7 @@ fn rpc_call(
 
 fn call(name: impl AsRef<[u8]>, arg: impl AsRef<[u8]>) -> PhpMixed {
     let name = name.as_ref().as_bstr();
-    let outcome = call_function(name, vec![PluginValue::string(arg.as_ref())])
+    let outcome = call_internal_function(name, vec![PluginValue::string(arg.as_ref())])
         .unwrap_or_else(|e| panic!("PHP RPC: request {name:?} failed: {e:#}"));
     let value = match outcome {
         Ok(value) => value,

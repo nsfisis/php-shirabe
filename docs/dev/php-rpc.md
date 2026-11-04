@@ -123,8 +123,9 @@ A `thread_local!` worker would not: each test thread would spawn a child of its 
 mutex itself is only held per frame, not across a call.
 
 While a Rust-initiated call waits for its `Return`, incoming `CallRustMethod` frames are
-dispatched to the caller-supplied `RustMethodDispatcher` (the cooperative loop); with no
-dispatcher active they are answered with an explicit `Throw`, never a silent null. Rust handle
+dispatched to the `RustMethodDispatcher` every call takes (the cooperative loop). The calls the
+crate makes for itself, none of which runs code that calls back, answer every callback with an
+explicit `Throw`, never a silent null. Rust handle
 0 is reserved for the runtime service endpoint, which answers calls that have no receiver entity.
 
 The PHP side mirrors this: its top level is a standing serve loop, and `callRust` drives the
@@ -136,7 +137,8 @@ same dispatch while waiting for its own `Return`.
   Composer runs in, so when a read or a write finds it gone, Shirabe exits with its exit code, or
   is killed by the signal that killed it, as Composer would be by a plugin's `exit()`, a fatal
   error or a signal.
-- The outer `anyhow::Result` of `call_function`/`call_static_method` is the fatal lane: broken
+- The outer `anyhow::Result` of `call_function`, `call_static_method`, `new_object` and
+  `call_php_method` is the fatal lane: broken
   framing, oversized frames, and an I/O failure while the worker is still running (with its
   state attached as context).
 - The inner `Result<PluginValue, PhpThrow>` is the recoverable lane: a PHP exception crossing

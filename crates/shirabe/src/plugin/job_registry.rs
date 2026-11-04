@@ -4,10 +4,11 @@
 //! the other side holds a promise for; only its id crosses the RPC channel. See
 //! `docs/dev/plugin-async.md`.
 
-use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::php_call::PhpCall;
 use crate::plugin::throwable_bridge::throw_into_error;
+use bstr::BStr;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, call_function_with_dispatcher};
+use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{bconcat, error_chain_message};
 
 /// The service a job is counted against: the one whose `countActiveJobs()` reports it and whose
@@ -198,7 +199,7 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
             vec![PluginValue::Int(id as i64), throw.to_wire()],
         ),
     };
-    match call_function_with_dispatcher(function, args, Some(&mut PluginRpcDispatcher::default())) {
+    match PhpCall::Function(BStr::new(function)).try_run::<PluginValue>(args) {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(throw)) => Err(throw),
         Err(error) => Err(PhpThrow::runtime(bconcat!(

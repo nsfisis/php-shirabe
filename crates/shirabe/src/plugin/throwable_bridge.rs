@@ -50,18 +50,6 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
     anyhow::Error::new(exception)
 }
 
-/// Collapses the two failure lanes of an RPC call into `anyhow`, for a caller where Composer does
-/// not catch the exception the PHP code may throw: the `Throw` becomes the fatal error it stands
-/// for.
-pub(crate) fn unwrap_php_result(
-    outcome: anyhow::Result<Result<PluginValue, PhpThrow>>,
-) -> anyhow::Result<PluginValue> {
-    match outcome? {
-        Ok(value) => Ok(value),
-        Err(throw) => Err(throw_into_error(throw)),
-    }
-}
-
 /// The ported exception of exactly `class`, built from what `throw` carries, or `None` if the
 /// port has no type for it or cannot build one from a `Throw`.
 fn revive(class: &BStr, throw: &PhpThrow) -> Option<AnyThrowable> {

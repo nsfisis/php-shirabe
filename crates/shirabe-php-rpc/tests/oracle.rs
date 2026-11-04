@@ -9,8 +9,23 @@
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::value::{serialize, unserialize};
-use shirabe_php_rpc::{PhpObject, PluginValue, call_function};
+use shirabe_php_rpc::{PhpObject, PhpThrow, PluginValue, RustMethodDispatcher, call_function};
 use shirabe_symfony_process::PhpExecutableFinder;
+
+/// The snippets these tests run never call back into Rust.
+struct NoCallbacks;
+
+impl RustMethodDispatcher for NoCallbacks {
+    fn dispatch(
+        &mut self,
+        _rhandle: u64,
+        method_name: &bstr::BStr,
+        _args: Vec<PluginValue>,
+        _out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        panic!("unexpected callback `{method_name:?}`")
+    }
+}
 
 fn php_available() -> bool {
     PhpExecutableFinder::new().find(false).is_some()
@@ -21,6 +36,7 @@ fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
     let outcome = call_function(
         "__shirabe_oracle_roundtrip",
         vec![PluginValue::String(bytes.into())],
+        &mut NoCallbacks,
     )
     .expect("oracle roundtrip request failed");
     match outcome.expect("oracle roundtrip threw") {
@@ -31,9 +47,13 @@ fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
 
 /// Runs a PHP snippet and returns its `return` value.
 fn php_eval(code: impl AsRef<[u8]>) -> PluginValue {
-    call_function("__shirabe_eval", vec![PluginValue::string(code.as_ref())])
-        .expect("eval request failed")
-        .expect("eval threw")
+    call_function(
+        "__shirabe_eval",
+        vec![PluginValue::string(code.as_ref())],
+        &mut NoCallbacks,
+    )
+    .expect("eval request failed")
+    .expect("eval threw")
 }
 
 fn assert_php_agrees(value: &PluginValue) {

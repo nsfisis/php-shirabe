@@ -9,21 +9,19 @@ use crate::event_dispatcher::{
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::plugin::php_call::PhpCall;
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::plugin::throwable_bridge::{throw_into_error, unwrap_php_result};
+use crate::plugin::throwable_bridge::throw_into_error;
 use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{
-    FromWire, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, ToWire, call_function,
-    call_function_with_dispatcher, call_php_method, call_static_method,
-};
+use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, ToWire};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, bconcat, display_to_bytes, error_message, explode,
@@ -366,15 +364,14 @@ impl EventDispatcher {
             } else if let Callable::PhpMethod(ref handle, ref method_name) = callable {
                 self.make_autoloader(event, &callable)?;
                 Self::ensure_script_autoloader()?;
-                let is_callable_value = unwrap_php_result(call_function_with_dispatcher(
-                    "is_callable",
-                    vec![PluginValue::List(vec![
-                        PluginValue::PhpHandle(handle.clone()),
-                        PluginValue::String(method_name.clone()),
-                    ])],
-                    Some(&mut PluginRpcDispatcher::default()),
-                ))?;
-                if !matches!(is_callable_value, PluginValue::Bool(true)) {
+                let is_callable: bool =
+                    PhpCall::Function(BStr::new("is_callable")).run(vec![PluginValue::List(
+                        vec![
+                            PluginValue::PhpHandle(handle.clone()),
+                            PluginValue::String(method_name.clone()),
+                        ],
+                    )])?;
+                if !is_callable {
                     return Err(RuntimeException::new(bconcat!(
                         "Subscriber ",
                         handle.class(),
@@ -415,24 +412,17 @@ impl EventDispatcher {
                 let mut dispatcher = PluginRpcDispatcher {
                     event: Some((event_rhandle, event)),
                 };
-                let outcome = call_php_method(
-                    handle,
-                    method_name,
+                let value: PluginValue = PhpCall::Method(handle, method_name.as_bstr()).run_with(
                     vec![PluginValue::RustHandle(RustObjHandle {
                         rhandle: event_rhandle,
                         class: bconcat!(stub_class),
                     })],
-                    Some(&mut dispatcher),
+                    &mut dispatcher,
                 )?;
-                r#return = match outcome {
-                    Ok(value) => {
-                        if matches!(value, PluginValue::Bool(false)) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                    Err(throw) => return Err(throw_into_error(throw)),
+                r#return = if matches!(value, PluginValue::Bool(false)) {
+                    1
+                } else {
+                    0
                 };
             } else if !is_string_callable {
                 // TODO(plugin): an ArrayCallable whose object half is a PhpMixed has no
@@ -838,17 +828,10 @@ try {
                             loader: self.loader.clone(),
                             event: None,
                         };
-                        let outcome = call_function_with_dispatcher(
-                            "__shirabe_eval",
-                            vec![PluginValue::string(snippet)],
-                            Some(&mut dispatcher),
-                        )?;
-                        let result = match outcome {
-                            Ok(PluginValue::Array(result)) => result,
-                            Ok(other) => {
-                                panic!("the eval snippet always returns an array, got {other:?}")
-                            }
-                            Err(throw) => return Err(throw_into_error(throw)),
+                        let value: PluginValue = PhpCall::Function(BStr::new("__shirabe_eval"))
+                            .run_with(vec![PluginValue::string(snippet)], &mut dispatcher)?;
+                        let PluginValue::Array(result) = value else {
+                            panic!("the eval snippet always returns an array, got {value:?}")
                         };
                         let command_output = match result.get(B("output")) {
                             Some(PluginValue::String(output)) => output,
@@ -1179,19 +1162,13 @@ try {
             loader: self.loader.clone(),
             event: Some((rhandle, event)),
         };
-        let outcome = call_static_method(
-            class_name,
-            method_name,
+        PhpCall::StaticMethod(class_name, method_name).run_with(
             vec![PluginValue::RustHandle(RustObjHandle {
                 rhandle,
                 class: bconcat!(stub_class),
             })],
-            Some(&mut dispatcher),
-        )?;
-        match outcome {
-            Ok(value) => PhpMixed::from_wire(&value).map_err(throw_into_error),
-            Err(throw) => Err(throw_into_error(throw)),
-        }
+            &mut dispatcher,
+        )
     }
 
     /// The proxy stub class (same FQCN as the real event class) an event crosses the RPC
@@ -1576,10 +1553,8 @@ try {
     /// in the child can resolve classes through the Rust-side [`ClassLoader`] built by
     /// [`Self::make_autoloader`].
     pub(crate) fn ensure_script_autoloader() -> anyhow::Result<()> {
-        unwrap_php_result(call_function(
-            "__shirabe_enable_script_autoloader",
-            Vec::new(),
-        ))?;
+        PhpCall::Function(BStr::new("__shirabe_enable_script_autoloader"))
+            .run::<PluginValue>(Vec::new())?;
         Ok(())
     }
 
@@ -1587,10 +1562,8 @@ try {
     /// before a `scripts` Command class can be autoloaded and hosted.
     pub(crate) fn ensure_composer_php_runtime(cache_dir: &std::path::Path) -> anyhow::Result<()> {
         let autoload = Self::composer_php_runtime_autoload(cache_dir)?;
-        unwrap_php_result(call_function(
-            "__shirabe_require",
-            vec![PluginValue::string(autoload)],
-        ))?;
+        PhpCall::Function(BStr::new("__shirabe_require"))
+            .run::<PluginValue>(vec![PluginValue::string(autoload)])?;
         crate::repository::FilesystemRepository::load_pending_installed_versions()
     }
 
@@ -1617,21 +1590,7 @@ try {
             loader: self.loader.clone(),
             event: None,
         };
-        let value = unwrap_php_result(call_function_with_dispatcher(
-            function,
-            args,
-            Some(&mut dispatcher),
-        ))?;
-        match value {
-            PluginValue::Bool(value) => Ok(value),
-            other => Err(RuntimeException::new(bconcat!(
-                "PHP runtime query `",
-                function,
-                "` did not return a bool: ",
-                display_to_bytes(format_args!("{other:?}"))
-            ))
-            .into()),
-        }
+        PhpCall::Function(function).run_with(args, &mut dispatcher)
     }
 
     fn io_clone(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {

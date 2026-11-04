@@ -22,6 +22,7 @@ use crate::plugin::capability::{Capability, CommandProvider};
 use crate::plugin::capable::Capable;
 use crate::plugin::job_registry;
 use crate::plugin::job_registry::JobOwner;
+use crate::plugin::php_call::PhpCall;
 use crate::plugin::php_plugin_value::{
     class_map_to_wire, link_from_wire, link_to_wire, response_to_wire,
 };
@@ -29,7 +30,7 @@ use crate::plugin::plugin_interface::PluginInterface;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::{FileDownloadContext, PreFileDownloadEvent};
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::plugin::throwable_bridge::{exception_into_throw, throw_into_error, unwrap_php_result};
+use crate::plugin::throwable_bridge::{exception_into_throw, throw_into_error};
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     LockArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
@@ -38,7 +39,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     FromWire, PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, ToWire,
-    call_function_with_dispatcher, call_php_method, new_object, wire,
+    wire,
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
@@ -1107,12 +1108,9 @@ fn class_loader_to_php(
         vec![vendor_dir.to_wire()],
     )?;
     let add = |method: &[u8], prefix: &[u8], paths: &[BString]| {
-        call_php_entity_method(
-            &handle,
-            BStr::new(method),
-            vec![PluginValue::string(prefix), paths.to_vec().to_wire()],
-        )
-        .map(|_| ())
+        PhpCall::Method(&handle, BStr::new(method))
+            .run::<PluginValue>(vec![PluginValue::string(prefix), paths.to_vec().to_wire()])
+            .map(|_| ())
     };
     for (prefix, paths) in loader.get_prefixes() {
         add(b"add", prefix.as_ref(), &paths)?;
@@ -1127,11 +1125,8 @@ fn class_loader_to_php(
         add(b"addPsr4", b"".as_slice(), loader.get_fallback_dirs_psr4())?;
     }
     if !loader.get_class_map().is_empty() {
-        call_php_entity_method(
-            &handle,
-            BStr::new("addClassMap"),
-            vec![loader.get_class_map().clone().to_wire()],
-        )?;
+        PhpCall::Method(&handle, BStr::new("addClassMap"))
+            .run::<PluginValue>(vec![loader.get_class_map().clone().to_wire()])?;
     }
     Ok(PluginValue::PhpHandle(handle))
 }
@@ -1336,11 +1331,7 @@ fn graph_http_downloader(
 /// PHP callers get the object type their signatures declare. The answer is the descriptor the
 /// worker exchanges for that promise, to be passed on as the answer of the call being served.
 fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
-    match call_function_with_dispatcher(
-        "__shirabe_resolved_promise",
-        vec![value],
-        Some(&mut PluginRpcDispatcher::default()),
-    ) {
+    match PhpCall::Function(BStr::new("__shirabe_resolved_promise")).try_run(vec![value]) {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
         Err(error) => Err(runtime_throw(bconcat!(
@@ -1354,11 +1345,8 @@ fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
 /// built in the worker. A failed request reaches the plugin as a rejection it handles, the way it
 /// does under Composer, rather than as a throw out of the call that started it.
 fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
-    match call_function_with_dispatcher(
-        "__shirabe_rejected_promise",
-        vec![throw.to_wire()],
-        Some(&mut PluginRpcDispatcher::default()),
-    ) {
+    match PhpCall::Function(BStr::new("__shirabe_rejected_promise")).try_run(vec![throw.to_wire()])
+    {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
         Err(error) => Err(runtime_throw(bconcat!(
@@ -1891,19 +1879,7 @@ fn is_php_callable(value: &PluginValue) -> anyhow::Result<bool> {
         | PluginValue::List(_)
         | PluginValue::Array(_)
         | PluginValue::PhpHandle(_) => {
-            let answer = unwrap_php_result(call_function_with_dispatcher(
-                "is_callable",
-                vec![value.clone()],
-                Some(&mut PluginRpcDispatcher::default()),
-            ))?;
-            match answer {
-                PluginValue::Bool(answer) => Ok(answer),
-                other => Err(RuntimeException::new(bconcat!(
-                    "is_callable did not return a bool over RPC: ",
-                    display_to_bytes(format_args!("{other:?}"))
-                ))
-                .into()),
-            }
+            PhpCall::Function(BStr::new("is_callable")).run(vec![value.clone()])
         }
         _ => Ok(false),
     }
@@ -1919,11 +1895,7 @@ fn call_php_callable(
     let mut call_args = Vec::with_capacity(args.len() + 1);
     call_args.push(callable.clone());
     call_args.extend(args);
-    unwrap_php_result(call_function_with_dispatcher(
-        "call_user_func",
-        call_args,
-        Some(&mut PluginRpcDispatcher::default()),
-    ))
+    PhpCall::Function(BStr::new("call_user_func")).run(call_args)
 }
 
 /// Serves the static methods a proxy stub forwards instead of running locally, because their real
@@ -3262,32 +3234,17 @@ impl PhpPluginProxy {
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
         let args = vec![composer_handle_value(composer), io_handle_value(io)?];
-        let outcome = call_php_method(
-            &self.handle,
-            method,
-            args,
-            Some(&mut PluginRpcDispatcher::default()),
-        )?;
-        match outcome {
-            Ok(_) => Ok(()),
-            Err(throw) => Err(throw_into_error(throw)),
-        }
+        PhpCall::Method(&self.handle, method).run::<PluginValue>(args)?;
+        Ok(())
     }
 
     /// For testing only: reads a public property of the plugin entity in the child, mirroring
     /// PHPUnit assertions like `$plugins[0]->version`.
     pub fn __get_property(&self, name: &BStr) -> anyhow::Result<PhpMixed> {
-        let outcome = shirabe_php_rpc::call_function(
-            "__shirabe_get_property",
-            vec![
-                PluginValue::PhpHandle(self.handle.clone()),
-                PluginValue::string(name),
-            ],
-        )?;
-        match outcome {
-            Ok(value) => PhpMixed::from_wire(&value).map_err(throw_into_error),
-            Err(throw) => Err(throw_into_error(throw)),
-        }
+        PhpCall::Function(BStr::new("__shirabe_get_property")).run(vec![
+            PluginValue::PhpHandle(self.handle.clone()),
+            PluginValue::string(name),
+        ])
     }
 }
 
@@ -3354,17 +3311,7 @@ impl PluginInterface for PhpPluginProxy {
 impl EventSubscriberInterface for PhpPluginProxy {
     fn get_subscribed_events(&self) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>> {
         // PHP: `$subscriber->getSubscribedEvents()` (an instance call of the static method).
-        let outcome = call_php_method(
-            &self.handle,
-            "getSubscribedEvents",
-            Vec::new(),
-            Some(&mut PluginRpcDispatcher::default()),
-        )?;
-        let value = match outcome {
-            Ok(value) => value,
-            Err(throw) => return Err(throw_into_error(throw)),
-        };
-        decode_subscribed_events(self.handle.class(), value)
+        PhpCall::Method(&self.handle, BStr::new("getSubscribedEvents")).run(Vec::new())
     }
 
     fn subscriber_handle(&self) -> PhpObjHandle {
@@ -3374,107 +3321,57 @@ impl EventSubscriberInterface for PhpPluginProxy {
 
 impl Capable for PhpPluginProxy {
     fn get_capabilities(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        let outcome = call_php_method(
-            &self.handle,
-            "getCapabilities",
-            Vec::new(),
-            Some(&mut PluginRpcDispatcher::default()),
-        )?;
-        let value = match outcome {
-            Ok(value) => value,
-            Err(throw) => return Err(throw_into_error(throw)),
-        };
+        let call = PhpCall::Method(&self.handle, BStr::new("getCapabilities"));
+        let value: PluginValue = call.run(Vec::new())?;
         // PHP: `(array) $plugin->getCapabilities()` — the interface declares no return type,
         // so a non-array return is cast. A handle in the map (a plugin putting an object among
         // its capability values) has no PhpMixed image and fails the conversion explicitly.
         let entries = match value {
             PluginValue::Null => IndexMap::new(),
             array @ (PluginValue::Array(_) | PluginValue::List(_)) => {
-                IndexMap::<BString, PhpMixed>::from_wire(&array).map_err(throw_into_error)?
+                IndexMap::<BString, PhpMixed>::from_wire(&array)
+                    .map_err(|throw| call.unsupported_shape(throw))?
             }
             scalar => IndexMap::from([(
                 "0".into(),
-                PhpMixed::from_wire(&scalar).map_err(throw_into_error)?,
+                PhpMixed::from_wire(&scalar).map_err(|throw| call.unsupported_shape(throw))?,
             )]),
         };
         Ok(entries)
     }
 }
 
-/// Decodes a `getSubscribedEvents()` wire value into the three shapes `addSubscriber`
-/// distinguishes: `'method'`, `['method', priority]`, and `[['method', priority], ...]`.
-/// A shape outside these is an explicit error, never a silently dropped listener.
-fn decode_subscribed_events(
-    class: &BStr,
-    value: PluginValue,
-) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>> {
-    let entries = match value {
-        PluginValue::Array(entries) => entries,
-        PluginValue::List(items) => {
-            // A PHP list-shaped array (integer keys) cannot map event names; an empty one is
-            // the only legal case (an empty PHP array serializes as a list).
-            if items.is_empty() {
-                IndexMap::new()
-            } else {
-                return Err(subscribed_events_shape_error(
-                    class,
-                    &PluginValue::List(items),
-                ));
-            }
-        }
-        other => return Err(subscribed_events_shape_error(class, &other)),
-    };
-    let mut events: IndexMap<BString, SubscribedEventEntry> = IndexMap::new();
-    for (event_name, params) in entries {
-        let entry = match &params {
-            PluginValue::String(method) => SubscribedEventEntry::Method(method.clone()),
-            PluginValue::List(items) => match items.first() {
-                Some(PluginValue::String(method)) => SubscribedEventEntry::MethodWithPriority(
-                    method.clone(),
-                    decode_listener_priority(class, items.get(1))?,
-                ),
-                _ => {
-                    let mut listeners = Vec::with_capacity(items.len());
-                    for listener in items {
-                        let PluginValue::List(pair) = listener else {
-                            return Err(subscribed_events_shape_error(class, &params));
-                        };
-                        let Some(PluginValue::String(method)) = pair.first() else {
-                            return Err(subscribed_events_shape_error(class, &params));
-                        };
-                        listeners.push((
-                            method.clone(),
-                            decode_listener_priority(class, pair.get(1))?,
-                        ));
-                    }
-                    SubscribedEventEntry::Methods(listeners)
-                }
-            },
-            _ => return Err(subscribed_events_shape_error(class, &params)),
+/// One entry of a `getSubscribedEvents()` answer, in the three shapes `addSubscriber`
+/// distinguishes: `'method'`, `['method', priority]`, and `[['method', priority], ...]`. A shape
+/// outside these is an explicit error, never a silently dropped listener.
+impl FromWire for SubscribedEventEntry {
+    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
+        let listener = |items: &[PluginValue]| -> Result<(BString, Option<i64>), PhpThrow> {
+            Ok((
+                BString::from_wire(items.first().unwrap_or(&wire::NULL))?,
+                Option::<i64>::from_wire(items.get(1).unwrap_or(&wire::NULL))?,
+            ))
         };
-        events.insert(event_name, entry);
+        match value {
+            PluginValue::String(method) => Ok(SubscribedEventEntry::Method(method.clone())),
+            PluginValue::List(items) if matches!(items.first(), Some(PluginValue::String(_))) => {
+                let (method, priority) = listener(items)?;
+                Ok(SubscribedEventEntry::MethodWithPriority(method, priority))
+            }
+            PluginValue::List(items) => items
+                .iter()
+                .map(|item| match item {
+                    PluginValue::List(pair) => listener(pair),
+                    other => Err(wire::unexpected("a [method, priority] pair", other)),
+                })
+                .collect::<Result<_, _>>()
+                .map(SubscribedEventEntry::Methods),
+            other => Err(wire::unexpected(
+                "a listener method or a list of them",
+                other,
+            )),
+        }
     }
-    Ok(events)
-}
-
-fn decode_listener_priority(
-    class: &BStr,
-    value: Option<&PluginValue>,
-) -> anyhow::Result<Option<i64>> {
-    match value {
-        None => Ok(None),
-        Some(PluginValue::Int(priority)) => Ok(Some(*priority)),
-        Some(other) => Err(subscribed_events_shape_error(class, other)),
-    }
-}
-
-fn subscribed_events_shape_error(class: &BStr, value: &PluginValue) -> anyhow::Error {
-    RuntimeException::new(bconcat!(
-        class,
-        "::getSubscribedEvents() returned an unsupported shape over RPC: ",
-        display_to_bytes(format_args!("{value:?}"))
-    ))
-    .into()
 }
 
 /// Wire value handing the shared Rust-side `$composer` to the child, interned in the R table.
@@ -3495,21 +3392,7 @@ pub fn io_handle_value(
 /// [`ClassLoader`]s.
 pub(crate) fn php_class_query(function: &BStr, args: Vec<PluginValue>) -> anyhow::Result<bool> {
     crate::event_dispatcher::EventDispatcher::ensure_script_autoloader()?;
-    let value = unwrap_php_result(call_function_with_dispatcher(
-        function,
-        args,
-        Some(&mut PluginRpcDispatcher::default()),
-    ))?;
-    match value {
-        PluginValue::Bool(value) => Ok(value),
-        other => Err(RuntimeException::new(bconcat!(
-            "PHP class query `",
-            function,
-            "` did not return a bool: ",
-            display_to_bytes(format_args!("{other:?}"))
-        ))
-        .into()),
-    }
+    PhpCall::Function(function).run(args)
 }
 
 /// Instantiates `new $class(...$ctor_args)` in the worker, with the script autoloader active.
@@ -3518,49 +3401,16 @@ pub(crate) fn new_php_object(
     ctor_args: Vec<PluginValue>,
 ) -> anyhow::Result<PhpObjHandle> {
     crate::event_dispatcher::EventDispatcher::ensure_script_autoloader()?;
-    let value = unwrap_php_result(new_object(
-        class,
-        ctor_args,
-        Some(&mut PluginRpcDispatcher::default()),
-    ))?;
-    match value {
-        PluginValue::PhpHandle(handle) => Ok(handle),
-        other => Err(RuntimeException::new(bconcat!(
-            "`new ",
-            class,
-            "` returned an unsupported shape over RPC: ",
-            display_to_bytes(format_args!("{other:?}"))
-        ))
-        .into()),
-    }
-}
-
-/// Calls `$obj->$method(...$args)` on a worker-side entity.
-pub(crate) fn call_php_entity_method(
-    handle: &PhpObjHandle,
-    method: &BStr,
-    args: Vec<PluginValue>,
-) -> anyhow::Result<PluginValue> {
-    unwrap_php_result(call_php_method(
-        handle,
-        method,
-        args,
-        Some(&mut PluginRpcDispatcher::default()),
-    ))
+    PhpCall::New(class).run(ctor_args)
 }
 
 /// `is_a($obj, $class)` evaluated in the worker: the child's own class table answers, so
 /// parent classes are covered (a `PhpObjHandle`'s `implements` lists interfaces only).
 pub(crate) fn php_is_a(handle: &PhpObjHandle, class: &BStr) -> anyhow::Result<bool> {
-    let value = unwrap_php_result(call_function_with_dispatcher(
-        "is_a",
-        vec![
-            PluginValue::PhpHandle(handle.clone()),
-            PluginValue::string(class),
-        ],
-        Some(&mut PluginRpcDispatcher::default()),
-    ))?;
-    Ok(matches!(value, PluginValue::Bool(true)))
+    PhpCall::Function(BStr::new("is_a")).run(vec![
+        PluginValue::PhpHandle(handle.clone()),
+        PluginValue::string(class),
+    ])
 }
 
 /// Wire value handing a Rust-side repository to the child, interned in the R table.
@@ -3585,13 +3435,8 @@ impl PhpInstallerProxy {
         Self { handle }
     }
 
-    fn call(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<PluginValue> {
-        unwrap_php_result(call_php_method(
-            &self.handle,
-            method,
-            args,
-            Some(&mut PluginRpcDispatcher::default()),
-        ))
+    fn call<R: FromWire>(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<R> {
+        PhpCall::Method(&self.handle, method).run(args)
     }
 
     fn package_arg(package: &PackageInterfaceHandle) -> PluginValue {
@@ -3617,39 +3462,26 @@ impl PhpInstallerProxy {
         method: &BStr,
         value: PluginValue,
     ) -> anyhow::Result<Option<PhpMixed>> {
+        let call = PhpCall::Method(&self.handle, method);
         let id = match value {
             PluginValue::Null => return Ok(None),
             PluginValue::Job(id) => id,
-            other => return Err(self.unsupported_shape(method, &other)),
+            other => {
+                return Err(call.unsupported_shape(wire::unexpected("a promise or null", &other)));
+            }
         };
-        match job_registry::await_php_job(id).await? {
-            PluginValue::Null => Ok(None),
-            other => Ok(Some(PhpMixed::from_wire(&other).map_err(throw_into_error)?)),
-        }
-    }
-
-    fn unsupported_shape(&self, method: &BStr, value: &PluginValue) -> anyhow::Error {
-        RuntimeException::new(bconcat!(
-            self.handle.class(),
-            "::",
-            method,
-            "() returned an unsupported shape over RPC: ",
-            display_to_bytes(format_args!("{value:?}"))
-        ))
-        .into()
+        let result = job_registry::await_php_job(id).await?;
+        Option::<PhpMixed>::from_wire(&result).map_err(|throw| call.unsupported_shape(throw))
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl crate::installer::InstallerInterface for PhpInstallerProxy {
     fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
-        match self.call(
+        self.call(
             BStr::new("supports"),
             vec![PluginValue::string(package_type)],
-        )? {
-            PluginValue::Bool(supports) => Ok(supports),
-            other => Err(self.unsupported_shape(BStr::new("supports"), &other)),
-        }
+        )
     }
 
     fn is_installed(
@@ -3658,10 +3490,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
-        match self.call(BStr::new("isInstalled"), args)? {
-            PluginValue::Bool(installed) => Ok(installed),
-            other => Err(self.unsupported_shape(BStr::new("isInstalled"), &other)),
-        }
+        self.call(BStr::new("isInstalled"), args)
     }
 
     async fn download(
@@ -3747,22 +3576,13 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         // infallible signature cannot carry, so it aborts rather than answering a path that
         // would silently install the package in the wrong place.
         let args = vec![Self::package_arg(&package)];
-        let value = self
-            .call(BStr::new("getInstallPath"), args)
+        self.call(BStr::new("getInstallPath"), args)
             .unwrap_or_else(|error| {
                 panic!(
                     "{}::getInstallPath failed over RPC: {error:#}",
                     self.handle.class().display_lossy()
                 )
-            });
-        match value {
-            PluginValue::Null => None,
-            PluginValue::String(path) => Some(std::path::PathBuf::from(path_from_bytes(&path))),
-            other => panic!(
-                "{}",
-                self.unsupported_shape(BStr::new("getInstallPath"), &other)
-            ),
-        }
+            })
     }
 }
 
@@ -3821,17 +3641,10 @@ impl PhpCapabilityProxy {
     /// `PhpPluginProxy::__get_property` the value keeps its wire form, so a test can assert the
     /// object identity behind a handle instead of only the plain data around it.
     pub fn __get_property(&self, name: &BStr) -> anyhow::Result<PluginValue> {
-        let outcome = shirabe_php_rpc::call_function(
-            "__shirabe_get_property",
-            vec![
-                PluginValue::PhpHandle(self.handle.clone()),
-                PluginValue::string(name),
-            ],
-        )?;
-        match outcome {
-            Ok(value) => Ok(value),
-            Err(throw) => Err(throw_into_error(throw)),
-        }
+        PhpCall::Function(BStr::new("__shirabe_get_property")).run(vec![
+            PluginValue::PhpHandle(self.handle.clone()),
+            PluginValue::string(name),
+        ])
     }
 }
 
@@ -3863,12 +3676,8 @@ impl CommandProvider for PhpCommandProviderProxy {
     fn get_commands(
         &self,
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>>> {
-        let value = unwrap_php_result(call_php_method(
-            &self.handle,
-            "getCommands",
-            Vec::new(),
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
+        let value: PluginValue =
+            PhpCall::Method(&self.handle, BStr::new("getCommands")).run(Vec::new())?;
         // PHP's getCommands(): array is unenforceable on the wire, and a
         // `Vec<Box<dyn BaseCommand>>` asserts every element up front, so the two checks
         // Application::getPluginCommands performs on the raw value live here, with its
@@ -4013,11 +3822,8 @@ pub(crate) fn extend_console_application_commands(
         .expect("only an application that published the handoff extends it");
     for handle in handles {
         if let Some(app) = context.app.borrow().as_ref() {
-            call_php_entity_method(
-                app,
-                BStr::new("add"),
-                vec![PluginValue::PhpHandle(handle.clone())],
-            )?;
+            PhpCall::Method(app, BStr::new("add"))
+                .run::<PluginValue>(vec![PluginValue::PhpHandle(handle.clone())])?;
         }
         context.plugin_commands.borrow_mut().push(handle);
     }
@@ -4074,21 +3880,8 @@ impl PhpConsoleApplicationContext {
                     .collect(),
             ),
         );
-        let value = unwrap_php_result(call_function_with_dispatcher(
-            "__shirabe_console_application_boot",
-            vec![PluginValue::Array(config)],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
-        let app = match value {
-            PluginValue::PhpHandle(app) => app,
-            other => {
-                return Err(RuntimeException::new(bconcat!(
-                    "__shirabe_console_application_boot returned an unsupported shape over RPC: ",
-                    display_to_bytes(format_args!("{other:?}"))
-                ))
-                .into());
-            }
-        };
+        let app: PhpObjHandle = PhpCall::Function(BStr::new("__shirabe_console_application_boot"))
+            .run(vec![PluginValue::Array(config)])?;
         *self.app.borrow_mut() = Some(app.clone());
         Ok(app)
     }
@@ -4108,17 +3901,7 @@ pub struct PhpCommandProxy {
 
 impl PhpCommandProxy {
     fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
-        let proxy_command = match Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))?
-        {
-            PluginValue::Bool(proxy_command) => proxy_command,
-            other => {
-                return Err(Self::unsupported_shape(
-                    &handle,
-                    BStr::new("isProxyCommand"),
-                    &other,
-                ));
-            }
-        };
+        let proxy_command = Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))?;
         Self::build(handle, proxy_command)
     }
 
@@ -4126,16 +3909,7 @@ impl PhpCommandProxy {
     /// so `isProxyCommand()` is asked for only when it also extends Composer's `BaseCommand`.
     pub(crate) fn new_script_command(handle: PhpObjHandle) -> anyhow::Result<Self> {
         let proxy_command = if php_is_a(&handle, BStr::new("Composer\\Command\\BaseCommand"))? {
-            match Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))? {
-                PluginValue::Bool(proxy_command) => proxy_command,
-                other => {
-                    return Err(Self::unsupported_shape(
-                        &handle,
-                        BStr::new("isProxyCommand"),
-                        &other,
-                    ));
-                }
-            }
+            Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))?
         } else {
             false
         };
@@ -4144,74 +3918,17 @@ impl PhpCommandProxy {
 
     fn build(handle: PhpObjHandle, proxy_command: bool) -> anyhow::Result<Self> {
         let data = crate::command::BaseCommandData::new(None);
-        let name = Self::call_metadata_getter(&handle, BStr::new("getName"))?;
-        match name {
-            PluginValue::Null => {}
-            PluginValue::String(bytes) => {
-                Command::set_name(&data, bytes.as_bstr())?;
-            }
-            other => {
-                return Err(Self::unsupported_shape(
-                    &handle,
-                    BStr::new("getName"),
-                    &other,
-                ));
-            }
+        let name: Option<BString> = Self::call_metadata_getter(&handle, BStr::new("getName"))?;
+        if let Some(name) = name {
+            Command::set_name(&data, name.as_bstr())?;
         }
-        let description = Self::call_metadata_getter(&handle, BStr::new("getDescription"))?;
-        match description {
-            PluginValue::String(bytes) => {
-                Command::set_description(&data, bytes.as_bstr());
-            }
-            other => {
-                return Err(Self::unsupported_shape(
-                    &handle,
-                    BStr::new("getDescription"),
-                    &other,
-                ));
-            }
-        }
-        let aliases = Self::call_metadata_getter(&handle, BStr::new("getAliases"))?;
-        let alias_items = match aliases {
-            PluginValue::List(items) => items,
-            PluginValue::Array(map) => map.into_values().collect(),
-            other => {
-                return Err(Self::unsupported_shape(
-                    &handle,
-                    BStr::new("getAliases"),
-                    &other,
-                ));
-            }
-        };
-        let mut alias_names = Vec::new();
-        for alias in alias_items {
-            match alias {
-                PluginValue::String(bytes) => {
-                    alias_names.push(bytes);
-                }
-                other => {
-                    return Err(Self::unsupported_shape(
-                        &handle,
-                        BStr::new("getAliases"),
-                        &other,
-                    ));
-                }
-            }
-        }
-        Command::set_aliases(&data, alias_names)?;
+        let description: BString =
+            Self::call_metadata_getter(&handle, BStr::new("getDescription"))?;
+        Command::set_description(&data, description.as_bstr());
+        let aliases: Vec<BString> = Self::call_metadata_getter(&handle, BStr::new("getAliases"))?;
+        Command::set_aliases(&data, aliases)?;
         let hidden = Self::call_metadata_getter(&handle, BStr::new("isHidden"))?;
-        match hidden {
-            PluginValue::Bool(hidden) => {
-                Command::set_hidden(&data, hidden);
-            }
-            other => {
-                return Err(Self::unsupported_shape(
-                    &handle,
-                    BStr::new("isHidden"),
-                    &other,
-                ));
-            }
-        }
+        Command::set_hidden(&data, hidden);
         Self::read_back_definition(&handle, &data)?;
         PENDING_COMMAND_HANDLES.with(|handles| handles.borrow_mut().push(handle.clone()));
         Ok(Self {
@@ -4231,19 +3948,14 @@ impl PhpCommandProxy {
             DefinitionItem, InputArgument, InputDefinition, InputOption,
         };
 
-        let value = unwrap_php_result(call_function_with_dispatcher(
-            "__shirabe_read_command_definition",
-            vec![PluginValue::PhpHandle(handle.clone())],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
+        let call = PhpCall::Function(BStr::new("__shirabe_read_command_definition"));
+        let value: PluginValue = call.run(vec![PluginValue::PhpHandle(handle.clone())])?;
+        let shape =
+            |other: &PluginValue| call.unsupported_shape(wire::unexpected("a definition", other));
         let mut map = match value {
             PluginValue::Array(map) => map,
             other => {
-                return Err(Self::unsupported_shape(
-                    handle,
-                    BStr::new("getDefinition"),
-                    &other,
-                ));
+                return Err(shape(&other));
             }
         };
         let field = |row: &mut IndexMap<BString, PluginValue>, key: &BStr| -> PluginValue {
@@ -4263,11 +3975,7 @@ impl PhpCommandProxy {
             let mut row = match row {
                 PluginValue::Array(row) => row,
                 other => {
-                    return Err(Self::unsupported_shape(
-                        handle,
-                        BStr::new("getDefinition"),
-                        &other,
-                    ));
+                    return Err(shape(&other));
                 }
             };
             let (name, description) = match (
@@ -4278,11 +3986,7 @@ impl PhpCommandProxy {
                     (name, description)
                 }
                 (other, _) => {
-                    return Err(Self::unsupported_shape(
-                        handle,
-                        BStr::new("getDefinition"),
-                        &other,
-                    ));
+                    return Err(shape(&other));
                 }
             };
             let required = matches!(
@@ -4316,11 +4020,7 @@ impl PhpCommandProxy {
             let mut row = match row {
                 PluginValue::Array(row) => row,
                 other => {
-                    return Err(Self::unsupported_shape(
-                        handle,
-                        BStr::new("getDefinition"),
-                        &other,
-                    ));
+                    return Err(shape(&other));
                 }
             };
             let (name, description) = match (
@@ -4331,11 +4031,7 @@ impl PhpCommandProxy {
                     (name, description)
                 }
                 (other, _) => {
-                    return Err(Self::unsupported_shape(
-                        handle,
-                        BStr::new("getDefinition"),
-                        &other,
-                    ));
+                    return Err(shape(&other));
                 }
             };
             let accept_value = matches!(
@@ -4401,11 +4097,7 @@ impl PhpCommandProxy {
                 Command::set_help(data, help.as_bstr());
             }
             other => {
-                return Err(Self::unsupported_shape(
-                    handle,
-                    BStr::new("getHelp"),
-                    &other,
-                ));
+                return Err(shape(&other));
             }
         }
         for usage in as_rows(field(&mut map, BStr::new("usages"))) {
@@ -4414,39 +4106,18 @@ impl PhpCommandProxy {
                     Command::add_usage(data, usage.as_bstr());
                 }
                 other => {
-                    return Err(Self::unsupported_shape(
-                        handle,
-                        BStr::new("getUsages"),
-                        &other,
-                    ));
+                    return Err(shape(&other));
                 }
             }
         }
         Ok(())
     }
 
-    fn call_metadata_getter(handle: &PhpObjHandle, method: &BStr) -> anyhow::Result<PluginValue> {
-        unwrap_php_result(call_php_method(
-            handle,
-            method,
-            Vec::new(),
-            Some(&mut PluginRpcDispatcher::default()),
-        ))
-    }
-
-    fn unsupported_shape(
+    fn call_metadata_getter<R: FromWire>(
         handle: &PhpObjHandle,
         method: &BStr,
-        value: &PluginValue,
-    ) -> anyhow::Error {
-        RuntimeException::new(bconcat!(
-            handle.class(),
-            "::",
-            method,
-            "() returned an unsupported shape over RPC: ",
-            display_to_bytes(format_args!("{value:?}"))
-        ))
-        .into()
+    ) -> anyhow::Result<R> {
+        PhpCall::Method(handle, method).run(Vec::new())
     }
 }
 
@@ -4474,19 +4145,10 @@ impl Command for PhpCommandProxy {
             })?;
         let app = context.booted_app()?;
         let input_line = input.borrow().__to_string();
-        let value = unwrap_php_result(call_function_with_dispatcher(
-            "__shirabe_run_console_application",
-            vec![PluginValue::PhpHandle(app), PluginValue::string(input_line)],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
-        match value {
-            PluginValue::Int(code) => Ok(code),
-            other => Err(Self::unsupported_shape(
-                &self.handle,
-                BStr::new("run"),
-                &other,
-            )),
-        }
+        PhpCall::Function(BStr::new("__shirabe_run_console_application")).run(vec![
+            PluginValue::PhpHandle(app),
+            PluginValue::string(input_line),
+        ])
     }
 
     async fn execute(
@@ -4561,9 +4223,8 @@ mod tests {
     #[test]
     fn a_listener_method_name_that_is_not_utf8_keeps_its_bytes() {
         let method = BString::from(b"on\xffEvent".as_slice());
-        let events = decode_subscribed_events(
-            BStr::new("Plugin"),
-            PluginValue::Array(IndexMap::from([
+        let events = IndexMap::<BString, SubscribedEventEntry>::from_wire(&PluginValue::Array(
+            IndexMap::from([
                 (BString::from("a"), PluginValue::String(method.clone())),
                 (
                     BString::from("b"),
@@ -4578,8 +4239,8 @@ mod tests {
                         method.clone(),
                     )])]),
                 ),
-            ])),
-        )
+            ]),
+        ))
         .unwrap();
         assert!(matches!(&events[bstr::B("a")], SubscribedEventEntry::Method(m) if *m == method));
         assert!(
@@ -4593,13 +4254,9 @@ mod tests {
     #[test]
     fn an_event_name_that_is_not_utf8_keeps_its_bytes() {
         let name = BString::from(b"event\xE9".as_slice());
-        let events = decode_subscribed_events(
-            BStr::new("Vendor\\Plugin"),
-            PluginValue::Array(IndexMap::from([(
-                name.clone(),
-                PluginValue::String(BString::from("method")),
-            )])),
-        )
+        let events = IndexMap::<BString, SubscribedEventEntry>::from_wire(&PluginValue::Array(
+            IndexMap::from([(name.clone(), PluginValue::String(BString::from("method")))]),
+        ))
         .unwrap();
         assert!(events.contains_key(&name));
     }

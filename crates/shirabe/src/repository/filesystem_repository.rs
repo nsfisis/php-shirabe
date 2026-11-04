@@ -6,7 +6,7 @@ use crate::json::JsonFile;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
-use crate::plugin::throwable_bridge::unwrap_php_result;
+use crate::plugin::php_call::PhpCall;
 use crate::repository::{
     FindPackageConstraint, InvalidRepositoryException, LoadPackagesResult, PlatformRepository,
     ProviderInfo, RepositoryInterface, SearchResult, WritableArrayRepository,
@@ -354,13 +354,11 @@ impl FilesystemRepository {
             // the glue skips it only when the class is not even autoloadable there (no Composer
             // PHP runtime = no observer code either).
             if shirabe_php_rpc::worker_is_running() {
-                unwrap_php_result(shirabe_php_rpc::call_function(
-                    "__shirabe_installed_versions_reload",
-                    vec![
-                        PhpMixed::Array(versions).to_wire(),
-                        shirabe_php_rpc::PluginValue::string(path_to_bytes(&repo_dir)),
-                    ],
-                ))?;
+                PhpCall::Function(BStr::new("__shirabe_installed_versions_reload"))
+                    .run::<shirabe_php_rpc::PluginValue>(vec![
+                    PhpMixed::Array(versions).to_wire(),
+                    shirabe_php_rpc::PluginValue::string(path_to_bytes(&repo_dir)),
+                ])?;
             }
         }
 
@@ -391,10 +389,10 @@ impl FilesystemRepository {
             .unwrap_or_else(|e| panic!("pending installed.php mutex poisoned: {e}"))
             .take();
         if let Some(path) = path {
-            unwrap_php_result(shirabe_php_rpc::call_function(
-                "__shirabe_safely_load_installed_versions",
-                vec![shirabe_php_rpc::PluginValue::string(path_to_bytes(&path))],
-            ))?;
+            PhpCall::Function(BStr::new("__shirabe_safely_load_installed_versions"))
+                .run::<shirabe_php_rpc::PluginValue>(vec![shirabe_php_rpc::PluginValue::string(
+                path_to_bytes(&path),
+            )])?;
         }
         Ok(())
     }

@@ -11,24 +11,23 @@ use crate::package::{
 };
 use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
+use crate::plugin::php_call::PhpCall;
 use crate::plugin::php_plugin_proxy::{
-    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, PluginRpcDispatcher, php_is_a,
-    plugin_handle_value,
+    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_is_a, plugin_handle_value,
 };
 use crate::plugin::plugin_interface::{self, PluginInterface};
-use crate::plugin::throwable_bridge::unwrap_php_result;
 use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
 };
 use crate::util::PackageSorter;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
+use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bconcat,
-    dirname, display_to_bytes, empty, file_get_contents, implode, ksort, path_from_bytes,
-    php_regex, preg_is_match, preg_quote, preg_replace2, strrpos, strtr_array, substr,
-    trigger_error, trim2, var_export, var_export_str, version_compare,
+    dirname, empty, file_get_contents, implode, ksort, path_from_bytes, php_regex, preg_is_match,
+    preg_quote, preg_replace2, strrpos, strtr_array, substr, trigger_error, trim2, var_export,
+    var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -552,49 +551,24 @@ impl PluginManager {
         Ok(())
     }
 
-    /// Runs a boolean runtime query in the PHP worker with the plugin dispatcher active.
-    fn php_runtime_bool(&self, function: &BStr, args: Vec<PluginValue>) -> anyhow::Result<bool> {
-        let value = unwrap_php_result(call_function_with_dispatcher(
-            function,
-            args,
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
-        match value {
-            PluginValue::Bool(value) => Ok(value),
-            other => Err(RuntimeException::new(bconcat!(
-                "PHP runtime query `",
-                function,
-                "` did not return a bool: ",
-                display_to_bytes(format_args!("{other:?}"))
-            ))
-            .into()),
-        }
-    }
-
     fn php_runtime_class_exists(&self, class: &BStr, autoload: bool) -> anyhow::Result<bool> {
-        self.php_runtime_bool(
-            BStr::new("class_exists"),
-            vec![PluginValue::string(class), PluginValue::Bool(autoload)],
-        )
+        PhpCall::Function(BStr::new("class_exists")).run(vec![
+            PluginValue::string(class),
+            PluginValue::Bool(autoload),
+        ])
     }
 
     fn php_runtime_is_a(&self, class: &BStr, interface: &BStr) -> anyhow::Result<bool> {
-        self.php_runtime_bool(
-            BStr::new("is_a"),
-            vec![
-                PluginValue::string(class),
-                PluginValue::string(interface),
-                PluginValue::Bool(true),
-            ],
-        )
+        PhpCall::Function(BStr::new("is_a")).run(vec![
+            PluginValue::string(class),
+            PluginValue::string(interface),
+            PluginValue::Bool(true),
+        ])
     }
 
     fn php_runtime_eval(&self, code: BString) -> anyhow::Result<()> {
-        unwrap_php_result(call_function_with_dispatcher(
-            "__shirabe_eval",
-            vec![PluginValue::string(code)],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
+        PhpCall::Function(BStr::new("__shirabe_eval"))
+            .run::<PluginValue>(vec![PluginValue::string(code)])?;
         Ok(())
     }
 
@@ -603,14 +577,10 @@ impl PluginManager {
         file_identifier: &BStr,
         file: &BStr,
     ) -> anyhow::Result<()> {
-        unwrap_php_result(call_function_with_dispatcher(
-            "__shirabe_composer_require",
-            vec![
-                PluginValue::string(file_identifier),
-                PluginValue::string(file),
-            ],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
+        PhpCall::Function(BStr::new("__shirabe_composer_require")).run::<PluginValue>(vec![
+            PluginValue::string(file_identifier),
+            PluginValue::string(file),
+        ])?;
         Ok(())
     }
 
@@ -627,21 +597,7 @@ impl PluginManager {
         class: &BStr,
         args: Vec<PluginValue>,
     ) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
-        let value = unwrap_php_result(shirabe_php_rpc::new_object(
-            class,
-            args,
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
-        match value {
-            PluginValue::PhpHandle(handle) => Ok(handle),
-            other => Err(RuntimeException::new(bconcat!(
-                "instantiating `",
-                class,
-                "` did not return a PHP handle: ",
-                display_to_bytes(format_args!("{other:?}"))
-            ))
-            .into()),
-        }
+        PhpCall::New(class).run(args)
     }
 
     /// Deactivates a plugin package
@@ -1077,12 +1033,9 @@ impl PluginManager {
         };
 
         // PHP: if (!class_exists($capabilityClass))
-        let exists = unwrap_php_result(call_function_with_dispatcher(
-            "class_exists",
-            vec![PluginValue::string(capability_class.clone())],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
-        if !matches!(exists, PluginValue::Bool(true)) {
+        let exists: bool = PhpCall::Function(BStr::new("class_exists"))
+            .run(vec![PluginValue::string(capability_class.clone())])?;
+        if !exists {
             return Err(RuntimeException::new(bconcat!(
                 "Cannot instantiate Capability, as class ",
                 capability_class,
@@ -1105,23 +1058,8 @@ impl PluginManager {
         let args_value = PluginValue::Array(ctor_args.into_iter().collect());
 
         // PHP: $capabilityObj = new $capabilityClass($ctorArgs);
-        let capability_obj = unwrap_php_result(shirabe_php_rpc::new_object(
-            capability_class.as_bstr(),
-            vec![args_value],
-            Some(&mut PluginRpcDispatcher::default()),
-        ))?;
-        let handle = match capability_obj {
-            PluginValue::PhpHandle(handle) => handle,
-            other => {
-                return Err(RuntimeException::new(bconcat!(
-                    "worker returned a non-object for new ",
-                    capability_class,
-                    "(...): ",
-                    display_to_bytes(format_args!("{other:?}"))
-                ))
-                .into());
-            }
-        };
+        let handle: shirabe_php_rpc::PhpObjHandle =
+            PhpCall::New(capability_class.as_bstr()).run(vec![args_value])?;
 
         // PHP: if (!$capabilityObj instanceof Capability || !$capabilityObj instanceof $capabilityClassName)
         if !php_is_a(

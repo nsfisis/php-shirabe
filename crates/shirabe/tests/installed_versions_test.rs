@@ -14,6 +14,7 @@ use php_worker::{
     load_composer_php_runtime, lock_php_worker, php_call_static, php_eval, php_runtime_available,
     php_single_quote,
 };
+use shirabe::plugin::php_call::PhpCall;
 use shirabe_php_rpc::{PluginValue, ToWire};
 use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str, realpath};
 use tempfile::TempDir;
@@ -182,7 +183,8 @@ fn test_satisfies() {
 }
 
 fn new_version_parser() -> PluginValue {
-    shirabe_php_rpc::new_object("Composer\\Semver\\VersionParser", vec![], None)
+    PhpCall::New(BStr::new("Composer\\Semver\\VersionParser"))
+        .try_run::<PluginValue>(vec![])
         .expect("VersionParser request failed")
         .expect("VersionParser threw")
 }
@@ -328,14 +330,10 @@ fn test_get_version_out_of_bounds() {
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
-    let throw = shirabe_php_rpc::call_static_method(
-        INSTALLED_VERSIONS,
-        "getVersion",
-        vec![PluginValue::string("not/installed")],
-        None,
-    )
-    .expect("getVersion request failed")
-    .expect_err("getVersion must throw for a package that is not installed");
+    let throw = PhpCall::StaticMethod(BStr::new(INSTALLED_VERSIONS), BStr::new("getVersion"))
+        .try_run::<PluginValue>(vec![PluginValue::string("not/installed")])
+        .expect("getVersion request failed")
+        .expect_err("getVersion must throw for a package that is not installed");
     assert_eq!("OutOfBoundsException", throw.exception_class);
 }
 

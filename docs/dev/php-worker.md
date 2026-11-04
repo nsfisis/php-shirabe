@@ -7,6 +7,17 @@ the worker loads, the classes that cross as materialized values, and how the con
 is split between the two worlds. Which treatment each Composer class receives is decided by
 [docs/dev/plugin-class-classification.md](./plugin-class-classification.md).
 
+## Calling into the worker
+
+The `shirabe` crate calls into the worker through `plugin::php_call::PhpCall` and nothing else: it
+names what to run (a function or entry point, a method of a P-table entity, a static method, a
+constructor) and decodes the answer as the type the caller asks for (`FromWire`). The callbacks
+the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the runtime
+service endpoint and the R table — unless the caller brings a dispatcher of its own, as script
+execution does to expose the event it dispatches. A PHP exception becomes the error of the ported
+exception it stands for (`try_run` keeps it apart for a caller that catches it), and an answer
+that does not decode is an error naming the call and the value it answered with.
+
 ## Entry points
 
 A `CallFunction` name reaches the worker's dispatch table first (see "Entry points" in

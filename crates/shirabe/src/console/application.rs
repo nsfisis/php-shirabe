@@ -22,6 +22,7 @@ use crate::io::{
     ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface,
 };
 use crate::json::JsonValidationException;
+use crate::plugin::php_call::PhpCall;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
@@ -2407,45 +2408,31 @@ impl ApplicationHandle {
                                         )?;
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
-                                        let cmd_name = crate::plugin::call_php_entity_method(
-                                            &handle,
-                                            BStr::new("getName"),
-                                            vec![],
-                                        )?;
-                                        if let shirabe_php_rpc::PluginValue::String(ref bytes) =
-                                            cmd_name
+                                        let cmd_name: Option<BString> =
+                                            PhpCall::Method(&handle, BStr::new("getName"))
+                                                .run(Vec::new())?;
+                                        if let Some(ref bytes) = cmd_name
                                             && !bytes.is_empty()
                                             && bytes != script
                                         {
                                             io.write_error(bconcat!("<warning>The script named ", script, " in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>"));
                                             // override it with the defined script name
-                                            crate::plugin::call_php_entity_method(
-                                                &handle,
-                                                BStr::new("setName"),
-                                                vec![shirabe_php_rpc::PluginValue::string(
+                                            PhpCall::Method(&handle, BStr::new("setName"))
+                                                .run::<shirabe_php_rpc::PluginValue>(vec![
+                                                shirabe_php_rpc::PluginValue::string(
                                                     script.clone(),
-                                                )],
-                                            )?;
+                                                ),
+                                            ])?;
                                         }
 
-                                        let cmd_description =
-                                            crate::plugin::call_php_entity_method(
-                                                &handle,
-                                                BStr::new("getDescription"),
-                                                vec![],
-                                            )?;
-                                        if matches!(
-                                            cmd_description,
-                                            shirabe_php_rpc::PluginValue::String(ref bytes)
-                                                if bytes.is_empty()
-                                        ) {
-                                            crate::plugin::call_php_entity_method(
-                                                &handle,
-                                                BStr::new("setDescription"),
-                                                vec![shirabe_php_rpc::PluginValue::string(
-                                                    description,
-                                                )],
-                                            )?;
+                                        let cmd_description: BString =
+                                            PhpCall::Method(&handle, BStr::new("getDescription"))
+                                                .run(Vec::new())?;
+                                        if cmd_description.is_empty() {
+                                            PhpCall::Method(&handle, BStr::new("setDescription"))
+                                                .run::<shirabe_php_rpc::PluginValue>(vec![
+                                                shirabe_php_rpc::PluginValue::string(description),
+                                            ])?;
                                         }
 
                                         let cmd =

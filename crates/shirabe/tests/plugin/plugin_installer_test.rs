@@ -21,6 +21,7 @@ use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{
     CompletePackageHandle, Locker, LockerInterface, PackageInterfaceHandle, RootPackageHandle,
 };
+use shirabe::plugin::php_call::PhpCall;
 use shirabe::plugin::plugin_interface::PluginInterface;
 use shirabe::plugin::{
     Capable, PluginManager, composer_handle_value, io_handle_value, plugin_handle_value,
@@ -892,12 +893,10 @@ fn load_mock_capability_class() {
         .join("../../composer/tests/Composer/Test/Plugin/Mock/Capability.php")
         .canonicalize()
         .expect("the Composer checkout must provide the plugin test mocks");
-    shirabe_php_rpc::call_function(
-        "__shirabe_require",
-        vec![PluginValue::string(path_to_bytes(&path))],
-    )
-    .unwrap()
-    .unwrap();
+    PhpCall::Function(BStr::new("__shirabe_require"))
+        .try_run::<PluginValue>(vec![PluginValue::string(path_to_bytes(&path))])
+        .unwrap()
+        .unwrap();
 }
 
 #[test]
