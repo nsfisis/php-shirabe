@@ -35,12 +35,12 @@ use shirabe_php_shim::{
     extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists,
     get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, ini_set, intval, is_dir, is_file,
     is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim2, mb_convert_encoding,
-    mb_convert_variables, mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage,
-    microtime, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, php_str,
-    php_to_string, php_truthy, php_uname, posix_getuid, preg_grep, preg_match, preg_quote,
-    preg_replace_callback, preg_split, putenv, random_bytes, realpath, restore_error_handler,
-    round, sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen, strpos,
-    strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
+    mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime, os_str_from_bytes,
+    path_from_bytes, path_to_bytes, php_regex, php_str, php_to_string, php_truthy, php_uname,
+    posix_getuid, preg_grep, preg_match, preg_quote, preg_replace_callback, preg_split, putenv,
+    random_bytes, realpath, restore_error_handler, round, sort_natural_flag_case, str_pad,
+    str_repeat, str_replace, str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count,
+    sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::input::InputInterfaceByName;
@@ -2499,15 +2499,19 @@ impl ApplicationHandle {
             }
 
             if let Some(st) = start_time {
+                let mib = |memory: anyhow::Result<i64>| match memory {
+                    Ok(memory) => bconcat!(
+                        display_to_bytes(round((memory as f64) / 1024.0 / 1024.0, 2)),
+                        "MiB"
+                    ),
+                    Err(_) => BString::from("<unknown>"),
+                };
                 io.write_error(bconcat!(
                     "<info>Memory usage: ",
-                    display_to_bytes(round((memory_get_usage() as f64) / 1024.0 / 1024.0, 2)),
-                    "MiB (peak: ",
-                    display_to_bytes(round(
-                        (memory_get_peak_usage(false) as f64) / 1024.0 / 1024.0,
-                        2
-                    )),
-                    "MiB), time: ",
+                    mib(shirabe_php_rpc::memory_get_usage(false)),
+                    " (peak: ",
+                    mib(shirabe_php_rpc::memory_get_peak_usage(false)),
+                    "), time: ",
                     display_to_bytes(round(microtime() - st, 2)),
                     "s</info>"
                 ));

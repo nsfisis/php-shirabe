@@ -10,9 +10,9 @@ use crate::terminal::Terminal;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, memory_get_usage,
-    microtime, php_str, php_to_string, preg_replace_callback, round, rtrim2, sprintf, str_pad,
-    str_repeat, substr_count, time,
+    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, microtime, php_str,
+    php_to_string, preg_replace_callback, round, rtrim2, sprintf, str_pad, str_repeat,
+    substr_count, time,
 };
 
 pub const FORMAT_VERBOSE: &BStr = php_str(b"verbose");
@@ -662,9 +662,12 @@ impl ProgressBar {
             Box::new(
                 |_bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
-                    Ok(Ok(PhpMixed::string(Helper::format_memory(
-                        memory_get_usage(),
-                    ))))
+                    Ok(Ok(PhpMixed::string(
+                        match shirabe_php_rpc::memory_get_usage(true) {
+                            Ok(memory) => Helper::format_memory(memory),
+                            Err(_) => BString::from("<unknown>"),
+                        },
+                    )))
                 },
             ),
         );

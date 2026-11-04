@@ -7,7 +7,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
     bconcat, canonical_int_key, display_to_bytes, error_message, mb_check_encoding,
-    mb_convert_encoding, memory_get_usage, microtime, preg_replace, str_repeat, strip_tags, strlen,
+    mb_convert_encoding, microtime, preg_replace, str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
     ProgressBar, QuestionHelper, QuestionHelperInterface, Table,
@@ -82,10 +82,18 @@ impl ConsoleIO {
         }
 
         let messages = if let Some(start_time) = self.start_time {
-            let memory_usage = (memory_get_usage() as f64) / 1024.0 / 1024.0;
+            let memory_usage = match shirabe_php_rpc::memory_get_usage(false) {
+                Ok(memory_usage) => display_to_bytes(format_args!(
+                    "{:.1}MiB",
+                    (memory_usage as f64) / 1024.0 / 1024.0
+                )),
+                Err(_) => BString::from("<unknown>"),
+            };
             let time_spent = microtime() - start_time;
             bconcat!(
-                display_to_bytes(format_args!("[{:.1}MiB/{:.2}s] ", memory_usage, time_spent)),
+                "[",
+                memory_usage,
+                display_to_bytes(format_args!("/{:.2}s] ", time_spent)),
                 messages
             )
         } else {

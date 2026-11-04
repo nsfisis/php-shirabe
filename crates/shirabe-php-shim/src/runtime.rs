@@ -323,16 +323,6 @@ pub fn dir() -> BString {
     todo!()
 }
 
-pub fn memory_get_usage() -> i64 {
-    // TODO(php-semantics): return PHP's actual emalloc-tracked memory usage instead of a stub 0.
-    0
-}
-
-pub fn memory_get_peak_usage(_real_usage: bool) -> i64 {
-    // TODO(php-semantics): return PHP's actual emalloc-tracked peak memory usage instead of a stub 0.
-    0
-}
-
 pub fn ini_set(_varname: impl AsRef<[u8]>, _value: impl AsRef<[u8]>) -> Option<BString> {
     let _varname = BStr::new(_varname.as_ref());
     let _value = BStr::new(_value.as_ref());

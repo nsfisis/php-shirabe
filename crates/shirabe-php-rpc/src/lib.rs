@@ -539,6 +539,18 @@ pub fn phpversion(extension: impl AsRef<[u8]>) -> anyhow::Result<Option<BString>
     string_or_false("phpversion", extension.as_ref().as_bstr())
 }
 
+/// PHP `memory_get_usage($real_usage)`, measured in the worker. The memory of Shirabe's own
+/// process is not included.
+pub fn memory_get_usage(real_usage: bool) -> anyhow::Result<i64> {
+    query("memory_get_usage", real_usage)
+}
+
+/// PHP `memory_get_peak_usage($real_usage)`, measured in the worker. The memory of Shirabe's own
+/// process is not included.
+pub fn memory_get_peak_usage(real_usage: bool) -> anyhow::Result<i64> {
+    query("memory_get_peak_usage", real_usage)
+}
+
 /// PHP `class_exists($class)`, autoloading through the worker's autoloaders.
 pub fn class_exists(class: impl AsRef<[u8]>) -> anyhow::Result<bool> {
     query("class_exists", class.as_ref().as_bstr())
@@ -1208,6 +1220,20 @@ mod tests {
         // XdebugHandler::getAllIniFiles() always yields at least one entry, which is the empty
         // string when no php.ini is loaded.
         assert!(!get_all_ini_files().unwrap().is_empty());
+    }
+
+    #[test]
+    fn queries_memory_usage_when_php_available() {
+        if PhpExecutableFinder::new().find(false).is_none() {
+            // No PHP in this environment; the worker cannot start.
+            return;
+        }
+
+        for real_usage in [false, true] {
+            let usage = memory_get_usage(real_usage).unwrap();
+            assert!(usage > 0);
+            assert!(memory_get_peak_usage(real_usage).unwrap() >= usage);
+        }
     }
 
     #[test]

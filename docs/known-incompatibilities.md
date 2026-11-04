@@ -133,3 +133,14 @@ Composer and Shirabe.
 
 Plugins and scripts run in the PHP worker, where `date.timezone` is applied as
 usual.
+
+### Memory usage
+
+The memory usage that Shirabe reports, in the `--profile` output and in the
+`%memory%` placeholder of progress bars, is measured in the PHP worker that
+runs plugins and scripts. The memory of the Shirabe process itself is not
+included; use a profiling tool to measure it.
+
+For the same reason, `memory_get_usage()` and `memory_get_peak_usage()` called
+from plugins and scripts report only the memory of the PHP worker, not that of
+the Shirabe process.
