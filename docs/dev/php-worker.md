@@ -87,12 +87,6 @@ Notable internal helpers:
   spawned into the storage each one names (`putenv()`, `$_ENV`, `$_SERVER`); see
   [docs/dev/env-vars-porting.md](./env-vars-porting.md). The outermost `rpc_call` of a session
   issues it whenever the journal has moved on.
-- `__shirabe_get_property` — for testing only: reads a public property of a P-table entity.
-- `__shirabe_reflection_invoke` / `__shirabe_reflection_get_property` /
-  `__shirabe_reflection_set_property` — for testing only: the `ReflectionMethod` /
-  `ReflectionProperty` access PHPUnit tests use to reach the non-public members of a P-table
-  entity.
-- `__shirabe_oracle_roundtrip` — codec oracle support for tests.
 - `__shirabe_console_application_boot` — builds the worker-side `Composer\Console\Application`
   (the `php/runtime/` definition) from the Rust handoff: the shared `$composer`/`$io` proxies,
   the initial working directory and disable-by-default flags, `\Shirabe\RustCommandStub` rows
@@ -102,6 +96,15 @@ Notable internal helpers:
   wire, and a failure propagates as a Throw (the booted application does not catch exceptions).
 - `__shirabe_read_command_definition` — reads a command's input definition (plus help text and
   extra usages) as plain data, so the Rust side mirrors it for `help`/`list` rendering.
+
+The helpers that exist only for tests sit together at the end of the table, each commented
+`For testing:`:
+
+- `__shirabe_oracle_roundtrip` — codec oracle support.
+- `__shirabe_get_property` — reads a public property of a P-table entity.
+- `__shirabe_reflection_invoke` / `__shirabe_reflection_get_property` /
+  `__shirabe_reflection_set_property` — the `ReflectionMethod` / `ReflectionProperty` access
+  PHPUnit tests use to reach the non-public members of a P-table entity.
 
 ### Runtime service endpoint
 

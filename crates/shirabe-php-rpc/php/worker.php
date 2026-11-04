@@ -836,10 +836,6 @@ ShirabeRpcRuntime::$dispatch = [
         ];
     },
     '__shirabe_eval' => static fn($args) => eval($args[0]),
-    // Round-trips raw serialize() bytes through the PHP core codec, for the codec oracle tests.
-    '__shirabe_oracle_roundtrip' => static fn($args) => serialize(
-        ShirabeRpcRuntime::unserializePayload($args[0])
-    ),
     '__shirabe_require' => static function ($args) {
         require_once $args[0];
         // The required file may have registered further prepending autoloaders (a Composer
@@ -993,36 +989,6 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return true;
     },
-    // For testing only: reads a public property of a P-table entity (PHPUnit asserts like
-    // `$plugins[0]->version` have no method to call).
-    '__shirabe_get_property' => static function ($args) {
-        $obj = ShirabeRpcRuntime::fromWire($args[0]);
-        if (!is_object($obj)) {
-            throw new RuntimeException('__shirabe_get_property expects a handle argument');
-        }
-        return $obj->{$args[1]};
-    },
-    // For testing only: the ReflectionMethod / ReflectionProperty access PHPUnit tests use to
-    // reach the non-public members of a P-table entity.
-    '__shirabe_reflection_invoke' => static function ($args) {
-        [$obj, $method, $methodArgs] = $args;
-        $reflMethod = new ReflectionMethod($obj, $method);
-        (\PHP_VERSION_ID < 80100) and $reflMethod->setAccessible(true);
-        return $reflMethod->invokeArgs($obj, $methodArgs);
-    },
-    '__shirabe_reflection_get_property' => static function ($args) {
-        [$obj, $name] = $args;
-        $reflProp = new ReflectionProperty($obj, $name);
-        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
-        return $reflProp->getValue($obj);
-    },
-    '__shirabe_reflection_set_property' => static function ($args) {
-        [$obj, $name, $value] = $args;
-        $reflProp = new ReflectionProperty($obj, $name);
-        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
-        $reflProp->setValue($obj, $value);
-        return null;
-    },
     // Builds the worker-side Composer\Console\Application (the runtime/ definition, not the
     // real class) from the Rust handoff; the caller keeps the returned handle and runs
     // plugin-provided commands through __shirabe_run_console_application.
@@ -1077,6 +1043,42 @@ ShirabeRpcRuntime::$dispatch = [
             'help' => $command->getHelp(),
             'usages' => $command->getUsages(),
         ];
+    },
+    // For testing: round-trips raw serialize() bytes through the PHP core codec, for the codec
+    // oracle tests.
+    '__shirabe_oracle_roundtrip' => static fn($args) => serialize(
+        ShirabeRpcRuntime::unserializePayload($args[0])
+    ),
+    // For testing: reads a public property of a P-table entity (PHPUnit asserts like
+    // `$plugins[0]->version` have no method to call).
+    '__shirabe_get_property' => static function ($args) {
+        $obj = ShirabeRpcRuntime::fromWire($args[0]);
+        if (!is_object($obj)) {
+            throw new RuntimeException('__shirabe_get_property expects a handle argument');
+        }
+        return $obj->{$args[1]};
+    },
+    // For testing: invokes a non-public method of a P-table entity through ReflectionMethod.
+    '__shirabe_reflection_invoke' => static function ($args) {
+        [$obj, $method, $methodArgs] = $args;
+        $reflMethod = new ReflectionMethod($obj, $method);
+        (\PHP_VERSION_ID < 80100) and $reflMethod->setAccessible(true);
+        return $reflMethod->invokeArgs($obj, $methodArgs);
+    },
+    // For testing: reads a non-public property of a P-table entity through ReflectionProperty.
+    '__shirabe_reflection_get_property' => static function ($args) {
+        [$obj, $name] = $args;
+        $reflProp = new ReflectionProperty($obj, $name);
+        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+        return $reflProp->getValue($obj);
+    },
+    // For testing: writes a non-public property of a P-table entity through ReflectionProperty.
+    '__shirabe_reflection_set_property' => static function ($args) {
+        [$obj, $name, $value] = $args;
+        $reflProp = new ReflectionProperty($obj, $name);
+        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+        $reflProp->setValue($obj, $value);
+        return null;
     },
 ];
 
