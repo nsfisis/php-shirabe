@@ -10,8 +10,7 @@ use crate::event_dispatcher::{
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::plugin::php_call::PhpCall;
-use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
-use crate::plugin::php_plugin_proxy::unavailable_method;
+use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, unavailable_method};
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;

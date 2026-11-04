@@ -314,7 +314,7 @@ macro_rules! wire_record {
         impl $crate::ToWire for $name {
             fn to_wire(self) -> $crate::PluginValue {
                 $crate::wire::record_to_wire(vec![
-                    $((stringify!($field).as_bytes(), $crate::ToWire::to_wire(self.$field)),)*
+                    $((stringify!($field).as_bytes(), $crate::ToWire::to_wire(self.$field))),*
                 ])
             }
         }
