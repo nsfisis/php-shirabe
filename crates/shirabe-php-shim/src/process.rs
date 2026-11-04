@@ -21,10 +21,14 @@ fn output_lines(stdout: &[u8]) -> Vec<BString> {
     lines
 }
 
+/// Runs `command` the way PHP's `popen($command, 'r')` does: only stdout is captured, and stdin and
+/// stderr are inherited.
 fn run_shell(command: &[u8]) -> Option<std::process::Output> {
     std::process::Command::new("/bin/sh")
         .arg("-c")
         .arg(os_str_from_bytes(command))
+        .stdin(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
         .output()
         .ok()
 }
