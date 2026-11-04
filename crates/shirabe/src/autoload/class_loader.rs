@@ -302,18 +302,13 @@ impl ClassLoader {
         if self.class_map_authoritative || self.missing_classes.contains_key(class) {
             return None;
         }
-        if let Some(apcu_prefix) = &self.apcu_prefix {
-            // No-op; APCu is not available in Rust.
-        }
+        // PHP also consults and fills the APCu cache around the lookup below. APCu is never enabled
+        // here (see set_apcu_prefix), so the prefix is always null.
 
         // TODO(php-runtime): PHP also looks for a Hack file (`.hh`) when it runs on HHVM. Only the
         // worker, which is the runtime that includes the file, can answer whether it is HHVM, and
         // asking boots it, while this lookup is what decides whether it is needed at all.
         let file = self.find_file_with_extension(class, BStr::new(".php"));
-
-        if let Some(apcu_prefix) = &self.apcu_prefix {
-            // No-op; APCu is not available in Rust.
-        }
 
         if file.is_none() {
             // Remember that this class does not exist.
