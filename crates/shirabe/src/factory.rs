@@ -563,18 +563,15 @@ impl Factory {
                         let installed_versions_path =
                             path_from_bytes(&config.borrow_mut().get_str("vendor-dir")?)
                                 .join("composer/installed.php");
+                        // The two class_exists() checks run in the PHP worker, where
+                        // InstalledVersions lives; see `__shirabe_safely_load_installed_versions`.
                         if !disable_plugins.is_disabled_at_all()
                             && !disable_scripts
-                            && !class_exists("Composer\\InstalledVersions")
                             && file_exists(&installed_versions_path)
                         {
-                            // force loading the class at this point so it is loaded from the composer phar and not from the vendor dir
-                            // as we cannot guarantee integrity of that file
-                            if class_exists("Composer\\InstalledVersions") {
-                                FilesystemRepository::safely_load_installed_versions(
-                                    &installed_versions_path,
-                                );
-                            }
+                            FilesystemRepository::safely_load_installed_versions(
+                                &installed_versions_path,
+                            );
                         }
                     }
 

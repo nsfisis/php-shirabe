@@ -1665,7 +1665,7 @@ try {
             "__shirabe_require",
             vec![PluginValue::string(autoload)],
         ))?;
-        Ok(())
+        crate::repository::FilesystemRepository::load_pending_installed_versions()
     }
 
     /// For testing only: a test that never registers a plugin package still needs the Composer

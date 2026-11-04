@@ -363,9 +363,9 @@ fn test_repository_writes_installed_php() {
     assert_eq!(expected, actual);
 }
 
-/// The Rust `FilesystemRepository::safely_load_installed_versions` is a no-op stub, and
-/// `InstalledVersions` has no Rust port at all; both live in the PHP worker, which is where the
-/// upstream assertions are checked. See `crates/shirabe/tests/installed_versions_test.rs`.
+/// The Rust `FilesystemRepository::safely_load_installed_versions` only defers the call to the PHP
+/// worker, and `InstalledVersions` has no Rust port at all; both run in the worker, which is where
+/// the upstream assertions are checked. See `crates/shirabe/tests/installed_versions_test.rs`.
 #[test]
 // Serialized because test_repository_writes_installed_php pushes InstalledVersions::reload into
 // the same worker, which would replace the state asserted here.

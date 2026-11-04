@@ -1,0 +1,18 @@
+{
+    "name": "shirabe/e2e-installed-versions",
+    "version": "1.0.0",
+    "description": "E2E fixture project: record what InstalledVersions reports to a script before installed.php is rewritten.",
+    "repositories": [
+        {
+            "packagist.org": false
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Shirabe\\E2e\\": "src/"
+        }
+    },
+    "scripts": {
+        "probe": "Shirabe\\E2e\\InstalledVersionsProbe::probe"
+    }
+}

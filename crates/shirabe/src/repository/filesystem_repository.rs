@@ -22,6 +22,11 @@ use shirabe_php_shim::{
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
 
+/// The `installed.php` passed to `FilesystemRepository::safely_load_installed_versions`, waiting
+/// for the Composer PHP runtime to be loaded into the PHP worker.
+static PENDING_INSTALLED_VERSIONS: std::sync::Mutex<Option<std::path::PathBuf>> =
+    std::sync::Mutex::new(None);
+
 /// Filesystem repository.
 #[derive(Debug)]
 pub struct FilesystemRepository {
@@ -361,10 +366,35 @@ impl FilesystemRepository {
     }
 
     /// As we load the file from vendor dir during bootstrap, we need to make sure it contains only expected code before executing it
-    pub fn safely_load_installed_versions(_path: &std::path::Path) -> bool {
-        // TODO(php-runtime): call `InstalledVersions::reload()` in PHP runtime process, not in
-        // Rust.
-        true
+    ///
+    /// `InstalledVersions` lives in the PHP worker, so the file is validated and loaded there, once
+    /// the Composer PHP runtime is loaded into the worker (see
+    /// [`Self::load_pending_installed_versions`]). Unlike Composer, which returns whether the file
+    /// passed the validation, this therefore returns nothing. Only the first path is kept, as
+    /// Composer loads the file only while `InstalledVersions` is not defined yet.
+    pub fn safely_load_installed_versions(path: &std::path::Path) {
+        let mut pending = PENDING_INSTALLED_VERSIONS
+            .lock()
+            .unwrap_or_else(|e| panic!("pending installed.php mutex poisoned: {e}"));
+        if pending.is_none() {
+            *pending = Some(path.to_path_buf());
+        }
+    }
+
+    /// Runs the deferred [`Self::safely_load_installed_versions`] in the PHP worker. Called right
+    /// after the Composer PHP runtime is loaded there, before any plugin or script code runs.
+    pub(crate) fn load_pending_installed_versions() -> anyhow::Result<()> {
+        let path = PENDING_INSTALLED_VERSIONS
+            .lock()
+            .unwrap_or_else(|e| panic!("pending installed.php mutex poisoned: {e}"))
+            .take();
+        if let Some(path) = path {
+            crate::event_dispatcher::unwrap_php_result(shirabe_php_rpc::call_function(
+                "__shirabe_safely_load_installed_versions",
+                vec![shirabe_php_rpc::PluginValue::string(path_to_bytes(&path))],
+            ))?;
+        }
+        Ok(())
     }
 
     fn dump_to_php_code(&self, array: &IndexMap<BString, PhpMixed>, level: i64) -> BString {

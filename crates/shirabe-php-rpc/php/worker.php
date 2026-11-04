@@ -982,9 +982,6 @@ ShirabeRpcRuntime::$dispatch = [
     // installedIsLocalDir restore. Skipped only when the class is not even autoloadable here
     // (the Composer PHP runtime was never loaded): without it no code in this process can
     // observe InstalledVersions at all.
-    // TODO(plugin): seeding the initial state when the plugin runtime boots (the Factory-time
-    // safelyLoadInstalledVersions of the project's installed.php) is not wired yet; until the
-    // first write of a run, a plugin observes an unseeded InstalledVersions.
     '__shirabe_installed_versions_reload' => static function ($args) {
         [$versions, $repoDir] = $args;
         if (!class_exists('Composer\\InstalledVersions')) {
@@ -1004,6 +1001,20 @@ ShirabeRpcRuntime::$dispatch = [
                 throw $e;
             }
             // noop, an outdated InstalledVersions class simply lacks the properties
+        }
+        return true;
+    },
+    // The InstalledVersions part of Factory::createComposer, run once the Composer PHP runtime is
+    // loaded into this child. The project's installed.php is loaded only while no
+    // InstalledVersions class is defined here yet, as in Composer.
+    '__shirabe_safely_load_installed_versions' => static function ($args) {
+        [$installedVersionsPath] = $args;
+        if (!class_exists('Composer\\InstalledVersions', false)) {
+            // force loading the class at this point so it is loaded from the composer phar and not from the vendor dir
+            // as we cannot guarantee integrity of that file
+            if (class_exists('Composer\\InstalledVersions')) {
+                \Composer\Repository\FilesystemRepository::safelyLoadInstalledVersions($installedVersionsPath);
+            }
         }
         return true;
     },
