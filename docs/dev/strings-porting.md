@@ -36,7 +36,7 @@ a private helper that only wraps such an API, may spell it.
 * The value is a regular expression. A pattern is a PHP string up to the point where it is compiled.
 * The value is a message for people. See [Building strings](#building-strings).
 * Bytes that are not valid UTF-8 "cannot match" the data being searched. Search the data as bytes.
-* The callee or a neighbouring field currently takes `String`. Change it.
+* The callee or a neighboring field currently takes `String`. Change it.
 * The code is shorter that way.
 
 Paths and binary data are not affected: they stay in the types below.
@@ -102,7 +102,7 @@ is received, through `display_to_bytes()` when the API only offers `Display`.
 ## Replacing `str` methods
 
 Methods of `str` and of `bstr::ByteSlice` that share a name with a PHP function often do not share
-its behaviour. Use the shim of the PHP function:
+its behavior. Use the shim of the PHP function:
 
 * `to_lowercase()`/`to_uppercase()` map Unicode; `strtolower()`/`strtoupper()` map ASCII only.
 * `trim()` strips Unicode whitespace; PHP's `trim()` strips `" \t\n\r\0\x0B"`.
@@ -110,15 +110,14 @@ its behaviour. Use the shim of the PHP function:
 * `lines()` also splits at `\r\n` and drops a trailing empty line; `explode("\n", ...)` does
   neither.
 
-The `ByteSlice` methods among these are in `disallowed-methods`. The shim of an `mb_*()` function,
+The `ByteSlice` methods among these are listed under `disallowed-methods` in `clippy.toml`. The shim of an `mb_*()` function,
 which decodes UTF-8 as PHP does, records that reason where it calls one.
 
 ## Building strings
 
 PHP's `.` operator and string interpolation map to `bconcat!`, and `sprintf()` to the shim's
 `sprintf()`. Both keep the bytes of their operands. `bconcat!` also takes integers, so `bconcat!(n)`
-is the string conversion of `n`. This applies to every string PHP code could
-observe, including messages read by people: errors, warnings, progress and exception messages. PHP
+is the string conversion of `n`. This applies to every string PHP code could observe, including messages read by people: errors, warnings, progress and exception messages. PHP
 writes those bytes unchanged, and so does Shirabe.
 
 `format!` produces a `String`, so formatting bytes into it replaces invalid UTF-8 with U+FFFD. Use it

@@ -13,11 +13,11 @@ behaves roughly the same way. The difference is when the interruption takes
 effect, as described in [known incompatibilities](../known-incompatibilities.md).
 
 > Composer runs its abort handler almost immediately after the signal arrives.
-> Shirabe, however, runs it at the next checkpoint instead, so stopping `shirabe`
-> command by `Ctrl+C` may take more time than Composer.
+> Shirabe, however, runs it at the next checkpoint instead, so stopping a `shirabe`
+> command with `Ctrl+C` may take longer than with Composer.
 
-In PHP, the VM checks for a pending signal at the end of a loop and on a
-function call, which gets the signal handler run almost immediately after the
+In PHP, the VM checks for a pending signal at the end of each loop iteration and on each
+function call, so the signal handler runs almost immediately after the
 signal arrives. Rust has no such mechanism, so we place the checkpoints by
 hand; grep for `signals.is_triggered()` to find them. They are not as
 fine-grained as a function call, so more work runs between receiving the signal

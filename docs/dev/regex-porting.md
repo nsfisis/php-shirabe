@@ -6,7 +6,7 @@ sets, follow the rules below when porting.
 
 ## Do not introduce a PCRE crate
 
-The `regex` crate is not based on PCRE library and does not support some features that PCRE does.
+The `regex` crate is not based on the PCRE library and does not support some features that PCRE does.
 
 Even when such a feature is needed, do not introduce a PCRE-family crate such as `pcre2`. Either
 rewrite the pattern into a form the `regex` crate can express, or decompose it into hand-written

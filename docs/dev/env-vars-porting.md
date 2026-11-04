@@ -15,8 +15,8 @@ The three differ in what they observe and when:
 * `$_ENV` and `$_SERVER` are snapshots taken at startup. They are populated once when the
   process starts and are not kept in sync afterwards. A later `putenv()` does *not* appear in
   `$_ENV`/`$_SERVER`, and assigning to `$_ENV`/`$_SERVER` does *not* change the real environment.
-* `$_ENV` and `$_SERVER` are not shared with child processes. Launching an external program via `system()`
-  and friends passes along the real environment (as mutated by `putenv()`), not the
+* `$_ENV` and `$_SERVER` are not shared with child processes. Launching an external program via
+  `system()` and friends passes along the real environment (as mutated by `putenv()`), not the
   `$_ENV`/`$_SERVER` snapshot.
 * Also, `$_ENV` and `$_SERVER` have their own storage; they are not shared.
 
@@ -35,7 +35,7 @@ each call site.
 
 ## Reaching the PHP runtime
 
-The PHP worker is a separate, long-lived process (`docs/dev/php-rpc.md`): it holds the environment
+The PHP worker is a separate, long-lived process ([docs/dev/php-rpc.md](./php-rpc.md)): it holds the environment
 it was handed at spawn, so a later write on the Rust side would be invisible to the PHP code
 running in it. Every write to one of the three storages is therefore recorded in an ordered journal
 (`env_mutations_since`), and `shirabe-php-rpc` replays the entries the worker has not seen yet —
