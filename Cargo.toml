@@ -79,6 +79,7 @@ multiple_inherent_impl = "warn"
 type_complexity = "allow"
 
 [profile.release]
+lto = "fat"
 strip = "debuginfo"
 
 [patch.crates-io]
