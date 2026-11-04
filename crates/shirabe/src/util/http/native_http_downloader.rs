@@ -76,6 +76,13 @@ fn runtime_client() -> reqwest::Client {
         reqwest::Client::builder()
             .pool_max_idle_per_host(8)
             .redirect(reqwest::redirect::Policy::none())
+            // CURLOPT_ENCODING = "": advertise and transparently decode every encoding curl
+            // supports. The body is decoded before read_body_with_limit sees it, so max_file_size
+            // applies to the decoded size, as in PHP.
+            .brotli(true)
+            .deflate(true)
+            .gzip(true)
+            .zstd(true)
             .build()
             // The default builder cannot realistically fail; if the TLS backend is unavailable we
             // cannot proceed, mirroring PHP aborting when curl is missing.
@@ -582,6 +589,8 @@ impl NativeHttpDownloader {
             display_to_bytes(resp.status())
         );
         // Header lines start with the status line so Response::get_status_message can find it.
+        // TODO(http): reqwest drops Content-Encoding and Content-Length from a response it decodes,
+        // while curl reports the headers as received.
         let mut headers_out: Vec<BString> = vec![status_line];
         for (k, v) in resp.headers().iter() {
             headers_out.push(bconcat!(k.as_str(), ": ", v.as_bytes()));
