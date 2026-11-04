@@ -27,7 +27,7 @@ shirabe-symfony-process = { path = "crates/shirabe-symfony-process" }
 shirabe-symfony-string = { path = "crates/shirabe-symfony-string" }
 anyhow = "1.0.104"
 async-trait = "0.1.92"
-base64 = "0.22.1"
+base64 = "0.23.1"
 bstr = "1.13.1"
 bzip2 = "0.6.1"
 chrono = { version = "0.4.45", features = ["serde"] }
@@ -37,16 +37,16 @@ flate2 = "1.1.10"
 futures = "0.3.34"
 indexmap = { version = "2.14.2", features = ["serde"] }
 jsonschema = { version = "0.46.10", default-features = false }
-md5 = "0.7.0"
+md5 = "0.8.1"
 memchr = "2.8.3"
 mimalloc = "0.1.52"
-mockall = "0.14.0"
+mockall = "0.15.0"
 nix = { version = "0.31.3", features = ["feature", "fs", "poll", "process", "sched", "signal", "user"] }
 regex = "1.13.1"
 reqwest = { version = "0.13.5", features = ["blocking", "brotli", "deflate", "gzip", "zstd"] }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
-serial_test = "3.5.0"
+serial_test = "4.0.1"
 sha1 = "0.11.0"
 sha2 = "0.11.1"
 tar = "0.4.46"
