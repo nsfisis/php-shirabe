@@ -377,7 +377,7 @@ impl EventDispatcher {
                 if !matches!(is_callable_value, PluginValue::Bool(true)) {
                     return Err(RuntimeException::new(bconcat!(
                         "Subscriber ",
-                        handle.class,
+                        handle.class(),
                         "::",
                         method_name,
                         " for event ",
@@ -391,7 +391,7 @@ impl EventDispatcher {
                         "> ",
                         formatted_event_name_with_args,
                         ": ",
-                        handle.class,
+                        handle.class(),
                         "->",
                         method_name,
                     ),
@@ -405,7 +405,7 @@ impl EventDispatcher {
                             "no proxy stub is available yet for the event `",
                             event.get_name(),
                             "` dispatched to ",
-                            handle.class,
+                            handle.class(),
                             "::",
                             method_name
                         ))
@@ -416,7 +416,7 @@ impl EventDispatcher {
                     event: Some((event_rhandle, event)),
                 };
                 let outcome = call_php_method(
-                    handle.phandle,
+                    handle,
                     method_name,
                     vec![PluginValue::RustHandle(RustObjHandle {
                         rhandle: event_rhandle,
@@ -1273,7 +1273,7 @@ try {
     /// passes an object, and no `Callable` shape holds a bare object, so the parameter is
     /// narrowed to the object's cross-RPC identity (its P-table handle). Of PHP's two match
     /// conditions only `$candidate[0] === $listener` can fire for an object listener; it maps
-    /// to phandle equality on `Callable::PhpMethod`.
+    /// to handle equality on `Callable::PhpMethod`.
     pub fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle) {
         for priorities in self.listeners.values_mut() {
             for listeners in priorities.values_mut() {
@@ -1281,7 +1281,7 @@ try {
                 // cross-RPC identity, so `$candidate[0] === $listener` is undecidable for it;
                 // only `PhpMethod` candidates are compared.
                 listeners.retain(|candidate| match candidate {
-                    Callable::PhpMethod(handle, _) => handle.phandle != listener.phandle,
+                    Callable::PhpMethod(handle, _) => handle != listener,
                     _ => true,
                 });
             }
@@ -1498,7 +1498,7 @@ try {
             },
             // PHP: get_class($callable[0]).'::'.$callable[1] — the object half's runtime class.
             Callable::PhpMethod(handle, method) => {
-                bconcat!(handle.class, "::", method)
+                bconcat!(handle.class(), "::", method)
             }
             Callable::Closure(_) => BString::from("closure"),
         };

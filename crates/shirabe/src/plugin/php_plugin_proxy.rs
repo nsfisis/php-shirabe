@@ -39,7 +39,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
-    call_function_with_dispatcher, call_php_method, new_object, release_php_handle,
+    call_function_with_dispatcher, call_php_method, new_object,
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
@@ -3581,16 +3581,15 @@ fn dispatch_installation_manager_method(
                 return Err(runtime_throw(bconcat!(
                     method_name,
                     " expects a Composer\\Installer\\InstallerInterface, got ",
-                    handle.class
+                    handle.class()
                 )));
             }
-            let phandle = handle.phandle;
-            let installer = php_installer_proxy(handle);
+            let installer = php_installer_proxy(handle.clone());
             if method_name == "addInstaller" {
                 im.borrow().add_installer(installer);
             } else {
                 im.borrow().remove_installer(&*installer);
-                forget_php_installer_proxy(phandle);
+                forget_php_installer_proxy(&handle);
             }
             Ok(PluginValue::Null)
         }
@@ -3671,20 +3670,12 @@ fn error_throw(context: impl AsRef<[u8]>, error: &anyhow::Error) -> PhpThrow {
 /// lifecycle call is forwarded as a `CallPhpMethod` RPC.
 #[derive(Debug)]
 pub struct PhpPluginProxy {
-    pub(crate) phandle: u64,
-    pub(crate) class: BString,
-    /// Every interface the entity's class implements (`class_implements` in the child), for
-    /// the `instanceof` checks PHP performs on plugin objects.
-    pub(crate) implements: Vec<BString>,
+    pub(crate) handle: PhpObjHandle,
 }
 
 impl PhpPluginProxy {
-    pub fn new(phandle: u64, class: BString, implements: Vec<BString>) -> Self {
-        Self {
-            phandle,
-            class,
-            implements,
-        }
+    pub fn new(handle: PhpObjHandle) -> Self {
+        Self { handle }
     }
 
     fn forward_lifecycle_call(
@@ -3695,7 +3686,7 @@ impl PhpPluginProxy {
     ) -> anyhow::Result<()> {
         let args = vec![composer_handle_value(composer), io_handle_value(io)?];
         let outcome = call_php_method(
-            self.phandle,
+            &self.handle,
             method,
             args,
             Some(&mut PluginRpcDispatcher::default()),
@@ -3712,11 +3703,7 @@ impl PhpPluginProxy {
         let outcome = shirabe_php_rpc::call_function(
             "__shirabe_get_property",
             vec![
-                PluginValue::PhpHandle(shirabe_php_rpc::PhpObjHandle {
-                    phandle: self.phandle,
-                    class: self.class.clone(),
-                    implements: Vec::new(),
-                }),
+                PluginValue::PhpHandle(self.handle.clone()),
                 PluginValue::string(name),
             ],
         )?;
@@ -3753,12 +3740,13 @@ impl PluginInterface for PhpPluginProxy {
     }
 
     fn get_class_name(&self) -> BString {
-        self.class.to_owned()
+        self.handle.class().to_owned()
     }
 
     fn as_event_subscriber(&self) -> Option<&dyn EventSubscriberInterface> {
         if self
-            .implements
+            .handle
+            .implements()
             .iter()
             .any(|interface| interface == "Composer\\EventDispatcher\\EventSubscriberInterface")
         {
@@ -3770,7 +3758,8 @@ impl PluginInterface for PhpPluginProxy {
 
     fn as_capable(&self) -> Option<&dyn Capable> {
         if self
-            .implements
+            .handle
+            .implements()
             .iter()
             .any(|interface| interface == "Composer\\Plugin\\Capable")
         {
@@ -3789,7 +3778,7 @@ impl EventSubscriberInterface for PhpPluginProxy {
     fn get_subscribed_events(&self) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>> {
         // PHP: `$subscriber->getSubscribedEvents()` (an instance call of the static method).
         let outcome = call_php_method(
-            self.phandle,
+            &self.handle,
             "getSubscribedEvents",
             Vec::new(),
             Some(&mut PluginRpcDispatcher::default()),
@@ -3798,22 +3787,18 @@ impl EventSubscriberInterface for PhpPluginProxy {
             Ok(value) => value,
             Err(throw) => return Err(throw_into_error(throw)),
         };
-        decode_subscribed_events(self.class.as_bstr(), value)
+        decode_subscribed_events(self.handle.class(), value)
     }
 
     fn subscriber_handle(&self) -> PhpObjHandle {
-        PhpObjHandle {
-            phandle: self.phandle,
-            class: self.class.clone(),
-            implements: self.implements.clone(),
-        }
+        self.handle.clone()
     }
 }
 
 impl Capable for PhpPluginProxy {
     fn get_capabilities(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let outcome = call_php_method(
-            self.phandle,
+            &self.handle,
             "getCapabilities",
             Vec::new(),
             Some(&mut PluginRpcDispatcher::default()),
@@ -3918,13 +3903,6 @@ fn subscribed_events_shape_error(class: &BStr, value: &PluginValue) -> anyhow::E
     .into()
 }
 
-impl Drop for PhpPluginProxy {
-    fn drop(&mut self) {
-        // A dead worker has nothing left to release.
-        let _ = release_php_handle(self.phandle);
-    }
-}
-
 /// Wire value handing the shared Rust-side `$composer` to the child, interned in the R table.
 pub fn composer_handle_value(composer: &ComposerHandle) -> PluginValue {
     rust_handle_value(register_composer_entity(composer), "Composer\\Composer")
@@ -3990,7 +3968,7 @@ pub(crate) fn call_php_entity_method(
     args: Vec<PluginValue>,
 ) -> anyhow::Result<PluginValue> {
     unwrap_php_result(call_php_method(
-        handle.phandle,
+        handle,
         method,
         args,
         Some(&mut PluginRpcDispatcher::default()),
@@ -4035,7 +4013,7 @@ impl PhpInstallerProxy {
 
     fn call(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<PluginValue> {
         unwrap_php_result(call_php_method(
-            self.handle.phandle,
+            &self.handle,
             method,
             args,
             Some(&mut PluginRpcDispatcher::default()),
@@ -4078,7 +4056,7 @@ impl PhpInstallerProxy {
 
     fn unsupported_shape(&self, method: &BStr, value: &PluginValue) -> anyhow::Error {
         RuntimeException::new(bconcat!(
-            self.handle.class,
+            self.handle.class(),
             "::",
             method,
             "() returned an unsupported shape over RPC: ",
@@ -4200,7 +4178,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             .unwrap_or_else(|error| {
                 panic!(
                     "{}::getInstallPath failed over RPC: {error:#}",
-                    self.handle.class.display_lossy()
+                    self.handle.class().display_lossy()
                 )
             });
         match value {
@@ -4214,18 +4192,12 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
     }
 }
 
-impl Drop for PhpInstallerProxy {
-    fn drop(&mut self) {
-        let _ = release_php_handle(self.handle.phandle);
-    }
-}
-
 thread_local! {
     /// The installer adapters handed to `InstallationManager::addInstaller` over RPC, keyed by
-    /// the entity's phandle. `removeInstaller` arrives carrying the same entity, and the
-    /// manager compares installers by identity, so the adapter it was given has to be found
-    /// again rather than rebuilt.
-    static PHP_INSTALLER_PROXIES: std::cell::RefCell<IndexMap<u64, std::rc::Rc<dyn crate::installer::InstallerInterface>>> =
+    /// the entity. `removeInstaller` arrives carrying the same entity, and the manager compares
+    /// installers by identity, so the adapter it was given has to be found again rather than
+    /// rebuilt.
+    static PHP_INSTALLER_PROXIES: std::cell::RefCell<IndexMap<PhpObjHandle, std::rc::Rc<dyn crate::installer::InstallerInterface>>> =
         std::cell::RefCell::new(IndexMap::new());
 }
 
@@ -4235,21 +4207,20 @@ pub(crate) fn php_installer_proxy(
 ) -> std::rc::Rc<dyn crate::installer::InstallerInterface> {
     PHP_INSTALLER_PROXIES.with(|proxies| {
         let mut proxies = proxies.borrow_mut();
-        if let Some(existing) = proxies.get(&handle.phandle) {
+        if let Some(existing) = proxies.get(&handle) {
             return existing.clone();
         }
-        let phandle = handle.phandle;
         let proxy: std::rc::Rc<dyn crate::installer::InstallerInterface> =
-            std::rc::Rc::new(PhpInstallerProxy::new(handle));
-        proxies.insert(phandle, proxy.clone());
+            std::rc::Rc::new(PhpInstallerProxy::new(handle.clone()));
+        proxies.insert(handle, proxy.clone());
         proxy
     })
 }
 
 /// Drops the adapter bookkeeping for an installer entity that left the manager.
-fn forget_php_installer_proxy(phandle: u64) {
+fn forget_php_installer_proxy(handle: &PhpObjHandle) {
     PHP_INSTALLER_PROXIES.with(|proxies| {
-        proxies.borrow_mut().shift_remove(&phandle);
+        proxies.borrow_mut().shift_remove(handle);
     });
 }
 
@@ -4296,12 +4267,6 @@ impl Capability for PhpCapabilityProxy {
     }
 }
 
-impl Drop for PhpCapabilityProxy {
-    fn drop(&mut self) {
-        let _ = release_php_handle(self.handle.phandle);
-    }
-}
-
 /// `CommandProvider` adapter for a capability entity living in the PHP child process.
 #[derive(Debug)]
 pub struct PhpCommandProviderProxy {
@@ -4325,7 +4290,7 @@ impl CommandProvider for PhpCommandProviderProxy {
         &self,
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>>> {
         let value = unwrap_php_result(call_php_method(
-            self.handle.phandle,
+            &self.handle,
             "getCommands",
             Vec::new(),
             Some(&mut PluginRpcDispatcher::default()),
@@ -4340,7 +4305,7 @@ impl CommandProvider for PhpCommandProviderProxy {
             _ => {
                 return Err(UnexpectedValueException::new(bconcat!(
                     "Plugin capability ",
-                    self.handle.class,
+                    self.handle.class(),
                     " failed to return an array from getCommands"
                 ))
                 .into());
@@ -4366,16 +4331,10 @@ impl CommandProvider for PhpCommandProviderProxy {
 fn invalid_command_error(capability: &PhpObjHandle) -> anyhow::Error {
     UnexpectedValueException::new(bconcat!(
         "Plugin capability ",
-        capability.class,
+        capability.class(),
         " returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects"
     ))
     .into()
-}
-
-impl Drop for PhpCommandProviderProxy {
-    fn drop(&mut self) {
-        let _ = release_php_handle(self.handle.phandle);
-    }
 }
 
 /// Metadata row for one Rust-implemented command, mirrored into the worker as a
@@ -4423,8 +4382,6 @@ struct PhpConsoleApplicationContext {
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
     rust_commands: Vec<RustCommandMetadata>,
-    /// Clones of the worker-hosted command handles; ownership (and release) stays with the
-    /// `PhpCommandProxy` instances holding the originals.
     plugin_commands: std::cell::RefCell<Vec<PhpObjHandle>>,
     app: std::cell::RefCell<Option<PhpObjHandle>>,
 }
@@ -4560,14 +4517,6 @@ impl PhpConsoleApplicationContext {
         };
         *self.app.borrow_mut() = Some(app.clone());
         Ok(app)
-    }
-}
-
-impl Drop for PhpConsoleApplicationContext {
-    fn drop(&mut self) {
-        if let Some(app) = self.app.borrow_mut().take() {
-            let _ = release_php_handle(app.phandle);
-        }
     }
 }
 
@@ -4897,7 +4846,7 @@ impl PhpCommandProxy {
 
     fn call_metadata_getter(handle: &PhpObjHandle, method: &BStr) -> anyhow::Result<PluginValue> {
         unwrap_php_result(call_php_method(
-            handle.phandle,
+            handle,
             method,
             Vec::new(),
             Some(&mut PluginRpcDispatcher::default()),
@@ -4910,7 +4859,7 @@ impl PhpCommandProxy {
         value: &PluginValue,
     ) -> anyhow::Error {
         RuntimeException::new(bconcat!(
-            handle.class,
+            handle.class(),
             "::",
             method,
             "() returned an unsupported shape over RPC: ",
@@ -4937,7 +4886,7 @@ impl Command for PhpCommandProxy {
             .ok_or_else(|| -> anyhow::Error {
                 RuntimeException::new(bconcat!(
                     "cannot run plugin-provided command ",
-                    self.handle.class,
+                    self.handle.class(),
                     ": no worker-side console application context was published"
                 ))
                 .into()
@@ -4968,7 +4917,7 @@ impl Command for PhpCommandProxy {
         // worker-side binding, so it stays an explicit error.
         Err(RuntimeException::new(bconcat!(
             "plugin-provided command ",
-            self.handle.class,
+            self.handle.class(),
             " executes in the PHP worker through run(); execute() must not be called directly"
         ))
         .into())
@@ -4991,13 +4940,7 @@ impl BaseCommand for PhpCommandProxy {
 
 impl PhpClass for PhpCommandProxy {
     fn php_class_name(&self) -> &BStr {
-        BStr::new(&self.handle.class)
-    }
-}
-
-impl Drop for PhpCommandProxy {
-    fn drop(&mut self) {
-        let _ = release_php_handle(self.handle.phandle);
+        self.handle.class()
     }
 }
 

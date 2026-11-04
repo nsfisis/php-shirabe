@@ -9,9 +9,10 @@
 //! codec must round-trip non-UTF-8 byte sequences losslessly.
 
 use anyhow::bail;
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, bconcat, utf8_text};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard, Weak};
 
 /// A handle to an object whose entity lives on the Rust side. PHP holds a thin proxy stub.
 #[derive(Debug, Clone, PartialEq)]
@@ -20,12 +21,101 @@ pub struct RustObjHandle {
     pub class: BString,
 }
 
-/// A handle to an object whose entity lives in the PHP child process.
-#[derive(Debug, Clone, PartialEq)]
-pub struct PhpObjHandle {
-    pub phandle: u64,
-    pub class: BString,
-    pub implements: Vec<BString>,
+/// An owning handle to an object whose entity lives in the PHP child process.
+///
+/// The worker's P table keeps the entity alive while any clone of the handle lives. One phandle
+/// has one shared entry on this side however many times its descriptor is decoded, and dropping
+/// the last clone queues a `ReleasePhpHandle`, which goes out ahead of the next frame sent to the
+/// worker. Handles compare equal exactly when they name the same entity.
+#[derive(Debug, Clone)]
+pub struct PhpObjHandle(Arc<PhpObjHandleEntry>);
+
+#[derive(Debug)]
+struct PhpObjHandleEntry {
+    phandle: u64,
+    class: BString,
+    /// Every interface the entity's class implements (`class_implements` in the worker).
+    implements: Vec<BString>,
+}
+
+#[derive(Debug, Default)]
+struct PhpHandleTable {
+    live: IndexMap<u64, Weak<PhpObjHandleEntry>>,
+    released: Vec<u64>,
+}
+
+static PHP_HANDLES: LazyLock<Mutex<PhpHandleTable>> = LazyLock::new(Mutex::default);
+
+fn php_handles() -> MutexGuard<'static, PhpHandleTable> {
+    PHP_HANDLES
+        .lock()
+        .unwrap_or_else(|e| panic!("PHP RPC: P handle table mutex poisoned: {e}"))
+}
+
+impl PhpObjHandle {
+    pub(crate) fn intern(phandle: u64, class: BString, implements: Vec<BString>) -> PhpObjHandle {
+        let mut table = php_handles();
+        if let Some(entry) = table.live.get(&phandle).and_then(Weak::upgrade) {
+            return PhpObjHandle(entry);
+        }
+        // A release still queued for this phandle has not reached the worker, so its P-table
+        // entry is intact and this handle takes it over.
+        table.released.retain(|&released| released != phandle);
+        let entry = Arc::new(PhpObjHandleEntry {
+            phandle,
+            class,
+            implements,
+        });
+        table.live.insert(phandle, Arc::downgrade(&entry));
+        PhpObjHandle(entry)
+    }
+
+    pub(crate) fn phandle(&self) -> u64 {
+        self.0.phandle
+    }
+
+    pub fn class(&self) -> &BStr {
+        self.0.class.as_bstr()
+    }
+
+    pub fn implements(&self) -> &[BString] {
+        &self.0.implements
+    }
+}
+
+impl PartialEq for PhpObjHandle {
+    fn eq(&self, other: &PhpObjHandle) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for PhpObjHandle {}
+
+impl std::hash::Hash for PhpObjHandle {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.phandle.hash(state);
+    }
+}
+
+impl Drop for PhpObjHandleEntry {
+    fn drop(&mut self) {
+        let mut table = php_handles();
+        // The phandle may already name a newer entry, decoded after this one became unreachable.
+        let current = table
+            .live
+            .get(&self.phandle)
+            .is_some_and(|live| std::ptr::eq(live.as_ptr(), self));
+        if current {
+            table.live.swap_remove(&self.phandle);
+            table.released.push(self.phandle);
+        }
+    }
+}
+
+/// Takes the phandles whose last handle has dropped since the previous call, for the
+/// `ReleasePhpHandle` frames that go out ahead of the next frame.
+pub(crate) fn take_released_php_handles() -> Vec<u64> {
+    std::mem::take(&mut php_handles().released)
 }
 
 /// The `O:` record of a serialized PHP object: a class name and a property table, with the
@@ -269,14 +359,14 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
             let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
             map.insert(
                 PHP_HANDLE_KEY.into(),
-                PluginValue::Int(i64::try_from(handle.phandle).expect("phandle exceeds i64")),
+                PluginValue::Int(i64::try_from(handle.phandle()).expect("phandle exceeds i64")),
             );
-            map.insert(CLASS_KEY.into(), PluginValue::string(handle.class.clone()));
+            map.insert(CLASS_KEY.into(), PluginValue::string(handle.class()));
             map.insert(
                 IMPLEMENTS_KEY.into(),
                 PluginValue::List(
                     handle
-                        .implements
+                        .implements()
                         .iter()
                         .map(|name| PluginValue::string(name.clone()))
                         .collect(),
@@ -659,11 +749,9 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
                 .collect::<anyhow::Result<_>>()?,
             other => bail!("__implements is not a list: {other:?}"),
         };
-        return Ok(Some(PluginValue::PhpHandle(PhpObjHandle {
-            phandle,
-            class,
-            implements,
-        })));
+        return Ok(Some(PluginValue::PhpHandle(PhpObjHandle::intern(
+            phandle, class, implements,
+        ))));
     }
 
     Ok(None)
@@ -884,11 +972,11 @@ mod tests {
             rhandle: 3,
             class: b"Caf\xe9".into(),
         }));
-        roundtrip(PluginValue::PhpHandle(PhpObjHandle {
-            phandle: 8,
-            class: b"Caf\xe9".into(),
-            implements: vec![b"Plugin\xff".into()],
-        }));
+        roundtrip(PluginValue::PhpHandle(PhpObjHandle::intern(
+            8,
+            b"Caf\xe9".into(),
+            vec![b"Plugin\xff".into()],
+        )));
     }
 
     #[test]
@@ -897,11 +985,11 @@ mod tests {
             rhandle: 3,
             class: "Composer\\Script\\Event".into(),
         }));
-        roundtrip(PluginValue::PhpHandle(PhpObjHandle {
-            phandle: 8,
-            class: "MyPlugin".into(),
-            implements: vec!["Composer\\Plugin\\PluginInterface".into()],
-        }));
+        roundtrip(PluginValue::PhpHandle(PhpObjHandle::intern(
+            8,
+            "MyPlugin".into(),
+            vec!["Composer\\Plugin\\PluginInterface".into()],
+        )));
         roundtrip(PluginValue::Job(7));
     }
 

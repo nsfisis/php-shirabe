@@ -188,7 +188,7 @@ impl RemoteFilesystem {
     fn call(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<PluginValue> {
         let entity = self.entity()?;
         Self::php_result(shirabe_php_rpc::call_php_method(
-            entity.phandle,
+            entity,
             method,
             args,
             Some(&mut PluginRpcDispatcher::default()),
@@ -352,14 +352,5 @@ impl RemoteFilesystem {
             Some(&mut PluginRpcDispatcher::default()),
         ))?;
         Ok(())
-    }
-}
-
-impl Drop for RemoteFilesystem {
-    fn drop(&mut self) {
-        if let Some(entity) = self.entity.get() {
-            // A dead worker has nothing left to release.
-            let _ = shirabe_php_rpc::release_php_handle(entity.phandle);
-        }
     }
 }

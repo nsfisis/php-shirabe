@@ -189,6 +189,17 @@ handle descriptor, a job or a materialized value of its own into a `__phandle` d
 handle); `ShirabeRpcRuntime::fromWire` resolves descriptors back to the live entity through
 `ShirabePhpObjectRegistry::get`.
 
+On the Rust side a P-table entry is owned by `PhpObjHandle`, the only form a phandle takes outside
+the wire layer. Its clones share one reference-counted entry, and the decoder interns by phandle:
+decoding a descriptor whose phandle is already held yields another clone of the same entry,
+however many times and through whichever value the entity crosses. The entry therefore stands for
+the P-table entry itself, so the worker needs no reference count. When the last clone drops, the
+phandle is queued, and `ReleasePhpHandle` for every queued phandle is written ahead of the next
+frame the Rust side sends. A dropped handle never writes to the socket itself, so dropping one is
+safe anywhere, including while a frame is being decoded. Until that next frame is written, the
+worker's entry is still intact: a descriptor for the same phandle decoded in the meantime takes the
+entry back over and withdraws the queued release.
+
 ## Trust model
 
 The worker runs plugin code, which Shirabe trusts exactly as Composer does: there is no sandbox.

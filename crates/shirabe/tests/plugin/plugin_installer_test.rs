@@ -943,12 +943,12 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
     assert!(
         capability
             .__handle()
-            .implements
+            .implements()
             .iter()
             .any(|interface| interface == capability_api)
     );
     // PHP: assertInstanceOf($capabilityImplementation, $capability)
-    assert_eq!(capability_implementation, capability.__handle().class);
+    assert_eq!(capability_implementation, capability.__handle().class());
     // PHP: assertSame(['a' => 1, 'b' => 2, 'plugin' => $plugin], $capability->args)
     assert_eq!(
         PluginValue::Array(IndexMap::from([

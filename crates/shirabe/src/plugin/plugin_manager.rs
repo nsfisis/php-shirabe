@@ -533,11 +533,7 @@ impl PluginManager {
                 }
                 let handle = self.php_runtime_new_object(class.as_bstr())?;
                 let plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> =
-                    std::rc::Rc::new(std::cell::RefCell::new(PhpPluginProxy::new(
-                        handle.phandle,
-                        handle.class,
-                        handle.implements,
-                    )));
+                    std::rc::Rc::new(std::cell::RefCell::new(PhpPluginProxy::new(handle)));
                 self.add_plugin(plugin.clone(), is_global_plugin, Some(package.clone()))?;
                 self.registered_plugins
                     .entry(package.get_name())
@@ -1101,11 +1097,7 @@ impl PluginManager {
         // instance itself. A PHP-implemented plugin already has an entity in the child's P
         // table; a Rust-implemented one crosses as a handle to its R-table entity.
         let plugin_value = match plugin.borrow().__as_php_plugin_proxy() {
-            Some(proxy) => PluginValue::PhpHandle(shirabe_php_rpc::PhpObjHandle {
-                phandle: proxy.phandle,
-                class: proxy.class.clone(),
-                implements: proxy.implements.clone(),
-            }),
+            Some(proxy) => PluginValue::PhpHandle(proxy.handle.clone()),
             None => plugin_handle_value(plugin),
         };
         let mut ctor_args = ctor_args;

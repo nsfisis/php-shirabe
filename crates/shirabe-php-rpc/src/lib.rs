@@ -828,7 +828,7 @@ pub fn call_static_method(
 
 /// Instantiates `new $class(...$ctor_args)` in the worker (autoloading the class if needed).
 /// On success the returned value is a `PluginValue::PhpHandle` registered in the worker's P
-/// table; the entity stays alive there until `release_php_handle`.
+/// table; the entity stays alive there while the handle does.
 pub fn new_object(
     class: impl AsRef<[u8]>,
     ctor_args: Vec<PluginValue>,
@@ -846,7 +846,7 @@ pub fn new_object(
 
 /// Calls `$obj->$method(...$args)` on a P-table entity in the worker.
 pub fn call_php_method(
-    phandle: u64,
+    handle: &PhpObjHandle,
     method: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
     dispatcher: Option<&mut dyn RustMethodDispatcher>,
@@ -854,19 +854,12 @@ pub fn call_php_method(
     rpc_call(
         |corr_id| Frame::CallPhpMethod {
             corr_id,
-            phandle,
+            phandle: handle.phandle(),
             method_name: method.as_ref().into(),
             args,
         },
         dispatcher,
     )
-}
-
-/// One-way notification dropping a P-table entity in the worker. Callers releasing from a
-/// destructor should ignore the error: a dead worker has nothing left to release.
-pub fn release_php_handle(phandle: u64) -> anyhow::Result<()> {
-    let _session = session::SessionGuard::enter();
-    send_frame(&Frame::ReleasePhpHandle { phandle })
 }
 
 /// Whether the PHP worker process has been spawned by this process. Callers that only need to
@@ -1345,13 +1338,20 @@ pub fn ensure_worker() -> anyhow::Result<()> {
 
 /// Writes one frame while holding the worker mutex only for the duration of the write, so the
 /// session owner (see `session`) can interleave sends and blocking reads without keeping the
-/// worker locked across a whole call.
+/// worker locked across a whole call. A `ReleasePhpHandle` for every P handle dropped since the
+/// previous write goes out first.
 fn send_frame(frame: &Frame) -> anyhow::Result<()> {
     with_worker(|worker| {
-        frame::write_frame(&mut worker.stream, frame).map_err(|e| {
-            worker.exit_if_worker_is_dead();
-            anyhow::Error::new(e).context(worker.worker_state())
-        })
+        let mut write = |frame: &Frame| {
+            frame::write_frame(&mut worker.stream, frame).map_err(|e| {
+                worker.exit_if_worker_is_dead();
+                anyhow::Error::new(e).context(worker.worker_state())
+            })
+        };
+        for phandle in value::take_released_php_handles() {
+            write(&Frame::ReleasePhpHandle { phandle })?;
+        }
+        write(frame)
     })?
 }
 
