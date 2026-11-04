@@ -1,9 +1,9 @@
-# Known Incompatibilities
+# Known incompatibilities
 
 NOTE: This is not an exhaustive list. Shirabe is in early development and there are still a number of significant incompatibilities with Composer that are not documented here yet.
 
 
-## Platform Support
+## Platform support
 
 We plan to support all platforms that Composer does, but currently:
 
@@ -17,11 +17,11 @@ as it starts the PHP process.
 
 ## Commands
 
-The command `self-update` is intentionally disabled because prebuilt binaries
+The `self-update` command is intentionally disabled because prebuilt binaries
 have not been published yet.
 
 
-## Default Home/Cache/Data Directories
+## Default home, cache and data directories
 
 To avoid conflicting with an existing Composer installation, Shirabe's default system directories
 use `shirabe`/`Shirabe` instead of `composer`/`Composer`.
@@ -42,41 +42,41 @@ The following are intentionally left unchanged for ecosystem compatibility:
 * `vendor/composer/` directory
 
 
-## Error Messages
+## Error messages
 
 Error messages, in particular those from PHP built-in functions, are not
 intended to be mapped exactly. Plugins or external tools that rely on error
 messages may break.
 
 
-## Version Reporting
+## Version reporting
 
 Shirabe has its own version, separate from the Composer version it is ported
 from. `shirabe --version`, `shirabe about` and `shirabe diagnose` report the
 Shirabe version and show the Composer version alongside it.
 
-The pseudo-package `composer` and `composer-runtime-api` keep the original
-Composer version in order not to break the version resolution.
+The pseudo-packages `composer` and `composer-runtime-api` keep the original
+Composer version so as not to break version resolution.
 
 
 ## Xdebug
 
-Composer disables Xdebug on startup. Shirabe emulates it, but the exact
-behavior is slightly different. See [docs/dev/xdebug.md](./dev/xdebug.md)
+Composer disables Xdebug on startup. Shirabe emulates this, but the exact
+behavior differs slightly. See [docs/dev/xdebug.md](./dev/xdebug.md)
 for details.
 
 
 ## Signals
 
 Composer runs its abort handler almost immediately after the signal arrives.
-Shirabe, however, runs it at the next checkpoint instead, so stopping `shirabe`
-command by `Ctrl+C` may take more time than Composer.
+Shirabe, however, runs it at the next checkpoint instead, so stopping a `shirabe`
+command with `Ctrl+C` may take longer than with Composer.
 
 Signal handling in plugins and scripts is undefined behavior: it may or may not
 work. See [docs/dev/signals.md](./dev/signals.md) for details.
 
 
-## Plugins and Scripts
+## Plugins and scripts
 
 Plugins and scripts in Shirabe are executed in a separate PHP process that
 communicates with Shirabe. This architecture has some limitations.
@@ -114,21 +114,21 @@ and `ProcessExecutor::executeAsync()` run in the Shirabe process, and their prom
 ### Output buffering functions
 
 `ob_*()` functions work as usual in PHP, but cannot capture any output from
-Rust side.
+the Rust side.
 
 
 ## Misc.
 
-### Default Timezone
+### Default timezone
 
 PHP resolves the default timezone from the `date.timezone` INI setting, and
 falls back to UTC when it is unset. Shirabe does not read php.ini: it uses the
 system's local timezone instead and falls back to UTC when no tz database is
 available.
 
-Only the date time for humans are affected, such as the reset time of the
-GitHub API rate limit. The machine-readable time, e.g., timestamps written to
-`composer.lock` or `vendor/composer/installed.json` are recorded in UTC in both
+Only dates and times shown to humans are affected, such as the reset time of
+the GitHub API rate limit. Machine-readable times, e.g. timestamps written to
+`composer.lock` or `vendor/composer/installed.json`, are recorded in UTC by both
 Composer and Shirabe.
 
 Plugins and scripts run in the PHP worker, where `date.timezone` is applied as

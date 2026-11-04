@@ -11,8 +11,8 @@ value is a list of filter directives in the syntax of
 for example `info` or `shirabe::installer=info,shirabe::dependency_resolver=debug`.
 
 Events are written to stderr, and each span reports its duration when it
-closes, which makes this useful for finding where time is spent. Unset or
-empty disables the output. Invalid directives print an error to stderr and
+closes, which makes this useful for finding where time is spent. An unset or
+empty value disables the output. Invalid directives print an error to stderr and
 disable the output; Shirabe itself keeps running.
 
 ## `SHIRABE_COMPOSER_PHP_DIR`
