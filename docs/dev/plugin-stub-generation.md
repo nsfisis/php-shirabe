@@ -67,7 +67,7 @@ installs both tools' dependencies and regenerates the report.
 
 * **Root stubs** (targets that extend no class; a target extending another
   target or a `php/runtime/` class inherits the boilerplate from it) carry the
-  proxy boilerplate: `__rhandle`/`__epoch` properties, the `__shirabeBind`
+  proxy boilerplate: the `__rhandle` property, the `__shirabeBind`
   binder the registry calls when reviving a stub for an existing entity, a
   destructor releasing the Rust handle, and the wire descriptor helper. The
   real `extends`/`implements` hierarchy is preserved and `\ShirabeRustStub` is
@@ -133,7 +133,7 @@ installs both tools' dependencies and regenerates the report.
   the boilerplate on every stub, whether or not the real class declares one:
   PHP has already copied the stub by the time it runs, so the copy asks the
   Rust side for a clone of the entity and rebinds itself to the fresh handle
-  (`__shirabeClone`, answered with `[rhandle, epoch]`). The clone semantics of
+  (`__shirabeClone`, answered with the fresh rhandle). The clone semantics of
   the real class live on the Rust side with the entity; entities that model no
   clone answer with an explicit error.
 * **Imports**: the original file's `use` statements are kept in their original

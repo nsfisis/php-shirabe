@@ -76,7 +76,7 @@ script-class autoloader uses to ask the Rust-side `ClassLoader` where a class fi
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
 the Rust process, against the Rust-side application state — `__shirabeConstruct`, which
 allocates the Rust entity behind a `new SomeProxiedClass(...)` written by plugin code and
-answers with `[rhandle, epoch]`, `__shirabeCallStatic`, which takes `[class, method, args]`
+answers with its rhandle, `__shirabeCallStatic`, which takes `[class, method, args]`
 and runs a static method no handle identifies a receiver for, and the job methods
 `__shirabeResolveJob` / `__shirabeRejectJob` / `__shirabeCancelJob` / `__shirabeAbortJobs`
 ([docs/dev/plugin-async.md](./plugin-async.md)). Classes and static methods Rust cannot answer

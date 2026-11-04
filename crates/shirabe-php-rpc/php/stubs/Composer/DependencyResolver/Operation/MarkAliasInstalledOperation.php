@@ -11,7 +11,7 @@ class MarkAliasInstalledOperation extends SolverOperation implements OperationIn
 {
     public function __construct(AliasPackage $package)
     {
-        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$package]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$package]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

@@ -15,9 +15,6 @@ class Event implements \ShirabeRustStub
 {
     /** @var int|null Null in native mode. */
     protected $__rhandle;
-    /** @var int */
-    protected $__epoch = 0;
-
     /** @var string This event's name (native mode) */
     protected $name;
 
@@ -38,10 +35,9 @@ class Event implements \ShirabeRustStub
         $this->flags = $flags;
     }
 
-    public function __shirabeBind(int $rhandle, int $epoch): void
+    public function __shirabeBind(int $rhandle): void
     {
         $this->__rhandle = $rhandle;
-        $this->__epoch = $epoch;
     }
 
     public function __destruct()
@@ -60,7 +56,6 @@ class Event implements \ShirabeRustStub
         return [
             '__rhandle' => $this->__rhandle,
             '__class' => static::class,
-            '__epoch' => $this->__epoch,
         ];
     }
 

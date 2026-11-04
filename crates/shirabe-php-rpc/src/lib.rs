@@ -978,10 +978,6 @@ fn rpc_call(
                 });
                 continue;
             }
-            Frame::EpochBump { .. } => {
-                // Rust is the sender of epoch bumps; tolerate the symmetric direction.
-                continue;
-            }
             other => panic!(
                 "PHP RPC: protocol violation — unexpected frame while waiting for corr_id \
                  {my_id}: {other:?}"

@@ -11,7 +11,6 @@ const SHIRABE_TAG_RETURN = 0x05;
 const SHIRABE_TAG_THROW = 0x06;
 const SHIRABE_TAG_RELEASE_RUST_HANDLE = 0x07;
 const SHIRABE_TAG_RELEASE_PHP_HANDLE = 0x08;
-const SHIRABE_TAG_EPOCH_BUMP = 0x09;
 
 const SHIRABE_MAX_FRAME_LEN = 268435456; // 256 MiB, mirrored on the Rust side.
 
@@ -22,12 +21,12 @@ interface ShirabeRustStub
      * Null when this instance holds no Rust handle: a dual-mode class (see php/runtime/) that
      * was constructed natively in this process crosses the wire as a P-table entity instead.
      *
-     * @return ?array{__rhandle: int, __class: string, __epoch: int}
+     * @return ?array{__rhandle: int, __class: string}
      */
     public function __shirabeRustHandleDescriptor(): ?array;
 
     /** Binds this stub to an existing Rust entity, in place of running its constructor. */
-    public function __shirabeBind(int $rhandle, int $epoch): void;
+    public function __shirabeBind(int $rhandle): void;
 }
 
 /**
@@ -53,7 +52,7 @@ final class ShirabeRustObjectRegistry
     /** @var array<int, WeakReference> */
     private static array $internTable = [];
 
-    public static function stubFor(int $rhandle, string $class, int $epoch): object
+    public static function stubFor(int $rhandle, string $class): object
     {
         if (isset(self::$internTable[$rhandle])) {
             $existing = self::$internTable[$rhandle]->get();
@@ -71,7 +70,7 @@ final class ShirabeRustObjectRegistry
         // The stub's constructor belongs to plugin code building a *new* entity; an entity that
         // already exists is bound directly, so proxying never runs it.
         $stub = (new ReflectionClass($class))->newInstanceWithoutConstructor();
-        $stub->__shirabeBind($rhandle, $epoch);
+        $stub->__shirabeBind($rhandle);
         self::$internTable[$rhandle] = WeakReference::create($stub);
         return $stub;
     }
@@ -84,16 +83,6 @@ final class ShirabeRustObjectRegistry
     public static function adopt(int $rhandle, object $stub): void
     {
         self::$internTable[$rhandle] = WeakReference::create($stub);
-    }
-
-    /** Invoked when an EpochBump frame arrives. No-op if the stub already died. */
-    public static function bumpEpoch(int $rhandle, int $epoch): void
-    {
-        $ref = self::$internTable[$rhandle] ?? null;
-        $stub = $ref !== null ? $ref->get() : null;
-        if ($stub !== null && method_exists($stub, '__invalidateCache')) {
-            $stub->__invalidateCache($epoch);
-        }
     }
 
     /** Invoked from stub destructors. */
@@ -456,8 +445,7 @@ final class ShirabeRpcRuntime
         if (isset($value['__rhandle'])) {
             return ShirabeRustObjectRegistry::stubFor(
                 $value['__rhandle'],
-                $value['__class'],
-                $value['__epoch']
+                $value['__class']
             );
         }
         if (isset($value['__phandle'])) {
@@ -593,10 +581,6 @@ final class ShirabeRpcRuntime
             case SHIRABE_TAG_RELEASE_PHP_HANDLE:
                 [$phandle] = $fields;
                 ShirabePhpObjectRegistry::release((int) $phandle);
-                break;
-            case SHIRABE_TAG_EPOCH_BUMP:
-                [$rhandle, $epoch] = $fields;
-                ShirabeRustObjectRegistry::bumpEpoch((int) $rhandle, (int) $epoch);
                 break;
             default:
                 self::fail("protocol violation: unexpected frame tag {$tag}");

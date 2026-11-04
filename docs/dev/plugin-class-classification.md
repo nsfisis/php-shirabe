@@ -186,10 +186,8 @@ mapping for the `Throw` message.
 
 #### pure/mutator (per method)
 
-Intended to drive epoch invalidation of child-side getter caches: after a
-mutator runs Rust-side, the affected proxies' caches would have to be
-dropped. No such cache exists: stubs forward every call, and nothing
-consumes these verdicts. A method is a
+Feeds the stateless-pure and value-object tests of the decision procedure
+(steps 6 and 7 below). A method is a
 mutator iff it assigns to `$this->…` (directly, via compound assignment,
 `unset`, increment), passes a `$this`-rooted expression into a by-reference
 parameter position (builtin signatures resolved from
@@ -655,8 +653,8 @@ All conservative:
 * a call to a method the class hierarchy does not declare (an
   interface-only method such as `$this->getVersion()` from
   `BasePackage::getUniqueName`) forces `mutator` even when every concrete
-  implementation is a pure read — this would cost spurious epoch
-  invalidations, not correctness, and can be refined by resolving such
+  implementation is a pure read — this can only keep a class out of the
+  `php-native` and `rust-snapshot` tests, and can be refined by resolving such
   callees over all concrete subtypes; a call to a declared abstract method
   is treated as pure;
 * `parent::m()` purity resolves against the own hierarchy rather than the

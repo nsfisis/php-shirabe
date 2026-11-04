@@ -19,8 +19,6 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 {
     /** @var int */
     protected $__rhandle;
-    /** @var int */
-    protected $__epoch;
     /** @var ?array<string, mixed> What the Rust side reports about the process, read once */
     private $__shirabeFacts;
     /** @var string */
@@ -36,10 +34,9 @@ class RustProcessStub extends Process implements \ShirabeRustStub
      * Binds the stub to the Rust-side process. An instance is never constructed: the real
      * constructor would describe a process this side is about to start.
      */
-    public function __shirabeBind(int $rhandle, int $epoch): void
+    public function __shirabeBind(int $rhandle): void
     {
         $this->__rhandle = $rhandle;
-        $this->__epoch = $epoch;
     }
 
     public function __destruct()
@@ -52,7 +49,6 @@ class RustProcessStub extends Process implements \ShirabeRustStub
         return [
             '__rhandle' => $this->__rhandle,
             '__class' => static::class,
-            '__epoch' => $this->__epoch,
         ];
     }
 

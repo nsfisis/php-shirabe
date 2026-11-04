@@ -18,7 +18,6 @@ use shirabe_php_shim::{PhpMixed, bconcat, utf8_text};
 pub struct RustObjHandle {
     pub rhandle: u64,
     pub class: BString,
-    pub epoch: u64,
     /// Present when the descriptor also carries a value snapshot of the entity's fields.
     pub snapshot: Option<IndexMap<BString, PluginValue>>,
 }
@@ -203,7 +202,6 @@ pub const MAX_DECODE_DEPTH: usize = 512;
 
 const RUST_HANDLE_KEY: &[u8] = b"__rhandle";
 const CLASS_KEY: &[u8] = b"__class";
-const EPOCH_KEY: &[u8] = b"__epoch";
 const SNAPSHOT_KEY: &[u8] = b"__snapshot";
 const PHP_HANDLE_KEY: &[u8] = b"__phandle";
 const IMPLEMENTS_KEY: &[u8] = b"__implements";
@@ -277,10 +275,6 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
                 PluginValue::Int(i64::try_from(handle.rhandle).expect("rhandle exceeds i64")),
             );
             map.insert(CLASS_KEY.into(), PluginValue::string(handle.class.clone()));
-            map.insert(
-                EPOCH_KEY.into(),
-                PluginValue::Int(i64::try_from(handle.epoch).expect("epoch exceeds i64")),
-            );
             if let Some(snapshot) = &handle.snapshot {
                 map.insert(SNAPSHOT_KEY.into(), PluginValue::Array(snapshot.clone()));
             }
@@ -665,16 +659,12 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
     if let Some(value) = get(RUST_HANDLE_KEY) {
         let allowed = entries
             .keys()
-            .all(|k| k == RUST_HANDLE_KEY || k == CLASS_KEY || k == EPOCH_KEY || k == SNAPSHOT_KEY);
-        if !allowed || entries.len() < 3 {
+            .all(|k| k == RUST_HANDLE_KEY || k == CLASS_KEY || k == SNAPSHOT_KEY);
+        if !allowed || entries.len() < 2 {
             bail!("malformed __rhandle descriptor: {entries:?}");
         }
         let rhandle = descriptor_u64(value, "__rhandle")?;
         let class = descriptor_class(get(CLASS_KEY), "__rhandle")?;
-        let epoch = descriptor_u64(
-            get(EPOCH_KEY).ok_or_else(|| anyhow::anyhow!("__rhandle descriptor lacks __epoch"))?,
-            "__epoch",
-        )?;
         let snapshot = match get(SNAPSHOT_KEY) {
             None => None,
             Some(PluginValue::Array(map)) => Some(map.clone()),
@@ -690,7 +680,6 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
         return Ok(Some(PluginValue::RustHandle(RustObjHandle {
             rhandle,
             class,
-            epoch,
             snapshot,
         })));
     }
@@ -938,7 +927,6 @@ mod tests {
         roundtrip(PluginValue::RustHandle(RustObjHandle {
             rhandle: 3,
             class: b"Caf\xe9".into(),
-            epoch: 1,
             snapshot: None,
         }));
         roundtrip(PluginValue::PhpHandle(PhpObjHandle {
@@ -956,7 +944,6 @@ mod tests {
         roundtrip(PluginValue::RustHandle(RustObjHandle {
             rhandle: 3,
             class: "Composer\\Script\\Event".into(),
-            epoch: 1,
             snapshot: None,
         }));
         roundtrip(PluginValue::PhpHandle(PhpObjHandle {

@@ -15,7 +15,7 @@ class ConsoleIO extends BaseIO
 {
     public function __construct(InputInterface $input, OutputInterface $output, HelperSet $helperSet)
     {
-        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$input, $output, $helperSet]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$input, $output, $helperSet]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

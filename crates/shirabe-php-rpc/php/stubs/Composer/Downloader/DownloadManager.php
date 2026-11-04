@@ -14,17 +14,14 @@ class DownloadManager implements \ShirabeRustStub
 {
     /** @var int */
     protected $__rhandle;
-    /** @var int */
-    protected $__epoch;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle, int $epoch): void
+    public function __shirabeBind(int $rhandle): void
     {
         $this->__rhandle = $rhandle;
-        $this->__epoch = $epoch;
     }
 
     public function __destruct()
@@ -37,7 +34,6 @@ class DownloadManager implements \ShirabeRustStub
         return [
             '__rhandle' => $this->__rhandle,
             '__class' => static::class,
-            '__epoch' => $this->__epoch,
         ];
     }
 
@@ -47,7 +43,7 @@ class DownloadManager implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
@@ -73,7 +69,7 @@ class DownloadManager implements \ShirabeRustStub
 
     public function __construct(IOInterface $io, bool $preferSource = false, ?Filesystem $filesystem = null)
     {
-        [$this->__rhandle, $this->__epoch] = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$io, $preferSource, $filesystem]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$io, $preferSource, $filesystem]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

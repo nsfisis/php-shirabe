@@ -22,7 +22,6 @@ pub const TAG_RETURN: u8 = 0x05;
 pub const TAG_THROW: u8 = 0x06;
 pub const TAG_RELEASE_RUST_HANDLE: u8 = 0x07;
 pub const TAG_RELEASE_PHP_HANDLE: u8 = 0x08;
-pub const TAG_EPOCH_BUMP: u8 = 0x09;
 
 #[derive(Debug)]
 pub enum Frame {
@@ -82,10 +81,6 @@ pub enum Frame {
     ReleasePhpHandle {
         phandle: u64,
     },
-    EpochBump {
-        rhandle: u64,
-        epoch: u64,
-    },
 }
 
 impl Frame {
@@ -100,7 +95,6 @@ impl Frame {
             Frame::Throw { .. } => TAG_THROW,
             Frame::ReleaseRustHandle { .. } => TAG_RELEASE_RUST_HANDLE,
             Frame::ReleasePhpHandle { .. } => TAG_RELEASE_PHP_HANDLE,
-            Frame::EpochBump { .. } => TAG_EPOCH_BUMP,
         }
     }
 
@@ -114,9 +108,7 @@ impl Frame {
             | Frame::CallRustMethod { corr_id, .. }
             | Frame::Return { corr_id, .. }
             | Frame::Throw { corr_id, .. } => *corr_id,
-            Frame::ReleaseRustHandle { .. }
-            | Frame::ReleasePhpHandle { .. }
-            | Frame::EpochBump { .. } => 0,
+            Frame::ReleaseRustHandle { .. } | Frame::ReleasePhpHandle { .. } => 0,
         }
     }
 
@@ -205,7 +197,6 @@ impl Frame {
             ],
             Frame::ReleaseRustHandle { rhandle } => vec![int_value(*rhandle)],
             Frame::ReleasePhpHandle { phandle } => vec![int_value(*phandle)],
-            Frame::EpochBump { rhandle, epoch } => vec![int_value(*rhandle), int_value(*epoch)],
         }
     }
 }
@@ -343,10 +334,6 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         },
         TAG_RELEASE_PHP_HANDLE => Frame::ReleasePhpHandle {
             phandle: expect_id(next()),
-        },
-        TAG_EPOCH_BUMP => Frame::EpochBump {
-            rhandle: expect_id(next()),
-            epoch: expect_id(next()),
         },
         _ => panic!("PHP RPC: protocol violation — unknown frame tag {tag:#04x}"),
     }
@@ -556,14 +543,10 @@ mod tests {
 
     #[test]
     fn frame_roundtrip_one_way_notification() {
-        let frame = roundtrip(Frame::EpochBump {
-            rhandle: 4,
-            epoch: 2,
-        });
+        let frame = roundtrip(Frame::ReleaseRustHandle { rhandle: 4 });
         match frame {
-            Frame::EpochBump { rhandle, epoch } => {
+            Frame::ReleaseRustHandle { rhandle } => {
                 assert_eq!(rhandle, 4);
-                assert_eq!(epoch, 2);
             }
             other => panic!("unexpected frame: {other:?}"),
         }

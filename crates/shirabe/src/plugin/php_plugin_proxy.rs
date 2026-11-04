@@ -184,7 +184,6 @@ pub(crate) fn rust_handle_value(rhandle: u64, class: impl AsRef<[u8]>) -> Plugin
     PluginValue::RustHandle(RustObjHandle {
         rhandle,
         class: BString::from(class.as_ref()),
-        epoch: 0,
         snapshot: None,
     })
 }
@@ -737,9 +736,9 @@ fn operation_construction_result(operation: AnyOperation) -> PluginValue {
     ))))
 }
 
-/// The `[$rhandle, $epoch]` pair a proxy stub's constructor binds itself to.
+/// The rhandle a proxy stub's constructor binds itself to.
 fn construction_result(rhandle: u64) -> PluginValue {
-    PluginValue::List(vec![PluginValue::Int(rhandle as i64), PluginValue::Int(0)])
+    PluginValue::Int(rhandle as i64)
 }
 
 /// Serves the `__clone` forwarder every proxy stub carries. Only entities whose Rust type
@@ -777,10 +776,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
             ));
         }
     };
-    Ok(PluginValue::List(vec![
-        PluginValue::Int(rhandle as i64),
-        PluginValue::Int(0),
-    ]))
+    Ok(PluginValue::Int(rhandle as i64))
 }
 
 /// Serves the `__get`/`__set`/`__isset`/`__unset` forwarders every proxy stub carries.

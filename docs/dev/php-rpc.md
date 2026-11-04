@@ -55,7 +55,6 @@ frame is a fatal channel error, not an allocation attempt.
 | `0x06` | `Throw` | both | `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
 | `0x07` | `ReleaseRustHandle` | PHP→Rust | `rhandle` |
 | `0x08` | `ReleasePhpHandle` | Rust→PHP | `phandle` |
-| `0x09` | `EpochBump` | Rust→PHP | `rhandle`, `epoch` |
 
 The Rust side allocates odd correlation ids, the PHP side even ones. `NewObject` instantiates
 a class in the worker and returns a `__phandle` descriptor for the new P-table entity;
@@ -70,7 +69,7 @@ model is `PluginValue`: PHP scalars, byte strings (`Vec<u8>` — non-UTF-8 round
 losslessly), lists, ordered maps, object records, and four descriptor kinds encoded as reserved
 arrays:
 
-- `{__rhandle, __class, __epoch[, __snapshot]}` — entity lives on the Rust side
+- `{__rhandle, __class[, __snapshot]}` — entity lives on the Rust side
 - `{__phandle, __class, __implements}` — entity lives in the PHP child
 - `{__pclass}` — a PHP class name
 - `{__job}` — an asynchronous job, an entity in neither table. The Rust side allocates odd job
@@ -201,7 +200,5 @@ so only the two processes holding its descriptors can reach it.
 ## Out of scope (deferred)
 
 By-ref parameters on Rust-initiated calls (`call_function`/`call_static_method`/`call_php_method`
-always send an empty `out_param_positions` and ignore the answer's `out_params`), epoch-based
-cache invalidation on the PHP side (the worker routes `EpochBump` to `__invalidateCache`, but no
-stub defines it and the Rust side never sends the frame), the `previous` of an exception crossing
-in either direction, and Windows support.
+always send an empty `out_param_positions` and ignore the answer's `out_params`), the `previous`
+of an exception crossing in either direction, and Windows support.
