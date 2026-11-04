@@ -17,7 +17,6 @@ $composerRoot = $repoRoot . '/composer';
 $reportPath = $repoRoot . '/scripts/plugin-class-classifier/report.json';
 $stubsDir = $repoRoot . '/crates/shirabe-php-rpc/php/stubs';
 $guardsDir = $repoRoot . '/crates/shirabe-php-rpc/php/guards';
-$libRs = $repoRoot . '/crates/shirabe-php-rpc/src/lib.rs';
 $check = false;
 
 foreach (array_slice($argv, 1) as $arg) {
@@ -58,7 +57,6 @@ $exemptions = $readList(__DIR__ . '/guard-exemptions.list');
 // so a targets.list entry can never shadow one.
 $runtimeDir = $repoRoot . '/crates/shirabe-php-rpc/php/runtime';
 $runtimeProvided = [];
-$runtimeFiles = [];
 if (is_dir($runtimeDir)) {
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($runtimeDir, FilesystemIterator::SKIP_DOTS)
@@ -66,13 +64,11 @@ if (is_dir($runtimeDir)) {
     foreach ($iterator as $entry) {
         if ($entry->isFile() && str_ends_with($entry->getFilename(), '.php')) {
             $relative = substr($entry->getPathname(), strlen($runtimeDir) + 1);
-            $runtimeFiles[] = $relative;
             $runtimeProvided[] = str_replace('/', '\\', substr($relative, 0, -strlen('.php')));
         }
     }
 }
 sort($runtimeProvided);
-sort($runtimeFiles);
 
 $problems = [];
 $report = Report::load($reportPath);
@@ -170,20 +166,6 @@ foreach ($generatedSets as [$dir, $generated, $source]) {
                 $problems[] = "stale file not covered by $source: $dir/$relative";
             }
         }
-    }
-}
-
-// The Rust side embeds every stub with include_str!; the two lists must not drift apart. The
-// whitespace is squeezed out first because rustfmt wraps a long include_str! across lines.
-$libRsText = preg_replace('/\s+/', '', (string) file_get_contents($libRs));
-foreach ($files as $relative => $_) {
-    if (!str_contains($libRsText, "include_str!(\"../php/stubs/$relative\")")) {
-        $problems[] = "STUB_FILES in $libRs does not embed $relative";
-    }
-}
-foreach ($runtimeFiles as $relative) {
-    if (!str_contains($libRsText, "include_str!(\"../php/runtime/$relative\")")) {
-        $problems[] = "RUNTIME_FILES in $libRs does not embed $relative";
     }
 }
 

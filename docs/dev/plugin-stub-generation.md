@@ -5,8 +5,8 @@
 The plugin PHP worker resolves proxied Composer FQCNs to thin stub classes whose
 public methods forward to the Rust-side entity over RPC (see
 `docs/dev/php-worker.md`, "Proxy stubs, runtime classes and guards"). These stub files, committed under
-`crates/shirabe-php-rpc/php/stubs/` and embedded into the binary by the
-`STUB_FILES` list in `crates/shirabe-php-rpc/src/lib.rs`, are *generated* by
+`crates/shirabe-php-rpc/php/stubs/` and embedded into the binary (the crate's
+`build.rs` embeds whatever the directory holds), are *generated* by
 `scripts/plugin-stub-generator` — never edited by hand. Generating them from the
 Composer sources keeps every stub signature mechanically faithful to the real
 class and turns "the stub is missing something the real class has" into a
@@ -18,7 +18,7 @@ no `php/runtime/` class shadows. Without them the worker's autoloader falls
 through to the real Composer implementation, and code running there works on a
 second instance the Rust side never sees — silent breakage in place of the
 explicit error an unimplemented plugin API is supposed to raise. `build.rs`
-embeds the guards, building the list from the directory itself.
+embeds the guards the same way as the stubs.
 
 ## Running
 
@@ -176,10 +176,9 @@ Generation fails — instead of emitting something quietly wrong — on:
 * a target whose FQCN is also provided by `php/runtime/`.
 
 `generate-stubs` (in both modes) additionally fails when a `.php` file exists
-under the stubs or guards directory that no target produces, or when `STUB_FILES` /
-`RUNTIME_FILES` in `crates/shirabe-php-rpc/src/lib.rs` does not embed every
-generated stub / runtime file. It also cross-checks the handoff property table
-for `Composer\Console\Application` (declared in `generate-stubs` itself) against
+under the stubs or guards directory that no target produces, since `build.rs`
+would embed it. It also cross-checks the handoff property table for
+`Composer\Console\Application` (declared in `generate-stubs` itself) against
 the real class: a property upstream adds without a handoff classification — or a
 table row the class no longer declares — fails generation, so the worker-side
 runtime application can never silently drop plugin-visible state after a
