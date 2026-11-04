@@ -47,7 +47,7 @@ pub(crate) struct PhpConsoleApplicationContext {
     initial_working_directory: Option<std::path::PathBuf>,
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
-    rust_commands: Vec<RustCommandMetadata>,
+    rust_commands: std::cell::RefCell<Vec<RustCommandMetadata>>,
     plugin_commands: std::cell::RefCell<Vec<PhpObjHandle>>,
     app: std::cell::RefCell<Option<PhpObjHandle>>,
 }
@@ -87,7 +87,7 @@ pub(crate) fn publish_console_application_context(
         initial_working_directory,
         disable_plugins_by_default,
         disable_scripts_by_default,
-        rust_commands,
+        rust_commands: std::cell::RefCell::new(rust_commands),
         plugin_commands: std::cell::RefCell::new(plugin_commands),
         app: std::cell::RefCell::new(None),
     });
@@ -113,6 +113,26 @@ pub(crate) fn extend_console_application_commands(
     Ok(())
 }
 
+/// Adds a Rust-implemented command to the published handoff, for commands registered after it
+/// was published. A worker-side application that already booted gets its
+/// `\Shirabe\RustCommandStub` right away, so the two sides keep the same command set.
+pub(crate) fn extend_console_application_rust_command(
+    metadata: RustCommandMetadata,
+) -> anyhow::Result<()> {
+    let context = CONSOLE_APP_CONTEXT
+        .with(|slot| slot.borrow().clone())
+        .expect("only an application that published the handoff extends it");
+    let app = context.app.borrow().clone();
+    if let Some(app) = app {
+        let stub: PhpObjHandle = PhpCall::New(BStr::new("Shirabe\\RustCommandStub"))
+            .run(vec![metadata.clone().to_wire()])?;
+        PhpCall::Method(&app, BStr::new("add"))
+            .run::<PluginValue>(vec![PluginValue::PhpHandle(stub)])?;
+    }
+    context.rust_commands.borrow_mut().push(metadata);
+    Ok(())
+}
+
 impl PhpConsoleApplicationContext {
     /// Boots the worker-side application on first use and returns its handle.
     pub(crate) fn booted_app(&self) -> anyhow::Result<PhpObjHandle> {
@@ -125,7 +145,7 @@ impl PhpConsoleApplicationContext {
             initial_working_directory: self.initial_working_directory.clone(),
             disable_plugins_by_default: self.disable_plugins_by_default,
             disable_scripts_by_default: self.disable_scripts_by_default,
-            rust_commands: self.rust_commands.clone(),
+            rust_commands: self.rust_commands.borrow().clone(),
             plugin_commands: self.plugin_commands.borrow().clone(),
         };
         let app: PhpObjHandle = PhpCall::Function(BStr::new("__shirabe_console_application_boot"))

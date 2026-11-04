@@ -590,14 +590,8 @@ impl Application {
     /// join the handoff it boots from when one of them actually runs. This application's first
     /// call publishes that handoff, carrying the shared object graph plus metadata mirrors of
     /// the commands registered so far — all Rust-implemented at that point, since a worker-hosted
-    /// command is only registered after being handed to this method.
-    ///
-    /// TODO(plugin): a Rust-implemented command registered *after* this first call is missing
-    /// from that mirror, so the worker cannot `find()` it. `Application::do_run` hits this when
-    /// one `scripts` entry names a Command class and a later entry falls back to
-    /// `ScriptAliasCommand`: the alias command is registered after the class command published
-    /// the handoff. Fixing it needs a metadata half of `extend_console_application_commands`
-    /// that also builds a `\Shirabe\RustCommandStub` in an already-booted worker application.
+    /// command is only registered after being handed to this method. Rust-implemented commands
+    /// registered later join it through `ApplicationHandle::register_worker_rust_command`.
     fn register_worker_console_commands(
         &mut self,
         composer: Option<&crate::composer::ComposerHandle>,
@@ -616,16 +610,7 @@ impl Application {
                 continue;
             }
             seen.push(ptr);
-            let command = command.borrow();
-            let Some(name) = command.get_name() else {
-                continue;
-            };
-            rust_commands.push(crate::plugin::console_bridge::RustCommandMetadata {
-                name,
-                description: command.get_description(),
-                aliases: command.get_aliases(),
-                hidden: command.is_hidden(),
-            });
+            rust_commands.push(rust_command_metadata(&*command.borrow()));
         }
         crate::plugin::console_bridge::publish_console_application_context(
             composer,
@@ -1849,6 +1834,21 @@ impl ApplicationHandle {
         Ok(Some(command))
     }
 
+    /// Mirrors a Rust-implemented command registered after the worker-side console application
+    /// handoff was published into that handoff, so worker-hosted commands can `find()` it like
+    /// the ones registered before. Before the handoff, publishing it mirrors every registered
+    /// command anyway.
+    fn register_worker_rust_command(
+        &self,
+        command: &std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
+    ) -> anyhow::Result<()> {
+        if !self.0.borrow().published_worker_console_context {
+            return Ok(());
+        }
+        let metadata = rust_command_metadata(&*command.borrow());
+        crate::plugin::console_bridge::extend_console_application_rust_command(metadata)
+    }
+
     pub async fn run(
         &self,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
@@ -2450,7 +2450,11 @@ impl ApplicationHandle {
                                 // Compatibility layer for symfony/console <7.4
                                 // (addCommand does not exist in the ported Application; add()
                                 // is the only registration entry point.)
-                                self.add(cmd)?;
+                                if let Some(cmd) = self.add(cmd)?
+                                    && !is_command_class
+                                {
+                                    self.register_worker_rust_command(&cmd)?;
+                                }
                             }
                         }
                     }
@@ -3005,6 +3009,20 @@ thread_local! {
     static WORKER_REVERSE_APPLICATION: std::cell::RefCell<
         Option<std::rc::Weak<std::cell::RefCell<Application>>>,
     > = const { std::cell::RefCell::new(None) };
+}
+
+/// The metadata a worker-side `\Shirabe\RustCommandStub` mirrors of a registered command.
+fn rust_command_metadata(
+    command: &dyn SymfonyCommand,
+) -> crate::plugin::console_bridge::RustCommandMetadata {
+    crate::plugin::console_bridge::RustCommandMetadata {
+        name: command
+            .get_name()
+            .expect("a registered command always has a name"),
+        description: command.get_description(),
+        aliases: command.get_aliases(),
+        hidden: command.is_hidden(),
+    }
 }
 
 /// Registers the application the worker's reverse command stubs call back into.

@@ -18,14 +18,19 @@ fn fixture_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-script-command")
 }
 
-struct CommandRun {
-    exit_code: i32,
-    stdout: BString,
-    stderr: BString,
+pub(crate) struct CommandRun {
+    pub(crate) exit_code: i32,
+    pub(crate) stdout: BString,
+    pub(crate) stderr: BString,
 }
 
 /// One composer-CLI invocation inside the prepared project.
-fn run_command(work: &Path, program: &BStr, prefix_args: &[&OsStr], args: &[&BStr]) -> CommandRun {
+pub(crate) fn run_command(
+    work: &Path,
+    program: &BStr,
+    prefix_args: &[&OsStr],
+    args: &[&BStr],
+) -> CommandRun {
     let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
         .args(args.iter().map(os_str_from_bytes))
@@ -58,7 +63,7 @@ fn list_body(text: &[u8]) -> &BStr {
     clippy::disallowed_methods,
     reason = "the test splits a child process's output into lines, which no PHP code does"
 )]
-fn lines_starting_with<'a>(text: &'a [u8], prefix: &BStr) -> Vec<&'a BStr> {
+pub(crate) fn lines_starting_with<'a>(text: &'a [u8], prefix: &BStr) -> Vec<&'a BStr> {
     text.lines()
         .map(|line| line.trim_end().as_bstr())
         .filter(|line| line.trim_start().starts_with(prefix.as_bytes()))
