@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Plugin/PreFileDownloadEvent.php
 
-use crate::event_dispatcher::Event;
+use crate::event_dispatcher::{Event, EventFlags};
 use crate::package::PackageInterfaceHandle;
 use crate::util::HttpDownloader;
 use bstr::{BStr, BString, ByteSlice};
@@ -39,7 +39,7 @@ impl PreFileDownloadEvent {
         context: Option<FileDownloadContext>,
     ) -> Self {
         Self {
-            inner: Event::new(name, vec![], IndexMap::new()),
+            inner: Event::new(name, vec![], EventFlags::default()),
             http_downloader,
             processed_url,
             custom_cache_key: None,

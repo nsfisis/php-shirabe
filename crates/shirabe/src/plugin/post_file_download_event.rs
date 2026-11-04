@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Plugin/PostFileDownloadEvent.php
 
-use crate::event_dispatcher::Event;
+use crate::event_dispatcher::{Event, EventFlags};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::FileDownloadContext;
 use bstr::{BStr, BString, ByteSlice};
@@ -26,7 +26,7 @@ impl PostFileDownloadEvent {
         context: Option<FileDownloadContext>,
     ) -> Self {
         Self {
-            inner: Event::new(name, vec![], indexmap::IndexMap::new()),
+            inner: Event::new(name, vec![], EventFlags::default()),
             file_name,
             checksum,
             url,

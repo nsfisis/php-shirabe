@@ -4,7 +4,7 @@
 
 use crate::autoload::ClassLoader;
 use crate::config::Config;
-use crate::event_dispatcher::EventDispatcher;
+use crate::event_dispatcher::{EventDispatcher, EventFlags};
 use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
     PlatformRequirementFilterInterface,
@@ -164,13 +164,14 @@ impl AutoloadGenerator {
                 );
             }
 
-            let mut additional_args: IndexMap<BString, PhpMixed> = IndexMap::new();
-            additional_args.insert("optimize".into(), PhpMixed::Bool(scan_psr_packages));
             self.event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::PRE_AUTOLOAD_DUMP,
                 self.dev_mode.get().unwrap_or(false),
                 vec![],
-                additional_args,
+                EventFlags {
+                    optimize: Some(scan_psr_packages),
+                    ..Default::default()
+                },
             )?;
         }
 
@@ -722,13 +723,14 @@ impl AutoloadGenerator {
         )?;
 
         if self.run_scripts.get() {
-            let mut additional_args: IndexMap<BString, PhpMixed> = IndexMap::new();
-            additional_args.insert("optimize".into(), PhpMixed::Bool(scan_psr_packages));
             self.event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::POST_AUTOLOAD_DUMP,
                 self.dev_mode.get().unwrap_or(false),
                 vec![],
-                additional_args,
+                EventFlags {
+                    optimize: Some(scan_psr_packages),
+                    ..Default::default()
+                },
             )?;
         }
 

@@ -1,11 +1,9 @@
 //! ref: composer/src/Composer/Script/Event.php
 
 use crate::composer::ComposerWeakHandle;
-use crate::event_dispatcher::{Event as BaseEvent, EventInterface};
+use crate::event_dispatcher::{Event as BaseEvent, EventFlags, EventInterface};
 use crate::io::IOInterface;
 use bstr::BString;
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Event {
@@ -29,7 +27,7 @@ impl Event {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
         args: Vec<BString>,
-        flags: IndexMap<BString, PhpMixed>,
+        flags: EventFlags,
     ) -> Self {
         Self {
             inner: BaseEvent::new(name, args, flags),
@@ -99,7 +97,7 @@ impl EventInterface for OriginatingEvent {
         }
     }
 
-    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
+    fn get_flags(&self) -> &EventFlags {
         match self {
             OriginatingEvent::Base(e) => e.get_flags(),
             OriginatingEvent::Script(e) => e.get_flags(),

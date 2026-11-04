@@ -5,6 +5,7 @@ use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
 use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::{AnyOperation, UninstallOperation};
+use crate::event_dispatcher::EventFlags;
 use crate::io::IOInterfaceWrite;
 use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};
@@ -229,7 +230,7 @@ impl Command for ReinstallCommand {
             ScriptEvents::PRE_INSTALL_CMD,
             dev_mode,
             vec![],
-            indexmap::IndexMap::new(),
+            EventFlags::default(),
         );
 
         let uninstall_operations: Vec<std::rc::Rc<AnyOperation>> = uninstall_operations
@@ -318,7 +319,7 @@ impl Command for ReinstallCommand {
             ScriptEvents::POST_INSTALL_CMD,
             dev_mode,
             vec![],
-            indexmap::IndexMap::new(),
+            EventFlags::default(),
         );
 
         Ok(0)

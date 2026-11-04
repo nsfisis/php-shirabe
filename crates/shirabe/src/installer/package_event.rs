@@ -2,11 +2,10 @@
 
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::event_dispatcher::Event;
+use crate::event_dispatcher::{Event, EventFlags};
 use crate::io::IOInterface;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BString;
-use indexmap::IndexMap;
 
 /// The operations are shared rather than owned so that the same operation crosses the plugin
 /// boundary as one object for both the pre- and the post-event, as it does in PHP.
@@ -32,7 +31,7 @@ impl PackageEvent {
         operation: std::rc::Rc<AnyOperation>,
     ) -> Self {
         Self {
-            inner: Event::new(event_name, vec![], IndexMap::new()),
+            inner: Event::new(event_name, vec![], EventFlags::default()),
             composer,
             io,
             dev_mode,

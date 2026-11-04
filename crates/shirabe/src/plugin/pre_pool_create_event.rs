@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Plugin/PrePoolCreateEvent.php
 
 use crate::dependency_resolver::Request;
-use crate::event_dispatcher::Event;
+use crate::event_dispatcher::{Event, EventFlags};
 use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::BString;
@@ -40,7 +40,7 @@ impl PrePoolCreateEvent {
         unacceptable_fixed_packages: Vec<BasePackageHandle>,
     ) -> Self {
         Self {
-            inner: Event::new(name, vec![], IndexMap::new()),
+            inner: Event::new(name, vec![], EventFlags::default()),
             repositories,
             request,
             acceptable_stabilities,

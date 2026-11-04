@@ -5,6 +5,7 @@ use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::composer::PartialComposerHandle;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::{DefaultPolicy, PolicyInterface};
+use crate::event_dispatcher::EventFlags;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
@@ -1855,7 +1856,7 @@ impl Command for ShowCommand {
                 input.clone(),
                 output,
                 vec![],
-                IndexMap::new(),
+                EventFlags::default(),
             );
             let command_event_name = command_event.get_name().to_owned();
             composer

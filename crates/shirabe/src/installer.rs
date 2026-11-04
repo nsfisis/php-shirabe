@@ -17,7 +17,6 @@ mod suggested_packages_reporter;
 
 pub use binary_installer::*;
 pub use binary_presence_interface::*;
-use bstr::{BStr, BString, ByteSlice};
 pub use installation_manager::*;
 pub use installer_event::*;
 pub use installer_events::*;
@@ -29,17 +28,7 @@ pub use package_event::*;
 pub use package_events::*;
 pub use plugin_installer::*;
 pub use project_installer::*;
-use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, array_map, array_unique, bconcat, implode, intval,
-    is_dir, is_numeric, path_from_bytes, strcmp, strpos, strtolower, touch, usort,
-};
 pub use suggested_packages_reporter::*;
-
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
-use indexmap::IndexMap;
-
-use shirabe_seld_json_lint::ParsingException;
-use shirabe_semver;
 
 use crate::advisory::{AuditConfig, Auditor};
 use crate::autoload::AutoloadGeneratorInterface;
@@ -52,11 +41,12 @@ use crate::dependency_resolver::{
     PoolOptimizer, Request, SecurityAdvisoryPoolFilter, Solver, UpdateAllowTransitiveDeps,
 };
 use crate::downloader::{DownloadManagerInterface, TransportException};
-use crate::event_dispatcher::EventDispatcherInterface;
+use crate::event_dispatcher::{EventDispatcherInterface, EventFlags};
 use crate::filter::platform_requirement_filter::{
     IgnoreListPlatformRequirementFilter, PlatformRequirementFilterFactory,
     PlatformRequirementFilterInterface,
 };
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::version::VersionParser;
@@ -71,6 +61,14 @@ use crate::repository::{
 };
 use crate::script::ScriptEvents;
 use crate::util::Platform;
+use bstr::{BStr, BString, ByteSlice};
+use indexmap::IndexMap;
+use shirabe_php_shim::{
+    Catch as _, PhpMixed, RuntimeException, array_map, array_unique, bconcat, implode, intval,
+    is_dir, is_numeric, path_from_bytes, strcmp, strpos, strtolower, touch, usort,
+};
+use shirabe_seld_json_lint::ParsingException;
+use shirabe_semver;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[derive(Debug)]
@@ -252,7 +250,7 @@ impl Installer {
                 event_name,
                 self.dev_mode,
                 vec![],
-                IndexMap::new(),
+                EventFlags::default(),
             )?;
         }
 
@@ -455,7 +453,7 @@ impl Installer {
                 event_name,
                 self.dev_mode,
                 vec![],
-                IndexMap::new(),
+                EventFlags::default(),
             )?;
         }
 

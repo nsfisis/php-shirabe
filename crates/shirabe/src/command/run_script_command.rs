@@ -3,11 +3,11 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
+use crate::event_dispatcher::EventFlags;
 use crate::io::IOInterfaceWrite;
 use crate::script::{Event as ScriptEvent, ScriptEvents};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString};
-use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class,
     str_replace, strtoupper, utf8_text,
@@ -297,7 +297,7 @@ impl Command for RunScriptCommand {
             io,
             dev_mode,
             vec![],
-            IndexMap::new(),
+            EventFlags::default(),
         );
         let has_listeners = dispatcher.borrow_mut().has_event_listeners(&event);
         if !has_listeners {
@@ -331,9 +331,12 @@ impl Command for RunScriptCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        dispatcher
-            .borrow_mut()
-            .dispatch_script(script.as_ref(), dev_mode, args, IndexMap::new())
+        dispatcher.borrow_mut().dispatch_script(
+            script.as_ref(),
+            dev_mode,
+            args,
+            EventFlags::default(),
+        )
     }
 
     fn initialize(

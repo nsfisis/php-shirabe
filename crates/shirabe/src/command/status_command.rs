@@ -3,6 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
+use crate::event_dispatcher::EventFlags;
 use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
@@ -342,7 +343,7 @@ impl Command for StatusCommand {
                     ScriptEvents::PRE_STATUS_CMD,
                     true,
                     vec![],
-                    indexmap::IndexMap::new(),
+                    EventFlags::default(),
                 );
         }
 
@@ -357,7 +358,7 @@ impl Command for StatusCommand {
                     ScriptEvents::POST_STATUS_CMD,
                     true,
                     vec![],
-                    indexmap::IndexMap::new(),
+                    EventFlags::default(),
                 );
         }
 

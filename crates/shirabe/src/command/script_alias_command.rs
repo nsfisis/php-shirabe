@@ -3,6 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
+use crate::event_dispatcher::EventFlags;
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
@@ -134,11 +135,10 @@ impl Command for ScriptAliasCommand {
         let _ = input;
         let script_alias_input =
             preg_replace2(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1, None);
-        let mut flags = indexmap::IndexMap::new();
-        flags.insert(
-            "script-alias-input".into(),
-            PhpMixed::string(script_alias_input),
-        );
+        let flags = EventFlags {
+            script_alias_input: Some(script_alias_input),
+            ..Default::default()
+        };
 
         let args_value: Vec<bstr::BString> = args
             .get(bstr::B("args"))

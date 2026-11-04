@@ -4,6 +4,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
 use crate::console::input::{InputArgument, InputOption};
+use crate::event_dispatcher::EventFlags;
 use crate::io::IOInterfaceWrite;
 use bstr::BString;
 use shirabe_php_shim::{
@@ -244,7 +245,7 @@ impl Command for ExecCommand {
             "__exec_command".into(),
             true,
             args,
-            indexmap::IndexMap::new(),
+            EventFlags::default(),
         )
     }
 

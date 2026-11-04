@@ -2,7 +2,7 @@
 
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::AnyTransaction;
-use crate::event_dispatcher::Event;
+use crate::event_dispatcher::{Event, EventFlags};
 use crate::io::IOInterface;
 use bstr::BString;
 
@@ -25,7 +25,7 @@ impl InstallerEvent {
         execute_operations: bool,
         transaction: std::rc::Rc<AnyTransaction>,
     ) -> Self {
-        let inner = Event::new(event_name, vec![], indexmap::IndexMap::new());
+        let inner = Event::new(event_name, vec![], EventFlags::default());
         Self {
             inner,
             composer,

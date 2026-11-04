@@ -1,10 +1,9 @@
 //! ref: composer/tests/Composer/Test/Script/EventTest.php
 
 use bstr::BString;
-use indexmap::IndexMap;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
-use shirabe::event_dispatcher::{Event as BaseEvent, EventInterface};
+use shirabe::event_dispatcher::{Event as BaseEvent, EventFlags, EventInterface};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::{RootPackageHandle, RootPackageInterfaceHandle};
@@ -32,8 +31,11 @@ fn test_event_sets_originating_event() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let composer = create_composer_instance();
 
-    let originating_event =
-        BaseEvent::new(BString::from("originatingEvent"), vec![], IndexMap::new());
+    let originating_event = BaseEvent::new(
+        BString::from("originatingEvent"),
+        vec![],
+        EventFlags::default(),
+    );
 
     let mut script_event = Event::new(
         BString::from("test"),
@@ -41,7 +43,7 @@ fn test_event_sets_originating_event() {
         io,
         true,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
 
     assert!(
@@ -70,7 +72,7 @@ fn test_event_calculates_nested_originating_event() {
     let originating_event = BaseEvent::new(
         BString::from("upperOriginatingEvent"),
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
 
     let mut intermediate_event = Event::new(
@@ -79,7 +81,7 @@ fn test_event_calculates_nested_originating_event() {
         io.clone(),
         true,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
     intermediate_event.set_originating_event(OriginatingEvent::Base(originating_event));
 
@@ -89,7 +91,7 @@ fn test_event_calculates_nested_originating_event() {
         io,
         true,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
     script_event.set_originating_event(OriginatingEvent::Script(Box::new(intermediate_event)));
 

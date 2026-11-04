@@ -6,6 +6,7 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
+use crate::event_dispatcher::EventFlags;
 use crate::factory::Factory;
 use crate::io::{BufferIO, IOInterface, IOInterfaceWrite, NullIO};
 use crate::json::{JsonFile, JsonValidationException};
@@ -1249,7 +1250,7 @@ impl Command for DiagnoseCommand {
                 input,
                 output,
                 vec![],
-                IndexMap::new(),
+                EventFlags::default(),
             );
             let command_event_name = command_event.get_name().to_owned();
             c.get_event_dispatcher()

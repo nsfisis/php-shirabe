@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Plugin/PreCommandRunEvent.php
 
-use crate::event_dispatcher::Event;
+use crate::event_dispatcher::{Event, EventFlags};
 use bstr::BString;
 use shirabe_symfony_console::input::InputInterface;
 
@@ -17,7 +17,7 @@ impl PreCommandRunEvent {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         command: BString,
     ) -> Self {
-        let inner = Event::new(name, vec![], indexmap::IndexMap::new());
+        let inner = Event::new(name, vec![], EventFlags::default());
         Self {
             inner,
             input,

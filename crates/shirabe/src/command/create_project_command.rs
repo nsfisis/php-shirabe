@@ -6,6 +6,7 @@ use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::operation::InstallOperation;
+use crate::event_dispatcher::EventFlags;
 use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
@@ -26,7 +27,6 @@ use crate::script::ScriptEvents;
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
-use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
     array_pop, bconcat, chdir, error_message, explode_with_limit, file_exists, getcwd,
@@ -239,7 +239,7 @@ impl CreateProjectCommand {
                 ScriptEvents::POST_ROOT_PACKAGE_INSTALL,
                 install_dev_packages,
                 vec![],
-                IndexMap::new(),
+                EventFlags::default(),
             );
 
         // use the new config including the newly installed project
@@ -404,7 +404,7 @@ impl CreateProjectCommand {
                 ScriptEvents::POST_CREATE_PROJECT_CMD,
                 install_dev_packages,
                 vec![],
-                indexmap::IndexMap::new(),
+                EventFlags::default(),
             );
 
         chdir(&old_cwd);

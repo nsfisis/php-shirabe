@@ -1,9 +1,7 @@
 //! ref: composer/src/Composer/Plugin/CommandEvent.php
 
-use crate::event_dispatcher::Event;
+use crate::event_dispatcher::{Event, EventFlags};
 use bstr::BString;
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 
@@ -22,7 +20,14 @@ impl CommandEvent {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Self {
-        Self::new6(name, command_name, input, output, vec![], IndexMap::new())
+        Self::new6(
+            name,
+            command_name,
+            input,
+            output,
+            vec![],
+            EventFlags::default(),
+        )
     }
 
     pub fn new6(
@@ -31,7 +36,7 @@ impl CommandEvent {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         args: Vec<BString>,
-        flags: IndexMap<BString, PhpMixed>,
+        flags: EventFlags,
     ) -> Self {
         let inner = Event::new(name, args, flags);
         Self {

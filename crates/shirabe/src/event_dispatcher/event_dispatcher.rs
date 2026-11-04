@@ -5,7 +5,8 @@ use crate::composer::{PartialComposerHandle, PartialComposerWeakHandle};
 use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::operation::AnyOperation;
 use crate::event_dispatcher::{
-    Event, EventInterface, EventSubscriberInterface, ScriptExecutionException, SubscribedEventEntry,
+    Event, EventFlags, EventInterface, EventSubscriberInterface, ScriptExecutionException,
+    SubscribedEventEntry,
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
@@ -19,7 +20,7 @@ use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, ToWire};
 use shirabe_php_shim::{
@@ -113,7 +114,7 @@ impl std::fmt::Debug for GetListenersOverride {
 
 /// For testing only. Holds a closure standing in for an overridden `dispatchScript` method.
 pub struct DispatchScriptOverride(
-    pub Box<dyn Fn(&BStr, bool, &[BString], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>>,
+    pub Box<dyn Fn(&BStr, bool, &[BString], &EventFlags) -> anyhow::Result<i64>>,
 );
 
 impl std::fmt::Debug for DispatchScriptOverride {
@@ -170,9 +171,7 @@ impl EventDispatcher {
     /// `onlyMethods(['dispatchScript'])->willReturnCallback(...)`.
     pub fn __set_dispatch_script_override(
         &mut self,
-        callback: Box<
-            dyn Fn(&BStr, bool, &[BString], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>,
-        >,
+        callback: Box<dyn Fn(&BStr, bool, &[BString], &EventFlags) -> anyhow::Result<i64>>,
     ) {
         self.dispatch_script_override = Some(DispatchScriptOverride(callback));
     }
@@ -199,7 +198,7 @@ impl EventDispatcher {
                 let name = event_name.ok_or_else(|| -> anyhow::Error {
                     InvalidArgumentException::new(BString::from("If no $event is passed in to Composer\\EventDispatcher\\EventDispatcher::dispatch you have to pass in an $eventName, got null.")).into()
                 })?;
-                let mut event = Event::new(name, Vec::new(), IndexMap::new());
+                let mut event = Event::new(name, Vec::new(), EventFlags::default());
                 self.do_dispatch(&mut event)
             }
             Some(event) => self.do_dispatch(event),
@@ -212,7 +211,7 @@ impl EventDispatcher {
         event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
-        flags: IndexMap<BString, PhpMixed>,
+        flags: EventFlags,
     ) -> anyhow::Result<i64> {
         if let Some(over) = &self.dispatch_script_override {
             return (over.0)(event_name, dev_mode, &additional_args, &flags);
@@ -506,7 +505,7 @@ impl EventDispatcher {
                             args = merged;
                         }
                         let mut flags = event.get_flags().clone();
-                        if flags.contains_key(B("script-alias-input")) {
+                        if let Some(script_alias_input) = &mut flags.script_alias_input {
                             let args_string = implode(
                                 " ",
                                 &script
@@ -514,16 +513,8 @@ impl EventDispatcher {
                                     .map(ProcessExecutor::escape)
                                     .collect::<Vec<_>>(),
                             );
-                            let existing = BString::from(
-                                flags
-                                    .get(B("script-alias-input"))
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or_default(),
-                            );
-                            flags.insert(
-                                "script-alias-input".into(),
-                                PhpMixed::string(bconcat!(args_string, " ", existing)),
-                            );
+                            *script_alias_input =
+                                bconcat!(args_string, " ", script_alias_input.as_bstr());
                         }
                         if strpos(callable_str, "@composer ") == Some(0) {
                             // COMPOSER_BINARY is a native executable, so it is run directly instead
@@ -565,7 +556,7 @@ impl EventDispatcher {
                                 .get_listeners(&Event::new(
                                     script_name.clone(),
                                     Vec::new(),
-                                    IndexMap::new(),
+                                    EventFlags::default(),
                                 ))
                                 .is_empty()
                             {
@@ -771,11 +762,8 @@ impl EventDispatcher {
                                 .map(ProcessExecutor::escape)
                                 .collect::<Vec<_>>(),
                         );
-                        let string_input = event
-                            .get_flags()
-                            .get(B("script-alias-input"))
-                            .and_then(|v| v.as_string().map(BString::from))
-                            .unwrap_or(args);
+                        let string_input =
+                            event.get_flags().script_alias_input.clone().unwrap_or(args);
                         let verbosity = if self.io.is_debug() {
                             output_interface::VERBOSITY_DEBUG
                         } else if self.io.is_very_verbose() {
@@ -1206,12 +1194,7 @@ try {
         }
 
         // do not output the command being run when using `composer <script-name>` as it is also fairly obvious the user is running it
-        if event
-            .get_flags()
-            .get(B("script-alias-input"))
-            .map(|v| !matches!(v, PhpMixed::Null))
-            .unwrap_or(false)
-        {
+        if event.get_flags().script_alias_input.is_some() {
             return false;
         }
 
@@ -1706,7 +1689,7 @@ pub(crate) fn dispatch_event_method(
                 .map(|arg| PluginValue::string(arg.clone()))
                 .collect(),
         )),
-        b"getFlags" => Ok(PhpMixed::Array(event.get_flags().clone()).to_wire()),
+        b"getFlags" => Ok(PhpMixed::Array(event.get_flags().to_php_array()).to_wire()),
         b"isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
         b"stopPropagation" => {
             event.stop_propagation();
@@ -1905,7 +1888,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
         event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
-        flags: IndexMap<BString, PhpMixed>,
+        flags: EventFlags,
     ) -> anyhow::Result<i64>;
     fn dispatch_installer_event(
         &mut self,
@@ -1934,7 +1917,7 @@ impl EventDispatcherInterface for EventDispatcher {
         event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
-        flags: IndexMap<BString, PhpMixed>,
+        flags: EventFlags,
     ) -> anyhow::Result<i64> {
         self.dispatch_script(event_name, dev_mode, additional_args, flags)
     }

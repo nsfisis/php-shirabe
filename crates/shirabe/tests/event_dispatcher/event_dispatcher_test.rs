@@ -13,7 +13,7 @@ use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
 use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::dependency_resolver::{AnyTransaction, Transaction};
-use shirabe::event_dispatcher::{Callable, EventDispatcher, EventInterface};
+use shirabe::event_dispatcher::{Callable, EventDispatcher, EventFlags, EventInterface};
 use shirabe::filter::PlatformRequirementFilterInterface;
 use shirabe::installer::{InstallationManagerInterface, InstallerEvents, InstallerInterface};
 use shirabe::io::buffer_io::BufferIO;
@@ -218,7 +218,7 @@ fn test_dispatcher_can_execute_single_command_line_script() {
                 ScriptEvents::POST_INSTALL_CMD,
                 false,
                 vec![],
-                IndexMap::new(),
+                EventFlags::default(),
             )
             .unwrap();
     }
@@ -261,7 +261,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
         io_dyn,
         false,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
     dispatcher
         .dispatch(Some("root".into()), Some(&mut event))
@@ -317,7 +317,7 @@ fn test_recursion_in_scripts_names() {
         io_dyn,
         false,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
     dispatcher
         .dispatch(Some("helloWorld".into()), Some(&mut event))
@@ -357,7 +357,7 @@ fn test_dispatcher_detect_infinite_recursion() {
         io,
         false,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
     let result = dispatcher.dispatch(Some("root".into()), Some(&mut event));
     let err = result.expect_err("infinite recursion must raise a RuntimeException");
@@ -423,7 +423,7 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
         null_io(),
         false,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
 
     assert!(!dispatcher.has_event_listeners(&event));
@@ -469,7 +469,7 @@ fn test_listener_exceptions_are_caught() {
         ScriptEvents::POST_INSTALL_CMD,
         false,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
 
     let e = result.expect_err("expected RuntimeException");
@@ -686,7 +686,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             null_io(),
             dev_mode,
             Vec::new(),
-            IndexMap::new(),
+            EventFlags::default(),
         );
 
         dispatcher
@@ -806,7 +806,7 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
             ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
-            IndexMap::new(),
+            EventFlags::default(),
         )
         .unwrap();
 
@@ -852,7 +852,7 @@ fn test_dispatcher_can_put_env() {
             ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
-            IndexMap::new(),
+            EventFlags::default(),
         )
         .unwrap();
 
@@ -910,7 +910,7 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
             ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
-            IndexMap::new(),
+            EventFlags::default(),
         )
         .unwrap();
     std::fs::remove_dir(php_test_dir.join("vendor/bin")).unwrap();
@@ -977,7 +977,7 @@ fn test_dispatcher_support_for_additional_args() {
             ScriptEvents::POST_INSTALL_CMD,
             false,
             vec!["ARG".into(), "ARG2".into(), "--arg".into()],
-            IndexMap::new(),
+            EventFlags::default(),
         )
         .unwrap();
 
@@ -1019,7 +1019,7 @@ fn test_dispatcher_outputs_command() {
             ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
-            IndexMap::new(),
+            EventFlags::default(),
         )
         .unwrap();
 
@@ -1059,7 +1059,7 @@ fn test_dispatcher_outputs_error_on_failed_command() {
         ScriptEvents::POST_INSTALL_CMD,
         false,
         vec![],
-        IndexMap::new(),
+        EventFlags::default(),
     );
 
     let e = result.expect_err("expected ScriptExecutionException");
@@ -1113,7 +1113,7 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
             ScriptEvents::POST_INSTALL_CMD,
             false,
             vec![],
-            IndexMap::new(),
+            EventFlags::default(),
         )
         .unwrap();
 

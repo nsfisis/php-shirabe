@@ -103,7 +103,7 @@ mod mock_event_dispatcher {
                 event_name: &bstr::BStr,
                 dev_mode: bool,
                 additional_args: Vec<bstr::BString>,
-                flags: IndexMap<BString, PhpMixed>,
+                flags: shirabe::event_dispatcher::EventFlags,
             ) -> anyhow::Result<i64>;
             fn dispatch_installer_event(
                 &mut self,

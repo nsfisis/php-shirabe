@@ -5,6 +5,7 @@ use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::event_dispatcher::EventFlags;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::archiver::ArchiveManagerInterface;
@@ -354,7 +355,7 @@ impl Command for ArchiveCommand {
                 ScriptEvents::PRE_ARCHIVE_CMD,
                 true,
                 vec![],
-                indexmap::IndexMap::new(),
+                EventFlags::default(),
             );
             config
         } else {
@@ -433,7 +434,7 @@ impl Command for ArchiveCommand {
                     ScriptEvents::POST_ARCHIVE_CMD,
                     true,
                     vec![],
-                    indexmap::IndexMap::new(),
+                    EventFlags::default(),
                 );
         }
 

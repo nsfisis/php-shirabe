@@ -173,7 +173,7 @@ impl EventDispatcherInterface for StubEventDispatcher {
         _event_name: &bstr::BStr,
         _dev_mode: bool,
         _additional_args: Vec<bstr::BString>,
-        _flags: IndexMap<BString, PhpMixed>,
+        _flags: shirabe::event_dispatcher::EventFlags,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
