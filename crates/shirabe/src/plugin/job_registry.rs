@@ -34,6 +34,12 @@ impl JobOwner {
     ) -> Self {
         Self(process.as_ptr() as usize)
     }
+
+    /// The same key as [`JobOwner::process_executor`], for code that only has the executor the
+    /// shared cell holds.
+    pub(crate) fn of_process_executor(process: &crate::util::ProcessExecutor) -> Self {
+        Self(process as *const crate::util::ProcessExecutor as usize)
+    }
 }
 
 /// A job the Rust side runs for a promise the worker holds.
@@ -64,9 +70,10 @@ struct Registry {
     php_jobs: IndexMap<u64, PhpJob>,
     /// The PHP-owned jobs a Rust future is parked on, in the order they parked.
     php_waiting: Vec<u64>,
-    /// Requests the Rust side started for itself. Their futures belong to whoever awaits them;
-    /// the entry only lets `abortJobs()` reach them.
-    internal_jobs: IndexMap<u64, (JobOwner, futures::future::AbortHandle)>,
+    /// Requests and processes the Rust side started for itself. Their futures belong to whoever
+    /// awaits them; the entry lets `Loop::wait()` count them and `abortJobs()` reach the ones that
+    /// carry an abort handle.
+    internal_jobs: IndexMap<u64, (JobOwner, Option<futures::future::AbortHandle>)>,
     next_internal_id: u64,
     /// Bumped by every pass over the job table, so a pass can tell that another one ran inside
     /// it and re-registered the wakers it had left behind.
@@ -116,6 +123,20 @@ pub(crate) fn count(owner: JobOwner) -> i64 {
             .filter(|job| job.owner == owner && job.future.is_some())
             .count() as i64
     })
+}
+
+/// How many jobs are active on `owner`, counting the ones the Rust side started for itself along
+/// with the ones plugin code started: what Composer's `countActiveJobs()` reports to `Loop::wait()`.
+pub(crate) fn count_active_jobs(owner: JobOwner) -> i64 {
+    let internal = REGISTRY.with(|registry| {
+        registry
+            .borrow()
+            .internal_jobs
+            .values()
+            .filter(|(job_owner, _)| *job_owner == owner)
+            .count() as i64
+    });
+    count(owner) + internal
 }
 
 fn has_jobs(owners: &[JobOwner]) -> bool {
@@ -262,11 +283,12 @@ pub(crate) fn cancel(id: u64) -> Option<PhpThrow> {
     job.started.get().then_some(job.canceled)
 }
 
-/// Records a request the Rust side started for itself. The entry lives as long as the returned
-/// guard, which the request's future holds until it settles.
+/// Records a request or a process the Rust side started for itself. The entry lives as long as
+/// the returned guard, which the job's future holds until it settles. Only an entry with an abort
+/// handle is cancelled by `abortJobs()`.
 pub(crate) fn record_internal_job(
     owner: JobOwner,
-    abort_handle: futures::future::AbortHandle,
+    abort_handle: Option<futures::future::AbortHandle>,
 ) -> InternalJobGuard {
     REGISTRY.with(|registry| {
         let mut registry = registry.borrow_mut();
@@ -297,7 +319,7 @@ pub(crate) fn abort_internal_jobs(owners: Option<&[JobOwner]>) {
             .internal_jobs
             .values()
             .filter(|(owner, _)| owners.is_none_or(|owners| owners.contains(owner)))
-            .map(|(_, handle)| handle.clone())
+            .filter_map(|(_, handle)| handle.clone())
             .collect()
     });
     for handle in handles {

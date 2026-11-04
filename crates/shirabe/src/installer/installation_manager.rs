@@ -955,46 +955,44 @@ impl InstallationManager {
         }
     }
 
-    /// PHP: waitOnPromises() creates a ProgressBar up front and Loop::wait advances it while the
-    /// concurrent promises resolve.
-    /// TODO(async): Loop::wait does not advance the bar it is handed (PHP sets it from the two
-    /// services' `countActiveJobs()` on every pass), so a single 0% -> 100% jump is rendered after
-    /// the wait instead of PHP's timing-driven intermediate snapshots.
     async fn wait_on_promises<'p>(
         &self,
         promises: Vec<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + 'p>>,
         >,
     ) -> anyhow::Result<()> {
-        let promise_count = promises.len() as i64;
-        let show_progress = self.output_progress
+        let mut progress = None;
+        if self.output_progress
             && !Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0")
             && !self.io.is_debug()
-            && promise_count > 1;
-
-        let result = self.loop_.borrow().wait(promises, None).await;
-
-        if result.is_ok() && show_progress {
-            let bar = {
-                let io_ref = self.io.borrow();
-                io_ref
-                    .as_any()
-                    .downcast_ref::<ConsoleIO>()
-                    .map(|console_io| console_io.get_progress_bar(promise_count))
-            };
-            if let Some(mut bar) = bar {
-                bar.start(Some(promise_count))?;
-                bar.set_progress(promise_count)?;
-                bar.finish()?;
-                bar.clear()?;
-                // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
-                if !self.io.is_decorated() {
-                    self.io.write_error("");
-                }
+            && promises.len() > 1
+        {
+            let io_ref = self.io.borrow();
+            // BufferIO extends ConsoleIO in PHP but is modeled as composition here.
+            progress = io_ref
+                .as_any()
+                .downcast_ref::<ConsoleIO>()
+                .or_else(|| {
+                    io_ref
+                        .as_any()
+                        .downcast_ref::<crate::io::buffer_io::BufferIO>()
+                        .map(|buffer_io| &buffer_io.inner)
+                })
+                .map(|console_io| console_io.get_progress_bar(0));
+        }
+        self.loop_
+            .borrow()
+            .wait(promises, progress.as_mut())
+            .await?;
+        if let Some(mut progress) = progress {
+            progress.clear()?;
+            // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
+            if !self.io.is_decorated() {
+                self.io.write_error("");
             }
         }
 
-        result
+        Ok(())
     }
 
     async fn run_cleanup(

@@ -591,7 +591,12 @@ impl ProcessExecutor {
     where
         C: IntoExecCommand,
     {
-        self.execute_async_job(command, cwd, None)
+        let owner = crate::plugin::job_registry::JobOwner::of_process_executor(self);
+        let job = self.execute_async_job(command, cwd, None);
+        Box::pin(async move {
+            let _recorded = crate::plugin::job_registry::record_internal_job(owner, None);
+            job.await
+        })
     }
 
     /// `execute_async` for a caller that registers the future as a job (see

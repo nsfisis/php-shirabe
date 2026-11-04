@@ -240,7 +240,7 @@ impl HttpDownloader {
         let (abort_handle, abort_registration) = futures::future::AbortHandle::new_pair();
         let _recorded = crate::plugin::job_registry::record_internal_job(
             crate::plugin::job_registry::JobOwner::of_http_downloader(self),
-            abort_handle,
+            Some(abort_handle),
         );
         let request = Self::download_with_native(
             self.semaphore.clone(),
