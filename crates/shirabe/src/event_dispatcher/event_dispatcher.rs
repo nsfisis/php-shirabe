@@ -1821,10 +1821,10 @@ pub(crate) fn dispatch_event_method(
         {
             Err(PhpThrow::runtime(bconcat!(
                 "the console ",
-                if method_name == "getInput" {
-                    "input"
-                } else {
-                    "output"
+                match method_name.as_bytes() {
+                    b"getInput" => "input",
+                    b"getOutput" => "output",
+                    _ => unreachable!(),
                 },
                 " of a command event is not available over RPC yet"
             )))

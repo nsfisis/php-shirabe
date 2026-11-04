@@ -460,11 +460,14 @@ fn dispatch_tick_method(
         None | Some(PluginValue::Null) => None,
         _ => Some(arg::<i64>(method_name, args, 0)? as u64),
     };
-    if method_name == "countActiveJobs" {
-        return Ok(PluginValue::Int(job_registry::tick(owner, cap, index)?));
+    match method_name.as_bytes() {
+        b"countActiveJobs" => Ok(PluginValue::Int(job_registry::tick(owner, cap, index)?)),
+        b"wait" => {
+            while job_registry::tick(owner, cap, index)? != 0 {}
+            Ok(PluginValue::Null)
+        }
+        _ => unreachable!(),
     }
-    while job_registry::tick(owner, cap, index)? != 0 {}
-    Ok(PluginValue::Null)
 }
 
 /// Serves a method call on an R-table entity, shared by every dispatcher: the child holds a
@@ -793,9 +796,10 @@ fn dispatch_property_access(
                 package.borrow_mut().as_package_interface_mut().set_id(id);
                 Ok(PluginValue::Null)
             }
-            _ => Err(PhpThrow::runtime(
+            b"__unset" => Err(PhpThrow::runtime(
                 "the package property `id` cannot be unset over RPC",
             )),
+            _ => unreachable!(),
         };
     }
     // TODO(plugin): the instance properties the proxied classes expose are widened on demand,
@@ -1187,13 +1191,14 @@ fn dispatch_download_manager_method(
     let future: std::pin::Pin<
         Box<dyn std::future::Future<Output = anyhow::Result<Option<PhpMixed>>>>,
     > = match method_name.as_bytes() {
-        b"setPreferSource" | b"setPreferDist" => {
+        b"setPreferSource" => {
             let preferred = arg::<bool>(method_name, args, 0)?;
-            if method_name == "setPreferSource" {
-                dm.borrow().set_prefer_source(preferred);
-            } else {
-                dm.borrow().set_prefer_dist(preferred);
-            }
+            dm.borrow().set_prefer_source(preferred);
+            return Ok(PluginValue::Null);
+        }
+        b"setPreferDist" => {
+            let preferred = arg::<bool>(method_name, args, 0)?;
+            dm.borrow().set_prefer_dist(preferred);
             return Ok(PluginValue::Null);
         }
         b"download" => {
@@ -1476,31 +1481,27 @@ fn dispatch_filesystem_method(
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        b"findShortestPath" | b"findShortestPathCode" => {
-            let from = path_arg(0)?;
-            let to = path_arg(1)?;
-            let fs = fs.borrow();
-            Ok(if method_name == "findShortestPath" {
-                fs.find_shortest_path(
-                    &from,
-                    &to,
-                    arg::<bool>(method_name, args, 2)?,
-                    arg::<bool>(method_name, args, 3)?,
-                )
-                .map_err(failed)?
-                .to_wire()
-            } else {
-                fs.find_shortest_path_code(
-                    &from,
-                    &to,
-                    arg::<bool>(method_name, args, 2)?,
-                    arg::<bool>(method_name, args, 3)?,
-                    arg::<bool>(method_name, args, 4)?,
-                )
-                .map_err(failed)?
-                .to_wire()
-            })
-        }
+        b"findShortestPath" => Ok(fs
+            .borrow()
+            .find_shortest_path(
+                &path_arg(0)?,
+                &path_arg(1)?,
+                arg::<bool>(method_name, args, 2)?,
+                arg::<bool>(method_name, args, 3)?,
+            )
+            .map_err(failed)?
+            .to_wire()),
+        b"findShortestPathCode" => Ok(fs
+            .borrow()
+            .find_shortest_path_code(
+                &path_arg(0)?,
+                &path_arg(1)?,
+                arg::<bool>(method_name, args, 2)?,
+                arg::<bool>(method_name, args, 3)?,
+                arg::<bool>(method_name, args, 4)?,
+            )
+            .map_err(failed)?
+            .to_wire()),
         b"isAbsolutePath" => Ok(fs.borrow().is_absolute_path(&path_arg(0)?).to_wire()),
         b"size" => Ok(fs.borrow().size(path_arg(0)?).map_err(failed)?.to_wire()),
         b"normalizePath" => Ok(fs.borrow().normalize_path(&path_arg(0)?).to_wire()),
@@ -1735,10 +1736,10 @@ fn dispatch_http_downloader_method(
         }
         b"add" | b"addCopy" => {
             let url = arg::<BString>(method_name, args, 0)?;
-            let (to, options_position) = if method_name == "add" {
-                (None, 1)
-            } else {
-                (Some(arg::<BString>(method_name, args, 1)?), 2)
+            let (to, options_position) = match method_name.as_bytes() {
+                b"add" => (None, 1),
+                b"addCopy" => (Some(arg::<BString>(method_name, args, 1)?), 2),
+                _ => unreachable!(),
             };
             let options = arg_or::<IndexMap<BString, PhpMixed>>(
                 method_name,
@@ -2083,10 +2084,10 @@ fn dispatch_repository_method(
                         "` cannot be called on it"
                     ))
                 })?;
-            let outcome = if method_name == "addPackage" {
-                writable.add_package(package)
-            } else {
-                writable.remove_package(package)
+            let outcome = match method_name.as_bytes() {
+                b"addPackage" => writable.add_package(package),
+                b"removePackage" => writable.remove_package(package),
+                _ => unreachable!(),
             };
             outcome
                 .map_err(|error| error_throw(bconcat!(method_name, " failed over RPC"), &error))?;
@@ -3051,11 +3052,13 @@ fn dispatch_installation_manager_method(
                 )));
             }
             let installer = php_installer_proxy(handle.clone());
-            if method_name == "addInstaller" {
-                im.borrow().add_installer(installer);
-            } else {
-                im.borrow().remove_installer(&*installer);
-                forget_php_installer_proxy(&handle);
+            match method_name.as_bytes() {
+                b"addInstaller" => im.borrow().add_installer(installer),
+                b"removeInstaller" => {
+                    im.borrow().remove_installer(&*installer);
+                    forget_php_installer_proxy(&handle);
+                }
+                _ => unreachable!(),
             }
             Ok(PluginValue::Null)
         }
@@ -3075,10 +3078,12 @@ fn dispatch_io_method(
             let (messages, newline, verbosity) = decode_write_args(method_name, args)?;
             let borrowed = io.borrow();
             for message in &messages {
-                if method_name == "write" {
-                    borrowed.write_bytes(message.as_bstr(), newline, verbosity);
-                } else {
-                    borrowed.write_error_bytes(message.as_bstr(), newline, verbosity);
+                match method_name.as_bytes() {
+                    b"write" => borrowed.write_bytes(message.as_bstr(), newline, verbosity),
+                    b"writeError" => {
+                        borrowed.write_error_bytes(message.as_bstr(), newline, verbosity)
+                    }
+                    _ => unreachable!(),
                 }
             }
             Ok(PluginValue::Null)
