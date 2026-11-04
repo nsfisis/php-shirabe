@@ -46,7 +46,7 @@ A Rust-owned class the child has no artifact for — every `unsupported` one, an
 every `rust-proxy`/`rust-snapshot` one whose stub is not written yet — is
 shadowed there by a generated *guard* class instead of the real Composer source:
 same FQCN, hierarchy and constants, every constructor and method an explicit
-error. See `docs/dev/plugin-stub-generation.md`.
+error. See [docs/dev/plugin-stub-generation.md](./plugin-stub-generation.md).
 
 #### rust-proxy
 
@@ -69,10 +69,10 @@ carries the object record `serialize()` writes for it, `unserialize()`
 revives a genuine instance of the real class without running a constructor,
 and getters answer locally with zero round-trips. Identity is not preserved
 — two calls of the same getter yield two objects in the child (see
-`docs/dev/php-rpc.md`). Only the classes on the codec's closed list cross
-this way today (`Link` and the `composer/semver` constraints it holds, and
-`Composer\Util\Http\Response`); the rest of the category has no artifact
-yet and is guarded.
+[docs/dev/php-rpc.md](./php-rpc.md)). Only the classes on the codec's closed
+list cross this way today (`Link` and the `composer/semver` constraints it
+holds, and `Composer\Util\Http\Response`); the rest of the category has no
+artifact yet and is guarded.
 
 `Response` is on the list by `overrides.list` entry rather than by the
 value-object rule, which rejects it because `collect()` assigns to `$this`.
@@ -173,7 +173,7 @@ ones — the run fails loudly until a human files it).
 
 A `needs-sync` static is not actually synced by copying it: the child holds no
 copy at all, because the stub forwards the accessors that read and write it
-(`__shirabe_call_static`, see `docs/dev/plugin-stub-generation.md`) where a
+(`__shirabe_call_static`, see [docs/dev/plugin-stub-generation.md](./plugin-stub-generation.md)) where a
 stub exists (`ProcessExecutor`); a `needs-sync` class without a stub is
 guarded. The disposition records that the state is shared, not the
 mechanism.
@@ -369,7 +369,7 @@ react/promise ships as real code while `PromiseInterface` is bridged.
 Three, all versioned next to the tool, all expected to stay short:
 
 * `two-world.list` — `Composer\Console\*`, `Composer\Command\*`,
-  symfony/console.
+  symfony/console, `Composer\Util\Loop` and `Composer\Util\SyncHelper`.
 * `static-state.list` — disposition per mutable-static class
   (`memo-cache` / `seed-once` / `needs-sync`); anything not listed fails
   the run.
@@ -405,16 +405,14 @@ reviewable outcome in the report, not a silent guess.
 
 ## Known deviations and open questions
 
-The mechanical rules surfaced several points where earlier design prose was
-incomplete or a decision is still owed. Some have been decided since, and
-this section records what the implementation does instead; the rest still
-need an explicit user decision, and the tool keeps them visible instead of
-resolving them silently.
+This section records the points where the mechanical rules alone do not
+settle how a class is served. For the decided ones it records what the
+implementation does; the others need an explicit maintainer decision, and
+the tool keeps them visible instead of resolving them silently.
 
 ### ProcessExecutor and HttpDownloader are reachable
 
-Earlier design analysis assumed no public getter returns a
-`ProcessExecutor`; it had checked `Composer.php`'s getters only. In fact
+No getter of `Composer` itself returns a `ProcessExecutor`, but
 `Composer::getLoop()` → `Loop::getProcessExecutor(): ?ProcessExecutor` /
 `Loop::getHttpDownloader(): HttpDownloader` make both reachable. The
 graph-owned `ProcessExecutor` instance must therefore be proxied (its job

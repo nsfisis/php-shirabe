@@ -3,8 +3,8 @@
 ## Purpose
 
 The plugin PHP worker resolves proxied Composer FQCNs to thin stub classes whose
-public methods forward to the Rust-side entity over RPC (see
-`docs/dev/php-worker.md`, "Proxy stubs, runtime classes and guards"). These stub files, committed under
+public methods forward to the Rust-side entity over RPC (see "Proxy stubs,
+runtime classes and guards" in [docs/dev/php-worker.md](./php-worker.md)). These stub files, committed under
 `crates/shirabe-php-rpc/php/stubs/` and embedded into the binary (the crate's
 `build.rs` embeds whatever the directory holds), are *generated* by
 `scripts/plugin-stub-generator` — never edited by hand. Generating them from the
@@ -35,10 +35,10 @@ Inputs:
   Growing the stub set means adding a line here and regenerating.
 * the hand-written classes under `crates/shirabe-php-rpc/php/runtime/` (their
   FQCNs derive from the file paths). These are hand-written implementations with
-  behavior of their own — two-world classes such as `Composer\Util\Loop` and
-  `Composer\Console\Application`, and dual-mode classes such as
-  `Composer\EventDispatcher\Event` that proxy when revived from a handle and run
-  natively when constructed in the worker — not mechanical proxies — so the generator never emits
+  behavior of their own, not mechanical proxies: two-world classes such as
+  `Composer\Util\Loop` and `Composer\Console\Application`, and dual-mode classes
+  such as `Composer\EventDispatcher\Event` that proxy when revived from a handle
+  and run natively when constructed in the worker. The generator never emits
   them, but it accepts them as base classes of generated stubs (computing the
   inherited surface from the real Composer class the runtime file mirrors) and
   fails if a `targets.list` entry would shadow one.
@@ -58,8 +58,9 @@ Inputs:
   and `Composer\Util\Http\Response`). An entry that needs no guard anyway
   fails the run.
 
-The freshness check for both sets runs in `cargo test` as
-`crates/shirabe-php-rpc/tests/generated_stubs.rs`; it fails when PHP, the
+The freshness check for both sets is the test
+`crates/shirabe-php-rpc/tests/generated_stubs.rs`
+(`cargo test -p shirabe-php-rpc --test generated_stubs`); it fails when PHP, the
 generator's vendor directory or the classifier report is unavailable. `just setup`
 installs both tools' dependencies and regenerates the report.
 
@@ -96,11 +97,11 @@ installs both tools' dependencies and regenerates the report.
   of a forward. `PartialComposer::getLoop()` is the one entry: `Composer\Util\Loop`
   is a `two-world` class the Rust side never hands out as an entity, so the stub
   answers with the worker-side Loop built over the proxied services
-  (`docs/dev/plugin-async.md`). An entry no stub declares fails generation.
+  ([docs/dev/plugin-async.md](./plugin-async.md)). An entry no stub declares fails generation.
 * **By-ref parameters** are declared `&$name` on the stub as well. The answer
   carries the value each of them holds afterwards, which the stub assigns back
-  (see "By-ref parameters" in `docs/dev/php-rpc.md`). A position the answer omits is left alone, so a
-  parameter the callee never assigned to keeps the value it had.
+  (see "By-ref parameters" in [docs/dev/php-rpc.md](./php-rpc.md)). A position
+  the answer omits is left alone, so a parameter the callee never assigned to keeps the value it had.
 * **Arity** is reproduced when — and only when — the real method body calls
   `func_num_args()`, in which case the stub trims the argument list to what the
   caller actually passed instead of sending the declared defaults. Sending them
@@ -187,4 +188,4 @@ Composer version bump.
 When a future Composer release adds a public member the emitter cannot handle,
 these assertions surface it at generation time; extending the emitter (or
 deciding the porting policy) is then an explicit step, mirroring the
-completeness stance of `docs/dev/plugin-class-classification.md`.
+completeness stance of [docs/dev/plugin-class-classification.md](./plugin-class-classification.md).
