@@ -368,16 +368,38 @@ pub struct CompiledPattern {
 static PATTERN_CACHE: LazyLock<Mutex<IndexMap<BString, Arc<CompiledPattern>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
+// Each thread also keeps its own entries: threads matching through a single `Regex` instance
+// contend on its search-cache pool (and on `PATTERN_CACHE` itself), which makes parallel matching
+// slower than matching on one thread. The thread that compiles a pattern uses the shared instance;
+// other threads clone it.
+thread_local! {
+    static THREAD_PATTERN_CACHE: std::cell::RefCell<IndexMap<BString, Arc<CompiledPattern>>> =
+        std::cell::RefCell::new(IndexMap::new());
+}
+
 fn compile_php_pattern(pattern: &[u8]) -> anyhow::Result<Arc<CompiledPattern>> {
-    if let Some(cached) = PATTERN_CACHE.lock().unwrap().get(pattern) {
-        return Ok(Arc::clone(cached));
+    if let Some(cached) = THREAD_PATTERN_CACHE.with_borrow(|cache| cache.get(pattern).cloned()) {
+        return Ok(cached);
     }
 
-    let compiled = Arc::new(compile_php_pattern_uncached(&byte_pattern_source(pattern))?);
-    PATTERN_CACHE
-        .lock()
-        .unwrap()
-        .insert(BString::from(pattern), Arc::clone(&compiled));
+    let shared = PATTERN_CACHE.lock().unwrap().get(pattern).cloned();
+    let compiled = match shared {
+        Some(shared) => Arc::new(CompiledPattern {
+            regex: shared.regex.clone(),
+            utf8: shared.utf8,
+        }),
+        None => {
+            let compiled = Arc::new(compile_php_pattern_uncached(&byte_pattern_source(pattern))?);
+            PATTERN_CACHE
+                .lock()
+                .unwrap()
+                .insert(BString::from(pattern), Arc::clone(&compiled));
+            compiled
+        }
+    };
+    THREAD_PATTERN_CACHE.with_borrow_mut(|cache| {
+        cache.insert(BString::from(pattern), Arc::clone(&compiled));
+    });
     Ok(compiled)
 }
 

@@ -2367,6 +2367,7 @@ dependencies = [
  "shirabe-php-rpc",
  "shirabe-php-shim",
  "shirabe-symfony-finder",
+ "tempfile",
 ]
 
 [[package]]

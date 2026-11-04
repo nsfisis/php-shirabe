@@ -19,6 +19,7 @@ pub struct ClassMapGenerator {
     scanned_files: Option<FileList>,
     class_map: ClassMap,
     stream_wrappers_regex: BString,
+    max_parse_threads: Option<usize>,
 }
 
 impl ClassMapGenerator {
@@ -34,6 +35,7 @@ impl ClassMapGenerator {
             scanned_files: None,
             class_map: ClassMap::new(),
             stream_wrappers_regex,
+            max_parse_threads: None,
         }
     }
 
@@ -45,6 +47,12 @@ impl ClassMapGenerator {
     pub fn avoid_duplicate_scans(&mut self, scanned_files: Option<FileList>) -> &mut Self {
         self.scanned_files = Some(scanned_files.unwrap_or_default());
         self
+    }
+
+    /// For testing only. Caps the number of threads `scan_paths()` parses files on; `1` parses
+    /// every file sequentially.
+    pub fn __set_max_parse_threads(&mut self, max_parse_threads: usize) {
+        self.max_parse_threads = Some(max_parse_threads);
     }
 
     /// Iterate over all files in the given directory searching for classes
@@ -129,6 +137,12 @@ impl ClassMapGenerator {
             &realpath(Self::get_cwd()?).unwrap_or_default(),
         ));
 
+        // PHP prepares, parses and records one file at a time. Here the files are prepared in input
+        // order, parsed on worker threads, and then recorded in input order, so the class map, the
+        // warnings and the first reported error are the same. Preparation stops at the first
+        // failure, which is reported once every file before it has been recorded.
+        let mut candidates: Vec<(BString, BString)> = vec![];
+        let mut preparation_error: Option<anyhow::Error> = None;
         for file in files {
             let mut file_path = file.clone();
             let ext = pathinfo(&file_path, PATHINFO_EXTENSION);
@@ -156,9 +170,9 @@ impl ClassMapGenerator {
             }
 
             if file_path.is_empty() {
-                return Err(
-                    LogicException::new(bconcat!("Got an empty $filePath for ", file)).into(),
-                );
+                preparation_error =
+                    Some(LogicException::new(bconcat!("Got an empty $filePath for ", file)).into());
+                break;
             }
 
             let real_path = if is_stream_wrapper_path {
@@ -167,12 +181,15 @@ impl ClassMapGenerator {
                 match realpath(path_from_bytes(&file_path)) {
                     Some(p) => BString::from(path_to_bytes(&p)),
                     None => {
-                        return Err(RuntimeException::new(bconcat!(
-                            "realpath of ",
-                            file_path,
-                            " failed to resolve, got false"
-                        ))
-                        .into());
+                        preparation_error = Some(
+                            RuntimeException::new(bconcat!(
+                                "realpath of ",
+                                file_path,
+                                " failed to resolve, got false"
+                            ))
+                            .into(),
+                        );
+                        break;
                     }
                 }
             };
@@ -196,7 +213,23 @@ impl ClassMapGenerator {
                 }
             }
 
-            let classes = PhpFileParser::find_classes(file_path.as_bstr())?;
+            candidates.push((file_path, real_path));
+        }
+
+        let mut parsed = self.find_classes_in_parallel(&candidates);
+
+        for (index, (file_path, real_path)) in candidates.into_iter().enumerate() {
+            // An earlier candidate of this call may have resolved to the same real path.
+            if let Some(ref scanned_files) = self.scanned_files
+                && scanned_files.contains(&real_path)
+            {
+                continue;
+            }
+
+            let classes = match parsed.get_mut(index).and_then(Option::take) {
+                Some(classes) => classes?,
+                None => PhpFileParser::find_classes(file_path.as_bstr())?,
+            };
             let effective_classes = if autoload_type != "classmap" && namespace.is_some() {
                 let filtered = self.filter_by_namespace(
                     classes,
@@ -231,7 +264,65 @@ impl ClassMapGenerator {
             }
         }
 
-        Ok(())
+        match preparation_error {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
+    }
+
+    /// Runs `PhpFileParser::find_classes()` for the given candidates on worker threads. Entries
+    /// are in candidate order; `None` entries are parsed by the caller in its sequential loop.
+    fn find_classes_in_parallel(
+        &self,
+        candidates: &[(BString, BString)],
+    ) -> Vec<Option<anyhow::Result<Vec<BString>>>> {
+        // TODO(perf): parsing stops scaling at a few threads, and one thread per logical CPU is
+        // slower than this cap.
+        let thread_count = self
+            .max_parse_threads
+            .unwrap_or_else(|| {
+                std::thread::available_parallelism()
+                    .map_or(1, std::num::NonZeroUsize::get)
+                    .min(4)
+            })
+            .min(candidates.len());
+        // The PHP version lookup behind the extra types talks to the PHP runtime, so it runs on
+        // this thread before any worker starts. If it fails, every file is parsed sequentially so
+        // that the failure is reported for the first file PHP would parse.
+        if thread_count < 2 || PhpFileParser::get_extra_types().is_err() {
+            return vec![];
+        }
+
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let mut parsed: Vec<Option<anyhow::Result<Vec<BString>>>> = std::iter::repeat_with(|| None)
+            .take(candidates.len())
+            .collect();
+        std::thread::scope(|scope| {
+            let workers: Vec<_> = (0..thread_count)
+                .map(|_| {
+                    scope.spawn(|| {
+                        let mut results = vec![];
+                        loop {
+                            let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let Some((file_path, _)) = candidates.get(index) else {
+                                break;
+                            };
+                            results.push((index, PhpFileParser::find_classes(file_path.as_bstr())));
+                        }
+                        results
+                    })
+                })
+                .collect();
+            for worker in workers {
+                let results = worker
+                    .join()
+                    .unwrap_or_else(|payload| std::panic::resume_unwind(payload));
+                for (index, result) in results {
+                    parsed[index] = Some(result);
+                }
+            }
+        });
+        parsed
     }
 
     /// Remove classes which could not have been loaded by namespace autoloaders

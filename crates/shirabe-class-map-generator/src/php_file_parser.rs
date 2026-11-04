@@ -143,7 +143,7 @@ impl PhpFileParser {
         Ok(classes)
     }
 
-    fn get_extra_types() -> anyhow::Result<&'static BStr> {
+    pub(crate) fn get_extra_types() -> anyhow::Result<&'static BStr> {
         static EXTRA_TYPES: OnceLock<BString> = OnceLock::new();
         if let Some(extra_types) = EXTRA_TYPES.get() {
             return Ok(extra_types.as_bstr());
