@@ -1968,8 +1968,7 @@ fn is_php_callable(value: &PluginValue) -> anyhow::Result<bool> {
         PluginValue::String(_)
         | PluginValue::List(_)
         | PluginValue::Array(_)
-        | PluginValue::PhpHandle(_)
-        | PluginValue::PhpClass(_) => {
+        | PluginValue::PhpHandle(_) => {
             let answer = unwrap_php_result(call_function_with_dispatcher(
                 "is_callable",
                 vec![value.clone()],

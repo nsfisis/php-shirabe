@@ -7,7 +7,7 @@ pub mod session;
 pub mod value;
 pub mod xdebug;
 
-pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
+pub use value::{PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
 
 use bstr::{B, BStr, BString, ByteSlice};
 use frame::Frame;

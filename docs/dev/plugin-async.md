@@ -61,9 +61,9 @@ Six rules follow.
 
 The additions to [docs/dev/php-rpc.md](./php-rpc.md) are small, deliberately. There is no new frame tag and no new message direction.
 
-### A fourth descriptor kind
+### A third descriptor kind
 
-Alongside `{__rhandle, …}`, `{__phandle, …}` and `{__pclass}`, a job travels as a reserved single-key array.
+Alongside `{__rhandle, …}` and `{__phandle, …}`, a job travels as a reserved single-key array.
 
 ```
 {__job: <int>}

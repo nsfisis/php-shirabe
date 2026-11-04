@@ -28,12 +28,6 @@ pub struct PhpObjHandle {
     pub implements: Vec<BString>,
 }
 
-/// A PHP class (not an instance), identified by its fully qualified name.
-#[derive(Debug, Clone, PartialEq)]
-pub struct PhpClassHandle {
-    pub class: BString,
-}
-
 /// The `O:` record of a serialized PHP object: a class name and a property table, with the
 /// property names carrying PHP's visibility mangling (hence the accessors below rather than
 /// bare names).
@@ -126,7 +120,6 @@ pub enum PluginValue {
     PhpObject(PhpObject),
     RustHandle(RustObjHandle),
     PhpHandle(PhpObjHandle),
-    PhpClass(PhpClassHandle),
     /// A job in the registry both sides hold an entry for (see `docs/dev/plugin-async.md`). The
     /// Rust side allocates odd ids, the worker even ones.
     Job(u64),
@@ -184,7 +177,6 @@ impl PluginValue {
             PluginValue::PhpObject(_)
             | PluginValue::RustHandle(_)
             | PluginValue::PhpHandle(_)
-            | PluginValue::PhpClass(_)
             | PluginValue::Job(_) => {
                 bail!(
                     "an object record or handle descriptor cannot be represented as PhpMixed: {self:?}"
@@ -202,7 +194,6 @@ const RUST_HANDLE_KEY: &[u8] = b"__rhandle";
 const CLASS_KEY: &[u8] = b"__class";
 const PHP_HANDLE_KEY: &[u8] = b"__phandle";
 const IMPLEMENTS_KEY: &[u8] = b"__implements";
-const PHP_CLASS_KEY: &[u8] = b"__pclass";
 const JOB_KEY: &[u8] = b"__job";
 
 /// Encodes a `PluginValue` in PHP `serialize()` grammar, byte-compatible with what the PHP core
@@ -290,14 +281,6 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
                         .map(|name| PluginValue::string(name.clone()))
                         .collect(),
                 ),
-            );
-            serialize_map(&map, out);
-        }
-        PluginValue::PhpClass(handle) => {
-            let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
-            map.insert(
-                PHP_CLASS_KEY.into(),
-                PluginValue::string(handle.class.clone()),
             );
             serialize_map(&map, out);
         }
@@ -633,14 +616,6 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
     let get = |key: &[u8]| entries.get(key);
 
     if entries.len() == 1 {
-        if let Some(value) = get(PHP_CLASS_KEY) {
-            let PluginValue::String(class) = value else {
-                bail!("__pclass descriptor with a non-string class: {value:?}");
-            };
-            return Ok(Some(PluginValue::PhpClass(PhpClassHandle {
-                class: class.clone(),
-            })));
-        }
         if let Some(value) = get(JOB_KEY) {
             let PluginValue::Int(id) = value else {
                 bail!("__job descriptor with a non-int id: {value:?}");
@@ -914,9 +889,6 @@ mod tests {
             class: b"Caf\xe9".into(),
             implements: vec![b"Plugin\xff".into()],
         }));
-        roundtrip(PluginValue::PhpClass(PhpClassHandle {
-            class: b"Caf\xe9".into(),
-        }));
     }
 
     #[test]
@@ -929,9 +901,6 @@ mod tests {
             phandle: 8,
             class: "MyPlugin".into(),
             implements: vec!["Composer\\Plugin\\PluginInterface".into()],
-        }));
-        roundtrip(PluginValue::PhpClass(PhpClassHandle {
-            class: "MyPlugin".into(),
         }));
         roundtrip(PluginValue::Job(7));
     }
@@ -983,7 +952,7 @@ mod tests {
         let value = PluginValue::from_php_mixed(&mixed);
         assert_eq!(value.to_php_mixed().unwrap(), mixed);
 
-        let handle = PluginValue::PhpClass(PhpClassHandle { class: "X".into() });
+        let handle = PluginValue::Job(1);
         assert!(handle.to_php_mixed().is_err());
     }
 }

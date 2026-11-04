@@ -66,12 +66,11 @@ Payloads are encoded with a Rust reimplementation of the PHP `serialize()` gramm
 (`src/value.rs`), byte-compatible with the PHP core implementation under
 `serialize_precision=-1` (the float formatting itself is ported in `shirabe-php-src`). The value
 model is `PluginValue`: PHP scalars, byte strings (`Vec<u8>` — non-UTF-8 round-trips
-losslessly), lists, ordered maps, object records, and four descriptor kinds encoded as reserved
+losslessly), lists, ordered maps, object records, and three descriptor kinds encoded as reserved
 arrays:
 
 - `{__rhandle, __class}` — entity lives on the Rust side
 - `{__phandle, __class, __implements}` — entity lives in the PHP child
-- `{__pclass}` — a PHP class name
 - `{__job}` — an asynchronous job, an entity in neither table. The Rust side allocates odd job
   ids, the PHP side even ones. See "Jobs" below.
 

@@ -431,11 +431,11 @@ final class ShirabeRpcRuntime
      * materialized value arrives as a real instance already, revived by unserialize().
      *
      * TODO(type-model): a descriptor travels in-band as a plain array, so its exact key set is
-     * the only thing separating it from plugin data of the same shape. Every check below except
-     * __pclass matches on the reserved key alone, so an array a plugin built with a __rhandle or
+     * the only thing separating it from plugin data of the same shape. The __rhandle and __phandle
+     * checks below match on the reserved key alone, so an array a plugin built with a __rhandle or
      * __phandle key of its own is read as a handle rather than kept as data. The Rust half
      * (`decode_handle` in `src/value.rs`) matches the whole key set, and diverges the other way.
-     * __pclass and __job are single-key descriptors and match on that.
+     * __job is a single-key descriptor and matches on that.
      */
     public static function fromWire($value)
     {
@@ -450,9 +450,6 @@ final class ShirabeRpcRuntime
         }
         if (isset($value['__phandle'])) {
             return ShirabePhpObjectRegistry::get((int) $value['__phandle']);
-        }
-        if (isset($value['__pclass']) && count($value) === 1) {
-            return $value['__pclass'];
         }
         if (isset($value['__job']) && count($value) === 1) {
             return ShirabeJobRegistry::promiseFor((int) $value['__job']);
