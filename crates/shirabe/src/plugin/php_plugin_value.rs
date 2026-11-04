@@ -30,9 +30,6 @@ const CONSTRAINT_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\Constrai
 const MULTI_CONSTRAINT_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\MultiConstraint");
 const MATCH_ALL_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\MatchAllConstraint");
 const MATCH_NONE_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\MatchNoneConstraint");
-fn throw(message: impl Into<BString>) -> PhpThrow {
-    PhpThrow::runtime(message)
-}
 
 fn as_object(value: &PluginValue) -> Option<&PhpObject> {
     match value {
@@ -106,7 +103,7 @@ fn constraint_to_wire(constraint: &AnyConstraint) -> PluginValue {
 
 fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
-        throw(bconcat!(
+        PhpThrow::runtime(bconcat!(
             "expected a semver constraint from the plugin, got ",
             display_to_bytes(format_args!("{value:?}"))
         ))
@@ -120,7 +117,7 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
         class if class == CONSTRAINT_CLASS => {
             let code: i64 = property("a semver constraint operator", object.protected("operator"))?;
             let operator = SimpleConstraint::from_operator_constant(code).ok_or_else(|| {
-                throw(bconcat!(
+                PhpThrow::runtime(bconcat!(
                     "a semver constraint has an unknown operator: ",
                     code
                 ))
@@ -143,14 +140,16 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
                     .map(constraint_from_wire)
                     .collect::<Result<Vec<_>, _>>()?,
                 other => {
-                    return Err(throw(bconcat!(
+                    return Err(PhpThrow::runtime(bconcat!(
                         "a MultiConstraint expects a list of constraints, got ",
                         display_to_bytes(format_args!("{other:?}"))
                     )));
                 }
             };
             if constraints.len() < 2 {
-                return Err(throw("a MultiConstraint needs at least two constraints"));
+                return Err(PhpThrow::runtime(
+                    "a MultiConstraint needs at least two constraints",
+                ));
             }
             let conjunctive = property(
                 "a MultiConstraint conjunctive flag",
@@ -171,7 +170,7 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
         // TODO(plugin): a plugin-defined ConstraintInterface implementation has no Rust
         // counterpart; the four composer/semver classes are the whole vocabulary here.
         other => {
-            return Err(throw(bconcat!(
+            return Err(PhpThrow::runtime(bconcat!(
                 "the semver constraint class `",
                 other,
                 "` cannot cross the plugin boundary"
@@ -277,7 +276,7 @@ pub(crate) fn link_to_wire(link: &Link) -> PluginValue {
 
 pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
-        throw(bconcat!(
+        PhpThrow::runtime(bconcat!(
             "expected a Link from the plugin, got ",
             display_to_bytes(format_args!("{value:?}"))
         ))
@@ -285,7 +284,7 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     if object.class != LINK_CLASS {
         // TODO(plugin): Link subclasses have no Rust counterpart; the port models links as a
         // single value type.
-        return Err(throw(bconcat!(
+        return Err(PhpThrow::runtime(bconcat!(
             "the class `",
             object.class,
             "` cannot cross the plugin boundary as a Link"
@@ -294,7 +293,7 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     let constraint = constraint_from_wire(
         object
             .protected("constraint")
-            .ok_or_else(|| throw("a Link expects a constraint"))?,
+            .ok_or_else(|| PhpThrow::runtime("a Link expects a constraint"))?,
     )?;
     // TODO(plugin): PHP's Link leaves $prettyConstraint nullable and throws from
     // getPrettyConstraint() when it was never given, but this port stores a string, so a link

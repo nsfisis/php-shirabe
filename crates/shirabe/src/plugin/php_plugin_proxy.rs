@@ -214,7 +214,7 @@ fn repository_stub_class(
     } else {
         // TODO(plugin): the remaining repository classes get stubs on demand, driven by
         // explicit errors from real plugins.
-        Err(runtime_throw(
+        Err(PhpThrow::runtime(
             "no proxy stub class is available for this repository over RPC yet",
         ))
     }
@@ -364,7 +364,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
                     input_line.as_ref(),
                 ) {
                     Ok(code) => Ok(code.to_wire()),
-                    Err(e) => Err(runtime_throw(bconcat!(error_chain_message(&e)))),
+                    Err(e) => Err(PhpThrow::runtime(bconcat!(error_chain_message(&e)))),
                 };
             }
             if method_name == "__shirabeConstruct" {
@@ -376,7 +376,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             if let Some(answer) = dispatch_job_service_method(method_name, &args) {
                 return answer;
             }
-            return Err(runtime_throw(bconcat!(
+            return Err(PhpThrow::runtime(bconcat!(
                 "unknown runtime service method `",
                 method_name,
                 "`"
@@ -476,7 +476,7 @@ pub(crate) fn dispatch_r_table_method(
     if method_name == "__shirabeClone" {
         return match entity {
             Some(entity) => clone_entity(&entity),
-            None => Err(runtime_throw(bconcat!("unknown Rust handle ", rhandle))),
+            None => Err(PhpThrow::runtime(bconcat!("unknown Rust handle ", rhandle))),
         };
     }
     if matches!(
@@ -485,7 +485,7 @@ pub(crate) fn dispatch_r_table_method(
     ) {
         return match entity {
             Some(entity) => dispatch_property_access(&entity, method_name, args),
-            None => Err(runtime_throw(bconcat!("unknown Rust handle ", rhandle))),
+            None => Err(PhpThrow::runtime(bconcat!("unknown Rust handle ", rhandle))),
         };
     }
     match entity {
@@ -527,7 +527,7 @@ pub(crate) fn dispatch_r_table_method(
             dispatch_http_downloader_method(&downloader, method_name, args)
         }
         Some(RustEntity::Process(process)) => dispatch_process_method(&process, method_name),
-        None => Err(runtime_throw(bconcat!("unknown Rust handle ", rhandle))),
+        None => Err(PhpThrow::runtime(bconcat!("unknown Rust handle ", rhandle))),
     }
 }
 
@@ -545,7 +545,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             (class, &Vec::new())
         }
         other => {
-            return Err(runtime_throw(bconcat!(
+            return Err(PhpThrow::runtime(bconcat!(
                 "__shirabeConstruct expects a class name and an argument list, got ",
                 display_to_bytes(format_args!("{other:?}"))
             )));
@@ -574,7 +574,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
             package_arg(position)?
                 .as_alias()
-                .ok_or_else(|| runtime_throw(bconcat!(class_name, " expects an AliasPackage")))
+                .ok_or_else(|| PhpThrow::runtime(bconcat!(class_name, " expects an AliasPackage")))
         };
     let package = match class.as_slice() {
         b"Composer\\Package\\Package" => AnyPackage::Package(crate::package::Package::new(
@@ -589,7 +589,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // an alias has no Rust representation, so its narrowing is an explicit error too.
         b"Composer\\Package\\AliasPackage" => {
             let alias_of = package_arg(0)?.as_package().ok_or_else(|| {
-                runtime_throw(bconcat!(class_name, " expects a real Package to alias"))
+                PhpThrow::runtime(bconcat!(class_name, " expects a real Package to alias"))
             })?;
             AnyPackage::AliasPackage(crate::package::AliasPackage::new(
                 alias_of,
@@ -599,7 +599,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
         b"Composer\\Package\\CompleteAliasPackage" => {
             let alias_of = package_arg(0)?.as_complete_package().ok_or_else(|| {
-                runtime_throw(bconcat!(
+                PhpThrow::runtime(bconcat!(
                     class_name,
                     " expects a real CompletePackage to alias"
                 ))
@@ -612,7 +612,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
         b"Composer\\Package\\RootAliasPackage" => {
             let alias_of = package_arg(0)?.as_root_package().ok_or_else(|| {
-                runtime_throw(bconcat!(class_name, " expects a real RootPackage to alias"))
+                PhpThrow::runtime(bconcat!(class_name, " expects a real RootPackage to alias"))
             })?;
             AnyPackage::RootAliasPackage(crate::package::RootAliasPackage::new(
                 alias_of,
@@ -708,7 +708,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // plugin-built instance means for the Rust-side graph, which is why none of them is
         // answered generically here.
         _ => {
-            return Err(runtime_throw(bconcat!(
+            return Err(PhpThrow::runtime(bconcat!(
                 "Shirabe does not support constructing ",
                 class_name,
                 " inside the plugin process yet"
@@ -762,7 +762,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::ProcessExecutor(_)
         | RustEntity::HttpDownloader(_)
         | RustEntity::Process(_) => {
-            return Err(runtime_throw(
+            return Err(PhpThrow::runtime(
                 "cloning this Rust-side entity over RPC is not supported",
             ));
         }
@@ -789,7 +789,7 @@ fn dispatch_property_access(
                 package.borrow_mut().as_package_interface_mut().set_id(id);
                 Ok(PluginValue::Null)
             }
-            _ => Err(runtime_throw(
+            _ => Err(PhpThrow::runtime(
                 "the package property `id` cannot be unset over RPC",
             )),
         };
@@ -797,7 +797,7 @@ fn dispatch_property_access(
     // TODO(plugin): the instance properties the proxied classes expose are widened on demand,
     // driven by these explicit errors from real plugins. Each one has to decide how the state
     // the real class keeps in that property is served from the Rust-side entity.
-    Err(runtime_throw(bconcat!(
+    Err(PhpThrow::runtime(bconcat!(
         "the property `",
         property,
         "` is not available over RPC yet"
@@ -812,7 +812,7 @@ fn dispatch_plugin_method(
         b"getCapabilities" => {
             let plugin = plugin.borrow();
             let capable = plugin.as_capable().ok_or_else(|| {
-                runtime_throw(bconcat!(
+                PhpThrow::runtime(bconcat!(
                     "plugin ",
                     plugin.get_class_name(),
                     " does not implement Capable"
@@ -826,11 +826,7 @@ fn dispatch_plugin_method(
         // TODO(plugin): the lifecycle methods would have to turn the `$composer`/`$io` stubs the
         // child passes back into the Rust handles they stand for; nothing calls them, because
         // Composer activates a Rust-implemented plugin on the Rust side.
-        other => Err(runtime_throw(bconcat!(
-            "the plugin method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("plugin", other)),
     }
 }
 
@@ -911,11 +907,7 @@ fn dispatch_composer_method(
         }
         // TODO(plugin): the remaining Composer object graph (getPluginManager, ...)
         // becomes reachable over RPC on demand, driven by explicit errors from real plugins.
-        other => Err(runtime_throw(bconcat!(
-            "the Composer method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("Composer", other)),
     }
 }
 
@@ -984,7 +976,7 @@ fn dispatch_autoload_generator_method(
                     locker,
                     strict_ambiguous,
                 )
-                .map_err(|error| error_throw(b"dump failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"dump failed", &error))?;
             return Ok(class_map_to_wire(&class_map));
         }
         b"buildPackageMap" => {
@@ -998,7 +990,7 @@ fn dispatch_autoload_generator_method(
             let package_map = generator
                 .borrow()
                 .build_package_map(installation_manager, root_package, packages)
-                .map_err(|error| error_throw(b"buildPackageMap failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"buildPackageMap failed", &error))?;
             return Ok(package_map_value(package_map));
         }
         b"parseAutoloads" => {
@@ -1017,24 +1009,20 @@ fn dispatch_autoload_generator_method(
             let loader = generator
                 .borrow()
                 .create_loader(&autoloads, vendor_dir.clone())
-                .map_err(|error| error_throw(b"createLoader failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"createLoader failed", &error))?;
             return class_loader_to_php(&loader, vendor_dir)
-                .map_err(|error| error_throw(b"createLoader failed over RPC", &error));
+                .map_err(|error| error_throw(b"createLoader failed", &error));
         }
         // TODO(plugin): no PlatformRequirementFilterInterface implementation crosses the boundary:
         // the factory's filters are guarded in the worker, and a plugin-implemented filter has no
         // Rust-side adapter.
         b"setPlatformRequirementFilter" => {
-            return Err(runtime_throw(
+            return Err(PhpThrow::runtime(
                 "AutoloadGenerator::setPlatformRequirementFilter() cannot take a filter over RPC yet",
             ));
         }
         other => {
-            return Err(runtime_throw(bconcat!(
-                "the AutoloadGenerator method `",
-                other,
-                "` is not available over RPC yet"
-            )));
+            return Err(unavailable_method("AutoloadGenerator", other));
         }
     }
     Ok(PluginValue::Null)
@@ -1143,14 +1131,14 @@ fn dispatch_config_method(
             let value = config
                 .borrow()
                 .get_with_flags(&key(0)?, flags(1)?)
-                .map_err(|error| error_throw(b"get failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"get failed", &error))?;
             Ok(value.to_wire())
         }
         b"all" => {
             let all = config
                 .borrow_mut()
                 .all(flags(0)?)
-                .map_err(|error| error_throw(b"all failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"all failed", &error))?;
             Ok(all.to_wire())
         }
         b"raw" => Ok(config.borrow().raw().to_wire()),
@@ -1172,11 +1160,7 @@ fn dispatch_config_method(
         // needs proxy stubs for ConfigSourceInterface implementations, and prohibitUrlByConfig
         // needs the IO argument decoded back into the Rust-side instance; both are widened on
         // demand, driven by explicit errors from real plugins.
-        other => Err(runtime_throw(bconcat!(
-            "the Config method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("Config", other)),
     }
 }
 
@@ -1262,11 +1246,7 @@ fn dispatch_download_manager_method(
         // getDownloaderForPackage / getDownloaderType) needs proxy stubs for
         // DownloaderInterface implementations before it can cross.
         other => {
-            return Err(runtime_throw(bconcat!(
-                "the DownloadManager method `",
-                other,
-                "` is not available over RPC yet"
-            )));
+            return Err(unavailable_method("DownloadManager", other));
         }
     };
 
@@ -1322,7 +1302,7 @@ fn graph_http_downloader(
             return Ok(composer.get_loop().borrow().get_http_downloader().clone());
         }
     }
-    Err(runtime_throw(
+    Err(PhpThrow::runtime(
         "this DownloadManager belongs to no Composer instance the plugin process holds",
     ))
 }
@@ -1334,7 +1314,7 @@ fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
     match PhpCall::Function(BStr::new("__shirabe_resolved_promise")).try_run(vec![value]) {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(runtime_throw(bconcat!(
+        Err(error) => Err(PhpThrow::runtime(bconcat!(
             "creating a resolved promise in the plugin process failed: ",
             error_chain_message(&error)
         ))),
@@ -1349,7 +1329,7 @@ fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
     {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(runtime_throw(bconcat!(
+        Err(error) => Err(PhpThrow::runtime(bconcat!(
             "creating a rejected promise in the plugin process failed: ",
             error_chain_message(&error)
         ))),
@@ -1383,11 +1363,7 @@ fn dispatch_process_method(
     method_name: &BStr,
 ) -> Result<PluginValue, PhpThrow> {
     if method_name != "__shirabeFacts" {
-        return Err(runtime_throw(bconcat!(
-            "unknown Process method `",
-            method_name,
-            "`"
-        )));
+        return Err(unavailable_method("Process", method_name));
     }
     let failed = |error: anyhow::Error| error_throw(b"reading the process failed", &error);
     let mut process = process.borrow_mut();
@@ -1456,7 +1432,7 @@ fn dispatch_filesystem_method(
                     JobOwner::process_executor(&executor),
                     executor,
                     std::rc::Rc::new(std::cell::Cell::new(true)),
-                    runtime_throw("Aborted process"),
+                    PhpThrow::runtime("Aborted process"),
                     Box::pin(async move {
                         future
                             .await
@@ -1553,11 +1529,7 @@ fn dispatch_filesystem_method(
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        other => Err(runtime_throw(bconcat!(
-            "the Filesystem method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("Filesystem", other)),
     }
 }
 
@@ -1706,7 +1678,7 @@ fn dispatch_process_executor_method(
                 started,
                 // TODO(async): cancelling drops the future and the `Process` in it, whose drop
                 // stops the child with SIGTERM; PHP sends SIGINT first and then calls `stop(1)`.
-                runtime_throw("Aborted process"),
+                PhpThrow::runtime("Aborted process"),
                 future,
             ))
         }
@@ -1716,11 +1688,7 @@ fn dispatch_process_executor_method(
             method_name,
             args,
         ),
-        other => Err(runtime_throw(bconcat!(
-            "unknown ProcessExecutor method `",
-            other,
-            "`"
-        ))),
+        other => Err(unavailable_method("ProcessExecutor", other)),
     }
 }
 
@@ -1825,11 +1793,7 @@ fn dispatch_http_downloader_method(
             method_name,
             args,
         ),
-        other => Err(runtime_throw(bconcat!(
-            "unknown HttpDownloader method `",
-            other,
-            "`"
-        ))),
+        other => Err(unavailable_method("HttpDownloader", other)),
     }
 }
 
@@ -1895,7 +1859,7 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
             None | Some(PluginValue::Array(_)),
         ) => (class, method, Vec::new()),
         other => {
-            return Err(runtime_throw(bconcat!(
+            return Err(PhpThrow::runtime(bconcat!(
                 "__shirabeCallStatic expects a class name, a method name and an argument list, \
                  got ",
                 display_to_bytes(format_args!("{other:?}"))
@@ -1914,7 +1878,7 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
         (b"Composer\\Package\\Locker", b"getContentHash") => {
             crate::package::Locker::get_content_hash(string_arg(0)?)
                 .map(PluginValue::string)
-                .map_err(|error| error_throw(b"getContentHash failed over RPC", &error))
+                .map_err(|error| error_throw(b"getContentHash failed", &error))
         }
         (b"Composer\\Util\\ProcessExecutor", b"getTimeout") => {
             Ok(crate::util::ProcessExecutor::get_timeout().to_wire())
@@ -1936,10 +1900,10 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
                 &argument,
             )))
         }
-        _ => Err(runtime_throw(bconcat!(
-            "Shirabe does not support calling ",
+        _ => Err(PhpThrow::runtime(bconcat!(
+            "the static method ",
             name,
-            " from the plugin process yet"
+            " is not available over RPC yet"
         ))),
     }
 }
@@ -1959,7 +1923,7 @@ fn dispatch_event_dispatcher_method(
                 // TODO(plugin): dispatching a worker-constructed event through the Rust-side
                 // dispatcher needs the event object (and the console input it carries) proxied
                 // back into this process, so only the no-listener case is answered here.
-                return Err(runtime_throw(bconcat!(
+                return Err(PhpThrow::runtime(bconcat!(
                     "dispatching `",
                     name,
                     "` from the plugin process is not supported yet while listeners are registered for it"
@@ -1971,11 +1935,7 @@ fn dispatch_event_dispatcher_method(
             // (a nested dispatch of the same event name throws there even with no listeners).
             Ok(PluginValue::Int(0))
         }
-        other => Err(runtime_throw(bconcat!(
-            "the EventDispatcher method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("EventDispatcher", other)),
     }
 }
 
@@ -2073,16 +2033,12 @@ fn dispatch_locker_method(
         }
         // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out and
         // no plugin holds a JsonFile it could pass to `updateHash()`.
-        b"getJsonFile" | b"updateHash" => Err(runtime_throw(bconcat!(
+        b"getJsonFile" | b"updateHash" => Err(PhpThrow::runtime(bconcat!(
             "the Locker method `",
             method_name,
             "` is not available over RPC yet: JsonFile cannot cross the boundary"
         ))),
-        other => Err(runtime_throw(bconcat!(
-            "the Locker method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("Locker", other)),
     }
 }
 
@@ -2094,11 +2050,7 @@ fn dispatch_repository_manager_method(
         b"getLocalRepository" => repository_handle_value(&rm.borrow().get_local_repository()),
         // TODO(plugin): the remaining RepositoryManager surface is widened on demand, driven
         // by explicit errors from real plugins.
-        other => Err(runtime_throw(bconcat!(
-            "the RepositoryManager method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("RepositoryManager", other)),
     }
 }
 
@@ -2112,7 +2064,7 @@ fn dispatch_repository_method(
             let package = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
             let has = repository
                 .has_package(package)
-                .map_err(|error| error_throw(b"hasPackage failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"hasPackage failed", &error))?;
             Ok(has.to_wire())
         }
         b"addPackage" | b"removePackage" => {
@@ -2121,7 +2073,7 @@ fn dispatch_repository_method(
             let writable = borrowed
                 .as_writable_repository_interface_mut()
                 .ok_or_else(|| {
-                    runtime_throw(bconcat!(
+                    PhpThrow::runtime(bconcat!(
                         "the repository behind this handle is not writable, so `",
                         method_name,
                         "` cannot be called on it"
@@ -2140,7 +2092,7 @@ fn dispatch_repository_method(
             let packages = repository
                 .borrow_mut()
                 .get_packages()
-                .map_err(|error| error_throw(b"getPackages failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"getPackages failed", &error))?;
             let mut items = Vec::with_capacity(packages.len());
             for package in packages {
                 items.push(package_handle_value(package.as_rc()));
@@ -2152,20 +2104,16 @@ fn dispatch_repository_method(
             let writable = borrowed
                 .as_writable_repository_interface_mut()
                 .ok_or_else(|| {
-                    runtime_throw("the repository behind this handle is not writable, so `getCanonicalPackages` cannot be called on it")
+                    PhpThrow::runtime("the repository behind this handle is not writable, so `getCanonicalPackages` cannot be called on it")
                 })?;
             let packages = writable
                 .get_canonical_packages()
-                .map_err(|error| error_throw(b"getCanonicalPackages failed over RPC", &error))?;
+                .map_err(|error| error_throw(b"getCanonicalPackages failed", &error))?;
             Ok(packages.to_wire())
         }
         // TODO(plugin): the remaining RepositoryInterface surface is widened on demand,
         // driven by explicit errors from real plugins.
-        other => Err(runtime_throw(bconcat!(
-            "the repository method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("repository", other)),
     }
 }
 
@@ -2215,7 +2163,7 @@ fn rust_entity_from_wire<T: FromRustEntity>(value: &PluginValue) -> Result<T, Ph
         .with(|table| table.borrow().get(&handle.rhandle).cloned())
         .and_then(T::from_entity)
         .ok_or_else(|| {
-            runtime_throw(bconcat!(
+            PhpThrow::runtime(bconcat!(
                 "expected ",
                 T::EXPECTED,
                 ", got Rust handle ",
@@ -2401,7 +2349,7 @@ fn dispatch_complete_package_getter(
     method_name: &BStr,
 ) -> Result<Option<PluginValue>, PhpThrow> {
     let unavailable = || {
-        runtime_throw(bconcat!(
+        PhpThrow::runtime(bconcat!(
             "`",
             method_name,
             "` is not available on this package over RPC"
@@ -2492,7 +2440,7 @@ fn dispatch_package_method(
                 b"setDistType" => package.set_dist_type(value),
                 b"setDistReference" => package.set_dist_reference(value),
                 _ => package.set_source_dist_references(value.ok_or_else(|| {
-                    runtime_throw("setSourceDistReferences expects a reference string")
+                    PhpThrow::runtime("setSourceDistReferences expects a reference string")
                 })?),
             }
             return Ok(PluginValue::Null);
@@ -2608,7 +2556,7 @@ fn dispatch_package_method(
         | b"replaceVersion" => {
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
-                runtime_throw(bconcat!(
+                PhpThrow::runtime(bconcat!(
                     "`",
                     method_name,
                     "` is not available on an alias package over RPC"
@@ -2670,7 +2618,7 @@ fn dispatch_package_method(
             )?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
-                runtime_throw(bconcat!(
+                PhpThrow::runtime(bconcat!(
                     "`",
                     method_name,
                     "` is not available on an alias package over RPC"
@@ -2689,7 +2637,7 @@ fn dispatch_package_method(
             let date = arg::<Option<chrono::DateTime<chrono::Utc>>>(method_name, args, 0)?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
-                runtime_throw("`setReleaseDate` is not available on an alias package over RPC")
+                PhpThrow::runtime("`setReleaseDate` is not available on an alias package over RPC")
             })?;
             package.set_release_date(date);
             return Ok(PluginValue::Null);
@@ -2710,7 +2658,7 @@ fn dispatch_package_method(
             let package = borrowed
                 .as_complete_package_interface_mut()
                 .ok_or_else(|| {
-                    runtime_throw(bconcat!(
+                    PhpThrow::runtime(bconcat!(
                         "`",
                         method_name,
                         "` is not available on this package over RPC"
@@ -2760,7 +2708,7 @@ fn dispatch_package_method(
         | b"setAliases" => {
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_root_package_interface_mut().ok_or_else(|| {
-                runtime_throw(bconcat!(
+                PhpThrow::runtime(bconcat!(
                     "`",
                     method_name,
                     "` is not available on this package over RPC"
@@ -2800,7 +2748,7 @@ fn dispatch_package_method(
         b"getAliasOf" | b"isRootPackageAlias" | b"hasSelfVersionRequires" => {
             let borrowed = package.borrow();
             let alias = borrowed.as_alias_package().ok_or_else(|| {
-                runtime_throw(bconcat!(
+                PhpThrow::runtime(bconcat!(
                     "`",
                     method_name,
                     "` is not available on this package over RPC"
@@ -2818,7 +2766,9 @@ fn dispatch_package_method(
                 .borrow_mut()
                 .as_alias_package_mut()
                 .ok_or_else(|| {
-                    runtime_throw("`setRootPackageAlias` is not available on this package over RPC")
+                    PhpThrow::runtime(
+                        "`setRootPackageAlias` is not available on this package over RPC",
+                    )
                 })?
                 .set_root_package_alias(value);
             return Ok(PluginValue::Null);
@@ -2901,11 +2851,7 @@ fn dispatch_package_method(
             .to_wire()),
         b"getTransportOptions" => Ok(package.get_transport_options().to_wire()),
         b"getReleaseDate" => Ok(package.get_release_date().to_wire()),
-        other => Err(runtime_throw(bconcat!(
-            "the package method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("package", other)),
     }
 }
 
@@ -2936,7 +2882,7 @@ fn dispatch_operation_method(
         (b"getTargetPackage", AnyOperation::Update(op)) => {
             Ok(package_handle_value(op.get_target_package().as_rc()))
         }
-        (other, _) => Err(runtime_throw(bconcat!(
+        (other, _) => Err(PhpThrow::runtime(bconcat!(
             "the operation method `",
             other,
             "` is not available on a ",
@@ -2976,11 +2922,7 @@ pub(crate) fn dispatch_pre_file_download_event_method(
             event.set_transport_options(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
-        other => Err(runtime_throw(bconcat!(
-            "the Event method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("Event", other)),
     }
 }
 
@@ -2996,11 +2938,7 @@ pub(crate) fn dispatch_post_file_download_event_method(
         b"getContext" => file_download_context_value(event.get_context()),
         b"getPackage" => Ok(event.get_package().to_wire()),
         b"getType" => Ok(event.get_type().to_wire()),
-        other => Err(runtime_throw(bconcat!(
-            "the Event method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("Event", other)),
     }
 }
 
@@ -3020,7 +2958,7 @@ pub(crate) fn dispatch_pre_pool_create_event_method(
         )),
         // TODO(plugin): Request has no proxy stub, so the request a listener would inspect or
         // change cannot cross the boundary yet.
-        b"getRequest" => Err(runtime_throw(
+        b"getRequest" => Err(PhpThrow::runtime(
             "the Request of a PrePoolCreateEvent is not available over RPC yet",
         )),
         b"getAcceptableStabilities" => Ok(event.get_acceptable_stabilities().clone().to_wire()),
@@ -3043,11 +2981,7 @@ pub(crate) fn dispatch_pre_pool_create_event_method(
             )?);
             Ok(PluginValue::Null)
         }
-        other => Err(runtime_throw(bconcat!(
-            "the Event method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("Event", other)),
     }
 }
 
@@ -3060,7 +2994,7 @@ fn file_download_context_value(
         Some(FileDownloadContext::Package(package)) => Ok(package.clone().to_wire()),
         // TODO(plugin): the array a repository passes names the repository itself, which cannot
         // cross the boundary yet.
-        Some(FileDownloadContext::Repository) => Err(runtime_throw(
+        Some(FileDownloadContext::Repository) => Err(PhpThrow::runtime(
             "the repository context of a file download event is not available over RPC yet",
         )),
     }
@@ -3078,11 +3012,7 @@ fn dispatch_transaction_method(
                 .map(operation_handle_value)
                 .collect(),
         )),
-        other => Err(runtime_throw(bconcat!(
-            "the Transaction method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("Transaction", other)),
     }
 }
 
@@ -3103,13 +3033,13 @@ fn dispatch_installation_manager_method(
                 BStr::new("Composer\\Installer\\InstallerInterface"),
             )
             .map_err(|error| {
-                runtime_throw(bconcat!(
+                PhpThrow::runtime(bconcat!(
                     method_name,
                     " could not type-check its argument: ",
                     error_chain_message(&error)
                 ))
             })? {
-                return Err(runtime_throw(bconcat!(
+                return Err(PhpThrow::runtime(bconcat!(
                     method_name,
                     " expects a Composer\\Installer\\InstallerInterface, got ",
                     handle.class()
@@ -3126,11 +3056,7 @@ fn dispatch_installation_manager_method(
         }
         // TODO(plugin): the remaining InstallationManager surface is widened on demand,
         // driven by explicit errors from real plugins.
-        other => Err(runtime_throw(bconcat!(
-            "the InstallationManager method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("InstallationManager", other)),
     }
 }
 
@@ -3159,11 +3085,7 @@ fn dispatch_io_method(
         b"isDecorated" => Ok(io.borrow().is_decorated().to_wire()),
         // TODO(plugin): the remaining IOInterface surface (ask*, authentications, ...) is
         // widened on demand, driven by explicit errors from real plugins.
-        other => Err(runtime_throw(bconcat!(
-            "the IO method `",
-            other,
-            "` is not available over RPC yet"
-        ))),
+        other => Err(unavailable_method("IO", other)),
     }
 }
 
@@ -3182,8 +3104,16 @@ fn decode_write_args(
     Ok((messages, newline, verbosity))
 }
 
-fn runtime_throw(message: impl Into<BString>) -> PhpThrow {
-    PhpThrow::runtime(message)
+/// The failure of a method of a proxied class the Rust side does not serve. `class` names the
+/// class the way the message reads, such as "repository" or "IO".
+pub(crate) fn unavailable_method(class: impl AsRef<[u8]>, method: impl AsRef<[u8]>) -> PhpThrow {
+    PhpThrow::runtime(bconcat!(
+        "the ",
+        class.as_ref(),
+        " method `",
+        method.as_ref(),
+        "` is not available over RPC yet"
+    ))
 }
 
 /// The `Throw` a failed Rust-side call crosses the boundary as. An error carrying a ported PHP
@@ -3193,7 +3123,7 @@ fn runtime_throw(message: impl Into<BString>) -> PhpThrow {
 fn error_throw(context: impl AsRef<[u8]>, error: &anyhow::Error) -> PhpThrow {
     match AnyThrowable::of(error) {
         Some(exception) => exception_into_throw(exception, error),
-        None => runtime_throw(bconcat!(context.as_ref(), ": ", error_chain_message(error))),
+        None => PhpThrow::runtime(bconcat!(context.as_ref(), ": ", error_chain_message(error))),
     }
 }
 

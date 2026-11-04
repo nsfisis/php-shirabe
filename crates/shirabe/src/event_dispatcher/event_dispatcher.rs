@@ -11,6 +11,7 @@ use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::php_plugin_proxy::unavailable_method;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
@@ -1643,7 +1644,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                 let class = match args.first() {
                     Some(PluginValue::String(bytes)) => bytes,
                     other => {
-                        return Err(runtime_throw(display_to_bytes(format_args!(
+                        return Err(PhpThrow::runtime(display_to_bytes(format_args!(
                             "__shirabe_find_file expects a class name argument, got {other:?}"
                         ))));
                     }
@@ -1670,7 +1671,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             {
                 return answer;
             }
-            return Err(runtime_throw(bconcat!(
+            return Err(PhpThrow::runtime(bconcat!(
                 "unknown runtime service method `",
                 method_name,
                 "`"
@@ -1720,7 +1721,7 @@ pub(crate) fn dispatch_event_method(
             (Some(event), _, _) => Ok(PluginValue::Bool(event.is_dev_mode())),
             (_, Some(event), _) => Ok(PluginValue::Bool(event.is_dev_mode())),
             (_, _, Some(event)) => Ok(PluginValue::Bool(event.is_dev_mode())),
-            _ => Err(runtime_throw(BString::from(
+            _ => Err(PhpThrow::runtime(BString::from(
                 "isDevMode is only available on script, package and installer events",
             ))),
         },
@@ -1734,13 +1735,13 @@ pub(crate) fn dispatch_event_method(
                 (_, Some(event), _) => event.get_composer().upgrade(),
                 (_, _, Some(event)) => event.get_composer().upgrade(),
                 _ => {
-                    return Err(runtime_throw(BString::from(
+                    return Err(PhpThrow::runtime(BString::from(
                         "getComposer is only available on script, package and installer events",
                     )));
                 }
             };
             let composer = composer.ok_or_else(|| {
-                runtime_throw(BString::from("the Composer instance of this event is gone"))
+                PhpThrow::runtime(BString::from("the Composer instance of this event is gone"))
             })?;
             let rhandle = crate::plugin::php_plugin_proxy::register_composer_entity(&composer);
             Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
@@ -1758,13 +1759,13 @@ pub(crate) fn dispatch_event_method(
                 (_, Some(event), _) => event.get_io(),
                 (_, _, Some(event)) => event.get_io(),
                 _ => {
-                    return Err(runtime_throw(BString::from(
+                    return Err(PhpThrow::runtime(BString::from(
                         "getIO is only available on script, package and installer events",
                     )));
                 }
             };
             let class = crate::plugin::php_plugin_proxy::io_stub_class(&io)
-                .map_err(|error| runtime_throw(error_message(&error)))?;
+                .map_err(|error| PhpThrow::runtime(error_message(&error)))?;
             let rhandle = crate::plugin::php_plugin_proxy::register_io_entity(&io);
             Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
                 rhandle, class,
@@ -1774,7 +1775,7 @@ pub(crate) fn dispatch_event_method(
             Some(event) => crate::plugin::php_plugin_proxy::repository_handle_value(
                 &event.get_local_repo().as_repository_handle(),
             ),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getLocalRepo is only available on package events",
             ))),
         },
@@ -1786,7 +1787,7 @@ pub(crate) fn dispatch_event_method(
                     .map(crate::plugin::php_plugin_proxy::operation_handle_value)
                     .collect(),
             )),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getOperations is only available on package events",
             ))),
         },
@@ -1794,19 +1795,19 @@ pub(crate) fn dispatch_event_method(
             Some(event) => Ok(crate::plugin::php_plugin_proxy::operation_handle_value(
                 event.get_operation(),
             )),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getOperation is only available on package events",
             ))),
         },
         b"getCommandName" => match event.as_any().downcast_ref::<CommandEvent>() {
             Some(event) => Ok(PluginValue::string(event.get_command_name())),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getCommandName is only available on command events",
             ))),
         },
         b"getCommand" => match event.as_any().downcast_ref::<PreCommandRunEvent>() {
             Some(event) => Ok(PluginValue::string(event.get_command())),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getCommand is only available on pre-command-run events",
             ))),
         },
@@ -1819,7 +1820,7 @@ pub(crate) fn dispatch_event_method(
                     .downcast_ref::<PreCommandRunEvent>()
                     .is_some() =>
         {
-            Err(runtime_throw(bconcat!(
+            Err(PhpThrow::runtime(bconcat!(
                 "the console ",
                 if method_name == "getInput" {
                     "input"
@@ -1831,7 +1832,7 @@ pub(crate) fn dispatch_event_method(
         }
         b"isExecutingOperations" => match installer_event(event) {
             Some(event) => Ok(PluginValue::Bool(event.is_executing_operations())),
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "isExecutingOperations is only available on installer events",
             ))),
         },
@@ -1842,7 +1843,7 @@ pub(crate) fn dispatch_event_method(
                 )),
                 None => Ok(PluginValue::Null),
             },
-            None => Err(runtime_throw(BString::from(
+            None => Err(PhpThrow::runtime(BString::from(
                 "getTransaction is only available on installer events",
             ))),
         },
@@ -1870,11 +1871,7 @@ pub(crate) fn dispatch_event_method(
                 }
                 // TODO(plugin): the rest need full proxying of the object graph an event exposes,
                 // which does not exist yet.
-                None => Err(runtime_throw(bconcat!(
-                    "the Event method `",
-                    other,
-                    "` is not available over RPC yet"
-                ))),
+                None => Err(unavailable_method("Event", other)),
             }
         }
     }
@@ -1890,10 +1887,6 @@ fn package_event(event: &dyn EventInterface) -> Option<&PackageEvent> {
 
 fn installer_event(event: &dyn EventInterface) -> Option<&InstallerEvent> {
     event.as_any().downcast_ref::<InstallerEvent>()
-}
-
-fn runtime_throw(message: impl Into<BString>) -> PhpThrow {
-    PhpThrow::runtime(message)
 }
 
 /// Quotes a string as a PHP single-quoted literal for a generated snippet.
