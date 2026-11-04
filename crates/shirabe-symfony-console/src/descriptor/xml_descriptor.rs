@@ -96,7 +96,7 @@ impl XmlDescriptor {
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         namespace: Option<BString>,
         short: bool,
-    ) -> DOMDocument {
+    ) -> anyhow::Result<DOMDocument> {
         let dom = DOMDocument::new("1.0", "UTF-8");
         let root_xml = dom.append_child(dom.create_element("symfony"));
 
@@ -118,7 +118,7 @@ impl XmlDescriptor {
             commands_xml.set_attribute("namespace", namespace);
         }
 
-        for command in description.get_commands().values() {
+        for command in description.get_commands()?.values() {
             let command = command.borrow();
             let command_xml = self.get_command_document(&*command, short);
             self.append_document(&commands_xml, &command_xml.as_node());
@@ -127,7 +127,7 @@ impl XmlDescriptor {
         if namespace.is_none() {
             let namespaces_xml = root_xml.append_child(dom.create_element("namespaces"));
 
-            let namespaces = description.get_namespaces();
+            let namespaces = description.get_namespaces()?;
             for namespace_description in namespaces.values() {
                 let namespace_array_xml =
                     namespaces_xml.append_child(dom.create_element("namespace"));
@@ -149,7 +149,7 @@ impl XmlDescriptor {
             }
         }
 
-        dom
+        Ok(dom)
     }
 
     fn describe_input_argument(
@@ -199,7 +199,7 @@ impl XmlDescriptor {
             _ => None,
         };
         let short = matches!(options.get(B("short")), Some(PhpMixed::Bool(true)));
-        self.write_document(self.get_application_document(application, namespace, short));
+        self.write_document(self.get_application_document(application, namespace, short)?);
         Ok(())
     }
 

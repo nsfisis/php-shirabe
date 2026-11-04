@@ -23,7 +23,7 @@ fn provide_command_cases() -> Vec<std::rc::Rc<std::cell::RefCell<dyn Command>>> 
         ApplicationDescription::new(application.__base_application(), None, false);
 
     let mut commands = Vec::new();
-    for command in description.get_commands().values() {
+    for command in description.get_commands().unwrap().values() {
         let name = command.borrow().get_name().unwrap_or_default();
         if ["about", "completion", "list"].iter().any(|n| name == *n) {
             continue;

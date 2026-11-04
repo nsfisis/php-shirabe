@@ -72,7 +72,7 @@ impl JsonDescriptor {
         let mut commands: Vec<PhpMixed> = vec![];
 
         let short = matches!(options.get(B("short")), Some(PhpMixed::Bool(true)));
-        for command in description.get_commands().values() {
+        for command in description.get_commands()?.values() {
             let command = command.borrow();
             commands.push(PhpMixed::Array(
                 self.get_command_data(&*command, short)?
@@ -106,7 +106,7 @@ impl JsonDescriptor {
                 "namespaces".into(),
                 PhpMixed::List(
                     description
-                        .get_namespaces()
+                        .get_namespaces()?
                         .into_values()
                         .map(|ns| PhpMixed::Array(ns.into_iter().collect()))
                         .collect(),

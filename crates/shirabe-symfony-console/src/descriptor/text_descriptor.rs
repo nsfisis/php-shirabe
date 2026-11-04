@@ -260,13 +260,13 @@ impl TextDescriptor {
         if matches!(options.get(B("raw_text")), Some(v) if php_truthy(v)) {
             let width = self.get_column_width(
                 &description
-                    .get_commands()
+                    .get_commands()?
                     .values()
                     .map(|c| CommandOrString::Command(c.clone()))
                     .collect::<Vec<_>>(),
             );
 
-            let command_list: Vec<_> = description.get_commands().values().cloned().collect();
+            let command_list: Vec<_> = description.get_commands()?.values().cloned().collect();
             for command in &command_list {
                 let command = command.borrow();
                 self.write_text(
@@ -306,8 +306,8 @@ impl TextDescriptor {
             self.write_text("\n", &IndexMap::new());
             self.write_text("\n", &IndexMap::new());
 
-            let mut commands = description.get_commands().clone();
-            let namespaces = description.get_namespaces();
+            let mut commands = description.get_commands()?.clone();
+            let namespaces = description.get_namespaces()?;
             if described_namespace.is_some() && !namespaces.is_empty() {
                 // make sure all alias commands are included when describing a specific namespace
                 let described_namespace_info = namespaces.values().next().unwrap();

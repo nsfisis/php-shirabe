@@ -36,22 +36,24 @@ impl ApplicationDescription {
         }
     }
 
-    pub fn get_namespaces(&mut self) -> IndexMap<BString, IndexMap<BString, PhpMixed>> {
+    pub fn get_namespaces(
+        &mut self,
+    ) -> anyhow::Result<IndexMap<BString, IndexMap<BString, PhpMixed>>> {
         if self.namespaces.is_none() {
-            self.inspect_application();
+            self.inspect_application()?;
         }
 
-        self.namespaces.clone().unwrap()
+        Ok(self.namespaces.clone().unwrap())
     }
 
     pub fn get_commands(
         &mut self,
-    ) -> &IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>> {
+    ) -> anyhow::Result<&IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>> {
         if self.commands.is_none() {
-            self.inspect_application();
+            self.inspect_application()?;
         }
 
-        self.commands.as_ref().unwrap()
+        Ok(self.commands.as_ref().unwrap())
     }
 
     pub fn get_command(
@@ -85,24 +87,20 @@ impl ApplicationDescription {
             .unwrap_or_else(|| self.aliases.as_ref().unwrap().get(name).unwrap().clone()))
     }
 
-    fn inspect_application(&mut self) {
+    fn inspect_application(&mut self) -> anyhow::Result<()> {
         self.commands = Some(IndexMap::new());
         self.namespaces = Some(IndexMap::new());
 
         let namespace_filter = match &self.namespace {
-            Some(ns) if !ns.is_empty() => Some(
-                self.application
-                    .borrow_mut()
-                    .find_namespace(ns.as_bstr())
-                    .unwrap(),
-            ),
+            Some(ns) if !ns.is_empty() => {
+                Some(self.application.borrow_mut().find_namespace(ns.as_bstr())?)
+            }
             _ => None,
         };
         let all = self
             .application
             .borrow_mut()
-            .all(namespace_filter.as_ref().map(|ns| ns.as_bstr()))
-            .unwrap();
+            .all(namespace_filter.as_ref().map(|ns| ns.as_bstr()))?;
         for (namespace, commands) in self.sort_commands(all) {
             let mut names: Vec<BString> = vec![];
 
@@ -138,6 +136,8 @@ impl ApplicationDescription {
             );
             self.namespaces.as_mut().unwrap().insert(namespace, entry);
         }
+
+        Ok(())
     }
 
     fn sort_commands(

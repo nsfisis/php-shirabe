@@ -252,7 +252,7 @@ impl MarkdownDescriptor {
             true,
         );
 
-        for namespace in description.get_namespaces().values() {
+        for namespace in description.get_namespaces()?.values() {
             let namespace_id = match namespace.get(B("id")) {
                 Some(PhpMixed::String(s)) => s.clone(),
                 _ => BString::default(),
@@ -298,7 +298,7 @@ impl MarkdownDescriptor {
             );
         }
 
-        for command in description.get_commands().values() {
+        for command in description.get_commands()?.values() {
             let command = command.borrow();
             self.write("\n\n", true);
             // describeCommand returns null; the guarded write never runs.

@@ -53,20 +53,24 @@ impl ListCommand {
         command
     }
 
-    pub fn complete_impl(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
+    pub fn complete_impl(
+        &self,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) -> anyhow::Result<()> {
         if input.must_suggest_argument_values_for("namespace") {
             let application = self.get_application().unwrap();
             let mut descriptor = ApplicationDescription::new(application, None, false);
             suggestions.suggest_values(
                 descriptor
-                    .get_namespaces()
+                    .get_namespaces()?
                     .keys()
                     .cloned()
                     .map(StringOrSuggestion::String)
                     .collect(),
             );
 
-            return;
+            return Ok(());
         }
 
         if input.must_suggest_option_values_for("format") {
@@ -79,6 +83,8 @@ impl ListCommand {
                     .collect(),
             );
         }
+
+        Ok(())
     }
 }
 
@@ -162,8 +168,7 @@ impl Command for ListCommand {
         input: &CompletionInput,
         suggestions: &mut CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        self.complete_impl(input, suggestions);
-        Ok(())
+        self.complete_impl(input, suggestions)
     }
 
     crate::delegate_command_trait_impls_to_inner!(inner);
