@@ -58,6 +58,11 @@ Inputs:
   and `Composer\Util\Http\Response`). An entry that needs no guard anyway
   fails the run.
 
+The same directory holds `surface-manifest`, which compares the forwards in the generated stubs
+with the dispatcher arms on the Rust side and writes `crates/shirabe/src/plugin/rpc/surface.tsv`
+(see "Regenerate the surface manifest" in [plugin-surface-widening.md](plugin-surface-widening.md));
+rerun it after regenerating.
+
 The freshness check for both sets is the test
 `crates/shirabe-php-rpc/tests/generated_stubs.rs`
 (`cargo test -p shirabe-php-rpc --test generated_stubs`); it fails when PHP, the

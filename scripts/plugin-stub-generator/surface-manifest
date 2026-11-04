@@ -1,0 +1,62 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Shirabe\PluginStubGenerator\GenerationError;
+use Shirabe\PluginStubGenerator\SurfaceManifest;
+
+$repoRoot = dirname(__DIR__, 2);
+$manifestPath = $repoRoot . '/crates/shirabe/src/plugin/rpc/surface.tsv';
+$check = false;
+
+foreach (array_slice($argv, 1) as $arg) {
+    if ($arg === '--check') {
+        $check = true;
+    } else {
+        fwrite(STDERR, "usage: surface-manifest [--check]\n");
+        exit(2);
+    }
+}
+
+$dispatchers = [];
+foreach (file(__DIR__ . '/dispatchers.list', FILE_IGNORE_NEW_LINES) as $line) {
+    $line = trim($line);
+    if ($line === '' || str_starts_with($line, '#')) {
+        continue;
+    }
+    $fields = preg_split('/\s+/', $line);
+    $fqcn = array_shift($fields);
+    if ($fields === [] || isset($dispatchers[$fqcn])) {
+        fwrite(STDERR, "error: malformed or duplicate entry in dispatchers.list: $line\n");
+        exit(1);
+    }
+    $dispatchers[$fqcn] = $fields === ['-'] ? [] : $fields;
+}
+
+$phpDir = $repoRoot . '/crates/shirabe-php-rpc/php';
+$manifest = new SurfaceManifest(
+    [$phpDir . '/stubs', $phpDir . '/runtime'],
+    $repoRoot . '/crates/shirabe/src',
+    $dispatchers,
+);
+try {
+    $content = $manifest->render();
+} catch (GenerationError $e) {
+    foreach ($e->errors as $error) {
+        fwrite(STDERR, "error: $error\n");
+    }
+    exit(1);
+}
+
+if ($check) {
+    if (@file_get_contents($manifestPath) !== $content) {
+        fwrite(STDERR, "error: stale manifest (regenerate): $manifestPath\n");
+        exit(1);
+    }
+    exit(0);
+}
+file_put_contents($manifestPath, $content);
+fwrite(STDERR, "manifest written to $manifestPath\n");
