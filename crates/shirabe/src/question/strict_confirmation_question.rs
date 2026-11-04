@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Question/StrictConfirmationQuestion.php
 
-use shirabe_php_shim::{PhpMixed, empty, is_bool, preg_is_match};
+use shirabe_php_shim::preg_is_match;
 use shirabe_symfony_console::exception::InvalidArgumentException;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::question::{Question, QuestionInterface};
 
 #[derive(Debug)]
@@ -18,7 +19,7 @@ impl StrictConfirmationQuestion {
         true_answer_regex: impl Into<bstr::BString>,
         false_answer_regex: impl Into<bstr::BString>,
     ) -> Self {
-        let inner = Question::new(question, Some(PhpMixed::Bool(default)));
+        let inner = Question::new(question, InputValue::Bool(default));
         let mut this = Self {
             inner,
             true_answer_regex: true_answer_regex.into(),
@@ -39,36 +40,35 @@ impl StrictConfirmationQuestion {
         &mut self.inner
     }
 
-    fn get_default_normalizer(&self) -> Box<dyn Fn(PhpMixed) -> PhpMixed> {
+    fn get_default_normalizer(&self) -> Box<dyn Fn(InputValue) -> InputValue> {
         let default = self.inner.get_default();
         let true_regex = self.true_answer_regex.clone();
         let false_regex = self.false_answer_regex.clone();
 
-        Box::new(move |answer: PhpMixed| {
-            if is_bool(&answer) {
+        Box::new(move |answer: InputValue| {
+            if let InputValue::Bool(_) = answer {
                 return answer;
             }
-            if empty(&answer) && !empty(&default) {
+            if !answer.to_bool() && default.to_bool() {
                 return default.clone();
             }
-            if let PhpMixed::String(s) = &answer {
+            if let InputValue::String(s) = &answer {
                 if preg_is_match(&true_regex, s) {
-                    return PhpMixed::Bool(true);
+                    return InputValue::Bool(true);
                 }
                 if preg_is_match(&false_regex, s) {
-                    return PhpMixed::Bool(false);
+                    return InputValue::Bool(false);
                 }
             }
-            PhpMixed::Null
+            InputValue::Null
         })
     }
 
     fn get_default_validator(
         &self,
-    ) -> Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
-        Box::new(|answer: Option<PhpMixed>| {
-            let answer = answer.unwrap_or(PhpMixed::Null);
-            if !is_bool(&answer) {
+    ) -> Box<dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>> {
+        Box::new(|answer: InputValue| {
+            if !matches!(answer, InputValue::Bool(_)) {
                 return Err(InvalidArgumentException::new(
                     "Please answer yes, y, no, or n.",
                 ));
@@ -86,7 +86,7 @@ impl QuestionInterface for StrictConfirmationQuestion {
         self.inner.get_question()
     }
 
-    fn get_default(&self) -> PhpMixed {
+    fn get_default(&self) -> InputValue {
         self.inner.get_default()
     }
 
@@ -102,17 +102,19 @@ impl QuestionInterface for StrictConfirmationQuestion {
         self.inner.is_hidden_fallback()
     }
 
-    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+    fn get_autocompleter_values(&self) -> Option<Vec<bstr::BString>> {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&bstr::BStr) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(
+        &self,
+    ) -> Option<&dyn Fn(&bstr::BStr) -> Option<Vec<bstr::BString>>> {
         self.inner.get_autocompleter_callback()
     }
 
     fn get_validator(
         &self,
-    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
+    ) -> Option<&dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>> {
         self.inner.get_validator()
     }
 
@@ -120,7 +122,7 @@ impl QuestionInterface for StrictConfirmationQuestion {
         self.inner.get_max_attempts()
     }
 
-    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
+    fn get_normalizer(&self) -> Option<&dyn Fn(InputValue) -> InputValue> {
         self.inner.get_normalizer()
     }
 

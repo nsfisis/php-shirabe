@@ -1,13 +1,13 @@
 //! ref: composer/tests/Composer/Test/Mock/IOMock.php
 
 use bstr::{BString, ByteSlice};
+use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, bconcat, php_regex, preg_is_match, preg_quote, preg_split,
-};
+use shirabe_php_shim::{PHP_EOL, bconcat, php_regex, preg_is_match, preg_quote, preg_split};
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::output_interface;
 use std::collections::VecDeque;
 
@@ -248,7 +248,7 @@ impl IOInterfaceImmutable for IOMock {
             .overwrite_error_bytes(message, newline, size, verbosity)
     }
 
-    fn ask_bytes(&self, question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask_bytes(&self, question: &bstr::BStr, default: InputValue) -> anyhow::Result<InputValue> {
         self.inner.ask_bytes(with_eol(question).as_ref(), default)
     }
     fn ask_confirmation_bytes(&self, question: &bstr::BStr, default: bool) -> anyhow::Result<bool> {
@@ -258,10 +258,10 @@ impl IOInterfaceImmutable for IOMock {
     fn ask_and_validate_bytes(
         &self,
         question: &bstr::BStr,
-        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
         attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> anyhow::Result<PhpMixed> {
+        default: InputValue,
+    ) -> anyhow::Result<InputValue> {
         self.inner
             .ask_and_validate_bytes(with_eol(question).as_ref(), validator, attempts, default)
     }
@@ -273,18 +273,18 @@ impl IOInterfaceImmutable for IOMock {
         // hiddeninput.exe, so PHP delegates to `ask` rather than the hidden variant.
         let result = self
             .inner
-            .ask_bytes(with_eol(question).as_ref(), PhpMixed::Null)?;
+            .ask_bytes(with_eol(question).as_ref(), InputValue::Null)?;
         Ok(result.as_string().map(bstr::BString::from))
     }
     fn select_bytes(
         &self,
         question: &bstr::BStr,
-        choices: PhpMixed,
-        default: PhpMixed,
-        attempts: PhpMixed,
+        choices: IndexMap<BString, BString>,
+        default: InputValue,
+        attempts: Option<i64>,
         error_message: &bstr::BStr,
         multiselect: bool,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<InputValue> {
         self.inner.select_bytes(
             with_eol(question).as_ref(),
             choices,

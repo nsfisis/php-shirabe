@@ -17,6 +17,7 @@ use shirabe_php_shim::{
     preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen, strpos, substr,
     trim, version_compare,
 };
+use shirabe_symfony_console::input::InputValue;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -1237,7 +1238,7 @@ impl VcsDownloader for GitDownloader {
                         if update { "s," } else { "" },
                         "?]?</info> "
                     ),
-                    PhpMixed::string(BString::from("?")),
+                    InputValue::from("?"),
                 )?
                 .as_string()
                 .map(|answer| answer.to_vec());

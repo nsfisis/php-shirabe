@@ -16,6 +16,7 @@ use shirabe_php_shim::{
     path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split,
     version_compare,
 };
+use shirabe_symfony_console::input::InputValue;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -308,7 +309,7 @@ impl VcsDownloader for SvnDownloader {
                 .io
                 .ask(
                     "    <info>Discard changes [y,n,v,?]?</info> ",
-                    PhpMixed::string(BString::from("?")),
+                    InputValue::from("?"),
                 )?
                 .as_string()
                 .map(|s| &**s)

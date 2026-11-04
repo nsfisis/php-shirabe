@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/IO/NullIO.php
 
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
-use shirabe_php_shim::PhpMixed;
+use bstr::BString;
+use indexmap::IndexMap;
+use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct NullIO {
@@ -70,7 +72,7 @@ impl IOInterfaceImmutable for NullIO {
     ) {
     }
 
-    fn ask_bytes(&self, _question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask_bytes(&self, _question: &bstr::BStr, default: InputValue) -> anyhow::Result<InputValue> {
         Ok(default)
     }
 
@@ -85,10 +87,10 @@ impl IOInterfaceImmutable for NullIO {
     fn ask_and_validate_bytes(
         &self,
         _question: &bstr::BStr,
-        _validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        _validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
         _attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> anyhow::Result<PhpMixed> {
+        default: InputValue,
+    ) -> anyhow::Result<InputValue> {
         Ok(default)
     }
 
@@ -102,12 +104,12 @@ impl IOInterfaceImmutable for NullIO {
     fn select_bytes(
         &self,
         _question: &bstr::BStr,
-        _choices: PhpMixed,
-        default: PhpMixed,
-        _attempts: PhpMixed,
+        _choices: IndexMap<BString, BString>,
+        default: InputValue,
+        _attempts: Option<i64>,
         _error_message: &bstr::BStr,
         _multiselect: bool,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<InputValue> {
         Ok(default)
     }
 

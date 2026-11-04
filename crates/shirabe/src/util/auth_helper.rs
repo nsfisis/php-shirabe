@@ -11,6 +11,7 @@ use shirabe_php_shim::{
     in_array_loose, in_array_strict, is_array, is_string, json_decode_assoc, parse_url, php_regex,
     php_to_string, preg_is_match, str_replace, strpos, strtolower, substr, trigger_error, trim,
 };
+use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct AuthHelper {
@@ -60,7 +61,7 @@ impl AuthHelper {
                     config_source.get_name(),
                     " ? [Yn] "
                 ),
-                Box::new(|value: PhpMixed| -> anyhow::Result<PhpMixed> {
+                Box::new(|value: InputValue| -> anyhow::Result<InputValue> {
                     let input = strtolower(substr(
                         trim(value.as_string().unwrap_or_default()),
                         0,
@@ -73,12 +74,12 @@ impl AuthHelper {
                             PhpMixed::string(BString::from("n")),
                         ],
                     ) {
-                        return Ok(PhpMixed::string(input));
+                        return Ok(InputValue::String(input));
                     }
                     Err(RuntimeException::new(BString::from("Please answer (y)es or (n)o")).into())
                 }),
                 None,
-                PhpMixed::string(BString::from("y")),
+                InputValue::from("y"),
             )?;
 
             if answer.as_string() == Some("y".into()) {
@@ -141,7 +142,7 @@ impl AuthHelper {
                 }
                 self.io.ask(
                     "After authorizing your token, confirm that you would like to retry the request",
-                    PhpMixed::Null,
+                    InputValue::Null,
                 )?;
 
                 return Ok(PromptAuthResult {
@@ -417,7 +418,7 @@ impl AuthHelper {
                 true,
                 io_interface::NORMAL,
             );
-            let username = self.io.ask("      Username: ", PhpMixed::Null)?;
+            let username = self.io.ask("      Username: ", InputValue::Null)?;
             let password = self.io.ask_and_hide_answer("      Password: ")?;
             self.io.borrow_mut().set_authentication(
                 origin.into(),

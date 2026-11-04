@@ -3,7 +3,7 @@
 use bstr::BString;
 use shirabe::io::IOInterfaceWrite;
 use shirabe::io::buffer_io::BufferIO;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
 #[test]
@@ -31,11 +31,11 @@ fn test_set_user_inputs() {
             .unwrap()
     );
     assert_eq!(
-        PhpMixed::string(BString::from("default")),
+        InputValue::String(BString::from("default")),
         buffer_io
             .ask(
                 "Empty string last",
-                PhpMixed::string(BString::from("default"))
+                InputValue::String(BString::from("default"))
             )
             .unwrap()
     );

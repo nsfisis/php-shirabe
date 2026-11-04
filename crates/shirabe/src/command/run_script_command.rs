@@ -9,8 +9,8 @@ use crate::script::{Event as ScriptEvent, ScriptEvents};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class,
-    str_replace, strtoupper, utf8_text,
+    Catch as _, InvalidArgumentException, RuntimeException, bconcat, impl_php_class, str_replace,
+    strtoupper, utf8_text,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::{CommandNotFoundException, NamespaceNotFoundException};
@@ -68,14 +68,9 @@ impl RunScriptCommand {
 
         let io = self.get_io();
         io.write_error("<info>scripts:</info>");
-        let table: Vec<PhpMixed> = scripts
+        let table: Vec<Vec<BString>> = scripts
             .iter()
-            .map(|(name, desc)| {
-                PhpMixed::List(vec![
-                    PhpMixed::string(bconcat!("  ", name)),
-                    PhpMixed::string(desc.clone()),
-                ])
-            })
+            .map(|(name, desc)| vec![bconcat!("  ", name), desc.clone()])
             .collect();
 
         self.render_table(table, output)?;
@@ -220,22 +215,20 @@ impl Command for RunScriptCommand {
 
             let mut options = indexmap::IndexMap::new();
             for script in &scripts {
-                options.insert(script.0.clone(), PhpMixed::string(script.1.clone()));
+                options.insert(script.0.clone(), script.1.clone());
             }
 
             let io = self.get_io();
             let script = io.select(
                 "Script to run: ",
-                PhpMixed::Array(options),
-                PhpMixed::string(BString::default()),
-                PhpMixed::Int(1),
+                options,
+                InputValue::from(""),
+                Some(1),
                 "Invalid script name \"%s\"",
                 false,
             )?;
 
-            input
-                .borrow_mut()
-                .set_argument("script", InputValue::from_php_mixed(&script))?;
+            input.borrow_mut().set_argument("script", script)?;
 
             Ok(())
         })();

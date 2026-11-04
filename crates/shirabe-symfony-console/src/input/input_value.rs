@@ -3,10 +3,15 @@
 use bstr::{BStr, BString};
 use shirabe_php_shim::PhpMixed;
 
-/// The value an option or an argument can hold.
+/// The value an option or an argument can hold, which is also the value a question takes as its
+/// default and gives as its answer.
 ///
 /// Symfony declares the domain as `string|bool|int|float|array|null` and only ever narrows it in
-/// PHPDoc; the arrays it stores are lists of strings.
+/// PHPDoc; the arrays it stores are lists of strings. A question's default is declared as
+/// `string|bool|int|float|null` and its answer as `mixed`, but what reaches them is a string read
+/// from the input, a default of the same domain as an option's, a bool from a confirmation, or a
+/// list of strings from a multiselect choice; the answers also flow back into options and
+/// arguments.
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputValue {
     Null,
@@ -18,8 +23,8 @@ pub enum InputValue {
 impl InputValue {
     /// Narrows a PHP value to this domain.
     ///
-    /// TODO(type-model): the question helpers and the plugin bridge still hand back a
-    /// `PhpMixed`, so a value outside this domain can only be rejected here.
+    /// TODO(type-model): the plugin bridge still hands back a `PhpMixed`, so a value outside this
+    /// domain can only be rejected here.
     pub fn from_php_mixed(value: &PhpMixed) -> Self {
         use shirabe_php_shim::PhpMixed;
         match value {

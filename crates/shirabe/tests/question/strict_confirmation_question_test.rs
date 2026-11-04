@@ -3,8 +3,7 @@
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::question::StrictConfirmationQuestion;
 use shirabe_php_shim::{
-    PhpMixed, PhpResource, bconcat, error_message, fwrite_resource, php_fopen_resource, php_str,
-    rewind,
+    PhpResource, bconcat, error_message, fwrite_resource, php_fopen_resource, php_str, rewind,
 };
 use shirabe_symfony_console::helper::{QuestionHelper, QuestionHelperInterface};
 use shirabe_symfony_console::input::{
@@ -60,7 +59,7 @@ fn test_ask_confirmation() {
                 .ask(&mut input, create_output_interface(), question.inner())
                 .unwrap()
                 .unwrap(),
-            PhpMixed::Bool(expected),
+            InputValue::Bool(expected),
             "confirmation question should {}",
             if expected { "pass" } else { "cancel" }
         );
@@ -93,7 +92,7 @@ fn test_ask_confirmation_with_custom_true_and_false_answer() {
             .ask(&mut input, create_output_interface(), question.inner())
             .unwrap()
             .unwrap(),
-        PhpMixed::Bool(true)
+        InputValue::Bool(true)
     );
 
     let (mut input, mut dialog) = create_input(BStr::new("nein\n"));
@@ -102,7 +101,7 @@ fn test_ask_confirmation_with_custom_true_and_false_answer() {
             .ask(&mut input, create_output_interface(), question.inner())
             .unwrap()
             .unwrap(),
-        PhpMixed::Bool(false)
+        InputValue::Bool(false)
     );
 }
 

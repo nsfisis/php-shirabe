@@ -1,22 +1,22 @@
 //! ref: composer/vendor/symfony/console/Helper/QuestionHelper.php
 
 use crate::cursor::Cursor;
-use crate::exception::{MissingInputException, RuntimeException};
+use crate::exception::{InvalidArgumentException, MissingInputException, RuntimeException};
 use crate::formatter::{OutputFormatter, OutputFormatterStyle};
 use crate::helper::{FormatBlockMessages, Helper, HelperInterface, HelperSet};
-use crate::input::InputInterface;
+use crate::input::{InputInterface, InputValue};
 use crate::output::{
     ConsoleOutput, ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
 };
-use crate::question::{ChoiceQuestion, QuestionInterface};
+use crate::question::{ChoiceQuestion, QuestionInterface, array_key};
 use crate::terminal::Terminal;
 use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc,
-    fgets, fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
-    path_from_bytes, path_to_bytes, php_fopen_resource, php_to_string, rewind, rtrim,
-    sapi_windows_cp_conv, sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand,
-    str_repeat, stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
+    Exception, PHP_EOL, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc, fgets,
+    fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
+    path_from_bytes, path_to_bytes, php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv,
+    sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat,
+    stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
     stream_set_blocking, strlen, substr, sys_get_temp_dir, trim, unlink,
 };
 use shirabe_symfony_string::s;
@@ -49,7 +49,7 @@ pub trait QuestionHelperInterface {
         input: &mut dyn InputInterface,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
-    ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
+    ) -> anyhow::Result<Result<InputValue, MissingInputException>> {
         let mut output = output;
         let error_output = {
             let borrowed = output.borrow();
@@ -63,7 +63,7 @@ pub trait QuestionHelperInterface {
         }
 
         if !input.is_interactive() {
-            return Ok(Ok(self.inner().get_default_answer(question)));
+            return Ok(Ok(self.inner().get_default_answer(question)?));
         }
 
         if let Some(streamable) = input.as_streamable()
@@ -72,7 +72,7 @@ pub trait QuestionHelperInterface {
             self.inner_mut().input_stream = Some(stream);
         }
 
-        let result: anyhow::Result<Result<PhpMixed, MissingInputException>> = (|| {
+        let result: anyhow::Result<Result<InputValue, MissingInputException>> = (|| {
             if question.get_validator().is_none() {
                 return self.do_ask(std::rc::Rc::clone(&output), question);
             }
@@ -88,8 +88,8 @@ pub trait QuestionHelperInterface {
             Err(exception) => {
                 input.set_interactive(false);
 
-                let fallback_output = self.inner().get_default_answer(question);
-                if matches!(fallback_output, PhpMixed::Null) {
+                let fallback_output = self.inner().get_default_answer(question)?;
+                if fallback_output.is_null() {
                     return Ok(Err(exception));
                 }
 
@@ -103,13 +103,13 @@ pub trait QuestionHelperInterface {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
-    ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
+    ) -> anyhow::Result<Result<InputValue, MissingInputException>> {
         self.write_prompt(std::rc::Rc::clone(&output), question);
 
         let input_stream = self.inner().input_stream.clone().unwrap_or_else(stdin);
         let autocomplete = question.get_autocompleter_callback();
 
-        let ret: PhpMixed;
+        let ret: BString;
 
         if let Some(autocomplete) = autocomplete
             && STTY.load(std::sync::atomic::Ordering::SeqCst)
@@ -128,13 +128,14 @@ pub trait QuestionHelperInterface {
                 Ok(value) => value,
                 Err(exception) => return Ok(Err(exception)),
             };
-            ret = PhpMixed::string(if question.is_trimmable() {
+            ret = if question.is_trimmable() {
                 trim(&autocomplete)
             } else {
                 autocomplete
-            });
+            };
         } else {
-            let mut r: PhpMixed = PhpMixed::Bool(false);
+            // `false` until a response is read.
+            let mut r: Option<BString> = None;
             if question.is_hidden() {
                 match self.inner().get_hidden_response(
                     std::rc::Rc::clone(&output),
@@ -142,7 +143,7 @@ pub trait QuestionHelperInterface {
                     question.is_trimmable(),
                 )? {
                     Ok(hidden_response) => {
-                        r = PhpMixed::string(if question.is_trimmable() {
+                        r = Some(if question.is_trimmable() {
                             trim(&hidden_response)
                         } else {
                             hidden_response
@@ -156,42 +157,44 @@ pub trait QuestionHelperInterface {
                 }
             }
 
-            if matches!(r, PhpMixed::Bool(false)) {
-                let is_blocked = stream_get_meta_data(&input_stream).blocked;
+            ret = match r {
+                Some(r) => r,
+                None => {
+                    let is_blocked = stream_get_meta_data(&input_stream).blocked;
 
-                if !is_blocked {
-                    stream_set_blocking(&input_stream, true);
-                }
+                    if !is_blocked {
+                        stream_set_blocking(&input_stream, true);
+                    }
 
-                let read = self.inner().read_input(&input_stream, question);
+                    let read = self.inner().read_input(&input_stream, question);
 
-                if !is_blocked {
-                    stream_set_blocking(&input_stream, false);
-                }
+                    if !is_blocked {
+                        stream_set_blocking(&input_stream, false);
+                    }
 
-                if matches!(read, PhpMixed::Bool(false)) {
-                    return Ok(Err(MissingInputException::new("Aborted.")));
+                    let Some(read) = read else {
+                        return Ok(Err(MissingInputException::new("Aborted.")));
+                    };
+                    if question.is_trimmable() {
+                        trim(&read)
+                    } else {
+                        read
+                    }
                 }
-                r = read;
-                if question.is_trimmable() {
-                    r = PhpMixed::string(trim(php_to_string(&r)));
-                }
-            }
-            ret = r;
+            };
         }
 
-        let mut ret = ret;
         {
             let borrowed = output.borrow();
             if let Some(section_output) =
                 (*borrowed).as_any().downcast_ref::<ConsoleSectionOutput>()
             {
-                section_output.add_content(php_to_string(&ret).as_bstr());
+                section_output.add_content(ret.as_bstr());
             }
         }
 
-        ret = if strlen(php_to_string(&ret)) > 0 {
-            ret
+        let ret = if strlen(&ret) > 0 {
+            InputValue::String(ret)
         } else {
             question.get_default()
         };
@@ -206,10 +209,10 @@ pub trait QuestionHelperInterface {
     /// Validates an attempt (PHP private; on the trait so it can late-bind the hooks).
     fn validate_attempts(
         &self,
-        interviewer: &dyn Fn() -> anyhow::Result<Result<PhpMixed, MissingInputException>>,
+        interviewer: &dyn Fn() -> anyhow::Result<Result<InputValue, MissingInputException>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
-    ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
+    ) -> anyhow::Result<Result<InputValue, MissingInputException>> {
         let mut error: Option<Exception> = None;
         let mut attempts = question.get_max_attempts();
 
@@ -230,7 +233,7 @@ pub trait QuestionHelperInterface {
                 Err(missing) => return Ok(Err(missing)),
             };
 
-            match question.get_validator().unwrap()(Some(interviewed)) {
+            match question.get_validator().unwrap()(interviewed) {
                 Ok(value) => return Ok(Ok(value)),
                 Err(e) => {
                     // PHP: `catch (RuntimeException $e) { throw $e; } catch (\Exception $error) {}`.
@@ -288,42 +291,42 @@ impl QuestionHelper {
         STTY.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
-    fn get_default_answer(&self, question: &impl QuestionInterface) -> PhpMixed {
+    fn get_default_answer(
+        &self,
+        question: &impl QuestionInterface,
+    ) -> Result<InputValue, InvalidArgumentException> {
         let default = question.get_default();
 
-        if matches!(default, PhpMixed::Null) {
-            return default;
+        if default.is_null() {
+            return Ok(default);
         }
 
         if let Some(validator) = question.get_validator() {
             // call_user_func($question->getValidator(), $default)
-            return validator(Some(default)).unwrap();
+            return validator(default);
         } else if let Some(choice_question) = question.as_choice() {
             let choices = choice_question.get_choices();
 
             if !choice_question.is_multiselect() {
-                return choices
-                    .get(B(&php_to_string(&default)))
+                return Ok(choices
+                    .get(B(&array_key(&default)))
                     .cloned()
-                    .unwrap_or(default);
+                    .map(InputValue::String)
+                    .unwrap_or(default));
             }
 
-            let default_parts = explode(",", php_to_string(&default));
-            let mut resolved: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
-            for (k, v) in default_parts.iter().enumerate() {
-                let v = if question.is_trimmable() {
-                    trim(v)
-                } else {
-                    v.clone()
-                };
-                let value = choices.get(B(&v)).cloned().unwrap_or(PhpMixed::string(v));
-                resolved.insert(bconcat!(k), value);
-            }
+            let resolved: Vec<BString> = explode(",", default.to_php_string())
+                .into_iter()
+                .map(|v| {
+                    let v = if question.is_trimmable() { trim(&v) } else { v };
+                    choices.get(B(&v)).cloned().unwrap_or(v)
+                })
+                .collect();
 
-            return PhpMixed::Array(resolved);
+            return Ok(InputValue::Array(resolved));
         }
 
-        default
+        Ok(default)
     }
 
     /// Outputs the question prompt.
@@ -363,15 +366,7 @@ impl QuestionHelper {
             let padding = str_repeat(" ", (max_width - Helper::width(key)) as usize);
 
             messages.push(bconcat!(
-                "  [<",
-                tag,
-                ">",
-                key,
-                padding,
-                "</",
-                tag,
-                ">] ",
-                php_to_string(value),
+                "  [<", tag, ">", key, padding, "</", tag, ">] ", value,
             ));
         }
 
@@ -407,7 +402,7 @@ impl QuestionHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
         input_stream: &PhpResource,
-        autocomplete: &dyn Fn(&BStr) -> Vec<PhpMixed>,
+        autocomplete: &dyn Fn(&BStr) -> Vec<BString>,
     ) -> Result<BString, MissingInputException> {
         let cursor = Cursor::new(std::rc::Rc::clone(&output), Some(input_stream.clone()));
 
@@ -453,7 +448,7 @@ impl QuestionHelper {
             if c.is_none()
                 || (ret.is_empty()
                     && c.as_deref() == Some(b"".as_slice())
-                    && matches!(question.get_default(), PhpMixed::Null))
+                    && question.get_default().is_null())
             {
                 shell_exec(bconcat!("stty ", stty_mode));
                 return Err(MissingInputException::new("Aborted."));
@@ -500,7 +495,7 @@ impl QuestionHelper {
                 if c.as_deref() == Some(b"\t".as_slice()) || c.as_deref() == Some(b"\n".as_slice())
                 {
                     if num_matches > 0 && -1 != ofs {
-                        ret = php_to_string(&matches[ofs as usize]);
+                        ret = matches[ofs as usize].clone();
                         // Echo out remaining chars for current match
                         let remaining_characters = substr(
                             &ret,
@@ -523,7 +518,7 @@ impl QuestionHelper {
                             .into_iter()
                             .filter(|m| {
                                 ret_for_filter.is_empty()
-                                    || php_to_string(m).starts_with(ret_for_filter.as_slice())
+                                    || m.starts_with(ret_for_filter.as_slice())
                             })
                             .collect();
                         ofs = -1;
@@ -579,7 +574,7 @@ impl QuestionHelper {
 
                 for value in autocomplete(ret.as_ref()) {
                     // If typed characters match the beginning chunk of value (e.g. [AcmeDe]moBundle)
-                    if php_to_string(&value).starts_with(temp_ret.as_slice()) {
+                    if value.starts_with(temp_ret.as_slice()) {
                         if (num_matches as usize) < matches.len() {
                             matches[num_matches as usize] = value;
                         } else {
@@ -601,7 +596,7 @@ impl QuestionHelper {
                     &[bconcat!(
                         "<hl>",
                         OutputFormatter::escape_trailing_backslash(substr(
-                            php_to_string(&matches[ofs as usize]),
+                            &matches[ofs as usize],
                             characters_entered,
                             None,
                         )),
@@ -713,27 +708,20 @@ impl QuestionHelper {
         value
     }
 
-    /// Reads one or more lines of input and returns what is read.
+    /// Reads one or more lines of input and returns what is read, or `None` for PHP's `false`.
     fn read_input(
         &self,
         input_stream: &PhpResource,
         question: &impl QuestionInterface,
-    ) -> PhpMixed {
+    ) -> Option<BString> {
         if !question.is_multiline() {
             let cp = self.set_io_codepage();
             let ret = fgets(input_stream, Some(4096));
 
-            return self.reset_io_codepage(
-                cp,
-                ret.map(PhpMixed::String).unwrap_or(PhpMixed::Bool(false)),
-            );
+            return self.reset_io_codepage(cp, ret);
         }
 
-        let multi_line_stream_reader = self.clone_input_stream(input_stream);
-        let multi_line_stream_reader = match multi_line_stream_reader {
-            Some(reader) => reader,
-            None => return PhpMixed::Bool(false),
-        };
+        let multi_line_stream_reader = self.clone_input_stream(input_stream)?;
 
         let mut ret = BString::default();
         let cp = self.set_io_codepage();
@@ -749,7 +737,7 @@ impl QuestionHelper {
             ret.extend_from_slice(&char);
         }
 
-        self.reset_io_codepage(cp, PhpMixed::String(ret))
+        self.reset_io_codepage(cp, Some(ret))
     }
 
     /// Sets console I/O to the host code page.
@@ -765,16 +753,20 @@ impl QuestionHelper {
     }
 
     /// Sets console I/O to the specified code page and converts the user input.
-    fn reset_io_codepage(&self, cp: i64, input: PhpMixed) -> PhpMixed {
+    ///
+    /// `None` stands for PHP's `false`.
+    fn reset_io_codepage(&self, cp: i64, input: Option<BString>) -> Option<BString> {
         let mut input = input;
         if 0 != cp {
             sapi_windows_cp_set(cp);
 
-            if !matches!(input, PhpMixed::Bool(false)) && !php_to_string(&input).is_empty() {
-                input = PhpMixed::string(sapi_windows_cp_conv(
+            if let Some(value) = &input
+                && !value.is_empty()
+            {
+                input = Some(sapi_windows_cp_conv(
                     sapi_windows_cp_get(Some(BStr::new("oem"))),
                     cp,
-                    &php_to_string(&input),
+                    value,
                 ));
             }
         }

@@ -6,14 +6,13 @@ use crate::question::StrictConfirmationQuestion;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
-    PhpMixed, array_search, bconcat, canonical_int_key, display_to_bytes, error_message,
-    in_array_strict, is_array, is_string, mb_check_encoding, mb_convert_encoding, memory_get_usage,
-    microtime, preg_replace, str_repeat, strip_tags, strlen,
+    bconcat, canonical_int_key, display_to_bytes, error_message, mb_check_encoding,
+    mb_convert_encoding, memory_get_usage, microtime, preg_replace, str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
     ProgressBar, QuestionHelper, QuestionHelperInterface, Table,
 };
-use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::{
     ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface,
 };
@@ -250,6 +249,14 @@ impl ConsoleIO {
         mb_convert_encoding(string, "UTF-8", "UTF-8")
     }
 
+    /// PHP: `is_string($default) ? self::sanitize($default) : $default`.
+    fn sanitize_default(default: InputValue) -> InputValue {
+        match default {
+            InputValue::String(default) => InputValue::String(Self::sanitize(default, true)),
+            other => other,
+        }
+    }
+
     /// Delegates to `QuestionHelper::ask`.
     ///
     /// PHP: `$helper->ask($this->input, $this->getErrorOutput(), $question)`.
@@ -257,7 +264,7 @@ impl ConsoleIO {
     /// propagate to the caller. The double `Result` is flattened: the inner
     /// `MissingInputException` is wrapped with its concrete type preserved so that
     /// `Application`'s `instanceof ExceptionInterface` downcast still recognizes it.
-    fn ask_question(&self, question: &impl QuestionInterface) -> anyhow::Result<PhpMixed> {
+    fn ask_question(&self, question: &impl QuestionInterface) -> anyhow::Result<InputValue> {
         let error_output = self.get_error_output();
         let mut question_helper = self.question_helper.borrow_mut();
         let mut input = self.input.borrow_mut();
@@ -328,17 +335,11 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.do_overwrite(message, newline, size, true, verbosity);
     }
 
-    fn ask_bytes(&self, question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(question, true);
-        let sanitized_default = if is_string(&default) {
-            Some(PhpMixed::string(Self::sanitize(
-                default.as_string().unwrap_or_default(),
-                true,
-            )))
-        } else {
-            Some(default)
-        };
-        let question = Question::new(sanitized_question, sanitized_default);
+    fn ask_bytes(&self, question: &bstr::BStr, default: InputValue) -> anyhow::Result<InputValue> {
+        let question = Question::new(
+            Self::sanitize(question, true),
+            Self::sanitize_default(default),
+        );
 
         self.ask_question(&question)
     }
@@ -353,42 +354,29 @@ impl IOInterfaceImmutable for ConsoleIO {
         );
 
         let result = self.ask_question(&question)?;
-        Ok(result.as_bool().unwrap_or(false))
+        Ok(result
+            .as_bool()
+            .expect("the StrictConfirmationQuestion validator only lets a bool through"))
     }
 
     fn ask_and_validate_bytes(
         &self,
         question: &bstr::BStr,
-        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
         attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(question, true);
-        let sanitized_default = if is_string(&default) {
-            Some(PhpMixed::string(Self::sanitize(
-                default.as_string().unwrap_or_default(),
-                true,
-            )))
-        } else {
-            Some(default)
-        };
-        let mut question = Question::new(sanitized_question, sanitized_default);
-        // Question::set_validator takes Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>;
-        // adapt the None answer to PHP's null and translate the validator's anyhow error into the
-        // InvalidArgumentException the Question validator type expects (QuestionHelper retries on it).
-        let adapted: Box<
-            dyn Fn(
-                Option<PhpMixed>,
-            ) -> Result<
-                PhpMixed,
-                shirabe_symfony_console::exception::InvalidArgumentException,
-            >,
-        > = Box::new(move |answer: Option<PhpMixed>| {
-            validator(answer.unwrap_or(PhpMixed::Null)).map_err(|e| {
+        default: InputValue,
+    ) -> anyhow::Result<InputValue> {
+        let mut question = Question::new(
+            Self::sanitize(question, true),
+            Self::sanitize_default(default),
+        );
+        // QuestionHelper retries on the InvalidArgumentException the Question validator returns,
+        // as PHP retries on any `\Exception`.
+        question.set_validator(Some(Box::new(move |answer: InputValue| {
+            validator(answer).map_err(|e| {
                 shirabe_symfony_console::exception::InvalidArgumentException::new(error_message(&e))
             })
-        });
-        question.set_validator(Some(adapted));
+        })));
         question.set_max_attempts(attempts)?;
 
         self.ask_question(&question)
@@ -399,119 +387,73 @@ impl IOInterfaceImmutable for ConsoleIO {
         question: &bstr::BStr,
     ) -> anyhow::Result<Option<bstr::BString>> {
         let sanitized_question = Self::sanitize(question, true);
-        let mut question = Question::new(sanitized_question, Some(PhpMixed::Null));
+        let mut question = Question::new(sanitized_question, InputValue::Null);
         // setHidden only throws when an autocompleter is set, which is not the case here.
         question
             .set_hidden(true)
             .expect("a freshly constructed question has no autocompleter");
 
-        let result = self.ask_question(&question)?;
-        Ok(result.as_string().map(BString::from))
+        match self.ask_question(&question)? {
+            InputValue::String(answer) => Ok(Some(answer)),
+            InputValue::Null => Ok(None),
+            other => panic!("a hidden question answered {:?}, not a string", other),
+        }
     }
 
     fn select_bytes(
         &self,
         question: &bstr::BStr,
-        choices: PhpMixed,
-        default: PhpMixed,
-        attempts: PhpMixed,
+        choices: IndexMap<BString, BString>,
+        default: InputValue,
+        attempts: Option<i64>,
         error_message: &bstr::BStr,
         multiselect: bool,
-    ) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(question, true);
-        // ChoiceQuestion::new expects an IndexMap<BString, PhpMixed>; project the
-        // sanitized choice list/map into the keyed form, preserving keys.
-        let sanitize_choice = |choice: &PhpMixed| {
-            PhpMixed::string(Self::sanitize(choice.as_string().unwrap_or_default(), true))
-        };
-        let sanitized_choices: IndexMap<BString, PhpMixed> = match &choices {
-            PhpMixed::List(l) => l
-                .iter()
-                .enumerate()
-                .map(|(i, choice)| (bconcat!(i), sanitize_choice(choice)))
-                .collect(),
-            PhpMixed::Array(a) => a
-                .iter()
-                .map(|(key, choice)| (key.clone(), sanitize_choice(choice)))
-                .collect(),
-            other => indexmap! { "0".into() => sanitize_choice(other) },
-        };
-        let sanitized_default = if is_string(&default) {
-            Some(PhpMixed::string(Self::sanitize(
-                default.as_string().unwrap_or_default(),
-                true,
-            )))
-        } else {
-            Some(default)
-        };
+    ) -> anyhow::Result<InputValue> {
+        let sanitized_choices: IndexMap<BString, BString> = choices
+            .iter()
+            .map(|(key, choice)| (key.clone(), Self::sanitize(choice, true)))
+            .collect();
         // Empty choices raise a LogicException (programmer error in PHP).
-        let mut question =
-            ChoiceQuestion::new(sanitized_question, sanitized_choices, sanitized_default)
-                .expect("select() always provides at least one choice");
+        let mut question = ChoiceQuestion::new(
+            Self::sanitize(question, true),
+            sanitized_choices,
+            Self::sanitize_default(default),
+        )
+        .expect("select() always provides at least one choice");
         // PHP: IOInterface requires false, and Question requires null or int
-        let max_attempts = match attempts {
-            PhpMixed::Bool(false) => None,
-            PhpMixed::Int(i) => Some(i),
-            _ => None,
-        };
         question
-            .set_max_attempts(max_attempts)
+            .set_max_attempts(attempts.filter(|&attempts| attempts != 0))
             .expect("select() max attempts must be a positive value");
         question.set_error_message(error_message);
         question.set_multiselect(multiselect);
 
-        let result: PhpMixed = self.ask_question(&question)?;
+        let result = self.ask_question(&question)?;
 
         // PHP: $isAssoc = (bool) \count(array_filter(array_keys($choices), 'is_string'));
-        let choice_keys: Vec<BString> = match &choices {
-            PhpMixed::Array(a) => a.keys().cloned().collect(),
-            PhpMixed::List(_) => vec![],
-            _ => vec![],
-        };
-        let is_assoc =
-            !choice_keys.is_empty() && choice_keys.iter().any(|k| canonical_int_key(k).is_none());
+        let is_assoc = choices.keys().any(|k| canonical_int_key(k).is_none());
         if is_assoc {
             return Ok(result);
         }
 
-        if !is_array(&result) {
-            let haystack: IndexMap<BString, BString> = match &choices {
-                PhpMixed::List(l) => l
+        let InputValue::Array(result) = result else {
+            // (string) array_search($result, $choices, true)
+            return Ok(InputValue::String(
+                choices
                     .iter()
-                    .enumerate()
-                    .filter_map(|(i, v)| v.as_string().map(|s| (bconcat!(i), BString::from(s))))
-                    .collect(),
-                PhpMixed::Array(a) => a
-                    .iter()
-                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), BString::from(s))))
-                    .collect(),
-                _ => IndexMap::new(),
-            };
-            return Ok(PhpMixed::string(
-                array_search(result.as_string().unwrap_or_default(), &haystack).unwrap_or_default(),
+                    .find(|(_, choice)| InputValue::String((*choice).clone()) == result)
+                    .map(|(index, _)| index.clone())
+                    .unwrap_or_default(),
             ));
-        }
+        };
 
         let mut results: Vec<BString> = vec![];
-        let result_list: Vec<PhpMixed> = result.as_list().cloned().unwrap_or_default();
-        let choice_list: Vec<(BString, PhpMixed)> = match &choices {
-            PhpMixed::List(l) => l
-                .iter()
-                .enumerate()
-                .map(|(i, v)| (bconcat!(i), v.clone()))
-                .collect(),
-            PhpMixed::Array(a) => a.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-            _ => vec![],
-        };
-        for (index, choice) in &choice_list {
-            if in_array_strict(choice.clone(), &result_list) {
+        for (index, choice) in &choices {
+            if result.contains(choice) {
                 results.push(index.clone());
             }
         }
 
-        Ok(PhpMixed::List(
-            results.into_iter().map(PhpMixed::String).collect(),
-        ))
+        Ok(InputValue::Array(results))
     }
 
     fn get_authentications(

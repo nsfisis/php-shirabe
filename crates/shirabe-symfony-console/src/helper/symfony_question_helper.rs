@@ -3,12 +3,10 @@
 use crate::formatter::OutputFormatter;
 use crate::helper::{QuestionHelper, QuestionHelperInterface};
 use crate::output::{OutputInterface, output_interface};
-use crate::question::QuestionInterface;
+use crate::question::{QuestionInterface, array_key};
 use crate::style::{StyleInterface, SymfonyStyle};
 use bstr::{B, BString};
-use shirabe_php_shim::{
-    Exception, PhpMixed, bconcat, boolval, explode, implode, php_os_family, php_to_string, trim,
-};
+use shirabe_php_shim::{Exception, bconcat, explode, implode, php_os_family, trim};
 use std::ops::{Deref, DerefMut};
 
 /// Symfony Style Guide compliant question helper.
@@ -53,23 +51,23 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
         }
 
         // switch (true)
-        if matches!(default, PhpMixed::Null) {
+        if default.is_null() {
             text = bconcat!(" <info>", text, "</info>:");
         } else if question.as_confirmation().is_some() {
             text = bconcat!(
                 " <info>",
                 text,
                 " (yes/no)</info> [<comment>",
-                if boolval(&default) { "yes" } else { "no" },
+                if default.to_bool() { "yes" } else { "no" },
                 "</comment>]:",
             );
         } else if let Some(choice_question) = question.as_choice().filter(|q| q.is_multiselect()) {
             let choices = choice_question.get_choices();
-            let default_parts = explode(",", php_to_string(&default));
+            let default_parts = explode(",", default.to_php_string());
 
             let resolved: Vec<BString> = default_parts
                 .iter()
-                .map(|value| php_to_string(choices.get(B(&trim(value))).unwrap()))
+                .map(|value| choices.get(B(&trim(value))).unwrap().clone())
                 .collect();
 
             text = bconcat!(
@@ -82,14 +80,14 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
         } else if let Some(choice_question) = question.as_choice() {
             let choices = choice_question.get_choices();
             let shown = choices
-                .get(B(&php_to_string(&default)))
+                .get(B(&array_key(&default)))
                 .cloned()
-                .unwrap_or(default);
+                .unwrap_or_else(|| default.to_php_string());
             text = bconcat!(
                 " <info>",
                 text,
                 "</info> [<comment>",
-                OutputFormatter::escape(php_to_string(&shown)).unwrap(),
+                OutputFormatter::escape(shown).unwrap(),
                 "</comment>]:",
             );
         } else {
@@ -97,7 +95,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
                 " <info>",
                 text,
                 "</info> [<comment>",
-                OutputFormatter::escape(php_to_string(&default)).unwrap(),
+                OutputFormatter::escape(default.to_php_string()).unwrap(),
                 "</comment>]:",
             );
         }

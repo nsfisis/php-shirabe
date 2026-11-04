@@ -899,9 +899,9 @@ impl Command for InitCommand {
             name = BString::from(io
             .ask_and_validate(
                 bconcat!("Package name (<vendor>/<name>) [<comment>", name_default, "</comment>]: "),
-                Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
+                Box::new(move |value: InputValue| -> anyhow::Result<InputValue> {
                     if value.is_null() {
-                        return Ok(PhpMixed::string(name_for_validate.clone()));
+                        return Ok(InputValue::String(name_for_validate.clone()));
                     }
 
                     if !preg_is_match(
@@ -917,7 +917,7 @@ impl Command for InitCommand {
                     Ok(value)
                 }),
                 None,
-                PhpMixed::string(name.clone()),
+                InputValue::String(name.clone()),
             )?
             .as_string()
             .unwrap_or_default());
@@ -937,13 +937,9 @@ impl Command for InitCommand {
                     description.unwrap_or_default(),
                     "</comment>]: "
                 ),
-                description_default
-                    .map(PhpMixed::string)
-                    .unwrap_or(PhpMixed::Null),
+                InputValue::from(description_default),
             )?;
-            input
-                .borrow_mut()
-                .set_option("description", InputValue::from_php_mixed(&description));
+            input.borrow_mut().set_option("description", description);
 
             let author_option = input
                 .borrow()
@@ -972,10 +968,10 @@ impl Command for InitCommand {
                 // The validator is a `'static` closure and cannot borrow `&self`, but
                 // parse_author_string is stateless (it only delegates to the stateless
                 // is_valid_email), so a fresh InitCommand stands in for `$self` here.
-                Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
+                Box::new(move |value: InputValue| -> anyhow::Result<InputValue> {
                     let value_str = value.as_string();
                     if value_str == Some("n".into()) || value_str == Some("no".into()) {
-                        return Ok(PhpMixed::Null);
+                        return Ok(InputValue::Null);
                     }
                     // PHP: $value = $value ?: $author
                     let value = match value_str {
@@ -989,16 +985,14 @@ impl Command for InitCommand {
                         .flatten()
                         .unwrap_or_default();
                     match parsed.get(bstr::B("email")).cloned().flatten() {
-                        None => Ok(PhpMixed::string(name)),
-                        Some(email) => Ok(PhpMixed::string(bconcat!(name, " <", email, ">"))),
+                        None => Ok(InputValue::String(name)),
+                        Some(email) => Ok(InputValue::String(bconcat!(name, " <", email, ">"))),
                     }
                 }),
                 None,
-                PhpMixed::string(author_default),
+                InputValue::String(author_default),
             )?;
-            input
-                .borrow_mut()
-                .set_option("author", InputValue::from_php_mixed(&author_value));
+            input.borrow_mut().set_option("author", author_value);
 
             let minimum_stability = input
                 .borrow()
@@ -1013,12 +1007,9 @@ impl Command for InitCommand {
                     minimum_stability.unwrap_or_default(),
                     "</comment>]: "
                 ),
-                Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
+                Box::new(move |value: InputValue| -> anyhow::Result<InputValue> {
                     if value.is_null() {
-                        return Ok(minimum_stability_for_validate
-                            .clone()
-                            .map(PhpMixed::string)
-                            .unwrap_or(PhpMixed::Null));
+                        return Ok(InputValue::from(minimum_stability_for_validate.clone()));
                     }
 
                     if base_package::stability_priority(value.as_string().unwrap_or_default())
@@ -1042,15 +1033,11 @@ impl Command for InitCommand {
                     Ok(value)
                 }),
                 None,
-                minimum_stability_default
-                    .clone()
-                    .map(PhpMixed::string)
-                    .unwrap_or(PhpMixed::Null),
+                InputValue::from(minimum_stability_default.clone()),
             )?;
-            input.borrow_mut().set_option(
-                "stability",
-                InputValue::from_php_mixed(&minimum_stability_value),
-            );
+            input
+                .borrow_mut()
+                .set_option("stability", minimum_stability_value);
 
             let type_val = input.borrow().get_option("type")?;
             let type_str = BString::from(type_val.as_string().unwrap_or_default());
@@ -1060,16 +1047,14 @@ impl Command for InitCommand {
                     type_str,
                     "</comment>]: "
                 ),
-                type_val.into(),
+                type_val,
             )?;
             if type_value.as_string() == Some("".into())
-                || matches!(type_value, PhpMixed::Bool(false))
+                || matches!(type_value, InputValue::Bool(false))
             {
-                type_value = PhpMixed::Null;
+                type_value = InputValue::Null;
             }
-            input
-                .borrow_mut()
-                .set_option("type", InputValue::from_php_mixed(&type_value));
+            input.borrow_mut().set_option("type", type_value);
 
             let mut license = input
                 .borrow()
@@ -1094,7 +1079,7 @@ impl Command for InitCommand {
                     license.clone().unwrap_or_default(),
                     "</comment>]: "
                 ),
-                license.map(PhpMixed::string).unwrap_or(PhpMixed::Null),
+                InputValue::from(license),
             )?;
             let spdx = SpdxLicenses::new();
             if !license.is_null()
@@ -1104,9 +1089,7 @@ impl Command for InitCommand {
                 return Err(InvalidArgumentException::new(bconcat!("Invalid license provided: ", license.as_string().unwrap_or_default(), ". Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted."))
             .into());
             }
-            input
-                .borrow_mut()
-                .set_option("license", InputValue::from_php_mixed(&license));
+            input.borrow_mut().set_option("license", license);
 
             io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
 
@@ -1204,14 +1187,14 @@ impl Command for InitCommand {
             let autoload_default = autoload.clone();
             let autoload_value = io.ask_and_validate(
             bconcat!("Add PSR-4 autoload mapping? Maps namespace \"", namespace, "\" to the entered relative path. [<comment>", autoload, "</comment>, n to skip]: "),
-            Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
+            Box::new(move |value: InputValue| -> anyhow::Result<InputValue> {
                 if value.is_null() {
-                    return Ok(PhpMixed::string(autoload_for_validate.clone()));
+                    return Ok(InputValue::String(autoload_for_validate.clone()));
                 }
 
                 let value_str = BString::from(value.as_string().unwrap_or_default());
                 if value_str == "n" || value_str == "no" {
-                    return Ok(PhpMixed::Null);
+                    return Ok(InputValue::Null);
                 }
 
                 let value_or_default = if value_str.is_empty() {
@@ -1226,14 +1209,12 @@ impl Command for InitCommand {
                     .into());
                 }
 
-                Ok(PhpMixed::string(value_or_default))
+                Ok(InputValue::String(value_or_default))
             }),
             None,
-            PhpMixed::string(autoload_default),
+            InputValue::String(autoload_default),
         )?;
-            input
-                .borrow_mut()
-                .set_option("autoload", InputValue::from_php_mixed(&autoload_value));
+            input.borrow_mut().set_option("autoload", autoload_value);
 
             Ok(())
         })();

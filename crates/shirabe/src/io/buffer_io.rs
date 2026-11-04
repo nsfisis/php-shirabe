@@ -2,13 +2,14 @@
 
 use crate::io::ConsoleIO;
 use bstr::BString;
+use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, PhpResource, PregMatches, RuntimeException, SEEK_SET, bconcat, fopen, fseek,
-    fwrite, php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
+    PHP_EOL, PhpResource, PregMatches, RuntimeException, SEEK_SET, bconcat, fopen, fseek, fwrite,
+    php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
 };
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
 use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::input::{InputInterface, StringInput};
+use shirabe_symfony_console::input::{InputInterface, InputValue, StringInput};
 use shirabe_symfony_console::output::{OutputInterface, StreamOutput};
 
 #[derive(Debug)]
@@ -183,7 +184,7 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
         self.inner
             .overwrite_error_bytes(message, newline, size, verbosity)
     }
-    fn ask_bytes(&self, question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask_bytes(&self, question: &bstr::BStr, default: InputValue) -> anyhow::Result<InputValue> {
         self.inner.ask_bytes(question, default)
     }
     fn ask_confirmation_bytes(&self, question: &bstr::BStr, default: bool) -> anyhow::Result<bool> {
@@ -192,10 +193,10 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     fn ask_and_validate_bytes(
         &self,
         question: &bstr::BStr,
-        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
         attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> anyhow::Result<PhpMixed> {
+        default: InputValue,
+    ) -> anyhow::Result<InputValue> {
         self.inner
             .ask_and_validate_bytes(question, validator, attempts, default)
     }
@@ -208,12 +209,12 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     fn select_bytes(
         &self,
         question: &bstr::BStr,
-        choices: PhpMixed,
-        default: PhpMixed,
-        attempts: PhpMixed,
+        choices: IndexMap<BString, BString>,
+        default: InputValue,
+        attempts: Option<i64>,
         error_message: &bstr::BStr,
         multiselect: bool,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<InputValue> {
         self.inner.select_bytes(
             question,
             choices,

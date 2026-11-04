@@ -2,7 +2,7 @@
 
 use crate::formatter::{OutputFormatter, OutputFormatterInterface};
 use crate::helper::{Cell, Helper, QuestionHelperInterface, Row, SymfonyQuestionHelper, Table};
-use crate::input::InputInterface;
+use crate::input::{InputInterface, InputValue};
 use crate::output::{
     ConsoleOutput, ConsoleOutputInterface, OUTPUT_NORMAL, OutputInterface, TrimmedBufferOutput,
 };
@@ -12,8 +12,8 @@ use crate::style::style_interface::StyleInterface;
 use crate::terminal::Terminal;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, array_unshift, bconcat, boolval, explode, str_repeat, str_replace,
-    strlen, substr, substr_count, wordwrap,
+    AsAny, PHP_EOL, array_unshift, bconcat, explode, str_repeat, str_replace, strlen, substr,
+    substr_count, wordwrap,
 };
 
 /// Output decorator helpers for the Symfony Style Guide.
@@ -82,7 +82,7 @@ impl SymfonyStyle {
         self.new_line(1);
     }
 
-    pub fn ask_question(&self, question: &impl QuestionInterface) -> PhpMixed {
+    pub fn ask_question(&self, question: &impl QuestionInterface) -> InputValue {
         if self.input.borrow().is_interactive() {
             self.auto_prepend_block();
         }
@@ -355,7 +355,7 @@ impl StyleInterface for SymfonyStyle {
     fn confirm(&self, question: &BStr, default: bool) -> bool {
         let answer = self.ask_question(&ConfirmationQuestion::new(question, default, "/^y/i"));
 
-        boolval(&answer)
+        answer.to_bool()
     }
 
     fn new_line(&self, count: i64) {
@@ -388,9 +388,8 @@ mod tests {
         )));
         let output_handle: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = output.clone();
 
-        let mut question = Question::new("Value?", None);
-        question.set_validator(Some(Box::new(|answer: Option<PhpMixed>| {
-            let answer = answer.unwrap();
+        let mut question = Question::new("Value?", InputValue::Null);
+        question.set_validator(Some(Box::new(|answer: InputValue| {
             if answer.as_string() == Some(BStr::new("good")) {
                 Ok(answer)
             } else {

@@ -43,7 +43,9 @@ pub(crate) fn dispatch_io_method(
             Ok(PluginValue::Null)
         }
         // TODO(plugin): the remaining IOInterface surface (ask*, authentications, ...) is
-        // widened on demand, driven by explicit errors from real plugins.
+        // widened on demand, driven by explicit errors from real plugins. The ask* methods take
+        // `InputValue` defaults and validators, which cannot hold an int or float default, a
+        // non-string choice, or a validator returning any other PHP value.
         other => Err(unavailable_method("IO", other)),
     }
 }

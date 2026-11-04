@@ -5,9 +5,10 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interfac
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, bconcat, implode, parse_url, path_to_bytes,
-    php_regex, preg_match, stripos, strpos, trim,
+    LogicException, RuntimeException, bconcat, implode, parse_url, path_to_bytes, php_regex,
+    preg_match, stripos, strpos, trim,
 };
+use shirabe_symfony_console::input::InputValue;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -196,7 +197,7 @@ impl Svn {
         self.credentials = Some(SvnCredentials {
             username: self
                 .io
-                .ask("Username: ", PhpMixed::string(""))?
+                .ask("Username: ", InputValue::from(""))?
                 .as_string()
                 .unwrap_or_default()
                 .to_owned(),

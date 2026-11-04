@@ -28,7 +28,7 @@ use shirabe_semver::{Intervals, constraint::MultiConstraint};
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{
     command::Command,
-    helper::Table,
+    helper::{Cell, Table},
     input::{InputInterface, InputValue},
     output::OutputInterface,
 };
@@ -172,29 +172,20 @@ impl UpdateCommand {
 
         let select_result = io.select(
             "Select packages: (Select more than one value separated by comma) ",
-            PhpMixed::Array(
-                autocompleter_values
-                    .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
-                    .collect(),
-            ),
-            PhpMixed::Bool(false),
-            PhpMixed::Int(1),
+            autocompleter_values,
+            InputValue::Bool(false),
+            Some(1),
             "No package named \"%s\" is installed.",
             true,
         )?;
-        let packages: Vec<BString> = match select_result {
-            PhpMixed::List(l) => l
-                .into_iter()
-                .filter_map(|v| v.as_string().map(BString::from))
-                .collect(),
-            _ => Vec::new(),
+        let InputValue::Array(packages) = select_result else {
+            panic!("a multiselect answer is a list, not {:?}", select_result);
         };
 
         let mut table = Table::new(output);
         table.set_headers(vec!["Selected packages".into()]);
         for package in &packages {
-            table.add_row(PhpMixed::List(vec![PhpMixed::string(package.clone())]).into());
+            table.add_row(vec![Cell::from(package.clone())].into());
         }
         table.render()?;
 

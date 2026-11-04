@@ -10,6 +10,7 @@ use shirabe_php_shim::{
     php_regex, preg_replace, str_replace_array, strcmp, strlen, strpos, strrpos, substr, time,
     trim,
 };
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_process::{ExecutableFinder, Process};
 use std::path::{Path, PathBuf};
 
@@ -248,7 +249,7 @@ impl Perforce {
         }
         self.p4_user = self
             .io
-            .ask("Enter P4 User:", PhpMixed::Null)?
+            .ask("Enter P4 User:", InputValue::Null)?
             .as_string()
             .map(BStr::to_owned);
         let command = if self.windows_flag {

@@ -8,7 +8,7 @@ use crate::event_dispatcher::EventFlags;
 use crate::io::IOInterfaceWrite;
 use bstr::BString;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, basename, bconcat, chdir, getcwd, glob, impl_php_class,
+    RuntimeException, basename, bconcat, canonical_int_key, chdir, getcwd, glob, impl_php_class,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
@@ -126,23 +126,26 @@ impl Command for ExecCommand {
             let io = self.get_io();
             let binary = io.select(
                 "Binary to run: ",
-                PhpMixed::List(
-                    binaries
-                        .iter()
-                        .map(|b| PhpMixed::string(b.clone()))
-                        .collect(),
-                ),
-                PhpMixed::string(BString::default()),
-                PhpMixed::Int(1),
+                binaries
+                    .iter()
+                    .enumerate()
+                    .map(|(index, binary)| (bconcat!(index), binary.clone()))
+                    .collect(),
+                InputValue::from(""),
+                Some(1),
                 "Invalid binary name \"%s\"",
                 false,
             )?;
 
-            if let Some(idx) = binary.as_int() {
-                input
-                    .borrow_mut()
-                    .set_argument("binary", InputValue::String(binaries[idx as usize].clone()));
-            }
+            // $binaries[$binary]
+            let index = binary
+                .as_string()
+                .and_then(|index| canonical_int_key(index))
+                .expect("select() resolves a list choice to its index");
+            input.borrow_mut().set_argument(
+                "binary",
+                InputValue::String(binaries[index as usize].clone()),
+            );
 
             Ok(())
         })();

@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, array_splice, bconcat, explode, get_debug_type, http_build_query_mixed, implode,
     mb_detect_encoding, mb_str_split, mb_strwidth, php_regex, preg_is_match, sprintf, str_pad,
-    str_repeat, str_replace, strlen, strstr, substr_count, to_string,
+    str_repeat, str_replace, strlen, strstr, substr_count,
 };
 
 /// A single cell within a table row.
@@ -105,17 +105,6 @@ impl From<TableCell> for Cell {
     }
 }
 
-/// Bridges PHP-typed cell values built elsewhere in the codebase (where rows are still assembled as
-/// `PhpMixed`) onto the typed cell. A cell is a scalar or null; collections stringify as PHP would.
-impl From<PhpMixed> for Cell {
-    fn from(value: PhpMixed) -> Self {
-        match value {
-            PhpMixed::Null => Cell::Null,
-            other => Cell::Value(to_string(&other)),
-        }
-    }
-}
-
 /// A table row.
 ///
 /// PHP types a row as `array<int, Cell>|TableSeparator`. The header/body boundary that PHP creates
@@ -173,18 +162,6 @@ impl Row {
 impl From<Vec<Cell>> for Row {
     fn from(cells: Vec<Cell>) -> Self {
         Row::Cells(cells)
-    }
-}
-
-/// Bridges PHP-typed rows built elsewhere (still assembled as `PhpMixed`) onto the typed row.
-impl From<PhpMixed> for Row {
-    fn from(value: PhpMixed) -> Self {
-        match value {
-            PhpMixed::List(items) => Row::Cells(items.into_iter().map(Cell::from).collect()),
-            PhpMixed::Array(map) => Row::Cells(map.into_values().map(Cell::from).collect()),
-            PhpMixed::Null => Row::Cells(Vec::new()),
-            other => Row::Cells(vec![Cell::from(other)]),
-        }
     }
 }
 

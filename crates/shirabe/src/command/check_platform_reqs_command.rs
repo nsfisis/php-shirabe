@@ -11,9 +11,7 @@ use crate::repository::{
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    PhpMixed, array_merge_map, bconcat, impl_php_class, json_bytes, rtrim, strip_tags,
-};
+use shirabe_php_shim::{array_merge_map, bconcat, impl_php_class, json_bytes, rtrim, strip_tags};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
@@ -119,18 +117,18 @@ impl CheckPlatformReqsCommand {
 
             io.write(&JsonFile::encode(&rows)?);
         } else {
-            let rows: Vec<PhpMixed> = results
+            let rows: Vec<Vec<BString>> = results
                 .iter()
                 .map(|result| {
-                    Ok(PhpMixed::List(vec![
-                        PhpMixed::string(result.platform_package.clone()),
-                        PhpMixed::string(result.version.clone()),
+                    Ok(vec![
+                        result.platform_package.clone(),
+                        result.version.clone(),
                         match &result.link {
-                            Some(link) => PhpMixed::string(link.to_php_string()),
-                            None => PhpMixed::string(BString::default()),
+                            Some(link) => link.to_php_string(),
+                            None => BString::default(),
                         },
                         if let Some(link) = &result.link {
-                            PhpMixed::string(bconcat!(
+                            bconcat!(
                                 link.get_source(),
                                 " ",
                                 link.get_description(),
@@ -139,12 +137,12 @@ impl CheckPlatformReqsCommand {
                                 " (",
                                 link.get_pretty_constraint()?,
                                 ")"
-                            ))
+                            )
                         } else {
-                            PhpMixed::string(BString::default())
+                            BString::default()
                         },
-                        PhpMixed::string(rtrim(bconcat!(result.status, " ", result.provider))),
-                    ]))
+                        rtrim(bconcat!(result.status, " ", result.provider)),
+                    ])
                 })
                 .collect::<anyhow::Result<_>>()?;
 

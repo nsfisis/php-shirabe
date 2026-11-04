@@ -1,10 +1,10 @@
 //! ref: composer/tests/Composer/Test/IO/NullIOTest.php
 
 use bstr::BString;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, indexmap};
 use shirabe::io::null_io::NullIO;
 use shirabe::io::{IOInterfaceImmutable, IOInterfaceWrite};
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
 
 #[test]
 fn test_is_interactive() {
@@ -44,8 +44,8 @@ fn test_ask() {
     let io = NullIO::new();
 
     assert_eq!(
-        PhpMixed::string(BString::from("foo")),
-        io.ask("bar", PhpMixed::string(BString::from("foo")))
+        InputValue::String(BString::from("foo")),
+        io.ask("bar", InputValue::String(BString::from("foo")))
             .unwrap()
     );
 }
@@ -62,12 +62,12 @@ fn test_ask_and_validate() {
     let io = NullIO::new();
 
     assert_eq!(
-        PhpMixed::string(BString::from("foo")),
+        InputValue::String(BString::from("foo")),
         io.ask_and_validate(
             "question",
-            Box::new(|_x| Ok(PhpMixed::Bool(true))),
+            Box::new(|_x| Ok(InputValue::Bool(true))),
             None,
-            PhpMixed::string(BString::from("foo"))
+            InputValue::String(BString::from("foo"))
         )
         .unwrap()
     );
@@ -78,15 +78,15 @@ fn test_select() {
     let io = NullIO::new();
 
     assert_eq!(
-        PhpMixed::string(BString::from("1")),
+        InputValue::String(BString::from("1")),
         io.select(
             "question",
-            PhpMixed::List(vec![
-                PhpMixed::string(BString::from("item1")),
-                PhpMixed::string(BString::from("item2")),
-            ]),
-            PhpMixed::string(BString::from("1")),
-            PhpMixed::Int(2),
+            indexmap! {
+                BString::from("0") => BString::from("item1"),
+                BString::from("1") => BString::from("item2"),
+            },
+            InputValue::String(BString::from("1")),
+            Some(2),
             "foo",
             true
         )

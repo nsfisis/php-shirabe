@@ -23,7 +23,10 @@ use shirabe_php_shim::{
     preg_match, sprintf, strlen, strpos, trim, utf8_text,
 };
 use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
+use shirabe_symfony_console::{
+    input::{InputInterface, InputValue},
+    output::OutputInterface,
+};
 
 pub trait PackageDiscoveryTrait: BaseCommand {
     fn get_repos_mut(
@@ -220,7 +223,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
         let io = self.get_io();
         loop {
-            let package_input = io.ask("Search for a package: ", PhpMixed::Null)?;
+            let package_input = io.ask("Search for a package: ", InputValue::Null)?;
             let mut package = match package_input.as_string() {
                 Some(s) => BString::from(s),
                 None => break,
@@ -315,18 +318,18 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                     let matches_clone = matches.clone();
                     let version_parser_clone = version_parser.clone();
-                    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(
-                        move |selection_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
+                    let validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>> = Box::new(
+                        move |selection_mixed: InputValue| -> anyhow::Result<InputValue> {
                             let selection =
                                 BString::from(selection_mixed.as_string().unwrap_or_default());
                             if selection.is_empty() {
-                                return Ok(PhpMixed::Bool(false));
+                                return Ok(InputValue::Bool(false));
                             }
 
                             if is_numeric(&PhpMixed::string(selection.clone())) {
                                 let idx = intval(&PhpMixed::string(selection.clone())) as usize;
                                 if let Some(p) = matches_clone.get(idx) {
-                                    return Ok(PhpMixed::string(p.name.clone()));
+                                    return Ok(InputValue::String(p.name.clone()));
                                 }
                             }
 
@@ -339,7 +342,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                     // validate version constraint
                                     version_parser_clone.parse_constraints(&v)?;
 
-                                    return Ok(PhpMixed::string(bconcat!(
+                                    return Ok(InputValue::String(bconcat!(
                                         m.name("name").unwrap_or_default(),
                                         " ",
                                         v
@@ -347,7 +350,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 }
 
                                 // parsing `acme/example`
-                                return Ok(PhpMixed::string(m.name("name").unwrap_or_default()));
+                                return Ok(InputValue::String(BString::from(
+                                    m.name("name").unwrap_or_default(),
+                                )));
                             }
 
                             Err(Exception::new(BString::from("Not a valid selection")).into())
@@ -359,7 +364,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             "Enter package # to add, or the complete package name if it is not listed: ",
                             validator,
                             Some(3),
-                            PhpMixed::string(BString::default()),
+                            InputValue::from(""),
                         )?
                         .as_string()
                         .map(BString::from)
@@ -368,13 +373,13 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                 // no constraint yet, determine the best version automatically
                 if !package.is_empty() && strpos(&package, " ").is_none() {
-                    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
-                        Box::new(|input_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
+                    let validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>> =
+                        Box::new(|input_mixed: InputValue| -> anyhow::Result<InputValue> {
                             let input = trim(input_mixed.as_string().unwrap_or_default());
                             if strlen(&input) > 0 {
-                                Ok(PhpMixed::string(input))
+                                Ok(InputValue::String(input))
                             } else {
-                                Ok(PhpMixed::Bool(false))
+                                Ok(InputValue::Bool(false))
                             }
                         });
 
@@ -382,11 +387,11 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         "Enter the version constraint to require (or leave blank to use the latest version): ",
                         validator,
                         Some(3),
-                        PhpMixed::string(BString::default()),
+                        InputValue::from(""),
                     )?;
 
                     let constraint: BString = match &constraint_mixed {
-                        PhpMixed::Bool(false) => {
+                        InputValue::Bool(false) => {
                             let (_name, c): (BString, BString) = self
                                 .find_best_version_and_name_for_package(
                                     io.clone(),
@@ -411,7 +416,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                             c
                         }
-                        PhpMixed::String(s) => s.clone(),
+                        InputValue::String(s) => s.clone(),
                         _ => BString::default(),
                     };
 
@@ -483,21 +488,22 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 if input.borrow().is_interactive() {
                     let providers_count = providers.len();
 
-                    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
-                        Box::new(move |value_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
+                    let validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>> = Box::new(
+                        move |value_mixed: InputValue| -> anyhow::Result<InputValue> {
                             let value = BString::from(value_mixed.as_string().unwrap_or_default());
                             let parser = VersionParser::new();
                             parser.parse_constraints(&value)?;
 
-                            Ok(PhpMixed::string(value))
-                        });
+                            Ok(InputValue::String(value))
+                        },
+                    );
                     constraint = self
                         .get_io()
                         .ask_and_validate(
                             bconcat!("Package \"<info>", name, "</info>\" does not exist but is provided by ", providers_count, " packages. Which version constraint would you like to use? [<info>*</info>] "),
                             validator,
                             Some(3),
-                            PhpMixed::string(BString::from("*")),
+                            InputValue::from("*"),
                         )?
                         .as_string()
                         .map(BString::from)
@@ -632,14 +638,13 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             name,
                             ".</error>\nPick one of these or leave empty to abort:"
                         ),
-                        PhpMixed::List(
-                            similar
-                                .iter()
-                                .map(|s| PhpMixed::string(s.clone()))
-                                .collect(),
-                        ),
-                        PhpMixed::Bool(false),
-                        PhpMixed::Int(1),
+                        similar
+                            .iter()
+                            .enumerate()
+                            .map(|(index, similar)| (bconcat!(index), similar.clone()))
+                            .collect(),
+                        InputValue::Bool(false),
+                        Some(1),
                         "No package named \"%s\" is installed.",
                         false,
                     )?;

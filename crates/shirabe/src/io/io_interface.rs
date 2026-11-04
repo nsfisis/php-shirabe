@@ -3,7 +3,7 @@
 use crate::config::Config;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
 
 pub const QUIET: i64 = 1;
 pub const NORMAL: i64 = 2;
@@ -45,26 +45,30 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
         verbosity: i64,
     );
 
+    /// PHP declares a default as `string|bool|int|float|null` and an answer as `mixed`; what
+    /// Composer passes and gets back is a string, a bool, a list of strings or null, which is the
+    /// domain of `InputValue`. The same goes for `ask_and_validate()` and `select()`.
+    ///
     /// PHP: `@throws \RuntimeException If there is no data to read in the input stream`.
     /// `QuestionHelper::ask` exceptions (validator errors, `MissingInputException`) propagate
     /// to the caller, hence the `anyhow::Result` return type.
-    fn ask_bytes(&self, question: &BStr, default: PhpMixed) -> anyhow::Result<PhpMixed>;
+    fn ask_bytes(&self, question: &BStr, default: InputValue) -> anyhow::Result<InputValue>;
 
     fn ask_confirmation_bytes(&self, question: &BStr, default: bool) -> anyhow::Result<bool>;
 
     fn ask_and_validate_bytes(
         &self,
         question: &BStr,
-        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
         attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> anyhow::Result<PhpMixed>;
+        default: InputValue,
+    ) -> anyhow::Result<InputValue>;
 
     fn ask_and_hide_answer_bytes(&self, question: &BStr) -> anyhow::Result<Option<BString>>;
 
-    /// PHP `array $choices` may be a list (`PhpMixed::List`) or an associative
-    /// array (`PhpMixed::Array`); list choices resolve to their index, while
-    /// associative choices resolve to their key.
+    /// PHP `array $choices` may be a list or an associative array; list choices resolve to their
+    /// index, while associative choices resolve to their key. A list is passed with its indexes
+    /// as keys. `attempts` is `None` for PHP's `false` (infinite attempts).
     ///
     /// PHP: `@throws \InvalidArgumentException` — the `ChoiceQuestion` validator error
     /// propagates to the caller once `$attempts` is exhausted, hence the `anyhow::Result`
@@ -72,12 +76,12 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     fn select_bytes(
         &self,
         question: &BStr,
-        choices: PhpMixed,
-        default: PhpMixed,
-        attempts: PhpMixed,
+        choices: IndexMap<BString, BString>,
+        default: InputValue,
+        attempts: Option<i64>,
         error_message: &BStr,
         multiselect: bool,
-    ) -> anyhow::Result<PhpMixed>;
+    ) -> anyhow::Result<InputValue>;
 
     fn get_authentications(&self) -> IndexMap<BString, IndexMap<BString, Option<BString>>>;
 
@@ -176,7 +180,7 @@ pub trait IOInterfaceWrite: IOInterfaceImmutable {
     ) {
         self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, size, verbosity)
     }
-    fn ask(&self, question: impl AsRef<[u8]>, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask(&self, question: impl AsRef<[u8]>, default: InputValue) -> anyhow::Result<InputValue> {
         self.ask_bytes(BStr::new(question.as_ref()), default)
     }
     fn ask_confirmation(&self, question: impl AsRef<[u8]>, default: bool) -> anyhow::Result<bool> {
@@ -185,10 +189,10 @@ pub trait IOInterfaceWrite: IOInterfaceImmutable {
     fn ask_and_validate(
         &self,
         question: impl AsRef<[u8]>,
-        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
         attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> anyhow::Result<PhpMixed> {
+        default: InputValue,
+    ) -> anyhow::Result<InputValue> {
         self.ask_and_validate_bytes(BStr::new(question.as_ref()), validator, attempts, default)
     }
     fn ask_and_hide_answer(&self, question: impl AsRef<[u8]>) -> anyhow::Result<Option<BString>> {
@@ -197,12 +201,12 @@ pub trait IOInterfaceWrite: IOInterfaceImmutable {
     fn select(
         &self,
         question: impl AsRef<[u8]>,
-        choices: PhpMixed,
-        default: PhpMixed,
-        attempts: PhpMixed,
+        choices: IndexMap<BString, BString>,
+        default: InputValue,
+        attempts: Option<i64>,
         error_message: impl AsRef<[u8]>,
         multiselect: bool,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<InputValue> {
         self.select_bytes(
             BStr::new(question.as_ref()),
             choices,
@@ -306,7 +310,7 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
             .overwrite_error_bytes(message, newline, size, verbosity)
     }
 
-    fn ask_bytes(&self, question: &BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask_bytes(&self, question: &BStr, default: InputValue) -> anyhow::Result<InputValue> {
         self.borrow().ask_bytes(question, default)
     }
 
@@ -317,10 +321,10 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     fn ask_and_validate_bytes(
         &self,
         question: &BStr,
-        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
         attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> anyhow::Result<PhpMixed> {
+        default: InputValue,
+    ) -> anyhow::Result<InputValue> {
         self.borrow()
             .ask_and_validate_bytes(question, validator, attempts, default)
     }
@@ -332,12 +336,12 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     fn select_bytes(
         &self,
         question: &BStr,
-        choices: PhpMixed,
-        default: PhpMixed,
-        attempts: PhpMixed,
+        choices: IndexMap<BString, BString>,
+        default: InputValue,
+        attempts: Option<i64>,
         error_message: &BStr,
         multiselect: bool,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<InputValue> {
         self.borrow().select_bytes(
             question,
             choices,

@@ -6,14 +6,22 @@
 //! builder-style setter. Unset methods fall back to NullIO-equivalent defaults.
 #![allow(dead_code)]
 
+use bstr::BString;
+use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
 
 // Records call arguments for a stubbed method, equivalent to PHPUnit's
 // `->expects($this->once())->method(...)->with(...)` call-count/argument verification.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct CallRecorder<T>(std::cell::RefCell<Vec<T>>);
+
+impl<T> Default for CallRecorder<T> {
+    fn default() -> Self {
+        Self(std::cell::RefCell::new(Vec::new()))
+    }
+}
 
 impl<T: Clone> CallRecorder<T> {
     fn push(&self, value: T) {
@@ -42,11 +50,11 @@ pub struct IOStub {
     // `getAuthentication` willReturn is a `['username' => ..., 'password' => ...]` array.
     get_authentication: Option<indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
 
-    ask: Option<PhpMixed>,
+    ask: Option<InputValue>,
     // When set, `askAndValidate` invokes the caller's validator with this value and returns/
     // propagates its `Result`, equivalent to a PHPUnit `willReturnCallback` that calls the
     // validator directly. When unset, `askAndValidate` just returns `default` (unvalidated).
-    ask_and_validate_answer: Option<PhpMixed>,
+    ask_and_validate_answer: Option<InputValue>,
     ask_confirmation: Option<bool>,
     ask_and_hide_answer: Option<Option<bstr::BString>>,
     // Keyed `askAndHideAnswer` replies, mirroring tests whose willReturnCallback
@@ -63,7 +71,7 @@ pub struct IOStub {
     // `willReturn`) even while `setAuthentication` is invoked.
     set_authentication_calls: CallRecorder<(bstr::BString, bstr::BString, Option<bstr::BString>)>,
     // Records `askAndValidate` calls (question, attempts, default).
-    ask_and_validate_calls: CallRecorder<(bstr::BString, Option<i64>, PhpMixed)>,
+    ask_and_validate_calls: CallRecorder<(bstr::BString, Option<i64>, InputValue)>,
     // Records `hasAuthentication` calls.
     has_authentication_calls: CallRecorder<bstr::BString>,
     // Records `getAuthentication` calls.
@@ -115,11 +123,11 @@ impl IOStub {
     ) {
         self.get_authentication = Some(value);
     }
-    pub fn with_ask(mut self, value: PhpMixed) -> Self {
+    pub fn with_ask(mut self, value: InputValue) -> Self {
         self.ask = Some(value);
         self
     }
-    pub fn with_ask_and_validate_answer(mut self, value: PhpMixed) -> Self {
+    pub fn with_ask_and_validate_answer(mut self, value: InputValue) -> Self {
         self.ask_and_validate_answer = Some(value);
         self
     }
@@ -173,7 +181,7 @@ impl IOStub {
     }
 
     // For testing only. Returns the recorded `askAndValidate` calls in call order.
-    pub fn ask_and_validate_calls(&self) -> Vec<(bstr::BString, Option<i64>, PhpMixed)> {
+    pub fn ask_and_validate_calls(&self) -> Vec<(bstr::BString, Option<i64>, InputValue)> {
         self.ask_and_validate_calls.calls()
     }
 
@@ -230,7 +238,7 @@ impl IOInterfaceImmutable for IOStub {
     ) {
     }
 
-    fn ask_bytes(&self, _question: &bstr::BStr, default: PhpMixed) -> anyhow::Result<PhpMixed> {
+    fn ask_bytes(&self, _question: &bstr::BStr, default: InputValue) -> anyhow::Result<InputValue> {
         Ok(self.ask.clone().unwrap_or(default))
     }
     fn ask_confirmation_bytes(
@@ -243,10 +251,10 @@ impl IOInterfaceImmutable for IOStub {
     fn ask_and_validate_bytes(
         &self,
         question: &bstr::BStr,
-        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
+        validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
         attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> anyhow::Result<PhpMixed> {
+        default: InputValue,
+    ) -> anyhow::Result<InputValue> {
         self.ask_and_validate_calls
             .push((question.to_owned(), attempts, default.clone()));
         match &self.ask_and_validate_answer {
@@ -266,12 +274,12 @@ impl IOInterfaceImmutable for IOStub {
     fn select_bytes(
         &self,
         _question: &bstr::BStr,
-        _choices: PhpMixed,
-        default: PhpMixed,
-        _attempts: PhpMixed,
+        _choices: IndexMap<BString, BString>,
+        default: InputValue,
+        _attempts: Option<i64>,
         _error_message: &bstr::BStr,
         _multiselect: bool,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<InputValue> {
         Ok(default)
     }
 

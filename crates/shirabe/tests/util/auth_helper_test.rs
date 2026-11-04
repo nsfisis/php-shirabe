@@ -8,6 +8,7 @@ use shirabe::config::ConfigSourceInterface;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
 use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, bconcat, json_encode, time};
+use shirabe_symfony_console::input::InputValue;
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
 // shared with the AuthHelper under test. The IOMockGuard runs assert_complete on drop.
@@ -586,7 +587,7 @@ fn test_store_auth_with_prompt_invalid_answer() {
     let config_source_name = "https://api.gitlab.com/source";
 
     let io = std::rc::Rc::new(std::cell::RefCell::new(
-        IOStub::new().with_ask_and_validate_answer(PhpMixed::string(BString::from("invalid"))),
+        IOStub::new().with_ask_and_validate_answer(InputValue::String(BString::from("invalid"))),
     ));
     let config = ConfigStubBuilder::new().build_shared();
 
@@ -619,7 +620,7 @@ fn test_store_auth_with_prompt_invalid_answer() {
                 " ? [Yn] "
             ),
             None,
-            PhpMixed::string(BString::from("y")),
+            InputValue::String(BString::from("y")),
         )],
         io.borrow().ask_and_validate_calls()
     );

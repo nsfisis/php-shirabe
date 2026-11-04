@@ -11,6 +11,7 @@ use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bconcat, http_build_query, in_array_strict,
     json_decode_assoc, php_regex, preg_replace, time, trim,
 };
+use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct GitLab {
@@ -417,8 +418,8 @@ impl GitLab {
     }
 
     fn create_token(&mut self, scheme: &BStr, origin_url: &BStr) -> anyhow::Result<PhpMixed> {
-        let username = match self.io.ask("Username: ", PhpMixed::Null)? {
-            PhpMixed::String(s) => s,
+        let username = match self.io.ask("Username: ", InputValue::Null)? {
+            InputValue::String(s) => s,
             _ => BString::default(),
         };
         let password = self

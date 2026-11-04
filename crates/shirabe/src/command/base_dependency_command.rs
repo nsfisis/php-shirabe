@@ -408,11 +408,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             new_table.extend(table);
             table = new_table;
         }
-        let table_as_mixed: Vec<PhpMixed> = table
-            .into_iter()
-            .map(|row| PhpMixed::List(row.into_iter().map(PhpMixed::string).collect()))
-            .collect();
-        self.render_table(table_as_mixed, output)
+        self.render_table(table, output)
     }
 
     fn init_styles(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {

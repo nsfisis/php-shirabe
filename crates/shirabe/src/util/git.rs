@@ -15,6 +15,7 @@ use shirabe_php_shim::{
     php_to_string, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
     str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
+use shirabe_symfony_console::input::InputValue;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -677,12 +678,7 @@ impl Git {
                     auth_map.insert(
                         BString::from("username"),
                         self.io
-                            .ask(
-                                "      Username: ",
-                                default_username
-                                    .map(PhpMixed::string)
-                                    .unwrap_or(PhpMixed::Null),
-                            )?
+                            .ask("      Username: ", InputValue::from(default_username))?
                             .as_string()
                             .map(BString::from),
                     );

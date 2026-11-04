@@ -12,14 +12,16 @@
 //     the returned value.
 
 use bstr::{BStr, BString};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, indexmap};
 use shirabe::io::io_interface::NORMAL;
 use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable, IOInterfaceWrite};
 use shirabe_php_shim::{
-    PhpMixed, PhpResource, bconcat, fwrite_resource, php_fopen_resource, rewind, str_repeat,
+    PhpResource, bconcat, fwrite_resource, php_fopen_resource, rewind, str_repeat,
 };
 use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::input::{ArrayInput, InputInterface, StreamableInputInterface};
+use shirabe_symfony_console::input::{
+    ArrayInput, InputInterface, InputValue, StreamableInputInterface,
+};
 use shirabe_symfony_console::output::{
     BufferedOutput, ConsoleOutput, ConsoleOutputInterface, OutputInterface,
 };
@@ -196,9 +198,9 @@ fn test_ask() {
     // stream yields the answer makes ConsoleIO::ask return that answer.
     let (console_io, _output) = make_console_io_with_answer(BStr::new("answer\n"));
     let result = console_io
-        .ask("Why?", PhpMixed::string(BString::from("default")))
+        .ask("Why?", InputValue::String(BString::from("default")))
         .unwrap();
-    assert_eq!(PhpMixed::string(BString::from("answer")), result);
+    assert_eq!(InputValue::String(BString::from("answer")), result);
 }
 
 #[test]
@@ -217,16 +219,16 @@ fn test_ask_and_validate() {
     // PHP asserts the helper receives a Question with a validator. Behaviorally, an always-true
     // validator passes the answer straight through.
     let (console_io, _output) = make_console_io_with_answer(BStr::new("answer\n"));
-    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(Ok);
+    let validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>> = Box::new(Ok);
     let result = console_io
         .ask_and_validate(
             "Why?",
             validator,
             Some(10),
-            PhpMixed::string(BString::from("default")),
+            InputValue::String(BString::from("default")),
         )
         .unwrap();
-    assert_eq!(PhpMixed::string(BString::from("answer")), result);
+    assert_eq!(InputValue::String(BString::from("answer")), result);
 }
 
 #[test]
@@ -237,19 +239,16 @@ fn test_select() {
     let (console_io, _output) = make_console_io_with_answer(BStr::new("item2\n"));
     let result = console_io.select(
         "Select item",
-        PhpMixed::List(vec![
-            PhpMixed::string(BString::from("item1")),
-            PhpMixed::string(BString::from("item2")),
-        ]),
-        PhpMixed::string(BString::from("item1")),
-        PhpMixed::Bool(false),
+        indexmap! {
+            BString::from("0") => BString::from("item1"),
+            BString::from("1") => BString::from("item2"),
+        },
+        InputValue::String(BString::from("item1")),
+        None,
         "Error message",
         true,
     );
-    assert_eq!(
-        PhpMixed::List(vec![PhpMixed::string(BString::from("1"))]),
-        result.unwrap()
-    );
+    assert_eq!(InputValue::Array(vec![BString::from("1")]), result.unwrap());
 }
 
 #[test]

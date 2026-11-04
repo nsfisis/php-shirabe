@@ -10,6 +10,7 @@ use shirabe::util::Perforce;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PHP_EOL, PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str};
+use shirabe_symfony_console::input::InputValue;
 
 const TEST_DEPOT: &BStr = php_str(b"depot");
 const TEST_BRANCH: &BStr = php_str(b"branch");
@@ -234,7 +235,7 @@ fn test_query_p4_user_queries_for_user() {
     let (process, _guard) = get_process_executor_mock(vec![], false, MockHandler::default());
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::string(BString::from("TEST_QUERY_USER"))),
+            IOStub::new().with_ask(InputValue::String(BString::from("TEST_QUERY_USER"))),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -253,7 +254,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::string(BString::from("TEST_QUERY_USER"))),
+            IOStub::new().with_ask(InputValue::String(BString::from("TEST_QUERY_USER"))),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -271,7 +272,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::string(BString::from("TEST_QUERY_USER"))),
+            IOStub::new().with_ask(InputValue::String(BString::from("TEST_QUERY_USER"))),
         ));
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
@@ -289,7 +290,7 @@ fn test_query_p4_user_escapes_injection_on_windows() {
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::string(BString::from("foo && calc.exe"))),
+            IOStub::new().with_ask(InputValue::String(BString::from("foo && calc.exe"))),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -305,9 +306,10 @@ fn test_query_p4_user_escapes_injection_on_unix() {
         true,
         MockHandler::default(),
     );
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_ask(PhpMixed::string(BString::from("foo; id")))),
-    );
+    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+        std::rc::Rc::new(std::cell::RefCell::new(
+            IOStub::new().with_ask(InputValue::String(BString::from("foo; id"))),
+        ));
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
 

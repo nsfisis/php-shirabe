@@ -1,18 +1,21 @@
 //! ref: composer/vendor/symfony/console/Question/ChoiceQuestion.php
 
 use crate::exception::{InvalidArgumentException, LogicException};
+use crate::input::InputValue;
 use crate::question::{Question, QuestionInterface};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, bconcat, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
+    PhpMixed, bconcat, explode, implode, loose_eq, php_regex, preg_is_match, sprintf, trim,
 };
 
 /// Represents a choice question.
+// TODO(type-model): Symfony accepts choices of any type; only strings are modelled, which is what
+// `ConsoleIO::select()` passes (its `sanitize()` takes strings under `strict_types`).
 #[derive(Debug)]
 pub struct ChoiceQuestion {
     inner: Question,
-    choices: IndexMap<BString, PhpMixed>,
+    choices: IndexMap<BString, BString>,
     multiselect: bool,
     prompt: BString,
     error_message: BString,
@@ -24,8 +27,8 @@ impl ChoiceQuestion {
     /// `$default` The default answer to return.
     pub fn new(
         question: impl Into<BString>,
-        choices: IndexMap<BString, PhpMixed>,
-        default: Option<PhpMixed>,
+        choices: IndexMap<BString, BString>,
+        default: InputValue,
     ) -> Result<Self, LogicException> {
         if choices.is_empty() {
             return Err(LogicException::new(
@@ -45,14 +48,14 @@ impl ChoiceQuestion {
         this.inner.set_validator(Some(validator));
         // setAutocompleterValues never throws for an array argument.
         this.inner
-            .set_autocompleter_values(Some(PhpMixed::Array(choices)))
+            .set_autocompleter_values(Some(choices))
             .expect("autocompleter cannot be set on a hidden question during construction");
 
         Ok(this)
     }
 
     /// Returns available choices.
-    pub fn get_choices(&self) -> &IndexMap<BString, PhpMixed> {
+    pub fn get_choices(&self) -> &IndexMap<BString, BString> {
         &self.choices
     }
 
@@ -107,49 +110,46 @@ impl ChoiceQuestion {
 
     fn get_default_validator(
         &self,
-    ) -> Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
+    ) -> Box<dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>> {
         let choices = self.choices.clone();
         let error_message = self.error_message.clone();
         let multiselect = self.multiselect;
-        let is_assoc = Question::is_assoc(&PhpMixed::Array(self.choices.clone()));
+        let is_assoc = Question::is_assoc(&self.choices);
         // PHP reads `$this->isTrimmable()` live inside the closure. A 'static boxed
         // closure cannot borrow `$this`, so the value is snapshotted at validator
         // creation time. setValidator is re-run on multiselect/errorMessage changes,
-        // but a later setTrimmable would not be reflected. See review notes.
+        // but a later setTrimmable would not be reflected.
         let trimmable = self.inner.is_trimmable();
 
-        Box::new(move |selected: Option<PhpMixed>| {
-            let selected = selected.unwrap_or(PhpMixed::Null);
-
-            let selected_choices: Vec<PhpMixed> = if multiselect {
+        Box::new(move |selected: InputValue| {
+            let mut selected_choices: Vec<InputValue> = if multiselect {
                 // Check for a separated comma values
-                if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), strval(&selected)) {
+                if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), selected.to_php_string()) {
                     return Err(InvalidArgumentException::new(sprintf(
                         &error_message,
-                        std::slice::from_ref(&selected),
+                        &[selected.to_php_mixed()],
                     )));
                 }
 
-                explode(",", strval(&selected))
+                explode(",", selected.to_php_string())
                     .into_iter()
-                    .map(PhpMixed::string)
+                    .map(InputValue::String)
                     .collect()
             } else {
                 vec![selected]
             };
 
-            let mut selected_choices = selected_choices;
             if trimmable {
                 for v in selected_choices.iter_mut() {
-                    *v = PhpMixed::string(trim(strval(v)));
+                    *v = InputValue::String(trim(v.to_php_string()));
                 }
             }
 
-            let mut multiselect_choices: Vec<PhpMixed> = Vec::new();
+            let mut multiselect_choices: Vec<BString> = Vec::new();
             for value in &selected_choices {
                 let mut results: Vec<&BString> = Vec::new();
                 for (key, choice) in &choices {
-                    if (*choice) == *value {
+                    if InputValue::String(choice.clone()) == *value {
                         results.push(key);
                     }
                 }
@@ -163,59 +163,59 @@ impl ChoiceQuestion {
                 }
 
                 // array_search($value, $choices)
-                let needle = strval(value);
+                let needle = value.to_php_mixed();
                 let result_key = choices
                     .iter()
-                    .find(|(_, choice)| strval(choice) == needle)
+                    .find(|(_, choice)| loose_eq(&PhpMixed::string((*choice).clone()), &needle))
                     .map(|(key, _)| key.clone());
 
-                let mut result: PhpMixed;
-                if !is_assoc {
-                    if let Some(found_key) = &result_key {
+                let result: Option<BString> = if !is_assoc {
+                    match &result_key {
                         // $result = $choices[$result];
-                        result = choices[B(found_key)].clone();
-                    } else if let Some(found) = choices.get(B(&strval(value))) {
+                        Some(found_key) => Some(choices[B(found_key)].clone()),
                         // isset($choices[$value])
-                        result = found.clone();
-                    } else {
-                        result = PhpMixed::Bool(false);
+                        None => choices.get(B(&array_key(value))).cloned(),
                     }
-                } else if result_key.is_none() {
-                    if let Some(_found) = choices.get(B(&strval(value))) {
-                        // false === $result && isset($choices[$value])
-                        result = value.clone();
-                    } else {
-                        result = PhpMixed::Bool(false);
-                    }
+                } else if result_key.is_none() && choices.contains_key(B(&array_key(value))) {
+                    // false === $result && isset($choices[$value])
+                    Some(value.to_php_string())
                 } else {
-                    // associative, found: keep the matched key
-                    result = PhpMixed::string(result_key.clone().unwrap());
-                }
+                    result_key
+                };
 
                 // false === $result
-                if matches!(result, PhpMixed::Bool(false)) {
+                let Some(result) = result else {
                     return Err(InvalidArgumentException::new(sprintf(
                         &error_message,
-                        std::slice::from_ref(value),
+                        &[value.to_php_mixed()],
                     )));
-                }
+                };
 
                 // For associative choices, consistently return the key as string:
-                if is_assoc {
-                    result = PhpMixed::string(strval(&result));
-                }
                 multiselect_choices.push(result);
             }
 
             if multiselect {
-                return Ok(PhpMixed::List(multiselect_choices));
+                return Ok(InputValue::Array(multiselect_choices));
             }
 
-            Ok(multiselect_choices
-                .into_iter()
-                .next()
-                .unwrap_or(PhpMixed::Bool(false)))
+            Ok(InputValue::String(
+                multiselect_choices
+                    .into_iter()
+                    .next()
+                    .expect("a single selection yields one choice"),
+            ))
         })
+    }
+}
+
+/// The key PHP uses when `$value` indexes an array: `null` is `""` and a bool is `0` or `1`.
+pub(crate) fn array_key(value: &InputValue) -> BString {
+    match value {
+        InputValue::Null => BString::default(),
+        InputValue::Bool(b) => BString::from(if *b { "1" } else { "0" }),
+        InputValue::String(s) => s.clone(),
+        InputValue::Array(_) => panic!("an array is not a valid array key"),
     }
 }
 
@@ -224,7 +224,7 @@ impl QuestionInterface for ChoiceQuestion {
         self.inner.get_question()
     }
 
-    fn get_default(&self) -> PhpMixed {
+    fn get_default(&self) -> InputValue {
         self.inner.get_default()
     }
 
@@ -240,17 +240,17 @@ impl QuestionInterface for ChoiceQuestion {
         self.inner.is_hidden_fallback()
     }
 
-    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+    fn get_autocompleter_values(&self) -> Option<Vec<BString>> {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<BString>>> {
         self.inner.get_autocompleter_callback()
     }
 
     fn get_validator(
         &self,
-    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
+    ) -> Option<&dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>> {
         self.inner.get_validator()
     }
 
@@ -258,7 +258,7 @@ impl QuestionInterface for ChoiceQuestion {
         self.inner.get_max_attempts()
     }
 
-    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
+    fn get_normalizer(&self) -> Option<&dyn Fn(InputValue) -> InputValue> {
         self.inner.get_normalizer()
     }
 

@@ -6,6 +6,7 @@ use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::HttpDownloader;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, trim};
+use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct Forgejo {
@@ -81,7 +82,7 @@ impl Forgejo {
 
         let username = self
             .io
-            .ask("Username: ", PhpMixed::Null)?
+            .ask("Username: ", InputValue::Null)?
             .as_string()
             .map(trim)
             .unwrap_or_default();

@@ -11,12 +11,11 @@ use crate::util::{PackageInfo, PackageSorter};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, impl_php_class, implode,
-    json_bytes,
+    RuntimeException, UnexpectedValueException, bconcat, impl_php_class, implode, json_bytes,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::helper::{Row, Table};
+use shirabe_symfony_console::helper::{Cell, Row, Table};
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_console::style::{StyleInterface, SymfonyStyle};
@@ -239,14 +238,14 @@ impl Command for LicensesCommand {
                         implode(", ", &pkg_licenses)
                     };
                     table.add_row(
-                        PhpMixed::List(vec![
-                            PhpMixed::string(name),
-                            PhpMixed::string(package.get_full_pretty_version(
+                        vec![
+                            Cell::from(name),
+                            Cell::from(package.get_full_pretty_version(
                                 true,
                                 crate::package::DisplayMode::SourceRefIfDev,
                             )),
-                            PhpMixed::string(licenses_str),
-                        ])
+                            Cell::from(licenses_str),
+                        ]
                         .into(),
                     );
                 }

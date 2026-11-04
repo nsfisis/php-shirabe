@@ -1,9 +1,10 @@
 //! ref: composer/vendor/symfony/console/Question/ConfirmationQuestion.php
 
 use crate::exception::InvalidArgumentException;
+use crate::input::InputValue;
 use crate::question::{Question, QuestionInterface};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{PhpMixed, empty, preg_is_match, strval};
+use shirabe_php_shim::preg_is_match;
 
 /// Represents a yes/no question.
 #[derive(Debug)]
@@ -22,7 +23,7 @@ impl ConfirmationQuestion {
         true_answer_regex: impl Into<BString>,
     ) -> Self {
         let mut this = Self {
-            inner: Question::new(question, Some(PhpMixed::Bool(default))),
+            inner: Question::new(question, InputValue::Bool(default)),
             true_answer_regex: true_answer_regex.into(),
         };
 
@@ -33,26 +34,26 @@ impl ConfirmationQuestion {
     }
 
     /// Returns the default answer normalizer.
-    fn get_default_normalizer(&self) -> Box<dyn Fn(PhpMixed) -> PhpMixed> {
+    fn get_default_normalizer(&self) -> Box<dyn Fn(InputValue) -> InputValue> {
         let default = self.inner.get_default();
         let regex = self.true_answer_regex.clone();
 
-        Box::new(move |answer: PhpMixed| {
-            if let PhpMixed::Bool(_) = answer {
+        Box::new(move |answer: InputValue| {
+            if let InputValue::Bool(_) = answer {
                 return answer;
             }
 
-            let answer_is_true = preg_is_match(&regex, strval(&answer));
+            let answer_is_true = preg_is_match(&regex, answer.to_php_string());
 
             // false === $default
-            if matches!(default, PhpMixed::Bool(false)) {
+            if matches!(default, InputValue::Bool(false)) {
                 // $answer && $answerIsTrue
-                return PhpMixed::Bool(!empty(&answer) && answer_is_true);
+                return InputValue::Bool(answer.to_bool() && answer_is_true);
             }
 
             // '' === $answer || $answerIsTrue
-            let answer_is_empty_string = matches!(&answer, PhpMixed::String(s) if s.is_empty());
-            PhpMixed::Bool(answer_is_empty_string || answer_is_true)
+            let answer_is_empty_string = matches!(&answer, InputValue::String(s) if s.is_empty());
+            InputValue::Bool(answer_is_empty_string || answer_is_true)
         })
     }
 }
@@ -62,7 +63,7 @@ impl QuestionInterface for ConfirmationQuestion {
         self.inner.get_question()
     }
 
-    fn get_default(&self) -> PhpMixed {
+    fn get_default(&self) -> InputValue {
         self.inner.get_default()
     }
 
@@ -78,17 +79,17 @@ impl QuestionInterface for ConfirmationQuestion {
         self.inner.is_hidden_fallback()
     }
 
-    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+    fn get_autocompleter_values(&self) -> Option<Vec<BString>> {
         self.inner.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<BString>>> {
         self.inner.get_autocompleter_callback()
     }
 
     fn get_validator(
         &self,
-    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
+    ) -> Option<&dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>> {
         self.inner.get_validator()
     }
 
@@ -96,7 +97,7 @@ impl QuestionInterface for ConfirmationQuestion {
         self.inner.get_max_attempts()
     }
 
-    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
+    fn get_normalizer(&self) -> Option<&dyn Fn(InputValue) -> InputValue> {
         self.inner.get_normalizer()
     }
 

@@ -1,10 +1,12 @@
 //! ref: composer/vendor/symfony/console/Question/Question.php
 
 use crate::exception::{InvalidArgumentException, LogicException};
+use crate::input::InputValue;
 use crate::question::choice_question::ChoiceQuestion;
 use crate::question::confirmation_question::ConfirmationQuestion;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{PhpMixed, canonical_int_key};
+use indexmap::IndexMap;
+use shirabe_php_shim::canonical_int_key;
 
 /// Polymorphic boundary for the Symfony Console Question hierarchy.
 ///
@@ -13,10 +15,13 @@ use shirabe_php_shim::{PhpMixed, canonical_int_key};
 /// `inner: Question` composition loses subtype identity, so consumers that take
 /// a `Question` and run `instanceof` checks are expressed here as a trait whose
 /// `as_choice`/`as_confirmation` downcasts stand in for `instanceof`.
+///
+/// Defaults, answers and the values validators and normalizers take and return are
+/// `InputValue`s; see there for how Symfony's `mixed` is narrowed.
 pub trait QuestionInterface: std::fmt::Debug {
     fn get_question(&self) -> &BStr;
 
-    fn get_default(&self) -> PhpMixed;
+    fn get_default(&self) -> InputValue;
 
     fn is_multiline(&self) -> bool;
 
@@ -24,17 +29,17 @@ pub trait QuestionInterface: std::fmt::Debug {
 
     fn is_hidden_fallback(&self) -> bool;
 
-    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>>;
+    fn get_autocompleter_values(&self) -> Option<Vec<BString>>;
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>;
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<BString>>>;
 
     fn get_validator(
         &self,
-    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>;
+    ) -> Option<&dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>>;
 
     fn get_max_attempts(&self) -> Option<i64>;
 
-    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed>;
+    fn get_normalizer(&self) -> Option<&dyn Fn(InputValue) -> InputValue>;
 
     fn is_trimmable(&self) -> bool;
 
@@ -55,10 +60,10 @@ pub struct Question {
     attempts: Option<i64>,
     hidden: bool,
     hidden_fallback: bool,
-    autocompleter_callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>>,
-    validator: Option<Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>>,
-    default: Option<PhpMixed>,
-    normalizer: Option<Box<dyn Fn(PhpMixed) -> PhpMixed>>,
+    autocompleter_callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<BString>>>>,
+    validator: Option<Box<dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>>>,
+    default: InputValue,
+    normalizer: Option<Box<dyn Fn(InputValue) -> InputValue>>,
     trimmable: bool,
     multiline: bool,
 }
@@ -80,7 +85,7 @@ impl std::fmt::Debug for Question {
 impl Question {
     /// `$question` The question to ask to the user.
     /// `$default` The default answer to return if the user enters nothing.
-    pub fn new(question: impl Into<BString>, default: Option<PhpMixed>) -> Self {
+    pub fn new(question: impl Into<BString>, default: InputValue) -> Self {
         Self {
             question: question.into(),
             attempts: None,
@@ -101,8 +106,8 @@ impl Question {
     }
 
     /// Returns the default answer.
-    pub fn get_default(&self) -> PhpMixed {
-        self.default.clone().unwrap_or(PhpMixed::Null)
+    pub fn get_default(&self) -> InputValue {
+        self.default.clone()
     }
 
     /// Returns whether the user response accepts newline characters.
@@ -150,7 +155,7 @@ impl Question {
     }
 
     /// Gets values for the autocompleter.
-    pub fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+    pub fn get_autocompleter_values(&self) -> Option<Vec<BString>> {
         let callback = self.get_autocompleter_callback();
 
         match callback {
@@ -162,47 +167,23 @@ impl Question {
     /// Sets values for the autocompleter.
     ///
     /// Throws LogicException.
+    // TODO(type-model): PHP also accepts a `\Traversable`, whose values are cached on the first
+    // call; only arrays are modelled.
     pub fn set_autocompleter_values(
         &mut self,
-        values: Option<PhpMixed>,
+        values: Option<IndexMap<BString, BString>>,
     ) -> Result<&mut Self, LogicException> {
-        let callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>> = match values {
-            // PHP: `if (\is_array($values))`. Both PhpMixed::List and ::Array model PHP arrays.
-            Some(values) if matches!(values, PhpMixed::List(_) | PhpMixed::Array(_)) => {
-                let values = if Self::is_assoc(&values) {
-                    let array = match &values {
-                        PhpMixed::Array(array) => array,
-                        _ => unreachable!(),
-                    };
+        let callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<BString>>>> = match values {
+            Some(values) => {
+                let values: Vec<BString> = if Self::is_assoc(&values) {
                     // array_merge(array_keys($values), array_values($values))
-                    let mut merged: Vec<PhpMixed> =
-                        array.keys().map(|k| PhpMixed::String(k.clone())).collect();
-                    merged.extend(array.values().cloned());
-                    merged
+                    values.keys().chain(values.values()).cloned().collect()
                 } else {
                     // array_values($values)
-                    match &values {
-                        PhpMixed::List(list) => list.to_vec(),
-                        PhpMixed::Array(array) => array.values().cloned().collect(),
-                        _ => unreachable!(),
-                    }
+                    values.into_values().collect()
                 };
 
                 Some(Box::new(move |_input: &BStr| Some(values.clone())))
-            }
-            // PHP: `elseif ($values instanceof \Traversable)`. In PHP this caches the
-            // iterator result; here non-array iterables are not modeled, so treat any
-            // remaining value as the Traversable branch.
-            Some(values) => {
-                // PHP: `iterator_to_array($values, false)` caches a Traversable.
-                // Non-array iterables are not modeled by PhpMixed; extract any
-                // list/array elements, otherwise treat as an empty iterator.
-                let cached: Vec<PhpMixed> = match values {
-                    PhpMixed::List(list) => list.into_iter().collect(),
-                    PhpMixed::Array(array) => array.into_values().collect(),
-                    _ => Vec::new(),
-                };
-                Some(Box::new(move |_input: &BStr| Some(cached.clone())))
             }
             None => None,
         };
@@ -211,7 +192,7 @@ impl Question {
     }
 
     /// Gets the callback function used for the autocompleter.
-    pub fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
+    pub fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<BString>>> {
         self.autocompleter_callback.as_deref()
     }
 
@@ -221,7 +202,7 @@ impl Question {
     /// corresponding suggestions.
     pub fn set_autocompleter_callback(
         &mut self,
-        callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<PhpMixed>>>>,
+        callback: Option<Box<dyn Fn(&BStr) -> Option<Vec<BString>>>>,
     ) -> Result<&mut Self, LogicException> {
         if self.hidden && callback.is_some() {
             return Err(LogicException::new(
@@ -237,9 +218,7 @@ impl Question {
     /// Sets a validator for the question.
     pub fn set_validator(
         &mut self,
-        validator: Option<
-            Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>,
-        >,
+        validator: Option<Box<dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>>>,
     ) -> &mut Self {
         self.validator = validator;
 
@@ -249,7 +228,7 @@ impl Question {
     /// Gets the validator for the question.
     pub fn get_validator(
         &self,
-    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
+    ) -> Option<&dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>> {
         self.validator.as_deref()
     }
 
@@ -285,7 +264,10 @@ impl Question {
     /// Sets a normalizer for the response.
     ///
     /// The normalizer can be a callable (a string), a closure or a class implementing __invoke.
-    pub fn set_normalizer(&mut self, normalizer: Box<dyn Fn(PhpMixed) -> PhpMixed>) -> &mut Self {
+    pub fn set_normalizer(
+        &mut self,
+        normalizer: Box<dyn Fn(InputValue) -> InputValue>,
+    ) -> &mut Self {
         self.normalizer = Some(normalizer);
 
         self
@@ -294,19 +276,14 @@ impl Question {
     /// Gets the normalizer for the response.
     ///
     /// The normalizer can ba a callable (a string), a closure or a class implementing __invoke.
-    pub fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
+    pub fn get_normalizer(&self) -> Option<&dyn Fn(InputValue) -> InputValue> {
         self.normalizer.as_deref()
     }
 
-    // PHP: `(bool) \count(array_filter(array_keys($array), 'is_string'))`.
-    // A `List` has only sequential int keys, so it is never associative. An `Array` is
-    // associative only when at least one key is a genuine string key; PHP normalizes
-    // canonical-integer string keys (e.g. "0", "12") back to int keys, so those do not count.
-    pub(crate) fn is_assoc(array: &PhpMixed) -> bool {
-        match array {
-            PhpMixed::Array(map) => map.keys().any(|key| canonical_int_key(key).is_none()),
-            _ => false,
-        }
+    // PHP: `(bool) \count(array_filter(array_keys($array), 'is_string'))`. PHP normalizes
+    // canonical-integer string keys (e.g. "0", "12") to int keys, so those do not count.
+    pub(crate) fn is_assoc<V>(array: &IndexMap<BString, V>) -> bool {
+        array.keys().any(|key| canonical_int_key(key).is_none())
     }
 
     pub fn is_trimmable(&self) -> bool {
@@ -325,7 +302,7 @@ impl QuestionInterface for Question {
         self.get_question()
     }
 
-    fn get_default(&self) -> PhpMixed {
+    fn get_default(&self) -> InputValue {
         self.get_default()
     }
 
@@ -341,17 +318,17 @@ impl QuestionInterface for Question {
         self.is_hidden_fallback()
     }
 
-    fn get_autocompleter_values(&self) -> Option<Vec<PhpMixed>> {
+    fn get_autocompleter_values(&self) -> Option<Vec<BString>> {
         self.get_autocompleter_values()
     }
 
-    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<PhpMixed>>> {
+    fn get_autocompleter_callback(&self) -> Option<&dyn Fn(&BStr) -> Option<Vec<BString>>> {
         self.get_autocompleter_callback()
     }
 
     fn get_validator(
         &self,
-    ) -> Option<&dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>> {
+    ) -> Option<&dyn Fn(InputValue) -> Result<InputValue, InvalidArgumentException>> {
         self.get_validator()
     }
 
@@ -359,7 +336,7 @@ impl QuestionInterface for Question {
         self.get_max_attempts()
     }
 
-    fn get_normalizer(&self) -> Option<&dyn Fn(PhpMixed) -> PhpMixed> {
+    fn get_normalizer(&self) -> Option<&dyn Fn(InputValue) -> InputValue> {
         self.get_normalizer()
     }
 

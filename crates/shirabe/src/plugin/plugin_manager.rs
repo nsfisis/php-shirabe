@@ -30,6 +30,7 @@ use shirabe_php_shim::{
     var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct PluginManager {
@@ -1249,7 +1250,7 @@ impl PluginManager {
 
                 let answer = self.io.ask(
                     bconcat!("Do you trust \"<fg=green;options=bold>", package, "</>\" to execute code and wish to enable it now? (writes \"allow-plugins\" to composer.json) [<comment>y,n,d,?</comment>] "),
-                    PhpMixed::string(default),
+                    InputValue::from(default),
                 )?;
                 let answer_str: &[u8] = answer.as_string().unwrap_or_default();
                 match answer_str {

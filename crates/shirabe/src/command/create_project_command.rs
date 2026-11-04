@@ -887,10 +887,9 @@ impl Command for CreateProjectCommand {
                 array_pop(&mut parts).unwrap_or_default(),
                 "</comment>]: "
             );
-            input.borrow_mut().set_argument(
-                "directory",
-                InputValue::from_php_mixed(&io.ask(prompt, PhpMixed::Null)?),
-            );
+            input
+                .borrow_mut()
+                .set_argument("directory", io.ask(prompt, InputValue::Null)?);
         }
 
         let repository_opt = input.borrow().get_option("repository")?;
