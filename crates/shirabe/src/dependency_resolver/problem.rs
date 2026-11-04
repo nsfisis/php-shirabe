@@ -379,9 +379,7 @@ impl Problem {
                 let version = Self::get_platform_package_version(
                     pool,
                     package_name,
-                    shirabe_php_rpc::phpversion("")?
-                        .unwrap_or_default()
-                        .as_ref(),
+                    shirabe_php_rpc::get_php_version()?.version.as_ref(),
                 );
 
                 let msg = bconcat!(
