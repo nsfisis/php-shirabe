@@ -17,6 +17,8 @@
 //!   /// php-src: ext/standard/strnatcmp.c `strnatcmp_ex` (PHP 8.5.2)
 //!   ```
 
+pub mod filter;
+
 // The module mirrors php-src's `main/` directory; it is not a binary entry point (autobins is
 // disabled in Cargo.toml). `special_module_name` is allowed crate-wide because the item-level
 // attribute does not reach this early-pass lint.

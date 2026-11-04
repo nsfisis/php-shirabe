@@ -542,7 +542,6 @@ fn test_git_disabled_by_default_in_github_protocols() {
     );
 }
 
-#[ignore = "shirabe_php_shim::filter::filter_var_url (reqwest::Url::parse) accepts \"git:Department/Repo.git\" as a valid cannot-be-a-base URL, while PHP's FILTER_VALIDATE_URL rejects it; the malformed-URL early-return in prohibit_url_by_config is skipped and the git scheme then hits the secure-http rejection"]
 #[test]
 fn test_allowed_urls_pass() {
     let urls = vec![

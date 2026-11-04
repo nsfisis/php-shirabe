@@ -2410,7 +2410,6 @@ dependencies = [
  "memchr",
  "nix",
  "regex",
- "reqwest",
  "serde",
  "serde_json",
  "sha1",

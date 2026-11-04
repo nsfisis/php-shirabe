@@ -1,26 +1,17 @@
 use bstr::ByteSlice;
+use shirabe_php_src::filter::logical_filters::{
+    php_filter_boolean, php_filter_int, php_filter_validate_ip, php_filter_validate_url,
+};
 
-// TODO(php-semantics):
-// Without FILTER_NULL_ON_FAILURE, php_filter_boolean trims surrounding
-// whitespace, lowercases, and yields true only for "1"/"true"/"on"/"yes";
-// every other input (including the "0"/"false"/"off"/"no"/"" set) yields
-// false.
+/// `filter_var($value, FILTER_VALIDATE_BOOLEAN)`: without `FILTER_NULL_ON_FAILURE`, a value that
+/// fails validation yields `false`.
 pub fn filter_var_boolean(value: impl AsRef<[u8]>) -> bool {
-    let trimmed = crate::trim(value);
-    matches!(
-        trimmed.to_ascii_lowercase().as_slice(),
-        b"1" | b"true" | b"on" | b"yes"
-    )
+    php_filter_boolean(value.as_ref()).unwrap_or(false)
 }
 
-// TODO(php-semantics): PHP's FILTER_VALIDATE_URL parses with php_url_parse_ex and
-// additionally validates the host as a domain/IPv6 literal. reqwest::Url
-// (WHATWG/RFC 3986) is stricter on some inputs and more lenient on others,
-// so this is not a byte-for-byte compatible validator.
-// A URL that is not valid UTF-8 holds a byte outside the ASCII range PHP accepts, so it is
-// rejected without parsing.
+/// `filter_var($value, FILTER_VALIDATE_URL) !== false`.
 pub fn filter_var_url(value: impl AsRef<[u8]>) -> bool {
-    crate::utf8_text(value.as_ref()).is_some_and(|value| reqwest::Url::parse(value).is_ok())
+    php_filter_validate_url(value.as_ref(), 0)
 }
 
 // TODO(pcre):
@@ -72,52 +63,13 @@ fn is_valid_email_domain(domain: &[u8]) -> bool {
     })
 }
 
-// TODO(php-semantics):
-// PHP's FILTER_VALIDATE_IP accepts both IPv4 and IPv6 literals. Rust's IpAddr
-// parser is a close match (both reject leading zeros in IPv4 octets), but is not
-// guaranteed byte-for-byte identical to PHP's hand-written validator on exotic
-// IPv6 forms.
+/// `filter_var($value, FILTER_VALIDATE_IP) !== false`.
 pub fn filter_var_ip(value: impl AsRef<[u8]>) -> bool {
-    crate::utf8_text(value.as_ref()).is_some_and(|value| value.parse::<std::net::IpAddr>().is_ok())
+    php_filter_validate_ip(value.as_ref(), 0)
 }
 
-// TODO(php-semantics):
-// Mirrors PHP's FILTER_VALIDATE_INT with min_range/max_range: surrounding
-// whitespace is trimmed, an optional sign is allowed, leading zeros are rejected
-// (except a lone "0"), and the parsed value must fall within [min, max]
-// inclusive.
+/// `filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => $min, 'max_range' => $max]])
+/// !== false`.
 pub fn filter_var_int_with_range(value: impl AsRef<[u8]>, min: i64, max: i64) -> bool {
-    match parse_filter_int(value.as_ref()) {
-        Some(n) => min <= n && n <= max,
-        None => false,
-    }
-}
-
-fn parse_filter_int(value: &[u8]) -> Option<i64> {
-    let is_space = |b: &u8| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C);
-    let start = value
-        .iter()
-        .position(|b| !is_space(b))
-        .unwrap_or(value.len());
-    let end = value
-        .iter()
-        .rposition(|b| !is_space(b))
-        .map_or(start, |i| i + 1);
-    let s = &value[start..end];
-    let (sign, digits) = match s.strip_prefix(b"-") {
-        Some(rest) => (-1i64, rest),
-        None => (1i64, s.strip_prefix(b"+").unwrap_or(s)),
-    };
-    if digits.is_empty() {
-        return None;
-    }
-    // A lone zero is valid; any other number must not have a leading zero.
-    if digits != b"0" && digits.starts_with(b"0") {
-        return None;
-    }
-    if !digits.iter().all(u8::is_ascii_digit) {
-        return None;
-    }
-    let magnitude: i64 = crate::utf8_text(digits)?.parse().ok()?;
-    Some(sign * magnitude)
+    php_filter_int(value.as_ref(), 0, Some(min), Some(max)).is_some()
 }
