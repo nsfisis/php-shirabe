@@ -107,7 +107,12 @@
               ./crates
             ];
           };
-          cargoLock.lockFile = ./Cargo.lock;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            outputHashes = {
+              "bstr-1.13.1" = "sha256-ya7L6P7FzMZx+zQY7UqxSnpLB3VaTB8UGoxvlKn01DU=";
+            };
+          };
 
           postPatch = ''
             cp -r ${composerRuntime} composer
