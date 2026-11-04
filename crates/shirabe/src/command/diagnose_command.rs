@@ -209,7 +209,7 @@ impl DiagnoseCommand {
             .borrow_mut()
             .get(
                 bconcat!(proto, "://repo.packagist.org/packages.json"),
-                IndexMap::new(),
+                crate::util::StreamContextOptions::new(),
             ) {
             Ok(_) => {}
             Err(e) => {
@@ -271,7 +271,7 @@ impl DiagnoseCommand {
             .as_ref()
             .unwrap()
             .borrow_mut()
-            .get(url, IndexMap::new())
+            .get(url, crate::util::StreamContextOptions::new())
         {
             Ok(_) => {}
             Err(e) => {
@@ -338,7 +338,7 @@ impl DiagnoseCommand {
                 .borrow_mut()
                 .get(
                     bconcat!(protocol, "://repo.packagist.org/packages.json"),
-                    IndexMap::new(),
+                    crate::util::StreamContextOptions::new(),
                 )?
                 .decode_json()?;
             if let Some(provider_includes) =
@@ -373,7 +373,7 @@ impl DiagnoseCommand {
                     .borrow_mut()
                     .get(
                         bconcat!(protocol, "://repo.packagist.org/", path),
-                        IndexMap::new(),
+                        crate::util::StreamContextOptions::new(),
                     )?;
                 let provider = response.get_body().unwrap_or_default().to_vec();
 
@@ -417,8 +417,8 @@ impl DiagnoseCommand {
             bconcat!("https://", domain, "/api/v3/")
         };
 
-        let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
-        opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+        let mut opts = crate::util::StreamContextOptions::new();
+        opts.set_retry_auth_failure(false);
 
         match self
             .http_downloader
@@ -484,8 +484,8 @@ impl DiagnoseCommand {
         } else {
             bconcat!("https://", domain, "/api/rate_limit")
         };
-        let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
-        opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+        let mut opts = crate::util::StreamContextOptions::new();
+        opts.set_retry_auth_failure(false);
         let data = self
             .http_downloader
             .borrow()
@@ -1287,7 +1287,11 @@ impl Command for DiagnoseCommand {
         );
 
         *self.http_downloader.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::create_http_downloader(io.clone(), &config, indexmap::IndexMap::new())?,
+            Factory::create_http_downloader(
+                io.clone(),
+                &config,
+                crate::util::StreamContextOptions::new(),
+            )?,
         )));
 
         // TODO(distribution): PHP tests `__FILE__`, which starts with `phar:` when Composer runs

@@ -33,7 +33,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
 use shirabe_php_shim::{
-    AnyThrowable, PhpMixed, bconcat, display_to_bytes, error_chain_message, path_to_bytes,
+    AnyThrowable, bconcat, display_to_bytes, error_chain_message, path_to_bytes,
 };
 
 /// Looks a class up in every Rust-side `ClassLoader` on the autoload stack, in stack order — the
@@ -370,11 +370,11 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                     crate::util::HttpDownloader::new(
                         io_arg(0)?,
                         config_arg(1)?,
-                        arg_or::<IndexMap<BString, PhpMixed>>(
+                        arg_or::<crate::util::StreamContextOptions>(
                             class_name,
                             ctor_args,
                             2,
-                            IndexMap::new(),
+                            crate::util::StreamContextOptions::new(),
                         )?,
                         arg_or::<bool>(class_name, ctor_args, 3, false)?,
                     )

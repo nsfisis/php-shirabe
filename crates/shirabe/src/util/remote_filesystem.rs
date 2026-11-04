@@ -10,6 +10,7 @@ use crate::config::Config;
 use crate::io::IOInterface;
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::rpc::table::{config_handle_value, io_handle_value};
+use crate::util::StreamContextOptions;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, ToWire, wire};
@@ -31,7 +32,7 @@ pub enum GetResult {
 pub struct RemoteFilesystem {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    options: IndexMap<BString, PhpMixed>,
+    options: StreamContextOptions,
     disable_tls: bool,
     entity: std::cell::OnceCell<PhpObjHandle>,
 }
@@ -42,7 +43,7 @@ impl RemoteFilesystem {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
         disable_tls: bool,
     ) -> Self {
         Self {
@@ -60,7 +61,7 @@ impl RemoteFilesystem {
         file_url: impl AsRef<[u8]>,
         file_name: impl AsRef<std::path::Path>,
         progress: bool,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<GetResult> {
         self.call(
             BStr::new("copy"),
@@ -69,7 +70,7 @@ impl RemoteFilesystem {
                 PluginValue::string(file_url.as_ref()),
                 PluginValue::string(path_to_bytes(file_name.as_ref())),
                 PluginValue::Bool(progress),
-                PhpMixed::Array(options).to_wire(),
+                options.to_wire(),
             ],
         )
     }
@@ -79,7 +80,7 @@ impl RemoteFilesystem {
         origin_url: impl AsRef<[u8]>,
         file_url: impl AsRef<[u8]>,
         progress: bool,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<GetResult> {
         self.call(
             BStr::new("getContents"),
@@ -87,16 +88,16 @@ impl RemoteFilesystem {
                 PluginValue::string(origin_url.as_ref()),
                 PluginValue::string(file_url.as_ref()),
                 PluginValue::Bool(progress),
-                PhpMixed::Array(options).to_wire(),
+                options.to_wire(),
             ],
         )
     }
 
-    pub fn get_options(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+    pub fn get_options(&self) -> anyhow::Result<StreamContextOptions> {
         self.call(BStr::new("getOptions"), Vec::new())
     }
 
-    pub fn set_options(&self, options: IndexMap<BString, PhpMixed>) -> anyhow::Result<()> {
+    pub fn set_options(&self, options: StreamContextOptions) -> anyhow::Result<()> {
         self.call::<PluginValue>(BStr::new("setOptions"), vec![options.to_wire()])?;
         Ok(())
     }
@@ -145,7 +146,7 @@ impl RemoteFilesystem {
         let handle: PhpObjHandle = PhpCall::New(CLASS).run(vec![
             io_handle_value(&self.io)?,
             config_handle_value(&self.config),
-            PhpMixed::Array(self.options.clone()).to_wire(),
+            self.options.clone().to_wire(),
             PluginValue::Bool(self.disable_tls),
         ])?;
 
@@ -163,13 +164,13 @@ impl RemoteFilesystem {
     pub fn __get_options_for_url(
         &self,
         origin_url: impl AsRef<[u8]>,
-        additional_options: IndexMap<BString, PhpMixed>,
+        additional_options: StreamContextOptions,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         self.reflection_invoke(
             BStr::new("getOptionsForUrl"),
             vec![
                 PluginValue::string(origin_url.as_ref()),
-                PhpMixed::Array(additional_options).to_wire(),
+                additional_options.to_wire(),
             ],
         )
     }

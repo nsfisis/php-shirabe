@@ -30,9 +30,9 @@ fn call_get_options_for_url(
     options: IndexMap<BString, PhpMixed>,
     file_url: &BStr,
 ) -> IndexMap<BString, PhpMixed> {
-    let fs = RemoteFilesystem::new(io, config_mock(), options, false);
+    let fs = RemoteFilesystem::new(io, config_mock(), options.into(), false);
     fs.__set_file_url(file_url).unwrap();
-    fs.__get_options_for_url(origin_url, additional_options)
+    fs.__get_options_for_url(origin_url, additional_options.into())
         .unwrap()
 }
 
@@ -201,7 +201,12 @@ fn test_callback_get_file_size() {
     // AuthHelper the constructor builds is guarded there.
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
-    let fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
+    let fs = RemoteFilesystem::new(
+        io,
+        config_mock(),
+        shirabe::util::StreamContextOptions::new(),
+        false,
+    );
     fs.__callback_get(
         STREAM_NOTIFY_FILE_SIZE_IS,
         0,
@@ -222,7 +227,12 @@ fn test_callback_get_notify_progress() {
     // AuthHelper the constructor builds is guarded there.
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
-    let fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
+    let fs = RemoteFilesystem::new(
+        io,
+        config_mock(),
+        shirabe::util::StreamContextOptions::new(),
+        false,
+    );
     fs.__set_bytes_max(20).unwrap();
     fs.__set_progress(true).unwrap();
 
@@ -246,7 +256,12 @@ fn test_callback_get_passes_through404() {
     // AuthHelper the constructor builds is guarded there.
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
-    let fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
+    let fs = RemoteFilesystem::new(
+        io,
+        config_mock(),
+        shirabe::util::StreamContextOptions::new(),
+        false,
+    );
 
     fs.__callback_get(
         STREAM_NOTIFY_FAILURE,
@@ -361,13 +376,23 @@ fn test_bit_bucket_public_download() {
     for (url, contents) in provide_bitbucket_public_download_urls() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
-        let rfs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
+        let rfs = RemoteFilesystem::new(
+            io,
+            config_mock(),
+            shirabe::util::StreamContextOptions::new(),
+            false,
+        );
         let hostname = parse_url(url)
             .and_then(|parsed| parsed.host)
             .unwrap_or_default();
 
         let result = rfs
-            .get_contents(&hostname, url, false, IndexMap::new())
+            .get_contents(
+                &hostname,
+                url,
+                false,
+                shirabe::util::StreamContextOptions::new(),
+            )
             .unwrap();
 
         assert_eq!(contents, get_result_to_string(&result));

@@ -137,9 +137,12 @@ impl ArchiveCommand {
             } else {
                 let factory = Factory::default();
                 let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
-                let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-                    Factory::create_http_downloader(io.clone(), config, indexmap::IndexMap::new())?,
-                ));
+                let http_downloader =
+                    std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
+                        io.clone(),
+                        config,
+                        crate::util::StreamContextOptions::new(),
+                    )?));
                 let download_manager = factory.create_download_manager(
                     io.clone(),
                     config,

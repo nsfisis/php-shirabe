@@ -143,7 +143,13 @@ fn test_error_messages() {
     // new HttpDownloader($this->io, $dlConfig): a real downloader (not the extract-path mock).
     let dl_config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-        HttpDownloader::new(io.clone(), dl_config, IndexMap::new(), false).unwrap(),
+        HttpDownloader::new(
+            io.clone(),
+            dl_config,
+            shirabe::util::StreamContextOptions::new(),
+            false,
+        )
+        .unwrap(),
     ));
 
     // $distUrl = 'file://'.__FILE__: an existing, non-zip file referenced by a file:// URL.

@@ -96,7 +96,13 @@ fn make_driver(
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-        HttpDownloader::new(io.clone(), config.clone(), IndexMap::new(), false).unwrap(),
+        HttpDownloader::new(
+            io.clone(),
+            config.clone(),
+            shirabe::util::StreamContextOptions::new(),
+            false,
+        )
+        .unwrap(),
     ));
     let (process, guard) = get_process_executor_mock(vec![], false, MockHandler::default());
     let driver = PerforceDriver::new(repo_config.clone(), io, config, http_downloader, process);

@@ -8,10 +8,10 @@ use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use crate::plugin::rpc::jobs::{
     HTTP_DOWNLOADER_TICK_CAP, dispatch_tick_method, rejected_promise, resolved_promise,
 };
+use crate::util::StreamContextOptions;
 use bstr::{BStr, BString, ByteSlice};
-use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes};
+use shirabe_php_shim::{bconcat, path_from_bytes};
 
 /// Serves the `HttpDownloader` proxy stub, whether the downloader behind it belongs to the object
 /// graph or was built by plugin code writing `new HttpDownloader(...)`. Both run their requests
@@ -23,16 +23,16 @@ pub(crate) fn dispatch_http_downloader_method(
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     match method_name.as_bytes() {
-        b"getOptions" => Ok(PhpMixed::Array(downloader.borrow().get_options().clone()).to_wire()),
+        b"getOptions" => Ok(downloader.borrow().get_options().clone().to_wire()),
         b"setOptions" => {
-            let options = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
+            let options = arg::<StreamContextOptions>(method_name, args, 0)?;
             downloader.borrow_mut().set_options(options);
             Ok(PluginValue::Null)
         }
         b"get" => {
             let url = arg::<BString>(method_name, args, 0)?;
             let options =
-                arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 1, IndexMap::new())?;
+                arg_or::<StreamContextOptions>(method_name, args, 1, StreamContextOptions::new())?;
             let response = downloader
                 .borrow()
                 .get(&url, options)
@@ -43,7 +43,7 @@ pub(crate) fn dispatch_http_downloader_method(
             let url = arg::<BString>(method_name, args, 0)?;
             let to = arg::<BString>(method_name, args, 1)?;
             let options =
-                arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 2, IndexMap::new())?;
+                arg_or::<StreamContextOptions>(method_name, args, 2, StreamContextOptions::new())?;
             let response = downloader
                 .borrow()
                 .copy(&url, path_from_bytes(&to), options)
@@ -57,11 +57,11 @@ pub(crate) fn dispatch_http_downloader_method(
                 b"addCopy" => (Some(arg::<BString>(method_name, args, 1)?), 2),
                 _ => unreachable!(),
             };
-            let options = arg_or::<IndexMap<BString, PhpMixed>>(
+            let options = arg_or::<StreamContextOptions>(
                 method_name,
                 args,
                 options_position,
-                IndexMap::new(),
+                StreamContextOptions::new(),
             )?;
             let failed =
                 |error: anyhow::Error| error_throw(bconcat!(method_name, " failed"), &error);

@@ -26,15 +26,15 @@ use crate::repository::{
     FilesystemRepository, InstalledFilesystemRepository, RepositoryFactory, RepositoryManager,
 };
 use crate::util::r#loop::Loop;
-use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
+use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
-    PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, bconcat,
-    dirname, error_message, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    implode, is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir, path_from_bytes,
-    path_to_bytes, pathinfo, realpath, rename, rtrim2, strpos, strtr, substr, trim2,
+    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, dirname, error_message,
+    extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file,
+    json_decode_assoc, json_decode_obj, mkdir, path_from_bytes, path_to_bytes, pathinfo, realpath,
+    rename, rtrim2, strpos, strtr, substr, trim2,
 };
 use shirabe_symfony_console::{
     formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
@@ -574,9 +574,12 @@ impl Factory {
                         }
                     }
 
-                    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-                        Self::create_http_downloader(io.clone(), &config, IndexMap::new())?,
-                    ));
+                    let http_downloader =
+                        std::rc::Rc::new(std::cell::RefCell::new(Self::create_http_downloader(
+                            io.clone(),
+                            &config,
+                            crate::util::StreamContextOptions::new(),
+                        )?));
                     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(
                         Some(io.clone()),
                     )));
@@ -1375,7 +1378,7 @@ impl Factory {
     pub fn create_http_downloader(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<HttpDownloader> {
         // TODO(plugin): static `$warned` flag — port as a OnceCell or atomic.
         static mut WARNED: bool = false;
@@ -1401,31 +1404,17 @@ impl Factory {
         } else if !extension_loaded("openssl") {
             return Err(NoSslException::new(BString::from("The openssl extension is required for SSL/TLS protection but is not available. If you can not enable the openssl extension, you can disable this error, at your own risk, by setting the 'disable-tls' option to true.")).into());
         }
-        let mut http_downloader_options: IndexMap<BString, PhpMixed> = IndexMap::new();
+        let mut http_downloader_options = StreamContextOptions::new();
         if !disable_tls {
-            if "" != config.borrow().get_path("cafile").unwrap_or_default() {
-                let mut ssl_map: IndexMap<BString, PhpMixed> = IndexMap::new();
-                ssl_map.insert(
-                    "cafile".into(),
-                    PhpMixed::string(config.borrow().get_path("cafile").unwrap_or_default()),
-                );
-                http_downloader_options
-                    .insert("ssl".into(), PhpMixed::Array(ssl_map.into_iter().collect()));
+            let cafile = config.borrow().get_path("cafile")?;
+            if !cafile.is_empty() {
+                http_downloader_options.ssl_mut()?.set_cafile(cafile);
             }
-            if "" != config.borrow().get_path("capath").unwrap_or_default() {
-                let existing_ssl = http_downloader_options
-                    .get(B("ssl"))
-                    .and_then(|v| v.as_array())
-                    .cloned()
-                    .unwrap_or_default();
-                let mut ssl_map = existing_ssl;
-                ssl_map.insert(
-                    "capath".into(),
-                    PhpMixed::string(config.borrow().get_path("capath").unwrap_or_default()),
-                );
-                http_downloader_options.insert("ssl".into(), PhpMixed::Array(ssl_map));
+            let capath = config.borrow().get_path("capath")?;
+            if !capath.is_empty() {
+                http_downloader_options.ssl_mut()?.set_capath(capath);
             }
-            http_downloader_options = array_replace_recursive(http_downloader_options, options);
+            http_downloader_options = http_downloader_options.replace_recursive(options);
         }
         let http_downloader_result: anyhow::Result<HttpDownloader> = HttpDownloader::new(
             io.clone(),

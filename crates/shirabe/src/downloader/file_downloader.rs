@@ -492,7 +492,11 @@ impl DownloaderInterface for FileDownloader {
                 let add_copy_result = self
                     .http_downloader
                     .borrow()
-                    .add_copy(&url.processed, &file_name, package.get_transport_options())
+                    .add_copy(
+                        &url.processed,
+                        &file_name,
+                        package.get_transport_options().into(),
+                    )
                     .await;
                 match add_copy_result {
                     Ok(mut response) => {

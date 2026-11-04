@@ -128,7 +128,10 @@ impl JsonFile {
             if let Some(http_downloader) = &self.http_downloader {
                 Ok(http_downloader
                     .borrow_mut()
-                    .get(path_to_bytes(&self.path), indexmap::IndexMap::new())?
+                    .get(
+                        path_to_bytes(&self.path),
+                        crate::util::StreamContextOptions::new(),
+                    )?
                     .get_body()
                     .map(<[u8]>::to_vec))
             } else {

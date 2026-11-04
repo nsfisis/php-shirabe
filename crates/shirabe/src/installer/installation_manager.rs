@@ -11,8 +11,8 @@ use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, 
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfaceHandle};
 use crate::signal::SignalSubscription;
-use crate::util::Platform;
 use crate::util::r#loop::Loop;
+use crate::util::{HttpOptions, Platform, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -860,23 +860,17 @@ impl InstallationManager {
                             BString::from("version_normalized"),
                             bstr::BString::from(&package.get_version()[..]),
                         );
-                        let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
-                        opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
-                        let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-                        http.insert("method".into(), PhpMixed::string(BString::from("POST")));
-                        http.insert(
-                            "header".into(),
-                            PhpMixed::List(vec![PhpMixed::string(BString::from(
-                                "Content-type: application/x-www-form-urlencoded",
-                            ))]),
-                        );
+                        let mut opts = StreamContextOptions::new();
+                        opts.set_retry_auth_failure(false);
+                        let mut http = HttpOptions::new();
+                        http.set_method("POST");
+                        http.set_header_lines(vec![BString::from(
+                            "Content-type: application/x-www-form-urlencoded",
+                        )]);
                         let params_vec: Vec<(&BString, &BString)> = params.iter().collect();
-                        http.insert(
-                            "content".into(),
-                            PhpMixed::string(http_build_query(&params_vec)),
-                        );
-                        http.insert("timeout".into(), PhpMixed::Int(3));
-                        opts.insert("http".into(), PhpMixed::Array(http.into_iter().collect()));
+                        http.set_content(http_build_query(&params_vec));
+                        http.set_timeout(3);
+                        opts.set_http(http);
 
                         let http_downloader = &*http_downloader;
                         promises.push(Box::pin(async move {
@@ -909,25 +903,17 @@ impl InstallationManager {
                     }
                 }
 
-                let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
-                opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
-                let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-                http.insert("method".into(), PhpMixed::string(BString::from("POST")));
-                http.insert(
-                    "header".into(),
-                    PhpMixed::List(vec![PhpMixed::string(BString::from(
-                        "Content-Type: application/json",
-                    ))]),
+                let mut opts = StreamContextOptions::new();
+                opts.set_retry_auth_failure(false);
+                let mut http = HttpOptions::new();
+                http.set_method("POST");
+                http.set_header_lines(vec![BString::from("Content-Type: application/json")]);
+                http.set_content(
+                    json_encode(&PhpMixed::Array(post_data.into_iter().collect()))
+                        .unwrap_or_default(),
                 );
-                http.insert(
-                    "content".into(),
-                    PhpMixed::string(
-                        json_encode(&PhpMixed::Array(post_data.into_iter().collect()))
-                            .unwrap_or_default(),
-                    ),
-                );
-                http.insert("timeout".into(), PhpMixed::Int(6));
-                opts.insert("http".into(), PhpMixed::Array(http.into_iter().collect()));
+                http.set_timeout(6);
+                opts.set_http(http);
 
                 let http_downloader = &*http_downloader;
                 let repo_url = repo_url.clone();

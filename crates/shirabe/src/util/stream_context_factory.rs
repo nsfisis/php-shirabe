@@ -4,14 +4,14 @@ use crate::composer;
 use crate::downloader::TransportException;
 use crate::repository::PlatformRepository;
 use crate::util::http::ProxyManager;
-use crate::util::{Filesystem, Platform};
-use bstr::{B, BString, ByteSlice};
+use crate::util::{Filesystem, HttpOptions, Platform, StreamContextOptions};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
     PhpMixed, TypeError, array_replace_recursive, bconcat, explode, extension_loaded,
-    get_debug_type, implode_mixed, is_dir, path_from_bytes, path_to_bytes, php_uname,
-    stream_context_create, stripos, uasort, uasort_map,
+    get_debug_type, is_dir, path_from_bytes, path_to_bytes, php_uname, stream_context_create,
+    stripos, uasort, uasort_map,
 };
 
 pub struct StreamContextFactory;
@@ -20,68 +20,54 @@ impl StreamContextFactory {
     /// Creates a context supporting HTTP proxies.
     pub fn get_context(
         url: impl AsRef<[u8]>,
-        default_options: IndexMap<BString, PhpMixed>,
+        default_options: StreamContextOptions,
         default_params: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Result<PhpMixed, Box<TransportException>>> {
-        let mut options: IndexMap<BString, PhpMixed> = {
-            let mut http = IndexMap::new();
-            // specify defaults again to try and work better with curlwrappers enabled
-            http.insert("follow_location".into(), PhpMixed::Int(1));
-            http.insert("max_redirects".into(), PhpMixed::Int(20));
-            let mut o = IndexMap::new();
-            o.insert("http".into(), PhpMixed::Array(http.into_iter().collect()));
-            o
-        };
+        let mut options = StreamContextOptions::new();
+        let mut http = HttpOptions::new();
+        // specify defaults again to try and work better with curlwrappers enabled
+        http.insert("follow_location", PhpMixed::Int(1));
+        http.insert("max_redirects", PhpMixed::Int(20));
+        options.set_http(http);
 
-        options = array_replace_recursive(
-            options,
+        options = options.replace_recursive(
             match Self::init_options(url, default_options.clone(), false)? {
                 Ok(options) => options,
                 Err(e) => return Ok(Err(e)),
             },
         );
-        let default_options = {
-            let mut o = default_options;
-            if let Some(PhpMixed::Array(http)) = o.get_mut(B("http")) {
-                http.shift_remove(B("header"));
-            }
-            o
-        };
-        options = array_replace_recursive(options, default_options);
+        let mut default_options = default_options;
+        // init_options() has rejected an `http` that is neither null nor an array.
+        if default_options.http().is_some() {
+            default_options.http_mut()?.remove("header");
+        }
+        options = options.replace_recursive(default_options);
 
-        if let Some(PhpMixed::Array(http)) = options.get_mut(B("http"))
-            && let Some(header) = http.get(B("header")).filter(|header| !header.is_null())
-        {
-            let fixed = Self::fix_http_header_field(header.clone())?;
-            http.insert("header".into(), fixed);
+        if let Some(header) = options.http().and_then(HttpOptions::header).cloned() {
+            let fixed = Self::fix_http_header_field(header)?;
+            options.http_mut()?.set_header(fixed);
         }
 
-        Ok(Ok(stream_context_create(&options, Some(&default_params))))
+        Ok(Ok(stream_context_create(
+            &options.into_array(),
+            Some(&default_params),
+        )))
     }
 
     pub fn init_options(
         url: impl AsRef<[u8]>,
-        mut options: IndexMap<BString, PhpMixed>,
+        mut options: StreamContextOptions,
         for_curl: bool,
-    ) -> anyhow::Result<Result<IndexMap<BString, PhpMixed>, Box<TransportException>>> {
+    ) -> anyhow::Result<Result<StreamContextOptions, Box<TransportException>>> {
         let url = url.as_ref();
         // Make sure the headers are in an array form
-        let http = options
-            .entry(BString::from("http"))
-            .or_insert(PhpMixed::Null);
-        if http.get(B("header")).is_none_or(PhpMixed::is_null) {
-            http.offset_set_target()?
-                .insert("header".into(), PhpMixed::List(vec![]));
+        let http = options.http_mut()?;
+        if http.header().is_none() {
+            http.set_header(PhpMixed::List(vec![]));
         }
-        let http = http
-            .as_array_mut()
-            .expect("`http` holds a header, so it is an array");
-        if let Some(PhpMixed::String(header_str)) = http.get(B("header")).cloned() {
-            let parts: Vec<PhpMixed> = explode("\r\n", &header_str)
-                .into_iter()
-                .map(PhpMixed::String)
-                .collect();
-            http.insert("header".into(), PhpMixed::List(parts));
+        if let Some(PhpMixed::String(header)) = http.header() {
+            let lines = explode("\r\n", header);
+            http.set_header_lines(lines);
         }
 
         // Add stream proxy options if there is a proxy
@@ -122,24 +108,18 @@ impl StreamContextFactory {
                     ))));
                 }
 
+                let mut proxy_options = StreamContextOptions::from_array(
+                    proxy_options
+                        .iter()
+                        .map(|(group, entries)| (group.clone(), PhpMixed::Array(entries.clone())))
+                        .collect(),
+                );
                 // Header will be a Proxy-Authorization string or not set
-                let proxy_http = proxy_options.get(bstr::B("http"));
-                if let Some(proxy_header) = proxy_http.and_then(|h| h.get(B("header"))) {
-                    Self::http_header_mut(&mut options).push(proxy_header.clone())?;
+                if let Some(header) = proxy_options.http().and_then(HttpOptions::header).cloned() {
+                    options.http_mut()?.push_header(header)?;
+                    proxy_options.http_mut()?.remove("header");
                 }
-
-                let proxy_options_flat: IndexMap<BString, PhpMixed> = proxy_options
-                    .iter()
-                    .map(|(k, v)| {
-                        let inner: IndexMap<BString, PhpMixed> = v
-                            .iter()
-                            .filter(|(ik, _)| *ik != "header")
-                            .map(|(ik, iv)| (ik.clone(), iv.clone()))
-                            .collect();
-                        (k.as_bstr().into(), PhpMixed::Array(inner))
-                    })
-                    .collect();
-                options = array_replace_recursive(options, proxy_options_flat);
+                options = options.replace_recursive(proxy_options);
             }
         }
 
@@ -154,11 +134,12 @@ impl StreamContextFactory {
             "streams"
         };
 
-        let has_user_agent = stripos(
-            implode_mixed("", Self::http_header_mut(&mut options))?,
-            "user-agent",
-        )
-        .is_some();
+        let has_user_agent = match options.http() {
+            Some(http) if http.header().is_some() => {
+                stripos(http.implode_header("")?, "user-agent").is_some()
+            }
+            _ => false,
+        };
 
         if !has_user_agent {
             let platform_php_version = PlatformRepository::get_platform_php_version();
@@ -183,18 +164,20 @@ impl StreamContextFactory {
                 },
                 ")"
             );
-            Self::http_header_mut(&mut options).push(PhpMixed::string(user_agent))?;
+            options
+                .http_mut()?
+                .push_header(PhpMixed::string(user_agent))?;
         }
 
         Ok(Ok(options))
     }
 
     pub fn get_tls_defaults(
-        options: &IndexMap<BString, PhpMixed>,
+        options: &StreamContextOptions,
         // `logger` was a PSR LoggerInterface; CaBundle is slated for removal so
         // it is now an unused `()` placeholder.
         logger: (),
-    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+    ) -> anyhow::Result<StreamContextOptions> {
         let ciphers = [
             "ECDHE-RSA-AES128-GCM-SHA256",
             "ECDHE-ECDSA-AES128-GCM-SHA256",
@@ -251,18 +234,18 @@ impl StreamContextFactory {
         ssl.insert("SNI_enabled".into(), PhpMixed::Bool(true));
         ssl.insert("capture_peer_cert".into(), PhpMixed::Bool(true));
 
-        if let Some(ssl_options) = options.get(B("ssl")).filter(|ssl| !ssl.is_null()) {
+        if let Some(ssl_options) = options.get("ssl").filter(|ssl| !ssl.is_null()) {
             let ssl_options = match ssl_options {
-                PhpMixed::Array(map) => map.clone(),
+                PhpMixed::Array(map) => map,
                 PhpMixed::List(list) => list
-                    .iter()
+                    .into_iter()
                     .enumerate()
-                    .map(|(i, v)| (bconcat!(i), v.clone()))
+                    .map(|(i, v)| (bconcat!(i), v))
                     .collect(),
                 other => {
                     return Err(TypeError::new(bconcat!(
                         "array_replace_recursive(): Argument #2 must be of type array, ",
-                        get_debug_type(other),
+                        get_debug_type(&other),
                         " given"
                     ))
                     .into());
@@ -323,18 +306,9 @@ impl StreamContextFactory {
         // Disable TLS compression to prevent CRIME attacks where supported.
         ssl.insert("disable_compression".into(), PhpMixed::Bool(true));
 
-        let mut defaults = IndexMap::new();
-        defaults.insert("ssl".into(), PhpMixed::Array(ssl));
+        let mut defaults = StreamContextOptions::new();
+        defaults.insert("ssl", PhpMixed::Array(ssl));
         Ok(defaults)
-    }
-
-    /// `$options['http']['header']`, which the start of `init_options` has set.
-    fn http_header_mut(options: &mut IndexMap<BString, PhpMixed>) -> &mut PhpMixed {
-        options
-            .get_mut(B("http"))
-            .and_then(PhpMixed::as_array_mut)
-            .and_then(|http| http.get_mut(B("header")))
-            .expect("init_options sets http.header before reading it")
     }
 
     /// A bug in PHP prevents the headers from correctly being sent when a content-type header is

@@ -38,7 +38,11 @@ impl RepositoryFactory {
             let json = JsonFile::new(
                 path_from_bytes(repository),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
-                    Factory::create_http_downloader(io.clone(), config, IndexMap::new())?,
+                    Factory::create_http_downloader(
+                        io.clone(),
+                        config,
+                        crate::util::StreamContextOptions::new(),
+                    )?,
                 ))),
                 Some(io.clone()),
             )?;
@@ -149,7 +153,11 @@ impl RepositoryFactory {
                 io.clone(),
                 &config,
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
-                    Factory::create_http_downloader(io, &config, IndexMap::new())?,
+                    Factory::create_http_downloader(
+                        io,
+                        &config,
+                        crate::util::StreamContextOptions::new(),
+                    )?,
                 ))),
                 None,
                 None,
@@ -174,7 +182,7 @@ impl RepositoryFactory {
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
                 io.clone(),
                 config,
-                IndexMap::new(),
+                crate::util::StreamContextOptions::new(),
             )?)),
         };
         let process = match process {

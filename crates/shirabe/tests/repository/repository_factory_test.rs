@@ -15,7 +15,13 @@ fn test_manager_with_all_repository_types() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-        HttpDownloader::new(io.clone(), config.clone(), IndexMap::new(), true).unwrap(),
+        HttpDownloader::new(
+            io.clone(),
+            config.clone(),
+            shirabe::util::StreamContextOptions::new(),
+            true,
+        )
+        .unwrap(),
     ));
 
     let manager =

@@ -32,7 +32,13 @@ fn create_path_repo(options: IndexMap<BString, PhpMixed>) -> PathRepository {
     // ref: createPathRepo wires the ProcessExecutor through a Loop so the VersionGuesser's async
     // git calls are permitted; constructing the Loop calls enable_async() on the shared executor.
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-        HttpDownloader::new(io.clone(), config.clone(), IndexMap::new(), false).unwrap(),
+        HttpDownloader::new(
+            io.clone(),
+            config.clone(),
+            shirabe::util::StreamContextOptions::new(),
+            false,
+        )
+        .unwrap(),
     ));
     let _loop = Loop::new(http_downloader, Some(proc.clone()));
 

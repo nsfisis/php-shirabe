@@ -20,7 +20,7 @@ use crate::repository::{
 };
 use crate::util::http::Response;
 use crate::util::r#loop::Loop;
-use crate::util::{HttpDownloader, Url, sync_executor};
+use crate::util::{HttpDownloader, StreamContextOptions, Url, sync_executor};
 use bstr::{B, BStr, BString, ByteSlice};
 use futures::StreamExt;
 use futures::stream::FuturesOrdered;
@@ -579,7 +579,7 @@ impl ComposerRepository {
             let result = self
                 .http_downloader
                 .borrow_mut()
-                .get(&url, self.options.clone())?
+                .get(&url, self.options.clone().into())?
                 .decode_json()?;
             let package_names: Vec<BString> = result
                 .as_array()
@@ -607,7 +607,7 @@ impl ComposerRepository {
         let result = self
             .http_downloader
             .borrow_mut()
-            .get(&url, self.options.clone())?
+            .get(&url, self.options.clone().into())?
             .decode_json()?;
         let package_names: Vec<BString> = result
             .as_array()
@@ -773,7 +773,7 @@ impl ComposerRepository {
             let search = self
                 .http_downloader
                 .borrow_mut()
-                .get(&url, self.options.clone())?
+                .get(&url, self.options.clone().into())?
                 .decode_json()?;
 
             let results_arr = search
@@ -851,7 +851,7 @@ impl ComposerRepository {
                 let result = self
                     .http_downloader
                     .borrow_mut()
-                    .get(&url, self.options.clone())?
+                    .get(&url, self.options.clone().into())?
                     .decode_json()?;
 
                 let mut results: Vec<IndexMap<BString, PhpMixed>> = Vec::new();
@@ -1070,29 +1070,15 @@ impl ComposerRepository {
         if let Some(api_url) = api_url
             && !package_constraint_map.is_empty()
         {
-            let mut options = self.options.clone();
-            let http_entry = options
-                .entry("http".into())
-                .or_insert(PhpMixed::Array(IndexMap::new()));
-            if let PhpMixed::Array(http_map) = http_entry {
-                http_map.insert("method".into(), PhpMixed::string(BString::from("POST")));
-                if let Some(header_val) = http_map.get(B("header")) {
-                    // cast to array
-                    let arr = match header_val {
-                        PhpMixed::List(l) => l.clone(),
-                        other => vec![other.clone()],
-                    };
-                    http_map.insert("header".into(), PhpMixed::List(arr));
-                }
-                let mut headers = match http_map.get(B("header")) {
-                    Some(PhpMixed::List(l)) => l.clone(),
-                    _ => vec![],
-                };
-                headers.push(PhpMixed::string(BString::from(
-                    "Content-type: application/x-www-form-urlencoded",
-                )));
-                http_map.insert("header".into(), PhpMixed::List(headers));
-                http_map.insert("timeout".into(), PhpMixed::Int(10));
+            let mut options: StreamContextOptions = self.options.clone().into();
+            let http = options.http_mut()?;
+            http.set_method("POST");
+            http.cast_header_to_array();
+            http.push_header(PhpMixed::string(
+                "Content-type: application/x-www-form-urlencoded",
+            ))?;
+            http.set_timeout(10);
+            {
                 let mut query: IndexMap<BString, PhpMixed> = IndexMap::new();
                 query.insert(
                     "packages".into(),
@@ -1104,7 +1090,7 @@ impl ComposerRepository {
                     ),
                 );
                 let body = http_build_query_mixed(&query, "", "&");
-                http_map.insert("content".into(), PhpMixed::string(body));
+                http.set_content(body);
             }
 
             let response = self.http_downloader.borrow_mut().get(&api_url, options)?;
@@ -1169,7 +1155,7 @@ impl ComposerRepository {
         if let Some(providers_api_url) = self.providers_api_url.clone() {
             let api_result = match self.http_downloader.borrow_mut().get(
                 str_replace("%package%", package_name, &providers_api_url),
-                self.options.clone(),
+                self.options.clone().into(),
             ) {
                 Ok(resp) => resp.decode_json()?,
                 Err(e) => {
@@ -2771,7 +2757,7 @@ impl ComposerRepository {
             cont
         } {
             let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
-                let mut options = self.options.clone();
+                let mut options: StreamContextOptions = self.options.clone().into();
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
@@ -2795,9 +2781,8 @@ impl ComposerRepository {
                     filename = BString::from(pre_file_download_event.get_processed_url());
                     options = pre_file_download_event
                         .get_transport_options()
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect();
+                        .clone()
+                        .into();
                 }
 
                 let mut response = self.http_downloader.borrow_mut().get(&filename, options)?;
@@ -2943,7 +2928,7 @@ impl ComposerRepository {
 
         let mut filename = BString::from(filename);
         let result: anyhow::Result<FetchFileIfLastModifiedResult> = (|| {
-            let mut options = self.options.clone();
+            let mut options: StreamContextOptions = self.options.clone().into();
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
@@ -2966,33 +2951,17 @@ impl ComposerRepository {
                 filename = BString::from(pre_file_download_event.get_processed_url());
                 options = pre_file_download_event
                     .get_transport_options()
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect();
+                    .clone()
+                    .into();
             }
 
             // cast http.header to array, then append
-            let http_entry = options
-                .entry("http".into())
-                .or_insert(PhpMixed::Array(IndexMap::new()));
-            if let PhpMixed::Array(http_map) = http_entry {
-                if let Some(existing) = http_map.get(B("header")) {
-                    let arr = match existing {
-                        PhpMixed::List(l) => l.clone(),
-                        other => vec![other.clone()],
-                    };
-                    http_map.insert("header".into(), PhpMixed::List(arr));
-                }
-                let mut headers = match http_map.get(B("header")) {
-                    Some(PhpMixed::List(l)) => l.clone(),
-                    _ => vec![],
-                };
-                headers.push(PhpMixed::string(bconcat!(
-                    "If-Modified-Since: ",
-                    last_modified_time
-                )));
-                http_map.insert("header".into(), PhpMixed::List(headers));
-            }
+            let http = options.http_mut()?;
+            http.cast_header_to_array();
+            http.push_header(PhpMixed::string(bconcat!(
+                "If-Modified-Since: ",
+                last_modified_time
+            )))?;
 
             let mut response = self
                 .http_downloader
@@ -3099,7 +3068,7 @@ impl ComposerRepository {
         }
 
         let mut filename = BString::from(filename);
-        let mut options = self.options.clone();
+        let mut options: StreamContextOptions = self.options.clone().into();
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
             let mut dispatcher = dispatcher.borrow_mut();
             let mut pre_file_download_event = PreFileDownloadEvent::new(
@@ -3122,33 +3091,17 @@ impl ComposerRepository {
             filename = BString::from(pre_file_download_event.get_processed_url());
             options = pre_file_download_event
                 .get_transport_options()
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
+                .clone()
+                .into();
         }
 
         if let Some(last_modified_time) = last_modified_time {
-            let http_entry = options
-                .entry("http".into())
-                .or_insert(PhpMixed::Array(IndexMap::new()));
-            if let PhpMixed::Array(http_map) = http_entry {
-                if let Some(existing) = http_map.get(B("header")) {
-                    let arr = match existing {
-                        PhpMixed::List(l) => l.clone(),
-                        other => vec![other.clone()],
-                    };
-                    http_map.insert("header".into(), PhpMixed::List(arr));
-                }
-                let mut headers = match http_map.get(B("header")) {
-                    Some(PhpMixed::List(l)) => l.clone(),
-                    _ => vec![],
-                };
-                headers.push(PhpMixed::string(bconcat!(
-                    "If-Modified-Since: ",
-                    last_modified_time
-                )));
-                http_map.insert("header".into(), PhpMixed::List(headers));
-            }
+            let http = options.http_mut()?;
+            http.cast_header_to_array();
+            http.push_header(PhpMixed::string(bconcat!(
+                "If-Modified-Since: ",
+                last_modified_time
+            )))?;
         }
 
         let response_result = self.http_downloader.borrow().add(&filename, options).await;

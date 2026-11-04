@@ -1,6 +1,5 @@
 //! ref: composer/tests/Composer/Test/FactoryTest.php sha1:42dc812351ccb668ee5a90d7f8b96d15b1ef1ce5
 
-use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::factory::Factory;
 use shirabe::io::{IOInterface, io_interface};
@@ -48,7 +47,8 @@ fn test_default_values_are_as_expected() {
         .build_shared();
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
-    Factory::create_http_downloader(io, &config, IndexMap::new()).unwrap();
+    Factory::create_http_downloader(io, &config, shirabe::util::StreamContextOptions::new())
+        .unwrap();
 }
 
 #[test]

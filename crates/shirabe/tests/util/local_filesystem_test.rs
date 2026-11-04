@@ -5,7 +5,6 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
-use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, LocalFilesystem};
 use shirabe_php_shim::{PhpMixed, bconcat, file_get_contents, strpos, unlink};
@@ -44,7 +43,7 @@ fn test_get_contents() {
             "http://example.org",
             bconcat!("file://", this_file()),
             false,
-            IndexMap::new(),
+            shirabe::util::StreamContextOptions::new(),
         )
         .unwrap();
     assert!(strpos(get_result_to_string(&res), "testGetContents").is_some());
@@ -64,7 +63,7 @@ fn test_copy() {
             bconcat!("file://", this_file()),
             &file,
             false,
-            IndexMap::new()
+            shirabe::util::StreamContextOptions::new()
         )
         .unwrap(),
         GetResult::True

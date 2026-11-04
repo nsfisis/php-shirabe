@@ -393,7 +393,7 @@ impl VersionGuesser {
             let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
                 http_io,
                 self.config.clone(),
-                IndexMap::new(),
+                crate::util::StreamContextOptions::new(),
                 false,
             )?));
             let mut driver = HgDriver::new(

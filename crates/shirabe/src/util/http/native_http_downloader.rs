@@ -24,14 +24,17 @@ use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
-use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreAuth, Url};
+use crate::util::{
+    AuthHelper, HttpDownloader, HttpOptions, Platform, PromptAuthResult, StoreAuth,
+    StreamContextOptions, Url,
+};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, bconcat, display_to_bytes, implode, in_array_loose, in_array_strict,
-    json_decode_assoc, parse_url, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
-    preg_quote, preg_replace, rename, stripos, strlen, strpos, strtolower, substr, trim,
-    unlink_silent, utf8_text,
+    PHP_EOL, PhpMixed, RuntimeException, TypeError, bconcat, display_to_bytes, get_debug_type,
+    in_array_loose, in_array_strict, intval, json_decode_assoc, parse_url, path_from_bytes,
+    path_to_bytes, php_regex, php_to_string, preg_is_match, preg_quote, preg_replace, rename,
+    stripos, strlen, strpos, strtolower, substr, trim, unlink_silent, utf8_text,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -109,7 +112,7 @@ impl NativeHttpDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        _options: IndexMap<BString, PhpMixed>,
+        _options: StreamContextOptions,
         _disable_tls: bool,
     ) -> Self {
         // PHP set up the multi/share handle here (CURLMOPT_PIPELINING, MAX_HOST_CONNECTIONS,
@@ -140,7 +143,7 @@ impl NativeHttpDownloader {
         &self,
         origin: &BStr,
         url: &BStr,
-        mut options: IndexMap<BString, PhpMixed>,
+        mut options: StreamContextOptions,
         copy_to: Option<&std::path::Path>,
     ) -> anyhow::Result<Result<Response, anyhow::Error>> {
         let mut attributes: IndexMap<BString, PhpMixed> = {
@@ -152,15 +155,10 @@ impl NativeHttpDownloader {
             m.insert("ipResolve".into(), PhpMixed::Null);
             m
         };
-        if options.contains_key(B("retry-auth-failure")) {
-            attributes.insert(
-                "retryAuthFailure".into(),
-                options
-                    .get(B("retry-auth-failure"))
-                    .cloned()
-                    .unwrap_or(PhpMixed::Null),
-            );
-            options.shift_remove(B("retry-auth-failure"));
+        if options.isset("retry-auth-failure")
+            && let Some(retry_auth_failure) = options.remove("retry-auth-failure")
+        {
+            attributes.insert("retryAuthFailure".into(), retry_auth_failure);
         }
 
         if attributes
@@ -187,7 +185,7 @@ impl NativeHttpDownloader {
             self.config.borrow_mut().prohibit_url_by_config(
                 url,
                 Some(self.io.clone()),
-                &options,
+                &options.to_array(),
             )?;
         }
 
@@ -195,12 +193,25 @@ impl NativeHttpDownloader {
         // up-front if the body temp file could not be opened. reqwest opens no file until
         // send_once(), so the auth/stream-context merge happens once per attempt inside the loop.
 
-        let header_strings = Self::header_list(&options);
-        let if_modified = if stripos(implode(",", &header_strings), "if-modified-since:").is_some()
+        // PHP runs `array_diff()` on a set header before anything converts it.
+        if let Some(header) = options.http().and_then(HttpOptions::header)
+            && !matches!(header, PhpMixed::List(_) | PhpMixed::Array(_))
         {
-            " if modified"
-        } else {
-            ""
+            return Err(TypeError::new(bconcat!(
+                "array_diff(): Argument #1 ($array) must be of type array, ",
+                get_debug_type(header),
+                " given"
+            ))
+            .into());
+        }
+        let if_modified = match options.http() {
+            Some(http)
+                if http.header().is_some()
+                    && stripos(http.implode_header(",")?, "if-modified-since:").is_some() =>
+            {
+                " if modified"
+            }
+            _ => "",
         };
         // PHP logs the proxy in the "Downloading" line; resolving it here keeps that message
         // faithful even though reqwest does not yet apply the proxy (see send_once TODO).
@@ -231,8 +242,9 @@ impl NativeHttpDownloader {
             let send_options =
                 crate::util::StreamContextFactory::init_options(&current_url, send_options, true)??;
 
+            let request = Self::curl_request_options(&send_options)?;
             let send_result = self
-                .send_once(current_url.as_bstr(), &send_options, copy_to, &attributes)
+                .send_once(current_url.as_bstr(), &request, copy_to, &attributes)
                 .await;
 
             match self
@@ -273,7 +285,7 @@ impl NativeHttpDownloader {
         url: &BStr,
         origin: &BStr,
         filename: Option<&std::path::Path>,
-        options: &IndexMap<BString, PhpMixed>,
+        options: &StreamContextOptions,
         attributes: &mut IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Decision> {
         let response = match send_result {
@@ -507,33 +519,22 @@ impl NativeHttpDownloader {
     async fn send_once(
         &self,
         url: &BStr,
-        options: &IndexMap<BString, PhpMixed>,
+        request: &CurlRequestOptions,
         filename: Option<&std::path::Path>,
         attributes: &IndexMap<BString, PhpMixed>,
     ) -> Result<RawResponse, TransportError> {
-        let http = options.get(B("http")).and_then(|v| v.as_array());
-        let method = http
-            .and_then(|h| h.get(B("method")))
-            .and_then(|v| v.as_string())
-            .unwrap_or("GET".into());
-        let body = http
-            .and_then(|h| h.get(B("content")))
-            .and_then(|v| v.as_string())
-            .map(|s| s.to_vec());
-        let timeout_secs = http
-            .and_then(|h| h.get(B("timeout")))
-            .and_then(|v| v.as_int())
-            .unwrap_or(0)
-            .max(300);
-        let headers = Self::header_list(options);
-        let max_file_size = options
-            .get(B("max_file_size"))
-            .and_then(|v| v.as_int())
-            .map(|n| n as u64);
+        let CurlRequestOptions {
+            method,
+            body,
+            timeout_secs,
+            headers,
+            max_file_size,
+        } = request;
+        let (body, max_file_size) = (body.clone(), *max_file_size);
 
-        // TODO(http): per-request ssl (cafile/verify_peer/local_cert) and proxy settings are reqwest
-        // Client-level, not request-level. They are not applied here yet; a ConnectionOptions-keyed
-        // Client cache (as in the design sketch) is required to honor them.
+        // TODO(http): the `ssl` options (cafile, capath, verify_peer, local_cert, ...) and the proxy
+        // are not applied: reqwest takes them per Client, not per request, so honoring them needs a
+        // Client for each set of connection options.
         // TODO(http): CURLOPT_IPRESOLVE (force IPv4/IPv6) has no direct reqwest API.
         let _ = attributes;
 
@@ -551,7 +552,7 @@ impl NativeHttpDownloader {
             });
         };
         let mut builder = self.client.request(reqwest_method, url);
-        for header in &headers {
+        for header in headers {
             if let Some((name, value)) = header.split_once_str(":") {
                 // Skip the Connection header reqwest manages itself.
                 let name = trim(name);
@@ -561,7 +562,9 @@ impl NativeHttpDownloader {
                 builder = builder.header(name.as_slice(), trim(value).as_slice());
             }
         }
-        builder = builder.timeout(std::time::Duration::from_secs(timeout_secs as u64));
+        if let Some(timeout_secs) = timeout_secs {
+            builder = builder.timeout(std::time::Duration::from_secs(*timeout_secs));
+        }
         if let Some(body) = body {
             builder = builder.body(body);
         }
@@ -923,15 +926,50 @@ impl NativeHttpDownloader {
         ))
     }
 
-    fn method_is_get(options: &IndexMap<BString, PhpMixed>) -> bool {
-        let method = options
-            .get(B("http"))
-            .and_then(|v| v.as_array())
-            .and_then(|h| h.get(B("method")))
-            .and_then(|v| v.as_string());
-        match method {
+    /// The `curl_setopt()` conversions of the options `CurlDownloader` maps to curl options.
+    fn curl_request_options(options: &StreamContextOptions) -> anyhow::Result<CurlRequestOptions> {
+        let http = options.http();
+        let method = http
+            .and_then(HttpOptions::method)
+            .map_or_else(|| BString::from("GET"), php_to_string);
+        let body = match http.and_then(HttpOptions::content) {
+            None => None,
+            // TODO(http): curl sends an array CURLOPT_POSTFIELDS as a multipart/form-data body.
+            Some(PhpMixed::List(_) | PhpMixed::Array(_)) => {
+                return Err(RuntimeException::new(
+                    "An array http.content (a multipart/form-data body) is not supported",
+                )
+                .into());
+            }
+            Some(content) => Some(php_to_string(content).into()),
+        };
+        // CURLOPT_TIMEOUT is max(default_socket_timeout, 300) unless http.timeout overrides it,
+        // and curl reads 0 as no timeout.
+        let timeout_secs = match http.and_then(HttpOptions::timeout) {
+            None => Some(300),
+            Some(timeout) => u64::try_from(intval(timeout)).ok().filter(|secs| *secs > 0),
+        };
+        let headers = match http {
+            Some(http) if http.header().is_some() => http.header_lines()?,
+            _ => Vec::new(),
+        };
+        let max_file_size = options
+            .max_file_size("stream_get_contents(): Argument #2 ($length)")?
+            .map(|n| n.max(0) as u64);
+
+        Ok(CurlRequestOptions {
+            method,
+            body,
+            timeout_secs,
+            headers,
+            max_file_size,
+        })
+    }
+
+    fn method_is_get(options: &StreamContextOptions) -> bool {
+        match options.http().and_then(HttpOptions::method) {
             None => true,
-            Some(m) => m == "GET",
+            Some(method) => matches!(method, PhpMixed::String(method) if method == "GET"),
         }
     }
 
@@ -939,23 +977,17 @@ impl NativeHttpDownloader {
     fn temp_file(filename: &std::path::Path) -> std::path::PathBuf {
         path_from_bytes(&bconcat!(path_to_bytes(filename), "~")).to_owned()
     }
+}
 
-    /// Extracts `options['http']['header']` as a `Vec<BString>`.
-    fn header_list(options: &IndexMap<BString, PhpMixed>) -> Vec<BString> {
-        options
-            .get(B("http"))
-            .and_then(|v| v.as_array())
-            .and_then(|h| h.get(B("header")))
-            .and_then(|v| match v {
-                PhpMixed::List(l) => Some(
-                    l.iter()
-                        .filter_map(|x| x.as_string().map(BStr::to_owned))
-                        .collect(),
-                ),
-                _ => None,
-            })
-            .unwrap_or_default()
-    }
+/// What one request sends, converted from its options.
+#[derive(Debug)]
+struct CurlRequestOptions {
+    method: BString,
+    body: Option<Vec<u8>>,
+    /// `None` for no timeout.
+    timeout_secs: Option<u64>,
+    headers: Vec<BString>,
+    max_file_size: Option<u64>,
 }
 
 /// A transport-layer failure approximating the curl errno branches PHP inspected.

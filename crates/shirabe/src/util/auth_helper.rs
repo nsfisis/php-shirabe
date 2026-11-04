@@ -3,13 +3,14 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
-use crate::util::{Bitbucket, GitHub, GitLab};
+use crate::util::{Bitbucket, GitHub, GitLab, HttpOptions, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, array_merge, base64_encode, bconcat, explode,
-    in_array_loose, in_array_strict, is_array, is_string, json_decode_assoc, parse_url, php_regex,
-    php_to_string, preg_is_match, str_replace, strpos, strtolower, substr, trigger_error, trim,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, TypeError, array_merge, base64_encode, bconcat,
+    explode, get_debug_type, in_array_loose, in_array_strict, is_array, is_string,
+    json_decode_assoc, parse_url, php_regex, php_to_string, preg_is_match, str_replace, strpos,
+    strtolower, substr, trigger_error, trim,
 };
 use shirabe_symfony_console::input::InputValue;
 
@@ -445,57 +446,30 @@ impl AuthHelper {
             E_USER_DEPRECATED,
         );
 
-        let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
-        http.insert(
-            "header".into(),
-            PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
-        );
-        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
-        options.insert("http".into(), PhpMixed::Array(http));
+        let mut http = HttpOptions::new();
+        http.set_header_lines(headers);
+        let mut options = StreamContextOptions::new();
+        options.set_http(http);
         let options = self.add_authentication_options(options, origin, url)?;
 
-        Ok(options[B("http")]
-            .as_array()
-            .and_then(|http| http.get(B("header")))
-            .and_then(|header| header.as_list())
-            .expect("addAuthenticationOptions always leaves http.header a list")
-            .iter()
-            .map(|v| BString::from(v.as_string().unwrap_or_default()))
-            .collect())
+        // TODO(type-model): PHP returns the header lines as they are; a custom header from
+        // auth.json that is not a string is converted to one here.
+        options
+            .http()
+            .expect("addAuthenticationOptions always leaves http an array")
+            .header_lines()
     }
 
     pub fn add_authentication_options(
         &mut self,
-        mut options: IndexMap<BString, PhpMixed>,
+        mut options: StreamContextOptions,
         origin: &BStr,
         url: &BStr,
-    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        if !options.contains_key(B("http")) {
-            options.insert("http".into(), PhpMixed::Array(IndexMap::new()));
+    ) -> anyhow::Result<StreamContextOptions> {
+        let http = options.http_mut()?;
+        if http.header().is_none() {
+            http.set_header(PhpMixed::List(vec![]));
         }
-        // PHP: if (!isset($options['http']['header']))
-        {
-            let http_has_header = if let Some(PhpMixed::Array(http)) = options.get(B("http")) {
-                http.contains_key(B("header"))
-            } else {
-                false
-            };
-            if !http_has_header && let Some(PhpMixed::Array(http)) = options.get_mut(B("http")) {
-                http.insert("header".into(), PhpMixed::List(vec![]));
-            }
-        }
-
-        // PHP: $headers = &$options['http']['header'];
-        // The reference is emulated by writing `headers` back into options below.
-        let mut headers: Vec<PhpMixed> = match options
-            .get(B("http"))
-            .and_then(|v| v.as_array())
-            .and_then(|h| h.get(B("header")))
-            .and_then(|v| v.as_list())
-        {
-            Some(list) => list.to_vec(),
-            None => vec![],
-        };
 
         if self.io.has_authentication(origin) {
             let mut authentication_display_message: Option<BString> = None;
@@ -509,10 +483,10 @@ impl AuthHelper {
                 .and_then(|v| v.clone())
                 .unwrap_or_default();
             if password == "bearer" {
-                headers.push(PhpMixed::string(bconcat!(
+                options.http_mut()?.push_header(PhpMixed::string(bconcat!(
                     "Authorization: Bearer ",
                     username
-                )));
+                )))?;
             } else if password == "custom-headers" {
                 // Handle custom HTTP headers from auth.json
                 #[allow(unused_assignments)]
@@ -521,14 +495,8 @@ impl AuthHelper {
                 // username field is always String in our IndexMap representation
                 custom_headers = json_decode_assoc(&username)?;
                 if is_array(&custom_headers) {
-                    if let Some(arr) = custom_headers.as_array() {
-                        for header in arr.values() {
-                            headers.push(header.clone());
-                        }
-                    } else if let Some(list) = custom_headers.as_list() {
-                        for header in list {
-                            headers.push(header.clone());
-                        }
+                    for header in custom_headers.values() {
+                        options.http_mut()?.push_header(header.clone())?;
                     }
                     authentication_display_message = Some(BString::from(
                         "Using custom HTTP headers for authentication",
@@ -537,10 +505,10 @@ impl AuthHelper {
             } else if origin == "github.com" && password == "x-oauth-basic" {
                 // only add the access_token if it is actually a github API URL
                 if preg_is_match(php_regex!(r"{^https?://api\.github\.com/}"), url) {
-                    headers.push(PhpMixed::string(bconcat!(
+                    options.http_mut()?.push_header(PhpMixed::string(bconcat!(
                         "Authorization: token ",
                         username
-                    )));
+                    )))?;
                     authentication_display_message =
                         Some(BString::from("Using GitHub token authentication"));
                 }
@@ -552,14 +520,16 @@ impl AuthHelper {
                 &self.config.borrow().get_list("gitlab-domains")?,
             ) {
                 if password == "oauth2" {
-                    headers.push(PhpMixed::string(bconcat!(
+                    options.http_mut()?.push_header(PhpMixed::string(bconcat!(
                         "Authorization: Bearer ",
                         username
-                    )));
+                    )))?;
                     authentication_display_message =
                         Some(BString::from("Using GitLab OAuth token authentication"));
                 } else {
-                    headers.push(PhpMixed::string(bconcat!("PRIVATE-TOKEN: ", username)));
+                    options
+                        .http_mut()?
+                        .push_header(PhpMixed::string(bconcat!("PRIVATE-TOKEN: ", username)))?;
                     authentication_display_message =
                         Some(BString::from("Using GitLab private token authentication"));
                 }
@@ -568,29 +538,40 @@ impl AuthHelper {
                 && username == "x-token-auth"
             {
                 if !self.is_public_bit_bucket_download(url) {
-                    headers.push(PhpMixed::string(bconcat!(
+                    options.http_mut()?.push_header(PhpMixed::string(bconcat!(
                         "Authorization: Bearer ",
                         password
-                    )));
+                    )))?;
                     authentication_display_message =
                         Some(BString::from("Using Bitbucket OAuth token authentication"));
                 }
             } else if username == "client-certificate" {
-                // PHP: $options['ssl'] = array_merge($options['ssl'] ?? [], json_decode_assoc((string) $auth['password']));
                 let existing_ssl = options
-                    .get(B("ssl"))
-                    .cloned()
+                    .get("ssl")
+                    .filter(|ssl| !ssl.is_null())
                     .unwrap_or(PhpMixed::Array(IndexMap::new()));
                 let decoded = json_decode_assoc(&password)?;
-                options.insert("ssl".into(), array_merge(existing_ssl, decoded));
+                for (position, argument) in [(1, &existing_ssl), (2, &decoded)] {
+                    if !matches!(argument, PhpMixed::List(_) | PhpMixed::Array(_)) {
+                        return Err(TypeError::new(bconcat!(
+                            "array_merge(): Argument #",
+                            position,
+                            " must be of type array, ",
+                            get_debug_type(argument),
+                            " given"
+                        ))
+                        .into());
+                    }
+                }
+                options.insert("ssl", array_merge(existing_ssl, decoded));
                 authentication_display_message =
                     Some(BString::from("Using SSL client certificate"));
             } else {
                 let auth_str = base64_encode(bconcat!(username, ":", password));
-                headers.push(PhpMixed::string(bconcat!(
+                options.http_mut()?.push_header(PhpMixed::string(bconcat!(
                     "Authorization: Basic ",
                     auth_str
-                )));
+                )))?;
                 authentication_display_message = Some(bconcat!(
                     "Using HTTP basic authentication with username \"",
                     username,
@@ -614,11 +595,6 @@ impl AuthHelper {
                 str_replace("api.", "", origin).as_bstr(),
                 url,
             );
-        }
-
-        // write headers back into options['http']['header']
-        if let Some(PhpMixed::Array(http)) = options.get_mut(B("http")) {
-            http.insert("header".into(), PhpMixed::List(headers));
         }
 
         Ok(options)

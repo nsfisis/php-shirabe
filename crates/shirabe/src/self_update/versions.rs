@@ -169,7 +169,7 @@ impl Versions {
                     .borrow_mut()
                     .get(
                         bconcat!(protocol, "://getcomposer.org/versions"),
-                        IndexMap::new(),
+                        crate::util::StreamContextOptions::new(),
                     )?
                     .decode_json()?,
             );

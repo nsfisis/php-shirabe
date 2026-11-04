@@ -117,8 +117,10 @@ impl Forgejo {
 
         match self.http_downloader.borrow_mut().get(
             bconcat!("https://", origin_url, "/api/v1/version"),
-            indexmap::indexmap! {
-                "retry-auth-failure".into() => false.into(),
+            {
+                let mut options = crate::util::StreamContextOptions::new();
+                options.set_retry_auth_failure(false);
+                options
             },
         ) {
             Ok(_) => {}

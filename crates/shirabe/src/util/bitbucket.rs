@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
-use crate::util::{HttpDownloader, ProcessExecutor};
+use crate::util::{HttpDownloader, HttpOptions, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -46,7 +46,7 @@ impl Bitbucket {
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
                 io.clone(),
                 &config,
-                IndexMap::new(),
+                crate::util::StreamContextOptions::new(),
             )?)),
         };
         Ok(Self {
@@ -95,15 +95,12 @@ impl Bitbucket {
     }
 
     fn request_access_token(&mut self) -> anyhow::Result<bool> {
-        let mut http = IndexMap::new();
-        http.insert("method".into(), PhpMixed::string(BString::from("POST")));
-        http.insert(
-            "content".into(),
-            PhpMixed::string(BString::from("grant_type=client_credentials")),
-        );
-        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
-        options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
-        options.insert("http".into(), PhpMixed::Array(http));
+        let mut http = HttpOptions::new();
+        http.set_method("POST");
+        http.set_content("grant_type=client_credentials");
+        let mut options = StreamContextOptions::new();
+        options.set_retry_auth_failure(false);
+        options.set_http(http);
 
         let response = match self
             .http_downloader

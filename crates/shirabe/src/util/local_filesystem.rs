@@ -8,12 +8,13 @@ use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::http::ProxyManager;
-use crate::util::{GetResult, Url};
-use bstr::{B, BStr, BString, ByteSlice};
+use crate::util::{GetResult, StreamContextOptions, Url};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, file_get_contents, file_get_contents_with_max_length,
-    file_put_contents, parse_url, path_from_bytes, php_regex, preg_is_match, strpos, strtr,
+    RuntimeException, bconcat, file_get_contents, file_get_contents_with_max_length,
+    file_put_contents, parse_url, path_from_bytes, php_regex, php_to_string, preg_is_match, strpos,
+    strtr,
 };
 
 #[derive(Debug)]
@@ -49,7 +50,7 @@ impl LocalFilesystem {
         file_url: impl AsRef<[u8]>,
         file_name: impl AsRef<std::path::Path>,
         progress: bool,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<GetResult> {
         self.get(
             origin_url.as_ref().as_bstr(),
@@ -65,7 +66,7 @@ impl LocalFilesystem {
         origin_url: impl AsRef<[u8]>,
         file_url: impl AsRef<[u8]>,
         progress: bool,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<GetResult> {
         self.get(
             origin_url.as_ref().as_bstr(),
@@ -80,40 +81,42 @@ impl LocalFilesystem {
         &self,
         origin_url: &BStr,
         file_url: &BStr,
-        mut options: IndexMap<BString, PhpMixed>,
+        mut options: StreamContextOptions,
         file_name: Option<&std::path::Path>,
         progress: bool,
     ) -> anyhow::Result<GetResult> {
-        options.shift_remove(B("retry-auth-failure"));
-        let is_redirect = options.shift_remove(B("redirects")).is_some();
+        if options.isset("retry-auth-failure") {
+            options.remove("retry-auth-failure");
+        }
+        let is_redirect = options.isset("redirects");
+        if is_redirect {
+            options.remove("redirects");
+        }
 
         let orig_file_url = file_url.to_owned();
         let mut file_url = file_url.to_owned();
 
-        if options.contains_key(B("prevent_ip_access_callable")) {
+        if options.isset("prevent_ip_access_callable") {
             return Err(RuntimeException::new(BString::from(
                 "RemoteFilesystem doesn't support the 'prevent_ip_access_callable' config.",
             ))
             .into());
         }
 
-        if let Some(token) = options.shift_remove(B("gitlab-token")) {
+        if options.isset("gitlab-token")
+            && let Some(token) = options.remove("gitlab-token")
+        {
             let separator = if strpos(&file_url, "?").is_none() {
                 "?"
             } else {
                 "&"
             };
-            file_url = bconcat!(
-                file_url,
-                separator,
-                "access_token=",
-                token.as_string().unwrap_or_default()
-            );
+            file_url = bconcat!(file_url, separator, "access_token=", php_to_string(&token));
         }
 
-        let max_file_size = options
-            .shift_remove(B("max_file_size"))
-            .and_then(|v| v.as_int());
+        let max_file_size = options.max_file_size(
+            "Composer\\Util\\RemoteFilesystem::getRemoteContents(): Argument #5 ($maxFileSize)",
+        )?;
 
         let using_proxy = {
             let proxy_manager_guard = ProxyManager::get_instance();

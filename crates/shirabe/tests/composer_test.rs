@@ -1,7 +1,6 @@
 //! ref: composer/tests/Composer/Test/ComposerTest.php sha1:c237b7414989161eef4bb451b40c75a64fa1ce62
 
 use bstr::BString;
-use indexmap::IndexMap;
 use shirabe::composer::Composer;
 use shirabe::config::Config;
 use shirabe::downloader::{DownloadManager, DownloadManagerInterface};
@@ -24,7 +23,13 @@ fn http_downloader(
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
     std::rc::Rc::new(std::cell::RefCell::new(
-        HttpDownloader::new(io.clone(), config, IndexMap::new(), true).unwrap(),
+        HttpDownloader::new(
+            io.clone(),
+            config,
+            shirabe::util::StreamContextOptions::new(),
+            true,
+        )
+        .unwrap(),
     ))
 }
 

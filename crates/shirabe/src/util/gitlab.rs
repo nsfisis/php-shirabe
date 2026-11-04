@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
-use crate::util::{HttpDownloader, ProcessExecutor};
+use crate::util::{HttpDownloader, HttpOptions, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -38,7 +38,7 @@ impl GitLab {
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
                 io.clone(),
                 &config,
-                IndexMap::new(),
+                crate::util::StreamContextOptions::new(),
             )?)),
         };
         Ok(Self {
@@ -437,24 +437,18 @@ impl GitLab {
             (B("password"), password.as_slice()),
             (B("grant_type"), B("password")),
         ]);
-        let mut http_inner: IndexMap<BString, PhpMixed> = IndexMap::new();
-        http_inner.insert("method".into(), PhpMixed::string(BString::from("POST")));
-        http_inner.insert(
-            "header".into(),
-            PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
-        );
-        http_inner.insert("content".into(), PhpMixed::string(data));
-        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
-        options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
-        options.insert("http".into(), PhpMixed::Array(http_inner));
+        let mut http = HttpOptions::new();
+        http.set_method("POST");
+        http.set_header_lines(headers);
+        http.set_content(data);
+        let mut options = StreamContextOptions::new();
+        options.set_retry_auth_failure(false);
+        options.set_http(http);
 
         let token = self
             .http_downloader
             .borrow_mut()
-            .get(
-                bconcat!(scheme, "://", api_url, "/oauth/token"),
-                options.into_iter().collect(),
-            )?
+            .get(bconcat!(scheme, "://", api_url, "/oauth/token"), options)?
             .decode_json()?;
 
         self.io
@@ -508,24 +502,18 @@ impl GitLab {
             (B("refresh_token"), refresh_token.as_slice()),
             (B("grant_type"), B("refresh_token")),
         ]);
-        let mut http_inner = IndexMap::new();
-        http_inner.insert("method".into(), PhpMixed::string(BString::from("POST")));
-        http_inner.insert(
-            "header".into(),
-            PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
-        );
-        http_inner.insert("content".into(), PhpMixed::string(data));
-        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
-        options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
-        options.insert("http".into(), PhpMixed::Array(http_inner));
+        let mut http = HttpOptions::new();
+        http.set_method("POST");
+        http.set_header_lines(headers);
+        http.set_content(data);
+        let mut options = StreamContextOptions::new();
+        options.set_retry_auth_failure(false);
+        options.set_http(http);
 
         let token = self
             .http_downloader
             .borrow_mut()
-            .get(
-                bconcat!(scheme, "://", origin_url, "/oauth/token"),
-                options.into_iter().collect(),
-            )?
+            .get(bconcat!(scheme, "://", origin_url, "/oauth/token"), options)?
             .decode_json()?;
 
         self.io.write_error3(

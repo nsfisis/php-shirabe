@@ -5,7 +5,6 @@ use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString};
-use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, bconcat, date_local, explode_limit, implode, in_array_loose, intval,
     php_regex, php_str, preg_is_match, preg_match, rawurlencode, str_replace, stripos, strtolower,
@@ -40,7 +39,7 @@ impl GitHub {
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
                 io.clone(),
                 &config,
-                IndexMap::new(),
+                crate::util::StreamContextOptions::new(),
             )?)),
         };
         Ok(Self {
@@ -242,8 +241,8 @@ impl GitHub {
             bconcat!(origin_url, "/api/v3/")
         };
 
-        let mut http_options: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
-        http_options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+        let mut http_options = crate::util::StreamContextOptions::new();
+        http_options.set_retry_auth_failure(false);
 
         match self
             .http_downloader

@@ -8,16 +8,16 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::util::http::{NativeHttpDownloader, Response};
 use crate::util::{
-    GetResult, LocalFilesystem, Platform, RemoteFilesystem, Silencer, StreamContextFactory, Url,
-    sync_executor,
+    GetResult, HttpOptions, LocalFilesystem, Platform, RemoteFilesystem, Silencer, SslOptions,
+    StreamContextFactory, StreamContextOptions, Url, sync_executor,
 };
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed,
-    array_replace_recursive, bconcat, empty, extension_loaded, implode, implode_mixed, intval,
-    is_numeric, path_to_bytes, pcre_check_utf8_subject, php_regex, php_truthy, preg_is_match,
-    preg_match, preg_replace, rawurldecode, stripos, strpos, substr, ucfirst, utf8_text,
+    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed, bconcat,
+    empty, extension_loaded, implode, intval, is_numeric, path_to_bytes, pcre_check_utf8_subject,
+    php_regex, php_truthy, preg_is_match, preg_match, preg_replace, rawurldecode, stripos, strpos,
+    substr, ucfirst, utf8_text,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -25,7 +25,7 @@ use shirabe_semver::constraint::SimpleConstraint;
 pub struct HttpDownloader {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    options: IndexMap<BString, PhpMixed>,
+    options: StreamContextOptions,
     /// Replaces PHP's `$runningJobs`/`$maxJobs` counters: a permit is held for the duration of
     /// each in-flight request and released when it settles.
     semaphore: std::rc::Rc<tokio::sync::Semaphore>,
@@ -96,7 +96,7 @@ impl HttpDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
         disable_tls: bool,
     ) -> anyhow::Result<Self> {
         let disabled = Platform::get_env("COMPOSER_DISABLE_NETWORK")
@@ -104,13 +104,13 @@ impl HttpDownloader {
 
         // Setup TLS options
         // The cafile option can be set via config.json
-        let mut self_options: IndexMap<BString, PhpMixed> = IndexMap::new();
+        let mut self_options = StreamContextOptions::new();
         if !disable_tls {
             self_options = StreamContextFactory::get_tls_defaults(&options, ())?;
         }
 
         // handle the other externally set options normally.
-        self_options = array_replace_recursive(self_options, options.clone());
+        self_options = self_options.replace_recursive(options.clone());
 
         // Composer builds its CurlDownloader only when the curl extension is loaded. The native
         // downloader needs no extension, so it is always there.
@@ -153,7 +153,7 @@ impl HttpDownloader {
     pub fn get(
         &self,
         url: impl AsRef<[u8]>,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<Response> {
         sync_executor::block_on(self.execute(url.as_ref().as_bstr(), options, None, true))
     }
@@ -162,7 +162,7 @@ impl HttpDownloader {
     pub async fn add(
         &self,
         url: impl AsRef<[u8]>,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<Response> {
         self.execute(url.as_ref().as_bstr(), options, None, false)
             .await
@@ -173,7 +173,7 @@ impl HttpDownloader {
         &self,
         url: impl AsRef<[u8]>,
         to: impl AsRef<std::path::Path>,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<Response> {
         sync_executor::block_on(self.execute(
             url.as_ref().as_bstr(),
@@ -188,7 +188,7 @@ impl HttpDownloader {
         &self,
         url: impl AsRef<[u8]>,
         to: impl AsRef<std::path::Path>,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
     ) -> anyhow::Result<Response> {
         self.execute(url.as_ref().as_bstr(), options, Some(to.as_ref()), false)
             .await
@@ -199,7 +199,7 @@ impl HttpDownloader {
     async fn execute(
         &self,
         url: &BStr,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
         copy_to: Option<&std::path::Path>,
         sync: bool,
     ) -> anyhow::Result<Response> {
@@ -272,9 +272,9 @@ impl HttpDownloader {
     fn prepare_request(
         &self,
         url: &BStr,
-        options: IndexMap<BString, PhpMixed>,
-    ) -> anyhow::Result<(IndexMap<BString, PhpMixed>, BString)> {
-        let options = array_replace_recursive(self.options.clone(), options);
+        options: StreamContextOptions,
+    ) -> anyhow::Result<(StreamContextOptions, BString)> {
+        let options = self.options.clone().replace_recursive(options);
         let origin = Url::get_origin(&self.config.borrow(), url)?;
 
         // capture username/password from URL if there is one
@@ -298,7 +298,7 @@ impl HttpDownloader {
         &self,
         url: &BStr,
         copy_to: Option<&std::path::Path>,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
         started: std::rc::Rc<std::cell::Cell<bool>>,
     ) -> anyhow::Result<HttpDownloaderJob> {
         if self.mock.is_some() {
@@ -356,7 +356,7 @@ impl HttpDownloader {
         disabled: bool,
         origin: BString,
         url: BString,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
         copy_to: Option<std::path::PathBuf>,
         started: Option<std::rc::Rc<std::cell::Cell<bool>>>,
     ) -> anyhow::Result<Response> {
@@ -369,13 +369,11 @@ impl HttpDownloader {
         }
 
         if disabled {
-            let http_header = options
-                .get(B("http"))
-                .and_then(|http| http.get(B("header")))
-                .filter(|header| !header.is_null());
-            let has_if_modified_since = match http_header {
-                Some(header) => stripos(implode_mixed("", header)?, "if-modified-since").is_some(),
-                None => false,
+            let has_if_modified_since = match options.http() {
+                Some(http) if http.header().is_some() => {
+                    stripos(http.implode_header("")?, "if-modified-since").is_some()
+                }
+                _ => false,
             };
             if has_if_modified_since {
                 return Ok(Response::new(url, Some(304), Vec::new(), Some(Vec::new())));
@@ -408,7 +406,7 @@ impl HttpDownloader {
         &self,
         origin: &BStr,
         url: &BStr,
-        options: IndexMap<BString, PhpMixed>,
+        options: StreamContextOptions,
         copy_to: Option<&std::path::Path>,
     ) -> anyhow::Result<Response> {
         if LocalFilesystem::handles(url) {
@@ -450,13 +448,13 @@ impl HttpDownloader {
     }
 
     /// Retrieve the options set in the constructor
-    pub fn get_options(&self) -> &IndexMap<BString, PhpMixed> {
+    pub fn get_options(&self) -> &StreamContextOptions {
         &self.options
     }
 
     /// Merges new options
-    pub fn set_options(&mut self, options: IndexMap<BString, PhpMixed>) {
-        self.options = array_replace_recursive(self.options.clone(), options);
+    pub fn set_options(&mut self, options: StreamContextOptions) {
+        self.options = self.options.clone().replace_recursive(options);
     }
 
     pub fn enable_async(&mut self) {
@@ -579,14 +577,14 @@ impl HttpDownloader {
             || strpos(e_as_transport.get_message(), "Could not resolve host").is_some()
         {
             Silencer::suppress(None);
-            let mut ctx_options: IndexMap<BString, PhpMixed> = IndexMap::new();
-            let mut ssl_map: IndexMap<BString, PhpMixed> = IndexMap::new();
-            ssl_map.insert("verify_peer".into(), PhpMixed::Bool(false));
-            ctx_options.insert("ssl".into(), PhpMixed::Array(ssl_map));
-            let mut http_map: IndexMap<BString, PhpMixed> = IndexMap::new();
-            http_map.insert("follow_location".into(), PhpMixed::Bool(false));
-            http_map.insert("ignore_errors".into(), PhpMixed::Bool(true));
-            ctx_options.insert("http".into(), PhpMixed::Array(http_map));
+            let mut ctx_options = StreamContextOptions::new();
+            let mut ssl = SslOptions::new();
+            ssl.insert("verify_peer", PhpMixed::Bool(false));
+            ctx_options.set_ssl(ssl);
+            let mut http = HttpOptions::new();
+            http.insert("follow_location", PhpMixed::Bool(false));
+            http.insert("ignore_errors", PhpMixed::Bool(true));
+            ctx_options.set_http(http);
             let test_connectivity =
                 get_as_php_http_wrapper(BStr::new("https://8.8.8.8"), &ctx_options);
             Silencer::restore();
@@ -606,7 +604,7 @@ impl HttpDownloader {
 
     /// PHP's `canUseCurl`, asked of the native downloader: Composer's reasons to keep a request
     /// away from curl hold for it too.
-    fn can_use_native(&self, url: &BStr, options: &IndexMap<BString, PhpMixed>) -> bool {
+    fn can_use_native(&self, url: &BStr, options: &StreamContextOptions) -> bool {
         if self.native.is_none() {
             return false;
         }
@@ -615,12 +613,8 @@ impl HttpDownloader {
             return false;
         }
 
-        let allow_self_signed = options.get(B("ssl")).and_then(|v| match v {
-            PhpMixed::Array(m) => m.get(B("allow_self_signed")).cloned(),
-            _ => None,
-        });
-        if let Some(v) = allow_self_signed
-            && !empty(&v)
+        if let Some(allow_self_signed) = options.ssl().and_then(SslOptions::allow_self_signed)
+            && !empty(allow_self_signed)
         {
             return false;
         }
@@ -642,10 +636,15 @@ impl HttpDownloader {
     ) -> Self {
         Self {
             local: LocalFilesystem::new(io.clone(), config.clone()),
-            rfs: RemoteFilesystem::new(io.clone(), config.clone(), IndexMap::new(), false),
+            rfs: RemoteFilesystem::new(
+                io.clone(),
+                config.clone(),
+                StreamContextOptions::new(),
+                false,
+            ),
             io,
             config,
-            options: IndexMap::new(),
+            options: StreamContextOptions::new(),
             semaphore: std::rc::Rc::new(tokio::sync::Semaphore::new(12)),
             native: None,
             disabled: false,
@@ -703,7 +702,7 @@ impl HttpDownloader {
     fn mock_get(
         &self,
         file_url: &BStr,
-        options: &IndexMap<BString, PhpMixed>,
+        options: &StreamContextOptions,
     ) -> anyhow::Result<Response> {
         if file_url.is_empty() {
             return Err(LogicException::new(BString::from("url cannot be an empty string")).into());
@@ -723,7 +722,8 @@ impl HttpDownloader {
             .and_then(|e| e.first())
             .is_some_and(|first| {
                 first.url == file_url
-                    && (first.options.is_none() || first.options.as_ref() == Some(options))
+                    && (first.options.is_none()
+                        || first.options.as_ref() == Some(&options.to_array()))
             });
 
         if matches_first {
@@ -765,7 +765,7 @@ impl HttpDownloader {
         panic!(
             "Received unexpected request for \"{}\" with options \"{}\"{}{}{}Received calls:{}{}",
             file_url.display_lossy(),
-            serde_json::to_string(&PhpJson::new(&PhpMixed::Array(options.clone())))
+            serde_json::to_string(&PhpJson::new(&PhpMixed::Array(options.to_array())))
                 .unwrap_or_default(),
             PHP_EOL.display_lossy(),
             next_expected.display_lossy(),
@@ -808,14 +808,12 @@ impl HttpDownloader {
 /// `http.follow_location` and `http.ignore_errors`, and panics on any other option.
 /// TODO(http): the remaining options of PHP's `http` and `ssl` contexts (`method`, `header`,
 /// `content`, `timeout`, `max_redirects`, `proxy`, `cafile`, ...) are not modeled.
-fn get_as_php_http_wrapper(
-    url: &BStr,
-    options: &IndexMap<BString, PhpMixed>,
-) -> anyhow::Result<Vec<u8>> {
+fn get_as_php_http_wrapper(url: &BStr, options: &StreamContextOptions) -> anyhow::Result<Vec<u8>> {
     assert!(
         preg_is_match(php_regex!(r"{^https?://}i"), url),
         "{url:?} is not an http:// or https:// URL",
     );
+    let options = options.to_array();
     for key in options.keys() {
         assert!(
             key == "ssl" || key == "http",
@@ -917,12 +915,12 @@ mod tests {
         bconcat!("http://", display_to_bytes(addr), "/")
     }
 
-    fn http_options(follow_location: bool, ignore_errors: bool) -> IndexMap<BString, PhpMixed> {
-        let mut http = IndexMap::new();
-        http.insert("follow_location".into(), PhpMixed::Bool(follow_location));
-        http.insert("ignore_errors".into(), PhpMixed::Bool(ignore_errors));
-        let mut options = IndexMap::new();
-        options.insert("http".into(), PhpMixed::Array(http));
+    fn http_options(follow_location: bool, ignore_errors: bool) -> StreamContextOptions {
+        let mut http = HttpOptions::new();
+        http.insert("follow_location", PhpMixed::Bool(follow_location));
+        http.insert("ignore_errors", PhpMixed::Bool(ignore_errors));
+        let mut options = StreamContextOptions::new();
+        options.set_http(http);
         options
     }
 

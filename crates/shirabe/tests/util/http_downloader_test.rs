@@ -43,12 +43,18 @@ fn test_capture_authentication_params_from_url() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1").unwrap();
-    let fs = HttpDownloader::new(io, config, IndexMap::new(), false).unwrap();
+    let fs = HttpDownloader::new(
+        io,
+        config,
+        shirabe::util::StreamContextOptions::new(),
+        false,
+    )
+    .unwrap();
     Platform::clear_env("COMPOSER_DISABLE_NETWORK").unwrap();
 
     if let Err(e) = fs.get(
         "https://user:pass@github.com/composer/composer/404",
-        IndexMap::new(),
+        shirabe::util::StreamContextOptions::new(),
     ) && let Some(te) = e.catch::<TransportException>()
     {
         assert_ne!(200, te.get_code());
@@ -166,7 +172,7 @@ fn test_constructor_rejects_an_unreadable_cafile() {
     let mut options = IndexMap::new();
     options.insert(BString::from("ssl"), PhpMixed::Array(ssl));
 
-    let error = HttpDownloader::new(io, config, options, false).unwrap_err();
+    let error = HttpDownloader::new(io, config, options.into(), false).unwrap_err();
 
     assert_eq!(
         "The configured cafile was not valid or could not be read.",

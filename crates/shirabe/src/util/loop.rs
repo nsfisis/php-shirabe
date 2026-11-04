@@ -161,7 +161,6 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::io::{IOInterface, NullIO};
-    use indexmap::IndexMap;
     use shirabe_symfony_console::output::BufferedOutput;
 
     #[test]
@@ -170,7 +169,8 @@ mod tests {
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-            HttpDownloader::new(io, config, IndexMap::new(), true).unwrap(),
+            HttpDownloader::new(io, config, crate::util::StreamContextOptions::new(), true)
+                .unwrap(),
         ));
         let process_executor =
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));

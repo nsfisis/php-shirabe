@@ -72,15 +72,14 @@ impl VcsDriverBase {
         &self,
         url: &BStr,
     ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
-        let options_mixed = self
-            .repo_config
-            .get(B("options"))
-            .cloned()
-            .unwrap_or(PhpMixed::Array(IndexMap::new()));
-        let options: IndexMap<BString, PhpMixed> = match options_mixed {
-            PhpMixed::Array(a) => a,
-            _ => IndexMap::new(),
-        };
+        let options = crate::util::StreamContextOptions::from_mixed(
+            self.repo_config
+                .get(B("options"))
+                .filter(|options| !options.is_null())
+                .cloned()
+                .unwrap_or(PhpMixed::Array(IndexMap::new())),
+            "Composer\\Util\\HttpDownloader::get(): Argument #2 ($options)",
+        )?;
         match self.http_downloader.borrow_mut().get(url, options) {
             Ok(response) => Ok(Ok(response)),
             Err(e) => match e.catch::<TransportException>() {
@@ -309,15 +308,14 @@ pub trait VcsDriver: VcsDriverInterface {
         &self,
         url: &BStr,
     ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
-        let options_mixed = self
-            .repo_config()
-            .get(B("options"))
-            .cloned()
-            .unwrap_or(PhpMixed::Array(IndexMap::new()));
-        let options: IndexMap<BString, PhpMixed> = match options_mixed {
-            PhpMixed::Array(a) => a,
-            _ => IndexMap::new(),
-        };
+        let options = crate::util::StreamContextOptions::from_mixed(
+            self.repo_config()
+                .get(B("options"))
+                .filter(|options| !options.is_null())
+                .cloned()
+                .unwrap_or(PhpMixed::Array(IndexMap::new())),
+            "Composer\\Util\\HttpDownloader::get(): Argument #2 ($options)",
+        )?;
         match self.http_downloader().borrow_mut().get(url, options) {
             Ok(response) => Ok(Ok(response)),
             Err(e) => match e.catch::<TransportException>() {

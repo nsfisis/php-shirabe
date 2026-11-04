@@ -431,8 +431,8 @@ impl GitHubDriver {
                 "/.github/contents/FUNDING.yml"
             ),
         ] {
-            let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
-            options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+            let mut options = crate::util::StreamContextOptions::new();
+            options.set_retry_auth_failure(false);
             let response = self
                 .inner
                 .http_downloader

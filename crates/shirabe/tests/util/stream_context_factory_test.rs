@@ -131,10 +131,13 @@ fn test_http_proxy() {
             (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
         ]),
     )]);
-    let context =
-        StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
-            .unwrap()
-            .unwrap();
+    let context = StreamContextFactory::get_context(
+        "http://example.org",
+        default_options.into(),
+        IndexMap::new(),
+    )
+    .unwrap()
+    .unwrap();
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
@@ -183,10 +186,13 @@ fn test_http_proxy_with_no_proxy() {
             (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
         ]),
     )]);
-    let context =
-        StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
-            .unwrap()
-            .unwrap();
+    let context = StreamContextFactory::get_context(
+        "http://example.org",
+        default_options.into(),
+        IndexMap::new(),
+    )
+    .unwrap()
+    .unwrap();
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
@@ -223,10 +229,13 @@ fn test_http_proxy_with_no_proxy_wildcard() {
             (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
         ]),
     )]);
-    let context =
-        StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
-            .unwrap()
-            .unwrap();
+    let context = StreamContextFactory::get_context(
+        "http://example.org",
+        default_options.into(),
+        IndexMap::new(),
+    )
+    .unwrap()
+    .unwrap();
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
@@ -270,10 +279,13 @@ fn test_options_are_preserved() {
             (BStr::new("request_fulluri"), PhpMixed::Bool(false)),
         ]),
     )]);
-    let context =
-        StreamContextFactory::get_context("http://example.org", default_options, IndexMap::new())
-            .unwrap()
-            .unwrap();
+    let context = StreamContextFactory::get_context(
+        "http://example.org",
+        default_options.into(),
+        IndexMap::new(),
+    )
+    .unwrap()
+    .unwrap();
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
@@ -319,10 +331,13 @@ fn test_http_proxy_without_port() {
             (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
         ]),
     )]);
-    let context =
-        StreamContextFactory::get_context("https://example.org", default_options, IndexMap::new())
-            .unwrap()
-            .unwrap();
+    let context = StreamContextFactory::get_context(
+        "https://example.org",
+        default_options.into(),
+        IndexMap::new(),
+    )
+    .unwrap()
+    .unwrap();
     let options = stream_context_get_options(&context);
 
     let expected = map(vec![(
@@ -365,13 +380,14 @@ fn test_https_proxy_override() {
     // expectException('Composer\Downloader\TransportException')
     let result = StreamContextFactory::get_context(
         "https://example.org",
-        map(vec![(
+        (map(vec![(
             BStr::new("http"),
             arr(vec![
                 (BStr::new("method"), s(BStr::new("GET"))),
                 (BStr::new("header"), s(BStr::new("User-Agent: foo"))),
             ]),
-        )]),
+        )]))
+        .into(),
         IndexMap::new(),
     );
     assert!(result.unwrap().is_err());
@@ -394,10 +410,11 @@ fn test_ssl_proxy() {
         if extension_loaded("openssl") {
             let context = StreamContextFactory::get_context(
                 "http://example.org",
-                map(vec![(
+                (map(vec![(
                     BStr::new("http"),
                     arr(vec![(BStr::new("header"), s(BStr::new("User-Agent: foo")))]),
-                )]),
+                )]))
+                .into(),
                 IndexMap::new(),
             )
             .unwrap()
@@ -424,7 +441,7 @@ fn test_ssl_proxy() {
             assert!(
                 StreamContextFactory::get_context(
                     "http://example.org",
-                    IndexMap::new(),
+                    shirabe::util::StreamContextOptions::new(),
                     IndexMap::new(),
                 )
                 .unwrap()
@@ -454,9 +471,10 @@ fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() 
         s(BStr::new("Authorization: Basic aW52YWxpZA==")),
         s(BStr::new("Content-Type: application/json")),
     ];
-    let context = StreamContextFactory::get_context("http://example.org", options, IndexMap::new())
-        .unwrap()
-        .unwrap();
+    let context =
+        StreamContextFactory::get_context("http://example.org", options.into(), IndexMap::new())
+            .unwrap()
+            .unwrap();
     let ctxoptions = stream_context_get_options(&context);
     let ctx_header = ctxoptions
         .get(B("http"))
@@ -479,9 +497,10 @@ fn test_init_options_does_include_proxy_auth_headers() {
     .unwrap();
 
     let options: IndexMap<BString, PhpMixed> = IndexMap::new();
-    let options = StreamContextFactory::init_options("https://example.org", options, false)
+    let options = StreamContextFactory::init_options("https://example.org", options.into(), false)
         .unwrap()
-        .unwrap();
+        .unwrap()
+        .into_array();
     let header_list: Vec<BString> = options
         .get(B("http"))
         .and_then(|v| v.as_array())
@@ -508,9 +527,10 @@ fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
     .unwrap();
 
     let options: IndexMap<BString, PhpMixed> = IndexMap::new();
-    let options = StreamContextFactory::init_options("https://example.org", options, true)
+    let options = StreamContextFactory::init_options("https://example.org", options.into(), true)
         .unwrap()
-        .unwrap();
+        .unwrap()
+        .into_array();
     let header_list: Vec<BString> = options
         .get(B("http"))
         .and_then(|v| v.as_array())
@@ -540,9 +560,10 @@ fn test_init_options_finds_the_user_agent_in_a_keyed_header_array() {
             arr(vec![(BStr::new("ua"), s(BStr::new("User-Agent: foo")))]),
         )]),
     )]);
-    let options = StreamContextFactory::init_options("https://example.org", options, true)
+    let options = StreamContextFactory::init_options("https://example.org", options.into(), true)
         .unwrap()
-        .unwrap();
+        .unwrap()
+        .into_array();
 
     assert_eq!(
         Some(&arr(vec![(
@@ -565,8 +586,8 @@ fn test_init_options_rejects_a_scalar_header() {
         BStr::new("http"),
         arr(vec![(BStr::new("header"), PhpMixed::Int(1))]),
     )]);
-    let error =
-        StreamContextFactory::init_options("https://example.org", options, true).unwrap_err();
+    let error = StreamContextFactory::init_options("https://example.org", options.into(), true)
+        .unwrap_err();
 
     assert!(
         error_message(&error)
@@ -587,8 +608,9 @@ fn test_get_context_rejects_a_header_line_that_is_not_a_string() {
             list(vec![s(BStr::new("X-Foo: bar")), PhpMixed::Int(1)]),
         )]),
     )]);
-    let error = StreamContextFactory::get_context("http://example.org", options, IndexMap::new())
-        .unwrap_err();
+    let error =
+        StreamContextFactory::get_context("http://example.org", options.into(), IndexMap::new())
+            .unwrap_err();
 
     assert!(
         error_message(&error)
@@ -601,7 +623,11 @@ fn test_get_context_rejects_a_header_line_that_is_not_a_string() {
 #[test]
 fn test_get_tls_defaults_rejects_ssl_options_that_are_not_an_array() {
     let options = map(vec![(BStr::new("ssl"), s(BStr::new("verify_peer")))]);
-    let error = StreamContextFactory::get_tls_defaults(&options, ()).unwrap_err();
+    let error = StreamContextFactory::get_tls_defaults(
+        &shirabe::util::StreamContextOptions::from(options.clone()),
+        (),
+    )
+    .unwrap_err();
 
     assert!(error_message(&error).contains_str(
         "array_replace_recursive(): Argument #2 must be of type array, string given"
@@ -614,7 +640,11 @@ fn test_get_tls_defaults_rejects_a_cafile_that_is_not_a_string() {
         BStr::new("ssl"),
         arr(vec![(BStr::new("cafile"), PhpMixed::Int(1))]),
     )]);
-    let error = StreamContextFactory::get_tls_defaults(&options, ()).unwrap_err();
+    let error = StreamContextFactory::get_tls_defaults(
+        &shirabe::util::StreamContextOptions::from(options.clone()),
+        (),
+    )
+    .unwrap_err();
 
     assert!(error_message(&error).contains_str(
         "Composer\\Util\\Filesystem::isReadable(): Argument #1 ($path) must be of type string, int given"

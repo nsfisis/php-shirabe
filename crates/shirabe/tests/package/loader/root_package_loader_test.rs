@@ -32,7 +32,13 @@ fn http_downloader(
     config: &std::rc::Rc<std::cell::RefCell<Config>>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
     std::rc::Rc::new(std::cell::RefCell::new(
-        HttpDownloader::new(io.clone(), config.clone(), IndexMap::new(), true).unwrap(),
+        HttpDownloader::new(
+            io.clone(),
+            config.clone(),
+            shirabe::util::StreamContextOptions::new(),
+            true,
+        )
+        .unwrap(),
     ))
 }
 
