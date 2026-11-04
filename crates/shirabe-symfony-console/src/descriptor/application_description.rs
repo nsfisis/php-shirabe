@@ -5,15 +5,23 @@ use crate::command::Command;
 use crate::exception::CommandNotFoundException;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat, php_str};
+use shirabe_php_shim::{bconcat, json_bytes, php_str};
+
+/// A namespace entry, `['id' => string, 'commands' => string[]]` in PHP.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct NamespaceDescription {
+    #[serde(serialize_with = "json_bytes::str")]
+    pub id: BString,
+    #[serde(serialize_with = "json_bytes::str_vec")]
+    pub commands: Vec<BString>,
+}
 
 #[derive(Debug)]
 pub struct ApplicationDescription {
     application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
     namespace: Option<BString>,
     show_hidden: bool,
-    /// Each namespace entry is `['id' => string, 'commands' => string[]]`.
-    namespaces: Option<IndexMap<BString, IndexMap<BString, PhpMixed>>>,
+    namespaces: Option<IndexMap<BString, NamespaceDescription>>,
     commands: Option<IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
     aliases: Option<IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
 }
@@ -36,9 +44,7 @@ impl ApplicationDescription {
         }
     }
 
-    pub fn get_namespaces(
-        &mut self,
-    ) -> anyhow::Result<IndexMap<BString, IndexMap<BString, PhpMixed>>> {
+    pub fn get_namespaces(&mut self) -> anyhow::Result<IndexMap<BString, NamespaceDescription>> {
         if self.namespaces.is_none() {
             self.inspect_application()?;
         }
@@ -128,12 +134,10 @@ impl ApplicationDescription {
                 names.push(name);
             }
 
-            let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
-            entry.insert("id".into(), PhpMixed::string(namespace.clone()));
-            entry.insert(
-                "commands".into(),
-                PhpMixed::List(names.into_iter().map(PhpMixed::string).collect()),
-            );
+            let entry = NamespaceDescription {
+                id: namespace.clone(),
+                commands: names,
+            };
             self.namespaces.as_mut().unwrap().insert(namespace, entry);
         }
 

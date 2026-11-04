@@ -2,7 +2,7 @@
 
 use crate::command::{Command, CommandData, SetDefinitionArg};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
-use crate::descriptor::{ApplicationDescription, DescribableObject};
+use crate::descriptor::{ApplicationDescription, DescribableObject, DescriptorOptions};
 use crate::helper::DescriptorHelper;
 use crate::input::{
     DefinitionItem, InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue,
@@ -150,14 +150,17 @@ impl Command for ListCommand {
     ) -> anyhow::Result<i64> {
         let mut helper = DescriptorHelper::new();
         let object = DescribableObject::Application(self.get_application().unwrap());
-        let mut options = indexmap::IndexMap::new();
-        options.insert("format".into(), input.borrow().get_option("format")?.into());
-        options.insert("raw_text".into(), input.borrow().get_option("raw")?.into());
-        options.insert(
-            "namespace".into(),
-            input.borrow().get_argument("namespace")?.into(),
-        );
-        options.insert("short".into(), input.borrow().get_option("short")?.into());
+        let options = DescriptorOptions {
+            format: input.borrow().get_option("format")?.to_php_string(),
+            raw_text: input.borrow().get_option("raw")?.to_bool(),
+            namespace: match input.borrow().get_argument("namespace")? {
+                InputValue::Null => None,
+                InputValue::String(namespace) => Some(namespace),
+                other => panic!("the namespace argument holds {:?}, not a string", other),
+            },
+            short: input.borrow().get_option("short")?.to_bool(),
+            ..DescriptorOptions::default()
+        };
         helper.describe2(output.clone(), object, options)?;
 
         Ok(0)

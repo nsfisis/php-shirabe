@@ -1,15 +1,15 @@
 //! ref: composer/vendor/symfony/console/Helper/DescriptorHelper.php
 
 use crate::descriptor::{
-    DescribableObject, DescriptorInterface, JsonDescriptor, MarkdownDescriptor, TextDescriptor,
-    XmlDescriptor,
+    DescribableObject, DescriptorInterface, DescriptorOptions, JsonDescriptor, MarkdownDescriptor,
+    TextDescriptor, XmlDescriptor,
 };
 use crate::exception::InvalidArgumentException;
 use crate::helper::{Helper, HelperInterface, HelperSet};
 use crate::output::OutputInterface;
-use bstr::{B, BStr, BString};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::bconcat;
 
 /// This class adds helper method to describe objects in various formats.
 #[derive(Default)]
@@ -47,24 +47,16 @@ impl DescriptorHelper {
     /// Available options are:
     /// * format: string, the output format name
     /// * raw_text: boolean, sets output type as raw
+    ///
+    /// The defaults PHP merges into `$options` (`raw_text` false, `format` "txt") are those of
+    /// `DescriptorOptions::default()`.
     pub fn describe2(
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
-        let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
-        merged.insert("raw_text".into(), PhpMixed::Bool(false));
-        merged.insert("format".into(), PhpMixed::string("txt"));
-        for (key, value) in options {
-            merged.insert(key, value);
-        }
-        let options = merged;
-
-        let format = match &options[B("format")] {
-            PhpMixed::String(format) => format.clone(),
-            _ => BString::default(),
-        };
+        let format = options.format.clone();
 
         if !self.descriptors.contains_key(&format) {
             return Err(InvalidArgumentException::new(bconcat!(

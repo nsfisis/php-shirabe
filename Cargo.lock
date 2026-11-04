@@ -2467,6 +2467,7 @@ dependencies = [
  "bstr",
  "indexmap",
  "regex",
+ "serde",
  "shirabe-php-shim",
  "shirabe-symfony-process",
  "shirabe-symfony-string",

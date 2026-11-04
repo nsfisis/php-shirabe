@@ -16,6 +16,7 @@ async-trait.workspace = true
 bstr.workspace = true
 indexmap.workspace = true
 regex.workspace = true
+serde.workspace = true
 
 [lints]
 workspace = true

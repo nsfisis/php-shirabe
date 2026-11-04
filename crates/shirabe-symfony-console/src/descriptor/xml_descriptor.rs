@@ -3,12 +3,11 @@
 use crate::application::Application;
 use crate::command::Command;
 use crate::descriptor::{
-    ApplicationDescription, DescribableObject, Descriptor, DescriptorInterface,
+    ApplicationDescription, DescribableObject, Descriptor, DescriptorInterface, DescriptorOptions,
 };
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::{B, BString};
-use indexmap::IndexMap;
+use bstr::BString;
 use shirabe_php_shim::{
     DOMDocument, DOMNode, PhpMixed, bconcat, php_to_string, php_truthy, str_replace, strpos,
     substr, var_export,
@@ -131,20 +130,12 @@ impl XmlDescriptor {
             for namespace_description in namespaces.values() {
                 let namespace_array_xml =
                     namespaces_xml.append_child(dom.create_element("namespace"));
-                let id = match namespace_description.get(B("id")) {
-                    Some(PhpMixed::String(s)) => s.as_slice(),
-                    _ => b"",
-                };
-                namespace_array_xml.set_attribute("id", id);
+                namespace_array_xml.set_attribute("id", &namespace_description.id);
 
-                if let Some(PhpMixed::List(names)) = namespace_description.get(B("commands")) {
-                    for name in names {
-                        let command_xml =
-                            namespace_array_xml.append_child(dom.create_element("command"));
-                        command_xml.append_child(
-                            dom.create_text_node(name.as_string().unwrap_or_default()),
-                        );
-                    }
+                for name in &namespace_description.commands {
+                    let command_xml =
+                        namespace_array_xml.append_child(dom.create_element("command"));
+                    command_xml.append_child(dom.create_text_node(name));
                 }
             }
         }
@@ -155,7 +146,7 @@ impl XmlDescriptor {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        _options: IndexMap<BString, PhpMixed>,
+        _options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         self.write_document(self.get_input_argument_document(argument));
         Ok(())
@@ -164,7 +155,7 @@ impl XmlDescriptor {
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        _options: IndexMap<BString, PhpMixed>,
+        _options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         self.write_document(self.get_input_option_document(option));
         Ok(())
@@ -173,7 +164,7 @@ impl XmlDescriptor {
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        _options: IndexMap<BString, PhpMixed>,
+        _options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         self.write_document(self.get_input_definition_document(definition));
         Ok(())
@@ -182,24 +173,22 @@ impl XmlDescriptor {
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
-        let short = matches!(options.get(B("short")), Some(PhpMixed::Bool(true)));
-        self.write_document(self.get_command_document(command, short));
+        self.write_document(self.get_command_document(command, options.short));
         Ok(())
     }
 
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
-        let namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.clone()),
-            _ => None,
-        };
-        let short = matches!(options.get(B("short")), Some(PhpMixed::Bool(true)));
-        self.write_document(self.get_application_document(application, namespace, short)?);
+        self.write_document(self.get_application_document(
+            application,
+            options.namespace,
+            options.short,
+        )?);
         Ok(())
     }
 
@@ -349,7 +338,7 @@ impl DescriptorInterface for XmlDescriptor {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         Descriptor::describe(self, output, object, options)
     }
@@ -367,7 +356,7 @@ impl Descriptor for XmlDescriptor {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         XmlDescriptor::describe_input_argument(self, argument, options)
     }
@@ -375,7 +364,7 @@ impl Descriptor for XmlDescriptor {
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         XmlDescriptor::describe_input_option(self, option, options)
     }
@@ -383,7 +372,7 @@ impl Descriptor for XmlDescriptor {
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         XmlDescriptor::describe_input_definition(self, definition, options)
     }
@@ -391,7 +380,7 @@ impl Descriptor for XmlDescriptor {
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         XmlDescriptor::describe_command(self, command, options)
     }
@@ -399,7 +388,7 @@ impl Descriptor for XmlDescriptor {
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<BString, PhpMixed>,
+        options: DescriptorOptions,
     ) -> anyhow::Result<()> {
         XmlDescriptor::describe_application(self, application, options)
     }

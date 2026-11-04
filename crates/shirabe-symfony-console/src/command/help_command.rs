@@ -2,7 +2,7 @@
 
 use crate::command::{Command, CommandData, SetDefinitionArg};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
-use crate::descriptor::{ApplicationDescription, DescribableObject};
+use crate::descriptor::{ApplicationDescription, DescribableObject, DescriptorOptions};
 use crate::helper::DescriptorHelper;
 use crate::input::{
     DefinitionItem, InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue,
@@ -153,9 +153,11 @@ impl Command for HelpCommand {
 
         let mut helper = DescriptorHelper::new();
         let object = DescribableObject::Command(self.command.borrow().clone().unwrap());
-        let mut options = indexmap::IndexMap::new();
-        options.insert("format".into(), input.borrow().get_option("format")?.into());
-        options.insert("raw_text".into(), input.borrow().get_option("raw")?.into());
+        let options = DescriptorOptions {
+            format: input.borrow().get_option("format")?.to_php_string(),
+            raw_text: input.borrow().get_option("raw")?.to_bool(),
+            ..DescriptorOptions::default()
+        };
         helper.describe2(output.clone(), object, options)?;
 
         *self.command.borrow_mut() = None;
