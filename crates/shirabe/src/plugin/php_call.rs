@@ -5,7 +5,7 @@
 //! worker makes while it is in flight with a `PluginRpcDispatcher` unless the caller brings a
 //! dispatcher of its own, and decodes the answer as the type the caller asks for.
 
-use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::rpc::dispatch::PluginRpcDispatcher;
 use crate::plugin::throwable_bridge::throw_into_error;
 use bstr::BStr;
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher};

@@ -10,10 +10,10 @@ use crate::event_dispatcher::{
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::plugin::php_call::PhpCall;
-use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, error_throw, unavailable_method};
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
+use crate::plugin::rpc::dispatch::{PluginRpcDispatcher, error_throw, unavailable_method};
 use crate::plugin::throwable_bridge::throw_into_error;
 use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
@@ -1660,13 +1660,13 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                 });
             }
             if method_name == "__shirabe_construct" {
-                return crate::plugin::php_plugin_proxy::construct_entity(&args);
+                return crate::plugin::rpc::dispatch::construct_entity(&args);
             }
             if method_name == "__shirabe_call_static" {
-                return crate::plugin::php_plugin_proxy::call_static_entity(&args);
+                return crate::plugin::rpc::dispatch::call_static_entity(&args);
             }
             if let Some(answer) =
-                crate::plugin::php_plugin_proxy::dispatch_job_service_method(method_name, &args)
+                crate::plugin::rpc::dispatch::dispatch_job_service_method(method_name, &args)
             {
                 return answer;
             }
@@ -1680,7 +1680,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             Some((event_rhandle, ref mut event)) if event_rhandle == rhandle => {
                 dispatch_event_method(&mut **event, method_name, &args)
             }
-            _ => crate::plugin::php_plugin_proxy::dispatch_r_table_method(
+            _ => crate::plugin::rpc::dispatch::dispatch_r_table_method(
                 rhandle,
                 method_name,
                 &args,
@@ -1742,8 +1742,8 @@ pub(crate) fn dispatch_event_method(
             let composer = composer.ok_or_else(|| {
                 PhpThrow::runtime(BString::from("the Composer instance of this event is gone"))
             })?;
-            let rhandle = crate::plugin::php_plugin_proxy::register_composer_entity(&composer);
-            Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
+            let rhandle = crate::plugin::rpc::table::register_composer_entity(&composer);
+            Ok(crate::plugin::rpc::table::rust_handle_value(
                 rhandle,
                 BStr::new("Composer\\Composer"),
             ))
@@ -1763,15 +1763,13 @@ pub(crate) fn dispatch_event_method(
                     )));
                 }
             };
-            let class = crate::plugin::php_plugin_proxy::io_stub_class(&io)
+            let class = crate::plugin::rpc::table::io_stub_class(&io)
                 .map_err(|error| PhpThrow::runtime(error_message(&error)))?;
-            let rhandle = crate::plugin::php_plugin_proxy::register_io_entity(&io);
-            Ok(crate::plugin::php_plugin_proxy::rust_handle_value(
-                rhandle, class,
-            ))
+            let rhandle = crate::plugin::rpc::table::register_io_entity(&io);
+            Ok(crate::plugin::rpc::table::rust_handle_value(rhandle, class))
         }
         b"getLocalRepo" => match package_event(event) {
-            Some(event) => crate::plugin::php_plugin_proxy::repository_handle_value(
+            Some(event) => crate::plugin::rpc::table::repository_handle_value(
                 &event.get_local_repo().as_repository_handle(),
             ),
             None => Err(PhpThrow::runtime(BString::from(
@@ -1783,7 +1781,7 @@ pub(crate) fn dispatch_event_method(
                 event
                     .get_operations()
                     .iter()
-                    .map(crate::plugin::php_plugin_proxy::operation_handle_value)
+                    .map(crate::plugin::rpc::table::operation_handle_value)
                     .collect(),
             )),
             None => Err(PhpThrow::runtime(BString::from(
@@ -1791,7 +1789,7 @@ pub(crate) fn dispatch_event_method(
             ))),
         },
         b"getOperation" => match package_event(event) {
-            Some(event) => Ok(crate::plugin::php_plugin_proxy::operation_handle_value(
+            Some(event) => Ok(crate::plugin::rpc::table::operation_handle_value(
                 event.get_operation(),
             )),
             None => Err(PhpThrow::runtime(BString::from(
@@ -1837,7 +1835,7 @@ pub(crate) fn dispatch_event_method(
         },
         b"getTransaction" => match installer_event(event) {
             Some(event) => match event.get_transaction() {
-                Some(transaction) => Ok(crate::plugin::php_plugin_proxy::transaction_handle_value(
+                Some(transaction) => Ok(crate::plugin::rpc::table::transaction_handle_value(
                     transaction,
                 )),
                 None => Ok(PluginValue::Null),
@@ -1848,13 +1846,13 @@ pub(crate) fn dispatch_event_method(
         },
         other => {
             if let Some(event) = event.as_any().downcast_ref::<PostFileDownloadEvent>() {
-                return crate::plugin::php_plugin_proxy::dispatch_post_file_download_event_method(
+                return crate::plugin::rpc::entities::events::dispatch_post_file_download_event_method(
                     event,
                     BStr::new(other),
                 );
             }
             if let Some(event) = event.as_any_mut().downcast_mut::<PrePoolCreateEvent>() {
-                return crate::plugin::php_plugin_proxy::dispatch_pre_pool_create_event_method(
+                return crate::plugin::rpc::entities::events::dispatch_pre_pool_create_event_method(
                     event,
                     BStr::new(other),
                     args,
@@ -1862,7 +1860,7 @@ pub(crate) fn dispatch_event_method(
             }
             match event.as_any_mut().downcast_mut::<PreFileDownloadEvent>() {
                 Some(event) => {
-                    crate::plugin::php_plugin_proxy::dispatch_pre_file_download_event_method(
+                    crate::plugin::rpc::entities::events::dispatch_pre_file_download_event_method(
                         event,
                         BStr::new(other),
                         args,

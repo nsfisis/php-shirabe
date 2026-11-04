@@ -534,7 +534,7 @@ impl Application {
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
         let mut commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![];
 
-        crate::plugin::reset_pending_plugin_command_handles();
+        crate::plugin::console_bridge::reset_pending_plugin_command_handles();
 
         let mut composer = self.get_composer(false, Some(false), None)?;
         if composer.is_none() {
@@ -558,11 +558,11 @@ impl Application {
             let mut ctor_args: IndexMap<BString, shirabe_php_rpc::PluginValue> = IndexMap::new();
             ctor_args.insert(
                 BString::from("composer"),
-                crate::plugin::composer_handle_value(&composer),
+                crate::plugin::rpc::table::composer_handle_value(&composer),
             );
             ctor_args.insert(
                 BString::from("io"),
-                crate::plugin::io_handle_value(&self.io)?,
+                crate::plugin::rpc::table::io_handle_value(&self.io)?,
             );
             let capabilities = pm.borrow().get_plugin_capabilities(
                 BStr::new("Composer\\Plugin\\Capability\\CommandProvider"),
@@ -585,7 +585,7 @@ impl Application {
             if !commands.is_empty() {
                 self.register_worker_console_commands(
                     Some(&composer),
-                    crate::plugin::take_pending_plugin_command_handles(),
+                    crate::plugin::console_bridge::take_pending_plugin_command_handles(),
                 )?;
             }
         }
@@ -611,12 +611,12 @@ impl Application {
         handles: Vec<shirabe_php_rpc::PhpObjHandle>,
     ) -> anyhow::Result<()> {
         if self.published_worker_console_context {
-            return crate::plugin::extend_console_application_commands(handles);
+            return crate::plugin::console_bridge::extend_console_application_commands(handles);
         }
         self.published_worker_console_context = true;
 
         let mut seen: Vec<*const ()> = Vec::new();
-        let mut rust_commands: Vec<crate::plugin::RustCommandMetadata> = Vec::new();
+        let mut rust_commands: Vec<crate::plugin::console_bridge::RustCommandMetadata> = Vec::new();
         for command in self.commands.values() {
             let ptr = std::rc::Rc::as_ptr(command) as *const ();
             if seen.contains(&ptr) {
@@ -627,14 +627,14 @@ impl Application {
             let Some(name) = command.get_name() else {
                 continue;
             };
-            rust_commands.push(crate::plugin::RustCommandMetadata {
+            rust_commands.push(crate::plugin::console_bridge::RustCommandMetadata {
                 name,
                 description: command.get_description(),
                 aliases: command.get_aliases(),
                 hidden: command.is_hidden(),
             });
         }
-        crate::plugin::publish_console_application_context(
+        crate::plugin::console_bridge::publish_console_application_context(
             composer,
             &self.io,
             self.get_initial_working_directory(),
@@ -2353,7 +2353,7 @@ impl ApplicationHandle {
                                 // `Composer\Command\AboutCommand`) is imported as a command by
                                 // PHP but falls through to ScriptAliasCommand here.
                                 let is_command_class = is_string(dummy)
-                                    && crate::plugin::find_file_in_registered_loaders(dummy_str)?
+                                    && crate::plugin::rpc::dispatch::find_file_in_registered_loaders(dummy_str)?
                                         .is_some()
                                     && {
                                         let cache_dir = match composer_opt {
@@ -2442,7 +2442,7 @@ impl ApplicationHandle {
                                                 .as_ref()
                                                 .and_then(|c| c.as_full())
                                                 .as_ref(),
-                                            crate::plugin::take_pending_plugin_command_handles(),
+                                            crate::plugin::console_bridge::take_pending_plugin_command_handles(),
                                         )?;
                                         std::rc::Rc::new(std::cell::RefCell::new(cmd))
                                     } else {

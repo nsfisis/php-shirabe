@@ -210,7 +210,7 @@ double-release) one entity; entities with no clone semantics answer with an expl
 
 ## The R table
 
-`R_TABLE` in `crates/shirabe/src/plugin/php_plugin_proxy.rs` holds the Rust-side entities, as
+`R_TABLE` in `crates/shirabe/src/plugin/rpc/table.rs` holds the Rust-side entities, as
 `RustEntity` with one variant per kind of entity that crosses. Interning scans the table for the
 same variant and shared-pointer address, with no separate reverse index. There is no per-plugin
 bookkeeping: an entry lives as long as a stub for it is reachable in the worker, which is also how

@@ -9,7 +9,7 @@
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::plugin::php_call::PhpCall;
-use crate::plugin::php_plugin_proxy::{config_handle_value, io_handle_value};
+use crate::plugin::rpc::table::{config_handle_value, io_handle_value};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, ToWire, wire};

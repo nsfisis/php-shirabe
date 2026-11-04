@@ -23,9 +23,8 @@ use shirabe::package::{
 };
 use shirabe::plugin::php_call::PhpCall;
 use shirabe::plugin::plugin_interface::PluginInterface;
-use shirabe::plugin::{
-    Capable, PluginManager, composer_handle_value, io_handle_value, plugin_handle_value,
-};
+use shirabe::plugin::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
+use shirabe::plugin::{Capable, PluginManager};
 use shirabe::repository::{
     InstalledArrayRepository, InstalledRepositoryInterfaceHandle, RepositoryInterfaceHandle,
     RepositoryManagerInterface,

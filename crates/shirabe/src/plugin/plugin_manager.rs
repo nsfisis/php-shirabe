@@ -12,10 +12,9 @@ use crate::package::{
 use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
 use crate::plugin::php_call::PhpCall;
-use crate::plugin::php_plugin_proxy::{
-    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_is_a, plugin_handle_value,
-};
 use crate::plugin::plugin_interface::{self, PluginInterface};
+use crate::plugin::proxy::{PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_is_a};
+use crate::plugin::rpc::table::plugin_handle_value;
 use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
 };
@@ -502,8 +501,8 @@ impl PluginManager {
                 let handle = self.php_runtime_new_object_with_args(
                     class.as_bstr(),
                     vec![
-                        crate::plugin::io_handle_value(&self.io)?,
-                        crate::plugin::composer_handle_value(&composer),
+                        crate::plugin::rpc::table::io_handle_value(&self.io)?,
+                        crate::plugin::rpc::table::composer_handle_value(&composer),
                     ],
                 )?;
                 let installer = crate::plugin::php_installer_proxy(handle);
