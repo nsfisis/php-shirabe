@@ -2352,67 +2352,108 @@ fn dispatch_complete_package_getter(
     package: &AnyPackage,
     method_name: &BStr,
 ) -> Result<Option<PluginValue>, PhpThrow> {
-    let unavailable = || {
-        PhpThrow::runtime(bconcat!(
-            "`",
-            method_name,
-            "` is not available on this package over RPC"
-        ))
+    let unavailable = || package_method_unavailable(method_name, b"this package");
+    let complete = || {
+        package
+            .as_complete_package_interface()
+            .ok_or_else(unavailable)
     };
+    let root = || package.as_root_package_interface().ok_or_else(unavailable);
     let value = match method_name.as_bytes() {
-        b"getScripts"
-        | b"getRepositories"
-        | b"getLicense"
-        | b"getKeywords"
-        | b"getDescription"
-        | b"getHomepage"
-        | b"getAuthors"
-        | b"getSupport"
-        | b"getFunding"
-        | b"isAbandoned"
-        | b"getReplacementPackage"
-        | b"getArchiveName"
-        | b"getArchiveExcludes" => {
-            let package = package
-                .as_complete_package_interface()
-                .ok_or_else(unavailable)?;
-            match method_name.as_bytes() {
-                b"getScripts" => package.get_scripts().to_wire(),
-                b"getRepositories" => package.get_repositories().to_wire(),
-                b"getLicense" => package.get_license().to_wire(),
-                b"getKeywords" => package.get_keywords().to_wire(),
-                b"getDescription" => package.get_description().to_wire(),
-                b"getHomepage" => package.get_homepage().to_wire(),
-                b"getAuthors" => package.get_authors().to_wire(),
-                b"getSupport" => package.get_support().to_wire(),
-                b"getFunding" => package.get_funding().to_wire(),
-                b"isAbandoned" => PluginValue::Bool(package.is_abandoned()),
-                b"getReplacementPackage" => package.get_replacement_package().to_wire(),
-                b"getArchiveName" => package.get_archive_name().to_wire(),
-                _ => package.get_archive_excludes().to_wire(),
-            }
-        }
-        b"getAliases"
-        | b"getMinimumStability"
-        | b"getStabilityFlags"
-        | b"getReferences"
-        | b"getPreferStable"
-        | b"getConfig" => {
-            let package = package
-                .as_root_package_interface()
-                .ok_or_else(unavailable)?;
-            match method_name.as_bytes() {
-                b"getAliases" => package.get_aliases().to_wire(),
-                b"getMinimumStability" => PluginValue::string(package.get_minimum_stability()),
-                b"getStabilityFlags" => package.get_stability_flags().to_wire(),
-                b"getReferences" => package.get_references().to_wire(),
-                b"getPreferStable" => PluginValue::Bool(package.get_prefer_stable()),
-                _ => package.get_config().to_wire(),
-            }
-        }
+        b"getScripts" => complete()?.get_scripts().to_wire(),
+        b"getRepositories" => complete()?.get_repositories().to_wire(),
+        b"getLicense" => complete()?.get_license().to_wire(),
+        b"getKeywords" => complete()?.get_keywords().to_wire(),
+        b"getDescription" => complete()?.get_description().to_wire(),
+        b"getHomepage" => complete()?.get_homepage().to_wire(),
+        b"getAuthors" => complete()?.get_authors().to_wire(),
+        b"getSupport" => complete()?.get_support().to_wire(),
+        b"getFunding" => complete()?.get_funding().to_wire(),
+        b"isAbandoned" => PluginValue::Bool(complete()?.is_abandoned()),
+        b"getReplacementPackage" => complete()?.get_replacement_package().to_wire(),
+        b"getArchiveName" => complete()?.get_archive_name().to_wire(),
+        b"getArchiveExcludes" => complete()?.get_archive_excludes().to_wire(),
+        b"getAliases" => root()?.get_aliases().to_wire(),
+        b"getMinimumStability" => PluginValue::string(root()?.get_minimum_stability()),
+        b"getStabilityFlags" => root()?.get_stability_flags().to_wire(),
+        b"getReferences" => root()?.get_references().to_wire(),
+        b"getPreferStable" => PluginValue::Bool(root()?.get_prefer_stable()),
+        b"getConfig" => root()?.get_config().to_wire(),
         _ => return Ok(None),
     };
     Ok(Some(value))
+}
+
+fn package_method_unavailable(method_name: &BStr, receiver: &[u8]) -> PhpThrow {
+    PhpThrow::runtime(bconcat!(
+        "`",
+        method_name,
+        "` is not available on ",
+        receiver,
+        " over RPC"
+    ))
+}
+
+/// The base `Package` behind `package`, for `Package`'s own setters. The concrete subclasses
+/// inherit them (their PHP overrides in `RootPackage` delegate to the same base state), so the
+/// base package answers for every real variant.
+fn base_package_mut<'a>(
+    package: &'a mut AnyPackage,
+    method_name: &BStr,
+) -> Result<&'a mut crate::package::Package, PhpThrow> {
+    package
+        .as_package_mut()
+        .ok_or_else(|| package_method_unavailable(method_name, b"an alias package"))
+}
+
+fn complete_package_mut<'a>(
+    package: &'a mut AnyPackage,
+    method_name: &BStr,
+) -> Result<&'a mut dyn crate::package::CompletePackageInterface, PhpThrow> {
+    package
+        .as_complete_package_interface_mut()
+        .ok_or_else(|| package_method_unavailable(method_name, b"this package"))
+}
+
+fn root_package_mut<'a>(
+    package: &'a mut AnyPackage,
+    method_name: &BStr,
+) -> Result<&'a mut dyn crate::package::RootPackageInterface, PhpThrow> {
+    package
+        .as_root_package_interface_mut()
+        .ok_or_else(|| package_method_unavailable(method_name, b"this package"))
+}
+
+/// Runs a setter that both `RootPackageInterface` and `Package` declare. `RootAliasPackage`
+/// overrides each of these to write through to its alias target, and `RootPackage` reaches the
+/// same base state either way, so a root package goes through the interface and any other
+/// package through its base `Package`.
+///
+/// TODO(type-model): choosing the body for the concrete variant belongs on `AnyPackage`, not
+/// here. The stub surface already decides which classes carry a method, so the `as_*_mut`
+/// accessors' "not available on an alias package" arms are unreachable for a method the alias
+/// stubs do not declare, and what is left is a per-variant dispatch that the `is_root` check
+/// only approximates: it covers `RootPackage` as well, where the extra hop is equivalent only
+/// while that impl keeps delegating to the base package, and nothing checks it. A new variant
+/// compiles into the wrong body without a diagnostic.
+fn set_on_root_or_base_package<T>(
+    package: &mut AnyPackage,
+    method_name: &BStr,
+    value: T,
+    root: impl FnOnce(&mut dyn crate::package::RootPackageInterface, T),
+    base: impl FnOnce(&mut crate::package::Package, T),
+) -> Result<(), PhpThrow> {
+    if package.is_root() {
+        root(
+            package
+                .as_root_package_interface_mut()
+                .expect("a root package exposes RootPackageInterface"),
+            value,
+        );
+    } else {
+        base(base_package_mut(package, method_name)?, value);
+    }
+    Ok(())
 }
 
 fn dispatch_package_method(
@@ -2420,45 +2461,77 @@ fn dispatch_package_method(
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
+    let links_arg =
+        || arg_or::<IndexMap<BString, crate::package::Link>>(method_name, args, 0, IndexMap::new());
     match method_name.as_bytes() {
         b"setId" => {
             let id = arg::<i64>(method_name, args, 0)?;
             package.borrow_mut().as_package_interface_mut().set_id(id);
-            return Ok(PluginValue::Null);
         }
-        b"setInstallationSource"
-        | b"setSourceReference"
-        | b"setSourceUrl"
-        | b"setDistUrl"
-        | b"setDistType"
-        | b"setDistReference"
-        | b"setSourceDistReferences" => {
+        b"setInstallationSource" => {
             let value = arg::<Option<BString>>(method_name, args, 0)?;
-            let mut borrowed = package.borrow_mut();
-            let package = borrowed.as_package_interface_mut();
-            match method_name.as_bytes() {
-                b"setInstallationSource" => package.set_installation_source(value),
-                b"setSourceReference" => package.set_source_reference(value),
-                b"setSourceUrl" => package.set_source_url(value),
-                b"setDistUrl" => package.set_dist_url(value),
-                b"setDistType" => package.set_dist_type(value),
-                b"setDistReference" => package.set_dist_reference(value),
-                _ => package.set_source_dist_references(value.ok_or_else(|| {
-                    PhpThrow::runtime("setSourceDistReferences expects a reference string")
-                })?),
-            }
-            return Ok(PluginValue::Null);
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_installation_source(value);
         }
-        b"setSourceMirrors" | b"setDistMirrors" => {
+        b"setSourceReference" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_source_reference(value);
+        }
+        b"setSourceUrl" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_source_url(value);
+        }
+        b"setDistUrl" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_dist_url(value);
+        }
+        b"setDistType" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_dist_type(value);
+        }
+        b"setDistReference" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_dist_reference(value);
+        }
+        b"setSourceDistReferences" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?.ok_or_else(|| {
+                PhpThrow::runtime("setSourceDistReferences expects a reference string")
+            })?;
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_source_dist_references(value);
+        }
+        b"setSourceMirrors" => {
             let mirrors = arg::<Option<Vec<crate::package::Mirror>>>(method_name, args, 0)?;
-            let mut borrowed = package.borrow_mut();
-            let package = borrowed.as_package_interface_mut();
-            if method_name == "setSourceMirrors" {
-                package.set_source_mirrors(mirrors);
-            } else {
-                package.set_dist_mirrors(mirrors);
-            }
-            return Ok(PluginValue::Null);
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_source_mirrors(mirrors);
+        }
+        b"setDistMirrors" => {
+            let mirrors = arg::<Option<Vec<crate::package::Mirror>>>(method_name, args, 0)?;
+            package
+                .borrow_mut()
+                .as_package_interface_mut()
+                .set_dist_mirrors(mirrors);
         }
         b"setRepository" => {
             let repository = arg::<RepositoryInterfaceHandle>(method_name, args, 0)?;
@@ -2467,7 +2540,6 @@ fn dispatch_package_method(
                 .as_package_interface_mut()
                 .set_repository(repository)
                 .map_err(|error| error_throw(b"setRepository failed", &error))?;
-            return Ok(PluginValue::Null);
         }
         b"setTransportOptions" => {
             let options =
@@ -2476,271 +2548,188 @@ fn dispatch_package_method(
                 .borrow_mut()
                 .as_package_interface_mut()
                 .set_transport_options(options);
-            return Ok(PluginValue::Null);
         }
-        // `RootAliasPackage` overrides each of these to write through to its alias target, and
-        // `RootPackage` reaches the same base state either way, so both go through the interface.
-        //
-        // TODO(type-model): choosing the body for the concrete variant belongs on `AnyPackage`,
-        // not here. The stub surface already decides which classes carry a method, so the
-        // `as_*_mut` accessors' "not available on an alias package" arms are unreachable for a
-        // method the alias stubs do not declare, and what is left is a per-variant dispatch that
-        // this guard only approximates: it covers `RootPackage` as well, where the extra hop is
-        // equivalent only while that impl keeps delegating to the base package, and nothing
-        // checks it. Method names repeated in the base-package arm below make the answer depend
-        // on arm order, and a new variant compiles into the wrong body without a diagnostic.
-        b"setRequires" | b"setDevRequires" | b"setConflicts" | b"setProvides" | b"setReplaces"
-        | b"setAutoload" | b"setDevAutoload" | b"setSuggests" | b"setExtra"
-            if package.borrow().is_root() =>
-        {
-            let mut borrowed = package.borrow_mut();
-            let package = borrowed
-                .as_root_package_interface_mut()
-                .expect("a root package exposes RootPackageInterface");
-            match method_name.as_bytes() {
-                b"setRequires" => package.set_requires(arg_or::<
-                    IndexMap<BString, crate::package::Link>,
-                >(
-                    method_name, args, 0, IndexMap::new()
-                )?),
-                b"setDevRequires" => {
-                    package.set_dev_requires(arg_or::<IndexMap<BString, crate::package::Link>>(
-                        method_name,
-                        args,
-                        0,
-                        IndexMap::new(),
-                    )?)
-                }
-                b"setConflicts" => package.set_conflicts(arg_or::<
-                    IndexMap<BString, crate::package::Link>,
-                >(
-                    method_name, args, 0, IndexMap::new()
-                )?),
-                b"setProvides" => package.set_provides(arg_or::<
-                    IndexMap<BString, crate::package::Link>,
-                >(
-                    method_name, args, 0, IndexMap::new()
-                )?),
-                b"setReplaces" => package.set_replaces(arg_or::<
-                    IndexMap<BString, crate::package::Link>,
-                >(
-                    method_name, args, 0, IndexMap::new()
-                )?),
-                b"setAutoload" => {
-                    package.set_autoload(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
-                }
-                b"setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<BString, PhpMixed>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-                b"setSuggests" => {
-                    package.set_suggests(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
-                }
-                _ => package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?),
-            }
-            return Ok(PluginValue::Null);
+        b"setRequires" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            links_arg()?,
+            |p, links| p.set_requires(links),
+            |p, links| p.set_requires(links),
+        )?,
+        b"setDevRequires" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            links_arg()?,
+            |p, links| p.set_dev_requires(links),
+            |p, links| p.set_dev_requires(links),
+        )?,
+        b"setConflicts" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            links_arg()?,
+            |p, links| p.set_conflicts(links),
+            |p, links| p.set_conflicts(links),
+        )?,
+        b"setProvides" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            links_arg()?,
+            |p, links| p.set_provides(links),
+            |p, links| p.set_provides(links),
+        )?,
+        b"setReplaces" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            links_arg()?,
+            |p, links| p.set_replaces(links),
+            |p, links| p.set_replaces(links),
+        )?,
+        b"setAutoload" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?,
+            |p, autoload| p.set_autoload(autoload),
+            |p, autoload| p.set_autoload(autoload),
+        )?,
+        b"setDevAutoload" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?,
+            |p, autoload| p.set_dev_autoload(autoload),
+            |p, autoload| p.set_dev_autoload(autoload),
+        )?,
+        b"setSuggests" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            arg::<IndexMap<BString, BString>>(method_name, args, 0)?,
+            |p, suggests| p.set_suggests(suggests),
+            |p, suggests| p.set_suggests(suggests),
+        )?,
+        b"setExtra" => set_on_root_or_base_package(
+            &mut package.borrow_mut(),
+            method_name,
+            arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?,
+            |p, extra| p.set_extra(extra),
+            |p, extra| p.set_extra(extra),
+        )?,
+        b"setType" => {
+            let value = arg::<BString>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_type(value);
         }
-        // `Package`'s own setters. The concrete subclasses inherit them (their PHP overrides in
-        // `RootPackage` delegate to the same base state), so the base package answers for every
-        // real variant.
-        b"setType"
-        | b"setTargetDir"
-        | b"setExtra"
-        | b"setBinaries"
-        | b"setSourceType"
-        | b"setDistSha1Checksum"
-        | b"setSuggests"
-        | b"setAutoload"
-        | b"setDevAutoload"
-        | b"setIncludePaths"
-        | b"setPhpExt"
-        | b"setNotificationUrl"
-        | b"setIsDefaultBranch"
-        | b"replaceVersion" => {
-            let mut borrowed = package.borrow_mut();
-            let package = borrowed.as_package_mut().ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(
-                    "`",
-                    method_name,
-                    "` is not available on an alias package over RPC"
-                ))
-            })?;
-            match method_name.as_bytes() {
-                b"setType" => package.set_type(arg::<BString>(method_name, args, 0)?),
-                b"setTargetDir" => {
-                    package.set_target_dir(arg::<Option<BString>>(method_name, args, 0)?)
-                }
-                b"setExtra" => {
-                    package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
-                }
-                b"setBinaries" => package.set_binaries(arg::<Vec<BString>>(method_name, args, 0)?),
-                b"setSourceType" => {
-                    package.set_source_type(arg::<Option<BString>>(method_name, args, 0)?)
-                }
-                b"setDistSha1Checksum" => {
-                    package.set_dist_sha1_checksum(arg::<Option<BString>>(method_name, args, 0)?)
-                }
-                b"setSuggests" => {
-                    package.set_suggests(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
-                }
-                b"setAutoload" => {
-                    package.set_autoload(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
-                }
-                b"setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<BString, PhpMixed>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-                b"setIncludePaths" => {
-                    package.set_include_paths(arg::<Vec<BString>>(method_name, args, 0)?)
-                }
-                b"setPhpExt" => package.set_php_ext(arg::<Option<IndexMap<BString, PhpMixed>>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-                b"setNotificationUrl" => {
-                    package.set_notification_url(arg::<BString>(method_name, args, 0)?)
-                }
-                b"setIsDefaultBranch" => {
-                    package.set_is_default_branch(arg::<bool>(method_name, args, 0)?)
-                }
-                _ => package.replace_version(
-                    arg::<BString>(method_name, args, 0)?,
-                    arg::<BString>(method_name, args, 1)?,
-                ),
-            }
-            return Ok(PluginValue::Null);
+        b"setTargetDir" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_target_dir(value);
         }
-        b"setRequires" | b"setConflicts" | b"setProvides" | b"setReplaces" | b"setDevRequires" => {
-            let links = arg_or::<IndexMap<BString, crate::package::Link>>(
-                method_name,
-                args,
-                0,
-                IndexMap::new(),
-            )?;
-            let mut borrowed = package.borrow_mut();
-            let package = borrowed.as_package_mut().ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(
-                    "`",
-                    method_name,
-                    "` is not available on an alias package over RPC"
-                ))
-            })?;
-            match method_name.as_bytes() {
-                b"setRequires" => package.set_requires(links),
-                b"setConflicts" => package.set_conflicts(links),
-                b"setProvides" => package.set_provides(links),
-                b"setReplaces" => package.set_replaces(links),
-                _ => package.set_dev_requires(links),
-            }
-            return Ok(PluginValue::Null);
+        b"setBinaries" => {
+            let value = arg::<Vec<BString>>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_binaries(value);
+        }
+        b"setSourceType" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_source_type(value);
+        }
+        b"setDistSha1Checksum" => {
+            let value = arg::<Option<BString>>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_dist_sha1_checksum(value);
+        }
+        b"setIncludePaths" => {
+            let value = arg::<Vec<BString>>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_include_paths(value);
+        }
+        b"setPhpExt" => {
+            let value = arg::<Option<IndexMap<BString, PhpMixed>>>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_php_ext(value);
+        }
+        b"setNotificationUrl" => {
+            let value = arg::<BString>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_notification_url(value);
+        }
+        b"setIsDefaultBranch" => {
+            let value = arg::<bool>(method_name, args, 0)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_is_default_branch(value);
+        }
+        b"replaceVersion" => {
+            let version = arg::<BString>(method_name, args, 0)?;
+            let pretty_version = arg::<BString>(method_name, args, 1)?;
+            base_package_mut(&mut package.borrow_mut(), method_name)?
+                .replace_version(version, pretty_version);
         }
         b"setReleaseDate" => {
             let date = arg::<Option<chrono::DateTime<chrono::Utc>>>(method_name, args, 0)?;
-            let mut borrowed = package.borrow_mut();
-            let package = borrowed.as_package_mut().ok_or_else(|| {
-                PhpThrow::runtime("`setReleaseDate` is not available on an alias package over RPC")
-            })?;
-            package.set_release_date(date);
-            return Ok(PluginValue::Null);
+            base_package_mut(&mut package.borrow_mut(), method_name)?.set_release_date(date);
         }
-        b"setScripts"
-        | b"setRepositories"
-        | b"setLicense"
-        | b"setKeywords"
-        | b"setDescription"
-        | b"setHomepage"
-        | b"setAuthors"
-        | b"setSupport"
-        | b"setFunding"
-        | b"setAbandoned"
-        | b"setArchiveName"
-        | b"setArchiveExcludes" => {
-            let mut borrowed = package.borrow_mut();
-            let package = borrowed
-                .as_complete_package_interface_mut()
-                .ok_or_else(|| {
-                    PhpThrow::runtime(bconcat!(
-                        "`",
-                        method_name,
-                        "` is not available on this package over RPC"
-                    ))
-                })?;
-            match method_name.as_bytes() {
-                b"setScripts" => package.set_scripts(arg::<IndexMap<BString, Vec<BString>>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-                b"setRepositories" => package.set_repositories(arg::<IndexMap<BString, PhpMixed>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-                b"setLicense" => package.set_license(arg::<Vec<BString>>(method_name, args, 0)?),
-                b"setKeywords" => package.set_keywords(arg::<Vec<BString>>(method_name, args, 0)?),
-                b"setDescription" => package.set_description(arg::<BString>(method_name, args, 0)?),
-                b"setHomepage" => package.set_homepage(arg::<BString>(method_name, args, 0)?),
-                b"setAuthors" => package.set_authors(arg::<Vec<IndexMap<BString, BString>>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-                b"setSupport" => {
-                    package.set_support(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
-                }
-                b"setFunding" => package.set_funding(arg::<Vec<IndexMap<BString, PhpMixed>>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-                b"setAbandoned" => package.set_abandoned(arg::<PhpMixed>(method_name, args, 0)?),
-                b"setArchiveName" => {
-                    package.set_archive_name(arg::<BString>(method_name, args, 0)?)
-                }
-                _ => package.set_archive_excludes(arg::<Vec<BString>>(method_name, args, 0)?),
-            }
-            return Ok(PluginValue::Null);
+        b"setScripts" => {
+            let value = arg::<IndexMap<BString, Vec<BString>>>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_scripts(value);
         }
-        b"setStabilityFlags"
-        | b"setMinimumStability"
-        | b"setPreferStable"
-        | b"setConfig"
-        | b"setReferences"
-        | b"setAliases" => {
-            let mut borrowed = package.borrow_mut();
-            let package = borrowed.as_root_package_interface_mut().ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(
-                    "`",
-                    method_name,
-                    "` is not available on this package over RPC"
-                ))
-            })?;
-            match method_name.as_bytes() {
-                b"setStabilityFlags" => package.set_stability_flags(arg::<IndexMap<BString, i64>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-                b"setMinimumStability" => {
-                    package.set_minimum_stability(arg::<BString>(method_name, args, 0)?)
-                }
-                b"setPreferStable" => package.set_prefer_stable(arg::<bool>(method_name, args, 0)?),
-                b"setConfig" => {
-                    package.set_config(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
-                }
-                b"setReferences" => {
-                    package.set_references(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
-                }
-                _ => package.set_aliases(arg::<Vec<IndexMap<BString, BString>>>(
-                    method_name,
-                    args,
-                    0,
-                )?),
-            }
-            return Ok(PluginValue::Null);
+        b"setRepositories" => {
+            let value = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_repositories(value);
+        }
+        b"setLicense" => {
+            let value = arg::<Vec<BString>>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_license(value);
+        }
+        b"setKeywords" => {
+            let value = arg::<Vec<BString>>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_keywords(value);
+        }
+        b"setDescription" => {
+            let value = arg::<BString>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_description(value);
+        }
+        b"setHomepage" => {
+            let value = arg::<BString>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_homepage(value);
+        }
+        b"setAuthors" => {
+            let value = arg::<Vec<IndexMap<BString, BString>>>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_authors(value);
+        }
+        b"setSupport" => {
+            let value = arg::<IndexMap<BString, BString>>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_support(value);
+        }
+        b"setFunding" => {
+            let value = arg::<Vec<IndexMap<BString, PhpMixed>>>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_funding(value);
+        }
+        b"setAbandoned" => {
+            let value = arg::<PhpMixed>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_abandoned(value);
+        }
+        b"setArchiveName" => {
+            let value = arg::<BString>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?.set_archive_name(value);
+        }
+        b"setArchiveExcludes" => {
+            let value = arg::<Vec<BString>>(method_name, args, 0)?;
+            complete_package_mut(&mut package.borrow_mut(), method_name)?
+                .set_archive_excludes(value);
+        }
+        b"setStabilityFlags" => {
+            let value = arg::<IndexMap<BString, i64>>(method_name, args, 0)?;
+            root_package_mut(&mut package.borrow_mut(), method_name)?.set_stability_flags(value);
+        }
+        b"setMinimumStability" => {
+            let value = arg::<BString>(method_name, args, 0)?;
+            root_package_mut(&mut package.borrow_mut(), method_name)?.set_minimum_stability(value);
+        }
+        b"setPreferStable" => {
+            let value = arg::<bool>(method_name, args, 0)?;
+            root_package_mut(&mut package.borrow_mut(), method_name)?.set_prefer_stable(value);
+        }
+        b"setConfig" => {
+            let value = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
+            root_package_mut(&mut package.borrow_mut(), method_name)?.set_config(value);
+        }
+        b"setReferences" => {
+            let value = arg::<IndexMap<BString, BString>>(method_name, args, 0)?;
+            root_package_mut(&mut package.borrow_mut(), method_name)?.set_references(value);
+        }
+        b"setAliases" => {
+            let value = arg::<Vec<IndexMap<BString, BString>>>(method_name, args, 0)?;
+            root_package_mut(&mut package.borrow_mut(), method_name)?.set_aliases(value);
         }
         b"equals" => {
             let other = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
@@ -2749,43 +2738,55 @@ fn dispatch_package_method(
         }
         // The subclasses narrow `getAliasOf`'s return type to their own alias target, but every
         // variant holds the one entity.
-        b"getAliasOf" | b"isRootPackageAlias" | b"hasSelfVersionRequires" => {
-            let borrowed = package.borrow();
-            let alias = borrowed.as_alias_package().ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(
-                    "`",
-                    method_name,
-                    "` is not available on this package over RPC"
-                ))
-            })?;
-            return Ok(match method_name.as_bytes() {
-                b"getAliasOf" => package_handle_value(alias.get_alias_of().as_rc()),
-                b"isRootPackageAlias" => alias.is_root_package_alias().to_wire(),
-                _ => alias.has_self_version_requires().to_wire(),
-            });
+        b"getAliasOf" => {
+            return Ok(package_handle_value(
+                alias_package(&package.borrow(), method_name)?
+                    .get_alias_of()
+                    .as_rc(),
+            ));
+        }
+        b"isRootPackageAlias" => {
+            return Ok(alias_package(&package.borrow(), method_name)?
+                .is_root_package_alias()
+                .to_wire());
+        }
+        b"hasSelfVersionRequires" => {
+            return Ok(alias_package(&package.borrow(), method_name)?
+                .has_self_version_requires()
+                .to_wire());
         }
         b"setRootPackageAlias" => {
             let value = arg::<bool>(method_name, args, 0)?;
             package
                 .borrow_mut()
                 .as_alias_package_mut()
-                .ok_or_else(|| {
-                    PhpThrow::runtime(
-                        "`setRootPackageAlias` is not available on this package over RPC",
-                    )
-                })?
+                .ok_or_else(|| package_method_unavailable(method_name, b"this package"))?
                 .set_root_package_alias(value);
-            return Ok(PluginValue::Null);
         }
-        _ => {}
+        _ => return dispatch_package_getter(&package.borrow(), method_name, args),
     }
+    Ok(PluginValue::Null)
+}
 
-    if let Some(value) = dispatch_complete_package_getter(&package.borrow(), method_name)? {
+fn alias_package<'a>(
+    package: &'a AnyPackage,
+    method_name: &BStr,
+) -> Result<&'a crate::package::AliasPackage, PhpThrow> {
+    package
+        .as_alias_package()
+        .ok_or_else(|| package_method_unavailable(method_name, b"this package"))
+}
+
+fn dispatch_package_getter(
+    package: &AnyPackage,
+    method_name: &BStr,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    if let Some(value) = dispatch_complete_package_getter(package, method_name)? {
         return Ok(value);
     }
 
-    let borrowed = package.borrow();
-    let package = borrowed.as_package_interface();
+    let package = package.as_package_interface();
     match method_name.as_bytes() {
         b"getName" => Ok(package.get_name().to_wire()),
         b"getPrettyName" => Ok(package.get_pretty_name().to_wire()),
