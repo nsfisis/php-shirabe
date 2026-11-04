@@ -50,7 +50,7 @@ pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
         ))
         .map(|p| bstr::BString::from(path_to_bytes(&p)))
         .unwrap_or_default(),
-    );
+    )?;
 
     let application = ApplicationHandle::new(BString::from("Shirabe"), BString::default())?;
     let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?));

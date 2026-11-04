@@ -49,7 +49,7 @@ impl GlobalCommand {
         quiet: bool,
     ) -> anyhow::Result<StringInput> {
         if Platform::get_env("COMPOSER").is_some() {
-            Platform::clear_env("COMPOSER");
+            Platform::clear_env("COMPOSER")?;
         }
 
         let config = Factory::create_config(None, None)?;

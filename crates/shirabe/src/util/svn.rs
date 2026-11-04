@@ -58,9 +58,9 @@ impl Svn {
         }
     }
 
-    pub fn clean_env() {
+    pub fn clean_env() -> anyhow::Result<()> {
         // clean up env for OSX, see https://github.com/composer/composer/issues/2146#issuecomment-35478940
-        Platform::clear_env("DYLD_LIBRARY_PATH");
+        Platform::clear_env("DYLD_LIBRARY_PATH")
     }
 
     /// Execute an SVN remote command and try to fix up the process with credentials

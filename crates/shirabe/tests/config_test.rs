@@ -648,10 +648,10 @@ fn test_disable_tls_can_be_overridden() {
 #[test]
 #[serial]
 fn test_process_timeout() {
-    Platform::put_env("COMPOSER_PROCESS_TIMEOUT", "0");
+    Platform::put_env("COMPOSER_PROCESS_TIMEOUT", "0").unwrap();
     let config = Config::new(true, None);
     let result = config.get("process-timeout").unwrap();
-    Platform::clear_env("COMPOSER_PROCESS_TIMEOUT");
+    Platform::clear_env("COMPOSER_PROCESS_TIMEOUT").unwrap();
 
     assert_eq!(PhpMixed::Int(0), result);
 }
@@ -659,10 +659,10 @@ fn test_process_timeout() {
 #[test]
 #[serial]
 fn test_htaccess_protect() {
-    Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
+    Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0").unwrap();
     let config = Config::new(true, None);
     let result = config.get("htaccess-protect").unwrap();
-    Platform::clear_env("COMPOSER_HTACCESS_PROTECT");
+    Platform::clear_env("COMPOSER_HTACCESS_PROTECT").unwrap();
 
     assert_eq!(PhpMixed::Bool(false), result);
 }
@@ -670,7 +670,7 @@ fn test_htaccess_protect() {
 #[test]
 #[serial]
 fn test_get_source_of_value() {
-    Platform::clear_env("COMPOSER_PROCESS_TIMEOUT");
+    Platform::clear_env("COMPOSER_PROCESS_TIMEOUT").unwrap();
 
     let mut config = Config::new(true, None);
 
@@ -693,10 +693,10 @@ fn test_get_source_of_value() {
 #[test]
 #[serial]
 fn test_get_source_of_value_env_variables() {
-    Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0");
+    Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0").unwrap();
     let config = Config::new(true, None);
     let result = config.get_source_of_value("htaccess-protect").unwrap();
-    Platform::clear_env("COMPOSER_HTACCESS_PROTECT");
+    Platform::clear_env("COMPOSER_HTACCESS_PROTECT").unwrap();
 
     assert_eq!("COMPOSER_HTACCESS_PROTECT", result);
 }
@@ -718,9 +718,9 @@ fn test_audit() {
         result.get(B("ignore"))
     );
 
-    Platform::put_env("COMPOSER_AUDIT_ABANDONED", Auditor::ABANDONED_IGNORE);
+    Platform::put_env("COMPOSER_AUDIT_ABANDONED", Auditor::ABANDONED_IGNORE).unwrap();
     let result = config.get("audit").unwrap();
-    Platform::clear_env("COMPOSER_AUDIT_ABANDONED");
+    Platform::clear_env("COMPOSER_AUDIT_ABANDONED").unwrap();
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("abandoned")));
     assert!(result.contains_key(B("ignore")));
@@ -773,9 +773,9 @@ fn test_audit() {
     );
 
     // Test COMPOSER_SECURITY_BLOCKING_ABANDONED env var
-    Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "1");
+    Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "1").unwrap();
     let result = config.get("audit").unwrap();
-    Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
+    Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED").unwrap();
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("block-abandoned")));
     assert_eq!(
@@ -783,9 +783,9 @@ fn test_audit() {
         result.get(B("block-abandoned"))
     );
 
-    Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "0");
+    Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "0").unwrap();
     let result = config.get("audit").unwrap();
-    Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
+    Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED").unwrap();
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("block-abandoned")));
     assert_eq!(

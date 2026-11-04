@@ -909,10 +909,10 @@ try {
 
                         if strpos(&exec, "@putenv ") == Some(0) {
                             if strpos(&exec, "=").is_none() {
-                                Platform::clear_env(substr(&exec, 8, None));
+                                Platform::clear_env(substr(&exec, 8, None))?;
                             } else {
                                 let parts = explode_with_limit("=", substr(&exec, 8, None), 2);
-                                Platform::put_env(&parts[0], &parts[1]);
+                                Platform::put_env(&parts[0], &parts[1])?;
                             }
 
                             continue;
@@ -960,7 +960,7 @@ try {
                             let finder = PhpExecutableFinder::new();
                             let php_path = finder.find(false);
                             if let Some(ref pp) = php_path {
-                                Platform::put_env("PHP_BINARY", pp);
+                                Platform::put_env("PHP_BINARY", pp)?;
                             }
 
                             if Platform::is_windows() {
@@ -1421,7 +1421,7 @@ try {
                     std::iter::once(bin_dir).chain(std::env::split_paths(path_value)),
                 )
                 .expect("bin-dir holds no path separator");
-                Platform::put_env(path_env, path_to_bytes(&path_value));
+                Platform::put_env(path_env, path_to_bytes(&path_value))?;
             }
         }
         Ok(())

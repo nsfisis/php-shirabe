@@ -5,7 +5,7 @@ use shirabe_php_shim::{bconcat, defined};
 
 #[test]
 fn test_expand_path() {
-    Platform::put_env("TESTENV", "/home/test");
+    Platform::put_env("TESTENV", "/home/test").unwrap();
     assert_eq!(
         "/home/test/myPath",
         Platform::expand_path("%TESTENV%/myPath")

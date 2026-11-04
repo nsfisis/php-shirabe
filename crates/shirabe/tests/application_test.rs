@@ -19,11 +19,11 @@ use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};
 
 fn set_up() {
-    Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");
+    Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1").unwrap();
 }
 
 fn tear_down() {
-    Platform::clear_env("COMPOSER_DISABLE_XDEBUG_WARN");
+    Platform::clear_env("COMPOSER_DISABLE_XDEBUG_WARN").unwrap();
 }
 
 struct TearDown;

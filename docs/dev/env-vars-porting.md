@@ -28,8 +28,7 @@ each call site.
 | PHP | Shirabe |
 | --- | --- |
 | `getenv()` | `getenv()`/`getenv_all()` |
-| `putenv("K=V")` | `putenv()` |
-| `putenv("K")` (unset) | `putenv_clear()` |
+| `putenv("K=V")`, `putenv("K")` (unset) | `putenv()` |
 | `$_ENV` | `PHP_ENV` |
 | `$_SERVER` | `PHP_SERVER` |
 

@@ -466,6 +466,7 @@ macro_rules! define_php_exception {
 define_php_exception!(Exception, ThrowableFields, r"Exception");
 define_php_exception!(Error, ThrowableFields, r"Error");
 define_php_exception!(TypeError, Error, r"TypeError");
+define_php_exception!(ValueError, Error, r"ValueError");
 define_php_exception!(RuntimeException, Exception, r"RuntimeException");
 define_php_exception!(
     PcreException,

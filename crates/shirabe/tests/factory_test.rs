@@ -16,7 +16,7 @@ use config_stub::ConfigStubBuilder;
 use io_mock::{Expectation, get_io_mock};
 
 fn tear_down() {
-    Platform::clear_env("COMPOSER");
+    Platform::clear_env("COMPOSER").unwrap();
 }
 
 struct TearDown;
@@ -68,7 +68,7 @@ fn test_get_composer_json_path_fails_if_dir() {
     let _tear_down = TearDown;
 
     let dir = env!("CARGO_MANIFEST_DIR");
-    Platform::put_env("COMPOSER", dir);
+    Platform::put_env("COMPOSER", dir).unwrap();
     let err = Factory::get_composer_file().unwrap_err();
     assert_eq!(
         bconcat!(
@@ -85,7 +85,7 @@ fn test_get_composer_json_path_fails_if_dir() {
 fn test_get_composer_json_path_from_env() {
     let _tear_down = TearDown;
 
-    Platform::put_env("COMPOSER", " foo.json ");
+    Platform::put_env("COMPOSER", " foo.json ").unwrap();
     assert_eq!(
         bstr::BStr::new("foo.json"),
         bstr::BStr::new(path_to_bytes(&Factory::get_composer_file().unwrap()))

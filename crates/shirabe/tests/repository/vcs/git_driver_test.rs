@@ -43,8 +43,8 @@ fn tear_down(home: &std::path::Path, network_env: &Option<bstr::BString>) {
     let mut fs = Filesystem::new(None);
     fs.remove_directory(home).unwrap();
     match network_env {
-        None => Platform::clear_env("COMPOSER_DISABLE_NETWORK"),
-        Some(network_env) => Platform::put_env("COMPOSER_DISABLE_NETWORK", network_env),
+        None => Platform::clear_env("COMPOSER_DISABLE_NETWORK").unwrap(),
+        Some(network_env) => Platform::put_env("COMPOSER_DISABLE_NETWORK", network_env).unwrap(),
     }
 }
 
@@ -178,7 +178,7 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
     let home_path = home.path().to_path_buf();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
-    Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
+    Platform::put_env("COMPOSER_DISABLE_NETWORK", "1").unwrap();
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =

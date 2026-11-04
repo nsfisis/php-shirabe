@@ -161,7 +161,7 @@ impl AutoloadGenerator {
                     } else {
                         "0"
                     },
-                );
+                )?;
             }
 
             self.event_dispatcher.borrow_mut().dispatch_script(

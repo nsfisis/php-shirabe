@@ -47,7 +47,7 @@ fn set_up() -> Fixtures {
 }
 
 fn tear_down() {
-    Platform::clear_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE");
+    Platform::clear_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE").unwrap();
 }
 
 struct TearDown;
@@ -182,7 +182,7 @@ fn test_select_lowest_with_prefer_dev_over_prerelease() {
     for stability in ["alpha1", "beta1", "RC1"] {
         let mut fixtures = set_up();
 
-        Platform::put_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE", "1");
+        Platform::put_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE", "1").unwrap();
         let dev_package = get_package("A", "dev-master");
         let prerelease_package = get_package("A", bconcat!("1.0.0-", stability));
         fixtures.repo.add_package(dev_package.clone()).unwrap();
@@ -251,7 +251,7 @@ fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
 
-    Platform::put_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE", "1");
+    Platform::put_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE", "1").unwrap();
     let stable_package = get_package("A", "1.0.0");
     let dev_package = get_package("A", "dev-master");
     fixtures.repo.add_package(stable_package.clone()).unwrap();

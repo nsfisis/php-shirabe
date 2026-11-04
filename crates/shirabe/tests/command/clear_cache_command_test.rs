@@ -8,7 +8,7 @@ use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn tear_down() {
     // --no-cache triggers the env to change so make sure the env is cleaned up after these tests run
-    Platform::clear_env("COMPOSER_CACHE_DIR");
+    Platform::clear_env("COMPOSER_CACHE_DIR").unwrap();
 }
 
 struct TearDown;

@@ -1184,31 +1184,31 @@ impl Git {
             if version_compare(&v, "2.3.0", CmpOp::Ge) {
                 // added in git 2.3.0, prevents prompting the user for username/password
                 if Platform::get_env("GIT_TERMINAL_PROMPT").is_none_or(|v| v != "0") {
-                    Platform::put_env("GIT_TERMINAL_PROMPT", "0");
+                    Platform::put_env("GIT_TERMINAL_PROMPT", "0")?;
                 }
             } else {
                 // added in git 1.7.1, prevents prompting the user for username/password
                 if Platform::get_env("GIT_ASKPASS").is_none_or(|v| v != "echo") {
-                    Platform::put_env("GIT_ASKPASS", "echo");
+                    Platform::put_env("GIT_ASKPASS", "echo")?;
                 }
             }
         }
 
         // clean up rogue git env vars in case this is running in a git hook
         if Platform::get_env("GIT_DIR").is_some() {
-            Platform::clear_env("GIT_DIR");
+            Platform::clear_env("GIT_DIR")?;
         }
         if Platform::get_env("GIT_WORK_TREE").is_some() {
-            Platform::clear_env("GIT_WORK_TREE");
+            Platform::clear_env("GIT_WORK_TREE")?;
         }
 
         // Run processes with predictable LANGUAGE
         if Platform::get_env("LANGUAGE").is_none_or(|v| v != "C") {
-            Platform::put_env("LANGUAGE", "C");
+            Platform::put_env("LANGUAGE", "C")?;
         }
 
         // clean up env for OSX, see https://github.com/composer/composer/issues/2146#issuecomment-35478940
-        Platform::clear_env("DYLD_LIBRARY_PATH");
+        Platform::clear_env("DYLD_LIBRARY_PATH")?;
 
         Ok(())
     }

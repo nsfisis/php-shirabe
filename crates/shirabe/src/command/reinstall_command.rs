@@ -226,7 +226,7 @@ impl Command for ReinstallCommand {
 
         let dev_mode = local_repo.get_dev_mode().unwrap_or(true);
 
-        Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
+        Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" })?;
         event_dispatcher.borrow_mut().dispatch_script(
             ScriptEvents::PRE_INSTALL_CMD,
             dev_mode,

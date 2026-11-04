@@ -322,7 +322,7 @@ impl Command for RunScriptCommand {
             ProcessExecutor::set_timeout(timeout);
         }
 
-        Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
+        Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" })?;
 
         dispatcher.borrow_mut().dispatch_script(
             script.as_ref(),

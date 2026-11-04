@@ -67,22 +67,22 @@ fn assert_options_eq(expected: &IndexMap<BString, PhpMixed>, actual: &IndexMap<B
 }
 
 fn set_up() {
-    Platform::clear_env("HTTP_PROXY");
-    Platform::clear_env("http_proxy");
-    Platform::clear_env("HTTPS_PROXY");
-    Platform::clear_env("https_proxy");
-    Platform::clear_env("NO_PROXY");
-    Platform::clear_env("no_proxy");
+    Platform::clear_env("HTTP_PROXY").unwrap();
+    Platform::clear_env("http_proxy").unwrap();
+    Platform::clear_env("HTTPS_PROXY").unwrap();
+    Platform::clear_env("https_proxy").unwrap();
+    Platform::clear_env("NO_PROXY").unwrap();
+    Platform::clear_env("no_proxy").unwrap();
     ProxyManager::reset();
 }
 
 fn tear_down() {
-    Platform::clear_env("HTTP_PROXY");
-    Platform::clear_env("http_proxy");
-    Platform::clear_env("HTTPS_PROXY");
-    Platform::clear_env("https_proxy");
-    Platform::clear_env("NO_PROXY");
-    Platform::clear_env("no_proxy");
+    Platform::clear_env("HTTP_PROXY").unwrap();
+    Platform::clear_env("http_proxy").unwrap();
+    Platform::clear_env("HTTPS_PROXY").unwrap();
+    Platform::clear_env("https_proxy").unwrap();
+    Platform::clear_env("NO_PROXY").unwrap();
+    Platform::clear_env("no_proxy").unwrap();
     ProxyManager::reset();
 }
 
@@ -120,8 +120,9 @@ fn test_http_proxy() {
     Platform::put_env(
         "http_proxy",
         "http://username:p%40ssword@proxyserver.net:3128/",
-    );
-    Platform::put_env("HTTP_PROXY", "http://proxyserver/");
+    )
+    .unwrap();
+    Platform::put_env("HTTP_PROXY", "http://proxyserver/").unwrap();
 
     let default_options = map(vec![(
         BStr::new("http"),
@@ -171,8 +172,9 @@ fn test_http_proxy_with_no_proxy() {
     Platform::put_env(
         "http_proxy",
         "http://username:password@proxyserver.net:3128/",
-    );
-    Platform::put_env("no_proxy", "foo,example.org");
+    )
+    .unwrap();
+    Platform::put_env("no_proxy", "foo,example.org").unwrap();
 
     let default_options = map(vec![(
         BStr::new("http"),
@@ -210,8 +212,9 @@ fn test_http_proxy_with_no_proxy_wildcard() {
     Platform::put_env(
         "http_proxy",
         "http://username:password@proxyserver.net:3128/",
-    );
-    Platform::put_env("no_proxy", "*");
+    )
+    .unwrap();
+    Platform::put_env("no_proxy", "*").unwrap();
 
     let default_options = map(vec![(
         BStr::new("http"),
@@ -250,7 +253,8 @@ fn test_options_are_preserved() {
     Platform::put_env(
         "http_proxy",
         "http://username:password@proxyserver.net:3128/",
-    );
+    )
+    .unwrap();
 
     let default_options = map(vec![(
         BStr::new("http"),
@@ -306,7 +310,7 @@ fn test_options_are_preserved() {
 fn test_http_proxy_without_port() {
     let _tear_down = TearDown;
     set_up();
-    Platform::put_env("https_proxy", "http://username:password@proxyserver.net");
+    Platform::put_env("https_proxy", "http://username:password@proxyserver.net").unwrap();
 
     let default_options = map(vec![(
         BStr::new("http"),
@@ -354,8 +358,8 @@ fn test_https_proxy_override() {
         return;
     }
 
-    Platform::put_env("http_proxy", "http://username:password@proxyserver.net");
-    Platform::put_env("https_proxy", "https://woopproxy.net");
+    Platform::put_env("http_proxy", "http://username:password@proxyserver.net").unwrap();
+    Platform::put_env("https_proxy", "https://woopproxy.net").unwrap();
 
     // Pointless test replaced by ProxyHelperTest.php
     // expectException('Composer\Downloader\TransportException')
@@ -385,7 +389,7 @@ fn test_ssl_proxy() {
         ),
     ] {
         set_up();
-        Platform::put_env("http_proxy", proxy);
+        Platform::put_env("http_proxy", proxy).unwrap();
 
         if extension_loaded("openssl") {
             let context = StreamContextFactory::get_context(
@@ -472,7 +476,8 @@ fn test_init_options_does_include_proxy_auth_headers() {
     Platform::put_env(
         "https_proxy",
         "http://username:password@proxyserver.net:3128/",
-    );
+    )
+    .unwrap();
 
     let options: IndexMap<BString, PhpMixed> = IndexMap::new();
     let options = StreamContextFactory::init_options("https://example.org", options, false)
@@ -501,7 +506,8 @@ fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
     Platform::put_env(
         "http_proxy",
         "http://username:password@proxyserver.net:3128/",
-    );
+    )
+    .unwrap();
 
     let options: IndexMap<BString, PhpMixed> = IndexMap::new();
     let options = StreamContextFactory::init_options("https://example.org", options, true)

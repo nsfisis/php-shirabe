@@ -237,7 +237,7 @@ impl Installer {
         }
 
         if self.run_scripts {
-            Platform::put_env("COMPOSER_DEV_MODE", if self.dev_mode { "1" } else { "0" });
+            Platform::put_env("COMPOSER_DEV_MODE", if self.dev_mode { "1" } else { "0" })?;
 
             // dispatch pre event
             // should we treat this more strictly as running an update and then running an install, triggering events multiple times?

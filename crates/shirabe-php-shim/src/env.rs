@@ -8,26 +8,48 @@ pub fn getenv<K: AsRef<std::ffi::OsStr>>(key: K) -> Option<std::ffi::OsString> {
     std::env::var_os(key)
 }
 
+/// PHP `putenv()`: `NAME=value` sets an environment variable and `NAME` unsets it. An empty
+/// assignment or one starting with `=` is a `ValueError`.
+///
+/// PHP returns `false` when the C library fails to set the variable. [`std::env::set_var`] panics
+/// in that case instead, so there is no `false` to return.
+///
 /// # Safety
 ///
-/// Wraps [`std::env::set_var`], which is unsafe: the caller must ensure no other
-/// thread is concurrently reading or writing the process environment for the
+/// Wraps [`std::env::set_var`] and [`std::env::remove_var`], which are unsafe: the caller must
+/// ensure no other thread is concurrently reading or writing the process environment for the
 /// duration of this call.
-pub unsafe fn putenv<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
-    // TODO(php-semantics): validate key and value format to avoid panic?
-    record(EnvStorageKind::Process, key.as_ref(), Some(value.as_ref()));
-    unsafe { std::env::set_var(key, value) }
-}
-
-/// # Safety
-///
-/// Wraps [`std::env::remove_var`], which is unsafe: the caller must ensure no other
-/// thread is concurrently reading or writing the process environment for the
-/// duration of this call.
-pub unsafe fn putenv_clear<K: AsRef<std::ffi::OsStr>>(key: K) {
-    // TODO(php-semantics): validate key and value format to avoid panic?
-    record(EnvStorageKind::Process, key.as_ref(), None);
-    unsafe { std::env::remove_var(key) }
+pub unsafe fn putenv(assignment: impl AsRef<std::ffi::OsStr>) -> anyhow::Result<()> {
+    let assignment = assignment.as_ref().as_encoded_bytes();
+    if assignment.is_empty() || assignment[0] == b'=' {
+        return Err(crate::ValueError::new(
+            "putenv(): Argument #1 ($assignment) must have a valid syntax",
+        )
+        .into());
+    }
+    // PHP hands the assignment to the C library as a NUL-terminated string.
+    let assignment = match assignment.iter().position(|&b| b == 0) {
+        Some(nul) => &assignment[..nul],
+        None => assignment,
+    };
+    // SAFETY: the assignment is split only at an ASCII `=` or NUL byte, so every part is still
+    // valid encoded bytes of an `OsStr`.
+    let os_str = |bytes| unsafe { std::ffi::OsStr::from_encoded_bytes_unchecked(bytes) };
+    match assignment.iter().position(|&b| b == b'=') {
+        Some(eq) => {
+            let (key, value) = (os_str(&assignment[..eq]), os_str(&assignment[eq + 1..]));
+            record(EnvStorageKind::Process, key, Some(value));
+            unsafe { std::env::set_var(key, value) }
+        }
+        // unsetenv("") fails with EINVAL, which PHP ignores.
+        None if assignment.is_empty() => {}
+        None => {
+            let name = os_str(assignment);
+            record(EnvStorageKind::Process, name, None);
+            unsafe { std::env::remove_var(name) }
+        }
+    }
+    Ok(())
 }
 
 /// Which of the three environment storages a recorded mutation writes to.

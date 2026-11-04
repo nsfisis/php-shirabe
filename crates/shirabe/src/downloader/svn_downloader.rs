@@ -133,7 +133,7 @@ impl VcsDownloader for SvnDownloader {
         url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        SvnUtil::clean_env();
+        SvnUtil::clean_env()?;
         let mut util = SvnUtil::new(
             url.to_owned(),
             self.inner.io.clone(),
@@ -156,7 +156,7 @@ impl VcsDownloader for SvnDownloader {
         path: &Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        SvnUtil::clean_env();
+        SvnUtil::clean_env()?;
         let r#ref = package.get_source_reference();
 
         {
@@ -199,7 +199,7 @@ impl VcsDownloader for SvnDownloader {
         path: &Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        SvnUtil::clean_env();
+        SvnUtil::clean_env()?;
         let r#ref = target.get_source_reference();
 
         if !self.has_metadata_repository(path) {

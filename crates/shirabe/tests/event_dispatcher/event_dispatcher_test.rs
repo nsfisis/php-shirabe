@@ -34,9 +34,9 @@ use shirabe_php_shim::{
 use shirabe_symfony_console::output::output_interface;
 
 fn tear_down() {
-    Platform::clear_env("COMPOSER_SKIP_SCRIPTS");
-    Platform::clear_env("PHP_BINARY");
-    Platform::clear_env("COMPOSER_BINARY");
+    Platform::clear_env("COMPOSER_SKIP_SCRIPTS").unwrap();
+    Platform::clear_env("PHP_BINARY").unwrap();
+    Platform::clear_env("COMPOSER_BINARY").unwrap();
 }
 
 struct TearDown;
@@ -145,7 +145,7 @@ fn ensure_php_binary() -> bool {
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join("php");
         if candidate.is_file() {
-            Platform::put_env("PHP_BINARY", path_to_bytes(&candidate));
+            Platform::put_env("PHP_BINARY", path_to_bytes(&candidate)).unwrap();
             return true;
         }
     }
@@ -406,7 +406,7 @@ fn test_dispatcher_installer_events() {
 #[serial]
 fn test_dispatcher_doesnt_return_skipped_scripts() {
     let _tear_down = TearDown;
-    Platform::put_env("COMPOSER_SKIP_SCRIPTS", "scriptName");
+    Platform::put_env("COMPOSER_SKIP_SCRIPTS", "scriptName").unwrap();
 
     let composer = create_composer_instance();
     let mut scripts: IndexMap<BString, Vec<BString>> = IndexMap::new();
@@ -894,7 +894,8 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     Platform::put_env(
         "COMPOSER_BIN_DIR",
         path_to_bytes(&php_test_dir.join("vendor/bin")),
-    );
+    )
+    .unwrap();
 
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
@@ -930,8 +931,8 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
 
     std::env::set_current_dir(&current_directory_bkp).unwrap();
     match composer_bin_dir_bkp {
-        Some(dir) if !dir.is_empty() => Platform::put_env("COMPOSER_BIN_DIR", &dir),
-        _ => Platform::clear_env("COMPOSER_BIN_DIR"),
+        Some(dir) if !dir.is_empty() => Platform::put_env("COMPOSER_BIN_DIR", &dir).unwrap(),
+        _ => Platform::clear_env("COMPOSER_BIN_DIR").unwrap(),
     }
 }
 
@@ -1094,7 +1095,7 @@ fn test_dispatcher_outputs_error_on_failed_command() {
 fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
     let _tear_down = TearDown;
 
-    Platform::put_env("COMPOSER_BINARY", "/path/to/shirabe");
+    Platform::put_env("COMPOSER_BINARY", "/path/to/shirabe").unwrap();
     let binary = ProcessExecutor::escape("/path/to/shirabe");
 
     let (process, _process_guard) = get_process_executor_mock(

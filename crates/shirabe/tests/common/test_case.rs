@@ -24,8 +24,7 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{
     PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, bconcat, function_exists, fwrite_resource, getenv,
-    path_from_bytes, path_to_bytes, php_fopen_resource, putenv, putenv_clear, rewind,
-    stream_get_contents,
+    path_from_bytes, path_to_bytes, php_fopen_resource, putenv, rewind, stream_get_contents,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -114,8 +113,8 @@ impl Drop for TearDown {
         // can be removed cleanly, even on a panicking test.
         let _ = std::env::set_current_dir(&self.prev_cwd);
         match &self.prev_composer_home {
-            Some(value) => Platform::put_env("COMPOSER_HOME", value),
-            None => Platform::clear_env("COMPOSER_HOME"),
+            Some(value) => Platform::put_env("COMPOSER_HOME", value).unwrap(),
+            None => Platform::clear_env("COMPOSER_HOME").unwrap(),
         }
     }
 }
@@ -133,8 +132,8 @@ pub fn init_temp_composer(
     let prev_cwd = std::env::current_dir().unwrap();
     let prev_composer_home = Platform::get_env("COMPOSER_HOME");
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&dir.join("composer-home")));
-    Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&dir.join("composer-home"))).unwrap();
+    Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1").unwrap();
 
     let mut composer_json = composer_json
         .cloned()
@@ -209,7 +208,7 @@ impl Drop for GitVersionGuard {
 /// dropped. Pair with `Platform::get_env(name)` captured before the override:
 /// ```ignore
 /// let original = Platform::get_env("HOME");
-/// Platform::put_env("HOME", "/tmp/fake-home");
+/// Platform::put_env("HOME", "/tmp/fake-home").unwrap();
 /// let _restore = RestoreEnv::new("HOME", original);
 /// ```
 pub struct RestoreEnv {
@@ -229,8 +228,8 @@ impl RestoreEnv {
 impl Drop for RestoreEnv {
     fn drop(&mut self) {
         match &self.original {
-            Some(value) => Platform::put_env(&self.name, value),
-            None => Platform::clear_env(&self.name),
+            Some(value) => Platform::put_env(&self.name, value).unwrap(),
+            None => Platform::clear_env(&self.name).unwrap(),
         }
     }
 }
@@ -416,14 +415,16 @@ impl ApplicationTester {
         match &prev_shell_verbosity {
             None => {
                 if function_exists("putenv") {
-                    unsafe { putenv_clear("SHELL_VERBOSITY") };
+                    unsafe { putenv("SHELL_VERBOSITY") }.unwrap();
                 }
                 PHP_ENV.lock().unwrap().clear("SHELL_VERBOSITY");
                 PHP_SERVER.lock().unwrap().clear("SHELL_VERBOSITY");
             }
             Some(prev) => {
                 if function_exists("putenv") {
-                    unsafe { putenv("SHELL_VERBOSITY", prev) };
+                    let mut assignment = std::ffi::OsString::from("SHELL_VERBOSITY=");
+                    assignment.push(prev);
+                    unsafe { putenv(assignment) }.unwrap();
                 }
                 PHP_ENV
                     .lock()

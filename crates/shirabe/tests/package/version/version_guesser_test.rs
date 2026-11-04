@@ -655,7 +655,7 @@ fn test_get_root_version_from_env() {
     ];
 
     for (env, expected_version) in root_env_versions {
-        Platform::put_env("COMPOSER_ROOT_VERSION", env);
+        Platform::put_env("COMPOSER_ROOT_VERSION", env).unwrap();
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
         let guesser = VersionGuesser::new(config, process, VersionParser::new(), None);
@@ -663,6 +663,6 @@ fn test_get_root_version_from_env() {
             expected_version,
             guesser.get_root_version_from_env().unwrap()
         );
-        Platform::clear_env("COMPOSER_ROOT_VERSION");
+        Platform::clear_env("COMPOSER_ROOT_VERSION").unwrap();
     }
 }

@@ -18,7 +18,7 @@ struct EnvGuard;
 
 impl Drop for EnvGuard {
     fn drop(&mut self) {
-        Platform::clear_env("COMPOSER");
+        Platform::clear_env("COMPOSER").unwrap();
     }
 }
 
@@ -51,8 +51,8 @@ fn test_global() {
     let composer_home: PathBuf = tear_down.working_dir();
     let composer_home_str = composer_home.to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
-    Platform::put_env("COMPOSER", fake_composer);
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
+    Platform::put_env("COMPOSER", fake_composer).unwrap();
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -96,7 +96,7 @@ fn test_cannot_create_home() {
     std::fs::write(&filename, "").unwrap();
     let filename_str = filename.to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&filename_str));
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&filename_str)).unwrap();
 
     let mut app_tester = get_application_tester();
     let err = app_tester
@@ -122,7 +122,7 @@ fn test_cannot_create_home() {
         err
     );
 
-    Platform::clear_env("COMPOSER_HOME");
+    Platform::clear_env("COMPOSER_HOME").unwrap();
 }
 
 #[test]
@@ -154,7 +154,7 @@ fn test_global_show() {
     pkg.set_description(BString::from("A globally installed tool"));
     create_installed_json(&[pkg.into()], &[], true);
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -193,7 +193,7 @@ fn test_global_show_without_packages() {
 
     create_installed_json(&[], &[], true);
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -241,7 +241,7 @@ fn test_global_require() {
     );
     let composer_home_str = tear_down.working_dir().to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -305,7 +305,7 @@ fn test_global_update() {
     create_installed_json(std::slice::from_ref(&pkg), &[], true);
     create_composer_lock(&[pkg], &[]);
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -344,7 +344,7 @@ fn test_global_changes_directory() {
     );
     let composer_home_str = tear_down.working_dir().to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
     let _test_dir = chdir_unique_tmp_directory();
 
@@ -380,7 +380,7 @@ fn test_global_missing_command_name() {
     let tear_down = init_temp_composer(None, None, None, true);
     let composer_home_str = tear_down.working_dir().to_path_buf();
 
-    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str));
+    Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
     let mut app_tester = get_application_tester();
     app_tester.set_inputs(vec![BString::from("")]);

@@ -1454,7 +1454,13 @@ impl Application {
 
         let shell_verbosity_value = bconcat!(shell_verbosity);
         let shell_verbosity_value = os_str_from_bytes(&shell_verbosity_value);
-        unsafe { putenv("SHELL_VERBOSITY", shell_verbosity_value) };
+        unsafe {
+            putenv(os_str_from_bytes(&bconcat!(
+                "SHELL_VERBOSITY=",
+                shell_verbosity
+            )))
+        }
+        .expect("a NAME=value assignment has a valid syntax");
         PHP_ENV.lock().unwrap().put(
             "SHELL_VERBOSITY".into(),
             shell_verbosity_value.to_os_string(),
@@ -1900,7 +1906,7 @@ impl ApplicationHandle {
                 } else {
                     "/dev/null"
                 },
-            );
+            )?;
         }
 
         // switch working dir
@@ -2597,8 +2603,10 @@ impl ApplicationHandle {
             let app = application.borrow();
             (app.terminal.get_height(), app.terminal.get_width())
         };
-        unsafe { putenv("LINES", os_str_from_bytes(&bconcat!(height))) };
-        unsafe { putenv("COLUMNS", os_str_from_bytes(&bconcat!(width))) };
+        unsafe { putenv(os_str_from_bytes(&bconcat!("LINES=", height))) }
+            .expect("a NAME=value assignment has a valid syntax");
+        unsafe { putenv(os_str_from_bytes(&bconcat!("COLUMNS=", width))) }
+            .expect("a NAME=value assignment has a valid syntax");
 
         let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = match input {
             None => std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(None, None)?)),

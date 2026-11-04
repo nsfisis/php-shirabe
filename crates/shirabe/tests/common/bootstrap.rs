@@ -22,16 +22,16 @@ pub fn bootstrap() {
         // TODO(php-runtime): port remaining bootstrap processes (the src/bootstrap.php include and
         // the InstalledVersions refresh are PHP autoload mechanics with no Rust counterpart yet).
 
-        Platform::put_env("COMPOSER_TESTS_ARE_RUNNING", "1");
+        Platform::put_env("COMPOSER_TESTS_ARE_RUNNING", "1").unwrap();
 
         // ensure Windows color support detection does not attempt to use colors
         // as this is dependent on env vars and not actual stream capabilities, see
         // https://github.com/composer/composer/issues/11598
-        Platform::put_env("NO_COLOR", "1");
+        Platform::put_env("NO_COLOR", "1").unwrap();
 
         // symfony/phpunit-bridge sets some default env vars which we do not need polluting the test env
-        Platform::clear_env("COMPOSER");
-        Platform::clear_env("COMPOSER_VENDOR_DIR");
-        Platform::clear_env("COMPOSER_BIN_DIR");
+        Platform::clear_env("COMPOSER").unwrap();
+        Platform::clear_env("COMPOSER_VENDOR_DIR").unwrap();
+        Platform::clear_env("COMPOSER_BIN_DIR").unwrap();
     });
 }

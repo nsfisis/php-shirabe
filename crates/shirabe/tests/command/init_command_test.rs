@@ -665,7 +665,7 @@ fn test_get_git_config() {
     )
     .unwrap();
     let original_home = Platform::get_env("HOME");
-    Platform::put_env("HOME", path_to_bytes(&home.path()));
+    Platform::put_env("HOME", path_to_bytes(&home.path())).unwrap();
     let _restore_home = RestoreEnv::new("HOME", original_home);
 
     let command = InitCommand::new();

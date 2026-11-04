@@ -42,9 +42,9 @@ fn test_capture_authentication_params_from_url() {
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
 
-    Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
+    Platform::put_env("COMPOSER_DISABLE_NETWORK", "1").unwrap();
     let fs = HttpDownloader::new(io, config, IndexMap::new(), false);
-    Platform::clear_env("COMPOSER_DISABLE_NETWORK");
+    Platform::clear_env("COMPOSER_DISABLE_NETWORK").unwrap();
 
     if let Err(e) = fs.get(
         "https://user:pass@github.com/composer/composer/404",

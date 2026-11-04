@@ -119,7 +119,7 @@ impl Command for ScriptAliasCommand {
                 .as_bool()
                 .unwrap_or(false);
 
-        Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
+        Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" })?;
 
         let script_alias_input = preg_replace2(
             php_regex!(r"{^\S+ ?}"),

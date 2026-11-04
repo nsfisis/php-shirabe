@@ -61,7 +61,7 @@ impl SvnDriver {
         self.inner.url = rtrim2(&normalized, "/");
         self.base_url = self.inner.url.clone();
 
-        SvnUtil::clean_env();
+        SvnUtil::clean_env()?;
 
         match self.inner.repo_config.get(B("trunk-path")) {
             Some(PhpMixed::Bool(false)) => self.trunk_path = None,

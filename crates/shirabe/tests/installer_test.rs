@@ -60,8 +60,8 @@ use shirabe_symfony_console::output::{OutputInterface, StreamOutput, VERBOSITY_N
 // ported; the cwd management (setUp's chdir(__DIR__) / tearDown's chdir($this->prevCwd)) and the
 // env clears are.
 fn tear_down() {
-    Platform::clear_env("COMPOSER_POOL_OPTIMIZER");
-    Platform::clear_env("COMPOSER_FUND");
+    Platform::clear_env("COMPOSER_POOL_OPTIMIZER").unwrap();
+    Platform::clear_env("COMPOSER_FUND").unwrap();
 }
 
 /// `#[serial]` on every test constructing this makes the process-wide chdir safe: serial_test's
@@ -837,11 +837,11 @@ fn evaluate_condition(condition: &BString) -> bool {
     match condition.as_bytes() {
         // putenv() returns true on success, so these conditions always run the test (with the env set).
         b"putenv('COMPOSER_FUND=1')" => {
-            Platform::put_env("COMPOSER_FUND", "1");
+            Platform::put_env("COMPOSER_FUND", "1").unwrap();
             true
         }
         b"putenv('COMPOSER_FUND=0')" => {
-            Platform::put_env("COMPOSER_FUND", "0");
+            Platform::put_env("COMPOSER_FUND", "0").unwrap();
             true
         }
         // HHVM is never defined under the Rust port.
@@ -1359,8 +1359,8 @@ fn test_slow_integration() {
             // the machine that generates or runs it. Nothing to fix on the Rust side.
             continue;
         }
-        Platform::clear_env("COMPOSER_FUND");
-        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
+        Platform::clear_env("COMPOSER_FUND").unwrap();
+        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0").unwrap();
         let expect_output = case.expect_output.clone();
         do_test_integration(&case, expect_output.as_ref());
     }
@@ -1371,8 +1371,8 @@ fn test_slow_integration() {
 fn test_integration_with_pool_optimizer() {
     let _tear_down = TearDown::new();
     for case in load_integration_tests("installer/") {
-        Platform::clear_env("COMPOSER_FUND");
-        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "1");
+        Platform::clear_env("COMPOSER_FUND").unwrap();
+        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "1").unwrap();
         let expect_output = case
             .expect_output_optimized
             .clone()
@@ -1387,8 +1387,8 @@ fn test_integration_with_pool_optimizer() {
 fn test_integration_with_raw_pool() {
     let _tear_down = TearDown::new();
     for case in load_integration_tests("installer/") {
-        Platform::clear_env("COMPOSER_FUND");
-        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0");
+        Platform::clear_env("COMPOSER_FUND").unwrap();
+        Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0").unwrap();
         let expect_output = case.expect_output.clone();
         do_test_integration(&case, expect_output.as_ref());
     }

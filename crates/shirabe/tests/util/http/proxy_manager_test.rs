@@ -8,26 +8,26 @@ use shirabe::util::platform::Platform;
 use shirabe_php_shim::bconcat;
 
 fn set_up() {
-    Platform::clear_env("HTTP_PROXY");
-    Platform::clear_env("http_proxy");
-    Platform::clear_env("HTTPS_PROXY");
-    Platform::clear_env("https_proxy");
-    Platform::clear_env("NO_PROXY");
-    Platform::clear_env("no_proxy");
-    Platform::clear_env("CGI_HTTP_PROXY");
-    Platform::clear_env("cgi_http_proxy");
+    Platform::clear_env("HTTP_PROXY").unwrap();
+    Platform::clear_env("http_proxy").unwrap();
+    Platform::clear_env("HTTPS_PROXY").unwrap();
+    Platform::clear_env("https_proxy").unwrap();
+    Platform::clear_env("NO_PROXY").unwrap();
+    Platform::clear_env("no_proxy").unwrap();
+    Platform::clear_env("CGI_HTTP_PROXY").unwrap();
+    Platform::clear_env("cgi_http_proxy").unwrap();
     ProxyManager::reset();
 }
 
 fn tear_down() {
-    Platform::clear_env("HTTP_PROXY");
-    Platform::clear_env("http_proxy");
-    Platform::clear_env("HTTPS_PROXY");
-    Platform::clear_env("https_proxy");
-    Platform::clear_env("NO_PROXY");
-    Platform::clear_env("no_proxy");
-    Platform::clear_env("CGI_HTTP_PROXY");
-    Platform::clear_env("cgi_http_proxy");
+    Platform::clear_env("HTTP_PROXY").unwrap();
+    Platform::clear_env("http_proxy").unwrap();
+    Platform::clear_env("HTTPS_PROXY").unwrap();
+    Platform::clear_env("https_proxy").unwrap();
+    Platform::clear_env("NO_PROXY").unwrap();
+    Platform::clear_env("no_proxy").unwrap();
+    Platform::clear_env("CGI_HTTP_PROXY").unwrap();
+    Platform::clear_env("cgi_http_proxy").unwrap();
     ProxyManager::reset();
 }
 
@@ -71,7 +71,7 @@ fn test_get_proxy_for_request_throws_on_bad_proxy_url() {
     let _tear_down = TearDown;
     set_up();
 
-    Platform::put_env("http_proxy", "localhost");
+    Platform::put_env("http_proxy", "localhost").unwrap();
     ProxyManager::reset();
     let guard = ProxyManager::get_instance();
     let proxy_manager = guard.as_ref().unwrap();
@@ -120,7 +120,7 @@ fn test_lowercase_overrides_uppercase() {
     for (server, url, expected_url) in cases {
         set_up();
         for (name, value) in &server {
-            Platform::put_env(name, value);
+            Platform::put_env(name, value).unwrap();
         }
         ProxyManager::reset();
 
@@ -154,7 +154,7 @@ fn test_cgi_proxy_is_only_used_when_no_http_proxy() {
     for (server, expected_url) in cases {
         set_up();
         for (name, value) in &server {
-            Platform::put_env(name, value);
+            Platform::put_env(name, value).unwrap();
         }
         ProxyManager::reset();
 
@@ -174,7 +174,7 @@ fn test_no_http_proxy_does_not_use_https_proxy() {
     let _tear_down = TearDown;
     set_up();
 
-    Platform::put_env("https_proxy", "https://proxy.com:443");
+    Platform::put_env("https_proxy", "https://proxy.com:443").unwrap();
     ProxyManager::reset();
     let guard = ProxyManager::get_instance();
     let proxy = guard
@@ -191,7 +191,7 @@ fn test_no_https_proxy_does_not_use_http_proxy() {
     let _tear_down = TearDown;
     set_up();
 
-    Platform::put_env("http_proxy", "http://proxy.com:80");
+    Platform::put_env("http_proxy", "http://proxy.com:80").unwrap();
     ProxyManager::reset();
     let guard = ProxyManager::get_instance();
     let proxy = guard
@@ -285,7 +285,7 @@ fn test_get_proxy_for_request() {
     for (srv, url, options, status, excluded) in cases {
         set_up();
         for (name, value) in &srv {
-            Platform::put_env(name, value);
+            Platform::put_env(name, value).unwrap();
         }
         ProxyManager::reset();
 

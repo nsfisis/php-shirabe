@@ -634,7 +634,7 @@ impl VersionGuesser {
         package_config: &IndexMap<BString, PhpMixed>,
         path: &Path,
     ) -> anyhow::Result<Option<VersionData>> {
-        SvnUtil::clean_env();
+        SvnUtil::clean_env()?;
 
         // try to fetch current version from svn
         let mut output = BString::default();

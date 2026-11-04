@@ -774,10 +774,10 @@ impl CreateProjectCommand {
         if file_exists(path_from_bytes(&bconcat!(directory, "/composer.json")))
             && Platform::get_env("COMPOSER").is_some()
         {
-            Platform::clear_env("COMPOSER");
+            Platform::clear_env("COMPOSER")?;
         }
 
-        Platform::put_env("COMPOSER_ROOT_VERSION", package.get_pretty_version());
+        Platform::put_env("COMPOSER_ROOT_VERSION", package.get_pretty_version())?;
 
         if let Some(signals) = &signals
             && signals.is_triggered()
