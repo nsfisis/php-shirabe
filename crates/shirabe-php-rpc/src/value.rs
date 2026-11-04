@@ -803,6 +803,26 @@ mod tests {
         assert_eq!(decoded, value, "encoded form: {:?}", BStr::new(&encoded));
     }
 
+    /// Handles compare by identity, and decoding a phandle that is still held yields the held
+    /// entry, so the handle is dropped before decoding to make the decoder read the descriptor.
+    /// Each test uses its own phandle: the handle table is shared by every test thread.
+    fn roundtrip_php_handle(phandle: u64, class: &[u8], implements: &[&[u8]]) {
+        let implements: Vec<BString> = implements.iter().map(|&name| name.into()).collect();
+        let encoded = serialize(&PluginValue::PhpHandle(PhpObjHandle::intern(
+            phandle,
+            class.into(),
+            implements.clone(),
+        )));
+        let decoded = unserialize(&encoded).expect("decode failed");
+        let PluginValue::PhpHandle(ref handle) = decoded else {
+            panic!("expected a PHP handle, got {decoded:?}");
+        };
+        assert_eq!(handle.phandle(), phandle);
+        assert_eq!(handle.class(), class);
+        assert_eq!(handle.implements(), implements.as_slice());
+        assert_eq!(serialize(&decoded), encoded);
+    }
+
     #[test]
     fn encodes_scalars_like_php() {
         assert_eq!(serialize(&PluginValue::Null), b"N;");
@@ -972,11 +992,7 @@ mod tests {
             rhandle: 3,
             class: b"Caf\xe9".into(),
         }));
-        roundtrip(PluginValue::PhpHandle(PhpObjHandle::intern(
-            8,
-            b"Caf\xe9".into(),
-            vec![b"Plugin\xff".into()],
-        )));
+        roundtrip_php_handle(8, b"Caf\xe9", &[b"Plugin\xff"]);
     }
 
     #[test]
@@ -985,11 +1001,7 @@ mod tests {
             rhandle: 3,
             class: "Composer\\Script\\Event".into(),
         }));
-        roundtrip(PluginValue::PhpHandle(PhpObjHandle::intern(
-            8,
-            "MyPlugin".into(),
-            vec!["Composer\\Plugin\\PluginInterface".into()],
-        )));
+        roundtrip_php_handle(9, b"MyPlugin", &[b"Composer\\Plugin\\PluginInterface"]);
         roundtrip(PluginValue::Job(7));
     }
 
