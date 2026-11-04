@@ -282,7 +282,7 @@ macro_rules! delegate_command_trait_impls_to_inner {
         $crate::delegate_to_inner!($field, fn get_synopsis(&self, short: bool) -> bstr::BString);
         $crate::delegate_to_inner!($field, fn add_usage(&self, usage: &bstr::BStr));
         $crate::delegate_to_inner!($field, fn get_usages(&self) -> Vec<bstr::BString>);
-        $crate::delegate_to_inner!($field, fn get_helper(&self, name: &bstr::BStr) -> anyhow::Result<Result<shirabe_php_shim::PhpMixed, $crate::exception::LogicException>>);
+        $crate::delegate_to_inner!($field, fn get_helper(&self, name: &bstr::BStr) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn $crate::helper::HelperInterface>>>);
         $crate::delegate_to_inner!($field, fn set_code(&self, code: Box<dyn Fn(&mut dyn $crate::input::InputInterface, &mut dyn $crate::output::OutputInterface) -> shirabe_php_shim::PhpMixed>));
         $crate::delegate_to_inner!($field, fn get_code(&self) -> std::cell::Ref<'_, Option<Box<dyn Fn(&mut dyn $crate::input::InputInterface, &mut dyn $crate::output::OutputInterface) -> shirabe_php_shim::PhpMixed>>>);
         $crate::delegate_to_inner!($field, fn ignore_validation_errors(&self));
@@ -475,7 +475,7 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
     fn get_helper(
         &self,
         name: &BStr,
-    ) -> anyhow::Result<Result<PhpMixed, crate::exception::LogicException>>;
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn crate::helper::HelperInterface>>>;
 
     fn set_code(
         &self,
@@ -754,26 +754,19 @@ impl Command for CommandData {
     fn get_helper(
         &self,
         name: &BStr,
-    ) -> anyhow::Result<Result<PhpMixed, crate::exception::LogicException>> {
-        let helper_set_ref = self.helper_set.borrow();
-        let helper_set = match &*helper_set_ref {
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn crate::helper::HelperInterface>>> {
+        let helper_set = match &*self.helper_set.borrow() {
             None => {
-                return Ok(Err(crate::exception::LogicException::new(bconcat!(
+                anyhow::bail!(crate::exception::LogicException::new(bconcat!(
                     "Cannot retrieve helper \"",
                     name,
                     "\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method."
-                ))));
+                )));
             }
-            Some(helper_set) => helper_set,
+            Some(helper_set) => helper_set.clone(),
         };
 
-        // TODO(plugin): PHP's Command::getHelper($name) looks a helper up by string via
-        // HelperSet::get($name). The HelperSet is now a closed set exposing only typed getters
-        // (get_formatter/get_question/...), so a string-keyed lookup no longer exists. Callers
-        // should use the typed getters on the HelperSet directly; restoring name-based lookup is
-        // deferred until the plugin API (which is the only source of dynamically named helpers).
-        let _ = helper_set;
-        todo!()
+        helper_set.borrow().get(name)
     }
 
     fn set_code(
@@ -810,5 +803,52 @@ impl std::fmt::Debug for CommandData {
             .field("hidden", &self.hidden.get())
             .field("description", &self.description.borrow())
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::helper::{FormatterHelper, HelperInterface};
+    use shirabe_php_shim::Catch;
+
+    #[test]
+    fn get_helper_looks_the_helper_up_by_name() {
+        let formatter: std::rc::Rc<std::cell::RefCell<dyn HelperInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(FormatterHelper::default()));
+        let command = CommandData::new(Some("namespace:name".into()));
+        command.set_helper_set(HelperSet::new(vec![(None, formatter.clone())]));
+
+        assert!(std::rc::Rc::ptr_eq(
+            &command.get_helper(BStr::new("formatter")).unwrap(),
+            &formatter,
+        ));
+    }
+
+    #[test]
+    fn get_helper_throws_for_an_undefined_helper() {
+        let command = CommandData::new(Some("namespace:name".into()));
+        command.set_helper_set(HelperSet::new(vec![]));
+
+        let error = command.get_helper(BStr::new("foo")).unwrap_err();
+        let exception = error
+            .catch::<crate::exception::InvalidArgumentException>()
+            .unwrap();
+        assert_eq!(
+            exception.get_message(),
+            "The helper \"foo\" is not defined."
+        );
+    }
+
+    #[test]
+    fn get_helper_without_a_helper_set_throws() {
+        let command = CommandData::new(Some("namespace:name".into()));
+
+        let error = command.get_helper(BStr::new("formatter")).unwrap_err();
+        let exception = error.catch::<crate::exception::LogicException>().unwrap();
+        assert_eq!(
+            exception.get_message(),
+            "Cannot retrieve helper \"formatter\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method."
+        );
     }
 }

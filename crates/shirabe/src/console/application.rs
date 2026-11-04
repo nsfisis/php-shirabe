@@ -56,7 +56,10 @@ use shirabe_symfony_console::{
         NamespaceNotFoundException, RuntimeException as ConsoleRuntimeException,
     },
     formatter::OutputFormatter,
-    helper::{FormatBlockMessages, FormatterHelper, Helper, HelperSet, QuestionHelper},
+    helper::{
+        DebugFormatterHelper, FormatBlockMessages, FormatterHelper, Helper, HelperSet,
+        ProcessHelper, QuestionHelper,
+    },
     input::{
         ArgumentName, ArgvInput, ArrayInput, InputArgument, InputDefinition, InputInterface,
         InputOption, InputValue, ParameterName,
@@ -1588,10 +1591,25 @@ impl Application {
     }
 
     /// Gets the default helper set with the helpers that should always be available.
-    ///
-    /// The closed set of four helpers is instantiated by `HelperSet::new()` itself.
     pub fn get_default_helper_set(&self) -> std::rc::Rc<std::cell::RefCell<HelperSet>> {
-        HelperSet::new()
+        HelperSet::new(vec![
+            (
+                None,
+                std::rc::Rc::new(std::cell::RefCell::new(FormatterHelper::default())),
+            ),
+            (
+                None,
+                std::rc::Rc::new(std::cell::RefCell::new(DebugFormatterHelper::default())),
+            ),
+            (
+                None,
+                std::rc::Rc::new(std::cell::RefCell::new(ProcessHelper::default())),
+            ),
+            (
+                None,
+                std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper::default())),
+            ),
+        ])
     }
 
     /// Returns abbreviated suggestions in string format.
@@ -2862,9 +2880,10 @@ impl ApplicationHandle {
         let application = &self.0;
         // PHP: foreach ($command->getHelperSet() as $helper) { if ($helper instanceof
         // InputAwareInterface) $helper->setInput($input); }
-        // TODO(plugin): the HelperSet is now a closed set of four helpers, none of which implement
-        // InputAwareInterface, so this loop is a no-op. Plugin-registered InputAware helpers cannot
-        // be reached until dynamic helper registration is restored (see HelperSet).
+        // TODO(port): HelperInterface exposes no InputAwareInterface view to test `instanceof`
+        // against, and InputAwareInterface::set_input takes an owned input rather than the shared
+        // handle, so the loop is not ported. None of the helpers in the default helper set
+        // implement InputAwareInterface.
         let _ = command.borrow().get_helper_set();
 
         command
