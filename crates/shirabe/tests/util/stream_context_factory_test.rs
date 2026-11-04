@@ -595,3 +595,28 @@ fn test_get_context_rejects_a_header_line_that_is_not_a_string() {
             .contains_str("stripos(): Argument #1 ($haystack) must be of type string, int given")
     );
 }
+
+// Not in Composer's test suite: getTlsDefaults() rejects ssl options PHP's functions do not
+// accept, instead of leaving them out.
+#[test]
+fn test_get_tls_defaults_rejects_ssl_options_that_are_not_an_array() {
+    let options = map(vec![(BStr::new("ssl"), s(BStr::new("verify_peer")))]);
+    let error = StreamContextFactory::get_tls_defaults(&options, ()).unwrap_err();
+
+    assert!(error_message(&error).contains_str(
+        "array_replace_recursive(): Argument #2 must be of type array, string given"
+    ));
+}
+
+#[test]
+fn test_get_tls_defaults_rejects_a_cafile_that_is_not_a_string() {
+    let options = map(vec![(
+        BStr::new("ssl"),
+        arr(vec![(BStr::new("cafile"), PhpMixed::Int(1))]),
+    )]);
+    let error = StreamContextFactory::get_tls_defaults(&options, ()).unwrap_err();
+
+    assert!(error_message(&error).contains_str(
+        "Composer\\Util\\Filesystem::isReadable(): Argument #1 ($path) must be of type string, int given"
+    ));
+}

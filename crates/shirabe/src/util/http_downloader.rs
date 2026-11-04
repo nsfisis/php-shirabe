@@ -106,7 +106,7 @@ impl HttpDownloader {
         // The cafile option can be set via config.json
         let mut self_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         if !disable_tls {
-            self_options = StreamContextFactory::get_tls_defaults(&options, ()).map_err(|e| *e)?;
+            self_options = StreamContextFactory::get_tls_defaults(&options, ())?;
         }
 
         // handle the other externally set options normally.

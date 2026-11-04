@@ -194,7 +194,7 @@ impl StreamContextFactory {
         // `logger` was a PSR LoggerInterface; CaBundle is slated for removal so
         // it is now an unused `()` placeholder.
         logger: (),
-    ) -> anyhow::Result<IndexMap<BString, PhpMixed>, Box<TransportException>> {
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let ciphers = [
             "ECDHE-RSA-AES128-GCM-SHA256",
             "ECDHE-ECDSA-AES128-GCM-SHA256",
@@ -244,96 +244,87 @@ impl StreamContextFactory {
         // They will be set in the getOptionsForUrl() method which receives a URL.
         //
         // cafile or capath can be overridden by passing in those options to constructor.
-        let ssl_defaults: IndexMap<BString, PhpMixed> = {
-            let mut ssl = IndexMap::new();
-            ssl.insert("ciphers".into(), PhpMixed::string(ciphers));
-            ssl.insert("verify_peer".into(), PhpMixed::Bool(true));
-            ssl.insert("verify_depth".into(), PhpMixed::Int(7));
-            ssl.insert("SNI_enabled".into(), PhpMixed::Bool(true));
-            ssl.insert("capture_peer_cert".into(), PhpMixed::Bool(true));
-            ssl
-        };
+        let mut ssl: IndexMap<BString, PhpMixed> = IndexMap::new();
+        ssl.insert("ciphers".into(), PhpMixed::string(ciphers));
+        ssl.insert("verify_peer".into(), PhpMixed::Bool(true));
+        ssl.insert("verify_depth".into(), PhpMixed::Int(7));
+        ssl.insert("SNI_enabled".into(), PhpMixed::Bool(true));
+        ssl.insert("capture_peer_cert".into(), PhpMixed::Bool(true));
 
-        let mut defaults: IndexMap<BString, PhpMixed> = {
-            let mut d = IndexMap::new();
-            d.insert(
-                "ssl".into(),
-                PhpMixed::Array(ssl_defaults.into_iter().collect()),
-            );
-            d
-        };
-
-        if let Some(ssl_options) = options.get(B("ssl"))
-            && let Some(ssl_defaults_mixed) = defaults.get(B("ssl")).cloned()
-        {
-            let merged = array_replace_recursive(
-                match ssl_defaults_mixed {
-                    PhpMixed::Array(a) => a,
-                    _ => IndexMap::new(),
-                },
-                match ssl_options.clone() {
-                    PhpMixed::Array(a) => a,
-                    _ => IndexMap::new(),
-                },
-            );
-            defaults.insert("ssl".into(), PhpMixed::Array(merged));
+        if let Some(ssl_options) = options.get(B("ssl")).filter(|ssl| !ssl.is_null()) {
+            let ssl_options = match ssl_options {
+                PhpMixed::Array(map) => map.clone(),
+                PhpMixed::List(list) => list
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (bconcat!(i), v.clone()))
+                    .collect(),
+                other => {
+                    return Err(TypeError::new(bconcat!(
+                        "array_replace_recursive(): Argument #2 must be of type array, ",
+                        get_debug_type(other),
+                        " given"
+                    ))
+                    .into());
+                }
+            };
+            ssl = array_replace_recursive(ssl, ssl_options);
         }
 
         // Attempt to find a local cafile or throw an exception if none pre-set.
         // The user may go download one if this occurs.
-        let ssl = defaults.get(B("ssl")).and_then(|v| v.as_array());
-        let has_cafile = ssl.as_ref().and_then(|a| a.get(B("cafile"))).is_some();
-        let has_capath = ssl.as_ref().and_then(|a| a.get(B("capath"))).is_some();
-        if !has_cafile && !has_capath {
+        let isset = |ssl: &IndexMap<BString, PhpMixed>, key: &[u8]| {
+            ssl.get(key).filter(|value| !value.is_null()).cloned()
+        };
+        if isset(&ssl, b"cafile").is_none() && isset(&ssl, b"capath").is_none() {
             let result = CaBundle::get_system_ca_root_bundle_path(logger);
-            let is_dir = is_dir(&result);
-            let result = BString::from(path_to_bytes(&result));
-            if is_dir {
-                if let Some(PhpMixed::Array(ssl)) = defaults.get_mut(B("ssl")) {
-                    ssl.insert("capath".into(), PhpMixed::string(result));
-                }
-            } else {
-                if let Some(PhpMixed::Array(ssl)) = defaults.get_mut(B("ssl")) {
-                    ssl.insert("cafile".into(), PhpMixed::string(result));
-                }
+            let key = if is_dir(&result) { "capath" } else { "cafile" };
+            ssl.insert(key.into(), PhpMixed::string(path_to_bytes(&result)));
+        }
+
+        if let Some(cafile) = isset(&ssl, b"cafile") {
+            let PhpMixed::String(cafile) = cafile else {
+                return Err(TypeError::new(bconcat!(
+                    "Composer\\Util\\Filesystem::isReadable(): Argument #1 ($path) must be of type string, ",
+                    get_debug_type(&cafile),
+                    " given"
+                ))
+                .into());
+            };
+            let cafile = path_from_bytes(&cafile);
+            if !Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger) {
+                return Err(TransportException::new(
+                    BString::from("The configured cafile was not valid or could not be read."),
+                    0,
+                )
+                .into());
             }
         }
 
-        let cafile = defaults
-            .get(B("ssl"))
-            .and_then(|v| v.as_array())
-            .and_then(|a| a.get(B("cafile")))
-            .and_then(|v| v.as_string())
-            .map(path_from_bytes);
-        if let Some(cafile) = cafile
-            && (!Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger))
-        {
-            return Err(Box::new(TransportException::new(
-                BString::from("The configured cafile was not valid or could not be read."),
-                0,
-            )));
-        }
-
-        let capath = defaults
-            .get(B("ssl"))
-            .and_then(|v| v.as_array())
-            .and_then(|a| a.get(B("capath")))
-            .and_then(|v| v.as_string())
-            .map(path_from_bytes);
-        if let Some(capath) = capath
-            && (!is_dir(capath) || !Filesystem::is_readable(capath))
-        {
-            return Err(Box::new(TransportException::new(
-                BString::from("The configured capath was not valid or could not be read."),
-                0,
-            )));
+        if let Some(capath) = isset(&ssl, b"capath") {
+            let PhpMixed::String(capath) = capath else {
+                return Err(TypeError::new(bconcat!(
+                    "is_dir(): Argument #1 ($filename) must be of type string, ",
+                    get_debug_type(&capath),
+                    " given"
+                ))
+                .into());
+            };
+            let capath = path_from_bytes(&capath);
+            if !is_dir(capath) || !Filesystem::is_readable(capath) {
+                return Err(TransportException::new(
+                    BString::from("The configured capath was not valid or could not be read."),
+                    0,
+                )
+                .into());
+            }
         }
 
         // Disable TLS compression to prevent CRIME attacks where supported.
-        if let Some(PhpMixed::Array(ssl)) = defaults.get_mut(B("ssl")) {
-            ssl.insert("disable_compression".into(), PhpMixed::Bool(true));
-        }
+        ssl.insert("disable_compression".into(), PhpMixed::Bool(true));
 
+        let mut defaults = IndexMap::new();
+        defaults.insert("ssl".into(), PhpMixed::Array(ssl));
         Ok(defaults)
     }
 
