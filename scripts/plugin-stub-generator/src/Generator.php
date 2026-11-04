@@ -47,7 +47,7 @@ final class Generator
             // entity and release it twice. The Rust side clones the entity instead, applying
             // whatever __clone semantics the real class defines, and this copy rebinds to the
             // fresh handle. Entities without clone semantics answer with an explicit error.
-            $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+            $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
             \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
         }
     PHP;
@@ -399,7 +399,7 @@ final class Generator
             $params[] = $rendered;
             $args[] = '$' . $paramName;
         }
-        $call = "\\ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, ["
+        $call = "\\ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, ["
             . implode(', ', $args) . ']])';
         return "    public function __construct(" . implode(', ', $params) . ")\n"
             . "    {\n"
@@ -609,7 +609,7 @@ final class Generator
         // self::class, not static::class: the forwarded statics stand for this class's own state,
         // and a plugin subclass redeclaring it is not modelled on the Rust side.
         $body = $this->renderForwardingBody(
-            "\\ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, '$name', %s]%s)",
+            "\\ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', %s]%s)",
             $args,
             $outPositions,
             $this->inspectsArgCount($fqcn, $name, $method),

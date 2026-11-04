@@ -1659,10 +1659,10 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                     None => PluginValue::Null,
                 });
             }
-            if method_name == "__shirabeConstruct" {
+            if method_name == "__shirabe_construct" {
                 return crate::plugin::php_plugin_proxy::construct_entity(&args);
             }
-            if method_name == "__shirabeCallStatic" {
+            if method_name == "__shirabe_call_static" {
                 return crate::plugin::php_plugin_proxy::call_static_entity(&args);
             }
             if let Some(answer) =

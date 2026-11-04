@@ -371,10 +371,10 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
                     Err(e) => Err(PhpThrow::runtime(bconcat!(error_chain_message(&e)))),
                 };
             }
-            if method_name == "__shirabeConstruct" {
+            if method_name == "__shirabe_construct" {
                 return construct_entity(&args);
             }
-            if method_name == "__shirabeCallStatic" {
+            if method_name == "__shirabe_call_static" {
                 return call_static_entity(&args);
             }
             if let Some(answer) = dispatch_job_service_method(method_name, &args) {
@@ -406,12 +406,12 @@ pub(crate) fn dispatch_job_service_method(
 ) -> Option<Result<PluginValue, PhpThrow>> {
     let job_id = || arg::<i64>(method_name, args, 0).map(|id| id as u64);
     Some(match method_name.as_bytes() {
-        b"__shirabeResolveJob" => job_id().map(|id| {
+        b"__shirabe_resolve_job" => job_id().map(|id| {
             let value = args.get(1).cloned().unwrap_or(PluginValue::Null);
             job_registry::settle_php_job(id, Ok(value));
             PluginValue::Null
         }),
-        b"__shirabeRejectJob" => job_id().map(|id| {
+        b"__shirabe_reject_job" => job_id().map(|id| {
             let description = args
                 .get(1)
                 .cloned()
@@ -419,11 +419,11 @@ pub(crate) fn dispatch_job_service_method(
             job_registry::settle_php_job(id, Err(PhpThrow::from_wire(description)));
             PluginValue::Null
         }),
-        b"__shirabeCancelJob" => job_id().map(|id| match job_registry::cancel(id) {
+        b"__shirabe_cancel_job" => job_id().map(|id| match job_registry::cancel(id) {
             Some(throw) => throw.to_wire(),
             None => PluginValue::Null,
         }),
-        b"__shirabeAbortJobs" => {
+        b"__shirabe_abort_jobs" => {
             job_registry::abort_internal_jobs(None);
             Ok(PluginValue::Null)
         }
@@ -480,7 +480,7 @@ pub(crate) fn dispatch_r_table_method(
     out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
     let entity = R_TABLE.with(|table| table.borrow().get(&rhandle).cloned());
-    if method_name == "__shirabeClone" {
+    if method_name == "__shirabe_clone" {
         return match entity {
             Some(entity) => clone_entity(&entity),
             None => Err(PhpThrow::runtime(bconcat!("unknown Rust handle ", rhandle))),
@@ -553,7 +553,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
         other => {
             return Err(PhpThrow::runtime(bconcat!(
-                "__shirabeConstruct expects a class name and an argument list, got ",
+                "__shirabe_construct expects a class name and an argument list, got ",
                 display_to_bytes(format_args!("{other:?}"))
             )));
         }
@@ -890,7 +890,7 @@ fn dispatch_composer_method(
         }
         // `getLoop()` itself never reaches here: the Loop is a two-world class, and the stub builds
         // the worker-side one over the two services the Rust-side Loop drives.
-        b"__shirabeLoopServices" => {
+        b"__shirabe_loop_services" => {
             let r#loop = composer.borrow().get_loop();
             let downloader = r#loop.borrow().get_http_downloader().clone();
             let process = r#loop.borrow().get_process_executor().cloned();
@@ -1371,7 +1371,7 @@ fn dispatch_process_method(
     process: &std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>>,
     method_name: &BStr,
 ) -> Result<PluginValue, PhpThrow> {
-    if method_name != "__shirabeFacts" {
+    if method_name != "__shirabe_facts" {
         return Err(unavailable_method("Process", method_name));
     }
     let failed = |error: anyhow::Error| error_throw(b"reading the process failed", &error);
@@ -1865,7 +1865,7 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
         ) => (class, method, Vec::new()),
         other => {
             return Err(PhpThrow::runtime(bconcat!(
-                "__shirabeCallStatic expects a class name, a method name and an argument list, \
+                "__shirabe_call_static expects a class name, a method name and an argument list, \
                  got ",
                 display_to_bytes(format_args!("{other:?}"))
             )));

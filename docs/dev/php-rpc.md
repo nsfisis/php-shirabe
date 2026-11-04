@@ -174,9 +174,11 @@ same dispatch while waiting for its own `Return`.
 ## Entry points
 
 `CallFunction` first consults the worker's dispatch table of named entry points, then falls back
-to calling the named PHP function; an unknown name is an explicit error. Shirabe-internal entry
-points are prefixed `__shirabe_`. Likewise, a `CallRustMethod` on handle 0 names a method of the
-runtime service endpoint; one it does not answer is an explicit error naming it.
+to calling the named PHP function; an unknown name is an explicit error. Likewise, a
+`CallRustMethod` on handle 0 names a method of the runtime service endpoint; one it does not
+answer is an explicit error naming it. Every name Shirabe defines on either side — an entry
+point, a runtime service method, and a method an entity answers beyond its PHP class's own (such
+as `__shirabe_clone`) — is `__shirabe_<snake_case>`.
 
 The entry points themselves are not part of the protocol: each is a consumer of it, and the
 catalogue lives in [docs/dev/php-worker.md](./php-worker.md).

@@ -11,7 +11,7 @@ class InstallOperation extends SolverOperation implements OperationInterface
 {
     public function __construct(PackageInterface $package)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$package]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$package]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

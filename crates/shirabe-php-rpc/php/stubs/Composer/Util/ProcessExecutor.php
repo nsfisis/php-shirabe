@@ -38,7 +38,7 @@ class ProcessExecutor implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
@@ -64,7 +64,7 @@ class ProcessExecutor implements \ShirabeRustStub
 
     public function __construct(?IOInterface $io = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$io]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
@@ -90,19 +90,19 @@ class ProcessExecutor implements \ShirabeRustStub
     // Forwarded rather than materialized: it reads the static property $timeout, whose value the Rust side owns.
     public static function getTimeout(): int
     {
-        return \ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, 'getTimeout', []]);
+        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getTimeout', []]);
     }
 
     // Forwarded rather than materialized: it reads the static property $timeout, whose value the Rust side owns.
     public static function setTimeout(int $timeout): void
     {
-        \ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, 'setTimeout', [$timeout]]);
+        \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'setTimeout', [$timeout]]);
     }
 
     // Forwarded rather than materialized: it references Composer\Util\Platform, which a guard shadows in the worker.
     public static function escape($argument): string
     {
-        return \ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, 'escape', [$argument]]);
+        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'escape', [$argument]]);
     }
 
     public function execute($command, &$output = null, ?string $cwd = null): int

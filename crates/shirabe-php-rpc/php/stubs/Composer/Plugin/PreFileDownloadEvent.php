@@ -12,7 +12,7 @@ class PreFileDownloadEvent extends Event
 {
     public function __construct(string $name, HttpDownloader $httpDownloader, string $processedUrl, string $type, $context = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$name, $httpDownloader, $processedUrl, $type, $context]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $httpDownloader, $processedUrl, $type, $context]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

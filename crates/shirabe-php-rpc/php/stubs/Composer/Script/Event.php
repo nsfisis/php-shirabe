@@ -13,7 +13,7 @@ class Event extends BaseEvent
 {
     public function __construct(string $name, Composer $composer, IOInterface $io, bool $devMode = false, array $args = [], array $flags = [])
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$name, $composer, $io, $devMode, $args, $flags]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $composer, $io, $devMode, $args, $flags]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

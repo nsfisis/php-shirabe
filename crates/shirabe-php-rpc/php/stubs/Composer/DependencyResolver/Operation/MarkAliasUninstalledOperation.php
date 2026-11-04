@@ -11,7 +11,7 @@ class MarkAliasUninstalledOperation extends SolverOperation implements Operation
 {
     public function __construct(AliasPackage $package)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$package]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$package]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

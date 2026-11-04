@@ -59,7 +59,7 @@ pub fn get_php_binary() -> anyhow::Result<std::path::PathBuf> {
 
 /// PHP `constant($name)`.
 fn constant<T: FromWire>(name: impl AsRef<[u8]>) -> anyhow::Result<T> {
-    query("constant", name.as_ref().as_bstr())
+    query("__shirabe_constant", name.as_ref().as_bstr())
 }
 
 /// The value `cell` caches, computing it with `init` on first use. A failed `init` caches
@@ -125,7 +125,7 @@ wire_record! {
 }
 
 wire_record! {
-    /// The names the `diagnose` payload reports on.
+    /// The names the `__shirabe_diagnose` payload reports on.
     struct DiagnoseQuery {
         extensions: Vec<BString>,
         functions: Vec<BString>,
@@ -208,7 +208,7 @@ static DIAGNOSTICS: OnceLock<Diagnostics> = OnceLock::new();
 pub fn get_diagnostics() -> anyhow::Result<&'static Diagnostics> {
     cached(&DIAGNOSTICS, || {
         query(
-            "diagnose",
+            "__shirabe_diagnose",
             DiagnoseQuery {
                 extensions: bstr_list(DIAGNOSE_EXTENSIONS),
                 functions: bstr_list(DIAGNOSE_FUNCTIONS),
@@ -273,7 +273,7 @@ const PLATFORM_EXTENSION_INFO: &[&BStr] = &[
 ];
 
 wire_record! {
-    /// The names the `platform` payload reports on.
+    /// The names the `__shirabe_platform` payload reports on.
     struct PlatformQuery {
         constants: Vec<BString>,
         classes: Vec<BString>,
@@ -282,7 +282,7 @@ wire_record! {
 }
 
 wire_record! {
-    /// The answer to the `platform` query, which [`PlatformInfo`] is built from.
+    /// The answer to the `__shirabe_platform` query, which [`PlatformInfo`] is built from.
     struct PlatformPayload {
         extensions: Vec<BString>,
         extension_versions: IndexMap<BString, BString>,
@@ -474,7 +474,7 @@ static PLATFORM_INFO: OnceLock<PlatformInfo> = OnceLock::new();
 pub fn get_platform_info() -> anyhow::Result<&'static PlatformInfo> {
     cached(&PLATFORM_INFO, || {
         let payload: PlatformPayload = query(
-            "platform",
+            "__shirabe_platform",
             PlatformQuery {
                 constants: bstr_list(PLATFORM_CONSTANTS),
                 classes: bstr_list(PLATFORM_CLASSES),
@@ -550,13 +550,13 @@ pub fn stream_resolve_include_path(
 /// when scanning is active. The worker runs on the ini files of the machine, so these are the
 /// user's own.
 pub fn get_all_ini_files() -> anyhow::Result<Vec<std::path::PathBuf>> {
-    query("get_all_ini_files", PluginValue::Null)
+    query("__shirabe_get_all_ini_files", PluginValue::Null)
 }
 
 /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()` as measured in the worker, which is
 /// the process Xdebug is loaded into.
 fn xdebug_active() -> anyhow::Result<bool> {
-    query("xdebug_active", PluginValue::Null)
+    query("__shirabe_xdebug_active", PluginValue::Null)
 }
 
 /// A PHP exception that crossed the RPC boundary (the recoverable failure lane, as opposed to

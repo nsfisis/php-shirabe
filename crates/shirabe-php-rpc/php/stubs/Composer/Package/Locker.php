@@ -41,7 +41,7 @@ class Locker implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
@@ -67,14 +67,14 @@ class Locker implements \ShirabeRustStub
 
     public function __construct(IOInterface $io, JsonFile $lockFile, InstallationManager $installationManager, string $composerFileContents, ?ProcessExecutor $process = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$io, $lockFile, $installationManager, $composerFileContents, $process]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $lockFile, $installationManager, $composerFileContents, $process]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     // Forwarded rather than materialized: it references Composer\Json\JsonFile, which a guard shadows in the worker.
     public static function getContentHash(string $composerFileContents): string
     {
-        return \ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, 'getContentHash', [$composerFileContents]]);
+        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getContentHash', [$composerFileContents]]);
     }
 
     public function getJsonFile(): JsonFile

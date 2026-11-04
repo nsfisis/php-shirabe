@@ -21,15 +21,20 @@ that does not decode is an error naming the call and the value it answered with.
 ## Entry points
 
 A `CallFunction` name reaches the worker's dispatch table first (see "Entry points" in
-[docs/dev/php-rpc.md](./php-rpc.md)). The table holds two composite queries, `diagnose` and
-`platform`, and the Shirabe-internal helpers.
+[docs/dev/php-rpc.md](./php-rpc.md)). The table holds two composite queries,
+`__shirabe_diagnose` and `__shirabe_platform`, the runtime queries `__shirabe_constant`,
+`__shirabe_get_all_ini_files` and `__shirabe_xdebug_active`, and the Shirabe-internal helpers.
+Every entry is named `__shirabe_<snake_case>`, including one that answers what a standard
+function would (`__shirabe_constant` answers null for an undefined constant, where `constant()`
+throws), so a name in the table never shadows a PHP function.
 
 A composite query answers everything one consumer needs about the runtime in a single round trip,
 because asking one constant and one extension at a time costs a round trip each. The Rust side
-sends the names to report on (the extensions, functions and ini settings for `diagnose`; the
-constants, classes and extension info for `platform`) with the query, so the lists exist only
-there, and decodes the answer into a struct cached in a `OnceLock` (`Diagnostics` for
-`diagnose`, `PlatformInfo` for `platform`) whose accessors panic on a name the list does not hold.
+sends the names to report on (the extensions, functions and ini settings for
+`__shirabe_diagnose`; the constants, classes and extension info for `__shirabe_platform`) with the
+query, so the lists exist only there, and decodes the answer into a struct cached in a `OnceLock`
+(`Diagnostics` for `__shirabe_diagnose`, `PlatformInfo` for `__shirabe_platform`) whose accessors
+panic on a name the list does not hold.
 
 The functions of `shirabe-php-rpc` that answer questions about the runtime — the two composite
 queries (`get_diagnostics`, `get_platform_info`), the PHP version and binary, and the few PHP
@@ -104,11 +109,11 @@ The runtime service endpoint (handle 0) answers `__shirabe_find_file`, which the
 script-class autoloader uses to ask the Rust-side `ClassLoader` where a class file lives,
 `__shirabe_run_rust_command` — the reverse half of the two-world command split: a
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
-the Rust process, against the Rust-side application state — `__shirabeConstruct`, which
+the Rust process, against the Rust-side application state — `__shirabe_construct`, which
 allocates the Rust entity behind a `new SomeProxiedClass(...)` written by plugin code and
-answers with its rhandle, `__shirabeCallStatic`, which takes `[class, method, args]`
+answers with its rhandle, `__shirabe_call_static`, which takes `[class, method, args]`
 and runs a static method no handle identifies a receiver for, and the job methods
-`__shirabeResolveJob` / `__shirabeRejectJob` / `__shirabeCancelJob` / `__shirabeAbortJobs`
+`__shirabe_resolve_job` / `__shirabe_reject_job` / `__shirabe_cancel_job` / `__shirabe_abort_jobs`
 ([docs/dev/plugin-async.md](./plugin-async.md)). Classes and static methods Rust cannot answer
 are an explicit error naming them.
 
@@ -196,7 +201,7 @@ resolved with highest priority, so these FQCNs can never be shadowed by the real
 Stubs are interned per rhandle (`WeakReference`-based registry) so identity (`===`) holds, and
 their destructors send `ReleaseRustHandle`. Reviving a stub for an existing entity bypasses its
 constructor (`newInstanceWithoutConstructor` plus `__shirabeBind`), because the constructor
-carries the real class's own signature and belongs to plugin code building a *new* entity. `clone` on a stub calls `__shirabeClone` on the
+carries the real class's own signature and belongs to plugin code building a *new* entity. `clone` on a stub calls `__shirabe_clone` on the
 entity and rebinds the copy to the handle that answers, so the two stubs never share (and never
 double-release) one entity; entities with no clone semantics answer with an explicit error.
 

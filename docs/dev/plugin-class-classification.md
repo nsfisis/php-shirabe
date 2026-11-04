@@ -156,7 +156,7 @@ Drives which side needs stubs and which needs adapters.
 A non-abstract class with a public constructor that is also reachable from
 the graph (e.g. `JsonFile`, obtainable via `Locker::getJsonFile()` *and*
 freely `new`ed by plugins). These need a constructor story on the stub (the
-stub constructor forwards to `__shirabeConstruct` on the runtime service
+stub constructor forwards to `__shirabe_construct` on the runtime service
 endpoint, and the Rust side allocates the entity and answers with its
 handle); the classifier surfaces them because they are individually
 design-sensitive.
@@ -173,7 +173,7 @@ ones — the run fails loudly until a human files it).
 
 A `needs-sync` static is not actually synced by copying it: the child holds no
 copy at all, because the stub forwards the accessors that read and write it
-(`__shirabeCallStatic`, see `docs/dev/plugin-stub-generation.md`) where a
+(`__shirabe_call_static`, see `docs/dev/plugin-stub-generation.md`) where a
 stub exists (`ProcessExecutor`); a `needs-sync` class without a stub is
 guarded. The disposition records that the state is shared, not the
 mechanism.
@@ -509,7 +509,7 @@ just as constantly, and which drives constructor-plus-setters on the
 package classes — takes `VersionSelector` and `VersionBumper`.
 
 The construction half now exists as a mechanism rather than a question: a
-stub constructor forwards to `__shirabeConstruct`, the Rust side allocates
+stub constructor forwards to `__shirabe_construct`, the Rust side allocates
 the entity and answers with its handle, and the plugin-`new`ed object is
 then the same entity the graph sees. It is filled in per class, driven by
 the explicit errors real plugins hit — today `Package`, `CompletePackage`,

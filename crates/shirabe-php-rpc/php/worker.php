@@ -208,7 +208,7 @@ final class ShirabeJobRegistry
                 // with the exception a started job is cancelled with, and with null for one that
                 // had not started, which Composer aborts without rejecting.
                 unset(self::$deferreds[$id]);
-                $thrown = ShirabeRpcRuntime::callRust(0, '__shirabeCancelJob', [$id]);
+                $thrown = ShirabeRpcRuntime::callRust(0, '__shirabe_cancel_job', [$id]);
                 if ($thrown !== null) {
                     throw \Shirabe\MaterializedThrowable::revive($thrown);
                 }
@@ -276,7 +276,7 @@ final class ShirabeJobRegistry
         $promise->then(
             static function ($value) use ($id, $forget): void {
                 $forget();
-                ShirabeRpcRuntime::callRust(0, '__shirabeResolveJob', [$id, $value]);
+                ShirabeRpcRuntime::callRust(0, '__shirabe_resolve_job', [$id, $value]);
             },
             static function ($reason) use ($id, $forget): void {
                 $forget();
@@ -285,7 +285,7 @@ final class ShirabeJobRegistry
                 }
                 ShirabeRpcRuntime::callRust(
                     0,
-                    '__shirabeRejectJob',
+                    '__shirabe_reject_job',
                     [$id, \Shirabe\MaterializedThrowable::describe($reason)]
                 );
             }
@@ -323,7 +323,7 @@ final class ShirabeRpcRuntime
     public static function loopFor(object $composer, int $rhandle): \Composer\Util\Loop
     {
         if (!isset(self::$loops[$rhandle])) {
-            [$httpDownloader, $processExecutor] = self::callRust($rhandle, '__shirabeLoopServices', []);
+            [$httpDownloader, $processExecutor] = self::callRust($rhandle, '__shirabe_loop_services', []);
             $loop = new \Composer\Util\Loop($httpDownloader, $processExecutor);
             $loop->__shirabeBindToExecution();
             self::$loops[$rhandle] = [$composer, $loop];
@@ -657,9 +657,9 @@ ShirabeRpcRuntime::$stubAutoloader = static function (string $class): void {
 spl_autoload_register(ShirabeRpcRuntime::$stubAutoloader, true, true);
 
 /**
- * Port of Composer\Platform\Runtime, whose runtime queries feed the `platform` payload. Its
- * parseHtmlExtensionInfo() has no counterpart here: the worker is always the CLI SAPI, so
- * getExtensionInfo() never takes the branch that reformats phpinfo()'s HTML output.
+ * Port of Composer\Platform\Runtime, whose runtime queries feed the `__shirabe_platform`
+ * payload. Its parseHtmlExtensionInfo() has no counterpart here: the worker is always the CLI
+ * SAPI, so getExtensionInfo() never takes the branch that reformats phpinfo()'s HTML output.
  */
 final class ShirabePlatformRuntime
 {
@@ -674,8 +674,8 @@ final class ShirabePlatformRuntime
     }
 }
 
-// Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the `xdebug_active`
-// query and the diagnose payload both report.
+// Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the
+// `__shirabe_xdebug_active` query and the `__shirabe_diagnose` payload both report.
 $xdebug_active = static function (): bool {
     if (!extension_loaded('xdebug')) {
         return false;
@@ -709,9 +709,9 @@ $xdebug_active = static function (): bool {
 };
 
 ShirabeRpcRuntime::$dispatch = [
-    'constant' => static fn($args) => defined($args[0]) ? constant($args[0]) : null,
-    'xdebug_active' => static fn($args) => $xdebug_active(),
-    'get_all_ini_files' => static function ($args) {
+    '__shirabe_constant' => static fn($args) => defined($args[0]) ? constant($args[0]) : null,
+    '__shirabe_xdebug_active' => static fn($args) => $xdebug_active(),
+    '__shirabe_get_all_ini_files' => static function ($args) {
         $paths = [(string) php_ini_loaded_file()];
         $scanned = php_ini_scanned_files();
         if ($scanned !== false) {
@@ -721,7 +721,7 @@ ShirabeRpcRuntime::$dispatch = [
     },
     // The names reported on arrive with the query: constants as ltrim($class.'::'.$constant, ':'),
     // classes, and the extensions whose info() output is reported when they are loaded.
-    'platform' => static function ($args) {
+    '__shirabe_platform' => static function ($args) {
         $query = $args[0];
         $extensions = get_loaded_extensions();
 
@@ -777,7 +777,7 @@ ShirabeRpcRuntime::$dispatch = [
         ];
     },
     // The extensions, functions and ini settings reported on arrive with the query.
-    'diagnose' => static function ($args) use ($xdebug_active) {
+    '__shirabe_diagnose' => static function ($args) use ($xdebug_active) {
         $query = $args[0];
         $extensions = [];
         foreach ($query['extensions'] as $extension) {
@@ -835,7 +835,6 @@ ShirabeRpcRuntime::$dispatch = [
             'ini_settings' => $ini_settings,
         ];
     },
-    // Shirabe-internal helpers, not PHP builtins:
     '__shirabe_eval' => static fn($args) => eval($args[0]),
     // Round-trips raw serialize() bytes through the PHP core codec, for the codec oracle tests.
     '__shirabe_oracle_roundtrip' => static fn($args) => serialize(

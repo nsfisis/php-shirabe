@@ -42,7 +42,7 @@ class RepositoryManager implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeClone', []);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
@@ -68,7 +68,7 @@ class RepositoryManager implements \ShirabeRustStub
 
     public function __construct(IOInterface $io, Config $config, HttpDownloader $httpDownloader, ?EventDispatcher $eventDispatcher = null, ?ProcessExecutor $process = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$io, $config, $httpDownloader, $eventDispatcher, $process]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $config, $httpDownloader, $eventDispatcher, $process]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

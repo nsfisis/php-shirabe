@@ -12,7 +12,7 @@ class BufferIO extends ConsoleIO
 {
     public function __construct(string $input = '', int $verbosity = StreamOutput::VERBOSITY_NORMAL, ?OutputFormatterInterface $formatter = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabeConstruct', [static::class, [$input, $verbosity, $formatter]]);
+        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$input, $verbosity, $formatter]]);
         \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

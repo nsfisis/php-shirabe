@@ -73,7 +73,7 @@ installs both tools' dependencies and regenerates the report.
   real `extends`/`implements` hierarchy is preserved and `\ShirabeRustStub` is
   appended to the interface list.
 * **Constructors** reproduce the real class's parameter list and forward to the
-  Rust side (`__shirabeConstruct` on handle 0), which allocates the entity and
+  Rust side (`__shirabe_construct` on handle 0), which allocates the entity and
   answers with its handle; a class Rust cannot build answers with an explicit
   error naming it. One is emitted for every root stub and for every subclass
   that declares a public constructor of its own, so `new SomeProxiedClass(...)`
@@ -117,7 +117,7 @@ installs both tools' dependencies and regenerates the report.
   One that reads a **static property** — whose value the Rust side owns, as
   `ProcessExecutor::$timeout` does — or that reaches a class a **guard**
   shadows there — as `ProcessExecutor::escape()` reaches `Composer\Util\Platform`
-  — forwards instead, through `__shirabeCallStatic` on handle 0, carrying a
+  — forwards instead, through `__shirabe_call_static` on handle 0, carrying a
   comment that names the reason. The test covers the transitive closure of the
   non-public static helpers the method calls, since those are materialized with
   it. A forwarded static may not take by-ref parameters; that combination fails
@@ -132,7 +132,7 @@ installs both tools' dependencies and regenerates the report.
   the boilerplate on every stub, whether or not the real class declares one:
   PHP has already copied the stub by the time it runs, so the copy asks the
   Rust side for a clone of the entity and rebinds itself to the fresh handle
-  (`__shirabeClone`, answered with the fresh rhandle). The clone semantics of
+  (`__shirabe_clone`, answered with the fresh rhandle). The clone semantics of
   the real class live on the Rust side with the entity; entities that model no
   clone answer with an explicit error.
 * **Imports**: the original file's `use` statements are kept in their original

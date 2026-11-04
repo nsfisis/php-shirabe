@@ -64,7 +64,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
     private function __shirabeFacts(): array
     {
         if ($this->__shirabeFacts === null) {
-            $this->__shirabeFacts = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeFacts', []);
+            $this->__shirabeFacts = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_facts', []);
             $this->__shirabeOutput = $this->__shirabeFacts['output'];
             $this->__shirabeErrorOutput = $this->__shirabeFacts['error_output'];
         }
