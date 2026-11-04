@@ -90,6 +90,21 @@ impl FromWire for i64 {
     }
 }
 
+impl ToWire for f64 {
+    fn to_wire(self) -> PluginValue {
+        PluginValue::Float(self)
+    }
+}
+
+impl FromWire for f64 {
+    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
+        match value {
+            PluginValue::Float(value) => Ok(*value),
+            other => Err(unexpected("a float", other)),
+        }
+    }
+}
+
 impl ToWire for BString {
     fn to_wire(self) -> PluginValue {
         PluginValue::String(self)
@@ -271,6 +286,103 @@ impl<T: FromWire> FromWire for IndexMap<BString, T> {
             other => Err(unexpected("an array", other)),
         }
     }
+}
+
+/// Defines a struct that crosses the boundary as a PHP array keyed by its field names, deriving
+/// `ToWire` and `FromWire` from its fields. The PHP side reads and writes the array under the
+/// same names, so a record is the one definition of a composite payload's keys on this side; a
+/// missing key or a value of the wrong type is a decoding failure naming the record and the key.
+#[macro_export]
+macro_rules! wire_record {
+    (
+        $(#[$attr:meta])*
+        $vis:vis struct $name:ident {
+            $(
+                $(#[$field_attr:meta])*
+                $field_vis:vis $field:ident: $ty:ty
+            ),* $(,)?
+        }
+    ) => {
+        $(#[$attr])*
+        $vis struct $name {
+            $(
+                $(#[$field_attr])*
+                $field_vis $field: $ty,
+            )*
+        }
+
+        impl $crate::ToWire for $name {
+            fn to_wire(self) -> $crate::PluginValue {
+                $crate::wire::record_to_wire(vec![
+                    $((stringify!($field).as_bytes(), $crate::ToWire::to_wire(self.$field)),)*
+                ])
+            }
+        }
+
+        impl $crate::FromWire for $name {
+            fn from_wire(value: &$crate::PluginValue) -> Result<Self, $crate::PhpThrow> {
+                let record = $crate::wire::record_entries(value, stringify!($name).as_bytes())?;
+                Ok($name {
+                    $(
+                        $field: $crate::wire::record_field(
+                            record,
+                            stringify!($name).as_bytes(),
+                            stringify!($field).as_bytes(),
+                        )?,
+                    )*
+                })
+            }
+        }
+    };
+}
+
+#[doc(hidden)]
+pub fn record_to_wire(fields: Vec<(&'static [u8], PluginValue)>) -> PluginValue {
+    PluginValue::Array(
+        fields
+            .into_iter()
+            .map(|(key, value)| (BString::from(key), value))
+            .collect(),
+    )
+}
+
+#[doc(hidden)]
+pub fn record_entries<'a>(
+    value: &'a PluginValue,
+    record: &[u8],
+) -> Result<&'a IndexMap<BString, PluginValue>, PhpThrow> {
+    match value {
+        PluginValue::Array(entries) => Ok(entries),
+        other => Err(unexpected(bconcat!("a ", record, " record"), other)),
+    }
+}
+
+#[doc(hidden)]
+pub fn record_field<T: FromWire>(
+    entries: &IndexMap<BString, PluginValue>,
+    record: &[u8],
+    field: &[u8],
+) -> Result<T, PhpThrow> {
+    let value = entries.get(field).ok_or_else(|| {
+        PhpThrow::runtime(bconcat!(
+            "the ",
+            record,
+            " record has no `",
+            field,
+            "` entry"
+        ))
+    })?;
+    T::from_wire(value).map_err(|throw| PhpThrow {
+        message: bconcat!(
+            "the `",
+            field,
+            "` entry of the ",
+            record,
+            " record: ",
+            throw.message
+        ),
+        ..throw
+    })
 }
 
 const DATE_TIME_IMMUTABLE_CLASS: &BStr = php_str(b"DateTimeImmutable");

@@ -657,59 +657,6 @@ spl_autoload_register(ShirabeRpcRuntime::$stubAutoloader, true, true);
  */
 final class ShirabePlatformRuntime
 {
-    /** The constants the `platform` payload reports, named ltrim($class.'::'.$constant, ':'). */
-    public const CONSTANTS = [
-        'PHP_VERSION',
-        'PHP_DEBUG',
-        'PHP_ZTS',
-        'PHP_INT_SIZE',
-        'AF_INET6',
-        'GD_VERSION',
-        'GMP_VERSION',
-        'ICONV_VERSION',
-        'INTL_ICU_VERSION',
-        'LIBXML_DOTTED_VERSION',
-        'MB_ONIGURUMA_VERSION',
-        'OPENSSL_VERSION_TEXT',
-        'PCRE_VERSION',
-        'PGSQL_LIBPQ_VERSION',
-        'RD_KAFKA_VERSION',
-        'SODIUM_LIBRARY_VERSION',
-        'LIBXSLT_DOTTED_VERSION',
-        'ZipArchive::LIBZIP_VERSION',
-        'ZLIB_VERSION',
-    ];
-
-    /** The extensions whose info() output the `platform` payload reports when they are loaded. */
-    public const EXTENSION_INFO = [
-        'amqp',
-        'bz2',
-        'curl',
-        'date',
-        'fileinfo',
-        'gd',
-        'intl',
-        'ldap',
-        'mbstring',
-        'memcached',
-        'mongodb',
-        'mysqlnd',
-        'pcre',
-        'pdo_mysql',
-        'pdo_pgsql',
-        'pdo_sqlite',
-        'pgsql',
-        'pq',
-        'sqlite3',
-        'ssh2',
-        'xsl',
-        'yaml',
-        'zlib',
-    ];
-
-    /** The classes the `platform` payload reports the existence of. */
-    public const CLASSES = ['ResourceBundle', 'IntlChar'];
-
     public static function getExtensionInfo(string $extension): string
     {
         $reflector = new ReflectionExtension($extension);
@@ -766,7 +713,10 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return $paths;
     },
+    // The names reported on arrive with the query: constants as ltrim($class.'::'.$constant, ':'),
+    // classes, and the extensions whose info() output is reported when they are loaded.
     'platform' => static function ($args) {
+        $query = $args[0];
         $extensions = get_loaded_extensions();
 
         $extension_versions = [];
@@ -776,24 +726,22 @@ ShirabeRpcRuntime::$dispatch = [
         }
 
         $extension_info = [];
-        foreach (ShirabePlatformRuntime::EXTENSION_INFO as $extension) {
+        foreach ($query['extension_info'] as $extension) {
             if (in_array($extension, $extensions, true)) {
                 $extension_info[$extension] = ShirabePlatformRuntime::getExtensionInfo($extension);
             }
         }
 
-        // Only the defined constants carry a value; `constant_names` tells the Rust side which
-        // names were looked up, so a name it reads but this list omits is an error rather than a
-        // silently undefined constant.
+        // Only the defined constants carry a value.
         $constants = [];
-        foreach (ShirabePlatformRuntime::CONSTANTS as $constant) {
+        foreach ($query['constants'] as $constant) {
             if (defined($constant)) {
                 $constants[$constant] = constant($constant);
             }
         }
 
         $classes = [];
-        foreach (ShirabePlatformRuntime::CLASSES as $class) {
+        foreach ($query['classes'] as $class) {
             $classes[$class] = class_exists($class, false);
         }
 
@@ -802,7 +750,7 @@ ShirabeRpcRuntime::$dispatch = [
         $inet_pton_ipv6 = @inet_pton('::');
 
         $resource_bundle_version = null;
-        if ($classes['ResourceBundle']) {
+        if (class_exists('ResourceBundle', false)) {
             $bundle = ResourceBundle::create('root', 'ICUDATA', false);
             if ($bundle !== null) {
                 $resource_bundle_version = $bundle->get('Version');
@@ -813,50 +761,32 @@ ShirabeRpcRuntime::$dispatch = [
             'extensions' => $extensions,
             'extension_versions' => $extension_versions,
             'extension_info' => $extension_info,
-            'constant_names' => ShirabePlatformRuntime::CONSTANTS,
             'constants' => $constants,
             'classes' => $classes,
             'curl_version' => extension_loaded('curl') ? curl_version()['version'] : null,
             'inet_pton_ipv6' => $inet_pton_ipv6 === false ? null : $inet_pton_ipv6,
             'resource_bundle_version' => $resource_bundle_version,
-            'intl_char_unicode_version' => $classes['IntlChar'] ? IntlChar::getUnicodeVersion() : null,
+            'intl_char_unicode_version' => class_exists('IntlChar', false) ? IntlChar::getUnicodeVersion() : null,
             'imagick_version_string' => extension_loaded('imagick') ? (new Imagick())->getVersion()['versionString'] : null,
         ];
     },
+    // The extensions, functions and ini settings reported on arrive with the query.
     'diagnose' => static function ($args) use ($xdebug_active) {
+        $query = $args[0];
         $extensions = [];
-        foreach ([
-            'apcu',
-            'curl',
-            'filter',
-            'hash',
-            'iconv',
-            'ionCube Loader',
-            'mbstring',
-            'openssl',
-            'Phar',
-            'uopz',
-            'zip',
-            'zlib',
-        ] as $extension) {
+        foreach ($query['extensions'] as $extension) {
             $extensions[$extension] = extension_loaded($extension);
         }
 
         $functions = [];
-        foreach (['disk_free_space', 'json_decode', 'proc_open'] as $function) {
+        foreach ($query['functions'] as $function) {
             $functions[$function] = function_exists($function);
         }
 
-        $ini = [];
-        foreach ([
-            'allow_url_fopen',
-            'apc.enable_cli',
-            'uopz.disable',
-            'uopz.exit',
-            'xdebug.profiler_enabled',
-        ] as $setting) {
+        $ini_settings = [];
+        foreach ($query['ini_settings'] as $setting) {
             $value = ini_get($setting);
-            $ini[$setting] = $value === false ? null : $value;
+            $ini_settings[$setting] = $value === false ? null : $value;
         }
 
         // curl_version() only exists while the extension is loaded; DiagnoseCommand reads these
@@ -896,7 +826,7 @@ ShirabeRpcRuntime::$dispatch = [
             'curl' => $curl,
             'extensions' => $extensions,
             'functions' => $functions,
-            'ini' => $ini,
+            'ini_settings' => $ini_settings,
         ];
     },
     // Shirabe-internal helpers, not PHP builtins:
@@ -1118,7 +1048,7 @@ ShirabeRpcRuntime::$dispatch = [
             $arguments[] = [
                 'name' => $argument->getName(),
                 'required' => $argument->isRequired(),
-                'isArray' => $argument->isArray(),
+                'is_array' => $argument->isArray(),
                 'description' => $argument->getDescription(),
                 'default' => $argument->getDefault(),
             ];
@@ -1128,10 +1058,10 @@ ShirabeRpcRuntime::$dispatch = [
             $options[] = [
                 'name' => $option->getName(),
                 'shortcut' => $option->getShortcut(),
-                'acceptValue' => $option->acceptValue(),
-                'isValueRequired' => $option->isValueRequired(),
-                'isArray' => $option->isArray(),
-                'isNegatable' => $option->isNegatable(),
+                'accept_value' => $option->acceptValue(),
+                'is_value_required' => $option->isValueRequired(),
+                'is_array' => $option->isArray(),
+                'is_negatable' => $option->isNegatable(),
                 'description' => $option->getDescription(),
                 'default' => $option->getDefault(),
             ];

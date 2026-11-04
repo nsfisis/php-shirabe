@@ -69,7 +69,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
         if ($this->__shirabeFacts === null) {
             $this->__shirabeFacts = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabeFacts', []);
             $this->__shirabeOutput = $this->__shirabeFacts['output'];
-            $this->__shirabeErrorOutput = $this->__shirabeFacts['errorOutput'];
+            $this->__shirabeErrorOutput = $this->__shirabeFacts['error_output'];
         }
 
         return $this->__shirabeFacts;
@@ -201,17 +201,17 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 
     public function getExitCode()
     {
-        return $this->__shirabeFact('exitCode');
+        return $this->__shirabeFact('exit_code');
     }
 
     public function getExitCodeText()
     {
-        return $this->__shirabeFact('exitCodeText');
+        return $this->__shirabeFact('exit_code_text');
     }
 
     public function isSuccessful()
     {
-        return 0 === $this->__shirabeFact('exitCode');
+        return 0 === $this->__shirabeFact('exit_code');
     }
 
     public function hasBeenSignaled()
@@ -221,7 +221,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 
     public function getTermSignal()
     {
-        return $this->__shirabeFact('termSignal');
+        return $this->__shirabeFact('term_signal');
     }
 
     public function hasBeenStopped()
@@ -231,7 +231,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 
     public function getStopSignal()
     {
-        return $this->__shirabeFact('stopSignal');
+        return $this->__shirabeFact('stop_signal');
     }
 
     public function isRunning()
@@ -256,7 +256,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 
     public function stop(float $timeout = 10, ?int $signal = null)
     {
-        return $this->__shirabeFact('exitCode');
+        return $this->__shirabeFact('exit_code');
     }
 
     public function addOutput(string $line)
@@ -276,7 +276,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 
     public function getCommandLine()
     {
-        return $this->__shirabeFact('commandLine');
+        return $this->__shirabeFact('command_line');
     }
 
     public function getTimeout()
@@ -321,7 +321,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 
     public function getWorkingDirectory()
     {
-        return $this->__shirabeFact('workingDirectory');
+        return $this->__shirabeFact('working_directory');
     }
 
     public function setWorkingDirectory(string $cwd)
@@ -355,7 +355,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 
     public function getStartTime(): float
     {
-        return $this->__shirabeFact('startTime');
+        return $this->__shirabeFact('start_time');
     }
 
     public function setOptions(array $options)

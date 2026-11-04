@@ -817,9 +817,9 @@ try {
     $status = $app->run(new \Symfony\Component\Console\Input\StringInput("#,
                             php_single_quote(string_input.as_ref()),
                             r#"), $output);
-    return ['status' => $status, 'output' => $output->fetch()];
+    return ['status' => $status, 'output' => $output->fetch(), 'throw' => null, 'caught' => false];
 } catch (\Throwable $e) {
-    return ['throw' => \Shirabe\MaterializedThrowable::describe($e), 'caught' => $e instanceof \Exception, 'output' => $output->fetch()];
+    return ['status' => null, 'output' => $output->fetch(), 'throw' => \Shirabe\MaterializedThrowable::describe($e), 'caught' => $e instanceof \Exception];
 }
 "#,
                         );
@@ -828,25 +828,14 @@ try {
                             loader: self.loader.clone(),
                             event: None,
                         };
-                        let value: PluginValue = PhpCall::Function(BStr::new("__shirabe_eval"))
-                            .run_with(vec![PluginValue::string(snippet)], &mut dispatcher)?;
-                        let PluginValue::Array(result) = value else {
-                            panic!("the eval snippet always returns an array, got {value:?}")
-                        };
-                        let command_output = match result.get(B("output")) {
-                            Some(PluginValue::String(output)) => output,
-                            other => {
-                                panic!("the eval snippet always returns its output, got {other:?}")
-                            }
-                        };
-                        if !command_output.is_empty() {
-                            self.io.write3(command_output, false, crate::io::NORMAL);
+                        let result: ScriptCommandResult =
+                            PhpCall::Function(BStr::new("__shirabe_eval"))
+                                .run_with(vec![PluginValue::string(snippet)], &mut dispatcher)?;
+                        if !result.output.is_empty() {
+                            self.io.write3(&result.output, false, crate::io::NORMAL);
                         }
-                        if let Some(throw) = result.get(B("throw")) {
-                            let throw = PhpThrow::from_wire(throw.clone());
-                            let caught =
-                                matches!(result.get(B("caught")), Some(PluginValue::Bool(true)));
-                            if caught {
+                        if let Some(throw) = result.throw {
+                            if result.caught {
                                 self.io.write_error3(
                                     bconcat!(
                                         "<error>Script ",
@@ -859,14 +848,11 @@ try {
                                     crate::io::QUIET,
                                 );
                             }
-                            return Err(throw_into_error(throw));
+                            return Err(throw_into_error(PhpThrow::from_wire(throw)));
                         }
-                        r#return = match result.get(B("status")) {
-                            Some(PluginValue::Int(status)) => *status,
-                            other => panic!(
-                                "the eval snippet always returns an int status, got {other:?}"
-                            ),
-                        };
+                        r#return = result
+                            .status
+                            .expect("the snippet reports a status whenever nothing was thrown");
                     }
                     Callable::String(callable_str) => {
                         let args = implode(
@@ -1614,6 +1600,18 @@ try {
             PhpMixed::List(l) => l.is_empty(),
             _ => false,
         }
+    }
+}
+
+shirabe_php_rpc::wire_record! {
+    /// What the snippet hosting a `scripts` Command class reports about its run: the exit status,
+    /// or the exception it ended with and whether Composer would have caught that exception.
+    #[derive(Debug)]
+    struct ScriptCommandResult {
+        status: Option<i64>,
+        output: BString,
+        throw: Option<PluginValue>,
+        caught: bool,
     }
 }
 

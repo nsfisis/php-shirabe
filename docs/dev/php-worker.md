@@ -26,9 +26,19 @@ A `CallFunction` name reaches the worker's dispatch table first (see "Entry poin
 
 A composite query answers everything one consumer needs about the runtime in a single round trip,
 because asking one constant and one extension at a time costs a round trip each. The Rust side
-decodes the answer into a struct cached in a `OnceLock` (`Diagnostics` for `diagnose`,
-`PlatformInfo` for `platform`) whose accessors panic on a name the worker does not report, so a
-consumer and the worker cannot drift apart unnoticed.
+sends the names to report on (the extensions, functions and ini settings for `diagnose`; the
+constants, classes and extension info for `platform`) with the query, so the lists exist only
+there, and decodes the answer into a struct cached in a `OnceLock` (`Diagnostics` for
+`diagnose`, `PlatformInfo` for `platform`) whose accessors panic on a name the list does not hold.
+
+### Records
+
+A composite payload — the answer of a composite query, the console application handoff, a
+command definition read back, the facts of a terminated process, the result of a `scripts` Command
+class — is a PHP array whose keys are the field names of one Rust struct declared with
+`shirabe_php_rpc::wire_record!`, which derives its `ToWire` / `FromWire` from those fields. The
+worker code reading or writing such an array uses the same snake_case names. A missing key or a
+value of the wrong type is a decoding failure naming the record and the key, never a default.
 
 Notable internal helpers:
 

@@ -52,13 +52,13 @@ class Application extends BaseApplication
         $app->setCatchExceptions(false);
         $app->shirabeComposer = $config['composer'];
         $app->shirabeIo = $config['io'];
-        $app->shirabeInitialWorkingDirectory = $config['initialWorkingDirectory'];
-        $app->shirabeDisablePluginsByDefault = $config['disablePluginsByDefault'];
-        $app->shirabeDisableScriptsByDefault = $config['disableScriptsByDefault'];
-        foreach ($config['rustCommands'] as $meta) {
+        $app->shirabeInitialWorkingDirectory = $config['initial_working_directory'];
+        $app->shirabeDisablePluginsByDefault = $config['disable_plugins_by_default'];
+        $app->shirabeDisableScriptsByDefault = $config['disable_scripts_by_default'];
+        foreach ($config['rust_commands'] as $meta) {
             $app->add(new \Shirabe\RustCommandStub($meta));
         }
-        foreach ($config['pluginCommands'] as $command) {
+        foreach ($config['plugin_commands'] as $command) {
             $app->add($command);
         }
 

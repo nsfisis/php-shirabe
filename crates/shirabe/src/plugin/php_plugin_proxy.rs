@@ -30,7 +30,7 @@ use crate::plugin::plugin_interface::PluginInterface;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::{FileDownloadContext, PreFileDownloadEvent};
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::plugin::throwable_bridge::{exception_into_throw, throw_into_error};
+use crate::plugin::throwable_bridge::exception_into_throw;
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     LockArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
@@ -1356,6 +1356,26 @@ fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
     }
 }
 
+shirabe_php_rpc::wire_record! {
+    /// Everything `Shirabe\RustProcessStub` answers about the terminated process behind it.
+    #[derive(Debug)]
+    struct ProcessFacts {
+        exit_code: Option<i64>,
+        exit_code_text: Option<BString>,
+        output: BString,
+        error_output: BString,
+        signaled: bool,
+        term_signal: i64,
+        stopped: bool,
+        stop_signal: i64,
+        command_line: BString,
+        working_directory: Option<std::path::PathBuf>,
+        env: IndexMap<BString, PhpMixed>,
+        timeout: Option<f64>,
+        start_time: f64,
+    }
+}
+
 /// Serves `Shirabe\RustProcessStub`: everything the stub answers about the terminated process
 /// behind it, read in one round trip.
 fn dispatch_process_method(
@@ -1371,60 +1391,22 @@ fn dispatch_process_method(
     }
     let failed = |error: anyhow::Error| error_throw(b"reading the process failed", &error);
     let mut process = process.borrow_mut();
-    let facts = [
-        ("exitCode", process.get_exit_code().to_wire()),
-        ("exitCodeText", process.get_exit_code_text().to_wire()),
-        (
-            "output",
-            PluginValue::string(process.get_output().map_err(failed)?),
-        ),
-        (
-            "errorOutput",
-            PluginValue::string(process.get_error_output().map_err(failed)?),
-        ),
-        (
-            "signaled",
-            PluginValue::Bool(process.has_been_signaled().map_err(failed)?),
-        ),
-        (
-            "termSignal",
-            PluginValue::Int(process.get_term_signal().map_err(failed)?),
-        ),
-        (
-            "stopped",
-            PluginValue::Bool(process.has_been_stopped().map_err(failed)?),
-        ),
-        (
-            "stopSignal",
-            PluginValue::Int(process.get_stop_signal().map_err(failed)?),
-        ),
-        (
-            "commandLine",
-            PluginValue::string(process.get_command_line()),
-        ),
-        (
-            "workingDirectory",
-            process.get_working_directory().to_wire(),
-        ),
-        ("env", PhpMixed::Array(process.get_env().clone()).to_wire()),
-        (
-            "timeout",
-            match process.get_timeout() {
-                Some(timeout) => PluginValue::Float(timeout),
-                None => PluginValue::Null,
-            },
-        ),
-        (
-            "startTime",
-            PluginValue::Float(process.get_start_time().map_err(failed)?),
-        ),
-    ];
-    Ok(PluginValue::Array(
-        facts
-            .into_iter()
-            .map(|(name, value)| (name.into(), value))
-            .collect(),
-    ))
+    Ok(ProcessFacts {
+        exit_code: process.get_exit_code(),
+        exit_code_text: process.get_exit_code_text(),
+        output: process.get_output().map_err(failed)?,
+        error_output: process.get_error_output().map_err(failed)?,
+        signaled: process.has_been_signaled().map_err(failed)?,
+        term_signal: process.get_term_signal().map_err(failed)?,
+        stopped: process.has_been_stopped().map_err(failed)?,
+        stop_signal: process.get_stop_signal().map_err(failed)?,
+        command_line: process.get_command_line(),
+        working_directory: process.get_working_directory(),
+        env: process.get_env().clone(),
+        timeout: process.get_timeout(),
+        start_time: process.get_start_time().map_err(failed)?,
+    }
+    .to_wire())
 }
 
 fn dispatch_filesystem_method(
@@ -3720,36 +3702,30 @@ fn invalid_command_error(capability: &PhpObjHandle) -> anyhow::Error {
     .into()
 }
 
-/// Metadata row for one Rust-implemented command, mirrored into the worker as a
-/// `\Shirabe\RustCommandStub` so a worker-hosted command can `find()` and invoke built-in
-/// commands (their execution crosses back into this process).
-#[derive(Debug)]
-pub(crate) struct RustCommandMetadata {
-    pub(crate) name: BString,
-    pub(crate) description: BString,
-    pub(crate) aliases: Vec<BString>,
-    pub(crate) hidden: bool,
+shirabe_php_rpc::wire_record! {
+    /// Metadata row for one Rust-implemented command, mirrored into the worker as a
+    /// `\Shirabe\RustCommandStub` so a worker-hosted command can `find()` and invoke built-in
+    /// commands (their execution crosses back into this process).
+    #[derive(Debug, Clone)]
+    pub(crate) struct RustCommandMetadata {
+        pub(crate) name: BString,
+        pub(crate) description: BString,
+        pub(crate) aliases: Vec<BString>,
+        pub(crate) hidden: bool,
+    }
 }
 
-impl RustCommandMetadata {
-    fn wire_value(&self) -> PluginValue {
-        let mut row: IndexMap<BString, PluginValue> = IndexMap::new();
-        row.insert("name".into(), PluginValue::string(self.name.clone()));
-        row.insert(
-            "description".into(),
-            PluginValue::string(self.description.clone()),
-        );
-        row.insert(
-            "aliases".into(),
-            PluginValue::List(
-                self.aliases
-                    .iter()
-                    .map(|alias| PluginValue::string(alias.clone()))
-                    .collect(),
-            ),
-        );
-        row.insert("hidden".into(), PluginValue::Bool(self.hidden));
-        PluginValue::Array(row)
+shirabe_php_rpc::wire_record! {
+    /// What `__shirabe_console_application_boot` builds the worker-side application from.
+    #[derive(Debug)]
+    struct ConsoleBootConfig {
+        composer: Option<PluginValue>,
+        io: PluginValue,
+        initial_working_directory: Option<std::path::PathBuf>,
+        disable_plugins_by_default: bool,
+        disable_scripts_by_default: bool,
+        rust_commands: Vec<RustCommandMetadata>,
+        plugin_commands: Vec<PhpObjHandle>,
     }
 }
 
@@ -3836,54 +3812,58 @@ impl PhpConsoleApplicationContext {
         if let Some(app) = self.app.borrow().as_ref() {
             return Ok(app.clone());
         }
-        let mut config: IndexMap<BString, PluginValue> = IndexMap::new();
-        config.insert(
-            "composer".into(),
-            match &self.composer {
-                Some(composer) => composer_handle_value(composer),
-                None => PluginValue::Null,
-            },
-        );
-        config.insert("io".into(), io_handle_value(&self.io)?);
-        config.insert(
-            "initialWorkingDirectory".into(),
-            match &self.initial_working_directory {
-                Some(dir) => PluginValue::String(dir.as_os_str().as_encoded_bytes().into()),
-                None => PluginValue::Null,
-            },
-        );
-        config.insert(
-            "disablePluginsByDefault".into(),
-            PluginValue::Bool(self.disable_plugins_by_default),
-        );
-        config.insert(
-            "disableScriptsByDefault".into(),
-            PluginValue::Bool(self.disable_scripts_by_default),
-        );
-        config.insert(
-            "rustCommands".into(),
-            PluginValue::List(
-                self.rust_commands
-                    .iter()
-                    .map(RustCommandMetadata::wire_value)
-                    .collect(),
-            ),
-        );
-        config.insert(
-            "pluginCommands".into(),
-            PluginValue::List(
-                self.plugin_commands
-                    .borrow()
-                    .iter()
-                    .cloned()
-                    .map(PluginValue::PhpHandle)
-                    .collect(),
-            ),
-        );
+        let config = ConsoleBootConfig {
+            composer: self.composer.as_ref().map(composer_handle_value),
+            io: io_handle_value(&self.io)?,
+            initial_working_directory: self.initial_working_directory.clone(),
+            disable_plugins_by_default: self.disable_plugins_by_default,
+            disable_scripts_by_default: self.disable_scripts_by_default,
+            rust_commands: self.rust_commands.clone(),
+            plugin_commands: self.plugin_commands.borrow().clone(),
+        };
         let app: PhpObjHandle = PhpCall::Function(BStr::new("__shirabe_console_application_boot"))
-            .run(vec![PluginValue::Array(config)])?;
+            .run(vec![config.to_wire()])?;
         *self.app.borrow_mut() = Some(app.clone());
         Ok(app)
+    }
+}
+
+shirabe_php_rpc::wire_record! {
+    /// A command's input definition, help text and extra usages, as
+    /// `__shirabe_read_command_definition` reads them.
+    #[derive(Debug)]
+    struct CommandDefinition {
+        arguments: Vec<CommandArgument>,
+        options: Vec<CommandOption>,
+        help: BString,
+        usages: Vec<BString>,
+    }
+}
+
+shirabe_php_rpc::wire_record! {
+    /// One `InputArgument` of a [`CommandDefinition`].
+    #[derive(Debug)]
+    struct CommandArgument {
+        name: BString,
+        required: bool,
+        is_array: bool,
+        description: BString,
+        default: PhpMixed,
+    }
+}
+
+shirabe_php_rpc::wire_record! {
+    /// One `InputOption` of a [`CommandDefinition`].
+    #[derive(Debug)]
+    struct CommandOption {
+        name: BString,
+        shortcut: Option<BString>,
+        accept_value: bool,
+        is_value_required: bool,
+        is_array: bool,
+        is_negatable: bool,
+        description: BString,
+        default: PhpMixed,
     }
 }
 
@@ -3948,101 +3928,30 @@ impl PhpCommandProxy {
             DefinitionItem, InputArgument, InputDefinition, InputOption,
         };
 
-        let call = PhpCall::Function(BStr::new("__shirabe_read_command_definition"));
-        let value: PluginValue = call.run(vec![PluginValue::PhpHandle(handle.clone())])?;
-        let shape =
-            |other: &PluginValue| call.unsupported_shape(wire::unexpected("a definition", other));
-        let mut map = match value {
-            PluginValue::Array(map) => map,
-            other => {
-                return Err(shape(&other));
-            }
-        };
-        let field = |row: &mut IndexMap<BString, PluginValue>, key: &BStr| -> PluginValue {
-            row.shift_remove(key.as_bytes())
-                .unwrap_or(PluginValue::Null)
-        };
-        let as_rows = |value: PluginValue| -> Vec<PluginValue> {
-            match value {
-                PluginValue::List(rows) => rows,
-                PluginValue::Array(map) => map.into_values().collect(),
-                _ => Vec::new(),
-            }
-        };
+        let definition: CommandDefinition =
+            PhpCall::Function(BStr::new("__shirabe_read_command_definition"))
+                .run(vec![PluginValue::PhpHandle(handle.clone())])?;
 
         let mut items: Vec<DefinitionItem> = Vec::new();
-        for row in as_rows(field(&mut map, BStr::new("arguments"))) {
-            let mut row = match row {
-                PluginValue::Array(row) => row,
-                other => {
-                    return Err(shape(&other));
-                }
-            };
-            let (name, description) = match (
-                field(&mut row, BStr::new("name")),
-                field(&mut row, BStr::new("description")),
-            ) {
-                (PluginValue::String(name), PluginValue::String(description)) => {
-                    (name, description)
-                }
-                (other, _) => {
-                    return Err(shape(&other));
-                }
-            };
-            let required = matches!(
-                field(&mut row, BStr::new("required")),
-                PluginValue::Bool(true)
-            );
-            let is_array = matches!(
-                field(&mut row, BStr::new("isArray")),
-                PluginValue::Bool(true)
-            );
-            let mut mode = if required {
+        for argument in definition.arguments {
+            let mut mode = if argument.required {
                 InputArgument::REQUIRED
             } else {
                 InputArgument::OPTIONAL
             };
-            if is_array {
+            if argument.is_array {
                 mode |= InputArgument::IS_ARRAY;
             }
-            let default = InputValue::from_php_mixed(
-                &PhpMixed::from_wire(&field(&mut row, BStr::new("default")))
-                    .map_err(throw_into_error)?,
-            );
             items.push(DefinitionItem::InputArgument(InputArgument::new(
-                name,
+                argument.name,
                 Some(mode),
-                description,
-                default,
+                argument.description,
+                InputValue::from_php_mixed(&argument.default),
             )?));
         }
-        for row in as_rows(field(&mut map, BStr::new("options"))) {
-            let mut row = match row {
-                PluginValue::Array(row) => row,
-                other => {
-                    return Err(shape(&other));
-                }
-            };
-            let (name, description) = match (
-                field(&mut row, BStr::new("name")),
-                field(&mut row, BStr::new("description")),
-            ) {
-                (PluginValue::String(name), PluginValue::String(description)) => {
-                    (name, description)
-                }
-                (other, _) => {
-                    return Err(shape(&other));
-                }
-            };
-            let accept_value = matches!(
-                field(&mut row, BStr::new("acceptValue")),
-                PluginValue::Bool(true)
-            );
-            let mut mode = if accept_value {
-                if matches!(
-                    field(&mut row, BStr::new("isValueRequired")),
-                    PluginValue::Bool(true)
-                ) {
+        for option in definition.options {
+            let mut mode = if option.accept_value {
+                if option.is_value_required {
                     InputOption::VALUE_REQUIRED
                 } else {
                     InputOption::VALUE_OPTIONAL
@@ -4050,39 +3959,24 @@ impl PhpCommandProxy {
             } else {
                 InputOption::VALUE_NONE
             };
-            if matches!(
-                field(&mut row, BStr::new("isArray")),
-                PluginValue::Bool(true)
-            ) {
+            if option.is_array {
                 mode |= InputOption::VALUE_IS_ARRAY;
             }
-            if matches!(
-                field(&mut row, BStr::new("isNegatable")),
-                PluginValue::Bool(true)
-            ) {
+            if option.is_negatable {
                 mode |= InputOption::VALUE_NEGATABLE;
             }
-            let shortcut = match PhpMixed::from_wire(&field(&mut row, BStr::new("shortcut")))
-                .map_err(throw_into_error)?
-            {
-                PhpMixed::String(shortcut) => Some(shortcut),
-                _ => None,
-            };
             // `getDefault()` exposes the stored representation (`false` for VALUE_NONE), while
             // the constructor only accepts null there; mirror the constructor's normalization.
-            let default = if accept_value {
-                InputValue::from_php_mixed(
-                    &PhpMixed::from_wire(&field(&mut row, BStr::new("default")))
-                        .map_err(throw_into_error)?,
-                )
+            let default = if option.accept_value {
+                InputValue::from_php_mixed(&option.default)
             } else {
                 InputValue::Null
             };
             items.push(DefinitionItem::InputOption(InputOption::new(
-                &name,
-                shortcut.as_ref().map(|shortcut| shortcut.as_bstr()),
+                &option.name,
+                option.shortcut.as_ref().map(|shortcut| shortcut.as_bstr()),
                 Some(mode),
-                description,
+                option.description,
                 default,
             )?));
         }
@@ -4092,23 +3986,9 @@ impl PhpCommandProxy {
             )?),
         );
 
-        match field(&mut map, BStr::new("help")) {
-            PluginValue::String(help) => {
-                Command::set_help(data, help.as_bstr());
-            }
-            other => {
-                return Err(shape(&other));
-            }
-        }
-        for usage in as_rows(field(&mut map, BStr::new("usages"))) {
-            match usage {
-                PluginValue::String(usage) => {
-                    Command::add_usage(data, usage.as_bstr());
-                }
-                other => {
-                    return Err(shape(&other));
-                }
-            }
+        Command::set_help(data, definition.help.as_bstr());
+        for usage in definition.usages {
+            Command::add_usage(data, usage.as_bstr());
         }
         Ok(())
     }
