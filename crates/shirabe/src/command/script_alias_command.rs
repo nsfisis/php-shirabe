@@ -7,8 +7,8 @@ use crate::event_dispatcher::EventFlags;
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, bconcat, impl_php_class, is_string,
-    php_regex, preg_replace2,
+    InvalidArgumentException, PhpMixed, bconcat, impl_php_class, is_string, php_regex,
+    preg_replace2,
 };
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
@@ -112,15 +112,6 @@ impl Command for ScriptAliasCommand {
 
         let args = input.borrow().get_arguments();
 
-        // TODO(symfony): InputInterface has_to_string/get_class_name not modeled in Rust
-        // TODO remove for Symfony 6+ as it is then in the interface
-        if false {
-            return Err(LogicException::new(BString::from(
-                "Expected an Input instance that is stringable",
-            ))
-            .into());
-        }
-
         let dev_mode = input.borrow().get_option("dev")?.as_bool().unwrap_or(false)
             || !input
                 .borrow()
@@ -130,11 +121,13 @@ impl Command for ScriptAliasCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        // TODO(symfony): InputInterface lacks to_string; use a placeholder until it is modeled.
-        let input_as_string = BString::default();
-        let _ = input;
-        let script_alias_input =
-            preg_replace2(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1, None);
+        let script_alias_input = preg_replace2(
+            php_regex!(r"{^\S+ ?}"),
+            "",
+            input.borrow().__to_string(),
+            1,
+            None,
+        );
         let flags = EventFlags {
             script_alias_input: Some(script_alias_input),
             ..Default::default()

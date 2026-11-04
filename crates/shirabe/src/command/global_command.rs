@@ -9,16 +9,14 @@ use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
 use bstr::BString;
 use shirabe_php_shim::{
-    LogicException, RuntimeException, bconcat, chdir, impl_php_class, path_from_bytes, php_regex,
-    preg_replace2, preg_split,
+    RuntimeException, bconcat, chdir, impl_php_class, path_from_bytes, php_regex, preg_replace2,
+    preg_split,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::{
     CompletionInput, CompletionSuggestions, StringOrSuggestion,
 };
-use shirabe_symfony_console::input::{
-    ArgvInput, ArrayInput, InputInterface, InputInterfaceByName, StringInput,
-};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, StringInput};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -43,28 +41,6 @@ impl GlobalCommand {
             .configure()
             .expect("GlobalCommand::configure uses static, valid metadata");
         command
-    }
-
-    // TODO remove for Symfony 6+ as it is then in the interface.
-    // Mirrors PHP's `method_exists($input, '__toString')` guard followed by
-    // `$input->__toString()`. `InputInterface` does not declare `__toString`, so the
-    // concrete stringable input types are matched explicitly.
-    fn input_to_string(input: &dyn InputInterface) -> anyhow::Result<bstr::BString> {
-        let input_any = input.as_any();
-        if let Some(argv_input) = input_any.downcast_ref::<ArgvInput>() {
-            Ok(argv_input.__to_string())
-        } else if let Some(array_input) = input_any.downcast_ref::<ArrayInput>() {
-            Ok(array_input.__to_string())
-        } else if let Some(string_input) = input_any.downcast_ref::<StringInput>() {
-            Ok(string_input.__to_string())
-        } else if let Some(completion_input) = input_any.downcast_ref::<CompletionInput>() {
-            Ok(completion_input.__to_string())
-        } else {
-            Err(LogicException::new(BString::from(
-                "Expected an Input instance that is stringable",
-            ))
-            .into())
-        }
     }
 
     fn prepare_subcommand_input(
@@ -110,7 +86,7 @@ impl GlobalCommand {
         let new_input_str = preg_replace2(
             php_regex!(r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}"),
             "",
-            &Self::input_to_string(&*input.borrow())?,
+            input.borrow().__to_string(),
             1,
             None,
         );
@@ -230,10 +206,7 @@ impl Command for GlobalCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let tokens = preg_split(
-            php_regex!(r"{\s+}"),
-            &Self::input_to_string(&*input.borrow())?,
-        );
+        let tokens = preg_split(php_regex!(r"{\s+}"), input.borrow().__to_string());
         let mut args: Vec<&bstr::BString> = vec![];
         for token in &tokens {
             if !token.is_empty() && !token.starts_with(b"-") {
