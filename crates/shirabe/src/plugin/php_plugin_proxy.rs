@@ -184,7 +184,6 @@ pub(crate) fn rust_handle_value(rhandle: u64, class: impl AsRef<[u8]>) -> Plugin
     PluginValue::RustHandle(RustObjHandle {
         rhandle,
         class: BString::from(class.as_ref()),
-        snapshot: None,
     })
 }
 

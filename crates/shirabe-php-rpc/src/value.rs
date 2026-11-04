@@ -18,8 +18,6 @@ use shirabe_php_shim::{PhpMixed, bconcat, utf8_text};
 pub struct RustObjHandle {
     pub rhandle: u64,
     pub class: BString,
-    /// Present when the descriptor also carries a value snapshot of the entity's fields.
-    pub snapshot: Option<IndexMap<BString, PluginValue>>,
 }
 
 /// A handle to an object whose entity lives in the PHP child process.
@@ -202,7 +200,6 @@ pub const MAX_DECODE_DEPTH: usize = 512;
 
 const RUST_HANDLE_KEY: &[u8] = b"__rhandle";
 const CLASS_KEY: &[u8] = b"__class";
-const SNAPSHOT_KEY: &[u8] = b"__snapshot";
 const PHP_HANDLE_KEY: &[u8] = b"__phandle";
 const IMPLEMENTS_KEY: &[u8] = b"__implements";
 const PHP_CLASS_KEY: &[u8] = b"__pclass";
@@ -275,9 +272,6 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
                 PluginValue::Int(i64::try_from(handle.rhandle).expect("rhandle exceeds i64")),
             );
             map.insert(CLASS_KEY.into(), PluginValue::string(handle.class.clone()));
-            if let Some(snapshot) = &handle.snapshot {
-                map.insert(SNAPSHOT_KEY.into(), PluginValue::Array(snapshot.clone()));
-            }
             serialize_map(&map, out);
         }
         PluginValue::PhpHandle(handle) => {
@@ -659,28 +653,15 @@ fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Opt
     if let Some(value) = get(RUST_HANDLE_KEY) {
         let allowed = entries
             .keys()
-            .all(|k| k == RUST_HANDLE_KEY || k == CLASS_KEY || k == SNAPSHOT_KEY);
-        if !allowed || entries.len() < 2 {
+            .all(|k| k == RUST_HANDLE_KEY || k == CLASS_KEY);
+        if !allowed || entries.len() != 2 {
             bail!("malformed __rhandle descriptor: {entries:?}");
         }
         let rhandle = descriptor_u64(value, "__rhandle")?;
         let class = descriptor_class(get(CLASS_KEY), "__rhandle")?;
-        let snapshot = match get(SNAPSHOT_KEY) {
-            None => None,
-            Some(PluginValue::Array(map)) => Some(map.clone()),
-            Some(PluginValue::List(items)) => Some(
-                items
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| (bconcat!(i), v.clone()))
-                    .collect(),
-            ),
-            Some(other) => bail!("__snapshot is not an array: {other:?}"),
-        };
         return Ok(Some(PluginValue::RustHandle(RustObjHandle {
             rhandle,
             class,
-            snapshot,
         })));
     }
 
@@ -927,7 +908,6 @@ mod tests {
         roundtrip(PluginValue::RustHandle(RustObjHandle {
             rhandle: 3,
             class: b"Caf\xe9".into(),
-            snapshot: None,
         }));
         roundtrip(PluginValue::PhpHandle(PhpObjHandle {
             phandle: 8,
@@ -944,7 +924,6 @@ mod tests {
         roundtrip(PluginValue::RustHandle(RustObjHandle {
             rhandle: 3,
             class: "Composer\\Script\\Event".into(),
-            snapshot: None,
         }));
         roundtrip(PluginValue::PhpHandle(PhpObjHandle {
             phandle: 8,

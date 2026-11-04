@@ -421,7 +421,6 @@ impl EventDispatcher {
                     vec![PluginValue::RustHandle(RustObjHandle {
                         rhandle: event_rhandle,
                         class: bconcat!(stub_class),
-                        snapshot: None,
                     })],
                     Some(&mut dispatcher),
                 )?;
@@ -1190,7 +1189,6 @@ try {
             vec![PluginValue::RustHandle(RustObjHandle {
                 rhandle,
                 class: bconcat!(stub_class),
-                snapshot: None,
             })],
             Some(&mut dispatcher),
         )?;

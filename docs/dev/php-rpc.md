@@ -69,7 +69,7 @@ model is `PluginValue`: PHP scalars, byte strings (`Vec<u8>` — non-UTF-8 round
 losslessly), lists, ordered maps, object records, and four descriptor kinds encoded as reserved
 arrays:
 
-- `{__rhandle, __class[, __snapshot]}` — entity lives on the Rust side
+- `{__rhandle, __class}` — entity lives on the Rust side
 - `{__phandle, __class, __implements}` — entity lives in the PHP child
 - `{__pclass}` — a PHP class name
 - `{__job}` — an asynchronous job, an entity in neither table. The Rust side allocates odd job
