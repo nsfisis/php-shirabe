@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Console/Application.php sha1:9a852708df1cec141ed6fe16e70143ed4a6b8a3f
 //! ref: composer/vendor/symfony/console/Application.php sha1:b1f6f6136fb657791ac69b1a42cdc9926c2f2566
 
+use crate::autoload::ClassLoader;
 use crate::command::{
     AboutCommand, ArchiveCommand, AuditCommand, BumpCommand, CheckPlatformReqsCommand,
     ClearCacheCommand, ConfigCommand, CreateProjectCommand, DependsCommand, DiagnoseCommand,
@@ -2329,7 +2330,7 @@ impl ApplicationHandle {
                                             .get_path("vendor-dir")
                                             .map(Some)?,
                                     )?;
-                                    loader.register(false);
+                                    ClassLoader::register(&loader, false);
                                 }
 
                                 // if the command is not an array of commands, and points to a valid SymfonyCommand subclass, import its details directly

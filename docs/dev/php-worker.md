@@ -64,7 +64,7 @@ Notable internal helpers:
   required file registered its own prepending autoloader (a Composer `vendor/autoload.php`
   does).
 - `__shirabe_enable_script_autoloader` — registers the autoloader that resolves classes through
-  the Rust-side `ClassLoader` via handle 0.
+  the Rust-side `ClassLoader`s on the autoload stack via handle 0.
 - `__shirabe_composer_require` — the body of `\Composer\Autoload\composerRequire`, sharing
   its `$GLOBALS['__composer_autoload_files']` guard (files-autoload entries of plugin
   packages).
@@ -109,7 +109,8 @@ The helpers that exist only for tests sit together at the end of the table, each
 ### Runtime service endpoint
 
 The runtime service endpoint (handle 0) answers `__shirabe_find_file`, which the worker's
-script-class autoloader uses to ask the Rust-side `ClassLoader` where a class file lives,
+script-class autoloader uses to ask the Rust-side `ClassLoader`s on the autoload stack where a
+class file lives,
 `__shirabe_run_rust_command` — the reverse half of the two-world command split: a
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
 the Rust process, against the Rust-side application state — `__shirabe_construct`, which

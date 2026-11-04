@@ -116,7 +116,7 @@ pub(crate) fn dispatch_autoload_generator_method(
                 .borrow()
                 .create_loader(&autoloads, vendor_dir.clone())
                 .map_err(|error| error_throw(b"createLoader failed", &error))?;
-            return class_loader_to_php(&loader, vendor_dir)
+            return class_loader_to_php(&loader.borrow(), vendor_dir)
                 .map_err(|error| error_throw(b"createLoader failed", &error));
         }
         // TODO(plugin): no PlatformRequirementFilterInterface implementation crosses the boundary:

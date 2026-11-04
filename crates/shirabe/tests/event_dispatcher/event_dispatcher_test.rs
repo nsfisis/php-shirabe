@@ -536,7 +536,7 @@ mod mock_autoload_generator {
                 &self,
                 autoloads: &IndexMap<BString, PhpMixed>,
                 vendor_dir: Option<bstr::BString>,
-            ) -> anyhow::Result<ClassLoader>;
+            ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<ClassLoader>>>;
         }
     }
 }
@@ -643,9 +643,11 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             .into_iter()
             .collect()
         });
-        generator
-            .expect_create_loader()
-            .returning(|_, _| Ok(ClassLoader::new(None)));
+        generator.expect_create_loader().returning(|_, _| {
+            Ok(std::rc::Rc::new(std::cell::RefCell::new(ClassLoader::new(
+                None,
+            ))))
+        });
         composer
             .borrow_mut()
             .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));

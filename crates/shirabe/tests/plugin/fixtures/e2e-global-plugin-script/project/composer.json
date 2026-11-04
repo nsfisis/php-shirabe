@@ -1,0 +1,12 @@
+{
+    "name": "shirabe/e2e-global-plugin-script",
+    "description": "E2E fixture project: a script calls a class of a globally installed plugin.",
+    "repositories": [
+        {
+            "packagist.org": false
+        }
+    ],
+    "scripts": {
+        "post-autoload-dump": "ShirabeTest\\GlobalHelper\\ScriptHandler::run"
+    }
+}

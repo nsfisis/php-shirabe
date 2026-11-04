@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/global-helper",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin installed globally whose class a project script calls.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\GlobalHelper\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\GlobalHelper\\Plugin"
+    }
+}

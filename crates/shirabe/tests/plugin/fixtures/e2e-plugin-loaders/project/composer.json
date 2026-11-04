@@ -1,0 +1,26 @@
+{
+    "name": "shirabe/e2e-plugin-loaders",
+    "description": "E2E fixture project: two plugins autoloaded from the same vendor directory.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugins/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/loader-first": "1.0.0",
+        "shirabe-test/loader-second": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/loader-first": true,
+            "shirabe-test/loader-second": true
+        }
+    }
+}

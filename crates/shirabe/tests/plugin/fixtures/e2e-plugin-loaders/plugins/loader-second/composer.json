@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/loader-second",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin whose class loader is registered after the first plugin's.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\LoaderSecond\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\LoaderSecond\\Plugin"
+    }
+}

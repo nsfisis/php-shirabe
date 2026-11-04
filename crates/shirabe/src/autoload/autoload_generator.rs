@@ -938,7 +938,7 @@ impl AutoloadGenerator {
         &self,
         autoloads: &IndexMap<BString, PhpMixed>,
         vendor_dir: Option<BString>,
-    ) -> anyhow::Result<ClassLoader> {
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<ClassLoader>>> {
         let mut loader = ClassLoader::new(vendor_dir);
 
         let path_list = |path: &PhpMixed| -> Vec<BString> {
@@ -1006,7 +1006,7 @@ impl AutoloadGenerator {
             loader.add_class_map(class_map_generator.get_class_map().get_map().clone());
         }
 
-        Ok(loader)
+        Ok(std::rc::Rc::new(std::cell::RefCell::new(loader)))
     }
 
     fn get_include_paths_file(
@@ -2122,7 +2122,7 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         &self,
         autoloads: &IndexMap<BString, PhpMixed>,
         vendor_dir: Option<BString>,
-    ) -> anyhow::Result<ClassLoader>;
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<ClassLoader>>>;
 }
 
 impl AutoloadGeneratorInterface for AutoloadGenerator {
@@ -2201,7 +2201,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         &self,
         autoloads: &IndexMap<BString, PhpMixed>,
         vendor_dir: Option<BString>,
-    ) -> anyhow::Result<ClassLoader> {
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<ClassLoader>>> {
         self.create_loader(autoloads, vendor_dir)
     }
 }

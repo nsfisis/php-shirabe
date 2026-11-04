@@ -36,20 +36,14 @@ use shirabe_php_shim::{
     AnyThrowable, PhpMixed, bconcat, display_to_bytes, error_chain_message, path_to_bytes,
 };
 
-/// Looks a class up in every registered Rust-side `ClassLoader`, in registration order — the
+/// Looks a class up in every Rust-side `ClassLoader` on the autoload stack, in stack order — the
 /// Rust mirror of what the PHP `spl_autoload_register` stack would do in-process.
-///
-/// TODO(plugin): `ClassLoader::register` keeps one loader per vendor-dir (matching upstream's
-/// `$registeredLoaders`), but the real spl stack keeps every registered loader; because the
-/// registered loaders are the only autoload stack here, registering a second plugin loader under
-/// the same vendor-dir evicts the first one, and a class of the earlier plugin that was never
-/// loaded can become unresolvable (PHP would still find it).
 pub(crate) fn find_file_in_registered_loaders(
     class: impl AsRef<[u8]>,
 ) -> anyhow::Result<Option<BString>> {
     let class = class.as_ref();
-    for (_vendor_dir, mut loader) in ClassLoader::get_registered_loaders() {
-        if let Some(file) = loader.find_file(class)? {
+    for loader in ClassLoader::autoload_stack() {
+        if let Some(file) = loader.borrow_mut().find_file(class)? {
             return Ok(Some(file));
         }
     }

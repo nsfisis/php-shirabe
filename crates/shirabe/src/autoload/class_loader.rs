@@ -7,17 +7,23 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, bconcat, file_exists, path_from_bytes, path_to_bytes,
     strlen, strpos, strrpos, strtr, substr,
 };
-use std::sync::{LazyLock, Mutex};
 
-static REGISTERED_LOADERS: LazyLock<Mutex<IndexMap<BString, ClassLoader>>> =
-    LazyLock::new(|| Mutex::new(IndexMap::new()));
+thread_local! {
+    static REGISTERED_LOADERS: std::cell::RefCell<IndexMap<BString, std::rc::Rc<std::cell::RefCell<ClassLoader>>>> =
+        std::cell::RefCell::new(IndexMap::new());
+
+    /// The loaders `register` puts on PHP's spl autoload stack, in stack order. Unlike
+    /// `REGISTERED_LOADERS`, which keeps one loader per vendor directory, it keeps every registered
+    /// loader, as the spl stack does.
+    static AUTOLOAD_STACK: std::cell::RefCell<Vec<std::rc::Rc<std::cell::RefCell<ClassLoader>>>> = const { std::cell::RefCell::new(Vec::new()) };
+}
 
 /// ClassLoader implements a PSR-0, PSR-4 and classmap class loader.
 ///
 /// `loadClass` is intentionally not ported. This function resolves class names to concrete files
 /// and `include`s them. Shirabe resolves files on the Rust side and lets the PHP worker `include`
 /// them. `$includeFile` and `initializeIncludeClosure` are not ported for the same reason.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ClassLoader {
     vendor_dir: Option<BString>,
 
@@ -260,36 +266,55 @@ impl ClassLoader {
     }
 
     /// Registers this instance as an autoloader.
-    pub fn register(&self, prepend: bool) {
-        // PHP also registers loadClass on the spl autoload stack. Here classes are loaded by the PHP
-        // worker, whose autoloader looks files up in the registered loaders.
-
-        if self.vendor_dir.is_none() {
-            return;
-        }
-
-        let mut registered = REGISTERED_LOADERS.lock().unwrap();
-        if prepend {
-            let mut new_map: IndexMap<BString, ClassLoader> = IndexMap::new();
-            new_map.insert(self.vendor_dir.clone().unwrap(), self.clone());
-            let old_map: IndexMap<BString, ClassLoader> = std::mem::take(&mut *registered);
-            for (k, v) in old_map {
-                if !new_map.contains_key(&k) {
-                    new_map.insert(k, v);
+    pub fn register(this: &std::rc::Rc<std::cell::RefCell<Self>>, prepend: bool) {
+        // PHP registers loadClass on the spl autoload stack. Here classes are loaded by the PHP
+        // worker, whose autoloader looks files up in the loaders of this stack.
+        AUTOLOAD_STACK.with_borrow_mut(|stack| {
+            // Like spl_autoload_register, a callback already on the stack stays where it is.
+            if !stack.iter().any(|loader| std::rc::Rc::ptr_eq(loader, this)) {
+                if prepend {
+                    stack.insert(0, this.clone());
+                } else {
+                    stack.push(this.clone());
                 }
             }
-            *registered = new_map;
-        } else {
-            registered.shift_remove(self.vendor_dir.as_ref().unwrap());
-            registered.insert(self.vendor_dir.clone().unwrap(), self.clone());
-        }
+        });
+
+        let Some(vendor_dir) = this.borrow().vendor_dir.clone() else {
+            return;
+        };
+
+        REGISTERED_LOADERS.with_borrow_mut(|registered| {
+            if prepend {
+                let mut new_map: IndexMap<BString, std::rc::Rc<std::cell::RefCell<ClassLoader>>> =
+                    IndexMap::new();
+                new_map.insert(vendor_dir, this.clone());
+                for (k, v) in std::mem::take(registered) {
+                    if !new_map.contains_key(&k) {
+                        new_map.insert(k, v);
+                    }
+                }
+                *registered = new_map;
+            } else {
+                registered.shift_remove(&vendor_dir);
+                registered.insert(vendor_dir, this.clone());
+            }
+        });
     }
 
     /// Unregisters this instance as an autoloader.
-    pub fn unregister(&self) {
-        if let Some(vendor_dir) = &self.vendor_dir {
-            REGISTERED_LOADERS.lock().unwrap().shift_remove(vendor_dir);
+    pub fn unregister(this: &std::rc::Rc<std::cell::RefCell<Self>>) {
+        AUTOLOAD_STACK
+            .with_borrow_mut(|stack| stack.retain(|loader| !std::rc::Rc::ptr_eq(loader, this)));
+
+        if let Some(vendor_dir) = &this.borrow().vendor_dir {
+            REGISTERED_LOADERS.with_borrow_mut(|registered| registered.shift_remove(vendor_dir));
         }
+    }
+
+    /// The loaders on the spl autoload stack, in the order PHP calls them for a class.
+    pub(crate) fn autoload_stack() -> Vec<std::rc::Rc<std::cell::RefCell<ClassLoader>>> {
+        AUTOLOAD_STACK.with_borrow(|stack| stack.clone())
     }
 
     /// Finds the path to the file where the class is defined.
@@ -319,8 +344,9 @@ impl ClassLoader {
     }
 
     /// Returns the currently registered loaders keyed by their corresponding vendor directories.
-    pub fn get_registered_loaders() -> IndexMap<BString, ClassLoader> {
-        REGISTERED_LOADERS.lock().unwrap().clone()
+    pub fn get_registered_loaders()
+    -> IndexMap<BString, std::rc::Rc<std::cell::RefCell<ClassLoader>>> {
+        REGISTERED_LOADERS.with_borrow(|registered| registered.clone())
     }
 
     fn find_file_with_extension(

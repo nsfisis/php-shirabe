@@ -568,13 +568,16 @@ Plugin classes are autoloaded from the Rust side. The loaders
 `PluginManager::registerPackage` builds live in the Rust process, and the
 worker's autoloader asks them for a file through the runtime service
 endpoint (`__shirabe_find_file`); the files-autoload entries and the
-`_composer_tmp` class-rename path run in the worker. One gap remains: the
-Rust side has no autoload stack of its own, and `ClassLoader::register` keeps
-one loader per vendor directory (matching upstream's `$registeredLoaders`)
-where PHP's autoload stack keeps every registered loader, so a second
-plugin loader registered under the same vendor directory evicts the first,
-and a class of the earlier plugin that was never loaded becomes
-unresolvable.
+`_composer_tmp` class-rename path run in the worker. `ClassLoader::register`
+keeps a Rust-side autoload stack that mirrors PHP's: every registered loader
+stays on it in registration order (or in front, when prepended), and every
+lookup the worker makes walks it, whether a plugin call or a script call is in
+flight, so the loader `EventDispatcher` builds for scripts sits on the same
+stack after the plugin loaders. `ClassLoader::getRegisteredLoaders()` keeps
+upstream's separate map of one loader per vendor directory, so a second
+plugin loader registered under the same vendor directory replaces the first
+there but not on the stack, and the earlier plugin's classes stay
+resolvable.
 
 ### ConsoleIO leaks world-2 objects
 

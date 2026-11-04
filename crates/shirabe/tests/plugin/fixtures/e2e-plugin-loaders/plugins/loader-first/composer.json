@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/loader-first",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin loading one of its own classes only after another plugin has been registered.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\LoaderFirst\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\LoaderFirst\\Plugin"
+    }
+}

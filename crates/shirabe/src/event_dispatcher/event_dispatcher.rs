@@ -86,7 +86,7 @@ impl std::fmt::Debug for Callable {
 pub struct EventDispatcher {
     composer: PartialComposerWeakHandle,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    loader: Option<ClassLoader>,
+    loader: Option<std::rc::Rc<std::cell::RefCell<ClassLoader>>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     listeners: IndexMap<BString, IndexMap<i64, Vec<Callable>>>,
     run_scripts: bool,
@@ -816,9 +816,7 @@ try {
 "#,
                         );
                         Self::ensure_script_autoloader()?;
-                        let mut dispatcher = ScriptRpcDispatcher {
-                            loader: self.loader.clone(),
-                        };
+                        let mut dispatcher = ScriptRpcDispatcher;
                         let result: ScriptCommandResult =
                             PhpCall::Function(BStr::new("__shirabe_eval"))
                                 .run_with(vec![PluginValue::string(snippet)], &mut dispatcher)?;
@@ -1139,9 +1137,7 @@ try {
         // rest), which only the Composer PHP runtime carries.
         Self::ensure_composer_php_runtime(|| self.cache_dir())?;
         Self::ensure_script_autoloader()?;
-        let mut dispatcher = ScriptRpcDispatcher {
-            loader: self.loader.clone(),
-        };
+        let mut dispatcher = ScriptRpcDispatcher;
         PhpCall::StaticMethod(class_name, method_name).run_with(
             vec![rust_handle_value(
                 register_entity(RustEntity::Event(event.clone())),
@@ -1508,7 +1504,7 @@ try {
             .parse_autoloads(package_map, package, PhpMixed::Bool(false));
 
         if let Some(loader) = &self.loader {
-            loader.unregister();
+            ClassLoader::unregister(loader);
         }
 
         let vendor_dir = composer
@@ -1517,7 +1513,7 @@ try {
             .borrow()
             .get_path("vendor-dir")?;
         let loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
-        loader.register(false);
+        ClassLoader::register(&loader, false);
         self.loader = Some(loader);
         Ok(())
     }
@@ -1563,9 +1559,7 @@ try {
     /// the script autoloader active so the query can trigger class loading.
     fn php_runtime_bool(&self, function: &BStr, args: Vec<PluginValue>) -> anyhow::Result<bool> {
         Self::ensure_script_autoloader()?;
-        let mut dispatcher = ScriptRpcDispatcher {
-            loader: self.loader.clone(),
-        };
+        let mut dispatcher = ScriptRpcDispatcher;
         PhpCall::Function(function).run_with(args, &mut dispatcher)
     }
 
@@ -1617,11 +1611,10 @@ shirabe_php_rpc::wire_record! {
 
 /// Serves `CallRustMethod` requests issued by the PHP worker while a script-related call is in
 /// flight: Rust handle 0 is the runtime service endpoint (autoload lookups against the
-/// Rust-side [`ClassLoader`]), every other rhandle resolves through the R table.
+/// Rust-side [`ClassLoader`]s on the autoload stack), every other rhandle resolves through the R
+/// table.
 #[derive(Debug)]
-struct ScriptRpcDispatcher {
-    loader: Option<ClassLoader>,
-}
+struct ScriptRpcDispatcher;
 
 impl RustMethodDispatcher for ScriptRpcDispatcher {
     fn dispatch(
@@ -1643,12 +1636,8 @@ impl RustMethodDispatcher for ScriptRpcDispatcher {
                         ))));
                     }
                 };
-                let file = match self.loader.as_mut() {
-                    Some(loader) => loader
-                        .find_file(class)
-                        .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?,
-                    None => None,
-                };
+                let file = crate::plugin::rpc::dispatch::find_file_in_registered_loaders(class)
+                    .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?;
                 return Ok(match file {
                     Some(file) => PluginValue::string(file),
                     None => PluginValue::Null,

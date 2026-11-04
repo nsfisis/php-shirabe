@@ -254,7 +254,7 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         &self,
         _autoloads: &IndexMap<BString, PhpMixed>,
         _vendor_dir: Option<bstr::BString>,
-    ) -> anyhow::Result<ClassLoader> {
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<ClassLoader>>> {
         unimplemented!("create_loader is not reached by the installer test path")
     }
 }

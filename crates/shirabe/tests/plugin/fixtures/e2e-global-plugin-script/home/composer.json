@@ -1,0 +1,22 @@
+{
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugins/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/global-helper": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/global-helper": true
+        }
+    }
+}

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Plugin/PluginManager.php sha1:96ebce86543a37e1b6fa37f7a39732271fcac193
 
+use crate::autoload::ClassLoader;
 use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle};
 use crate::config::AllowPlugins;
 use crate::event_dispatcher::EventDispatcher;
@@ -399,8 +400,8 @@ impl PluginManager {
             .get_config()
             .borrow()
             .get_path("vendor-dir")?;
-        let mut class_loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
-        class_loader.register(false);
+        let class_loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
+        ClassLoader::register(&class_loader, false);
 
         // The plugin code runs in the PHP worker: load the Composer PHP runtime (contracts like
         // PluginInterface) and the reverse-RPC autoloader before touching plugin classes there.
@@ -433,12 +434,15 @@ impl PluginManager {
             let mut class = class;
             if self.php_runtime_class_exists(class.as_bstr(), false)? {
                 class = trim2(&class, "\\");
-                let path = class_loader.find_file(&class)?.unwrap_or_else(|| {
-                    panic!(
-                        "plugin class `{}` is already defined but has no autoloadable file",
-                        class.display_lossy()
-                    )
-                });
+                let path = class_loader
+                    .borrow_mut()
+                    .find_file(&class)?
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "plugin class `{}` is already defined but has no autoloadable file",
+                            class.display_lossy()
+                        )
+                    });
                 let code = file_get_contents(path_from_bytes(&path)).unwrap_or_else(|_| {
                     panic!(
                         "unable to read the plugin class file `{}`",
