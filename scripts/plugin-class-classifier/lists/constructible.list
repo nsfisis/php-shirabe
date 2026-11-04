@@ -1,0 +1,20 @@
+# Proxied classes plugin code can construct: the stub constructor reaches an arm
+# of `construct_entity` in crates/shirabe/src/plugin/rpc/dispatch.rs, which
+# allocates a Rust-side entity of its own. Constructing one of these does not
+# demote the constructing class. One FQCN per line; every entry must be
+# classified rust-proxy, and the plugin_constructible_list rule of
+# scripts/linters/lint keeps the list equal to the classes that function builds.
+Composer\Package\Package
+Composer\Package\CompletePackage
+Composer\Package\AliasPackage
+Composer\Package\CompleteAliasPackage
+Composer\Package\RootAliasPackage
+Composer\DependencyResolver\Operation\InstallOperation
+Composer\DependencyResolver\Operation\UpdateOperation
+Composer\DependencyResolver\Operation\UninstallOperation
+Composer\DependencyResolver\Operation\MarkAliasInstalledOperation
+Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation
+Composer\Util\Filesystem
+Composer\Util\ProcessExecutor
+Composer\Util\HttpDownloader
+Composer\IO\BufferIO

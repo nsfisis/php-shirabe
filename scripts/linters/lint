@@ -20,6 +20,7 @@ use Shirabe\Lint\Linters\NoStdCollectionsMaps;
 use Shirabe\Lint\Linters\NoUseAsAlias;
 use Shirabe\Lint\Linters\OneUsePerModule;
 use Shirabe\Lint\Linters\PhpSrcDerivationBoundary;
+use Shirabe\Lint\Linters\PluginConstructibleList;
 use Shirabe\Lint\Linters\SortedDependencies;
 use Shirabe\Lint\Runner;
 
@@ -71,6 +72,7 @@ $runner = new Runner($rootDir, [
     [new NoUseAsAlias(), []],
     [new OneUsePerModule(), []],
     [new PhpSrcDerivationBoundary(), []],
+    [new PluginConstructibleList(), []],
     [new SortedDependencies(), []],
 ]);
 

@@ -15,8 +15,10 @@ namespace Shirabe\PluginClassifier;
  *   - `new X` works when X exists there as executable-or-local code: a
  *     php-native class, a two-world class (real console code), a vendor
  *     class (real package code), a rust-snapshot value object (values are
- *     built locally), or a PHP builtin. Constructing a rust-proxy service
- *     is the unresolved dual-instantiation case and demotes.
+ *     built locally), a rust-proxy class on constructible.list (the Rust
+ *     side allocates an entity of its own for it), or a PHP builtin.
+ *     Constructing any other rust-proxy service is the unresolved
+ *     dual-instantiation case and demotes.
  *   - `X::method()` / `X::$prop` additionally works when X is any stubbed
  *     reachable class (proxy stubs carry static methods as RPC), so only
  *     unsupported peers and unknown types demote.
@@ -112,7 +114,7 @@ final class NativeFixedPoint
             ?? $this->reachableCategories[$ref]
             ?? null;
         if ($category !== null) {
-            if ($isNew && $category === 'rust-proxy') {
+            if ($isNew && $category === 'rust-proxy' && !isset($this->lists->constructible[$ref])) {
                 return "constructs proxied service $ref (dual instantiation unresolved)";
             }
 

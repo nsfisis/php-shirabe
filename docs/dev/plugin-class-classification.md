@@ -339,7 +339,9 @@ process:
 * `new X` additionally requires local constructibility: php-native,
   two-world, vendor, and builtin classes are real code; `rust-snapshot`
   values may be built locally (they are values — they become Rust-backed
-  when they cross the boundary). Constructing a `rust-proxy` service is the
+  when they cross the boundary). So may a `rust-proxy` class on
+  `constructible.list`: its stub constructor has the Rust side allocate an
+  entity of its own. Constructing any other `rust-proxy` service is the
   unresolved dual-instantiation case and demotes, explicitly and visibly.
 * a `needs-sync` static disposition (and an unfiled one) also demotes.
 
@@ -383,6 +385,14 @@ Three, all versioned next to the tool, all expected to stay short:
   to a native downloader instead) and `RemoteFilesystem` (it hands the
   requests it cannot serve itself to an instance of the real class in the
   child).
+
+Next to them, `constructible.list` is not an exception but a mirror of the
+Rust side: the `rust-proxy` classes whose stub constructor reaches an arm of
+`construct_entity` (`crates/shirabe/src/plugin/rpc/dispatch.rs`), which
+"Unreachable types" above lets other classes construct. An entry that is
+not classified `rust-proxy` fails the run, and the
+`plugin_constructible_list` rule of `scripts/linters/lint` fails unless the
+list names exactly the classes that function builds.
 
 ### Failure mode
 
@@ -496,49 +506,35 @@ view on the lock file the Rust side never reads back, and
 
 `Locker::getJsonFile(): JsonFile` makes `JsonFile` reachable, so it is
 `rust-proxy` + `plugin-constructible` — and plugins `new JsonFile(...)`
-constantly. The question is not cosmetic: a `rust-proxy` class a plugin
-constructs demotes the constructing class, and the demotions cascade.
-`ProcessExecutor` is what carries the VCS/auth utility belt to
-`unsupported`: `GitHub`, `GitLab`, `Bitbucket` and `Svn` construct one,
-`Git` constructs a `Bitbucket`, `AuthHelper` a `GitHub`, and
-`RemoteFilesystem` an `AuthHelper` (`RemoteFilesystem` itself is filed
-`php-native` by override, so building one is the explicit error of the
-`AuthHelper` guard). `JsonFile` takes `ConfigValidator` and
-`RepositoryFactory` the same way, and `ArrayLoader` — which plugins `new`
-just as constantly, and which drives constructor-plus-setters on the
-package classes — takes `VersionSelector` and `VersionBumper`.
+constantly, as they do `ArrayLoader`. The question is not cosmetic: a
+`rust-proxy` class a plugin constructs demotes the constructing class unless
+the Rust side can build it, and the demotions cascade. `ConfigValidator`,
+for one, is `unsupported` for constructing a `JsonFile`, and so is every
+class that constructs a `ConfigValidator` in turn.
 
-The construction half now exists as a mechanism rather than a question: a
+The construction half exists as a mechanism rather than a question: a
 stub constructor forwards to `__shirabe_construct`, the Rust side allocates
 the entity and answers with its handle, and the plugin-`new`ed object is
 then the same entity the graph sees. It is filled in per class, driven by
-the explicit errors real plugins hit — today `Package`, `CompletePackage`,
-the three alias packages, the five solver operations,
-`Composer\Util\Filesystem` (with or without its `ProcessExecutor` argument),
-`Composer\Util\ProcessExecutor`, `Composer\Util\HttpDownloader` and
-`Composer\IO\BufferIO` (without its `OutputFormatterInterface` argument, a
-Symfony object no proxy carries to the Rust side) can be built this way.
-Every other
-proxied class answers with an explicit error naming it.
+the explicit errors real plugins hit; `constructible.list` names the
+classes built this way, and every other proxied class answers with an
+explicit error naming it.
 `Composer\EventDispatcher\Event` and `Composer\Plugin\PreCommandRunEvent`
 are the exception: their worker-side definitions are hand-written dual-mode
 classes, so `new` builds a native in-process instance (what
 `BaseCommand::initialize()` does), while an instance revived from a Rust
 handle forwards over RPC.
 
-`JsonFile` and `ArrayLoader` are still undecided, so the classes above stay
-`unsupported` — but a guard now shadows each of them in the child, so
+The demotion rule reads the buildable proxied classes from
+`constructible.list` (see "Exception lists"), and constructing one does not
+demote. Only the unreachable fixed point consults the list: the
+body-locality condition of the stateless-pure and value-object tests still
+rejects every constructed `rust-proxy` class.
+
+`JsonFile` and `ArrayLoader` are undecided, so the classes that construct
+them stay `unsupported` — but a guard shadows each of them in the child, so
 touching one is an explicit error instead of real code running against a
 second instance.
-
-The demotion rule has not been taught about the construction stories: it
-demotes for constructing any `rust-proxy` service, whether or not that
-service can now be built. `Composer\Package\Archiver\ArchivableFilesFinder`
-is `unsupported` for `new Filesystem` alone, and the VCS/auth belt is
-`unsupported` for `new ProcessExecutor` alone; neither forks any state any
-more. Promoting them means feeding the per-class construction stories back
-into the rule; the `HttpDownloader` those classes take as a constructor
-argument is one a plugin can now build.
 
 ### Package and CompletePackage
 

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Shirabe\PluginClassifier;
 
 /**
- * The three versioned exception lists. Formats are line-based; `#` starts a
- * comment, blank lines are skipped.
+ * The three versioned exception lists, plus the list of proxied classes the
+ * Rust side can construct for plugin code. Formats are line-based; `#` starts
+ * a comment, blank lines are skipped.
  *
- *   two-world.list    one namespace prefix (or exact FQCN) per line
- *   static-state.list "FQCN memo-cache|seed-once|needs-sync" per line
- *   overrides.list    "FQCN category reason..." per line
+ *   two-world.list     one namespace prefix (or exact FQCN) per line
+ *   static-state.list  "FQCN memo-cache|seed-once|needs-sync" per line
+ *   overrides.list     "FQCN category reason..." per line
+ *   constructible.list one FQCN per line
  */
 final class Lists
 {
@@ -22,6 +24,9 @@ final class Lists
 
     /** @var array<string, array{category: string, reason: string}> */
     public array $overrides = [];
+
+    /** @var array<string, true> FQCN => true */
+    public array $constructible = [];
 
     public static function load(string $dir): self
     {
@@ -48,6 +53,13 @@ final class Lists
                 throw new \RuntimeException("overrides.list: unknown category {$parts[1]}: $line");
             }
             $lists->overrides[$parts[0]] = ['category' => $parts[1], 'reason' => $parts[2]];
+        }
+
+        foreach (self::lines("$dir/constructible.list") as $line) {
+            if (preg_match('/\s/', $line) === 1) {
+                throw new \RuntimeException("constructible.list: malformed line (need one FQCN): $line");
+            }
+            $lists->constructible[$line] = true;
         }
 
         return $lists;

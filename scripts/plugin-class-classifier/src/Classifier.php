@@ -501,6 +501,12 @@ final class Classifier
                 $this->violations[] = "$fqcn writes static properties but has no disposition in static-state.list";
             }
         }
+        foreach ($this->lists->constructible as $fqcn => $_) {
+            $category = $this->rows[$fqcn]['category'] ?? null;
+            if ($category !== 'rust-proxy') {
+                $this->violations[] = "constructible.list: $fqcn is classified " . ($category ?? 'nowhere') . ', not rust-proxy';
+            }
+        }
         foreach ($this->closure->unknownReachable as $fqcn => $bits) {
             $this->violations[] = "reachable type $fqcn is neither a composer class, a known vendor package, nor a PHP builtin";
         }
