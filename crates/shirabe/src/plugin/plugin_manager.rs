@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Plugin/PluginManager.php
 
 use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle};
-use crate::event_dispatcher::{EventDispatcher, unwrap_php_result};
+use crate::event_dispatcher::EventDispatcher;
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
@@ -16,6 +16,7 @@ use crate::plugin::php_plugin_proxy::{
     plugin_handle_value,
 };
 use crate::plugin::plugin_interface::{self, PluginInterface};
+use crate::plugin::throwable_bridge::unwrap_php_result;
 use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
 };

@@ -13,7 +13,7 @@ use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::plugin::throwable_bridge::{described_throw, throw_into_error};
+use crate::plugin::throwable_bridge::{described_throw, throw_into_error, unwrap_php_result};
 use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
@@ -2014,17 +2014,6 @@ fn installer_event(event: &dyn EventInterface) -> Option<&InstallerEvent> {
 
 fn runtime_throw(message: impl Into<BString>) -> PhpThrow {
     PhpThrow::runtime(message)
-}
-
-/// Collapses the two failure lanes of an RPC call into `anyhow`: the callers here treat a PHP
-/// exception raised during a runtime query as fatal for the current dispatch.
-pub(crate) fn unwrap_php_result(
-    outcome: anyhow::Result<Result<PluginValue, PhpThrow>>,
-) -> anyhow::Result<PluginValue> {
-    match outcome? {
-        Ok(value) => Ok(value),
-        Err(throw) => Err(throw_into_error(throw)),
-    }
 }
 
 /// Quotes a string as a PHP single-quoted literal for a generated snippet.

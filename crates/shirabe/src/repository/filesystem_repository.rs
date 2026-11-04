@@ -6,6 +6,7 @@ use crate::json::JsonFile;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
+use crate::plugin::throwable_bridge::unwrap_php_result;
 use crate::repository::{
     FindPackageConstraint, InvalidRepositoryException, LoadPackagesResult, PlatformRepository,
     ProviderInfo, RepositoryInterface, SearchResult, WritableArrayRepository,
@@ -352,7 +353,7 @@ impl FilesystemRepository {
             // the glue skips it only when the class is not even autoloadable there (no Composer
             // PHP runtime = no observer code either).
             if shirabe_php_rpc::worker_is_running() {
-                crate::event_dispatcher::unwrap_php_result(shirabe_php_rpc::call_function(
+                unwrap_php_result(shirabe_php_rpc::call_function(
                     "__shirabe_installed_versions_reload",
                     vec![
                         shirabe_php_rpc::PluginValue::from_php_mixed(&PhpMixed::Array(versions)),
@@ -389,7 +390,7 @@ impl FilesystemRepository {
             .unwrap_or_else(|e| panic!("pending installed.php mutex poisoned: {e}"))
             .take();
         if let Some(path) = path {
-            crate::event_dispatcher::unwrap_php_result(shirabe_php_rpc::call_function(
+            unwrap_php_result(shirabe_php_rpc::call_function(
                 "__shirabe_safely_load_installed_versions",
                 vec![shirabe_php_rpc::PluginValue::string(path_to_bytes(&path))],
             ))?;

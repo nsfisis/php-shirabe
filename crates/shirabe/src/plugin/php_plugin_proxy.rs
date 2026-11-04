@@ -11,9 +11,7 @@ use crate::composer::ComposerHandle;
 use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::operation::AnyOperation;
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
-use crate::event_dispatcher::{
-    EventInterface, EventSubscriberInterface, SubscribedEventEntry, unwrap_php_result,
-};
+use crate::event_dispatcher::{EventInterface, EventSubscriberInterface, SubscribedEventEntry};
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::installer::InstallationManagerInterface;
 use crate::io::IOInterface;
@@ -32,7 +30,7 @@ use crate::plugin::plugin_interface::PluginInterface;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::{FileDownloadContext, PreFileDownloadEvent};
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::plugin::throwable_bridge::{exception_into_throw, throw_into_error};
+use crate::plugin::throwable_bridge::{exception_into_throw, throw_into_error, unwrap_php_result};
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     LockArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
