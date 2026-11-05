@@ -11,7 +11,7 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, TimeZone};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_ONLYDIR, bconcat, defined, file_exists, glob_with_flags, implode, is_dir,
+    GLOB_BRACE, GLOB_ONLYDIR, bconcat, file_exists, glob_with_flags, implode, is_dir,
     loosely_compare, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match,
     preg_quote, rtrim2, str_replace,
 };
@@ -188,7 +188,9 @@ impl Finder {
         } else {
             // TODO(php-semantics): PHP also passes GLOB_NOSORT, which `glob_with_flags` does not
             // model; the result is sorted below either way.
-            let flags = (if defined("GLOB_BRACE") { GLOB_BRACE } else { 0 }) | GLOB_ONLYDIR;
+            // PHP checks defined('GLOB_BRACE'), which depends on the glob() PHP was built with;
+            // Shirabe's glob() always supports GLOB_BRACE.
+            let flags = GLOB_BRACE | GLOB_ONLYDIR;
             let mut glob = glob_with_flags(dir, flags);
             if !glob.is_empty() {
                 glob.sort_by(|a, b| loosely_compare(a, b));

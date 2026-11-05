@@ -15,9 +15,9 @@ use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, Platform, ProcessE
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bconcat, defined, dirname,
-    file_exists, file_get_contents, glob_with_flags, hash, is_dir, path_from_bytes, path_to_bytes,
-    php_regex, preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
+    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bconcat, dirname, file_exists,
+    file_get_contents, glob_with_flags, hash, is_dir, path_from_bytes, path_to_bytes, php_regex,
+    preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
 };
 
 #[derive(Debug)]
@@ -356,17 +356,9 @@ impl PathRepository {
     }
 
     fn get_url_matches(&self) -> anyhow::Result<Vec<BString>> {
-        let mut flags = GLOB_MARK | GLOB_ONLYDIR;
-
-        if defined("GLOB_BRACE") {
-            flags |= GLOB_BRACE;
-        } else if self.url.contains(&b'{') || self.url.contains(&b'}') {
-            return Err(RuntimeException::new(bconcat!(
-                "The operating system does not support GLOB_BRACE which is required for the url ",
-                self.url
-            ))
-            .into());
-        }
+        // PHP checks defined('GLOB_BRACE'), which depends on the glob() PHP was built with;
+        // Shirabe's glob() always supports GLOB_BRACE.
+        let flags = GLOB_MARK | GLOB_ONLYDIR | GLOB_BRACE;
 
         // Ensure environment-specific path separators are normalized to URL separators
         Ok(glob_with_flags(&self.url, flags)
