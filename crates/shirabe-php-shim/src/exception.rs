@@ -172,6 +172,17 @@ impl AnyThrowable {
         class.as_any_mut().downcast_mut::<T>()
     }
 
+    /// PHP's `get_debug_type()`. The name of an anonymous class contains a NUL byte, e.g.,
+    /// `<parent class>@anonymous<NUL><file><line>`. `get_debug_type()` truncates the NUL, the
+    /// file and the line.
+    pub fn get_debug_type(&self) -> &BStr {
+        let class = self.php_class_name();
+        match class.find_byte(0) {
+            Some(end) => &class[..end],
+            None => class,
+        }
+    }
+
     pub fn get_message(&self) -> &BStr {
         self.0.fields().get_message()
     }

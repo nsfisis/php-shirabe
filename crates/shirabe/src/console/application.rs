@@ -30,7 +30,7 @@ use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
-    LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpClass, PhpMixed, PregMatches,
+    LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpMixed, PregMatches,
     RuntimeException, STDIN, STR_PAD_RIGHT, basename, bconcat, bin2hex, chdir, defined, dirname,
     disk_free_space, display_to_bytes, error_message, exec, explode, explode_limit,
     extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists,
@@ -1257,8 +1257,9 @@ impl Application {
             let mut len;
             let mut title = BString::default();
             if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
-                let class = throwable_debug_type(exception);
-                let code = throwable_get_code(exception);
+                let class =
+                    exception.map_or_else(|| BStr::new("Exception"), AnyThrowable::get_debug_type);
+                let code = exception.map_or(0, AnyThrowable::get_code);
                 title = bconcat!(
                     "  [",
                     class,
@@ -2690,7 +2691,7 @@ impl ApplicationHandle {
 
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
-                let exit_code = throwable_get_code(AnyThrowable::of(&e)) as i32;
+                let exit_code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code) as i32;
                 if is_numeric_string(bconcat!(exit_code)) {
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
@@ -2965,23 +2966,6 @@ fn throwable_is_exception_interface(e: Option<&AnyThrowable>) -> bool {
             || e.is_instanceof::<InvalidOptionException>()
             || e.is_instanceof::<MissingInputException>()
     })
-}
-
-/// PHP's `$e->getCode()`; everything the port does not recognize as an exception defaults to PHP's
-/// 0.
-fn throwable_get_code(e: Option<&AnyThrowable>) -> i64 {
-    e.map_or(0, AnyThrowable::get_code)
-}
-
-/// PHP's `get_debug_type($e)` for the title line, reached only when the message is empty or output
-/// is verbose. Only the name of an anonymous class contains a NUL byte, and `get_debug_type` names
-/// such a class by what precedes it, e.g. `RuntimeException@anonymous`.
-fn throwable_debug_type(e: Option<&AnyThrowable>) -> &BStr {
-    let class = e.map_or_else(|| BStr::new("Exception"), PhpClass::php_class_name);
-    match class.find_byte(0) {
-        Some(end) => &class[..end],
-        None => class,
-    }
 }
 
 /// The replacement `doRenderThrowable` writes for an anonymous class name found in a message:
