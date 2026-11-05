@@ -8,12 +8,12 @@
 
 use crate::glob::Glob;
 use bstr::{BStr, BString, ByteSlice};
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{DateTime, TimeZone};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_ONLYDIR, bconcat, defined, file_exists, glob_with_flags, implode, is_dir,
     loosely_compare, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match,
-    preg_quote, rtrim2, str_replace, utf8_text,
+    preg_quote, rtrim2, str_replace,
 };
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -285,8 +285,10 @@ impl Finder {
         self
     }
 
-    pub fn date(&mut self, date: &BStr) -> &mut Self {
-        self.dates.push(parse_date_comparator(date));
+    /// `date('until '.$date->format('Y-m-d H:i:s'))`, taking the date as a value instead of a
+    /// string to parse. Symfony's Finder has no such method.
+    pub fn date_until<Tz: TimeZone>(&mut self, date: &DateTime<Tz>) -> &mut Self {
+        self.dates.push((BString::from("<"), date.timestamp()));
 
         self
     }
@@ -711,56 +713,6 @@ fn comparator_test(operator: &BStr, test: i64, target: i64) -> bool {
     }
 }
 
-/// `DateComparator::__construct`, returning `(operator, target unix timestamp)`.
-fn parse_date_comparator(test: &BStr) -> (BString, i64) {
-    let pattern = "#^\\s*(==|!=|[<>]=?|after|since|before|until)?\\s*(.+?)\\s*$#i";
-    let Some(matches) = preg_match(pattern, test) else {
-        panic!(
-            "Don't understand \"{}\" as a date test.",
-            test.display_lossy()
-        );
-    };
-
-    let date = matches.get(2).unwrap_or_default();
-    let target = parse_datetime_to_unix(date.to_owned().as_bstr());
-
-    let operator = match matches.get(1).map(|s| &**s) {
-        Some(b"since" | b"after") => ">",
-        Some(b"until" | b"before") => "<",
-        Some(b"!=") => "!=",
-        Some(b">") => ">",
-        Some(b">=") => ">=",
-        Some(b"<") => "<",
-        Some(b"<=") => "<=",
-        _ => "==",
-    };
-    let operator = BString::from(operator);
-
-    (operator, target)
-}
-
-/// `(new \DateTime($s))->format('U')`.
-///
-/// TODO(php-semantics): PHP's `\DateTime` accepts any strtotime() expression, but only the
-/// `Y-m-d H:i:s` / `Y-m-d` shapes produced by the callers are parsed here. The components are
-/// interpreted as UTC (not PHP's local timezone) so the timestamp round-trips with the
-/// `chrono::Utc`-derived thresholds the callers format from.
-fn parse_datetime_to_unix(s: &BStr) -> i64 {
-    let text = utf8_text(s).unwrap_or_default();
-    if let Ok(datetime) = NaiveDateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S") {
-        return datetime.and_utc().timestamp();
-    }
-    if let Ok(date) = NaiveDate::parse_from_str(text, "%Y-%m-%d") {
-        return date
-            .and_hms_opt(0, 0, 0)
-            .expect("midnight is always valid")
-            .and_utc()
-            .timestamp();
-    }
-
-    panic!("\"{}\" is not a valid date.", s.display_lossy());
-}
-
 fn apply_order(ordering: std::cmp::Ordering, order: i64) -> std::cmp::Ordering {
     if order < 0 {
         ordering.reverse()
@@ -854,6 +806,7 @@ impl IntoIterator for &mut Finder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shirabe_php_shim::{time, touch2};
 
     fn relative_names(finder: &Finder, root: &Path) -> Vec<BString> {
         let mut names: Vec<BString> = finder
@@ -895,5 +848,23 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("file"), b"").unwrap();
         Finder::create().r#in(tmp.path().join("fi*"));
+    }
+
+    #[test]
+    fn date_until_keeps_entries_older_than_the_date() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("old"), b"").unwrap();
+        std::fs::write(tmp.path().join("new"), b"").unwrap();
+        assert!(touch2(tmp.path().join("old"), time() - 3 * 86_400));
+
+        let mut finder = Finder::create();
+        finder
+            .files()
+            .r#in(tmp.path())
+            .date_until(&(chrono::Utc::now() - chrono::Duration::days(1)));
+        assert_eq!(
+            relative_names(&finder, tmp.path()),
+            vec![BString::from("old")]
+        );
     }
 }

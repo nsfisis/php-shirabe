@@ -2,14 +2,13 @@
 
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Filesystem, Platform};
-use bstr::{BStr, BString, ByteSlice};
-use chrono::Utc;
+use bstr::{BStr, BString};
+use chrono::{DateTime, Utc};
 use shirabe_php_shim::{
-    bconcat, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
-    display_to_bytes, file_exists, file_get_contents, file_put_contents, filemtime, hash_file,
-    is_dir, is_writable, mkdir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_replace, random_bytes, random_int, rename, rtrim2, time, touch, touch3,
-    unlink,
+    bconcat, bin2hex, clearstatcache, dirname, disk_free_space, display_to_bytes, file_exists,
+    file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir,
+    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
+    random_bytes, random_int, rename, rtrim2, time, touch, touch3, unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
@@ -370,12 +369,8 @@ impl Cache {
 
         if self.is_enabled() && !self.read_only {
             let expire = Utc::now() - chrono::Duration::seconds(ttl);
-            let expire_str = bconcat!(
-                "until ",
-                display_to_bytes(expire.format(date_format_to_strftime(b"Y-m-d H:i:s")))
-            );
 
-            for file in self.gc_outdated_files(expire_str.as_bstr()) {
+            for file in self.gc_outdated_files(&expire) {
                 let _ = self.filesystem.borrow_mut().unlink(&file);
             }
 
@@ -398,8 +393,8 @@ impl Cache {
         false
     }
 
-    /// Files matching `get_finder().date(...)`. Honours the [`CacheMock`] seam when set.
-    fn gc_outdated_files(&self, expire_str: &BStr) -> Vec<std::path::PathBuf> {
+    /// The cache files last modified before `expire`. Honours the [`CacheMock`] seam when set.
+    fn gc_outdated_files(&self, expire: &DateTime<Utc>) -> Vec<std::path::PathBuf> {
         if let Some(mock) = &self.mock
             && let Some(finder) = &mock.finder
         {
@@ -407,11 +402,11 @@ impl Cache {
         }
 
         let mut finder = self.get_finder();
-        finder.date(BStr::new(&expire_str));
+        finder.date_until(expire);
         finder.into_iter().collect()
     }
 
-    /// Files from `get_finder().sort_by_accessed_time()`. Honours the [`CacheMock`] seam when set.
+    /// The cache files, least recently accessed first. Honours the [`CacheMock`] seam when set.
     fn gc_files_by_accessed_time(&self) -> Vec<std::path::PathBuf> {
         if let Some(mock) = &self.mock
             && let Some(finder) = &mock.finder
@@ -443,13 +438,11 @@ impl Cache {
             let expire = Utc::now() - chrono::Duration::seconds(ttl);
 
             let mut finder = Finder::create();
-            finder.r#in(&self.root).directories().depth(0).date(
-                bconcat!(
-                    "until ",
-                    display_to_bytes(expire.format(date_format_to_strftime(b"Y-m-d H:i:s")))
-                )
-                .as_bstr(),
-            );
+            finder
+                .r#in(&self.root)
+                .directories()
+                .depth(0)
+                .date_until(&expire);
             for file in &mut finder {
                 let _ = self.filesystem.borrow_mut().remove_directory(&file);
             }
