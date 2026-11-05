@@ -1131,6 +1131,13 @@ pub const GLOB_MARK: i64 = 8;
 pub const GLOB_ONLYDIR: i64 = 1024;
 pub const GLOB_BRACE: i64 = 4096;
 
+/// TODO(php-semantics): this approximates PHP's bundled glob (`main/php_glob.c`). It never
+/// returns PHP's `false`, the `GLOB_*` values differ from PHP's, and `GLOB_NOSORT`,
+/// `GLOB_NOCHECK`, `GLOB_NOESCAPE` and `GLOB_ERR` are not modeled. Brace alternatives are sorted
+/// and deduplicated together instead of being kept in pattern order with duplicates, and an
+/// unbalanced brace is not handled as PHP does. `[^...]` is taken as a negated class, which PHP
+/// does not do. Backslash escapes, POSIX character classes (`[[:alpha:]]`), the `.` and `..`
+/// entries matched by `.*`, and trailing or doubled slashes are not reproduced.
 pub fn glob_with_flags(pattern: impl AsRef<[u8]>, flags: i64) -> Vec<BString> {
     let pattern = pattern.as_ref();
     let patterns = if flags & GLOB_BRACE != 0 {

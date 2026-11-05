@@ -2492,6 +2492,7 @@ dependencies = [
  "indexmap",
  "regex",
  "shirabe-php-shim",
+ "tempfile",
 ]
 
 [[package]]

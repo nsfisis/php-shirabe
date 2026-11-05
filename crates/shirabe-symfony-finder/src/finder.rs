@@ -11,8 +11,9 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
-    bconcat, file_exists, glob, implode, is_dir, path_from_bytes, path_to_bytes, php_regex,
-    php_str, preg_is_match, preg_match, preg_quote, rtrim2, str_replace, utf8_text,
+    GLOB_BRACE, GLOB_ONLYDIR, bconcat, defined, file_exists, glob_with_flags, implode, is_dir,
+    loosely_compare, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match,
+    preg_quote, rtrim2, str_replace, utf8_text,
 };
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -185,16 +186,13 @@ impl Finder {
         if is_dir(dirs.as_ref()) {
             resolved_dirs.push(self.normalize_dir(dir));
         } else {
-            // GLOB_ONLYDIR is emulated by retaining directory matches only.
-            // TODO(php-semantics): wildcard `in()` paths depend on `shirabe_php_shim::glob`, which is
-            // still `todo!()`; only the real-directory branch above currently resolves.
-            let mut globbed: Vec<BString> = glob(dir)
-                .into_iter()
-                .filter(|path| is_dir(path_from_bytes(&path)))
-                .collect();
-            if !globbed.is_empty() {
-                globbed.sort();
-                for g in &globbed {
+            // TODO(php-semantics): PHP also passes GLOB_NOSORT, which `glob_with_flags` does not
+            // model; the result is sorted below either way.
+            let flags = (if defined("GLOB_BRACE") { GLOB_BRACE } else { 0 }) | GLOB_ONLYDIR;
+            let mut glob = glob_with_flags(dir, flags);
+            if !glob.is_empty() {
+                glob.sort_by(|a, b| loosely_compare(a, b));
+                for g in &glob {
                     resolved_dirs.push(self.normalize_dir(g));
                 }
             } else {
@@ -850,5 +848,52 @@ impl IntoIterator for &mut Finder {
 
     fn into_iter(self) -> Self::IntoIter {
         self.collect_paths().into_iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn relative_names(finder: &Finder, root: &Path) -> Vec<BString> {
+        let mut names: Vec<BString> = finder
+            .iter()
+            .map(|path| BString::from(path_to_bytes(path.strip_prefix(root).unwrap())))
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn in_expands_wildcards_and_braces() {
+        let tmp = tempfile::tempdir().unwrap();
+        for dir in ["x/a", "x/b", "x/c"] {
+            std::fs::create_dir_all(tmp.path().join(dir)).unwrap();
+        }
+        for file in ["x/a/1", "x/b/2", "x/c/3"] {
+            std::fs::write(tmp.path().join(file), b"").unwrap();
+        }
+
+        let mut finder = Finder::create();
+        finder.files().r#in(tmp.path().join("x/{a,c}"));
+        assert_eq!(
+            relative_names(&finder, tmp.path()),
+            vec![BString::from("x/a/1"), BString::from("x/c/3")]
+        );
+
+        let mut finder = Finder::create();
+        finder.files().r#in(tmp.path().join("x/[ab]"));
+        assert_eq!(
+            relative_names(&finder, tmp.path()),
+            vec![BString::from("x/a/1"), BString::from("x/b/2")]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "directory does not exist")]
+    fn in_rejects_a_wildcard_matching_no_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("file"), b"").unwrap();
+        Finder::create().r#in(tmp.path().join("fi*"));
     }
 }
