@@ -10,10 +10,9 @@ use crate::plugin::rpc::dispatch::unavailable_method;
 use crate::plugin::rpc::table::{
     RustEntity, register_entity, repository_handle_value, rust_handle_value,
 };
+use crate::util::StreamContextOptions;
 use bstr::{BStr, BString, ByteSlice};
-use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::PhpMixed;
 
 /// Serves the methods `PreFileDownloadEvent` declares beyond the base event's.
 pub(crate) fn dispatch_pre_file_download_event_method(
@@ -42,7 +41,7 @@ pub(crate) fn dispatch_pre_file_download_event_method(
         b"getContext" => file_download_context_value(event.get_context()),
         b"getTransportOptions" => Ok(event.get_transport_options().clone().to_wire()),
         b"setTransportOptions" => {
-            event.set_transport_options(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?);
+            event.set_transport_options(arg::<StreamContextOptions>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
         other => Err(unavailable_method("Event", other)),

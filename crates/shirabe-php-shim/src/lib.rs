@@ -348,34 +348,6 @@ impl PhpMixed {
         matches!(self, PhpMixed::Null)
     }
 
-    /// The array that PHP's `$value[$key] = ...` writes into. Null and false auto-vivify an empty
-    /// array, and a list becomes a keyed array.
-    pub fn offset_set_target(&mut self) -> anyhow::Result<&mut IndexMap<BString, PhpMixed>> {
-        match self {
-            PhpMixed::Null | PhpMixed::Bool(false) => *self = PhpMixed::Array(IndexMap::new()),
-            PhpMixed::List(list) => {
-                *self = PhpMixed::Array(
-                    std::mem::take(list)
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, v)| (bconcat!(i), v))
-                        .collect(),
-                )
-            }
-            _ => {}
-        }
-        match self {
-            PhpMixed::Array(map) => Ok(map),
-            PhpMixed::String(_) => {
-                Err(Error::new("Cannot access offset of type string on string").into())
-            }
-            PhpMixed::Object(_) => {
-                Err(Error::new("Cannot use object of type stdClass as array").into())
-            }
-            _ => Err(Error::new("Cannot use a scalar value as an array").into()),
-        }
-    }
-
     /// PHP's `$value[] = $item`. Null and false auto-vivify an empty array first.
     pub fn push(&mut self, item: PhpMixed) -> anyhow::Result<()> {
         if matches!(self, PhpMixed::Null | PhpMixed::Bool(false)) {

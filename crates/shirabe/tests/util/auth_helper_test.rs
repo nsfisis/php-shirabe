@@ -89,7 +89,11 @@ fn test_add_authentication_header_without_auth_credentials() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 
@@ -109,7 +113,11 @@ fn test_add_authentication_header_with_bearer_password() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 
@@ -144,7 +152,11 @@ fn test_add_authentication_header_with_github_token() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 
@@ -180,7 +192,11 @@ fn test_add_authentication_header_with_gitlab_oath_token() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 
@@ -224,7 +240,11 @@ fn test_add_authentication_options_for_client_certificate() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 
@@ -257,7 +277,11 @@ fn add_authentication_header_with_gitlab_private_token(password: &BStr) {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 
@@ -300,7 +324,11 @@ fn test_add_authentication_header_with_bitbucket_oath_token() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 
@@ -327,7 +355,11 @@ fn add_authentication_header_with_bitbucket_public_url(url: &BStr) {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 
@@ -374,7 +406,11 @@ fn add_authentication_header_with_basic_http_authentication(
 
     let options = f
         .auth_helper
-        .add_authentication_options(options.into(), BStr::new(origin), BStr::new(url))
+        .add_authentication_options(
+            options.try_into().unwrap(),
+            BStr::new(origin),
+            BStr::new(url),
+        )
         .unwrap()
         .into_array();
 

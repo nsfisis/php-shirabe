@@ -1408,11 +1408,11 @@ impl Factory {
         if !disable_tls {
             let cafile = config.borrow().get_path("cafile")?;
             if !cafile.is_empty() {
-                http_downloader_options.ssl_mut()?.set_cafile(cafile);
+                http_downloader_options.ssl_mut().set_cafile(cafile);
             }
             let capath = config.borrow().get_path("capath")?;
             if !capath.is_empty() {
-                http_downloader_options.ssl_mut()?.set_capath(capath);
+                http_downloader_options.ssl_mut().set_capath(capath);
             }
             http_downloader_options = http_downloader_options.replace_recursive(options);
         }

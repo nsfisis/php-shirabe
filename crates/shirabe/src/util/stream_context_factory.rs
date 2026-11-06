@@ -37,15 +37,14 @@ impl StreamContextFactory {
             },
         );
         let mut default_options = default_options;
-        // init_options() has rejected an `http` that is neither null nor an array.
         if default_options.http().is_some() {
-            default_options.http_mut()?.remove("header");
+            default_options.http_mut().remove("header");
         }
         options = options.replace_recursive(default_options);
 
         if let Some(header) = options.http().and_then(HttpOptions::header).cloned() {
             let fixed = Self::fix_http_header_field(header)?;
-            options.http_mut()?.set_header(fixed);
+            options.http_mut().set_header(fixed);
         }
 
         Ok(Ok(stream_context_create(
@@ -61,7 +60,7 @@ impl StreamContextFactory {
     ) -> anyhow::Result<Result<StreamContextOptions, Box<TransportException>>> {
         let url = url.as_ref();
         // Make sure the headers are in an array form
-        let http = options.http_mut()?;
+        let http = options.http_mut();
         if http.header().is_none() {
             http.set_header(PhpMixed::List(vec![]));
         }
@@ -113,11 +112,12 @@ impl StreamContextFactory {
                         .iter()
                         .map(|(group, entries)| (group.clone(), PhpMixed::Array(entries.clone())))
                         .collect(),
-                );
+                )
+                .expect("every proxy context option group is an array");
                 // Header will be a Proxy-Authorization string or not set
                 if let Some(header) = proxy_options.http().and_then(HttpOptions::header).cloned() {
-                    options.http_mut()?.push_header(header)?;
-                    proxy_options.http_mut()?.remove("header");
+                    options.http_mut().push_header(header)?;
+                    proxy_options.http_mut().remove("header");
                 }
                 options = options.replace_recursive(proxy_options);
             }
@@ -165,7 +165,7 @@ impl StreamContextFactory {
                 ")"
             );
             options
-                .http_mut()?
+                .http_mut()
                 .push_header(PhpMixed::string(user_agent))?;
         }
 
@@ -234,24 +234,8 @@ impl StreamContextFactory {
         ssl.insert("SNI_enabled".into(), PhpMixed::Bool(true));
         ssl.insert("capture_peer_cert".into(), PhpMixed::Bool(true));
 
-        if let Some(ssl_options) = options.get("ssl").filter(|ssl| !ssl.is_null()) {
-            let ssl_options = match ssl_options {
-                PhpMixed::Array(map) => map,
-                PhpMixed::List(list) => list
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, v)| (bconcat!(i), v))
-                    .collect(),
-                other => {
-                    return Err(TypeError::new(bconcat!(
-                        "array_replace_recursive(): Argument #2 must be of type array, ",
-                        get_debug_type(&other),
-                        " given"
-                    ))
-                    .into());
-                }
-            };
-            ssl = array_replace_recursive(ssl, ssl_options);
+        if let Some(ssl_options) = options.ssl() {
+            ssl = array_replace_recursive(ssl, ssl_options.to_array());
         }
 
         // Attempt to find a local cafile or throw an exception if none pre-set.
@@ -307,7 +291,7 @@ impl StreamContextFactory {
         ssl.insert("disable_compression".into(), PhpMixed::Bool(true));
 
         let mut defaults = StreamContextOptions::new();
-        defaults.insert("ssl", PhpMixed::Array(ssl));
+        defaults.insert("ssl", PhpMixed::Array(ssl))?;
         Ok(defaults)
     }
 

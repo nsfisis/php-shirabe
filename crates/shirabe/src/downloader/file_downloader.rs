@@ -16,7 +16,9 @@ use crate::package::comparer::Comparer;
 use crate::plugin::{
     FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
 };
-use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, Url as UrlUtil};
+use crate::util::{
+    Filesystem, HttpDownloader, Platform, ProcessExecutor, StreamContextOptions, Url as UrlUtil,
+};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -495,7 +497,7 @@ impl DownloaderInterface for FileDownloader {
                     .add_copy(
                         &url.processed,
                         &file_name,
-                        package.get_transport_options().into(),
+                        StreamContextOptions::from_array(package.get_transport_options())?,
                     )
                     .await;
                 match add_copy_result {

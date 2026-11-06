@@ -30,9 +30,9 @@ fn call_get_options_for_url(
     options: IndexMap<BString, PhpMixed>,
     file_url: &BStr,
 ) -> IndexMap<BString, PhpMixed> {
-    let fs = RemoteFilesystem::new(io, config_mock(), options.into(), false);
+    let fs = RemoteFilesystem::new(io, config_mock(), options.try_into().unwrap(), false);
     fs.__set_file_url(file_url).unwrap();
-    fs.__get_options_for_url(origin_url, additional_options.into())
+    fs.__get_options_for_url(origin_url, additional_options.try_into().unwrap())
         .unwrap()
 }
 

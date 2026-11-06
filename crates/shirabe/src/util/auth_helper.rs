@@ -466,7 +466,7 @@ impl AuthHelper {
         origin: &BStr,
         url: &BStr,
     ) -> anyhow::Result<StreamContextOptions> {
-        let http = options.http_mut()?;
+        let http = options.http_mut();
         if http.header().is_none() {
             http.set_header(PhpMixed::List(vec![]));
         }
@@ -483,7 +483,7 @@ impl AuthHelper {
                 .and_then(|v| v.clone())
                 .unwrap_or_default();
             if password == "bearer" {
-                options.http_mut()?.push_header(PhpMixed::string(bconcat!(
+                options.http_mut().push_header(PhpMixed::string(bconcat!(
                     "Authorization: Bearer ",
                     username
                 )))?;
@@ -496,7 +496,7 @@ impl AuthHelper {
                 custom_headers = json_decode_assoc(&username)?;
                 if is_array(&custom_headers) {
                     for header in custom_headers.values() {
-                        options.http_mut()?.push_header(header.clone())?;
+                        options.http_mut().push_header(header.clone())?;
                     }
                     authentication_display_message = Some(BString::from(
                         "Using custom HTTP headers for authentication",
@@ -505,7 +505,7 @@ impl AuthHelper {
             } else if origin == "github.com" && password == "x-oauth-basic" {
                 // only add the access_token if it is actually a github API URL
                 if preg_is_match(php_regex!(r"{^https?://api\.github\.com/}"), url) {
-                    options.http_mut()?.push_header(PhpMixed::string(bconcat!(
+                    options.http_mut().push_header(PhpMixed::string(bconcat!(
                         "Authorization: token ",
                         username
                     )))?;
@@ -520,7 +520,7 @@ impl AuthHelper {
                 &self.config.borrow().get_list("gitlab-domains")?,
             ) {
                 if password == "oauth2" {
-                    options.http_mut()?.push_header(PhpMixed::string(bconcat!(
+                    options.http_mut().push_header(PhpMixed::string(bconcat!(
                         "Authorization: Bearer ",
                         username
                     )))?;
@@ -528,7 +528,7 @@ impl AuthHelper {
                         Some(BString::from("Using GitLab OAuth token authentication"));
                 } else {
                     options
-                        .http_mut()?
+                        .http_mut()
                         .push_header(PhpMixed::string(bconcat!("PRIVATE-TOKEN: ", username)))?;
                     authentication_display_message =
                         Some(BString::from("Using GitLab private token authentication"));
@@ -538,7 +538,7 @@ impl AuthHelper {
                 && username == "x-token-auth"
             {
                 if !self.is_public_bit_bucket_download(url) {
-                    options.http_mut()?.push_header(PhpMixed::string(bconcat!(
+                    options.http_mut().push_header(PhpMixed::string(bconcat!(
                         "Authorization: Bearer ",
                         password
                     )))?;
@@ -563,12 +563,12 @@ impl AuthHelper {
                         .into());
                     }
                 }
-                options.insert("ssl", array_merge(existing_ssl, decoded));
+                options.insert("ssl", array_merge(existing_ssl, decoded))?;
                 authentication_display_message =
                     Some(BString::from("Using SSL client certificate"));
             } else {
                 let auth_str = base64_encode(bconcat!(username, ":", password));
-                options.http_mut()?.push_header(PhpMixed::string(bconcat!(
+                options.http_mut().push_header(PhpMixed::string(bconcat!(
                     "Authorization: Basic ",
                     auth_str
                 )))?;

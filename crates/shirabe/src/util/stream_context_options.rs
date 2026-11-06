@@ -16,8 +16,8 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{
-    PhpMixed, TypeError, array_replace_recursive, bconcat, get_debug_type, implode_mixed,
-    php_to_string,
+    PhpMixed, TypeError, array_replace_recursive, bconcat, error_message, get_debug_type,
+    implode_mixed, php_to_string,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -29,7 +29,7 @@ pub struct StreamContextOptions {
 enum StreamContextOption {
     Http(HttpOptions),
     Ssl(SslOptions),
-    /// Any other key, or `http`/`ssl` holding something other than a keyed array.
+    /// Any key other than `http` and `ssl`.
     Other(PhpMixed),
 }
 
@@ -51,29 +51,25 @@ impl StreamContextOptions {
         Self::default()
     }
 
-    pub fn from_array(array: IndexMap<BString, PhpMixed>) -> Self {
+    pub fn from_array(array: IndexMap<BString, PhpMixed>) -> anyhow::Result<Self> {
         let mut options = Self::new();
         for (key, value) in array {
-            options.insert(key, value);
+            options.insert(key, value)?;
         }
-        options
+        Ok(options)
     }
 
-    /// The array an `array $options` parameter receives. Anything else fails with the TypeError
-    /// of PHP's type check, for which `parameter` names the parameter (e.g.
-    /// `Composer\Util\HttpDownloader::get(): Argument #2 ($options)`).
-    pub fn from_mixed(value: PhpMixed, parameter: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+    pub fn from_mixed(value: PhpMixed) -> anyhow::Result<Self> {
         match value {
-            PhpMixed::Array(array) => Ok(Self::from_array(array)),
-            PhpMixed::List(list) => Ok(Self::from_array(
+            PhpMixed::Array(array) => Self::from_array(array),
+            PhpMixed::List(list) => Self::from_array(
                 list.into_iter()
                     .enumerate()
                     .map(|(i, value)| (bconcat!(i), value))
                     .collect(),
-            )),
+            ),
             other => Err(TypeError::new(bconcat!(
-                parameter.as_ref(),
-                " must be of type array, ",
+                "Stream context options must be of type array, ",
                 get_debug_type(&other),
                 " given"
             ))
@@ -113,11 +109,20 @@ impl StreamContextOptions {
             .is_some_and(|value| !matches!(value, StreamContextOption::Other(PhpMixed::Null)))
     }
 
-    /// `$options[$key] = $value`. An existing key keeps its position.
-    pub fn insert(&mut self, key: impl Into<BString>, value: PhpMixed) {
+    /// `$options[$key] = $value`. An existing key keeps its position. Fails on an `http` or `ssl`
+    /// group that is not an array, and removes the group for a null or false one (see the module
+    /// documentation).
+    pub fn insert(&mut self, key: impl Into<BString>, value: PhpMixed) -> anyhow::Result<()> {
         let key = key.into();
-        let value = StreamContextOption::from_mixed(&key, value);
-        self.entries.insert(key, value);
+        match StreamContextOption::from_mixed(&key, value)? {
+            Some(value) => {
+                self.entries.insert(key, value);
+            }
+            None => {
+                self.entries.shift_remove(&key);
+            }
+        }
+        Ok(())
     }
 
     /// `unset($options[$key])`.
@@ -127,26 +132,25 @@ impl StreamContextOptions {
             .map(StreamContextOption::into_mixed)
     }
 
-    /// `$options['http']`, when it is an array.
+    /// `$options['http']`, when it is set.
     pub fn http(&self) -> Option<&HttpOptions> {
         match self.entries.get(B("http")) {
             Some(StreamContextOption::Http(http)) => Some(http),
-            _ => None,
+            Some(other) => unreachable!("`http` is always an HttpOptions, got {other:?}"),
+            None => None,
         }
     }
 
-    /// `$options['http']` as a write to one of its keys sees it: a missing, null or false group
-    /// becomes an empty array, and a scalar fails as PHP does.
-    pub fn http_mut(&mut self) -> anyhow::Result<&mut HttpOptions> {
-        let entry = self.group_mut(b"http")?;
-        if let StreamContextOption::Other(PhpMixed::Array(map)) = entry {
-            *entry = StreamContextOption::Http(HttpOptions {
-                entries: std::mem::take(map),
-            });
-        }
-        match entry {
-            StreamContextOption::Http(http) => Ok(http),
-            _ => unreachable!("group_mut() leaves `http` an array"),
+    /// `$options['http']` for a write to one of its keys, which creates a missing group as PHP's
+    /// `$options['http'][$key] = ...` does.
+    pub fn http_mut(&mut self) -> &mut HttpOptions {
+        match self
+            .entries
+            .entry("http".into())
+            .or_insert_with(|| StreamContextOption::Http(HttpOptions::new()))
+        {
+            StreamContextOption::Http(http) => http,
+            other => unreachable!("`http` is always an HttpOptions, got {other:?}"),
         }
     }
 
@@ -156,25 +160,24 @@ impl StreamContextOptions {
             .insert("http".into(), StreamContextOption::Http(http));
     }
 
-    /// `$options['ssl']`, when it is an array.
+    /// `$options['ssl']`, when it is set.
     pub fn ssl(&self) -> Option<&SslOptions> {
         match self.entries.get(B("ssl")) {
             Some(StreamContextOption::Ssl(ssl)) => Some(ssl),
-            _ => None,
+            Some(other) => unreachable!("`ssl` is always an SslOptions, got {other:?}"),
+            None => None,
         }
     }
 
-    /// `$options['ssl']` as a write to one of its keys sees it, like [`Self::http_mut`].
-    pub fn ssl_mut(&mut self) -> anyhow::Result<&mut SslOptions> {
-        let entry = self.group_mut(b"ssl")?;
-        if let StreamContextOption::Other(PhpMixed::Array(map)) = entry {
-            *entry = StreamContextOption::Ssl(SslOptions {
-                entries: std::mem::take(map),
-            });
-        }
-        match entry {
-            StreamContextOption::Ssl(ssl) => Ok(ssl),
-            _ => unreachable!("group_mut() leaves `ssl` an array"),
+    /// `$options['ssl']` for a write to one of its keys, like [`Self::http_mut`].
+    pub fn ssl_mut(&mut self) -> &mut SslOptions {
+        match self
+            .entries
+            .entry("ssl".into())
+            .or_insert_with(|| StreamContextOption::Ssl(SslOptions::new()))
+        {
+            StreamContextOption::Ssl(ssl) => ssl,
+            other => unreachable!("`ssl` is always an SslOptions, got {other:?}"),
         }
     }
 
@@ -184,33 +187,19 @@ impl StreamContextOptions {
             .insert("ssl".into(), StreamContextOption::Ssl(ssl));
     }
 
-    /// The group under `key`, auto-vivified for a write. A group that is not an array yet is left
-    /// as `Other(PhpMixed::Array)` for the caller to wrap.
-    fn group_mut(&mut self, key: &[u8]) -> anyhow::Result<&mut StreamContextOption> {
-        let entry = self
-            .entries
-            .entry(key.into())
-            .or_insert(StreamContextOption::Other(PhpMixed::Null));
-        if let StreamContextOption::Other(value) = entry {
-            value.offset_set_target()?;
-        }
-        Ok(entry)
-    }
-
     pub fn set_retry_auth_failure(&mut self, retry_auth_failure: bool) {
-        self.insert("retry-auth-failure", PhpMixed::Bool(retry_auth_failure));
+        self.insert("retry-auth-failure", PhpMixed::Bool(retry_auth_failure))
+            .expect("`retry-auth-failure` is not a group");
     }
 
-    /// `max_file_size`, when it is set. Its consumers declare it `?int` under strict_types, and
-    /// `parameter` names the one that receives it (e.g.
-    /// `stream_get_contents(): Argument #2 ($length)`) for the TypeError any other value raises.
-    pub fn max_file_size(&self, parameter: impl AsRef<[u8]>) -> anyhow::Result<Option<i64>> {
+    /// `max_file_size`, when it is set. Its consumers declare it `?int` under strict_types, so
+    /// any other value is invalid.
+    pub fn max_file_size(&self) -> anyhow::Result<Option<i64>> {
         match self.get("max_file_size") {
             None | Some(PhpMixed::Null) => Ok(None),
             Some(PhpMixed::Int(max_file_size)) => Ok(Some(max_file_size)),
             Some(other) => Err(TypeError::new(bconcat!(
-                parameter.as_ref(),
-                " must be of type ?int, ",
+                "The \"max_file_size\" option must be of type ?int, ",
                 get_debug_type(&other),
                 " given"
             ))
@@ -224,11 +213,14 @@ impl StreamContextOptions {
             self.into_array(),
             replacement.into_array(),
         ))
+        .expect("replacing an array group with an array group leaves an array")
     }
 }
 
-impl From<IndexMap<BString, PhpMixed>> for StreamContextOptions {
-    fn from(array: IndexMap<BString, PhpMixed>) -> Self {
+impl TryFrom<IndexMap<BString, PhpMixed>> for StreamContextOptions {
+    type Error = anyhow::Error;
+
+    fn try_from(array: IndexMap<BString, PhpMixed>) -> anyhow::Result<Self> {
         Self::from_array(array)
     }
 }
@@ -241,17 +233,41 @@ impl ToWire for StreamContextOptions {
 
 impl FromWire for StreamContextOptions {
     fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
-        IndexMap::<BString, PhpMixed>::from_wire(value).map(Self::from_array)
+        Self::from_array(IndexMap::<BString, PhpMixed>::from_wire(value)?)
+            .map_err(|error| PhpThrow::new("TypeError", error_message(&error), 0))
     }
 }
 
 impl StreamContextOption {
-    fn from_mixed(key: &[u8], value: PhpMixed) -> Self {
-        match (key, value) {
-            (b"http", PhpMixed::Array(entries)) => Self::Http(HttpOptions { entries }),
-            (b"ssl", PhpMixed::Array(entries)) => Self::Ssl(SslOptions { entries }),
-            (_, value) => Self::Other(value),
+    /// The entry `$options[$key] = $value` stores, `None` for a null or false `http`/`ssl` group.
+    fn from_mixed(key: &[u8], value: PhpMixed) -> anyhow::Result<Option<Self>> {
+        if key != b"http" && key != b"ssl" {
+            return Ok(Some(Self::Other(value)));
         }
+        let entries = match value {
+            PhpMixed::Null | PhpMixed::Bool(false) => return Ok(None),
+            PhpMixed::Array(entries) => entries,
+            PhpMixed::List(list) => list
+                .into_iter()
+                .enumerate()
+                .map(|(i, value)| (bconcat!(i), value))
+                .collect(),
+            other => {
+                return Err(TypeError::new(bconcat!(
+                    "The \"",
+                    key,
+                    "\" stream context option must be of type array, ",
+                    get_debug_type(&other),
+                    " given"
+                ))
+                .into());
+            }
+        };
+        Ok(Some(if key == b"http" {
+            Self::Http(HttpOptions { entries })
+        } else {
+            Self::Ssl(SslOptions { entries })
+        }))
     }
 
     fn to_mixed(&self) -> PhpMixed {
@@ -390,6 +406,10 @@ impl SslOptions {
         self.entries.insert(key.into(), value);
     }
 
+    pub fn to_array(&self) -> IndexMap<BString, PhpMixed> {
+        self.entries.clone()
+    }
+
     pub fn set_cafile(&mut self, cafile: impl Into<BString>) {
         self.insert("cafile", PhpMixed::String(cafile.into()));
     }
@@ -406,7 +426,6 @@ impl SslOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shirabe_php_shim::error_message;
 
     fn array<K: AsRef<[u8]>>(entries: Vec<(K, PhpMixed)>) -> PhpMixed {
         PhpMixed::Array(
@@ -419,7 +438,7 @@ mod tests {
 
     fn options<K: AsRef<[u8]>>(entries: Vec<(K, PhpMixed)>) -> StreamContextOptions {
         match array(entries) {
-            PhpMixed::Array(array) => StreamContextOptions::from_array(array),
+            PhpMixed::Array(array) => StreamContextOptions::from_array(array).unwrap(),
             _ => unreachable!(),
         }
     }
@@ -441,8 +460,8 @@ mod tests {
         let PhpMixed::Array(entries) = original.clone() else {
             unreachable!()
         };
-        let mut options = StreamContextOptions::from_array(entries);
-        options.http_mut().unwrap().set_method("POST");
+        let mut options = StreamContextOptions::from_array(entries).unwrap();
+        options.http_mut().set_method("POST");
 
         let PhpMixed::Array(mut expected) = original else {
             unreachable!()
@@ -457,28 +476,42 @@ mod tests {
     }
 
     #[test]
-    fn writes_to_a_missing_or_null_group_create_it() {
+    fn writes_to_a_missing_null_or_false_group_create_it() {
         let mut missing = StreamContextOptions::new();
-        missing.http_mut().unwrap().set_timeout(10);
+        missing.http_mut().set_timeout(10);
         let mut null = options(vec![("http", PhpMixed::Null)]);
-        null.http_mut().unwrap().set_timeout(10);
+        null.http_mut().set_timeout(10);
+        let mut r#false = options(vec![("http", PhpMixed::Bool(false))]);
+        r#false.http_mut().set_timeout(10);
 
         let expected = array(vec![("http", array(vec![("timeout", PhpMixed::Int(10))]))]);
         assert_eq!(expected, PhpMixed::Array(missing.into_array()));
         assert_eq!(expected, PhpMixed::Array(null.into_array()));
+        assert_eq!(expected, PhpMixed::Array(r#false.into_array()));
     }
 
     #[test]
-    fn writes_to_a_scalar_group_fail() {
-        let mut options = options(vec![("ssl", PhpMixed::Int(1))]);
-
-        let error = options.ssl_mut().unwrap_err();
+    fn keeps_a_list_group_as_an_array() {
+        let options = options(vec![("ssl", PhpMixed::List(vec![PhpMixed::Int(1)]))]);
 
         assert_eq!(
-            "Cannot use a scalar value as an array",
+            array(vec![("ssl", array(vec![("0", PhpMixed::Int(1))]))]),
+            PhpMixed::Array(options.into_array())
+        );
+    }
+
+    #[test]
+    fn rejects_a_group_that_is_not_an_array() {
+        let PhpMixed::Array(entries) = array(vec![("ssl", PhpMixed::Int(1))]) else {
+            unreachable!()
+        };
+
+        let error = StreamContextOptions::from_array(entries).unwrap_err();
+
+        assert_eq!(
+            "The \"ssl\" stream context option must be of type array, int given",
             error_message(&error)
         );
-        assert!(options.ssl().is_none());
     }
 
     #[test]
@@ -496,7 +529,6 @@ mod tests {
 
         options
             .http_mut()
-            .unwrap()
             .push_header(PhpMixed::string("C: c"))
             .unwrap();
 
@@ -514,12 +546,10 @@ mod tests {
     fn rejects_a_max_file_size_that_is_not_an_integer() {
         let options = options(vec![("max_file_size", PhpMixed::string("10"))]);
 
-        let error = options
-            .max_file_size("f(): Argument #1 ($size)")
-            .unwrap_err();
+        let error = options.max_file_size().unwrap_err();
 
         assert_eq!(
-            "f(): Argument #1 ($size) must be of type ?int, string given",
+            "The \"max_file_size\" option must be of type ?int, string given",
             error_message(&error)
         );
     }

@@ -114,9 +114,7 @@ impl LocalFilesystem {
             file_url = bconcat!(file_url, separator, "access_token=", php_to_string(&token));
         }
 
-        let max_file_size = options.max_file_size(
-            "Composer\\Util\\RemoteFilesystem::getRemoteContents(): Argument #5 ($maxFileSize)",
-        )?;
+        let max_file_size = options.max_file_size()?;
 
         let using_proxy = {
             let proxy_manager_guard = ProxyManager::get_instance();

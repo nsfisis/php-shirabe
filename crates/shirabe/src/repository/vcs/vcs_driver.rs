@@ -7,7 +7,7 @@ use crate::io::IOInterface;
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::VcsDriverInterface;
 use crate::util::http::Response;
-use crate::util::{HttpDownloader, ProcessExecutor};
+use crate::util::{HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
@@ -72,13 +72,12 @@ impl VcsDriverBase {
         &self,
         url: &BStr,
     ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
-        let options = crate::util::StreamContextOptions::from_mixed(
+        let options = StreamContextOptions::from_mixed(
             self.repo_config
                 .get(B("options"))
                 .filter(|options| !options.is_null())
                 .cloned()
                 .unwrap_or(PhpMixed::Array(IndexMap::new())),
-            "Composer\\Util\\HttpDownloader::get(): Argument #2 ($options)",
         )?;
         match self.http_downloader.borrow_mut().get(url, options) {
             Ok(response) => Ok(Ok(response)),
@@ -308,13 +307,12 @@ pub trait VcsDriver: VcsDriverInterface {
         &self,
         url: &BStr,
     ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
-        let options = crate::util::StreamContextOptions::from_mixed(
+        let options = StreamContextOptions::from_mixed(
             self.repo_config()
                 .get(B("options"))
                 .filter(|options| !options.is_null())
                 .cloned()
                 .unwrap_or(PhpMixed::Array(IndexMap::new())),
-            "Composer\\Util\\HttpDownloader::get(): Argument #2 ($options)",
         )?;
         match self.http_downloader().borrow_mut().get(url, options) {
             Ok(response) => Ok(Ok(response)),

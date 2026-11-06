@@ -953,9 +953,7 @@ impl NativeHttpDownloader {
             Some(http) if http.header().is_some() => http.header_lines()?,
             _ => Vec::new(),
         };
-        let max_file_size = options
-            .max_file_size("stream_get_contents(): Argument #2 ($length)")?
-            .map(|n| n.max(0) as u64);
+        let max_file_size = options.max_file_size()?.map(|n| n.max(0) as u64);
 
         Ok(CurlRequestOptions {
             method,

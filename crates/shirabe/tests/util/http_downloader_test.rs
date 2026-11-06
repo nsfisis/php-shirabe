@@ -172,7 +172,7 @@ fn test_constructor_rejects_an_unreadable_cafile() {
     let mut options = IndexMap::new();
     options.insert(BString::from("ssl"), PhpMixed::Array(ssl));
 
-    let error = HttpDownloader::new(io, config, options.into(), false).unwrap_err();
+    let error = HttpDownloader::new(io, config, options.try_into().unwrap(), false).unwrap_err();
 
     assert_eq!(
         "The configured cafile was not valid or could not be read.",

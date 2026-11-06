@@ -72,7 +72,7 @@ pub struct ComposerRepository {
     /// injected via `set_self_handle`. Used to wire package -> repository back-references.
     self_weak: std::cell::RefCell<Option<RepositoryInterfaceWeakHandle>>,
     repo_config: IndexMap<BString, PhpMixed>,
-    options: IndexMap<BString, PhpMixed>,
+    options: StreamContextOptions,
     /// non-empty-string
     url: BString,
     /// non-empty-string
@@ -281,7 +281,7 @@ impl ComposerRepository {
             .into());
         }
 
-        if !repo_config.contains_key(B("options")) {
+        if repo_config.get(B("options")).is_none_or(PhpMixed::is_null) {
             repo_config.insert("options".into(), PhpMixed::Array(IndexMap::new()));
         }
         let mut allow_ssl_downgrade = false;
@@ -291,13 +291,7 @@ impl ComposerRepository {
             allow_ssl_downgrade = true;
         }
 
-        let options = repo_config
-            .get(B("options"))
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .collect::<IndexMap<BString, PhpMixed>>();
+        let options = StreamContextOptions::from_mixed(repo_config[B("options")].clone())?;
         let mut url = BString::from(
             repo_config
                 .get(B("url"))
@@ -579,7 +573,7 @@ impl ComposerRepository {
             let result = self
                 .http_downloader
                 .borrow_mut()
-                .get(&url, self.options.clone().into())?
+                .get(&url, self.options.clone())?
                 .decode_json()?;
             let package_names: Vec<BString> = result
                 .as_array()
@@ -607,7 +601,7 @@ impl ComposerRepository {
         let result = self
             .http_downloader
             .borrow_mut()
-            .get(&url, self.options.clone().into())?
+            .get(&url, self.options.clone())?
             .decode_json()?;
         let package_names: Vec<BString> = result
             .as_array()
@@ -773,7 +767,7 @@ impl ComposerRepository {
             let search = self
                 .http_downloader
                 .borrow_mut()
-                .get(&url, self.options.clone().into())?
+                .get(&url, self.options.clone())?
                 .decode_json()?;
 
             let results_arr = search
@@ -851,7 +845,7 @@ impl ComposerRepository {
                 let result = self
                     .http_downloader
                     .borrow_mut()
-                    .get(&url, self.options.clone().into())?
+                    .get(&url, self.options.clone())?
                     .decode_json()?;
 
                 let mut results: Vec<IndexMap<BString, PhpMixed>> = Vec::new();
@@ -1070,8 +1064,8 @@ impl ComposerRepository {
         if let Some(api_url) = api_url
             && !package_constraint_map.is_empty()
         {
-            let mut options: StreamContextOptions = self.options.clone().into();
-            let http = options.http_mut()?;
+            let mut options = self.options.clone();
+            let http = options.http_mut();
             http.set_method("POST");
             http.cast_header_to_array();
             http.push_header(PhpMixed::string(
@@ -1155,7 +1149,7 @@ impl ComposerRepository {
         if let Some(providers_api_url) = self.providers_api_url.clone() {
             let api_result = match self.http_downloader.borrow_mut().get(
                 str_replace("%package%", package_name, &providers_api_url),
-                self.options.clone().into(),
+                self.options.clone(),
             ) {
                 Ok(resp) => resp.decode_json()?,
                 Err(e) => {
@@ -1289,7 +1283,7 @@ impl ComposerRepository {
     fn configure_package_transport_options(&self, package: PackageInterfaceHandle) {
         for url in package.get_dist_urls() {
             if url.starts_with(&self.base_url) {
-                package.set_transport_options(self.options.clone());
+                package.set_transport_options(self.options.to_array());
 
                 return;
             }
@@ -2757,7 +2751,7 @@ impl ComposerRepository {
             cont
         } {
             let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
-                let mut options: StreamContextOptions = self.options.clone().into();
+                let mut options = self.options.clone();
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
@@ -2767,8 +2761,7 @@ impl ComposerRepository {
                         "metadata".into(),
                         Some(FileDownloadContext::Repository),
                     );
-                    pre_file_download_event
-                        .set_transport_options(self.options.clone().into_iter().collect());
+                    pre_file_download_event.set_transport_options(self.options.clone());
                     let pre_file_download_event_name =
                         pre_file_download_event.get_name().to_owned();
                     let pre_file_download_event =
@@ -2779,10 +2772,7 @@ impl ComposerRepository {
                     )?;
                     let pre_file_download_event = pre_file_download_event.borrow();
                     filename = BString::from(pre_file_download_event.get_processed_url());
-                    options = pre_file_download_event
-                        .get_transport_options()
-                        .clone()
-                        .into();
+                    options = pre_file_download_event.get_transport_options().clone();
                 }
 
                 let mut response = self.http_downloader.borrow_mut().get(&filename, options)?;
@@ -2928,7 +2918,7 @@ impl ComposerRepository {
 
         let mut filename = BString::from(filename);
         let result: anyhow::Result<FetchFileIfLastModifiedResult> = (|| {
-            let mut options: StreamContextOptions = self.options.clone().into();
+            let mut options = self.options.clone();
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
@@ -2938,8 +2928,7 @@ impl ComposerRepository {
                     "metadata".into(),
                     Some(FileDownloadContext::Repository),
                 );
-                pre_file_download_event
-                    .set_transport_options(self.options.clone().into_iter().collect());
+                pre_file_download_event.set_transport_options(self.options.clone());
                 let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
                 let pre_file_download_event =
                     std::rc::Rc::new(std::cell::RefCell::new(pre_file_download_event));
@@ -2949,14 +2938,11 @@ impl ComposerRepository {
                 )?;
                 let pre_file_download_event = pre_file_download_event.borrow();
                 filename = BString::from(pre_file_download_event.get_processed_url());
-                options = pre_file_download_event
-                    .get_transport_options()
-                    .clone()
-                    .into();
+                options = pre_file_download_event.get_transport_options().clone();
             }
 
             // cast http.header to array, then append
-            let http = options.http_mut()?;
+            let http = options.http_mut();
             http.cast_header_to_array();
             http.push_header(PhpMixed::string(bconcat!(
                 "If-Modified-Since: ",
@@ -3068,7 +3054,7 @@ impl ComposerRepository {
         }
 
         let mut filename = BString::from(filename);
-        let mut options: StreamContextOptions = self.options.clone().into();
+        let mut options = self.options.clone();
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
             let mut dispatcher = dispatcher.borrow_mut();
             let mut pre_file_download_event = PreFileDownloadEvent::new(
@@ -3078,8 +3064,7 @@ impl ComposerRepository {
                 "metadata".into(),
                 Some(FileDownloadContext::Repository),
             );
-            pre_file_download_event
-                .set_transport_options(self.options.clone().into_iter().collect());
+            pre_file_download_event.set_transport_options(self.options.clone());
             let pre_file_download_event_name = pre_file_download_event.get_name().to_owned();
             let pre_file_download_event =
                 std::rc::Rc::new(std::cell::RefCell::new(pre_file_download_event));
@@ -3089,14 +3074,11 @@ impl ComposerRepository {
             )?;
             let pre_file_download_event = pre_file_download_event.borrow();
             filename = BString::from(pre_file_download_event.get_processed_url());
-            options = pre_file_download_event
-                .get_transport_options()
-                .clone()
-                .into();
+            options = pre_file_download_event.get_transport_options().clone();
         }
 
         if let Some(last_modified_time) = last_modified_time {
-            let http = options.http_mut()?;
+            let http = options.http_mut();
             http.cast_header_to_array();
             http.push_header(PhpMixed::string(bconcat!(
                 "If-Modified-Since: ",

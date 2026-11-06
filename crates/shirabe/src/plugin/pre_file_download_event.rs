@@ -2,10 +2,8 @@
 
 use crate::event_dispatcher::{Event, EventFlags};
 use crate::package::PackageInterfaceHandle;
-use crate::util::HttpDownloader;
+use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 
 /// The `$context` a file download event carries: the package a dist download is for, or the
 /// array a repository passes along with a metadata download.
@@ -27,7 +25,7 @@ pub struct PreFileDownloadEvent {
     custom_cache_key: Option<BString>,
     r#type: BString,
     context: Option<FileDownloadContext>,
-    transport_options: IndexMap<BString, PhpMixed>,
+    transport_options: StreamContextOptions,
 }
 
 impl PreFileDownloadEvent {
@@ -45,7 +43,7 @@ impl PreFileDownloadEvent {
             custom_cache_key: None,
             r#type,
             context,
-            transport_options: IndexMap::new(),
+            transport_options: StreamContextOptions::new(),
         }
     }
 
@@ -81,11 +79,11 @@ impl PreFileDownloadEvent {
         self.context.as_ref()
     }
 
-    pub fn get_transport_options(&self) -> &IndexMap<BString, PhpMixed> {
+    pub fn get_transport_options(&self) -> &StreamContextOptions {
         &self.transport_options
     }
 
-    pub fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>) {
+    pub fn set_transport_options(&mut self, options: StreamContextOptions) {
         self.transport_options = options;
     }
 }
