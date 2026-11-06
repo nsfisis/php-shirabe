@@ -3,7 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, getenv, hexdec, implode, php_str, round, strlen, substr};
+use shirabe_php_shim::{bconcat, getenv, implode, php_str, round, strlen, substr, utf8_text};
 
 const COLORS: [(&BStr, i64); 9] = [
     (php_str(b"black"), 0),
@@ -162,9 +162,20 @@ impl Color {
                 )));
             }
 
+            // PHP's hexdec() skips characters that are not hex digits, raising only a deprecation
+            // notice; such a color is rejected here instead.
+            let Some(hex_color) = utf8_text(&color).and_then(|c| i64::from_str_radix(c, 16).ok())
+            else {
+                return Err(InvalidArgumentException::new(bconcat!(
+                    "Invalid \"",
+                    color,
+                    "\" color."
+                )));
+            };
+
             return Ok(bconcat!(
                 if background { "4" } else { "3" },
-                Self::convert_hex_color_to_ansi(hexdec(&color))
+                Self::convert_hex_color_to_ansi(hex_color)
             ));
         }
 

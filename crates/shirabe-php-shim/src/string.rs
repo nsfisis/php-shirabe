@@ -1124,22 +1124,6 @@ pub fn php_strip_whitespace(path: impl AsRef<std::path::Path>) -> Result<BString
     Ok(BString::from(out))
 }
 
-pub fn hexdec(s: impl AsRef<[u8]>) -> i64 {
-    // PHP hexdec() ignores characters outside [0-9A-Fa-f].
-    // TODO(php-semantics): PHP promotes the result to float on overflow; this i64 return wraps instead.
-    let mut acc: u64 = 0;
-    for &b in s.as_ref() {
-        let d = match b {
-            b'0'..=b'9' => b - b'0',
-            b'a'..=b'f' => b - b'a' + 10,
-            b'A'..=b'F' => b - b'A' + 10,
-            _ => continue,
-        };
-        acc = acc.wrapping_mul(16).wrapping_add(d as u64);
-    }
-    acc as i64
-}
-
 pub fn byte_at(s: impl AsRef<[u8]>, i: usize) -> u8 {
     s.as_ref().get(i).copied().unwrap_or(0)
 }
