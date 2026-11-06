@@ -987,7 +987,7 @@ impl Process {
         cmd: &[u8],
         env: &mut IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<BString> {
-        let uid = uniqid("", true);
+        let uid = uniqid("");
         let mut var_count: i64 = 0;
         let mut var_cache: IndexMap<BString, BString> = IndexMap::new();
         let cmd = preg_replace_callback(

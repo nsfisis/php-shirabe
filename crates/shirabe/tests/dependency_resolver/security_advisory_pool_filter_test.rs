@@ -376,10 +376,7 @@ fn generate_security_advisory(
     source.insert("remoteId".into(), PhpMixed::string(BString::from("test")));
 
     let mut advisory: IndexMap<BString, PhpMixed> = IndexMap::new();
-    advisory.insert(
-        "advisoryId".into(),
-        PhpMixed::string(uniqid("PKSA-", false)),
-    );
+    advisory.insert("advisoryId".into(), PhpMixed::string(uniqid("PKSA-")));
     advisory.insert(
         "packageName".into(),
         PhpMixed::string(bconcat!(package_name)),

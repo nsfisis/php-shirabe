@@ -1,5 +1,5 @@
 use crate::{PhpMixed, bconcat};
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
 use shirabe_php_src::standard::string::{php_trim_mask, php_wordwrap};
@@ -1203,29 +1203,6 @@ pub fn number_format(
         result.insert(0, b'-');
     }
     result
-}
-
-pub fn uniqid(prefix: impl AsRef<[u8]>, more_entropy: bool) -> BString {
-    // PHP builds the id from the current time: 8 hex digits of seconds followed by 5 hex digits of
-    // microseconds. With $more_entropy a '.' and a random fraction (PHP's "%08.8F") are appended.
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let mut out = BString::from(prefix.as_ref());
-    out.push_str(crate::display_to_bytes(format_args!(
-        "{:08x}{:05x}",
-        now.as_secs(),
-        now.subsec_micros()
-    )));
-    if more_entropy {
-        // TODO(php-semantics): PHP uses its combined LCG; this uses `fastrand`, so the random suffix is
-        // not reproducible against PHP (it is non-deterministic in PHP too).
-        out.push_str(crate::display_to_bytes(format_args!(
-            ".{:.8}",
-            fastrand::f64() * 10.0
-        )));
-    }
-    out
 }
 
 #[cfg(test)]

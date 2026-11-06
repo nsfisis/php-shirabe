@@ -12,6 +12,19 @@ pub fn random_bytes(len: usize) -> Vec<u8> {
     buf
 }
 
+/// `prefix` followed by 16 random hex digits.
+///
+/// This stands in for PHP's `uniqid()` where the caller only needs a value that is unlikely to
+/// collide. The output does not follow the format of `uniqid()`.
+pub fn uniqid(prefix: impl AsRef<[u8]>) -> bstr::BString {
+    let mut id = bstr::BString::from(prefix.as_ref());
+    id.extend_from_slice(&crate::display_to_bytes(format_args!(
+        "{:016x}",
+        fastrand::u64(..)
+    )));
+    id
+}
+
 /// Integral types for which [`random_int`] can generate a value.
 pub trait RandomInt: Sized {
     fn random_int(range: impl std::ops::RangeBounds<Self>) -> Self;

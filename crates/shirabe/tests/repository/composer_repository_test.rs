@@ -702,7 +702,7 @@ fn generate_security_advisory(
     cve: Option<&BStr>,
     affected_versions: &BStr,
 ) -> (bstr::BString, PhpMixed) {
-    let advisory_id = uniqid("PKSA-", false);
+    let advisory_id = uniqid("PKSA-");
     let advisory = str_kv(&[
         (
             BStr::new("advisoryId"),
