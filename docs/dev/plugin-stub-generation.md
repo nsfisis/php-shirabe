@@ -59,15 +59,14 @@ Inputs:
   fails the run.
 
 The same directory holds `surface-manifest`, which compares the forwards in the generated stubs
-with the dispatcher arms on the Rust side and writes `crates/shirabe/src/plugin/rpc/surface.tsv`
-(see "Regenerate the surface manifest" in [plugin-surface-widening.md](plugin-surface-widening.md));
-rerun it after regenerating.
+with the dispatcher arms on the Rust side and writes `crates/shirabe/src/plugin/rpc/surface.tsv`;
+rerun it after regenerating the stubs or changing a dispatcher. The `plugin_surface_manifest` rule
+of `scripts/linters/lint` fails when the committed manifest is stale.
 
-The freshness check for both sets is the test
-`crates/shirabe-php-rpc/tests/generated_stubs.rs`
-(`cargo test -p shirabe-php-rpc --test generated_stubs`); it fails when PHP, the
-generator's vendor directory or the classifier report is unavailable. `just setup`
-installs both tools' dependencies and regenerates the report.
+The freshness check for both sets is the `plugin_generated_stubs` rule of
+`scripts/linters/lint`; it fails when the generator's vendor directory or the
+classifier report is unavailable. `just setup` installs both tools' dependencies and
+regenerates the report.
 
 ## What the generator emits
 

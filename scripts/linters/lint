@@ -21,6 +21,8 @@ use Shirabe\Lint\Linters\NoUseAsAlias;
 use Shirabe\Lint\Linters\OneUsePerModule;
 use Shirabe\Lint\Linters\PhpSrcDerivationBoundary;
 use Shirabe\Lint\Linters\PluginConstructibleList;
+use Shirabe\Lint\Linters\PluginGeneratedStubs;
+use Shirabe\Lint\Linters\PluginSurfaceManifest;
 use Shirabe\Lint\Linters\SortedDependencies;
 use Shirabe\Lint\Linters\UpstreamFileHash;
 use Shirabe\Lint\Runner;
@@ -74,6 +76,8 @@ $runner = new Runner($rootDir, [
     [new OneUsePerModule(), []],
     [new PhpSrcDerivationBoundary(), []],
     [new PluginConstructibleList(), []],
+    [new PluginGeneratedStubs(), []],
+    [new PluginSurfaceManifest(), []],
     [new SortedDependencies(), []],
     [new UpstreamFileHash(), []],
 ]);
