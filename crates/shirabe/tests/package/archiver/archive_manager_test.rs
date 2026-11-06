@@ -2,16 +2,14 @@
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::config::Config;
-use shirabe::downloader::{DownloadManager, GitDownloader};
+use shirabe::factory::Factory;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::CompletePackageInterfaceHandle;
-use shirabe::package::archiver::{ArchiveManager, PharArchiver, ZipArchiver};
+use shirabe::package::archiver::ArchiveManager;
 use shirabe::package::handle::CompletePackageHandle;
-use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe::util::{Filesystem, ProcessExecutor};
+use shirabe::util::{ProcessExecutor, StreamContextOptions};
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bconcat, file_exists, file_put_contents,
     path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
@@ -20,9 +18,6 @@ use shirabe_symfony_process::Process;
 use tempfile::TempDir;
 
 // ref: ArchiverTestCase::setUp + ArchiveManagerTest::setUp.
-//
-// The PHP test builds the ArchiveManager via Factory/FactoryMock; here we construct it directly
-// with the same archivers (ZipArchiver + PharArchiver) that Factory::createArchiveManager adds.
 struct TestCase {
     manager: ArchiveManager,
     test_dir: std::path::PathBuf,
@@ -35,38 +30,26 @@ impl TestCase {
         let guard = TempDir::new().unwrap();
         let test_dir = guard.path().to_path_buf();
 
+        let factory = Factory::default();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
-        // The filename/unknown-format tests never drive the download path, so a mock
-        // HttpDownloader (no curl backend) is sufficient to satisfy Loop's dependency.
+        let config = std::rc::Rc::new(std::cell::RefCell::new(
+            Factory::__create_config_mock(None).unwrap(),
+        ));
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-            HttpDownloader::__new_mock(io.clone(), config.clone()),
+            Factory::create_http_downloader(io.clone(), &config, StreamContextOptions::new())
+                .unwrap(),
         ));
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
-        let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(
-            process.clone(),
-        ))));
-        let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
-        // Factory::createDownloadManager registers a git downloader; the archive tests clone the
-        // package source (source type 'git') through it.
-        dm.set_downloader(
-            "git",
-            std::rc::Rc::new(std::cell::RefCell::new(GitDownloader::new(
-                io.clone(),
-                config,
-                Some(process),
-                Some(fs),
-            ))),
-        );
-        let dm = std::rc::Rc::new(std::cell::RefCell::new(dm));
+        let dm = factory
+            .create_download_manager(io, &config, &http_downloader, &process, None)
+            .unwrap();
         let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
-
-        let mut manager = ArchiveManager::new(dm, r#loop);
-        manager.add_archiver(Box::new(ZipArchiver::new()));
-        manager.add_archiver(Box::new(PharArchiver::new()));
+        let manager = factory
+            .create_archive_manager(&Factory::create_config(None, None).unwrap(), &dm, &r#loop)
+            .unwrap();
 
         let target_dir = test_dir.join("composer_archiver_tests");
 
@@ -178,9 +161,6 @@ fn test_unknown_format() {
 
 // ref: ArchiveManagerTest::testArchiveTar / testArchiveCustomFileName.
 #[test]
-// TODO(port): the config lacks the `home` setting that FactoryMock::createConfig provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that FactoryMock::createConfig provides"]
 fn test_archive_tar() {
     if !git_is_executable() {
         return;
@@ -215,9 +195,6 @@ fn test_archive_tar() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that FactoryMock::createConfig provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that FactoryMock::createConfig provides"]
 fn test_archive_custom_file_name() {
     if !git_is_executable() {
         return;

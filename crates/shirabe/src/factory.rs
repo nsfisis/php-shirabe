@@ -1347,7 +1347,7 @@ impl Factory {
 
     /// For testing only: equivalent of `FactoryMock::createConfig`. Builds a `Config` with a unique
     /// temp home and packagist disabled, without loading the global config/auth files.
-    fn __create_config_mock(cwd: Option<&Path>) -> anyhow::Result<Config> {
+    pub fn __create_config_mock(cwd: Option<&Path>) -> anyhow::Result<Config> {
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT: AtomicU64 = AtomicU64::new(0);
 

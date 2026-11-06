@@ -10,13 +10,15 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::GitLabDriver;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bconcat, extension_loaded};
+use shirabe_php_shim::{PhpMixed, bconcat, extension_loaded, path_to_bytes};
+use tempfile::TempDir;
 
-// Mirrors GitLabDriverTest::setUp's `gitlab-domains` configuration.
-fn make_config() -> Config {
+// Mirrors GitLabDriverTest::setUp's configuration.
+fn make_config(home: &std::path::Path) -> Config {
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
+    config_section.insert("home".into(), PhpMixed::string(path_to_bytes(home)));
     config_section.insert(
         "gitlab-domains".into(),
         PhpMixed::List(vec![
@@ -37,6 +39,7 @@ fn make_config() -> Config {
 // bare `getMock()` ProcessExecutor; none of these tests invoke git, so an empty
 // strict expectation set both matches PHP and catches unexpected process calls.
 struct Fixtures {
+    home: TempDir,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -44,11 +47,13 @@ struct Fixtures {
 }
 
 fn fixtures() -> Fixtures {
+    let home = TempDir::new().unwrap();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(make_config()));
+    let config = std::rc::Rc::new(std::cell::RefCell::new(make_config(home.path())));
     let (process, _process_guard) = get_process_executor_mock(vec![], true, MockHandler::default());
     Fixtures {
+        home,
         io,
         config,
         process,
@@ -204,9 +209,6 @@ fn do_test_initialize_public_project(
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_initialize() {
     let fixtures = fixtures();
     for (url, api_url) in provide_initialize_urls() {
@@ -215,9 +217,6 @@ fn test_initialize() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_initialize_public_project() {
     let fixtures = fixtures();
     for (url, api_url) in provide_initialize_urls() {
@@ -226,9 +225,6 @@ fn test_initialize_public_project() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_initialize_public_project_as_anonymous() {
     let fixtures = fixtures();
     for (url, api_url) in provide_initialize_urls() {
@@ -282,9 +278,6 @@ fn test_initialize_public_project_as_anonymous() {
 
 /// Also support repositories over HTTP (TLS) and has a port number.
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_initialize_with_port_number() {
     let fixtures = fixtures();
     let domain = "gitlab.mycompany.com";
@@ -359,9 +352,6 @@ fn test_initialize_with_port_number() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_invalid_support_data() {
     let fixtures = fixtures();
     let repo_url = BStr::new("https://gitlab.com/mygroup/myproject");
@@ -406,9 +396,6 @@ fn test_invalid_support_data() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_get_dist() {
     let fixtures = fixtures();
     let (driver, _guard) = do_test_initialize(
@@ -434,9 +421,6 @@ fn test_get_dist() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_get_source() {
     let fixtures = fixtures();
     let (driver, _guard) = do_test_initialize(
@@ -458,9 +442,6 @@ fn test_get_source() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_get_source_given_public_project() {
     let fixtures = fixtures();
     let (driver, _guard) = do_test_initialize_public_project(
@@ -482,9 +463,6 @@ fn test_get_source_given_public_project() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_get_tags() {
     let fixtures = fixtures();
     let (mut driver, _init_guard) = do_test_initialize(
@@ -554,9 +532,6 @@ fn test_get_tags() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_get_paginated_refs() {
     let fixtures = fixtures();
     let (mut driver, _init_guard) = do_test_initialize(
@@ -664,9 +639,6 @@ fn branch_entry(name: &BStr, id: &BStr, committed_date: &BStr) -> PhpMixed {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_get_branches() {
     let fixtures = fixtures();
     let (mut driver, _init_guard) = do_test_initialize(
@@ -738,9 +710,10 @@ fn test_get_branches() {
 #[test]
 fn test_supports() {
     for (url, expected) in data_for_test_supports() {
+        let home = TempDir::new().unwrap();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-        let config = std::rc::Rc::new(std::cell::RefCell::new(make_config()));
+        let config = std::rc::Rc::new(std::cell::RefCell::new(make_config(home.path())));
 
         assert_eq!(
             expected,
@@ -795,9 +768,6 @@ fn data_for_test_supports() -> Vec<(&'static BStr, bool)> {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_gitlab_sub_directory() {
     let fixtures = fixtures();
     let url = "https://mycompany.com/gitlab/mygroup/my-pro.ject";
@@ -840,9 +810,6 @@ fn test_gitlab_sub_directory() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_gitlab_sub_group() {
     let fixtures = fixtures();
     let url = "https://gitlab.com/mygroup/mysubgroup/myproject";
@@ -885,9 +852,6 @@ fn test_gitlab_sub_group() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_gitlab_sub_directory_sub_group() {
     let fixtures = fixtures();
     let url = "https://mycompany.com/gitlab/mygroup/mysubgroup/myproject";
@@ -931,9 +895,6 @@ fn test_gitlab_sub_directory_sub_group() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_forwards_options() {
     let fixtures = fixtures();
     let mut ssl: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -981,9 +942,6 @@ fn test_forwards_options() {
 }
 
 #[test]
-// TODO(port): the config lacks the `home` setting that GitLabDriverTest::setUp provides, so
-// reading a directory setting derived from it fails as Config::get('home') does.
-#[ignore = "the config lacks the home setting that GitLabDriverTest::setUp provides"]
 fn test_protocol_override_repository_url_generation() {
     let fixtures = fixtures();
     // @link http://doc.gitlab.com/ce/api/projects.html#get-single-project
@@ -1009,7 +967,7 @@ fn test_protocol_override_repository_url_generation() {
     let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
     // clone $this->config and merge gitlab-protocol => http.
-    let mut config = make_config();
+    let mut config = make_config(fixtures.home.path());
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
