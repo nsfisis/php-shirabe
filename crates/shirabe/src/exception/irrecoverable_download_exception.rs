@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Exception/IrrecoverableDownloadException.php sha1:633400c9a9dfb5973a890954e46c098339c2d86a
 
 use bstr::BString;
-use shirabe_php_shim::RuntimeException;
+use shirabe_php_shim::{RuntimeException, impl_php_exception};
 
 #[derive(Debug)]
 pub struct IrrecoverableDownloadException(pub RuntimeException);
@@ -13,7 +13,7 @@ impl IrrecoverableDownloadException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     IrrecoverableDownloadException,
     0,
     r"Composer\Exception\IrrecoverableDownloadException"

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Exception/NoSslException.php sha1:028672aabe912923f0bb37f7bb2ef7bd6df2a31b
 
 use bstr::BString;
-use shirabe_php_shim::RuntimeException;
+use shirabe_php_shim::{RuntimeException, impl_php_exception};
 
 /// Specific exception for Composer\Util\HttpDownloader creation.
 #[derive(Debug)]
@@ -14,4 +14,4 @@ impl NoSslException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(NoSslException, 0, r"Composer\Exception\NoSslException");
+impl_php_exception!(NoSslException, 0, r"Composer\Exception\NoSslException");

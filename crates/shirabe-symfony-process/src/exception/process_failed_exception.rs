@@ -2,7 +2,7 @@
 
 use crate::exception::{InvalidArgumentException, RuntimeException};
 use crate::process::Process;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::{bconcat, impl_php_exception};
 
 #[derive(Debug)]
 pub struct ProcessFailedException {
@@ -46,7 +46,7 @@ impl ProcessFailedException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     ProcessFailedException,
     inner,
     r"Symfony\Component\Process\Exception\ProcessFailedException"

@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/filesystem/Exception/IOException.php sha1:26c2d0ed00f4063a561046d700938b161fe3d7ec
 
 use bstr::BString;
-use shirabe_php_shim::RuntimeException;
+use shirabe_php_shim::{RuntimeException, impl_php_exception};
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl IOException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     IOException,
     inner,
     r"Symfony\Component\Filesystem\Exception\IOException"

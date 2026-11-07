@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/EventDispatcher/ScriptExecutionException.php sha1:8740e0adecb9efaa8072645070f1c1f142ac5e00
 
 use bstr::BString;
-use shirabe_php_shim::RuntimeException;
+use shirabe_php_shim::{RuntimeException, impl_php_exception};
 
 /// Thrown when a script running an external process exits with a non-0 status code
 #[derive(Debug)]
@@ -14,7 +14,7 @@ impl ScriptExecutionException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     ScriptExecutionException,
     0,
     r"Composer\EventDispatcher\ScriptExecutionException"

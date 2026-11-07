@@ -2,6 +2,7 @@
 
 use super::exception_interface::ExceptionInterface;
 use bstr::BString;
+use shirabe_php_shim::impl_php_exception;
 
 #[derive(Debug)]
 pub struct InvalidArgumentException(pub shirabe_php_shim::InvalidArgumentException);
@@ -13,7 +14,7 @@ impl InvalidArgumentException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     InvalidArgumentException,
     0,
     r"Symfony\Component\String\Exception\InvalidArgumentException"

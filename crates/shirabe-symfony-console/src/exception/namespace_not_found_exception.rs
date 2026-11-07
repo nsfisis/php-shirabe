@@ -3,6 +3,7 @@
 use super::command_not_found_exception::CommandNotFoundException;
 use super::exception_interface::ExceptionInterface;
 use bstr::BString;
+use shirabe_php_shim::impl_php_exception;
 
 #[derive(Debug)]
 pub struct NamespaceNotFoundException(pub CommandNotFoundException);
@@ -14,7 +15,7 @@ impl NamespaceNotFoundException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     NamespaceNotFoundException,
     0,
     r"Symfony\Component\Console\Exception\NamespaceNotFoundException"

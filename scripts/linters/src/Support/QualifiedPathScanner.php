@@ -8,14 +8,14 @@ namespace Shirabe\Lint\Support;
  * Finds paths rooted at a given first segment (e.g. `shirabe_php_shim::foo::Bar`) in Rust source,
  * outside comments, string and char literals, `use` declarations, `macro_rules!` bodies and
  * restricted visibilities (`pub(in ...)`). Paths that name a macro invocation (`root::foo!`) are
- * reported only when $includeMacros is set.
+ * reported too.
  */
 final class QualifiedPathScanner
 {
     private const SEGMENT_RE = '/\A\s*::\s*((?:r#)?[A-Za-z_][A-Za-z0-9_]*)/';
 
     /** @return list<array{path: string, line: int, offset: int, length: int}> */
-    public static function find(string $src, string $root, bool $includeMacros = false): array
+    public static function find(string $src, string $root): array
     {
         $found = [];
         $len = strlen($src);
@@ -60,7 +60,7 @@ final class QualifiedPathScanner
                     $path .= "::{$s[1]}";
                     $end += strlen($s[0]);
                 }
-                if ($path !== $word && ($includeMacros || !preg_match('/\A\s*!/', substr($src, $end, 16)))) {
+                if ($path !== $word) {
                     $found[] = ['path' => $path, 'line' => $line, 'offset' => $i, 'length' => $end - $i];
                 }
             } else {

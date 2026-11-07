@@ -2,7 +2,7 @@
 
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Exception, PhpMixed, bconcat, implode};
+use shirabe_php_shim::{Exception, PhpMixed, bconcat, impl_php_exception, implode};
 
 #[derive(Debug)]
 pub struct InvalidPackageException {
@@ -51,7 +51,7 @@ impl InvalidPackageException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     InvalidPackageException,
     inner,
     r"Composer\Package\Loader\InvalidPackageException"

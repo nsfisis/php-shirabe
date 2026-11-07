@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/process/Exception/InvalidArgumentException.php sha1:1afc135760927a15f53345e49d763fef6cea2098
 
 use bstr::BString;
+use shirabe_php_shim::impl_php_exception;
 
 #[derive(Debug)]
 pub struct InvalidArgumentException {
@@ -16,7 +17,7 @@ impl InvalidArgumentException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     InvalidArgumentException,
     inner,
     r"Symfony\Component\Process\Exception\InvalidArgumentException"

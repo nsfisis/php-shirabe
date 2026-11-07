@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Downloader/TransportException.php sha1:b7bd47db7402a92d600ea4ce8abd9c66d23f1b27
 
 use bstr::BString;
-use shirabe_php_shim::{PhpMixed, RuntimeException};
+use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_exception};
 
 #[derive(Debug, Clone)]
 pub struct TransportException {
@@ -57,7 +57,7 @@ impl TransportException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     TransportException,
     inner,
     r"Composer\Downloader\TransportException"

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/SolverBugException.php sha1:258f0748dc9343317c51383d3aae87882147610f
 
 use bstr::BString;
-use shirabe_php_shim::{RuntimeException, bconcat};
+use shirabe_php_shim::{RuntimeException, bconcat, impl_php_exception};
 
 #[derive(Debug)]
 pub struct SolverBugException(pub RuntimeException);
@@ -18,7 +18,7 @@ impl SolverBugException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     SolverBugException,
     0,
     r"Composer\DependencyResolver\SolverBugException"

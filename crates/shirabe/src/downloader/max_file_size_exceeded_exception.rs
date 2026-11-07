@@ -2,6 +2,7 @@
 
 use crate::downloader::transport_exception::TransportException;
 use bstr::BString;
+use shirabe_php_shim::impl_php_exception;
 
 #[derive(Debug)]
 pub struct MaxFileSizeExceededException(pub TransportException);
@@ -13,7 +14,7 @@ impl MaxFileSizeExceededException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     MaxFileSizeExceededException,
     0,
     r"Composer\Downloader\MaxFileSizeExceededException"

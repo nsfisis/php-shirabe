@@ -2,6 +2,7 @@
 
 use super::exception_interface::ExceptionInterface;
 use bstr::BString;
+use shirabe_php_shim::impl_php_exception;
 
 #[derive(Debug)]
 pub struct RuntimeException(pub shirabe_php_shim::RuntimeException);
@@ -13,7 +14,7 @@ impl RuntimeException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     RuntimeException,
     0,
     r"Symfony\Component\Console\Exception\RuntimeException"

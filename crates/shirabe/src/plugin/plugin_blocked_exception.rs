@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Plugin/PluginBlockedException.php sha1:aa7b95b50977653112c523868c37453e8523d220
 
 use bstr::BString;
-use shirabe_php_shim::UnexpectedValueException;
+use shirabe_php_shim::{UnexpectedValueException, impl_php_exception};
 
 // TODO(plugin): PluginBlockedException is a part of Plugin API.
 #[derive(Debug)]
@@ -14,7 +14,7 @@ impl PluginBlockedException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     PluginBlockedException,
     0,
     r"Composer\Plugin\PluginBlockedException"

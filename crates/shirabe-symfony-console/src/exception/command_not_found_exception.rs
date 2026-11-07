@@ -2,7 +2,7 @@
 
 use super::exception_interface::ExceptionInterface;
 use bstr::BString;
-use shirabe_php_shim::InvalidArgumentException;
+use shirabe_php_shim::{InvalidArgumentException, impl_php_exception};
 
 #[derive(Debug)]
 pub struct CommandNotFoundException {
@@ -24,7 +24,7 @@ impl CommandNotFoundException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     CommandNotFoundException,
     inner,
     r"Symfony\Component\Console\Exception\CommandNotFoundException"

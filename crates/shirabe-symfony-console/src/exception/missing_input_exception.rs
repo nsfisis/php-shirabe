@@ -3,6 +3,7 @@
 use super::exception_interface::ExceptionInterface;
 use super::runtime_exception::RuntimeException;
 use bstr::BString;
+use shirabe_php_shim::impl_php_exception;
 
 #[derive(Debug)]
 pub struct MissingInputException(pub RuntimeException);
@@ -14,7 +15,7 @@ impl MissingInputException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     MissingInputException,
     0,
     r"Symfony\Component\Console\Exception\MissingInputException"

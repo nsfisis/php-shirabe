@@ -40,7 +40,7 @@ final class NoQualifiedCratePath implements Linter
                 continue;
             }
 
-            foreach (QualifiedPathScanner::find(file_get_contents($path), 'crate', true) as $found) {
+            foreach (QualifiedPathScanner::find(file_get_contents($path), 'crate') as $found) {
                 $errors[] = "{$relative}:{$found['line']}: `{$found['path']}` (import it with `use`)";
             }
         }

@@ -2,7 +2,7 @@
 
 use crate::exception::RuntimeException;
 use crate::process::Process;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::{bconcat, impl_php_exception};
 
 #[derive(Debug)]
 pub struct ProcessSignaledException {
@@ -30,7 +30,7 @@ impl ProcessSignaledException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     ProcessSignaledException,
     inner,
     r"Symfony\Component\Process\Exception\ProcessSignaledException"

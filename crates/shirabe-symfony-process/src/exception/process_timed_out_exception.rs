@@ -2,7 +2,7 @@
 
 use crate::exception::RuntimeException;
 use crate::process::Process;
-use shirabe_php_shim::{PhpMixed, bconcat, php_to_string};
+use shirabe_php_shim::{PhpMixed, bconcat, impl_php_exception, php_to_string};
 
 #[derive(Debug)]
 pub struct ProcessTimedOutException {
@@ -30,7 +30,7 @@ impl ProcessTimedOutException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     ProcessTimedOutException,
     inner,
     r"Symfony\Component\Process\Exception\ProcessTimedOutException"

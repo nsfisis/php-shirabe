@@ -389,7 +389,7 @@ fn test_var_replacement() {
         config.get("bin-dir").unwrap()
     );
     assert_eq!(
-        PhpMixed::string(shirabe_php_shim::bconcat!(home, "/foo")),
+        PhpMixed::string(bconcat!(home, "/foo")),
         config.get("cache-dir").unwrap()
     );
 }
@@ -425,7 +425,7 @@ fn test_realpath_replacement() {
         config.get("vendor-dir").unwrap()
     );
     assert_eq!(
-        PhpMixed::string(shirabe_php_shim::bconcat!(home, "/foo")),
+        PhpMixed::string(bconcat!(home, "/foo")),
         config.get("bin-dir").unwrap()
     );
     assert_eq!(

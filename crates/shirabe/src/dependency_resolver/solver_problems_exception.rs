@@ -4,7 +4,9 @@ use crate::dependency_resolver::{Pool, Problem, Request, Rule};
 use crate::repository::RepositorySet;
 use crate::util::IniHelper;
 use bstr::{BString, ByteSlice, ByteVec};
-use shirabe_php_shim::{RuntimeException, array_unique, bconcat, implode, path_to_bytes};
+use shirabe_php_shim::{
+    RuntimeException, array_unique, bconcat, impl_php_exception, implode, path_to_bytes,
+};
 
 #[derive(Debug)]
 pub struct SolverProblemsException {
@@ -169,7 +171,7 @@ impl SolverProblemsException {
     }
 }
 
-shirabe_php_shim::impl_php_exception!(
+impl_php_exception!(
     SolverProblemsException,
     inner,
     r"Composer\DependencyResolver\SolverProblemsException",
