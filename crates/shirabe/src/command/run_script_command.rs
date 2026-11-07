@@ -116,7 +116,7 @@ impl Command for RunScriptCommand {
         self.set_definition(&[
             // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
             // extra ones the caller passes).
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 "script",
                 Some(InputArgument::OPTIONAL),
                 "Script name to run.",

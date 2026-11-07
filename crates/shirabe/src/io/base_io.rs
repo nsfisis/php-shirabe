@@ -85,11 +85,11 @@ pub trait BaseIO: IOInterface {
             {
                 return;
             }
-            self.write_error3(
-                bconcat!("<warning>Warning: You should avoid overwriting already defined auth settings for ", repository_name, ".</warning>"),
-                true,
-                io_interface::NORMAL,
-            );
+            self.write_error(bconcat!(
+                "<warning>Warning: You should avoid overwriting already defined auth settings for ",
+                repository_name,
+                ".</warning>"
+            ));
         }
         BaseIO::set_authentication(self, repository_name, username, password);
     }
@@ -341,7 +341,7 @@ pub trait BaseIO: IOInterface {
                 }
 
                 if !ssl_options.contains_key(B("local_cert")) {
-                    self.write_error3(bconcat!("<warning>Warning: Client certificate configuration is missing key `local_cert` for ", domain, ".</warning>"), true, io_interface::NORMAL);
+                    self.write_error(bconcat!("<warning>Warning: Client certificate configuration is missing key `local_cert` for ", domain, ".</warning>"));
                     continue;
                 }
 
@@ -412,31 +412,21 @@ pub trait BaseIO: IOInterface {
         ]
         .contains(&level)
         {
-            self.write_error3(
-                bconcat!("<error>", message_str, "</error>"),
-                true,
-                io_interface::NORMAL,
-            );
+            self.write_error(bconcat!("<error>", message_str, "</error>"));
         } else if level == LogLevel::WARNING {
-            self.write_error3(
-                bconcat!("<warning>", message_str, "</warning>"),
-                true,
-                io_interface::NORMAL,
-            );
+            self.write_error(bconcat!("<warning>", message_str, "</warning>"));
         } else if level == LogLevel::NOTICE {
-            self.write_error3(
+            self.write_error_with_verbosity(
                 bconcat!("<info>", message_str, "</info>"),
-                true,
                 io_interface::VERBOSE,
             );
         } else if level == LogLevel::INFO {
-            self.write_error3(
+            self.write_error_with_verbosity(
                 bconcat!("<info>", message_str, "</info>"),
-                true,
                 io_interface::VERY_VERBOSE,
             );
         } else {
-            self.write_error3(&message_str, true, io_interface::DEBUG);
+            self.write_error_with_verbosity(&message_str, io_interface::DEBUG);
         }
     }
 }

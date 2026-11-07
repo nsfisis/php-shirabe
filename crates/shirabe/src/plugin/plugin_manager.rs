@@ -276,7 +276,7 @@ impl PluginManager {
             .map(|v| v.as_bool() == Some(true))
             .unwrap_or(false);
         if !self.is_plugin_allowed(package.get_name(), is_global_plugin, plugin_optional, true)? {
-            self.io.write_error3(
+            self.io.write_error_with_verbosity(
                 bconcat!(
                     "Skipped loading \"",
                     package.get_name(),
@@ -288,7 +288,6 @@ impl PluginManager {
                     },
                     "as it is not in config.allow-plugins"
                 ),
-                true,
                 DEBUG,
             );
             return Ok(());
@@ -719,7 +718,7 @@ impl PluginManager {
                     plugin_optional,
                     true,
                 )? {
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!(
                             "Skipped loading \"",
                             plugin.borrow().get_class_name(),
@@ -733,7 +732,6 @@ impl PluginManager {
                             },
                             " as it is not in config.allow-plugins"
                         ),
-                        true,
                         DEBUG,
                     );
                     return Ok(());
@@ -748,7 +746,7 @@ impl PluginManager {
         if is_global_plugin || self.running_in_global_dir {
             details.push("installed globally".into());
         }
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!(
                 "Loading plugin ",
                 plugin.borrow().get_class_name(),
@@ -758,7 +756,6 @@ impl PluginManager {
                     BString::default()
                 }
             ),
-            true,
             DEBUG,
         );
         self.plugins.push(plugin.clone());
@@ -790,9 +787,8 @@ impl PluginManager {
             None => return Ok(()),
         };
 
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!("Unloading plugin ", plugin.borrow().get_class_name()),
-            true,
             DEBUG,
         );
         let removed = self.plugins.remove(index);
@@ -821,9 +817,8 @@ impl PluginManager {
         &self,
         plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
     ) -> anyhow::Result<()> {
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!("Uninstalling plugin ", plugin.borrow().get_class_name()),
-            true,
             DEBUG,
         );
         plugin

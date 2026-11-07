@@ -322,9 +322,9 @@ impl Command for ArchiveCommand {
         self.set_name("archive".into())?;
         self.set_description("Creates an archive of this composer package".into());
         self.set_definition(&[
-            InputArgument::new5("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, self.suggest_available_package(99)).unwrap().into(),
+            InputArgument::with_suggested_values("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, self.suggest_available_package(99)).unwrap().into(),
             InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
-            InputOption::new6("format", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| BString::from(*s)).collect())).unwrap().into(),
+            InputOption::with_suggested_values("format", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, SuggestedValues::List(Self::FORMATS.iter().map(|s| BString::from(*s)).collect())).unwrap().into(),
             InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
             InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
             InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),

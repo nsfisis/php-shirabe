@@ -25,7 +25,7 @@ impl InputOption {
         description: impl AsRef<[u8]>,
         default: Option<InputValue>,
     ) -> anyhow::Result<Self> {
-        Self::new6(
+        Self::with_suggested_values(
             name,
             shortcut,
             mode,
@@ -36,7 +36,7 @@ impl InputOption {
     }
 
     /// PHP's constructor with the sixth parameter, `$suggestedValues`.
-    pub fn new6(
+    pub fn with_suggested_values(
         name: impl AsRef<[u8]>,
         shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,

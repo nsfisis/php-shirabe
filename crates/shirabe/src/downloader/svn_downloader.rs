@@ -5,7 +5,7 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
@@ -172,14 +172,10 @@ impl VcsDownloader for SvnDownloader {
             }
         }
 
-        self.inner.io.write_error3(
-            bconcat!(
-                " Checking out ",
-                package.get_source_reference().unwrap_or_default()
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        self.inner.io.write_error(bconcat!(
+            " Checking out ",
+            package.get_source_reference().unwrap_or_default()
+        ));
         self.execute(
             package,
             url,
@@ -226,11 +222,10 @@ impl VcsDownloader for SvnDownloader {
             flags.push("--ignore-ancestry".into());
         }
 
-        self.inner.io.write_error3(
-            bconcat!(" Checking out ", r#ref.clone().unwrap_or_default()),
-            true,
-            io_interface::NORMAL,
-        );
+        self.inner.io.write_error(bconcat!(
+            " Checking out ",
+            r#ref.clone().unwrap_or_default()
+        ));
         let mut command: Vec<BString> = vec!["svn".into(), "switch".into()];
         command.extend(flags);
         self.execute(
@@ -271,34 +266,26 @@ impl VcsDownloader for SvnDownloader {
             .map(|elem| bconcat!("    ", elem))
             .collect();
         let count_changes = changes.len() as i64;
-        self.inner.io.write_error3(
-            bconcat!(
-                "    <error>",
-                package.get_pretty_name(),
-                " has modified file",
-                if count_changes == 1 { "" } else { "s" },
-                ":</error>"
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        self.inner.io.write_error(bconcat!(
+            "    <error>",
+            package.get_pretty_name(),
+            " has modified file",
+            if count_changes == 1 { "" } else { "s" },
+            ":</error>"
+        ));
         let slice_end = 10_usize.min(changes.len());
         for line in &changes[..slice_end] {
-            self.inner.io.write_error3(line, true, io_interface::NORMAL);
+            self.inner.io.write_error(line);
         }
         if count_changes > 10 {
             let remaining_changes = count_changes - 10;
-            self.inner.io.write_error3(
-                bconcat!(
-                    "    <info>",
-                    remaining_changes,
-                    " more file",
-                    if remaining_changes == 1 { "" } else { "s" },
-                    " modified, choose \"v\" to view the full list</info>"
-                ),
-                true,
-                io_interface::NORMAL,
-            );
+            self.inner.io.write_error(bconcat!(
+                "    <info>",
+                remaining_changes,
+                " more file",
+                if remaining_changes == 1 { "" } else { "s" },
+                " modified, choose \"v\" to view the full list</info>"
+            ));
         }
 
         loop {
@@ -321,7 +308,7 @@ impl VcsDownloader for SvnDownloader {
                 }
                 Some(b"v") => {
                     for line in &changes {
-                        self.inner.io.write_error3(line, true, io_interface::NORMAL);
+                        self.inner.io.write_error(line);
                     }
                 }
                 _ => {
@@ -339,7 +326,7 @@ impl VcsDownloader for SvnDownloader {
                         BString::from("    ? - print help"),
                     ];
                     for line in &help_lines {
-                        self.inner.io.write_error3(line, true, io_interface::NORMAL);
+                        self.inner.io.write_error(line);
                     }
                 }
             }
@@ -489,7 +476,7 @@ impl DownloaderInterface for SvnDownloader {
         Some(self)
     }
 
-    async fn download(
+    async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
@@ -509,7 +496,7 @@ impl DownloaderInterface for SvnDownloader {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
-    async fn install(
+    async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
@@ -527,7 +514,7 @@ impl DownloaderInterface for SvnDownloader {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
 
-    async fn remove(
+    async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,

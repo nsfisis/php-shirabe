@@ -9,7 +9,7 @@ use crate::event_dispatcher::{
     SubscribedEventEntry,
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NORMAL, QUIET, VERBOSE};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, QUIET, VERBOSE};
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
@@ -308,20 +308,16 @@ impl EventDispatcher {
             // TODO(plugin): PackageEvent / CommandEvent / PreCommandRunEvent specialization
             // requires polymorphic dispatch; the simple Event branch is sufficient for now.
             let details: Option<BString> = None;
-            self.io.write_error3(
-                bconcat!(
-                    "Dispatching <info>",
-                    event.borrow().get_name(),
-                    "</info>",
-                    details
-                        .as_ref()
-                        .map(|d| bconcat!(" (", d, ")"))
-                        .unwrap_or_default(),
-                    " event"
-                ),
-                true,
-                NORMAL,
-            );
+            self.io.write_error(bconcat!(
+                "Dispatching <info>",
+                event.borrow().get_name(),
+                "</info>",
+                details
+                    .as_ref()
+                    .map(|d| bconcat!(" (", d, ")"))
+                    .unwrap_or_default(),
+                " event"
+            ));
         }
 
         let listeners = self.get_listeners(&*event.borrow());
@@ -400,7 +396,7 @@ impl EventDispatcher {
                     ))
                     .into());
                 }
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!(
                         "> ",
                         formatted_event_name_with_args,
@@ -409,7 +405,6 @@ impl EventDispatcher {
                         "->",
                         method_name,
                     ),
-                    true,
                     VERBOSE,
                 );
                 let stub_class =
@@ -475,7 +470,7 @@ impl EventDispatcher {
                     } else {
                         BString::from("?")
                     };
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!(
                             "> ",
                             formatted_event_name_with_args,
@@ -484,7 +479,6 @@ impl EventDispatcher {
                             "->",
                             method_name,
                         ),
-                        true,
                         VERBOSE,
                     );
                 }
@@ -495,9 +489,8 @@ impl EventDispatcher {
                     Callable::String(ref callable_str)
                         if self.is_composer_script(callable_str.as_ref()) =>
                     {
-                        self.io.write_error3(
+                        self.io.write_error_with_verbosity(
                             bconcat!("> ", formatted_event_name_with_args, ": ", callable_str),
-                            true,
                             VERBOSE,
                         );
 
@@ -542,7 +535,7 @@ impl EventDispatcher {
                             );
                             let exit_code = self.execute_tty(&exec)?;
                             if exit_code != 0 {
-                                self.io.write_error3(
+                                self.io.write_error_with_verbosity(
                                     bconcat!(
                                         "<error>Script ",
                                         callable_str,
@@ -552,7 +545,6 @@ impl EventDispatcher {
                                         bconcat!(exit_code),
                                         "</error>"
                                     ),
-                                    true,
                                     QUIET,
                                 );
 
@@ -574,13 +566,12 @@ impl EventDispatcher {
                                 ))
                                 .is_empty()
                             {
-                                self.io.write_error3(
+                                self.io.write_error_with_verbosity(
                                     bconcat!(
                                         "<warning>You made a reference to a non-existent script ",
                                         callable_str,
                                         "</warning>"
                                     ),
-                                    true,
                                     QUIET,
                                 );
                             }
@@ -608,7 +599,7 @@ impl EventDispatcher {
                                 Ok(v) => r#return = v,
                                 Err(e) => {
                                     if e.is_instanceof::<ScriptExecutionException>() {
-                                        self.io.write_error3(
+                                        self.io.write_error_with_verbosity(
                                             bconcat!(
                                                 "<error>Script ",
                                                 callable_str,
@@ -616,7 +607,6 @@ impl EventDispatcher {
                                                 event_name.as_bstr(),
                                                 "</error>"
                                             ),
-                                            true,
                                             QUIET,
                                         );
                                     }
@@ -637,7 +627,7 @@ impl EventDispatcher {
                             BStr::new("class_exists"),
                             vec![PluginValue::string(class_name.clone())],
                         )? {
-                            self.io.write_error3(
+                            self.io.write_error_with_verbosity(
                                 bconcat!(
                                     "<warning>Class ",
                                     class_name,
@@ -645,7 +635,6 @@ impl EventDispatcher {
                                     event_name.as_bstr(),
                                     " script</warning>"
                                 ),
-                                true,
                                 QUIET,
                             );
                             continue;
@@ -654,7 +643,7 @@ impl EventDispatcher {
                             BStr::new("is_callable"),
                             vec![PluginValue::string(callable_str.clone())],
                         )? {
-                            self.io.write_error3(
+                            self.io.write_error_with_verbosity(
                                 bconcat!(
                                     "<warning>Method ",
                                     callable_str,
@@ -662,7 +651,6 @@ impl EventDispatcher {
                                     event_name.as_bstr(),
                                     " script</warning>"
                                 ),
-                                true,
                                 QUIET,
                             );
                             continue;
@@ -677,7 +665,7 @@ impl EventDispatcher {
                                 r#return = if let PhpMixed::Bool(false) = v { 1 } else { 0 };
                             }
                             Err(e) => {
-                                self.io.write_error3(
+                                self.io.write_error_with_verbosity(
                                     bconcat!(
                                         "<error>Script ",
                                         callable_str,
@@ -685,7 +673,6 @@ impl EventDispatcher {
                                         event_name.as_bstr(),
                                         " event terminated with an exception</error>"
                                     ),
-                                    true,
                                     QUIET,
                                 );
                                 return Err(e);
@@ -712,7 +699,7 @@ impl EventDispatcher {
                             BStr::new("class_exists"),
                             vec![PluginValue::string(class_name.clone())],
                         )? {
-                            self.io.write_error3(
+                            self.io.write_error_with_verbosity(
                                 bconcat!(
                                     "<warning>Class ",
                                     class_name,
@@ -720,7 +707,6 @@ impl EventDispatcher {
                                     event_name.as_bstr(),
                                     " script</warning>"
                                 ),
-                                true,
                                 QUIET,
                             );
                             continue;
@@ -735,7 +721,7 @@ impl EventDispatcher {
                                 PluginValue::Bool(true),
                             ],
                         )? {
-                            self.io.write_error3(bconcat!("<warning>Class ", class_name, " does not extend Symfony\\Component\\Console\\Command\\Command, can not call ", event_name.as_bstr(), " script</warning>"), true, QUIET);
+                            self.io.write_error_with_verbosity(bconcat!("<warning>Class ", class_name, " does not extend Symfony\\Component\\Console\\Command\\Command, can not call ", event_name.as_bstr(), " script</warning>"), QUIET);
                             continue;
                         }
                         if self.php_runtime_bool(
@@ -745,13 +731,12 @@ impl EventDispatcher {
                                 str_replace("-", "_", strtoupper(event_name.as_bstr()))
                             ))],
                         )? {
-                            self.io.write_error3(
+                            self.io.write_error_with_verbosity(
                                 bconcat!(
                                     "<warning>You cannot bind ",
                                     event_name.as_bstr(),
                                     " to a Command class, use a non-reserved name</warning>"
                                 ),
-                                true,
                                 QUIET,
                             );
                             continue;
@@ -831,11 +816,11 @@ try {
                             PhpCall::Function(BStr::new("__shirabe_eval"))
                                 .run_with(vec![PluginValue::string(snippet)], &mut dispatcher)?;
                         if !result.output.is_empty() {
-                            self.io.write3(&result.output, false, NORMAL);
+                            self.io.write_no_newline(&result.output);
                         }
                         if let Some(throw) = result.throw {
                             if result.caught {
-                                self.io.write_error3(
+                                self.io.write_error_with_verbosity(
                                     bconcat!(
                                         "<error>Script ",
                                         callable_str,
@@ -843,7 +828,6 @@ try {
                                         event_name.as_bstr(),
                                         " event terminated with an exception</error>"
                                     ),
-                                    true,
                                     QUIET,
                                 );
                             }
@@ -879,13 +863,10 @@ try {
                         };
 
                         if self.io.is_verbose() {
-                            self.io.write_error3(
-                                bconcat!("> ", event_name.as_bstr(), ": ", exec),
-                                true,
-                                NORMAL,
-                            );
+                            self.io
+                                .write_error(bconcat!("> ", event_name.as_bstr(), ": ", exec));
                         } else if self.event_needs_to_output(&*event.borrow()) {
-                            self.io.write_error3(bconcat!("> ", exec), true, NORMAL);
+                            self.io.write_error(bconcat!("> ", exec));
                         }
 
                         let possible_local_binaries = self
@@ -996,7 +977,7 @@ try {
 
                         let exit_code = self.execute_tty(&exec)?;
                         if exit_code != 0 {
-                            self.io.write_error3(
+                            self.io.write_error_with_verbosity(
                                 bconcat!(
                                     "<error>Script ",
                                     callable_str,
@@ -1006,7 +987,6 @@ try {
                                     bconcat!(exit_code),
                                     "</error>"
                                 ),
-                                true,
                                 QUIET,
                             );
 
@@ -1114,14 +1094,17 @@ try {
     ) -> anyhow::Result<PhpMixed> {
         let event_name = event.borrow().get_name().to_owned();
         if self.io.is_verbose() {
-            self.io.write_error3(
-                bconcat!("> ", event_name, ": ", class_name, "::", method_name),
-                true,
-                NORMAL,
-            );
+            self.io.write_error(bconcat!(
+                "> ",
+                event_name,
+                ": ",
+                class_name,
+                "::",
+                method_name
+            ));
         } else if self.event_needs_to_output(&*event.borrow()) {
             self.io
-                .write_error3(bconcat!("> ", class_name, "::", method_name), true, NORMAL);
+                .write_error(bconcat!("> ", class_name, "::", method_name));
         }
 
         let stub_class =
@@ -1339,13 +1322,12 @@ try {
         };
 
         if self.skip_scripts.iter().any(|s| s == event.get_name()) {
-            self.io.write_error3(
+            self.io.write_error_with_verbosity(
                 bconcat!(
                     "Skipped script listeners for <info>",
                     event.get_name(),
                     "</info> because of COMPOSER_SKIP_SCRIPTS"
                 ),
-                true,
                 VERBOSE,
             );
 

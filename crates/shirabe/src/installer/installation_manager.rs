@@ -581,11 +581,7 @@ impl InstallationManager {
             {
                 // output alias ops in debug verbosity as they have no output otherwise
                 if self.io.is_debug() {
-                    self.io.write_error3(
-                        bconcat!("  - ", operation.show(false)),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    self.io.write_error(bconcat!("  - ", operation.show(false)));
                 }
                 match &*operation {
                     AnyOperation::MarkAliasInstalled(op) => {
@@ -1027,9 +1023,8 @@ impl InstallationManager {
             >,
         >,
     ) {
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
-            true,
             io_interface::DEBUG,
         );
         self.run_cleanup(cleanup_promises).await;

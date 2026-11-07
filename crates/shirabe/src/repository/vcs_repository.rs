@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::loader::{
     ArrayLoader, InvalidPackageException, LoaderInterface, ValidatingArrayLoader,
 };
@@ -416,8 +416,7 @@ impl VcsRepository {
             if is_very_verbose {
                 self.io.write_error(&msg);
             } else if is_verbose {
-                self.io
-                    .overwrite_error4(&msg, false, None, io_interface::NORMAL);
+                self.io.overwrite_error_no_newline(&msg);
             }
 
             let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
@@ -603,8 +602,7 @@ impl VcsRepository {
         }
 
         if !is_very_verbose {
-            self.io
-                .overwrite_error4("", false, None, io_interface::NORMAL);
+            self.io.overwrite_error_no_newline("");
         }
 
         let mut branches = self.driver.borrow_mut().as_mut().unwrap().get_branches()?;
@@ -643,8 +641,7 @@ impl VcsRepository {
             if is_very_verbose {
                 self.io.write_error(&msg);
             } else if is_verbose {
-                self.io
-                    .overwrite_error4(&msg, false, None, io_interface::NORMAL);
+                self.io.overwrite_error_no_newline(&msg);
             }
 
             let parsed_branch_opt = self.validate_branch(branch.as_bstr());
@@ -825,8 +822,7 @@ impl VcsRepository {
         self.driver.borrow_mut().as_mut().unwrap().cleanup()?;
 
         if !is_very_verbose {
-            self.io
-                .overwrite_error4("", false, None, io_interface::NORMAL);
+            self.io.overwrite_error_no_newline("");
         }
 
         if self.inner.get_packages_internal().is_empty() {
@@ -994,8 +990,7 @@ impl VcsRepository {
             if is_very_verbose {
                 self.io.write_error(&msg);
             } else if is_verbose {
-                self.io
-                    .overwrite_error4(&msg, false, None, io_interface::NORMAL);
+                self.io.overwrite_error_no_newline(&msg);
             }
 
             data.shift_remove(B("default-branch"));

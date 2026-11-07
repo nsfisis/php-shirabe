@@ -111,7 +111,7 @@ impl Command for AuditCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "format",
                 Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
@@ -130,7 +130,7 @@ impl Command for AuditCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "abandoned",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
@@ -145,7 +145,7 @@ impl Command for AuditCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "ignore-severity",
                 None,
                 Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED),

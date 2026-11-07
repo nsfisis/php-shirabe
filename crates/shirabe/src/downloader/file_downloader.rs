@@ -102,7 +102,7 @@ impl FileDownloader {
         {
             this.io
                 .borrow()
-                .write_error3("Running cache garbage collection", true, VERY_VERBOSE);
+                .write_error_with_verbosity("Running cache garbage collection", VERY_VERBOSE);
             let ttl = this.config.borrow().get_cache_files_ttl();
             let max_size = this.config.borrow().get_cache_files_maxsize()?;
             cache.borrow_mut().gc(ttl, max_size);
@@ -144,9 +144,10 @@ impl FileDownloader {
                     .remove_directory(&compare_dir)?;
             }
 
-            this.download(package.clone(), &compare_dir, None, false)
+            this.download_with_output(package.clone(), &compare_dir, None, false)
                 .await?;
-            this.install(package.clone(), &compare_dir, false).await?;
+            this.install_with_output(package.clone(), &compare_dir, false)
+                .await?;
 
             let mut comparer = Comparer::new();
             comparer.set_source(compare_dir.clone());
@@ -207,8 +208,8 @@ impl FileDownloader {
         ));
 
         // PHP: return $this->remove($initial, $path, false)->then(fn () => $this->install($target, $path, false));
-        let _ = this.remove(initial, path, false).await?;
-        this.install(target, path, false).await
+        let _ = this.remove_with_output(initial, path, false).await?;
+        this.install_with_output(target, path, false).await
     }
 
     fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> BString {
@@ -344,7 +345,7 @@ impl DownloaderInterface for FileDownloader {
         Some(self)
     }
 
-    async fn download(
+    async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
@@ -450,7 +451,7 @@ impl DownloaderInterface for FileDownloader {
 
             if from_cache {
                 if output {
-                    self.io.borrow().write_error3(
+                    self.io.borrow().write_error_with_verbosity(
                         bconcat!(
                             "  - Loading <info>",
                             package.get_name(),
@@ -458,7 +459,6 @@ impl DownloaderInterface for FileDownloader {
                             package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
                             "</comment>) from cache"
                         ),
-                        true,
                         io_interface::VERY_VERBOSE,
                     );
                 }
@@ -717,7 +717,7 @@ impl DownloaderInterface for FileDownloader {
         Ok(Some(PhpMixed::Null))
     }
 
-    async fn install(
+    async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
@@ -788,7 +788,7 @@ impl DownloaderInterface for FileDownloader {
             .await
     }
 
-    async fn remove(
+    async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,

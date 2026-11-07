@@ -225,7 +225,8 @@ impl Solver {
 
         self.setup_fixed_map(request);
 
-        self.io.write_error3("Generating rules", true, DEBUG);
+        self.io
+            .write_error_with_verbosity("Generating rules", DEBUG);
         let mut rule_set_generator = RuleSetGenerator::new(self.policy.clone(), self.pool.clone());
         self.rules =
             rule_set_generator.get_rules_for(request, Some(platform_requirement_filter.clone()))?;
@@ -248,16 +249,15 @@ impl Solver {
         self.make_assertion_rule_decisions()?;
 
         self.io
-            .write_error3("Resolving dependencies through SAT", true, DEBUG);
+            .write_error_with_verbosity("Resolving dependencies through SAT", DEBUG);
         let before = microtime();
         self.run_sat()?;
-        self.io.write_error3("", true, DEBUG);
-        self.io.write_error3(
+        self.io.write_error_with_verbosity("", DEBUG);
+        self.io.write_error_with_verbosity(
             sprintf(
                 "Dependency resolution completed in %.3f seconds",
                 &[PhpMixed::Float(microtime() - before)],
             ),
-            true,
             VERBOSE,
         );
 
@@ -766,30 +766,28 @@ impl Solver {
             let mut rules_count = self.rules.count();
             let mut pass = 1_i64;
 
-            self.io.write_error3("Looking at all rules.", true, DEBUG);
+            self.io
+                .write_error_with_verbosity("Looking at all rules.", DEBUG);
             let mut i = 0_i64;
             let mut n = 0_i64;
             while n < rules_count {
                 if i == rules_count {
                     if 1 == pass {
-                        self.io.write_error3(
+                        self.io.write_error_no_newline_with_verbosity(
                             bconcat!(
                                 "Something's changed, looking at all rules again (pass #",
                                 pass,
                                 ")"
                             ),
-                            false,
                             DEBUG,
                         );
                     } else {
-                        self.io.overwrite_error4(
+                        self.io.overwrite_error_no_newline_with_verbosity(
                             bconcat!(
                                 "Something's changed, looking at all rules again (pass #",
                                 pass,
                                 ")"
                             ),
-                            false,
-                            None,
                             DEBUG,
                         );
                     }

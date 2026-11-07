@@ -14,7 +14,7 @@ mod json_config_source;
 pub use config_source_interface::*;
 pub use json_config_source::*;
 
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 
@@ -1498,20 +1498,16 @@ impl Config {
                 && let Some(ref hostname) = hostname
             {
                 if !self.warned_hosts.contains_key(hostname) {
-                    io.write_error3(
-                        bconcat!(
-                            "<warning>Warning: Accessing ",
-                            hostname,
-                            " over ",
-                            scheme
-                                .as_ref()
-                                .map_or(B(""), |scheme| scheme.as_slice())
-                                .as_bstr(),
-                            " which is an insecure protocol.</warning>"
-                        ),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    io.write_error(bconcat!(
+                        "<warning>Warning: Accessing ",
+                        hostname,
+                        " over ",
+                        scheme
+                            .as_ref()
+                            .map_or(B(""), |scheme| scheme.as_slice())
+                            .as_bstr(),
+                        " which is an insecure protocol.</warning>"
+                    ));
                 }
                 self.warned_hosts.insert(hostname.clone(), true);
             }
@@ -1546,17 +1542,13 @@ impl Config {
             }
 
             if let Some(w) = warning {
-                io.write_error3(
-                    bconcat!(
-                        "<warning>Warning: Accessing ",
-                        hostname,
-                        " with ",
-                        w,
-                        " disabled.</warning>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error(bconcat!(
+                    "<warning>Warning: Accessing ",
+                    hostname,
+                    " with ",
+                    w,
+                    " disabled.</warning>"
+                ));
                 self.ssl_verify_warned_hosts.insert(hostname.clone(), true);
             }
         }

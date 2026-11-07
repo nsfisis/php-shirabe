@@ -57,7 +57,7 @@ impl Command for ProhibitsCommand {
             "Shows which packages prevent the given package from being installed".into(),
         );
         self.set_definition(&[
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 <Self as BaseDependencyCommand>::ARGUMENT_PACKAGE,
                 Some(InputArgument::REQUIRED),
                 "Package to inspect",

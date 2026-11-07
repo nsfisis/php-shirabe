@@ -13,10 +13,13 @@ pub struct TableSeparator {
 
 impl TableSeparator {
     pub fn new() -> Self {
-        Self::new1(IndexMap::new()).expect("TableSeparator default options are always valid")
+        Self::with_options(IndexMap::new())
+            .expect("TableSeparator default options are always valid")
     }
 
-    fn new1(options: IndexMap<BString, TableCellOption>) -> Result<Self, InvalidArgumentException> {
+    fn with_options(
+        options: IndexMap<BString, TableCellOption>,
+    ) -> Result<Self, InvalidArgumentException> {
         Ok(Self {
             inner: TableCell::new("", options)?,
         })

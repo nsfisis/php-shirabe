@@ -52,7 +52,7 @@ impl Command for InstallCommand {
         self.set_definition(&[
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-            InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
+            InputOption::with_suggested_values("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
             InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything (implicitly enables --verbose).", None).unwrap().into(),
             InputOption::new("download-only", None, Some(InputOption::VALUE_NONE), "Download only, do not install packages.", None).unwrap().into(),
             InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Enables installation of require-dev packages (enabled by default, only present for BC).", None).unwrap().into(),
@@ -63,7 +63,7 @@ impl Command for InstallCommand {
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Do not use, only defined here to catch misuse of the install command.", None).unwrap().into(),
             InputOption::new("audit", None, Some(InputOption::VALUE_NONE), "Run an audit after installation is complete.", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
+            InputOption::with_suggested_values("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
             InputOption::new("verbose", Some("v|vv|vvv".into()), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
             InputOption::new("optimize-autoloader", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
             InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),

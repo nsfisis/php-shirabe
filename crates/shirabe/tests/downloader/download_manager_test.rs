@@ -26,7 +26,7 @@ mod mock_downloader {
         #[async_trait::async_trait(?Send)]
         impl DownloaderInterface for Downloader {
             fn get_installation_source(&self) -> bstr::BString;
-            async fn download(
+            async fn download_with_output(
                 &self,
                 package: PackageInterfaceHandle,
                 path: &std::path::Path,
@@ -40,7 +40,7 @@ mod mock_downloader {
                 path: &std::path::Path,
                 prev_package: Option<PackageInterfaceHandle>,
             ) -> anyhow::Result<Option<PhpMixed>>;
-            async fn install(
+            async fn install_with_output(
                 &self,
                 package: PackageInterfaceHandle,
                 path: &std::path::Path,
@@ -52,7 +52,7 @@ mod mock_downloader {
                 target: PackageInterfaceHandle,
                 path: &std::path::Path,
             ) -> anyhow::Result<Option<PhpMixed>>;
-            async fn remove(
+            async fn remove_with_output(
                 &self,
                 package: PackageInterfaceHandle,
                 path: &std::path::Path,
@@ -242,7 +242,7 @@ fn test_full_package_download() {
 
     let mut downloader = downloader_mock(BStr::new("dist"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -267,14 +267,14 @@ fn test_full_package_download_failover() {
     // dist downloader fails, source downloader (tried next) succeeds.
     let mut downloader_fail = downloader_mock(BStr::new("dist"));
     downloader_fail
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Err(RuntimeException::new(BString::from("Foo")).into()));
 
     let mut downloader_success = downloader_mock(BStr::new("source"));
     downloader_success
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -314,7 +314,7 @@ fn test_dist_only_package_download() {
 
     let mut downloader = downloader_mock(BStr::new("dist"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -337,7 +337,7 @@ fn test_source_only_package_download() {
 
     let mut downloader = downloader_mock(BStr::new("source"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -378,7 +378,7 @@ fn test_full_package_download_with_source_preferred() {
 
     let mut downloader = downloader_mock(BStr::new("source"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -402,7 +402,7 @@ fn test_dist_only_package_download_with_source_preferred() {
 
     let mut downloader = downloader_mock(BStr::new("dist"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -426,7 +426,7 @@ fn test_source_only_package_download_with_source_preferred() {
 
     let mut downloader = downloader_mock(BStr::new("source"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -494,14 +494,14 @@ fn test_update_dist_with_not_equal_types() {
 
     let mut xz_downloader = downloader_mock(BStr::new("dist"));
     xz_downloader
-        .expect_remove()
+        .expect_remove_with_output()
         .times(1)
         .withf(|_pkg, path, _output| path == "vendor/bundles/FOS/UserBundle")
         .returning(|_, _, _| Ok(None));
 
     let mut zip_downloader = downloader_mock(BStr::new("dist"));
     zip_downloader
-        .expect_install()
+        .expect_install_with_output()
         .times(1)
         .withf(|_pkg, path, _output| path == "vendor/bundles/FOS/UserBundle")
         .returning(|_, _, _| Ok(None));
@@ -671,7 +671,7 @@ fn test_remove() {
 
     let mut pear_downloader = downloader_mock(BStr::new("dist"));
     pear_downloader
-        .expect_remove()
+        .expect_remove_with_output()
         .times(1)
         .withf(|_pkg, path, _output| path == "vendor/bundles/FOS/UserBundle")
         .returning(|_, _, _| Ok(None));
@@ -712,7 +712,7 @@ fn test_install_preference_without_preference_dev() {
 
     let mut downloader = downloader_mock(BStr::new("source"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -736,7 +736,7 @@ fn test_install_preference_without_preference_no_dev() {
 
     let mut downloader = downloader_mock(BStr::new("dist"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -760,7 +760,7 @@ fn test_install_preference_without_match_dev() {
 
     let mut downloader = downloader_mock(BStr::new("source"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -785,7 +785,7 @@ fn test_install_preference_without_match_no_dev() {
 
     let mut downloader = downloader_mock(BStr::new("dist"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -810,7 +810,7 @@ fn test_install_preference_with_match_auto_dev() {
 
     let mut downloader = downloader_mock(BStr::new("source"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -835,7 +835,7 @@ fn test_install_preference_with_match_auto_no_dev() {
 
     let mut downloader = downloader_mock(BStr::new("dist"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -860,7 +860,7 @@ fn test_install_preference_with_match_source() {
 
     let mut downloader = downloader_mock(BStr::new("source"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
@@ -885,7 +885,7 @@ fn test_install_preference_with_match_dist() {
 
     let mut downloader = downloader_mock(BStr::new("dist"));
     downloader
-        .expect_download()
+        .expect_download_with_output()
         .times(1)
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));

@@ -2,7 +2,7 @@
 
 use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use bstr::{BStr, BString, ByteSlice};
@@ -171,15 +171,11 @@ impl DownloadManager {
                 }
             };
             if retry {
-                self.io.write_error3(
-                    bconcat!(
-                        "    <warning>Now trying to download from ",
-                        source,
-                        "</warning>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.io.write_error(bconcat!(
+                    "    <warning>Now trying to download from ",
+                    source,
+                    "</warning>"
+                ));
             }
             package.set_installation_source(Some(source.clone()));
 
@@ -189,7 +185,7 @@ impl DownloadManager {
 
             let result = match downloader
                 .borrow()
-                .download3(package.clone(), &target_dir, prev_package.clone())
+                .download(package.clone(), &target_dir, prev_package.clone())
                 .await
             {
                 Ok(r) => r,
@@ -206,19 +202,15 @@ impl DownloadManager {
                             .unwrap()
                             .get_message()
                             .to_owned();
-                        self.io.write_error3(
-                            bconcat!(
-                                "    <warning>Failed to download ",
-                                package.get_pretty_name(),
-                                " from ",
-                                source,
-                                ": ",
-                                message,
-                                "</warning>"
-                            ),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.io.write_error(bconcat!(
+                            "    <warning>Failed to download ",
+                            package.get_pretty_name(),
+                            " from ",
+                            source,
+                            ": ",
+                            message,
+                            "</warning>"
+                        ));
 
                         retry = true;
                         continue;
@@ -259,7 +251,7 @@ impl DownloadManager {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
-            return downloader.borrow().install2(package, &target_dir).await;
+            return downloader.borrow().install(package, &target_dir).await;
         }
 
         Ok(None)
@@ -287,7 +279,7 @@ impl DownloadManager {
                 .as_ref()
                 .unwrap()
                 .borrow()
-                .remove2(initial, &target_dir)
+                .remove(initial, &target_dir)
                 .await;
         }
 
@@ -315,11 +307,11 @@ impl DownloadManager {
                         .unwrap()
                         .get_message()
                         .to_owned();
-                    self.io.write_error3(
-                        bconcat!("<error>    Update failed (", message, ")</error>"),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    self.io.write_error(bconcat!(
+                        "<error>    Update failed (",
+                        message,
+                        ")</error>"
+                    ));
                     if !self.io.ask_confirmation(
                         "    Would you like to try reinstalling the package instead [<comment>yes</comment>]? ",
                         true,
@@ -337,7 +329,7 @@ impl DownloadManager {
             .as_ref()
             .unwrap()
             .borrow()
-            .remove2(initial, &target_dir)
+            .remove(initial, &target_dir)
             .await?;
         self.install(target, &target_dir).await
     }
@@ -350,7 +342,7 @@ impl DownloadManager {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
-            return downloader.borrow().remove2(package, &target_dir).await;
+            return downloader.borrow().remove(package, &target_dir).await;
         }
 
         Ok(None)

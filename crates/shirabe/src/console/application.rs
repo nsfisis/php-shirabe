@@ -259,19 +259,18 @@ impl Application {
 
         let io = self.get_io();
         if let Some(msg) = &disk_hint_msg {
-            io.write_error3(msg, true, io_interface::QUIET);
+            io.write_error_with_verbosity(msg, io_interface::QUIET);
         }
 
         let message = error_message(exception);
         if exception.is_instanceof::<TransportException>()
             && message.contains_str("Unable to use a proxy")
         {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 "<error>The following exception indicates your proxy is misconfigured</error>",
-                true,
                 io_interface::QUIET,
             );
-            io.write_error3("<error>Check https://getcomposer.org/doc/faqs/how-to-use-composer-behind-a-proxy.md for details</error>", true, io_interface::QUIET);
+            io.write_error_with_verbosity("<error>Check https://getcomposer.org/doc/faqs/how-to-use-composer-behind-a-proxy.md for details</error>", io_interface::QUIET);
         }
 
         if Platform::is_windows()
@@ -280,17 +279,15 @@ impl Application {
         {
             let avast_detect = glob("C:\\Program Files\\Avast*");
             if !avast_detect.is_empty() {
-                io.write_error3("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, io_interface::QUIET);
-                io.write_error3(
+                io.write_error_with_verbosity("<error>The following exception indicates a possible issue with the Avast Firewall</error>", io_interface::QUIET);
+                io.write_error_with_verbosity(
                     "<error>Check https://getcomposer.org/local-issuer for details</error>",
-                    true,
                     io_interface::QUIET,
                 );
             } else {
-                io.write_error3("<error>The following exception indicates a possible issue with a Firewall/Antivirus</error>", true, io_interface::QUIET);
-                io.write_error3(
+                io.write_error_with_verbosity("<error>The following exception indicates a possible issue with a Firewall/Antivirus</error>", io_interface::QUIET);
+                io.write_error_with_verbosity(
                     "<error>Check https://getcomposer.org/local-issuer for details</error>",
-                    true,
                     io_interface::QUIET,
                 );
             }
@@ -299,39 +296,38 @@ impl Application {
         if Platform::is_windows()
             && strpos(&message, "The system cannot find the path specified").is_some()
         {
-            io.write_error3("<error>The following exception may be caused by a stale entry in your cmd.exe AutoRun</error>", true, io_interface::QUIET);
-            io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#-the-system-cannot-find-the-path-specified-windows- for details</error>", true, io_interface::QUIET);
+            io.write_error_with_verbosity("<error>The following exception may be caused by a stale entry in your cmd.exe AutoRun</error>", io_interface::QUIET);
+            io.write_error_with_verbosity("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#-the-system-cannot-find-the-path-specified-windows- for details</error>", io_interface::QUIET);
         }
 
         if strpos(&message, "fork failed - Cannot allocate memory").is_some() {
-            io.write_error3("<error>The following exception is caused by a lack of memory or swap, or not having swap configured</error>", true, io_interface::QUIET);
-            io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>", true, io_interface::QUIET);
+            io.write_error_with_verbosity("<error>The following exception is caused by a lack of memory or swap, or not having swap configured</error>", io_interface::QUIET);
+            io.write_error_with_verbosity("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>", io_interface::QUIET);
         }
 
         if exception.is_instanceof::<ProcessTimedOutException>() {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 "<error>The following exception is caused by a process timeout</error>",
-                true,
                 io_interface::QUIET,
             );
-            io.write_error3("<error>Check https://getcomposer.org/doc/06-config.md#process-timeout for details</error>", true, io_interface::QUIET);
+            io.write_error_with_verbosity("<error>Check https://getcomposer.org/doc/06-config.md#process-timeout for details</error>", io_interface::QUIET);
         }
 
         if self.get_disable_plugins_by_default()
             && self.is_running_as_root()
             && !self.io.is_interactive()
         {
-            io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the following exception. See also https://getcomposer.org/root</error>", true, io_interface::QUIET);
+            io.write_error_with_verbosity("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the following exception. See also https://getcomposer.org/root</error>", io_interface::QUIET);
         } else if exception.is_instanceof::<CommandNotFoundException>()
             && self.get_disable_plugins_by_default()
         {
-            io.write_error3("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", true, io_interface::QUIET);
+            io.write_error_with_verbosity("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", io_interface::QUIET);
         }
 
         let hints = HttpDownloader::get_exception_hints(exception).unwrap_or_default();
         if !hints.is_empty() {
             for hint in &hints {
-                io.write_error3(hint, true, io_interface::QUIET);
+                io.write_error_with_verbosity(hint, io_interface::QUIET);
             }
         }
     }
@@ -1921,7 +1917,7 @@ impl ApplicationHandle {
         ErrorHandler::register(Some(io.clone()));
 
         if input.borrow().has_parameter_option(&["--no-cache"], false) {
-            io.write_error3("Disabling cache usage", true, io_interface::DEBUG);
+            io.write_error_with_verbosity("Disabling cache usage", io_interface::DEBUG);
             Platform::put_env(
                 "COMPOSER_CACHE_DIR",
                 if Platform::is_windows() {
@@ -1940,7 +1936,7 @@ impl ApplicationHandle {
             chdir(nwd);
             application.borrow_mut().initial_working_directory = getcwd();
             let cwd = Platform::get_cwd(true).unwrap_or_default();
-            io.write_error3(
+            io.write_error_with_verbosity(
                 bconcat!(
                     "Changed CWD to ",
                     if !cwd.as_os_str().is_empty() {
@@ -1949,7 +1945,6 @@ impl ApplicationHandle {
                         nwd.clone()
                     }
                 ),
-                true,
                 io_interface::DEBUG,
             );
         }
@@ -2195,7 +2190,7 @@ impl ApplicationHandle {
         }
 
         if !is_proxy_command {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 bconcat!(
                     "Running Shirabe ",
                     composer::SHIRABE_VERSION,
@@ -2210,7 +2205,6 @@ impl ApplicationHandle {
                     " / ",
                     php_uname("r")
                 ),
-                true,
                 io_interface::DEBUG,
             );
 
@@ -2553,10 +2547,9 @@ impl ApplicationHandle {
                         && application.borrow().is_running_as_root()
                         && !io.is_interactive()
                     {
-                        io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", true, io_interface::QUIET);
-                        io.write_error3(
+                        io.write_error_with_verbosity("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", io_interface::QUIET);
+                        io.write_error_with_verbosity(
                             "<error>See also https://getcomposer.org/root</error>",
-                            true,
                             io_interface::QUIET,
                         );
                     }

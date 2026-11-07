@@ -6,7 +6,7 @@
 
 use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
-use crate::io::{DEBUG, IOInterface, IOInterfaceWrite, NORMAL};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::util::http::ProxyManager;
 use crate::util::{GetResult, Platform, StreamContextOptions, Url};
 use bstr::{BStr, BString, ByteSlice};
@@ -126,7 +126,7 @@ impl LocalFilesystem {
                 .get_status(Some(BStr::new(" using proxy (%s)")))
                 .unwrap_or_default()
         };
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!(
                 if strpos(&orig_file_url, "http") == Some(0) {
                     "Downloading "
@@ -136,7 +136,6 @@ impl LocalFilesystem {
                 Url::sanitize(orig_file_url.clone()),
                 using_proxy
             ),
-            true,
             DEBUG,
         );
 
@@ -153,11 +152,8 @@ impl LocalFilesystem {
         }
 
         if progress && !is_redirect {
-            self.io.write_error3(
-                "Downloading (<comment>connecting...</comment>)",
-                false,
-                NORMAL,
-            );
+            self.io
+                .write_error_no_newline("Downloading (<comment>connecting...</comment>)");
         }
 
         // TODO(php-semantics): PHP captures the file_get_contents warning via set_error_handler and
@@ -187,20 +183,15 @@ impl LocalFilesystem {
         }
 
         if progress && !is_redirect {
-            self.io.overwrite_error4(
-                bconcat!(
-                    "Downloading (",
-                    if result.is_none() {
-                        "<error>failed</error>"
-                    } else {
-                        "<comment>100%</comment>"
-                    },
-                    ")"
-                ),
-                false,
-                None,
-                NORMAL,
-            );
+            self.io.overwrite_error_no_newline(bconcat!(
+                "Downloading (",
+                if result.is_none() {
+                    "<error>failed</error>"
+                } else {
+                    "<comment>100%</comment>"
+                },
+                ")"
+            ));
         }
 
         let Some(result) = result else {

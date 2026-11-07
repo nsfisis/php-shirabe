@@ -22,7 +22,7 @@
 
 use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
-use crate::io::{DEBUG, IOInterface, IOInterfaceWrite, NORMAL};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
 use crate::util::{
     AuthHelper, HttpDownloader, HttpOptions, Platform, PromptAuthResult, StoreAuth,
@@ -223,9 +223,8 @@ impl NativeHttpDownloader {
             .unwrap_or_default();
         // `attributes.redirects == 0 && attributes.retries == 0` in PHP is always true here since
         // this runs exactly once, before the retry loop below has a chance to advance either.
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!("Downloading ", Url::sanitize(url), using_proxy, if_modified),
-            true,
             DEBUG,
         );
 
@@ -295,11 +294,7 @@ impl NativeHttpDownloader {
                 // the curl errno, so this fires on the is_timeout() branch instead.
                 if transport_err.was_timeout && !TIMEOUT_WARNING.load(Ordering::Relaxed) {
                     TIMEOUT_WARNING.store(true, Ordering::Relaxed);
-                    self.io.write_error3(
-                        "<warning>A connection timeout was encountered. If you intend to run Composer without connecting to the internet, run the command again prefixed with COMPOSER_DISABLE_NETWORK=1 to make Composer run in offline mode.</warning>",
-                        true,
-                        NORMAL,
-                    );
+                    self.io.write_error("<warning>A connection timeout was encountered. If you intend to run Composer without connecting to the internet, run the command again prefixed with COMPOSER_DISABLE_NETWORK=1 to make Composer run in offline mode.</warning>");
                 }
 
                 // PHP retried on a set of curl errnos (7/16/92/6/28 and 56/35 with "Connection
@@ -318,7 +313,7 @@ impl NativeHttpDownloader {
                     if transport_err.is_connect && !attributes.contains_key(B("ipResolve")) {
                         attributes.insert("ipResolve".into(), PhpMixed::Int(4));
                     }
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!(
                             "Retrying (",
                             retries + 1,
@@ -326,7 +321,6 @@ impl NativeHttpDownloader {
                             Url::sanitize(url),
                             " due to connection error"
                         ),
-                        true,
                         DEBUG,
                     );
                     if let Some(filename) = filename {
@@ -366,9 +360,8 @@ impl NativeHttpDownloader {
         let status_code = response.status;
         let native_response = response.into_native_http_response(url);
 
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!("[", status_code, "] ", Url::sanitize(url)),
-            true,
             DEBUG,
         );
 
@@ -460,7 +453,7 @@ impl NativeHttpDownloader {
                 && matches!(status_code, 423 | 425 | 500 | 502 | 503 | 504 | 507 | 510)
                 && retries < self.max_retries
             {
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!(
                         "Retrying (",
                         retries + 1,
@@ -469,7 +462,6 @@ impl NativeHttpDownloader {
                         " due to status code ",
                         status_code
                     ),
-                    true,
                     DEBUG,
                 );
                 attributes.insert("retries".into(), PhpMixed::Int(retries + 1));
@@ -736,7 +728,7 @@ impl NativeHttpDownloader {
         }
 
         if !target_url.is_empty() {
-            self.io.write_error3(
+            self.io.write_error_with_verbosity(
                 bconcat!(
                     "Following redirect (",
                     attributes
@@ -747,7 +739,6 @@ impl NativeHttpDownloader {
                     ") ",
                     Url::sanitize(target_url.clone())
                 ),
-                true,
                 DEBUG,
             );
 

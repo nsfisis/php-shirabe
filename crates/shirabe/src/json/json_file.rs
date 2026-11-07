@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Json/JsonFile.php sha1:1769fe849f0bf7f8e0727be30497de38ce137aac
 
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonValidationException;
 use crate::util::{Filesystem, HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
@@ -150,11 +150,7 @@ impl JsonFile {
                     {
                         realpath_info = bconcat!(" (", realpath, ")");
                     }
-                    io.write_error3(
-                        bconcat!("Reading ", self.path, realpath_info),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    io.write_error(bconcat!("Reading ", self.path, realpath_info));
                 }
                 Ok(file_get_contents(&self.path).ok())
             }

@@ -9,7 +9,7 @@ use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -91,11 +91,7 @@ impl UpdateCommand {
             None
         };
 
-        io.write_error3(
-            "<info>Loading packages that can be updated...</info>",
-            true,
-            io_interface::NORMAL,
-        );
+        io.write_error("<info>Loading packages that can be updated...</info>");
         let mut autocompleter_values: IndexMap<BString, BString> = IndexMap::new();
         let installed_packages: Vec<PackageInterfaceHandle> =
             if composer_ref.get_locker().borrow_mut().is_locked() {
@@ -258,18 +254,18 @@ impl Command for UpdateCommand {
         self.set_aliases(vec!["u".into(), "upgrade".into()])?;
         self.set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file".into());
         self.set_definition(&[
-            InputArgument::new5("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that should be updated, if not provided all packages are.", None, self.suggest_installed_package(false, false)).unwrap().into(),
+            InputArgument::with_suggested_values("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that should be updated, if not provided all packages are.", None, self.suggest_installed_package(false, false)).unwrap().into(),
             InputOption::new("with", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Temporary version constraint to add, e.g. foo/bar:1.0.0 or foo/bar=1.0.0", None).unwrap().into(),
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-            InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
+            InputOption::with_suggested_values("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
             InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything (implicitly enables --verbose).", None).unwrap().into(),
             InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Enables installation of require-dev packages (enabled by default, only present for BC).", None).unwrap().into(),
             InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables installation of require-dev packages.", None).unwrap().into(),
             InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Overwrites the lock file hash to suppress warning about the lock file being out of date without updating package versions. Package metadata like mirrors and URLs are updated if they changed.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
             InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
+            InputOption::with_suggested_values("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
             InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
@@ -289,7 +285,7 @@ impl Command for UpdateCommand {
             InputOption::new("patch-only", None, Some(InputOption::VALUE_NONE), "Only allow patch version updates for currently installed dependencies.", None).unwrap().into(),
             InputOption::new("interactive", Some("i".into()), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
             InputOption::new("root-reqs", None, Some(InputOption::VALUE_NONE), "Restricts the update to your first degree dependencies.", None).unwrap().into(),
-            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), SuggestedValues::List(vec![BString::from("dev"), BString::from("no-dev"), BString::from("all")])).unwrap().into(),
+            InputOption::with_suggested_values("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), SuggestedValues::List(vec![BString::from("dev"), BString::from("no-dev"), BString::from("all")])).unwrap().into(),
         ]);
         self.set_help(
             "The <info>update</info> command reads the composer.json file from the\n\
@@ -319,11 +315,7 @@ impl Command for UpdateCommand {
     ) -> anyhow::Result<i64> {
         let io = self.get_io().clone();
         if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
-            io.write_error3(
-                "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>",
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error("<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>");
         }
         if input
             .borrow()
@@ -331,11 +323,7 @@ impl Command for UpdateCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            io.write_error3(
-                "<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>",
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error("<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>");
         }
 
         let composer_handle = self.require_composer(None, None)?;
@@ -404,19 +392,15 @@ impl Command for UpdateCommand {
             if let Some(root_req) = root_requirements.get(&package)
                 && !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())?
             {
-                io.write_error3(
-                    bconcat!(
-                        "<error>The temporary constraint \"",
-                        constraint,
-                        "\" for \"",
-                        package,
-                        "\" must be a subset of the constraint in your composer.json (",
-                        root_req.get_pretty_constraint()?,
-                        ")</error>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error(bconcat!(
+                    "<error>The temporary constraint \"",
+                    constraint,
+                    "\" for \"",
+                    package,
+                    "\" must be a subset of the constraint in your composer.json (",
+                    root_req.get_pretty_constraint()?,
+                    ")</error>"
+                ));
                 io.write(bconcat!(
                     "<info>Run `shirabe require ",
                     package,
@@ -524,7 +508,7 @@ impl Command for UpdateCommand {
         packages = filtered_packages;
 
         if update_mirrors && !packages.is_empty() {
-            io.write_error3("<error>You cannot simultaneously update only a selection of packages and regenerate the lock file metadata.</error>", true, io_interface::NORMAL);
+            io.write_error("<error>You cannot simultaneously update only a selection of packages and regenerate the lock file metadata.</error>");
 
             return Ok(-1);
         }
@@ -698,11 +682,7 @@ impl Command for UpdateCommand {
             };
 
             if bump_after_update != BumpAfterUpdate::Disabled {
-                io.write_error3(
-                    "<info>Bumping dependencies</info>",
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error("<info>Bumping dependencies</info>");
                 let bump_command = BumpCommand::new();
                 bump_command.set_composer(composer_handle.clone());
                 result = bump_command.do_bump(

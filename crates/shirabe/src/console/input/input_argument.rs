@@ -22,7 +22,7 @@ impl InputArgument {
         description: impl AsRef<[u8]>,
         default: Option<InputValue>,
     ) -> anyhow::Result<Self> {
-        Self::new5(
+        Self::with_suggested_values(
             name,
             mode,
             description,
@@ -32,7 +32,7 @@ impl InputArgument {
     }
 
     /// PHP's constructor with the fifth parameter, `$suggestedValues`.
-    pub fn new5(
+    pub fn with_suggested_values(
         name: impl AsRef<[u8]>,
         mode: Option<i64>,
         description: impl AsRef<[u8]>,

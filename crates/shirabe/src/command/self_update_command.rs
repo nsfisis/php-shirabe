@@ -4,7 +4,7 @@ use crate::command::base_command::{base_command_complete, base_command_initializ
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;
-use crate::io::{IOInterfaceWrite, io_interface};
+use crate::io::IOInterfaceWrite;
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -77,11 +77,7 @@ impl Command for SelfUpdateCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let io = self.get_io();
-        io.write_error3(
-            "<error>The self-update command is not available in Shirabe.</error>",
-            true,
-            io_interface::NORMAL,
-        );
+        io.write_error("<error>The self-update command is not available in Shirabe.</error>");
 
         Ok(1)
     }

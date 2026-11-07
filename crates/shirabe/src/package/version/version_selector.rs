@@ -183,7 +183,7 @@ impl VersionSelector {
                             } else {
                                 ""
                             };
-                            io.write_error3(
+                            io.write_error_with_verbosity(
                                 bconcat!(
                                     "<warning>Cannot use ",
                                     pkg.get_pretty_name(),
@@ -200,7 +200,6 @@ impl VersionSelector {
                                     reason,
                                     ".</>"
                                 ),
-                                true,
                                 if is_first_warning {
                                     io_interface::NORMAL
                                 } else {

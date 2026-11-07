@@ -4,7 +4,7 @@ use crate::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,
 };
 use crate::installer::InstallerInterface;
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
@@ -66,11 +66,10 @@ impl InstallerInterface for MetapackageInstaller {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.write_error3(
-            bconcat!("  - ", InstallOperation::format(package.clone(), false)),
-            true,
-            io_interface::NORMAL,
-        );
+        self.io.write_error(bconcat!(
+            "  - ",
+            InstallOperation::format(package.clone(), false)
+        ));
 
         repo.borrow_mut()
             .add_package(PackageInterfaceHandle::dup(&package));
@@ -92,14 +91,10 @@ impl InstallerInterface for MetapackageInstaller {
             .into());
         }
 
-        self.io.write_error3(
-            bconcat!(
-                "  - ",
-                UpdateOperation::format(initial.clone(), target.clone(), false)
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        self.io.write_error(bconcat!(
+            "  - ",
+            UpdateOperation::format(initial.clone(), target.clone(), false)
+        ));
 
         let mut repo = repo.borrow_mut();
         repo.remove_package(initial);
@@ -121,11 +116,10 @@ impl InstallerInterface for MetapackageInstaller {
             .into());
         }
 
-        self.io.write_error3(
-            bconcat!("  - ", UninstallOperation::format(package.clone(), false)),
-            true,
-            io_interface::NORMAL,
-        );
+        self.io.write_error(bconcat!(
+            "  - ",
+            UninstallOperation::format(package.clone(), false)
+        ));
 
         repo.borrow_mut().remove_package(package);
 

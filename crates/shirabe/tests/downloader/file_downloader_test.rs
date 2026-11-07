@@ -80,7 +80,8 @@ fn test_download_for_package_without_dist_reference() {
     let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, None);
-    let result = run(downloader.download(package, std::path::Path::new("/path"), None, true));
+    let result =
+        run(downloader.download_with_output(package, std::path::Path::new("/path"), None, true));
 
     let e = result.expect_err("expected InvalidArgumentException");
     assert!(
@@ -103,7 +104,8 @@ fn test_download_to_existing_file() {
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, None);
 
-    let result = run(downloader.download(package, std::path::Path::new(&path), None, true));
+    let result =
+        run(downloader.download_with_output(package, std::path::Path::new(&path), None, true));
 
     let e = result.expect_err("download to an existing file was expected to throw");
     assert!(
@@ -165,7 +167,7 @@ fn test_download_but_file_is_unsaved() {
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
-            .download(package.clone(), std::path::Path::new(&path), None, true)
+            .download_with_output(package.clone(), std::path::Path::new(&path), None, true)
             .await
             .map(|_| ())
     });
@@ -295,7 +297,7 @@ fn test_download_file_with_invalid_checksum() {
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
-            .download(package.clone(), std::path::Path::new(&path), None, true)
+            .download_with_output(package.clone(), std::path::Path::new(&path), None, true)
             .await
             .map(|_| ())
     });
@@ -384,7 +386,7 @@ fn test_downgrade_shows_appropriate_message() {
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
-            .download(
+            .download_with_output(
                 new_package.clone(),
                 std::path::Path::new(&path),
                 Some(old_package.clone()),

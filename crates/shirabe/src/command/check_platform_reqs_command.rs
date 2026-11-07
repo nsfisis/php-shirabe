@@ -182,7 +182,7 @@ impl Command for CheckPlatformReqsCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "format",
                 Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),

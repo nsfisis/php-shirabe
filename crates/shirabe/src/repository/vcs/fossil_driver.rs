@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
@@ -147,17 +147,13 @@ impl FossilDriver {
                 Some(path_from_bytes(&self.checkout_dir)),
             )? != 0
             {
-                self.inner.io.write_error3(
-                    bconcat!(
-                        "<error>Failed to update ",
-                        self.inner.url,
-                        ", package information from this repository may be outdated (",
-                        self.inner.process.borrow().get_error_output(),
-                        ")</error>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.inner.io.write_error(bconcat!(
+                    "<error>Failed to update ",
+                    self.inner.url,
+                    ", package information from this repository may be outdated (",
+                    self.inner.process.borrow().get_error_output(),
+                    ")</error>"
+                ));
             }
         } else {
             // clean up directory and do a fresh clone into it

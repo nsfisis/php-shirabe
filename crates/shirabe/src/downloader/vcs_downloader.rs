@@ -7,7 +7,7 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
@@ -157,24 +157,16 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io().write_error3(
-                            bconcat!(
-                                "Failed: [",
-                                AnyThrowable::of(&e)
-                                    .expect("PHP reaches this only with a caught \\Throwable")
-                                    .php_class_name(),
-                                "] ",
-                                error_message(&e)
-                            ),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.io().write_error(bconcat!(
+                            "Failed: [",
+                            AnyThrowable::of(&e)
+                                .expect("PHP reaches this only with a caught \\Throwable")
+                                .php_class_name(),
+                            "] ",
+                            error_message(&e)
+                        ));
                     } else if !urls.is_empty() {
-                        self.io().write_error3(
-                            "    Failed, trying the next URL",
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.io().write_error("    Failed, trying the next URL");
                     }
                     if urls.is_empty() {
                         return Err(e);
@@ -248,15 +240,11 @@ pub trait VcsDownloader:
             .into());
         }
 
-        self.io().write_error3(
-            bconcat!(
-                "  - ",
-                InstallOperation::format(package.clone(), false),
-                ": "
-            ),
-            false,
-            io_interface::NORMAL,
-        );
+        self.io().write_error_no_newline(bconcat!(
+            "  - ",
+            InstallOperation::format(package.clone(), false),
+            ": "
+        ));
 
         let mut urls = self.prepare_urls(package.get_source_urls());
         while let Some(url) = array_shift(&mut urls) {
@@ -273,24 +261,16 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io().write_error3(
-                            bconcat!(
-                                "Failed: [",
-                                AnyThrowable::of(&e)
-                                    .expect("PHP reaches this only with a caught \\Throwable")
-                                    .php_class_name(),
-                                "] ",
-                                error_message(&e)
-                            ),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.io().write_error(bconcat!(
+                            "Failed: [",
+                            AnyThrowable::of(&e)
+                                .expect("PHP reaches this only with a caught \\Throwable")
+                                .php_class_name(),
+                            "] ",
+                            error_message(&e)
+                        ));
                     } else if !urls.is_empty() {
-                        self.io().write_error3(
-                            "    Failed, trying the next URL",
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.io().write_error("    Failed, trying the next URL");
                     }
                     if urls.is_empty() {
                         return Err(e);
@@ -317,15 +297,11 @@ pub trait VcsDownloader:
             .into());
         }
 
-        self.io().write_error3(
-            bconcat!(
-                "  - ",
-                UpdateOperation::format(initial.clone(), target.clone(), false),
-                ": "
-            ),
-            false,
-            io_interface::NORMAL,
-        );
+        self.io().write_error_no_newline(bconcat!(
+            "  - ",
+            UpdateOperation::format(initial.clone(), target.clone(), false),
+            ": "
+        ));
 
         let mut urls = self.prepare_urls(target.get_source_urls());
 
@@ -348,24 +324,16 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io().write_error3(
-                            bconcat!(
-                                "Failed: [",
-                                AnyThrowable::of(&e)
-                                    .expect("PHP reaches this only with a caught \\Throwable")
-                                    .php_class_name(),
-                                "] ",
-                                error_message(&e)
-                            ),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.io().write_error(bconcat!(
+                            "Failed: [",
+                            AnyThrowable::of(&e)
+                                .expect("PHP reaches this only with a caught \\Throwable")
+                                .php_class_name(),
+                            "] ",
+                            error_message(&e)
+                        ));
                     } else if !urls.is_empty() {
-                        self.io().write_error3(
-                            "    Failed, trying the next URL",
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.io().write_error("    Failed, trying the next URL");
                     }
                     exception = Some(e);
                 }
@@ -396,9 +364,8 @@ pub trait VcsDownloader:
                 // escape angle brackets for proper output in the console
                 logs = str_replace("<", "\\<", &logs);
 
-                self.io()
-                    .write_error3(bconcat!("    ", message), true, io_interface::NORMAL);
-                self.io().write_error3(&logs, true, io_interface::NORMAL);
+                self.io().write_error(bconcat!("    ", message));
+                self.io().write_error(&logs);
             }
         }
 
@@ -416,11 +383,8 @@ pub trait VcsDownloader:
         package: PackageInterfaceHandle,
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io().write_error3(
-            bconcat!("  - ", UninstallOperation::format(package, false)),
-            true,
-            io_interface::NORMAL,
-        );
+        self.io()
+            .write_error(bconcat!("  - ", UninstallOperation::format(package, false)));
 
         let result = Filesystem::remove_directory_async_via(self.filesystem(), path).await?;
         if !result {

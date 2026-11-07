@@ -178,7 +178,7 @@ impl GitLab {
         message: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io.write_error3(msg, true, io_interface::NORMAL);
+            self.io.write_error(msg);
         }
 
         let local_auth_config_name: Option<BString> = self
@@ -194,45 +194,24 @@ impl GitLab {
             "/-/user_settings/personal_access_tokens"
         );
         let revoke_link = bconcat!(scheme, "://", origin_url, "/-/user_settings/applications");
-        self.io.write_error3(
-            bconcat!(
-                "A token will be created and stored in \"",
-                local_auth_config_name
-                    .as_ref()
-                    .map(|name| bconcat!(name, " OR "))
-                    .unwrap_or_default(),
-                self.config.borrow().get_auth_config_source().get_name(),
-                "\", your password will never be stored"
-            ),
-            true,
-            io_interface::NORMAL,
-        );
-        self.io.write_error3(
-            "To revoke access to this token you can visit:",
-            true,
-            io_interface::NORMAL,
-        );
+        self.io.write_error(bconcat!(
+            "A token will be created and stored in \"",
+            local_auth_config_name
+                .as_ref()
+                .map(|name| bconcat!(name, " OR "))
+                .unwrap_or_default(),
+            self.config.borrow().get_auth_config_source().get_name(),
+            "\", your password will never be stored"
+        ));
         self.io
-            .write_error3(&revoke_link, true, io_interface::NORMAL);
-        self.io.write_error3(
-            "Alternatively you can setup an personal access token on:",
-            true,
-            io_interface::NORMAL,
-        );
+            .write_error("To revoke access to this token you can visit:");
+        self.io.write_error(&revoke_link);
         self.io
-            .write_error3(&personal_access_token_link, true, io_interface::NORMAL);
-        self.io.write_error3(
-            "and store it under \"gitlab-token\" see https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token for more details.",
-            true,
-            io_interface::NORMAL,
-        );
-        self.io.write_error3(
-            "https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token",
-            true,
-            io_interface::NORMAL,
-        );
-        self.io
-            .write_error3("for more details.", true, io_interface::NORMAL);
+            .write_error("Alternatively you can setup an personal access token on:");
+        self.io.write_error(&personal_access_token_link);
+        self.io.write_error("and store it under \"gitlab-token\" see https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token for more details.");
+        self.io.write_error("https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token");
+        self.io.write_error("for more details.");
 
         let mut store_in_local_auth_config = false;
         if has_local_auth_config {
@@ -263,45 +242,21 @@ impl GitLab {
                                     .and_then(|v| v.as_string())
                                     == Some("invalid_grant".into());
                                 if is_invalid_grant {
-                                    self.io.write_error3(
-                                        "Bad credentials. If you have two factor authentication enabled you will have to manually create a personal access token",
-                                        true,
-                                        io_interface::NORMAL,
-                                    );
+                                    self.io.write_error("Bad credentials. If you have two factor authentication enabled you will have to manually create a personal access token");
                                 } else {
-                                    self.io.write_error3(
-                                        "Bad credentials.",
-                                        true,
-                                        io_interface::NORMAL,
-                                    );
+                                    self.io.write_error("Bad credentials.");
                                 }
                             } else {
-                                self.io.write_error3(
-                                    "Maximum number of login attempts exceeded. Please try again later.",
-                                    true,
-                                    io_interface::NORMAL,
-                                );
+                                self.io.write_error("Maximum number of login attempts exceeded. Please try again later.");
                             }
 
-                            self.io.write_error3(
-                                "You can also manually create a personal access token enabling the \"read_api\" scope at:",
-                                true,
-                                io_interface::NORMAL,
-                            );
-                            self.io.write_error3(
-                                &personal_access_token_link,
-                                true,
-                                io_interface::NORMAL,
-                            );
-                            self.io.write_error3(
-                                bconcat!(
-                                    "Add it using \"shirabe config --global --auth gitlab-token.",
-                                    origin_url,
-                                    " <token>\""
-                                ),
-                                true,
-                                io_interface::NORMAL,
-                            );
+                            self.io.write_error("You can also manually create a personal access token enabling the \"read_api\" scope at:");
+                            self.io.write_error(&personal_access_token_link);
+                            self.io.write_error(bconcat!(
+                                "Add it using \"shirabe config --global --auth gitlab-token.",
+                                origin_url,
+                                " <token>\""
+                            ));
 
                             continue;
                         }
@@ -380,11 +335,8 @@ impl GitLab {
             Err(e) => match e.catch::<TransportException>() {
                 Some(te) => {
                     let message = te.get_message().to_owned();
-                    self.io.write_error3(
-                        bconcat!("Couldn't refresh access token: ", message),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    self.io
+                        .write_error(bconcat!("Couldn't refresh access token: ", message));
                     return Ok(false);
                 }
                 None => return Err(e),
@@ -451,8 +403,7 @@ impl GitLab {
             .get(bconcat!(scheme, "://", api_url, "/oauth/token"), options)?
             .decode_json()?;
 
-        self.io
-            .write_error3("Token successfully created", true, io_interface::NORMAL);
+        self.io.write_error("Token successfully created");
 
         Ok(token)
     }
@@ -516,12 +467,11 @@ impl GitLab {
             .get(bconcat!(scheme, "://", origin_url, "/oauth/token"), options)?
             .decode_json()?;
 
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             "GitLab token successfully refreshed",
-            true,
             io_interface::VERY_VERBOSE,
         );
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!(
                 "To revoke access to this token you can visit ",
                 scheme,
@@ -529,7 +479,6 @@ impl GitLab {
                 origin_url,
                 "/-/user_settings/applications"
             ),
-            true,
             io_interface::VERY_VERBOSE,
         );
 

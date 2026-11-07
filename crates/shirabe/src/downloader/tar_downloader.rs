@@ -89,7 +89,7 @@ impl DownloaderInterface for TarDownloader {
         Some(self)
     }
 
-    async fn download(
+    async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
@@ -97,7 +97,7 @@ impl DownloaderInterface for TarDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
-            .download(package, path, prev_package, output)
+            .download_with_output(package, path, prev_package, output)
             .await
     }
 
@@ -111,7 +111,7 @@ impl DownloaderInterface for TarDownloader {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
-    async fn install(
+    async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
@@ -132,13 +132,13 @@ impl DownloaderInterface for TarDownloader {
             .await
     }
 
-    async fn remove(
+    async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.inner.remove(package, path, output).await
+        self.inner.remove_with_output(package, path, output).await
     }
 
     async fn cleanup(

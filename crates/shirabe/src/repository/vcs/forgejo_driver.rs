@@ -480,13 +480,12 @@ impl ForgejoDriver {
         }
 
         if !extension_loaded("openssl") {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 bconcat!(
                     "Skipping Forgejo driver for ",
                     url,
                     " because the OpenSSL PHP extension is missing."
                 ),
-                true,
                 io_interface::VERBOSE,
             );
 
@@ -627,7 +626,7 @@ impl ForgejoDriver {
             Ok(()) => Ok(true),
             Err(e) => {
                 self.git_driver = None;
-                self.inner.io.write_error3(bconcat!("<error>Failed to clone the ", ssh_url, " repository, try running in interactive mode so that you can enter your Forgejo credentials</error>"), true, io_interface::NORMAL);
+                self.inner.io.write_error(bconcat!("<error>Failed to clone the ", ssh_url, " repository, try running in interactive mode so that you can enter your Forgejo credentials</error>"));
                 Err(e)
             }
         }

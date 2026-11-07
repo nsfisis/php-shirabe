@@ -65,11 +65,7 @@ impl Git {
                     return Err(RuntimeException::new(msg).into());
                 }
                 Some(io) => {
-                    io.write_error3(
-                        bconcat!("<warning>", msg, "</warning>"),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    io.write_error(bconcat!("<warning>", msg, "</warning>"));
                 }
             }
         }
@@ -517,10 +513,8 @@ impl Git {
                 }
                 // Falling back to ssh
                 let ssh_url = bconcat!("git@bitbucket.org:", repo_with_git_part);
-                self.io.write_error3(
+                self.io.write_error(
                     "    No bitbucket authentication configured. Falling back to ssh.",
-                    true,
-                    io_interface::NORMAL,
                 );
                 if run_commands_inline(
                     ssh_url.as_bstr(),
@@ -664,14 +658,13 @@ impl Git {
                         }
                     }
 
-                    self.io.write_error3(
-                        bconcat!("    Authentication required (<info>", m2, "</info>):"),
-                        true,
-                        io_interface::NORMAL,
-                    );
-                    self.io.write_error3(
+                    self.io.write_error(bconcat!(
+                        "    Authentication required (<info>",
+                        m2,
+                        "</info>):"
+                    ));
+                    self.io.write_error_with_verbosity(
                         bconcat!("<warning>", trim(&error_msg), "</warning>"),
-                        true,
                         io_interface::VERBOSE,
                     );
                     let mut auth_map: IndexMap<BString, Option<BString>> = IndexMap::new();
@@ -765,15 +758,11 @@ impl Git {
                 .as_ref()
                 .is_none_or(|v| v != "prime")
         {
-            self.io.write_error3(
-                bconcat!(
-                    "<warning>Aborting git mirror sync of ",
-                    url,
-                    " as network is disabled</warning>"
-                ),
-                true,
-                io_interface::NORMAL,
-            );
+            self.io.write_error(bconcat!(
+                "<warning>Aborting git mirror sync of ",
+                url,
+                " as network is disabled</warning>"
+            ));
 
             return Ok(false);
         }
@@ -841,9 +830,8 @@ impl Git {
             };
 
             if let Err(e) = outcome {
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!("<error>Sync mirror failed: ", error_message(&e), "</error>"),
-                    true,
                     io_interface::DEBUG,
                 );
 
@@ -1161,13 +1149,12 @@ impl Git {
         match result {
             Ok(v) => v,
             Err(e) => {
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!(
                         "<error>Failed to fetch root identifier from remote: ",
                         error_message(&e),
                         "</error>"
                     ),
-                    true,
                     io_interface::DEBUG,
                 );
                 None

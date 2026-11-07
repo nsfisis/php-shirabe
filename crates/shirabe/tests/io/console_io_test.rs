@@ -13,7 +13,6 @@
 
 use bstr::{BStr, BString};
 use indexmap::{IndexMap, indexmap};
-use shirabe::io::io_interface::NORMAL;
 use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable, IOInterfaceWrite};
 use shirabe_php_shim::{
     PhpResource, bconcat, fwrite_resource, php_fopen_resource, rewind, str_repeat,
@@ -100,7 +99,7 @@ fn test_write() {
     let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = buffered.clone();
     let console_io = ConsoleIO::new(input, output, QuestionHelper::default());
 
-    console_io.write3("some information about something", false, NORMAL);
+    console_io.write_no_newline("some information about something");
 
     assert_eq!(
         "some information about something",
@@ -127,7 +126,7 @@ fn test_write_error() {
         std::rc::Rc::new(std::cell::RefCell::new(console_output));
     let console_io = ConsoleIO::new(input, output, QuestionHelper::default());
 
-    console_io.write_error3("some information about something", false, NORMAL);
+    console_io.write_error_no_newline("some information about something");
 
     assert_eq!(
         "some information about something",
@@ -135,10 +134,10 @@ fn test_write_error() {
     );
 }
 
-#[ignore = "ConsoleIO::write3 takes a single string; the test feeds a 2-element array ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed messages array, which the string signature cannot represent"]
+#[ignore = "ConsoleIO::write_with_verbosity takes a single string; the test feeds a 2-element array ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed messages array, which the string signature cannot represent"]
 #[test]
 fn test_write_with_multiple_line_string_when_debugging() {
-    // TODO(type-model): ConsoleIO::write3 takes a single string; the test feeds a 2-element array
+    // TODO(type-model): ConsoleIO::write_with_verbosity takes a single string; the test feeds a 2-element array
     // ['First line','Second lines'] and asserts a per-element regex on the debugging-prefixed
     // messages array, which the string signature cannot represent.
     todo!()
@@ -168,14 +167,9 @@ fn test_overwrite() {
     let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = buffered.clone();
     let console_io = ConsoleIO::new(input, output, QuestionHelper::default());
 
-    console_io.write3("something (<question>strlen = 23</question>)", true, NORMAL);
-    console_io.overwrite4("shorter (<comment>12</comment>)", false, None, NORMAL);
-    console_io.overwrite4(
-        "something longer than initial (<info>34</info>)",
-        true,
-        None,
-        NORMAL,
-    );
+    console_io.write("something (<question>strlen = 23</question>)");
+    console_io.overwrite_no_newline("shorter (<comment>12</comment>)");
+    console_io.overwrite("something longer than initial (<info>34</info>)");
 
     let bs = |n: usize| str_repeat("\u{08}", n);
     let expected = bconcat!(

@@ -58,7 +58,7 @@ impl Command for DependsCommand {
         self.set_aliases(vec!["why".into()])?;
         self.set_description("Shows which packages cause the given package to be installed".into());
         self.set_definition(&[
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 ARGUMENT_PACKAGE,
                 Some(InputArgument::REQUIRED),
                 "Package to inspect",

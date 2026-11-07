@@ -677,11 +677,7 @@ impl GitLabDriver {
             Err(e) => {
                 self.git_driver = None;
 
-                self.inner.io.write_error3(
-                    bconcat!("<error>Failed to clone the ", url, " repository, try running in interactive mode so that you can enter your credentials</error>"),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.inner.io.write_error(bconcat!("<error>Failed to clone the ", url, " repository, try running in interactive mode so that you can enter your credentials</error>"));
                 Err(e)
             }
         }
@@ -792,11 +788,7 @@ impl GitLabDriver {
                         }
 
                         if !more_than_guest_access {
-                            this.inner.io.write_error3(
-                            "<warning>GitLab token with Guest or Planner only access detected</warning>",
-                            true,
-                            io_interface::NORMAL,
-                        );
+                            this.inner.io.write_error("<warning>GitLab token with Guest or Planner only access detected</warning>");
 
                             this.attempt_clone_fallback()?;
 
@@ -881,19 +873,15 @@ impl GitLabDriver {
                         Some(b"null".to_vec()),
                     )));
                 }
-                self.inner.io.write_error3(
-                    bconcat!(
-                        "<warning>Failed to download ",
-                        self.namespace,
-                        "/",
-                        self.repository,
-                        ":",
-                        e.get_message(),
-                        "</warning>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.inner.io.write_error(bconcat!(
+                    "<warning>Failed to download ",
+                    self.namespace,
+                    "/",
+                    self.repository,
+                    ":",
+                    e.get_message(),
+                    "</warning>"
+                ));
                 git_lab_util.authorize_oauth_interactively(
                     self.scheme.as_bstr(),
                     self.inner.origin_url.as_bstr(),
@@ -964,13 +952,12 @@ impl GitLabDriver {
         }
 
         if scheme == "https" && !extension_loaded("openssl") {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 bconcat!(
                     "Skipping GitLab driver for ",
                     url,
                     " because the OpenSSL PHP extension is missing."
                 ),
-                true,
                 io_interface::VERBOSE,
             );
 

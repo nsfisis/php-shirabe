@@ -1102,15 +1102,14 @@ impl PoolBuilder {
             return pool;
         }
 
-        self.io.write3(
+        self.io.write_with_verbosity(
             sprintf(
                 "Pool optimizer completed in %.3f seconds",
                 &[PhpMixed::Float(microtime() - before)],
             ),
-            true,
             io_interface::VERY_VERBOSE,
         );
-        self.io.write3(
+        self.io.write_with_verbosity(
             bconcat!(
                 "<info>Found ",
                 number_format(total, 0, ".", ","),
@@ -1120,7 +1119,6 @@ impl PoolBuilder {
                 display_to_bytes(round(100.0 / total * filtered, 0)),
                 "%) were optimized away.</info>"
             ),
-            true,
             io_interface::VERY_VERBOSE,
         );
 
@@ -1155,15 +1153,14 @@ impl PoolBuilder {
             return Ok(pool);
         }
 
-        self.io.write3(
+        self.io.write_with_verbosity(
             sprintf(
                 "Security advisory pool filter completed in %.3f seconds",
                 &[PhpMixed::Float(microtime() - before)],
             ),
-            true,
             io_interface::VERY_VERBOSE,
         );
-        self.io.write3(
+        self.io.write_with_verbosity(
             bconcat!(
                 "<info>Found ",
                 number_format(total, 0, ".", ","),
@@ -1173,7 +1170,6 @@ impl PoolBuilder {
                 display_to_bytes(round(100.0 / total * filtered, 0)),
                 "%) were filtered away.</info>"
             ),
-            true,
             io_interface::VERY_VERBOSE,
         );
 

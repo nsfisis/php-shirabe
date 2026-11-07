@@ -11,7 +11,7 @@ use shirabe_php_shim::{PhpClass, PhpMixed};
 pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
     fn get_installation_source(&self) -> BString;
 
-    async fn download(
+    async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
@@ -19,14 +19,14 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    /// Convenience for the PHP default `$output = true` overload.
-    async fn download3(
+    async fn download(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.download(package, path, prev_package, true).await
+        self.download_with_output(package, path, prev_package, true)
+            .await
     }
 
     async fn prepare(
@@ -37,20 +37,19 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    async fn install(
+    async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    /// Convenience for the PHP default `$output = true` overload.
-    async fn install2(
+    async fn install(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.install(package, path, true).await
+        self.install_with_output(package, path, true).await
     }
 
     async fn update(
@@ -60,20 +59,19 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
         path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    async fn remove(
+    async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    /// Convenience for the PHP default `$output = true` overload.
-    async fn remove2(
+    async fn remove(
         &self,
         package: PackageInterfaceHandle,
         path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.remove(package, path, true).await
+        self.remove_with_output(package, path, true).await
     }
 
     async fn cleanup(

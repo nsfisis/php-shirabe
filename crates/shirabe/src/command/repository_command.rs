@@ -227,7 +227,7 @@ impl Command for RepositoryCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "before",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
@@ -237,7 +237,7 @@ impl Command for RepositoryCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "after",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
@@ -247,7 +247,7 @@ impl Command for RepositoryCommand {
             )
             .unwrap()
             .into(),
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 "action",
                 Some(InputArgument::OPTIONAL),
                 "Action to perform: list, add, remove, set-url, get-url, enable, disable",
@@ -264,7 +264,7 @@ impl Command for RepositoryCommand {
             )
             .unwrap()
             .into(),
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 "name",
                 Some(InputArgument::OPTIONAL),
                 "Repository name (or special name packagist.org for enable/disable)",
@@ -273,7 +273,7 @@ impl Command for RepositoryCommand {
             )
             .unwrap()
             .into(),
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 "arg1",
                 Some(InputArgument::OPTIONAL),
                 "Type for add, or new URL for set-url, or JSON config for add",

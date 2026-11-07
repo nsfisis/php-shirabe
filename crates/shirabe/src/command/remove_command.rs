@@ -60,7 +60,7 @@ impl Command for RemoveCommand {
         self.set_aliases(vec!["rm".into(), "uninstall".into()])?;
         self.set_description("Removes a package from the require or require-dev".into());
         self.set_definition(&[
-                InputArgument::new5("packages",
+                InputArgument::with_suggested_values("packages",
             Some(InputArgument::IS_ARRAY),
             "Packages that should be removed.",
             None,
@@ -95,7 +95,7 @@ impl Command for RemoveCommand {
         Some(InputOption::VALUE_NONE),
         "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).",
         None).unwrap().into(),
-        InputOption::new6("audit-format",
+        InputOption::with_suggested_values("audit-format",
         None,
         Some(InputOption::VALUE_REQUIRED),
         "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",

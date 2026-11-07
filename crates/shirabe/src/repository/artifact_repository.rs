@@ -121,18 +121,17 @@ impl ArtifactRepository {
             let basename = basename(path_to_bytes(&file_path));
             match package {
                 None => {
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!(
                             "File <comment>",
                             basename,
                             "</comment> doesn't seem to hold a package"
                         ),
-                        true,
                         io_interface::VERBOSE,
                     );
                 }
                 Some(package) => {
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!(
                             "Found package <info>",
                             package.get_name(),
@@ -142,7 +141,6 @@ impl ArtifactRepository {
                             basename,
                             "</info>"
                         ),
-                        true,
                         io_interface::VERBOSE,
                     );
                     self.inner.add_package(package);
@@ -178,14 +176,13 @@ impl ArtifactRepository {
         match get_result {
             Ok(j) => json = j,
             Err(exception) => {
-                self.io.write3(
+                self.io.write_no_newline_with_verbosity(
                     bconcat!(
                         "Failed loading package ",
                         pathname,
                         ": ",
                         error_message(&exception)
                     ),
-                    false,
                     io_interface::VERBOSE,
                 );
             }

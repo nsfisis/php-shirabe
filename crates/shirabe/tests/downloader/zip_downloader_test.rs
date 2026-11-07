@@ -183,7 +183,7 @@ fn test_error_messages() {
     let result: anyhow::Result<()> = (|| {
         let loop_ = Loop::new(http_downloader.clone(), None);
         let promise = Box::pin(async {
-            DownloaderInterface::download(
+            DownloaderInterface::download_with_output(
                 &downloader,
                 package.clone(),
                 std::path::Path::new(&path),
@@ -194,7 +194,7 @@ fn test_error_messages() {
             .map(|_| ())
         });
         run(loop_.wait(vec![promise], None))?;
-        run(DownloaderInterface::install(
+        run(DownloaderInterface::install_with_output(
             &downloader,
             package.clone(),
             std::path::Path::new(&path),

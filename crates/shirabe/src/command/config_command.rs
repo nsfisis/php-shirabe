@@ -270,7 +270,7 @@ impl ConfigCommand {
                     bconcat!("https://getcomposer.org/doc/06-config.md#", id)
                 };
             if is_string(&raw_val) && raw_val.as_string() != value_inner.as_string() {
-                self.get_io().write3(
+                self.get_io().write_with_verbosity(
                     bconcat!(
                         "[<fg=yellow;href=",
                         link,
@@ -284,11 +284,10 @@ impl ConfigCommand {
                         ")</info>",
                         source
                     ),
-                    true,
                     io_interface::QUIET,
                 );
             } else {
-                self.get_io().write3(
+                self.get_io().write_with_verbosity(
                     bconcat!(
                         "[<fg=yellow;href=",
                         link,
@@ -300,7 +299,6 @@ impl ConfigCommand {
                         "</info>",
                         source
                     ),
-                    true,
                     io_interface::QUIET,
                 );
             }
@@ -459,7 +457,7 @@ impl Command for ConfigCommand {
         InputOption::new("merge", Some("m".into()), Some(InputOption::VALUE_NONE), "Merge the setting value with the current value, to be used with extra.* or audit.ignore[-abandoned] keys in combination with --json", None).unwrap().into(),
         InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lowest priority) to the existing ones instead of prepending it (highest priority)", None).unwrap().into(),
         InputOption::new("source", None, Some(InputOption::VALUE_NONE), "Display where the config value is loaded from", None).unwrap().into(),
-        InputArgument::new5("setting-key", None, "Setting key", None, self.suggest_setting_keys()).unwrap().into(),
+        InputArgument::with_suggested_values("setting-key", None, "Setting key", None, self.suggest_setting_keys()).unwrap().into(),
         InputArgument::new("setting-value", Some(InputArgument::IS_ARRAY), "Setting value", None).unwrap().into(),
             ]);
         self.set_help(
@@ -846,9 +844,8 @@ impl Command for ConfigCommand {
                 source_of_config_value = bconcat!(" (", source, ")");
             }
 
-            self.get_io().write3(
+            self.get_io().write_with_verbosity(
                 bconcat!(value_str, source_of_config_value),
-                true,
                 io_interface::QUIET,
             );
 

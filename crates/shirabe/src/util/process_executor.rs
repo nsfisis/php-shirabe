@@ -309,13 +309,12 @@ impl ProcessExecutor {
         if signals.is_triggered()
             && let Some(io) = &self.io
         {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 bconcat!(
                     "Received ",
                     signals.last_signal().as_str(),
                     ", aborting when child process is done"
                 ),
-                true,
                 io_interface::DEBUG,
             );
         }
@@ -708,13 +707,9 @@ impl ProcessExecutor {
         }
 
         if Process::ERR == r#type {
-            io.as_mut()
-                .unwrap()
-                .write_error_raw3(buffer, false, io_interface::NORMAL);
+            io.as_mut().unwrap().write_error_raw_no_newline(buffer);
         } else {
-            io.as_mut()
-                .unwrap()
-                .write_raw3(buffer, false, io_interface::NORMAL);
+            io.as_mut().unwrap().write_raw_no_newline(buffer);
         }
     }
 

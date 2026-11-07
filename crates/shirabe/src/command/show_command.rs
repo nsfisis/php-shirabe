@@ -1382,7 +1382,7 @@ impl Command for ShowCommand {
             .into()
         };
         self.set_definition(&[
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 "package",
                 Some(InputArgument::OPTIONAL),
                 "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.",
@@ -1418,7 +1418,7 @@ impl Command for ShowCommand {
                 Some(BStr::new("o")),
                 BStr::new("Show the latest version but only for packages that are outdated"),
             ),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "ignore",
                 None,
                 Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
@@ -1458,7 +1458,7 @@ impl Command for ShowCommand {
                 None,
                 BStr::new("Return a non-zero exit code when there are outdated packages"),
             ),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "format",
                 Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),
@@ -1846,7 +1846,7 @@ impl Command for ShowCommand {
 
         if let Some(ref composer) = composer {
             let composer = composer_full(composer);
-            let command_event = CommandEvent::new6(
+            let command_event = CommandEvent::with_args_and_flags(
                 PluginEvents::COMMAND,
                 "show",
                 input.clone(),

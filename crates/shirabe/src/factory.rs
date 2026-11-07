@@ -18,7 +18,7 @@ use crate::installer::{
     BinaryInstaller, BinaryInstallerInterface, InstallationManager, InstallationManagerInterface,
     LibraryInstaller, MetapackageInstaller, PluginInstaller,
 };
-use crate::io::{DEBUG, IOInterface, IOInterfaceWrite, NORMAL};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::archiver::{ArchiveManager, PharArchiver, ZipArchiver};
 use crate::package::loader::RootPackageLoader;
@@ -240,9 +240,8 @@ impl Factory {
         let file = JsonFile::new(global_config_path, None, io.clone())?;
         if file.exists() {
             if let Some(io_ref) = &io {
-                io_ref.write_error3(
+                io_ref.write_error_with_verbosity(
                     bconcat!("Loading config file ", file.get_path()),
-                    true,
                     DEBUG,
                 );
             }
@@ -290,9 +289,8 @@ impl Factory {
         let auth_file = JsonFile::new(auth_file_path, None, io.clone())?;
         if auth_file.exists() {
             if let Some(io_ref) = &io {
-                io_ref.write_error3(
+                io_ref.write_error_with_verbosity(
                     bconcat!("Loading config file ", auth_file.get_path()),
-                    true,
                     DEBUG,
                 );
             }
@@ -482,7 +480,7 @@ impl Factory {
         config.merge(&local_config_data, &local_config_source);
 
         if let Some(ref composer_file_path) = composer_file {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 bconcat!(
                     "Loading config file ",
                     composer_file_path,
@@ -490,7 +488,6 @@ impl Factory {
                     realpath(composer_file_path).unwrap_or_default(),
                     ")"
                 ),
-                true,
                 DEBUG,
             );
             config.set_config_source(Box::new(JsonConfigSource::new(
@@ -511,9 +508,8 @@ impl Factory {
                 Some(io.clone()),
             )?;
             if local_auth_file.exists() {
-                io.write_error3(
+                io.write_error_with_verbosity(
                     bconcat!("Loading config file ", local_auth_file.get_path()),
-                    true,
                     DEBUG,
                 );
                 Self::validate_json_schema(
@@ -720,11 +716,7 @@ impl Factory {
                             let lock_file = Self::get_lock_file(composer_file_path);
                             let lock_enabled = config.borrow().get_bool("lock");
                             if !lock_enabled && file_exists(&lock_file) {
-                                io.write_error3(
-                                    bconcat!("<warning>", lock_file, " is present but ignored as the \"lock\" config option is disabled.</warning>"),
-                                    true,
-                                    NORMAL,
-                                );
+                                io.write_error(bconcat!("<warning>", lock_file, " is present but ignored as the \"lock\" config option is disabled.</warning>"));
                             }
 
                             let locker = Locker::new(
@@ -945,9 +937,8 @@ impl Factory {
         ) {
             Ok(c) => Some(c),
             Err(e) => {
-                io.write_error3(
+                io.write_error_with_verbosity(
                     bconcat!("Failed to initialize global composer: ", error_message(&e)),
-                    true,
                     DEBUG,
                 );
                 None
@@ -1394,10 +1385,8 @@ impl Factory {
             disable_tls = !extension_loaded("openssl");
         } else if config.borrow().get_bool("disable-tls") {
             if !unsafe { WARNED } {
-                io.write_error3(
+                io.write_error(
                     "<warning>You are running Shirabe with SSL/TLS protection disabled.</warning>",
-                    true,
-                    NORMAL,
                 );
             }
             unsafe { WARNED = true };
@@ -1429,21 +1418,9 @@ impl Factory {
                 if let Some(te) = e.catch::<TransportException>()
                     && strpos(te.get_message(), "cafile").is_some()
                 {
-                    io.write3(
-                            "<error>Unable to locate a valid CA certificate file. You must set a valid 'cafile' option.</error>",
-                            true,
-                            NORMAL,
-                        );
-                    io.write3(
-                            "<error>A valid CA certificate file is required for SSL/TLS protection.</error>",
-                            true,
-                            NORMAL,
-                        );
-                    io.write3(
-                            "<error>You can disable this error, at your own risk, by setting the 'disable-tls' option to true.</error>",
-                            true,
-                            NORMAL,
-                        );
+                    io.write("<error>Unable to locate a valid CA certificate file. You must set a valid 'cafile' option.</error>");
+                    io.write("<error>A valid CA certificate file is required for SSL/TLS protection.</error>");
+                    io.write("<error>You can disable this error, at your own risk, by setting the 'disable-tls' option to true.</error>");
                 }
                 return Err(e);
             }
@@ -1471,7 +1448,7 @@ impl Factory {
         }
 
         if let Some(io_ref) = &io {
-            io_ref.write_error3("Loading auth config from COMPOSER_AUTH", true, DEBUG);
+            io_ref.write_error_with_verbosity("Loading auth config from COMPOSER_AUTH", DEBUG);
         }
         Self::validate_json_schema(
             io,
@@ -1546,7 +1523,7 @@ impl Factory {
                     (implode(bconcat!(PHP_EOL, " - "), jve.get_errors()))
                 );
                 if let Some(io_ref) = io {
-                    io_ref.write_error3(bconcat!("<warning>", msg, "</>"), true, NORMAL);
+                    io_ref.write_error(bconcat!("<warning>", msg, "</>"));
                 } else {
                     return Err(UnexpectedValueException::new(msg).into());
                 }

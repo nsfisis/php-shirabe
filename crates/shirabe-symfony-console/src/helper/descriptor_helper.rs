@@ -50,7 +50,7 @@ impl DescriptorHelper {
     ///
     /// The defaults PHP merges into `$options` (`raw_text` false, `format` "txt") are those of
     /// `DescriptorOptions::default()`.
-    pub fn describe2(
+    pub fn describe(
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,

@@ -94,7 +94,7 @@ impl Command for SuggestsCommand {
             )
             .unwrap()
             .into(),
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 "packages",
                 Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                 "Packages that you want to list suggestions from.",

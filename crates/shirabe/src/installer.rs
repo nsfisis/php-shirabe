@@ -563,15 +563,11 @@ impl Installer {
 
         if (self.update_allow_list.is_some() || self.update_mirrors) && locked_repository.is_none()
         {
-            self.io.write_error3(
-                bconcat!("<error>Cannot update ", if self.update_mirrors {
+            self.io.write_error_with_verbosity(bconcat!("<error>Cannot update ", if self.update_mirrors {
                         "lock file information"
                     } else {
                         "only a partial set of packages"
-                    }, " without a lock file present. Run `shirabe update` to generate a lock file.</error>"),
-                true,
-                io_interface::QUIET,
-            );
+                    }, " without a lock file present. Run `shirabe update` to generate a lock file.</error>"), io_interface::QUIET);
 
             return Ok(Self::ERROR_NO_LOCK_FILE_FOR_PARTIAL_UPDATE);
         }
@@ -647,18 +643,13 @@ impl Installer {
                     false,
                 )?;
 
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!("<error>", err, "</error>"),
-                    true,
                     io_interface::QUIET,
                 );
                 self.io.write_error(&pretty_problem);
                 if !self.dev_mode {
-                    self.io.write_error3(
-                        "<warning>Running update with --no-dev does not mean require-dev is ignored, it just means the packages will not be installed. If dev requirements are blocking the update you have to resolve those problems.</warning>",
-                        true,
-                        io_interface::QUIET,
-                    );
+                    self.io.write_error_with_verbosity("<warning>Running update with --no-dev does not mean require-dev is ignored, it just means the packages will not be installed. If dev requirements are blocking the update you have to resolve those problems.</warning>", io_interface::QUIET);
                 }
 
                 let mut ghe = GithubActionError::new(self.io.clone());
@@ -669,18 +660,16 @@ impl Installer {
         }
         let _ = solver;
 
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!(
                 "Analyzed ",
                 pool.borrow().get_packages().len(),
                 " packages to resolve dependencies"
             ),
-            true,
             io_interface::VERBOSE,
         );
-        self.io.write_error3(
+        self.io.write_error_with_verbosity(
             bconcat!("Analyzed ", rule_set_size, " rules to resolve dependencies"),
-            true,
             io_interface::VERBOSE,
         );
 
@@ -771,23 +760,20 @@ impl Installer {
                     "</info>"
                 ));
                 if !install_names.is_empty() {
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!("Installs: ", implode(", ", &install_names)),
-                        true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !update_names.is_empty() {
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!("Updates: ", implode(", ", &update_names)),
-                        true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !uninstalls.is_empty() {
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!("Removals: ", implode(", ", &uninstall_names)),
-                        true,
                         io_interface::VERBOSE,
                     );
                 }
@@ -929,9 +915,8 @@ impl Installer {
                     true,
                 )?;
 
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!("<error>", err, "</error>"),
-                    true,
                     io_interface::QUIET,
                 );
                 self.io.write_error(
@@ -1005,11 +990,7 @@ impl Installer {
                 self.create_request(fixed_root_package, &platform_repo, Some(&locked_repository))?;
 
             if !self.locker.borrow_mut().is_fresh()? {
-                self.io.write_error3(
-                    "<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `shirabe update` or `shirabe update <package name>`.</warning>",
-                    true,
-                    io_interface::QUIET,
-                );
+                self.io.write_error_with_verbosity("<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `shirabe update` or `shirabe update <package name>`.</warning>", io_interface::QUIET);
             }
 
             let package_for_missing = self.package.clone();
@@ -1088,11 +1069,7 @@ impl Installer {
 
                     // installing the locked packages on this platform resulted in lock modifying operations, there wasn't a conflict, but the lock file as-is seems to not work on this system
                     if !lock_transaction.get_operations().is_empty() {
-                        self.io.write_error3(
-                            "<error>Your lock file cannot be installed on this system without changes. Please run shirabe update.</error>",
-                            true,
-                            io_interface::QUIET,
-                        );
+                        self.io.write_error_with_verbosity("<error>Your lock file cannot be installed on this system without changes. Please run shirabe update.</error>", io_interface::QUIET);
 
                         return Ok(Self::ERROR_LOCK_FILE_INVALID);
                     }
@@ -1107,9 +1084,8 @@ impl Installer {
                         false,
                     )?;
 
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!("<error>", err, "</error>"),
-                        true,
                         io_interface::QUIET,
                     );
                     self.io.write_error(&pretty_problem);
@@ -1187,23 +1163,20 @@ impl Installer {
                 "</info>"
             ));
             if !installs.is_empty() {
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!("Installs: ", implode(", ", &installs)),
-                    true,
                     io_interface::VERBOSE,
                 );
             }
             if !updates.is_empty() {
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!("Updates: ", implode(", ", &updates)),
-                    true,
                     io_interface::VERBOSE,
                 );
             }
             if !uninstalls.is_empty() {
-                self.io.write_error3(
+                self.io.write_error_with_verbosity(
                     bconcat!("Removals: ", implode(", ", &uninstalls)),
-                    true,
                     io_interface::VERBOSE,
                 );
             }
@@ -1636,9 +1609,8 @@ impl Installer {
         // to configure from the outside of Installer but this is only
         // a debugging tool and should never be required in any other use case
         if Platform::get_env("COMPOSER_POOL_OPTIMIZER").is_some_and(|v| v == "0") {
-            self.io.write3(
+            self.io.write_with_verbosity(
                 "Pool Optimizer was disabled for debugging purposes.",
-                true,
                 io_interface::DEBUG,
             );
 

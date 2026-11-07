@@ -80,7 +80,7 @@ impl Command for ExecCommand {
             InputOption::new("list", Some("l".into()), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
             // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
             // extra ones the caller passes).
-            InputArgument::new5("binary",
+            InputArgument::with_suggested_values("binary",
             Some(InputArgument::OPTIONAL),
             "The binary to run, e.g. phpunit",
             None,

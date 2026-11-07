@@ -19,7 +19,7 @@ impl<'a> DownloaderOrManager<'a> {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.borrow_mut().download3(package, path, prev_package).await,
+            Self::Interface(d) => d.borrow_mut().download(package, path, prev_package).await,
             Self::Manager(d) => d.borrow().download(package, path, prev_package).await,
         }
     }
@@ -51,7 +51,7 @@ impl<'a> DownloaderOrManager<'a> {
         path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.borrow_mut().install2(package, path).await,
+            Self::Interface(d) => d.borrow_mut().install(package, path).await,
             Self::Manager(d) => d.borrow().install(package, path).await,
         }
     }

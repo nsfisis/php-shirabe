@@ -66,7 +66,10 @@ impl TableCell {
     ///
     /// The options used by the Table helper are internally controlled, so a malformed-option
     /// error here would be a programming bug rather than a recoverable condition.
-    pub fn new2(value: impl AsRef<[u8]>, options: IndexMap<BString, TableCellOption>) -> Self {
+    pub fn new_with_valid_options(
+        value: impl AsRef<[u8]>,
+        options: IndexMap<BString, TableCellOption>,
+    ) -> Self {
         Self::new(value, options).expect("TableCell options built internally are always valid")
     }
 

@@ -133,7 +133,7 @@ impl AuthHelper {
                     sso_url.unwrap_or_default(),
                     "\n"
                 );
-                self.io.write_error3(&message, true, io_interface::NORMAL);
+                self.io.write_error(&message);
                 if !self.io.is_interactive() {
                     return Err(TransportException::new(
                         bconcat!("Could not authenticate against ", origin),
@@ -414,11 +414,11 @@ impl AuthHelper {
                 .into());
             }
 
-            self.io.write_error3(
-                bconcat!("    Authentication required (<info>", origin, "</info>):"),
-                true,
-                io_interface::NORMAL,
-            );
+            self.io.write_error(bconcat!(
+                "    Authentication required (<info>",
+                origin,
+                "</info>):"
+            ));
             let username = self.io.ask("      Username: ", InputValue::Null)?;
             let password = self.io.ask_and_hide_answer("      Password: ")?;
             self.io.borrow_mut().set_authentication(
@@ -584,7 +584,7 @@ impl AuthHelper {
                     self.displayed_origin_authentications.get(origin) == Some(display_message);
                 if !already_displayed {
                     self.io
-                        .write_error3(display_message, true, io_interface::DEBUG);
+                        .write_error_with_verbosity(display_message, io_interface::DEBUG);
                     self.displayed_origin_authentications
                         .insert(origin.into(), display_message.clone());
                 }

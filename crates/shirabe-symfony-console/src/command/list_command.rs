@@ -162,7 +162,7 @@ impl Command for ListCommand {
             short: input.borrow().get_option("short")?.to_bool(),
             ..DescriptorOptions::default()
         };
-        helper.describe2(output.clone(), object, options)?;
+        helper.describe(output.clone(), object, options)?;
 
         Ok(0)
     }

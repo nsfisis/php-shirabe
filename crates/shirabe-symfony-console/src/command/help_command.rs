@@ -159,7 +159,7 @@ impl Command for HelpCommand {
             raw_text: input.borrow().get_option("raw")?.to_bool(),
             ..DescriptorOptions::default()
         };
-        helper.describe2(output.clone(), object, options)?;
+        helper.describe(output.clone(), object, options)?;
 
         *self.command.borrow_mut() = None;
 

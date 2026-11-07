@@ -20,7 +20,7 @@ impl CommandEvent {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Self {
-        Self::new6(
+        Self::with_args_and_flags(
             name,
             command_name,
             input,
@@ -30,7 +30,7 @@ impl CommandEvent {
         )
     }
 
-    pub fn new6(
+    pub fn with_args_and_flags(
         name: impl Into<BString>,
         command_name: impl AsRef<[u8]>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,

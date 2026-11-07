@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
 use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, ProcessExecutor, Url};
 use bstr::{BStr, BString, ByteSlice};
@@ -117,15 +117,11 @@ impl GitDriver {
                     ))
                     .into());
                 }
-                self.inner.io.write_error3(
-                    bconcat!(
-                        "<error>Failed to update ",
-                        self.inner.url,
-                        ", package information from this repository may be outdated</error>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.inner.io.write_error(bconcat!(
+                    "<error>Failed to update ",
+                    self.inner.url,
+                    ", package information from this repository may be outdated</error>"
+                ));
             }
 
             cache_url = self.inner.url.clone();

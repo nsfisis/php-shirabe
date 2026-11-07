@@ -139,7 +139,7 @@ impl Command for HomeCommand {
             "Opens the package's repository URL or homepage in your browser".into(),
         );
         self.set_definition(&[
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 "packages",
                 Some(InputArgument::IS_ARRAY),
                 "Package(s) to browse to.",

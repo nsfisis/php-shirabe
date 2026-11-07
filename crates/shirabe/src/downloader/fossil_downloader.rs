@@ -298,7 +298,7 @@ impl DownloaderInterface for FossilDownloader {
         <Self as VcsDownloader>::get_installation_source(self)
     }
 
-    async fn download(
+    async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
@@ -318,7 +318,7 @@ impl DownloaderInterface for FossilDownloader {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
-    async fn install(
+    async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
@@ -336,7 +336,7 @@ impl DownloaderInterface for FossilDownloader {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
 
-    async fn remove(
+    async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
         path: &Path,

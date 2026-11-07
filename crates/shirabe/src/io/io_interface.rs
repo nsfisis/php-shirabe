@@ -106,80 +106,74 @@ pub trait IOInterfaceWrite: IOInterfaceImmutable {
     fn write(&self, message: impl AsRef<[u8]>) {
         self.write_bytes(BStr::new(message.as_ref()), true, NORMAL)
     }
-    fn write2(&self, message: impl AsRef<[u8]>, newline: bool) {
-        self.write_bytes(BStr::new(message.as_ref()), newline, NORMAL)
-    }
-    fn write3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
-        self.write_bytes(BStr::new(message.as_ref()), newline, verbosity)
-    }
     fn write_no_newline(&self, message: impl AsRef<[u8]>) {
         self.write_bytes(BStr::new(message.as_ref()), false, NORMAL)
+    }
+    fn write_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.write_bytes(BStr::new(message.as_ref()), true, verbosity)
+    }
+    fn write_no_newline_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.write_bytes(BStr::new(message.as_ref()), false, verbosity)
     }
     fn write_error(&self, message: impl AsRef<[u8]>) {
         self.write_error_bytes(BStr::new(message.as_ref()), true, NORMAL)
     }
-    fn write_error2(&self, message: impl AsRef<[u8]>, newline: bool) {
-        self.write_error_bytes(BStr::new(message.as_ref()), newline, NORMAL)
-    }
-    fn write_error3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
-        self.write_error_bytes(BStr::new(message.as_ref()), newline, verbosity)
-    }
     fn write_error_no_newline(&self, message: impl AsRef<[u8]>) {
         self.write_error_bytes(BStr::new(message.as_ref()), false, NORMAL)
+    }
+    fn write_error_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.write_error_bytes(BStr::new(message.as_ref()), true, verbosity)
+    }
+    fn write_error_no_newline_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.write_error_bytes(BStr::new(message.as_ref()), false, verbosity)
     }
     fn write_raw(&self, message: impl AsRef<[u8]>) {
         self.write_raw_bytes(BStr::new(message.as_ref()), true, NORMAL)
     }
-    fn write_raw2(&self, message: impl AsRef<[u8]>, newline: bool) {
-        self.write_raw_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    fn write_raw_no_newline(&self, message: impl AsRef<[u8]>) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), false, NORMAL)
     }
-    fn write_raw3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
-        self.write_raw_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    fn write_raw_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), true, verbosity)
+    }
+    fn write_raw_no_newline_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), false, verbosity)
     }
     fn write_error_raw(&self, message: impl AsRef<[u8]>) {
         self.write_error_raw_bytes(BStr::new(message.as_ref()), true, NORMAL)
     }
-    fn write_error_raw2(&self, message: impl AsRef<[u8]>, newline: bool) {
-        self.write_error_raw_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    fn write_error_raw_no_newline(&self, message: impl AsRef<[u8]>) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), false, NORMAL)
     }
-    fn write_error_raw3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
-        self.write_error_raw_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    fn write_error_raw_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), true, verbosity)
+    }
+    fn write_error_raw_no_newline_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), false, verbosity)
     }
     fn overwrite(&self, message: impl AsRef<[u8]>) {
         self.overwrite_bytes(BStr::new(message.as_ref()), true, None, NORMAL)
     }
-    fn overwrite2(&self, message: impl AsRef<[u8]>, newline: bool) {
-        self.overwrite_bytes(BStr::new(message.as_ref()), newline, None, NORMAL)
+    fn overwrite_no_newline(&self, message: impl AsRef<[u8]>) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), false, None, NORMAL)
     }
-    fn overwrite3(&self, message: impl AsRef<[u8]>, newline: bool, size: Option<i64>) {
-        self.overwrite_bytes(BStr::new(message.as_ref()), newline, size, NORMAL)
+    fn overwrite_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), true, None, verbosity)
     }
-    fn overwrite4(
-        &self,
-        message: impl AsRef<[u8]>,
-        newline: bool,
-        size: Option<i64>,
-        verbosity: i64,
-    ) {
-        self.overwrite_bytes(BStr::new(message.as_ref()), newline, size, verbosity)
+    fn overwrite_no_newline_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), false, None, verbosity)
     }
     fn overwrite_error(&self, message: impl AsRef<[u8]>) {
         self.overwrite_error_bytes(BStr::new(message.as_ref()), true, None, NORMAL)
     }
-    fn overwrite_error2(&self, message: impl AsRef<[u8]>, newline: bool) {
-        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, None, NORMAL)
+    fn overwrite_error_no_newline(&self, message: impl AsRef<[u8]>) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), false, None, NORMAL)
     }
-    fn overwrite_error3(&self, message: impl AsRef<[u8]>, newline: bool, size: Option<i64>) {
-        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, size, NORMAL)
+    fn overwrite_error_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), true, None, verbosity)
     }
-    fn overwrite_error4(
-        &self,
-        message: impl AsRef<[u8]>,
-        newline: bool,
-        size: Option<i64>,
-        verbosity: i64,
-    ) {
-        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, size, verbosity)
+    fn overwrite_error_no_newline_with_verbosity(&self, message: impl AsRef<[u8]>, verbosity: i64) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), false, None, verbosity)
     }
     fn ask(&self, question: impl AsRef<[u8]>, default: InputValue) -> anyhow::Result<InputValue> {
         self.ask_bytes(BStr::new(question.as_ref()), default)

@@ -5,7 +5,7 @@ use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
 };
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -147,11 +147,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         requirement_field(&requirement, BStr::new("version")),
                     )
                 {
-                    io.write_error3(
-                        bconcat!("<warning>The \"", requirement_field(&requirement, BStr::new("version")), "\" constraint for \"", requirement_field(&requirement, BStr::new("name")), "\" appears too strict and will likely not match what you want. See https://getcomposer.org/constraints</warning>"),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    io.write_error(bconcat!("<warning>The \"", requirement_field(&requirement, BStr::new("version")), "\" constraint for \"", requirement_field(&requirement, BStr::new("name")), "\" appears too strict and will likely not match what you want. See https://getcomposer.org/constraints</warning>"));
                 }
 
                 if !requirement.contains_key(B("version")) {
@@ -171,17 +167,13 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                     if use_best_version_constraint {
                         requirement.insert("version".into(), version.clone());
-                        io.write_error3(
-                            bconcat!(
-                                "Using version <info>",
-                                version,
-                                "</info> for <info>",
-                                requirement_field(&requirement, BStr::new("name")),
-                                "</info>"
-                            ),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        io.write_error(bconcat!(
+                            "Using version <info>",
+                            version,
+                            "</info> for <info>",
+                            requirement_field(&requirement, BStr::new("name")),
+                            "</info>"
+                        ));
                     } else {
                         requirement.insert("version".into(), "guess".into());
                     }
@@ -294,24 +286,20 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         ));
                     }
 
-                    io.write_error3("", true, io_interface::NORMAL);
-                    io.write_error3(
-                        bconcat!(
-                            "Found <info>",
-                            matches.len() as i64,
-                            "</info> packages matching <info>",
-                            package,
-                            "</info>"
-                        ),
-                        true,
-                        io_interface::NORMAL,
-                    );
-                    io.write_error3("", true, io_interface::NORMAL);
+                    io.write_error("");
+                    io.write_error(bconcat!(
+                        "Found <info>",
+                        matches.len() as i64,
+                        "</info> packages matching <info>",
+                        package,
+                        "</info>"
+                    ));
+                    io.write_error("");
 
                     for choice in &choices {
-                        io.write_error3(choice, true, io_interface::NORMAL);
+                        io.write_error(choice);
                     }
-                    io.write_error3("", true, io_interface::NORMAL);
+                    io.write_error("");
 
                     let matches_clone = matches.clone();
                     let version_parser_clone = version_parser.clone();
@@ -399,17 +387,13 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                     fixed,
                                 )?;
 
-                            io.write_error3(
-                                bconcat!(
-                                    "Using version <info>",
-                                    c,
-                                    "</info> for <info>",
-                                    package,
-                                    "</info>"
-                                ),
-                                true,
-                                io_interface::NORMAL,
-                            );
+                            io.write_error(bconcat!(
+                                "Using version <info>",
+                                c,
+                                "</info> for <info>",
+                                package,
+                                "</info>"
+                            ));
 
                             c
                         }

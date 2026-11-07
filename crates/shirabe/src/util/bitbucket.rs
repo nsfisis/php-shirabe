@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{HttpDownloader, HttpOptions, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
@@ -111,44 +111,20 @@ impl Bitbucket {
             Err(te) => {
                 let code = transport_error_code(&te).unwrap_or(0);
                 if code == 400 {
-                    self.io.write_error3(
-                        "<error>Invalid OAuth consumer provided.</error>",
-                        true,
-                        io_interface::NORMAL,
-                    );
-                    self.io.write_error3(
-                        "This can have three reasons:",
-                        true,
-                        io_interface::NORMAL,
-                    );
-                    self.io.write_error3(
+                    self.io
+                        .write_error("<error>Invalid OAuth consumer provided.</error>");
+                    self.io.write_error("This can have three reasons:");
+                    self.io.write_error(
                         "1. You are authenticating with a bitbucket username/password combination",
-                        true,
-                        io_interface::NORMAL,
                     );
-                    self.io.write_error3(
-                        "2. You are using an OAuth consumer, but didn't configure a (dummy) callback url",
-                        true,
-                        io_interface::NORMAL,
-                    );
-                    self.io.write_error3(
-                        "3. You are using an OAuth consumer, but didn't configure it as private consumer",
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    self.io.write_error("2. You are using an OAuth consumer, but didn't configure a (dummy) callback url");
+                    self.io.write_error("3. You are using an OAuth consumer, but didn't configure it as private consumer");
                     return Ok(false);
                 }
                 if code == 403 || code == 401 {
-                    self.io.write_error3(
-                        "<error>Invalid OAuth consumer provided.</error>",
-                        true,
-                        io_interface::NORMAL,
-                    );
-                    self.io.write_error3(
-                        "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    self.io
+                        .write_error("<error>Invalid OAuth consumer provided.</error>");
+                    self.io.write_error("You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"");
                     return Ok(false);
                 }
                 return Err(te);
@@ -184,7 +160,7 @@ impl Bitbucket {
         message: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io.write_error3(msg, true, io_interface::NORMAL);
+            self.io.write_error(msg);
         }
 
         let local_auth_config_name: Option<BString> = self
@@ -196,28 +172,19 @@ impl Bitbucket {
         let auth_config_source_name = self.config.borrow().get_auth_config_source().get_name();
         let url =
             "https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/";
-        self.io
-            .write_error3("Follow the instructions here:", true, io_interface::NORMAL);
-        self.io.write_error3(url, true, io_interface::NORMAL);
+        self.io.write_error("Follow the instructions here:");
+        self.io.write_error(url);
         let local_name_prefix = local_auth_config_name
             .as_ref()
             .map(|name| bconcat!(name, " OR "))
             .unwrap_or_default();
-        self.io.write_error3(
-            bconcat!(
-                "to create a consumer. It will be stored in \"",
-                local_name_prefix,
-                auth_config_source_name,
-                "\" for future use by Composer."
-            ),
-            true,
-            io_interface::NORMAL,
-        );
-        self.io.write_error3(
-            "Ensure you enter a \"Callback URL\" (http://example.com is fine) or it will not be possible to create an Access Token (this callback url will not be used by composer)",
-            true,
-            io_interface::NORMAL,
-        );
+        self.io.write_error(bconcat!(
+            "to create a consumer. It will be stored in \"",
+            local_name_prefix,
+            auth_config_source_name,
+            "\" for future use by Composer."
+        ));
+        self.io.write_error("Ensure you enter a \"Callback URL\" (http://example.com is fine) or it will not be possible to create an Access Token (this callback url will not be used by composer)");
 
         let mut store_in_local_auth_config = false;
         if has_local_auth_config {
@@ -234,16 +201,9 @@ impl Bitbucket {
         let consumer_key = trim(consumer_key);
 
         if consumer_key.is_empty() {
-            self.io.write_error3(
-                "<warning>No consumer key given, aborting.</warning>",
-                true,
-                io_interface::NORMAL,
-            );
-            self.io.write_error3(
-                "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
-                true,
-                io_interface::NORMAL,
-            );
+            self.io
+                .write_error("<warning>No consumer key given, aborting.</warning>");
+            self.io.write_error("You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"");
             return Ok(false);
         }
 
@@ -254,16 +214,9 @@ impl Bitbucket {
         let consumer_secret = trim(consumer_secret);
 
         if consumer_secret.is_empty() {
-            self.io.write_error3(
-                "<warning>No consumer secret given, aborting.</warning>",
-                true,
-                io_interface::NORMAL,
-            );
-            self.io.write_error3(
-                "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
-                true,
-                io_interface::NORMAL,
-            );
+            self.io
+                .write_error("<warning>No consumer secret given, aborting.</warning>");
+            self.io.write_error("You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"");
             return Ok(false);
         }
 
@@ -287,11 +240,8 @@ impl Bitbucket {
             .get_auth_config_source_mut()
             .remove_config_setting(bstr::BStr::new(&bconcat!("http-basic.", origin_url)))?;
 
-        self.io.write_error3(
-            "<info>Consumer stored successfully.</info>",
-            true,
-            io_interface::NORMAL,
-        );
+        self.io
+            .write_error("<info>Consumer stored successfully.</info>");
 
         Ok(true)
     }

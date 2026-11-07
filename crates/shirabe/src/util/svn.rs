@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Svn.php sha1:49634190b2b4684ef42c9ccf8a263f365d7eb904
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
@@ -126,7 +126,7 @@ impl Svn {
                     .get_or_insert_with(BString::default)
                     .push_str(buffer);
                 if verbose {
-                    io.borrow().write_error2(buffer, false);
+                    io.borrow().write_error_no_newline(buffer);
                 }
                 Ok(false)
             });
@@ -183,15 +183,11 @@ impl Svn {
             .into());
         }
 
-        self.io.write_error3(
-            bconcat!(
-                "The Subversion server (",
-                self.url,
-                ") requested credentials:"
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        self.io.write_error(bconcat!(
+            "The Subversion server (",
+            self.url,
+            ") requested credentials:"
+        ));
 
         self.has_auth = Some(true);
         self.credentials = Some(SvnCredentials {

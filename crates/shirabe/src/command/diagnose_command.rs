@@ -1246,7 +1246,7 @@ impl Command for DiagnoseCommand {
             let c = composer_full(c);
             config = c.get_config();
 
-            let command_event = CommandEvent::new6(
+            let command_event = CommandEvent::with_args_and_flags(
                 PluginEvents::COMMAND,
                 "diagnose",
                 input,

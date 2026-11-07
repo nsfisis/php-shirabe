@@ -679,9 +679,8 @@ impl CreateProjectCommand {
         let real_dir = realpath(&directory);
         let signals = real_dir.as_ref().map(|_| SignalSubscription::new());
         let abort_on_signal = |signals: &SignalSubscription| {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
-                true,
                 DEBUG,
             );
             let mut fs = Filesystem::new(None);
@@ -798,13 +797,13 @@ impl Command for CreateProjectCommand {
         self.set_name("create-project".into())?;
         self.set_description("Creates new project from a package into given directory".into());
         self.set_definition(&[
-                InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
+                InputArgument::with_suggested_values("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
                 InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
                 InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None).unwrap().into(),
                 InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
                 InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
                 InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-                InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
+                InputOption::with_suggested_values("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
                 InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories to look the package up, either by URL or using JSON arrays", None).unwrap().into(),
                 InputOption::new("repository-url", None, Some(InputOption::VALUE_REQUIRED), "DEPRECATED: Use --repository instead.", None).unwrap().into(),
                 InputOption::new("add-repository", None, Some(InputOption::VALUE_NONE), "Add the custom repository in the composer.json. If a lock file is present it will be deleted and an update will be run instead of install.", None).unwrap().into(),
@@ -818,7 +817,7 @@ impl Command for CreateProjectCommand {
                 InputOption::new("remove-vcs", None, Some(InputOption::VALUE_NONE), "Whether to force deletion of the vcs folder without prompting.", None).unwrap().into(),
                 InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Whether to skip installation of the package dependencies.", None).unwrap().into(),
                 InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Whether to skip auditing of the installed package dependencies (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-                InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
+                InputOption::with_suggested_values("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
                 InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
                 InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
                 InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),

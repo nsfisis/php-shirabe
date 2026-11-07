@@ -319,16 +319,12 @@ impl RequireCommand {
             flags.push_str(" --with-dependencies");
         }
 
-        io.write_error3(
-            bconcat!(
-                "<info>Running shirabe update ",
-                implode(" ", &array_keys(requirements)),
-                flags,
-                "</info>"
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        io.write_error(bconcat!(
+            "<info>Running shirabe update ",
+            implode(" ", &array_keys(requirements)),
+            flags,
+            "</info>"
+        ));
 
         let command_event =
             CommandEvent::new(PluginEvents::COMMAND, "require", input.clone(), output);
@@ -429,7 +425,7 @@ impl RequireCommand {
                         .unwrap_or_default(),
                 )? {
                     if !req.contains_key(B("version")) {
-                        io.write_error3(bconcat!("You can also try re-running shirabe require with an explicit version constraint, e.g. \"shirabe require ", req.get(B("name")).cloned().unwrap_or_default(), ":*\" to figure out if any version is installable, or \"shirabe require ", req.get(B("name")).cloned().unwrap_or_default(), ":^2.1\" if you know which you need."), true, io_interface::NORMAL);
+                        io.write_error(bconcat!("You can also try re-running shirabe require with an explicit version constraint, e.g. \"shirabe require ", req.get(B("name")).cloned().unwrap_or_default(), ":*\" to figure out if any version is installable, or \"shirabe require ", req.get(B("name")).cloned().unwrap_or_default(), ":^2.1\" if you know which you need."));
                         break;
                     }
                 }
@@ -498,17 +494,13 @@ impl RequireCommand {
                     version_selector.find_recommended_require_version(package.clone())?,
                 );
             }
-            self.get_io().write_error3(
-                bconcat!(
-                    "Using version <info>",
-                    requirements.get(package_name).cloned().unwrap_or_default(),
-                    "</info> for <info>",
-                    package_name,
-                    "</info>"
-                ),
-                true,
-                io_interface::NORMAL,
-            );
+            self.get_io().write_error(bconcat!(
+                "Using version <info>",
+                requirements.get(package_name).cloned().unwrap_or_default(),
+                "</info> for <info>",
+                package_name,
+                "</info>"
+            ));
 
             // Regex pattern compatibility:
             // PCRE `{^dev-(?!main$|master$|trunk$|latest$)}` uses a negative lookahead,
@@ -657,7 +649,7 @@ impl RequireCommand {
                 &*self.file.borrow(),
                 ".</error>"
             );
-            self.get_io().write_error3(&msg, true, io_interface::NORMAL);
+            self.get_io().write_error(&msg);
             unlink(json.borrow().get_path());
             if file_exists(&lock) {
                 unlink(&lock);
@@ -674,7 +666,7 @@ impl RequireCommand {
                 extra,
                 "original content.</error>"
             );
-            self.get_io().write_error3(&msg, true, io_interface::NORMAL);
+            self.get_io().write_error(&msg);
             file_put_contents(json.borrow().get_path(), &*self.composer_backup.borrow());
             if let Some(ref lock_backup) = *self.lock_backup.borrow() {
                 file_put_contents(&lock, lock_backup);
@@ -705,19 +697,19 @@ impl Command for RequireCommand {
             "Adds required packages to your composer.json and installs them".into(),
         );
         self.set_definition(&[
-            InputArgument::new5("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Optional package name can also include a version constraint, e.g. foo/bar or foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
+            InputArgument::with_suggested_values("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Optional package name can also include a version constraint, e.g. foo/bar or foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
             InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Add requirement to require-dev.", None).unwrap().into(),
             InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything (implicitly enables --verbose).", None).unwrap().into(),
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-            InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
+            InputOption::with_suggested_values("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
             InputOption::new("fixed", None, Some(InputOption::VALUE_NONE), "Write fixed version to the composer.json.", None).unwrap().into(),
             InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
             InputOption::new("no-update", None, Some(InputOption::VALUE_NONE), "Disables the automatic update of the dependencies (implies --no-install).", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
             InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
+            InputOption::with_suggested_values("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| (*s).to_owned()).collect())).unwrap().into(),
             InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
             InputOption::new("update-no-dev", None, Some(InputOption::VALUE_NONE), "Run the dependency update with the --no-dev option.", None).unwrap().into(),
             InputOption::new("update-with-dependencies", Some("w".into()), Some(InputOption::VALUE_NONE), "Allows inherited dependencies to be updated, except those that are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
@@ -763,7 +755,7 @@ impl Command for RequireCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            self.get_io().write_error3("<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>", true, io_interface::NORMAL);
+            self.get_io().write_error("<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>");
         }
 
         let file = self.file.borrow().clone();
@@ -772,13 +764,13 @@ impl Command for RequireCommand {
             self.newly_created.get() && file_put_contents(&file, b"{\n}\n").is_none();
         if write_failed {
             let msg = bconcat!("<error>", file, " could not be created.</error>");
-            self.get_io().write_error3(&msg, true, io_interface::NORMAL);
+            self.get_io().write_error(&msg);
 
             return Ok(1);
         }
         if !Filesystem::is_readable(&file) {
             let msg = bconcat!("<error>", file, " is not readable.</error>");
-            self.get_io().write_error3(&msg, true, io_interface::NORMAL);
+            self.get_io().write_error(&msg);
 
             return Ok(1);
         }
@@ -804,9 +796,8 @@ impl Command for RequireCommand {
 
         let signals = SignalSubscription::new();
         let abort_on_signal = |signals: &SignalSubscription| {
-            self.get_io().write_error3(
+            self.get_io().write_error_with_verbosity(
                 bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
-                true,
                 io_interface::DEBUG,
             );
             self.revert_composer_file();
@@ -818,7 +809,7 @@ impl Command for RequireCommand {
         let backup_contents = self.composer_backup.borrow().clone();
         if !is_writable(&file) && file_put_contents(&file, &backup_contents).is_none() {
             let msg = bconcat!("<error>", file, " is not writable.</error>");
-            self.get_io().write_error3(&msg, true, io_interface::NORMAL);
+            self.get_io().write_error(&msg);
 
             return Ok(1);
         }
@@ -841,10 +832,10 @@ impl Command for RequireCommand {
             if package_type != "project"
                 && !input.borrow().get_option("dev")?.as_bool().unwrap_or(false)
             {
-                self.get_io().write_error3("<error>The \"--fixed\" option is only allowed for packages with a \"project\" type or for dev dependencies to prevent possible misuses.</error>", true, io_interface::NORMAL);
+                self.get_io().write_error("<error>The \"--fixed\" option is only allowed for packages with a \"project\" type or for dev dependencies to prevent possible misuses.</error>");
 
                 if config.get("type").is_none() {
-                    self.get_io().write_error3("<error>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</error>", true, io_interface::NORMAL);
+                    self.get_io().write_error("<error>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</error>");
                 }
 
                 return Ok(1);
@@ -1043,7 +1034,7 @@ impl Command for RequireCommand {
                     package,
                     "' cannot require itself in its composer.json</error>"
                 );
-                self.get_io().write_error3(&msg, true, io_interface::NORMAL);
+                self.get_io().write_error(&msg);
 
                 return Ok(1);
             }
@@ -1155,8 +1146,7 @@ impl Command for RequireCommand {
             },
             "</info>"
         );
-        self.get_io()
-            .write_error3(&updated_msg, true, io_interface::NORMAL);
+        self.get_io().write_error(&updated_msg);
 
         if input
             .borrow()

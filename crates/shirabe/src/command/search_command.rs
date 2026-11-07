@@ -103,7 +103,7 @@ impl Command for SearchCommand {
             )
             .unwrap()
             .into(),
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "format",
                 Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),

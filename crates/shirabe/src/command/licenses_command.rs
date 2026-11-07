@@ -75,7 +75,7 @@ impl Command for LicensesCommand {
         self.set_name("licenses".into())?;
         self.set_description("Shows information about licenses of dependencies".into());
         self.set_definition(&[
-            InputOption::new6(
+            InputOption::with_suggested_values(
                 "format",
                 Some("f".into()),
                 Some(InputOption::VALUE_REQUIRED),

@@ -801,13 +801,12 @@ impl GitBitbucketDriver {
         }
 
         if !extension_loaded("openssl") {
-            io.write_error3(
+            io.write_error_with_verbosity(
                 bconcat!(
                     "Skipping Bitbucket git driver for ",
                     url,
                     " because the OpenSSL PHP extension is missing."
                 ),
-                true,
                 io_interface::VERBOSE,
             );
 

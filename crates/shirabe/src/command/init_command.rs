@@ -5,7 +5,7 @@ use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDisco
 use crate::console::input::InputOption;
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
-use crate::io::{IOInterfaceWrite, io_interface};
+use crate::io::IOInterfaceWrite;
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::base_package::{self};
 use crate::repository::{
@@ -449,8 +449,8 @@ impl Command for InitCommand {
         InputOption::new("author", None, Some(InputOption::VALUE_REQUIRED), "Author name of package", None).unwrap().into(),
         InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED), "Type of package (e.g. library, project, metapackage, composer-plugin)", None).unwrap().into(),
         InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
-        InputOption::new6("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
-        InputOption::new6("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
+        InputOption::with_suggested_values("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
+        InputOption::with_suggested_values("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
         InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), bconcat!("Minimum stability (empty or one of: ", implode(", ", &base_package::STABILITIES.keys().copied().collect::<Vec<_>>()), ")"), None).unwrap().into(),
         InputOption::new("license", Some("l".into()), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
@@ -647,18 +647,14 @@ impl Command for InitCommand {
         let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()))?;
 
         if input.borrow().is_interactive() {
-            io.write_error3(bconcat!("\n", json, "\n"), true, io_interface::NORMAL);
+            io.write_error(bconcat!("\n", json, "\n"));
             if !io.ask_confirmation("Do you confirm generation [<comment>yes</comment>]? ", true)? {
-                io.write_error3("<error>Command aborted</error>", true, io_interface::NORMAL);
+                io.write_error("<error>Command aborted</error>");
 
                 return Ok(1);
             }
         } else {
-            io.write_error3(
-                bconcat!("Writing ", file_obj.get_path()),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error(bconcat!("Writing ", file_obj.get_path()));
         }
 
         file_obj.write(PhpMixed::Array(options_for_encode))?;
@@ -666,20 +662,12 @@ impl Command for InitCommand {
         if let Err(e) = validate_result {
             // try to downcast to JsonValidationException
             if let Some(json_err) = e.catch::<JsonValidationException>() {
-                io.write_error3(
-                    "<error>Schema validation error, aborting</error>",
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error("<error>Schema validation error, aborting</error>");
                 let errors = bconcat!(
                     " - ",
                     (implode(bconcat!(PHP_EOL, " - "), json_err.get_errors()))
                 );
-                io.write_error3(
-                    bconcat!(json_err.get_message(), ":", PHP_EOL, errors),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error(bconcat!(json_err.get_message(), ":", PHP_EOL, errors));
                 let _ = unlink(file_obj.get_path());
 
                 return Ok(1);
@@ -731,17 +719,13 @@ impl Command for InitCommand {
                 .namespace_from_package_name(name.as_string().unwrap_or_default())
                 .unwrap_or_default();
 
-            io.write_error3(
-                bconcat!(
-                    "PSR-4 autoloading configured. Use \"<comment>namespace ",
-                    namespace,
-                    ";</comment>\" in ",
-                    autoload_path.clone().unwrap_or_default()
-                ),
-                true,
-                io_interface::NORMAL,
-            );
-            io.write_error3("Include the Composer autoloader with: <comment>require 'vendor/autoload.php';</comment>", true, io_interface::NORMAL);
+            io.write_error(bconcat!(
+                "PSR-4 autoloading configured. Use \"<comment>namespace ",
+                namespace,
+                ";</comment>\" in ",
+                autoload_path.clone().unwrap_or_default()
+            ));
+            io.write_error("Include the Composer autoloader with: <comment>require 'vendor/autoload.php';</comment>");
         }
 
         Ok(0)
@@ -861,27 +845,19 @@ impl Command for InitCommand {
                 // unset($repos, $config, $repositories);
             }
 
-            io.write_error3(
-                bconcat!(
-                    "\n",
-                    formatter.borrow().format_block(
-                        FormatBlockMessages::String(
-                            "Welcome to the Shirabe config generator".into(),
-                        ),
-                        "bg=blue;fg=white".into(),
-                        true,
-                    ),
-                    "\n"
+            io.write_error(bconcat!(
+                "\n",
+                formatter.borrow().format_block(
+                    FormatBlockMessages::String("Welcome to the Shirabe config generator".into()),
+                    "bg=blue;fg=white".into(),
+                    true,
                 ),
-                true,
-                io_interface::NORMAL,
-            );
+                "\n"
+            ));
 
             // namespace
-            io.write_error3(
+            io.write_error(
                 "\nThis command will guide you through creating your composer.json config.\n",
-                true,
-                io_interface::NORMAL,
             );
 
             let name_option = input
@@ -1091,7 +1067,7 @@ impl Command for InitCommand {
             }
             input.borrow_mut().set_option("license", license);
 
-            io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
+            io.write_error("\nDefine your dependencies.\n");
 
             // prepare to resolve dependencies
             let repos = self.get_repos();

@@ -6,7 +6,7 @@ use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::json::{JsonFile, JsonManipulator};
 use crate::package::base_package;
 use crate::package::version::VersionBumper;
@@ -60,11 +60,11 @@ impl BumpCommand {
         let composer_json_path = Factory::get_composer_file()?;
 
         if !Filesystem::is_readable(&composer_json_path) {
-            io.write_error3(
-                bconcat!("<error>", composer_json_path, " is not readable.</error>"),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error(bconcat!(
+                "<error>",
+                composer_json_path,
+                " is not readable.</error>"
+            ));
             return Ok(Self::ERROR_GENERIC);
         }
 
@@ -72,11 +72,11 @@ impl BumpCommand {
         let contents = match file_get_contents(composer_json.get_path()) {
             Ok(c) => c,
             Err(_) => {
-                io.write_error3(
-                    bconcat!("<error>", composer_json_path, " is not readable.</error>"),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error(bconcat!(
+                    "<error>",
+                    composer_json_path,
+                    " is not readable.</error>"
+                ));
                 return Ok(Self::ERROR_GENERIC);
             }
         };
@@ -84,11 +84,11 @@ impl BumpCommand {
         if !is_writable(&composer_json_path)
             && file_put_contents(&composer_json_path, &contents).is_none()
         {
-            io.write_error3(
-                bconcat!("<error>", composer_json_path, " is not writable.</error>"),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error(bconcat!(
+                "<error>",
+                composer_json_path,
+                " is not writable.</error>"
+            ));
             return Ok(Self::ERROR_GENERIC);
         }
 
@@ -104,11 +104,7 @@ impl BumpCommand {
                 .into()
         } else if composer.get_locker().borrow_mut().is_locked() {
             if !composer.get_locker().borrow_mut().is_fresh()? {
-                io.write_error3(
-                    "<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>",
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error("<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>");
                 return Ok(Self::ERROR_LOCK_OUTDATED);
             }
             composer
@@ -124,31 +120,19 @@ impl BumpCommand {
         };
 
         if composer.get_package().get_type() != "project" && !dev_only {
-            io.write_error3(
-                "<warning>Warning: Bumping dependency constraints is not recommended for libraries as it will narrow down your dependencies and may cause problems for your users.</warning>",
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error("<warning>Warning: Bumping dependency constraints is not recommended for libraries as it will narrow down your dependencies and may cause problems for your users.</warning>");
 
             let contents_data = composer_json.read()?;
             if !contents_data
                 .as_array()
                 .is_some_and(|m| m.contains_key(B("type")))
             {
-                io.write_error3(
-                    "<warning>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</warning>",
-                    true,
-                    io_interface::NORMAL,
-                );
-                io.write_error3(
-                    bconcat!(
-                        "<warning>Alternatively you can use ",
-                        dev_only_flag_hint,
-                        " to only bump dependencies within \"require-dev\".</warning>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error("<warning>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</warning>");
+                io.write_error(bconcat!(
+                    "<warning>Alternatively you can use ",
+                    dev_only_flag_hint,
+                    " to only bump dependencies within \"require-dev\".</warning>"
+                ));
             }
         }
 
@@ -338,7 +322,7 @@ impl Command for BumpCommand {
         self.set_name("bump".into())?;
         self.set_description("Increases the lower limit of your composer.json requirements to the currently installed versions".into());
         self.set_definition(&[
-            InputArgument::new5(
+            InputArgument::with_suggested_values(
                 "packages",
                 Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                 "Optional package name(s) to restrict which packages are bumped.",

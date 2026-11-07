@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
@@ -85,7 +85,7 @@ impl GitHub {
         message: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io.write_error3(msg, true, io_interface::NORMAL);
+            self.io.write_error(msg);
         }
 
         let mut note = BString::from("Shirabe");
@@ -129,8 +129,7 @@ impl GitHub {
             BString::from("Carefully consider the following options in order:"),
             BString::default(),
         ];
-        self.io
-            .write_error3(implode("\n", &lines), true, io_interface::NORMAL);
+        self.io.write_error(implode("\n", &lines));
 
         let encoded_note = str_replace("%20", "+", rawurlencode(&note));
         let lines = [
@@ -149,8 +148,7 @@ impl GitHub {
             ),
             BString::default(),
         ];
-        self.io
-            .write_error3(implode("\n", &lines), true, io_interface::NORMAL);
+        self.io.write_error(implode("\n", &lines));
 
         let lines = [
             BString::from(
@@ -170,8 +168,7 @@ impl GitHub {
             ),
             BString::default(),
         ];
-        self.io
-            .write_error3(implode("\n", &lines), true, io_interface::NORMAL);
+        self.io.write_error(implode("\n", &lines));
 
         let mut lines3 = vec![
             BString::from(
@@ -193,14 +190,9 @@ impl GitHub {
             BString::default(),
         ];
         let _ = &mut lines3;
-        self.io
-            .write_error3(implode("\n", &lines3), true, io_interface::NORMAL);
+        self.io.write_error(implode("\n", &lines3));
 
-        self.io.write_error3(
-            "For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#github-oauth",
-            true,
-            io_interface::NORMAL,
-        );
+        self.io.write_error("For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#github-oauth");
 
         let mut store_in_local_auth_config = false;
         if local_name.is_some() {
@@ -217,16 +209,9 @@ impl GitHub {
         );
 
         if token.is_empty() {
-            self.io.write_error3(
-                "<warning>No token given, aborting.</warning>",
-                true,
-                io_interface::NORMAL,
-            );
-            self.io.write_error3(
-                "You can also add it manually later by using \"shirabe config --global --auth github-oauth.github.com <token>\"",
-                true,
-                io_interface::NORMAL,
-            );
+            self.io
+                .write_error("<warning>No token given, aborting.</warning>");
+            self.io.write_error("You can also add it manually later by using \"shirabe config --global --auth github-oauth.github.com <token>\"");
             return Ok(false);
         }
 
@@ -257,16 +242,9 @@ impl GitHub {
                     .map(|t| t.get_code())
                     .unwrap_or(0);
                 if code == 403 || code == 401 {
-                    self.io.write_error3(
-                        "<error>Invalid token provided.</error>",
-                        true,
-                        io_interface::NORMAL,
-                    );
-                    self.io.write_error3(
-                        "You can also add it manually later by using \"shirabe config --global --auth github-oauth.github.com <token>\"",
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    self.io
+                        .write_error("<error>Invalid token provided.</error>");
+                    self.io.write_error("You can also add it manually later by using \"shirabe config --global --auth github-oauth.github.com <token>\"");
                     return Ok(false);
                 }
                 return Err(te);
@@ -296,11 +274,8 @@ impl GitHub {
                 .add_config_setting(bstr::BStr::new(&key), PhpMixed::string(token))?;
         }
 
-        self.io.write_error3(
-            "<info>Token stored successfully.</info>",
-            true,
-            io_interface::NORMAL,
-        );
+        self.io
+            .write_error("<info>Token stored successfully.</info>");
 
         Ok(true)
     }

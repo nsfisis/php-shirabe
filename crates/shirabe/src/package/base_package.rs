@@ -137,10 +137,13 @@ pub trait BasePackage: PackageInterface {
 }
 
 pub fn package_name_to_regexp(allow_pattern: impl AsRef<[u8]>) -> BString {
-    package_name_to_regexp2(allow_pattern, "{^%s$}i")
+    package_name_to_regexp_with_wrap(allow_pattern, "{^%s$}i")
 }
 
-pub fn package_name_to_regexp2(allow_pattern: impl AsRef<[u8]>, wrap: impl AsRef<[u8]>) -> BString {
+pub fn package_name_to_regexp_with_wrap(
+    allow_pattern: impl AsRef<[u8]>,
+    wrap: impl AsRef<[u8]>,
+) -> BString {
     let cleaned = str_replace("\\*", ".*", preg_quote(allow_pattern, None));
     str_replace("%s", cleaned, wrap)
 }
@@ -151,7 +154,7 @@ pub fn package_names_to_regexp(
 ) -> BString {
     let patterns: Vec<BString> = package_names
         .iter()
-        .map(|name| package_name_to_regexp2(name, "%s"))
+        .map(|name| package_name_to_regexp_with_wrap(name, "%s"))
         .collect();
     str_replace("%s", implode("|", &patterns), wrap)
 }

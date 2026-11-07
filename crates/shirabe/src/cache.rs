@@ -126,8 +126,10 @@ impl Cache {
         if self.is_enabled() {
             let full_path = self.full_path(file);
             if file_exists(&full_path) {
-                self.io
-                    .write_error3(bconcat!("Reading ", full_path, " from cache"), true, DEBUG);
+                self.io.write_error_with_verbosity(
+                    bconcat!("Reading ", full_path, " from cache"),
+                    DEBUG,
+                );
 
                 return file_get_contents(&full_path).map(BString::from).ok();
             }
@@ -149,7 +151,7 @@ impl Cache {
             let dest = self.full_path(file);
 
             self.io
-                .write_error3(bconcat!("Writing ", dest, " into cache"), true, DEBUG);
+                .write_error_with_verbosity(bconcat!("Writing ", dest, " into cache"), DEBUG);
 
             let temp_file_name = path_from_bytes(&bconcat!(
                 path_to_bytes(&dest),
@@ -177,13 +179,12 @@ impl Cache {
                         return self.write(file, contents);
                     }
 
-                    self.io.write_error3(
+                    self.io.write_error_with_verbosity(
                         bconcat!(
                             "<warning>Failed to write into cache: ",
                             display_to_bytes(&e),
                             "</warning>"
                         ),
-                        true,
                         DEBUG,
                     );
                     let last_error = display_to_bytes(&e);
@@ -276,8 +277,10 @@ impl Cache {
                     touch(&full_path);
                 }
 
-                self.io
-                    .write_error3(bconcat!("Reading ", full_path, " from cache"), true, DEBUG);
+                self.io.write_error_with_verbosity(
+                    bconcat!("Reading ", full_path, " from cache"),
+                    DEBUG,
+                );
 
                 return self
                     .filesystem

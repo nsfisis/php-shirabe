@@ -45,7 +45,7 @@ impl Command for OutdatedCommand {
         self.set_name("outdated".into())?;
         self.set_description("Shows a list of installed packages that have updates available, including their latest version".into());
         self.set_definition(&[
-            InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None, self.suggest_installed_package(false, false)).unwrap().into(),
+            InputArgument::with_suggested_values("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         InputOption::new("outdated", Some("o".into()), Some(InputOption::VALUE_NONE), "Show only packages that are outdated (this is the default, but present here for compat with `show`", None).unwrap().into(),
         InputOption::new("all", Some("a".into()), Some(InputOption::VALUE_NONE), "Show all installed packages with their latest versions", None).unwrap().into(),
         InputOption::new("locked", None, Some(InputOption::VALUE_NONE), "Shows updates for packages from the lock file, regardless of what is currently in vendor dir", None).unwrap().into(),
@@ -55,8 +55,8 @@ impl Command for OutdatedCommand {
         InputOption::new("minor-only", Some("m".into()), Some(InputOption::VALUE_NONE), "Show only packages that have minor SemVer-compatible updates.", None).unwrap().into(),
         InputOption::new("patch-only", Some("p".into()), Some(InputOption::VALUE_NONE), "Show only packages that have patch SemVer-compatible updates.", None).unwrap().into(),
         InputOption::new("sort-by-age", Some("A".into()), Some(InputOption::VALUE_NONE), "Displays the installed version's age, and sorts packages oldest first.", None).unwrap().into(),
-        InputOption::new6("format", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(InputValue::from("text")), SuggestedValues::List(vec![BString::from("json"), BString::from("text")])).unwrap().into(),
-        InputOption::new6("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None, self.suggest_installed_package(false, false)).unwrap().into(),
+        InputOption::with_suggested_values("format", Some("f".into()), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(InputValue::from("text")), SuggestedValues::List(vec![BString::from("json"), BString::from("text")])).unwrap().into(),
+        InputOption::with_suggested_values("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables search in require-dev packages.", None).unwrap().into(),
         InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option", None).unwrap().into(),
         InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages). Use with the --outdated option", None).unwrap().into(),

@@ -737,7 +737,7 @@ impl Table {
                         .collect::<Vec<_>>(),
                 );
                 cell = if cell.is_table_cell() {
-                    Cell::Cell(TableCell::new2(
+                    Cell::Cell(TableCell::new_with_valid_options(
                         &escaped,
                         Self::table_cell_options_colspan(cell.colspan()),
                     ))
@@ -756,7 +756,7 @@ impl Table {
                     let line_key = line_key as i64;
                     let mut line = Cell::Value(line);
                     if colspan > 1 {
-                        line = Cell::Cell(TableCell::new2(
+                        line = Cell::Cell(TableCell::new_with_valid_options(
                             line.to_php_string(),
                             Self::table_cell_options_colspan(colspan),
                         ));
@@ -852,7 +852,7 @@ impl Table {
                     set_cell(
                         &mut r,
                         column,
-                        Cell::Cell(TableCell::new2(
+                        Cell::Cell(TableCell::new_with_valid_options(
                             lines[0].to_php_string(),
                             Self::table_cell_options_colspan_style(cell.colspan(), cell.style()),
                         )),
@@ -873,7 +873,7 @@ impl Table {
                         .unwrap_or(Cell::Value(BString::default()));
                     unmerged_rows.get_mut(&unmerged_row_key).unwrap().insert(
                         column,
-                        Cell::Cell(TableCell::new2(
+                        Cell::Cell(TableCell::new_with_valid_options(
                             value.to_php_string(),
                             Self::table_cell_options_colspan_style(cell.colspan(), cell.style()),
                         )),
@@ -942,7 +942,7 @@ impl Table {
             let cell_value = cell.clone();
             *cell = Cell::Value(BString::default());
             if cell_value.is_table_cell() {
-                *cell = Cell::Cell(TableCell::new2(
+                *cell = Cell::Cell(TableCell::new_with_valid_options(
                     "",
                     Self::table_cell_options_colspan(cell_value.colspan()),
                 ));

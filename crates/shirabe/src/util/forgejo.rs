@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, trim};
@@ -35,16 +35,13 @@ impl Forgejo {
         message: Option<&BStr>,
     ) -> anyhow::Result<Result<bool, TransportException>> {
         if let Some(message) = message {
-            self.io.write_error3(message, true, io_interface::NORMAL);
+            self.io.write_error(message);
         }
 
         let url = bconcat!("https://", origin_url, "/user/settings/applications");
-        self.io.write_error3(
-            "Setup a personal access token with repository:read permissions on:",
-            true,
-            io_interface::NORMAL,
-        );
-        self.io.write_error3(&url, true, io_interface::NORMAL);
+        self.io
+            .write_error("Setup a personal access token with repository:read permissions on:");
+        self.io.write_error(&url);
         let (local_auth_name, has_local_auth, auth_name): (BString, bool, BString) = {
             let cfg = self.config.borrow();
             let local = cfg.get_local_auth_config_source().map(|s| s.get_name());
@@ -56,21 +53,13 @@ impl Forgejo {
         } else {
             BString::default()
         };
-        self.io.write_error3(
-            bconcat!(
-                "Tokens will be stored in plain text in \"",
-                local_prefix,
-                auth_name,
-                "\" for future use by Composer."
-            ),
-            true,
-            io_interface::NORMAL,
-        );
-        self.io.write_error3(
-            "For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#forgejo-token",
-            true,
-            io_interface::NORMAL,
-        );
+        self.io.write_error(bconcat!(
+            "Tokens will be stored in plain text in \"",
+            local_prefix,
+            auth_name,
+            "\" for future use by Composer."
+        ));
+        self.io.write_error("For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#forgejo-token");
 
         let mut store_in_local_auth_config = false;
         if has_local_auth {
@@ -98,13 +87,9 @@ impl Forgejo {
             " <username> <token>\""
         );
         if token.is_empty() || username.is_empty() {
-            self.io.write_error3(
-                "<warning>No username/token given, aborting.</warning>",
-                true,
-                io_interface::NORMAL,
-            );
             self.io
-                .write_error3(&add_token_manually, true, io_interface::NORMAL);
+                .write_error("<warning>No username/token given, aborting.</warning>");
+            self.io.write_error(&add_token_manually);
 
             return Ok(Ok(false));
         }
@@ -130,13 +115,9 @@ impl Forgejo {
                     .map(|te| te.get_code())
                     .unwrap_or(0);
                 if [403, 401, 404].contains(&code) {
-                    self.io.write_error3(
-                        "<error>Invalid access token provided.</error>",
-                        true,
-                        io_interface::NORMAL,
-                    );
                     self.io
-                        .write_error3(&add_token_manually, true, io_interface::NORMAL);
+                        .write_error("<error>Invalid access token provided.</error>");
+                    self.io.write_error(&add_token_manually);
 
                     return Ok(Ok(false));
                 }
@@ -167,11 +148,8 @@ impl Forgejo {
                 .add_config_setting(bstr::BStr::new(&setting_key), value)?;
         }
 
-        self.io.write_error3(
-            "<info>Token stored successfully.</info>",
-            true,
-            io_interface::NORMAL,
-        );
+        self.io
+            .write_error("<info>Token stored successfully.</info>");
 
         Ok(Ok(true))
     }

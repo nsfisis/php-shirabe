@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Installer/BinaryInstaller.php sha1:098d10272c26a2dcf2ef4bf287922b35ca147bdc
 
-use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
@@ -85,31 +85,23 @@ impl BinaryInstaller {
         for bin in &binaries {
             let mut bin_path = PathBuf::from(path_from_bytes(&bconcat!(install_path, "/", bin)));
             if !file_exists(&bin_path) {
-                self.io.write_error3(
-                    bconcat!(
-                        "    <warning>Skipped installation of bin ",
-                        bin,
-                        " for package ",
-                        package.get_name(),
-                        ": file not found in package</warning>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.io.write_error(bconcat!(
+                    "    <warning>Skipped installation of bin ",
+                    bin,
+                    " for package ",
+                    package.get_name(),
+                    ": file not found in package</warning>"
+                ));
                 continue;
             }
             if is_dir(&bin_path) {
-                self.io.write_error3(
-                    bconcat!(
-                        "    <warning>Skipped installation of bin ",
-                        bin,
-                        " for package ",
-                        package.get_name(),
-                        ": found a directory at that path</warning>"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.io.write_error(bconcat!(
+                    "    <warning>Skipped installation of bin ",
+                    bin,
+                    " for package ",
+                    package.get_name(),
+                    ": found a directory at that path</warning>"
+                ));
                 continue;
             }
             if !self.filesystem.borrow_mut().is_absolute_path(&bin_path) {
@@ -124,17 +116,13 @@ impl BinaryInstaller {
             if file_exists(&link) {
                 if !is_link(&link) {
                     if warn_on_overwrite {
-                        self.io.write_error3(
-                            bconcat!(
-                                "    Skipped installation of bin ",
-                                bin,
-                                " for package ",
-                                package.get_name(),
-                                ": name conflicts with an existing file"
-                            ),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.io.write_error(bconcat!(
+                            "    Skipped installation of bin ",
+                            bin,
+                            " for package ",
+                            package.get_name(),
+                            ": name conflicts with an existing file"
+                        ));
                     }
                     continue;
                 }
@@ -228,17 +216,13 @@ impl BinaryInstaller {
             self.install_unixy_proxy_binaries(bin_path, &link)?;
             link = PathBuf::from(path_from_bytes(&bconcat!(link, ".bat")));
             if file_exists(&link) {
-                self.io.write_error3(
-                    bconcat!(
-                        "    Skipped installation of bin ",
-                        bin,
-                        ".bat proxy for package ",
-                        package.get_name(),
-                        ": a .bat proxy was already installed"
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.io.write_error(bconcat!(
+                    "    Skipped installation of bin ",
+                    bin,
+                    ".bat proxy for package ",
+                    package.get_name(),
+                    ": a .bat proxy was already installed"
+                ));
             }
         }
         if !file_exists(&link) {

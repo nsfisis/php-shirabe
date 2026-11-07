@@ -104,7 +104,7 @@ impl Command for FundCommand {
         self.set_description(
             "Discover how to help fund the maintenance of your dependencies".into(),
         );
-        self.set_definition(&[InputOption::new6(
+        self.set_definition(&[InputOption::with_suggested_values(
             "format",
             Some("f".into()),
             Some(InputOption::VALUE_REQUIRED),
